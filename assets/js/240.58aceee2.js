@@ -741,8 +741,8 @@ function horizontalTarget(d) {
 var dayjs_min = __webpack_require__(27484);
 // EXTERNAL MODULE: ./node_modules/@braintree/sanitize-url/dist/index.js
 var dist = __webpack_require__(17967);
-// EXTERNAL MODULE: ./node_modules/dompurify/dist/purify.es.js
-var purify_es = __webpack_require__(20683);
+// EXTERNAL MODULE: ./node_modules/dompurify/dist/purify.es.mjs
+var purify_es = __webpack_require__(22424);
 ;// CONCATENATED MODULE: ./node_modules/mermaid/dist/sankeyDiagram-6db3d513.js
 
 

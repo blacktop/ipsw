@@ -1,9 +1,9 @@
 "use strict";
-exports.id = 183;
-exports.ids = [183];
+exports.id = 700;
+exports.ids = [700];
 exports.modules = {
 
-/***/ 52183:
+/***/ 12700:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -11,11 +11,12 @@ exports.modules = {
 /* harmony export */ });
 /* harmony import */ var _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(36690);
 /* harmony import */ var d3__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(64218);
-/* harmony import */ var _svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(43317);
+/* harmony import */ var khroma__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(91619);
+/* harmony import */ var khroma__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(12281);
+/* harmony import */ var khroma__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(7201);
 /* harmony import */ var dayjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(27484);
 /* harmony import */ var _braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(17967);
-/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(20683);
-
+/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(22424);
 
 
 
@@ -32,14 +33,14 @@ var parser = function() {
     for (o2 = o2 || {}, l = k.length; l--; o2[k[l]] = v)
       ;
     return o2;
-  }, $V0 = [6, 8, 10, 11, 12, 14, 16, 17, 18], $V1 = [1, 9], $V2 = [1, 10], $V3 = [1, 11], $V4 = [1, 12], $V5 = [1, 13], $V6 = [1, 14];
+  }, $V0 = [6, 8, 10, 11, 12, 14, 16, 17, 20, 21], $V1 = [1, 9], $V2 = [1, 10], $V3 = [1, 11], $V4 = [1, 12], $V5 = [1, 13], $V6 = [1, 16], $V7 = [1, 17];
   var parser2 = {
     trace: function trace() {
     },
     yy: {},
-    symbols_: { "error": 2, "start": 3, "journey": 4, "document": 5, "EOF": 6, "line": 7, "SPACE": 8, "statement": 9, "NEWLINE": 10, "title": 11, "acc_title": 12, "acc_title_value": 13, "acc_descr": 14, "acc_descr_value": 15, "acc_descr_multiline_value": 16, "section": 17, "taskName": 18, "taskData": 19, "$accept": 0, "$end": 1 },
-    terminals_: { 2: "error", 4: "journey", 6: "EOF", 8: "SPACE", 10: "NEWLINE", 11: "title", 12: "acc_title", 13: "acc_title_value", 14: "acc_descr", 15: "acc_descr_value", 16: "acc_descr_multiline_value", 17: "section", 18: "taskName", 19: "taskData" },
-    productions_: [0, [3, 3], [5, 0], [5, 2], [7, 2], [7, 1], [7, 1], [7, 1], [9, 1], [9, 2], [9, 2], [9, 1], [9, 1], [9, 2]],
+    symbols_: { "error": 2, "start": 3, "timeline": 4, "document": 5, "EOF": 6, "line": 7, "SPACE": 8, "statement": 9, "NEWLINE": 10, "title": 11, "acc_title": 12, "acc_title_value": 13, "acc_descr": 14, "acc_descr_value": 15, "acc_descr_multiline_value": 16, "section": 17, "period_statement": 18, "event_statement": 19, "period": 20, "event": 21, "$accept": 0, "$end": 1 },
+    terminals_: { 2: "error", 4: "timeline", 6: "EOF", 8: "SPACE", 10: "NEWLINE", 11: "title", 12: "acc_title", 13: "acc_title_value", 14: "acc_descr", 15: "acc_descr_value", 16: "acc_descr_multiline_value", 17: "section", 20: "period", 21: "event" },
+    productions_: [0, [3, 3], [5, 0], [5, 2], [7, 2], [7, 1], [7, 1], [7, 1], [9, 1], [9, 2], [9, 2], [9, 1], [9, 1], [9, 1], [9, 1], [18, 1], [19, 1]],
     performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$) {
       var $0 = $$.length - 1;
       switch (yystate) {
@@ -61,29 +62,33 @@ var parser = function() {
           this.$ = [];
           break;
         case 8:
-          yy.setDiagramTitle($$[$0].substr(6));
+          yy.getCommonDb().setDiagramTitle($$[$0].substr(6));
           this.$ = $$[$0].substr(6);
           break;
         case 9:
           this.$ = $$[$0].trim();
-          yy.setAccTitle(this.$);
+          yy.getCommonDb().setAccTitle(this.$);
           break;
         case 10:
         case 11:
           this.$ = $$[$0].trim();
-          yy.setAccDescription(this.$);
+          yy.getCommonDb().setAccDescription(this.$);
           break;
         case 12:
           yy.addSection($$[$0].substr(8));
           this.$ = $$[$0].substr(8);
           break;
-        case 13:
-          yy.addTask($$[$0 - 1], $$[$0]);
-          this.$ = "task";
+        case 15:
+          yy.addTask($$[$0], 0, "");
+          this.$ = $$[$0];
+          break;
+        case 16:
+          yy.addEvent($$[$0].substr(2));
+          this.$ = $$[$0];
           break;
       }
     },
-    table: [{ 3: 1, 4: [1, 2] }, { 1: [3] }, o($V0, [2, 2], { 5: 3 }), { 6: [1, 4], 7: 5, 8: [1, 6], 9: 7, 10: [1, 8], 11: $V1, 12: $V2, 14: $V3, 16: $V4, 17: $V5, 18: $V6 }, o($V0, [2, 7], { 1: [2, 1] }), o($V0, [2, 3]), { 9: 15, 11: $V1, 12: $V2, 14: $V3, 16: $V4, 17: $V5, 18: $V6 }, o($V0, [2, 5]), o($V0, [2, 6]), o($V0, [2, 8]), { 13: [1, 16] }, { 15: [1, 17] }, o($V0, [2, 11]), o($V0, [2, 12]), { 19: [1, 18] }, o($V0, [2, 4]), o($V0, [2, 9]), o($V0, [2, 10]), o($V0, [2, 13])],
+    table: [{ 3: 1, 4: [1, 2] }, { 1: [3] }, o($V0, [2, 2], { 5: 3 }), { 6: [1, 4], 7: 5, 8: [1, 6], 9: 7, 10: [1, 8], 11: $V1, 12: $V2, 14: $V3, 16: $V4, 17: $V5, 18: 14, 19: 15, 20: $V6, 21: $V7 }, o($V0, [2, 7], { 1: [2, 1] }), o($V0, [2, 3]), { 9: 18, 11: $V1, 12: $V2, 14: $V3, 16: $V4, 17: $V5, 18: 14, 19: 15, 20: $V6, 21: $V7 }, o($V0, [2, 5]), o($V0, [2, 6]), o($V0, [2, 8]), { 13: [1, 19] }, { 15: [1, 20] }, o($V0, [2, 11]), o($V0, [2, 12]), o($V0, [2, 13]), o($V0, [2, 14]), o($V0, [2, 15]), o($V0, [2, 16]), o($V0, [2, 4]), o($V0, [2, 9]), o($V0, [2, 10])],
     defaultActions: {},
     parseError: function parseError(str, hash) {
       if (hash.recoverable) {
@@ -543,19 +548,17 @@ var parser = function() {
           case 14:
             return 17;
           case 15:
-            return 18;
+            return 21;
           case 16:
-            return 19;
+            return 20;
           case 17:
-            return ":";
-          case 18:
             return 6;
-          case 19:
+          case 18:
             return "INVALID";
         }
       },
-      rules: [/^(?:%(?!\{)[^\n]*)/i, /^(?:[^\}]%%[^\n]*)/i, /^(?:[\n]+)/i, /^(?:\s+)/i, /^(?:#[^\n]*)/i, /^(?:journey\b)/i, /^(?:title\s[^#\n;]+)/i, /^(?:accTitle\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*\{\s*)/i, /^(?:[\}])/i, /^(?:[^\}]*)/i, /^(?:section\s[^#:\n;]+)/i, /^(?:[^#:\n;]+)/i, /^(?::[^#\n;]+)/i, /^(?::)/i, /^(?:$)/i, /^(?:.)/i],
-      conditions: { "acc_descr_multiline": { "rules": [12, 13], "inclusive": false }, "acc_descr": { "rules": [10], "inclusive": false }, "acc_title": { "rules": [8], "inclusive": false }, "INITIAL": { "rules": [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 14, 15, 16, 17, 18, 19], "inclusive": true } }
+      rules: [/^(?:%(?!\{)[^\n]*)/i, /^(?:[^\}]%%[^\n]*)/i, /^(?:[\n]+)/i, /^(?:\s+)/i, /^(?:#[^\n]*)/i, /^(?:timeline\b)/i, /^(?:title\s[^#\n;]+)/i, /^(?:accTitle\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*\{\s*)/i, /^(?:[\}])/i, /^(?:[^\}]*)/i, /^(?:section\s[^#:\n;]+)/i, /^(?::\s[^#:\n;]+)/i, /^(?:[^#:\n;]+)/i, /^(?:$)/i, /^(?:.)/i],
+      conditions: { "acc_descr_multiline": { "rules": [12, 13], "inclusive": false }, "acc_descr": { "rules": [10], "inclusive": false }, "acc_title": { "rules": [8], "inclusive": false }, "INITIAL": { "rules": [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 14, 15, 16, 17, 18], "inclusive": true } }
     };
     return lexer2;
   }();
@@ -570,9 +573,11 @@ var parser = function() {
 parser.parser = parser;
 const parser$1 = parser;
 let currentSection = "";
+let currentTaskId = 0;
 const sections = [];
 const tasks = [];
 const rawTasks = [];
+const getCommonDb = () => _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.K;
 const clear = function() {
   sections.length = 0;
   tasks.length = 0;
@@ -598,36 +603,21 @@ const getTasks = function() {
   tasks.push(...rawTasks);
   return tasks;
 };
-const updateActors = function() {
-  const tempActors = [];
-  tasks.forEach((task) => {
-    if (task.people) {
-      tempActors.push(...task.people);
-    }
-  });
-  const unique = new Set(tempActors);
-  return [...unique].sort();
-};
-const addTask = function(descr, taskData) {
-  const pieces = taskData.substr(1).split(":");
-  let score = 0;
-  let peeps = [];
-  if (pieces.length === 1) {
-    score = Number(pieces[0]);
-    peeps = [];
-  } else {
-    score = Number(pieces[0]);
-    peeps = pieces[1].split(",");
-  }
-  const peopleList = peeps.map((s) => s.trim());
+const addTask = function(period, length, event) {
   const rawTask = {
+    id: currentTaskId++,
     section: currentSection,
     type: currentSection,
-    people: peopleList,
-    task: descr,
-    score
+    task: period,
+    score: length ? length : 0,
+    //if event is defined, then add it the events array
+    events: event ? [event] : []
   };
   rawTasks.push(rawTask);
+};
+const addEvent = function(event) {
+  const currentTask = rawTasks.find((task) => task.id === currentTaskId - 1);
+  currentTask.events.push(event);
 };
 const addTaskOrg = function(descr) {
   const newTask = {
@@ -650,162 +640,43 @@ const compileTasks = function() {
   }
   return allProcessed;
 };
-const getActors = function() {
-  return updateActors();
-};
-const db = {
-  getConfig: () => (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey,
+const timelineDb = {
   clear,
-  setDiagramTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.q,
-  getDiagramTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.r,
-  setAccTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.s,
-  getAccTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.g,
-  setAccDescription: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.b,
-  getAccDescription: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.a,
+  getCommonDb,
   addSection,
   getSections,
   getTasks,
   addTask,
   addTaskOrg,
-  getActors
+  addEvent
 };
-const getStyles = (options) => `.label {
-    font-family: 'trebuchet ms', verdana, arial, sans-serif;
-    font-family: var(--mermaid-font-family);
-    color: ${options.textColor};
-  }
-  .mouth {
-    stroke: #666;
-  }
-
-  line {
-    stroke: ${options.textColor}
-  }
-
-  .legend {
-    fill: ${options.textColor};
-  }
-
-  .label text {
-    fill: #333;
-  }
-  .label {
-    color: ${options.textColor}
-  }
-
-  .face {
-    ${options.faceColor ? `fill: ${options.faceColor}` : "fill: #FFF8DC"};
-    stroke: #999;
-  }
-
-  .node rect,
-  .node circle,
-  .node ellipse,
-  .node polygon,
-  .node path {
-    fill: ${options.mainBkg};
-    stroke: ${options.nodeBorder};
-    stroke-width: 1px;
-  }
-
-  .node .label {
-    text-align: center;
-  }
-  .node.clickable {
-    cursor: pointer;
-  }
-
-  .arrowheadPath {
-    fill: ${options.arrowheadColor};
-  }
-
-  .edgePath .path {
-    stroke: ${options.lineColor};
-    stroke-width: 1.5px;
-  }
-
-  .flowchart-link {
-    stroke: ${options.lineColor};
-    fill: none;
-  }
-
-  .edgeLabel {
-    background-color: ${options.edgeLabelBackground};
-    rect {
-      opacity: 0.5;
-    }
-    text-align: center;
-  }
-
-  .cluster rect {
-  }
-
-  .cluster text {
-    fill: ${options.titleColor};
-  }
-
-  div.mermaidTooltip {
-    position: absolute;
-    text-align: center;
-    max-width: 200px;
-    padding: 2px;
-    font-family: 'trebuchet ms', verdana, arial, sans-serif;
-    font-family: var(--mermaid-font-family);
-    font-size: 12px;
-    background: ${options.tertiaryColor};
-    border: 1px solid ${options.border2};
-    border-radius: 2px;
-    pointer-events: none;
-    z-index: 100;
-  }
-
-  .task-type-0, .section-type-0  {
-    ${options.fillType0 ? `fill: ${options.fillType0}` : ""};
-  }
-  .task-type-1, .section-type-1  {
-    ${options.fillType0 ? `fill: ${options.fillType1}` : ""};
-  }
-  .task-type-2, .section-type-2  {
-    ${options.fillType0 ? `fill: ${options.fillType2}` : ""};
-  }
-  .task-type-3, .section-type-3  {
-    ${options.fillType0 ? `fill: ${options.fillType3}` : ""};
-  }
-  .task-type-4, .section-type-4  {
-    ${options.fillType0 ? `fill: ${options.fillType4}` : ""};
-  }
-  .task-type-5, .section-type-5  {
-    ${options.fillType0 ? `fill: ${options.fillType5}` : ""};
-  }
-  .task-type-6, .section-type-6  {
-    ${options.fillType0 ? `fill: ${options.fillType6}` : ""};
-  }
-  .task-type-7, .section-type-7  {
-    ${options.fillType0 ? `fill: ${options.fillType7}` : ""};
-  }
-
-  .actor-0 {
-    ${options.actor0 ? `fill: ${options.actor0}` : ""};
-  }
-  .actor-1 {
-    ${options.actor1 ? `fill: ${options.actor1}` : ""};
-  }
-  .actor-2 {
-    ${options.actor2 ? `fill: ${options.actor2}` : ""};
-  }
-  .actor-3 {
-    ${options.actor3 ? `fill: ${options.actor3}` : ""};
-  }
-  .actor-4 {
-    ${options.actor4 ? `fill: ${options.actor4}` : ""};
-  }
-  .actor-5 {
-    ${options.actor5 ? `fill: ${options.actor5}` : ""};
-  }
-`;
-const styles = getStyles;
+const db = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  addEvent,
+  addSection,
+  addTask,
+  addTaskOrg,
+  clear,
+  default: timelineDb,
+  getCommonDb,
+  getSections,
+  getTasks
+}, Symbol.toStringTag, { value: "Module" }));
+const MAX_SECTIONS = 12;
 const drawRect = function(elem, rectData) {
-  return (0,_svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__.d)(elem, rectData);
+  const rectElem = elem.append("rect");
+  rectElem.attr("x", rectData.x);
+  rectElem.attr("y", rectData.y);
+  rectElem.attr("fill", rectData.fill);
+  rectElem.attr("stroke", rectData.stroke);
+  rectElem.attr("width", rectData.width);
+  rectElem.attr("height", rectData.height);
+  rectElem.attr("rx", rectData.rx);
+  rectElem.attr("ry", rectData.ry);
+  if (rectData.class !== void 0) {
+    rectElem.attr("class", rectData.class);
+  }
+  return rectElem;
 };
 const drawFace = function(element, faceData) {
   const radius = 15;
@@ -850,7 +721,19 @@ const drawCircle = function(element, circleData) {
   return circleElement;
 };
 const drawText = function(elem, textData) {
-  return (0,_svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__.f)(elem, textData);
+  const nText = textData.text.replace(/<br\s*\/?>/gi, " ");
+  const textElem = elem.append("text");
+  textElem.attr("x", textData.x);
+  textElem.attr("y", textData.y);
+  textElem.attr("class", "legend");
+  textElem.style("text-anchor", textData.anchor);
+  if (textData.class !== void 0) {
+    textElem.attr("class", textData.class);
+  }
+  const span = textElem.append("tspan");
+  span.attr("x", textData.x + textData.textMargin * 2);
+  span.text(nText);
+  return textElem;
 };
 const drawLabel = function(elem, txtObject) {
   function genPoints(x, y, width, height, cut) {
@@ -863,20 +746,19 @@ const drawLabel = function(elem, txtObject) {
   txtObject.x = txtObject.x + 0.5 * txtObject.labelMargin;
   drawText(elem, txtObject);
 };
-const drawSection = function(elem, section, conf2) {
+const drawSection = function(elem, section, conf) {
   const g = elem.append("g");
-  const rect = (0,_svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__.g)();
+  const rect = getNoteRect();
   rect.x = section.x;
   rect.y = section.y;
   rect.fill = section.fill;
-  rect.width = conf2.width * section.taskCount + // width of the tasks
-  conf2.diagramMarginX * (section.taskCount - 1);
-  rect.height = conf2.height;
+  rect.width = conf.width;
+  rect.height = conf.height;
   rect.class = "journey-section section-type-" + section.num;
   rect.rx = 3;
   rect.ry = 3;
   drawRect(g, rect);
-  _drawTextCandidateFunc(conf2)(
+  _drawTextCandidateFunc(conf)(
     section.text,
     g,
     rect.x,
@@ -884,13 +766,13 @@ const drawSection = function(elem, section, conf2) {
     rect.width,
     rect.height,
     { class: "journey-section section-type-" + section.num },
-    conf2,
+    conf,
     section.colour
   );
 };
 let taskCount = -1;
-const drawTask = function(elem, task, conf2) {
-  const center = task.x + conf2.width / 2;
+const drawTask = function(elem, task, conf) {
+  const center = task.x + conf.width / 2;
   const g = elem.append("g");
   taskCount++;
   const maxHeight = 300 + 5 * 30;
@@ -900,32 +782,18 @@ const drawTask = function(elem, task, conf2) {
     cy: 300 + (5 - task.score) * 30,
     score: task.score
   });
-  const rect = (0,_svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__.g)();
+  const rect = getNoteRect();
   rect.x = task.x;
   rect.y = task.y;
   rect.fill = task.fill;
-  rect.width = conf2.width;
-  rect.height = conf2.height;
+  rect.width = conf.width;
+  rect.height = conf.height;
   rect.class = "task task-type-" + task.num;
   rect.rx = 3;
   rect.ry = 3;
   drawRect(g, rect);
-  let xPos = task.x + 14;
-  task.people.forEach((person) => {
-    const colour = task.actors[person].color;
-    const circle = {
-      cx: xPos,
-      cy: task.y,
-      r: 7,
-      fill: colour,
-      stroke: "#000",
-      title: person,
-      pos: task.actors[person].position
-    };
-    drawCircle(g, circle);
-    xPos += 10;
-  });
-  _drawTextCandidateFunc(conf2)(
+  task.x + 14;
+  _drawTextCandidateFunc(conf)(
     task.task,
     g,
     rect.x,
@@ -933,20 +801,52 @@ const drawTask = function(elem, task, conf2) {
     rect.width,
     rect.height,
     { class: "task" },
-    conf2,
+    conf,
     task.colour
   );
 };
-const drawBackgroundRect = function(elem, bounds2) {
-  (0,_svgDrawCommon_ad5ef572_js__WEBPACK_IMPORTED_MODULE_5__.a)(elem, bounds2);
+const drawBackgroundRect = function(elem, bounds) {
+  const rectElem = drawRect(elem, {
+    x: bounds.startx,
+    y: bounds.starty,
+    width: bounds.stopx - bounds.startx,
+    height: bounds.stopy - bounds.starty,
+    fill: bounds.fill,
+    class: "rect"
+  });
+  rectElem.lower();
+};
+const getTextObj = function() {
+  return {
+    x: 0,
+    y: 0,
+    fill: void 0,
+    "text-anchor": "start",
+    width: 100,
+    height: 100,
+    textMargin: 0,
+    rx: 0,
+    ry: 0
+  };
+};
+const getNoteRect = function() {
+  return {
+    x: 0,
+    y: 0,
+    width: 100,
+    anchor: "start",
+    height: 100,
+    rx: 0,
+    ry: 0
+  };
 };
 const _drawTextCandidateFunc = function() {
   function byText(content, g, x, y, width, height, textAttrs, colour) {
     const text = g.append("text").attr("x", x + width / 2).attr("y", y + height / 2 + 5).style("font-color", colour).style("text-anchor", "middle").text(content);
     _setTextAttrs(text, textAttrs);
   }
-  function byTspan(content, g, x, y, width, height, textAttrs, conf2, colour) {
-    const { taskFontSize, taskFontFamily } = conf2;
+  function byTspan(content, g, x, y, width, height, textAttrs, conf, colour) {
+    const { taskFontSize, taskFontFamily } = conf;
     const lines = content.split(/<br\s*\/?>/gi);
     for (let i = 0; i < lines.length; i++) {
       const dy = i * taskFontSize - taskFontSize * (lines.length - 1) / 2;
@@ -956,12 +856,12 @@ const _drawTextCandidateFunc = function() {
       _setTextAttrs(text, textAttrs);
     }
   }
-  function byFo(content, g, x, y, width, height, textAttrs, conf2) {
+  function byFo(content, g, x, y, width, height, textAttrs, conf) {
     const body = g.append("switch");
     const f = body.append("foreignObject").attr("x", x).attr("y", y).attr("width", width).attr("height", height).attr("position", "fixed");
     const text = f.append("xhtml:div").style("display", "table").style("height", "100%").style("width", "100%");
     text.append("div").attr("class", "label").style("display", "table-cell").style("text-align", "center").style("vertical-align", "middle").text(content);
-    byTspan(content, body, x, y, width, height, textAttrs, conf2);
+    byTspan(content, body, x, y, width, height, textAttrs, conf);
     _setTextAttrs(text, textAttrs);
   }
   function _setTextAttrs(toText, fromTextAttrsDict) {
@@ -971,12 +871,68 @@ const _drawTextCandidateFunc = function() {
       }
     }
   }
-  return function(conf2) {
-    return conf2.textPlacement === "fo" ? byFo : conf2.textPlacement === "old" ? byText : byTspan;
+  return function(conf) {
+    return conf.textPlacement === "fo" ? byFo : conf.textPlacement === "old" ? byText : byTspan;
   };
 }();
 const initGraphics = function(graphics) {
   graphics.append("defs").append("marker").attr("id", "arrowhead").attr("refX", 5).attr("refY", 2).attr("markerWidth", 6).attr("markerHeight", 4).attr("orient", "auto").append("path").attr("d", "M 0,0 V 4 L6,2 Z");
+};
+function wrap(text, width) {
+  text.each(function() {
+    var text2 = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(this), words = text2.text().split(/(\s+|<br>)/).reverse(), word, line = [], lineHeight = 1.1, y = text2.attr("y"), dy = parseFloat(text2.attr("dy")), tspan = text2.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+    for (let j = 0; j < words.length; j++) {
+      word = words[words.length - 1 - j];
+      line.push(word);
+      tspan.text(line.join(" ").trim());
+      if (tspan.node().getComputedTextLength() > width || word === "<br>") {
+        line.pop();
+        tspan.text(line.join(" ").trim());
+        if (word === "<br>") {
+          line = [""];
+        } else {
+          line = [word];
+        }
+        tspan = text2.append("tspan").attr("x", 0).attr("y", y).attr("dy", lineHeight + "em").text(word);
+      }
+    }
+  });
+}
+const drawNode = function(elem, node, fullSection, conf) {
+  const section = fullSection % MAX_SECTIONS - 1;
+  const nodeElem = elem.append("g");
+  node.section = section;
+  nodeElem.attr(
+    "class",
+    (node.class ? node.class + " " : "") + "timeline-node " + ("section-" + section)
+  );
+  const bkgElem = nodeElem.append("g");
+  const textElem = nodeElem.append("g");
+  const txt = textElem.append("text").text(node.descr).attr("dy", "1em").attr("alignment-baseline", "middle").attr("dominant-baseline", "middle").attr("text-anchor", "middle").call(wrap, node.width);
+  const bbox = txt.node().getBBox();
+  const fontSize = conf.fontSize && conf.fontSize.replace ? conf.fontSize.replace("px", "") : conf.fontSize;
+  node.height = bbox.height + fontSize * 1.1 * 0.5 + node.padding;
+  node.height = Math.max(node.height, node.maxHeight);
+  node.width = node.width + 2 * node.padding;
+  textElem.attr("transform", "translate(" + node.width / 2 + ", " + node.padding / 2 + ")");
+  defaultBkg(bkgElem, node, section);
+  return node;
+};
+const getVirtualNodeHeight = function(elem, node, conf) {
+  const textElem = elem.append("g");
+  const txt = textElem.append("text").text(node.descr).attr("dy", "1em").attr("alignment-baseline", "middle").attr("dominant-baseline", "middle").attr("text-anchor", "middle").call(wrap, node.width);
+  const bbox = txt.node().getBBox();
+  const fontSize = conf.fontSize && conf.fontSize.replace ? conf.fontSize.replace("px", "") : conf.fontSize;
+  textElem.remove();
+  return bbox.height + fontSize * 1.1 * 0.5 + node.padding;
+};
+const defaultBkg = function(elem, node, section) {
+  const rd = 5;
+  elem.append("path").attr("id", "node-" + node.id).attr("class", "node-bkg node-" + node.type).attr(
+    "d",
+    `M0 ${node.height - rd} v${-node.height + 2 * rd} q0,-5 5,-5 h${node.width - 2 * rd} q5,0 5,5 v${node.height - rd} H0 Z`
+  );
+  elem.append("line").attr("class", "node-line-" + section).attr("x1", 0).attr("y1", node.height).attr("x2", node.width).attr("y2", node.height);
 };
 const svgDraw = {
   drawRect,
@@ -986,330 +942,296 @@ const svgDraw = {
   drawLabel,
   drawTask,
   drawBackgroundRect,
-  initGraphics
+  getTextObj,
+  getNoteRect,
+  initGraphics,
+  drawNode,
+  getVirtualNodeHeight
 };
-const setConf = function(cnf) {
-  const keys = Object.keys(cnf);
-  keys.forEach(function(key) {
-    conf[key] = cnf[key];
-  });
-};
-const actors = {};
-function drawActorLegend(diagram2) {
-  const conf2 = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey;
-  let yPos = 60;
-  Object.keys(actors).forEach((person) => {
-    const colour = actors[person].color;
-    const circleData = {
-      cx: 20,
-      cy: yPos,
-      r: 7,
-      fill: colour,
-      stroke: "#000",
-      pos: actors[person].position
-    };
-    svgDraw.drawCircle(diagram2, circleData);
-    const labelData = {
-      x: 40,
-      y: yPos + 7,
-      fill: "#666",
-      text: person,
-      textMargin: conf2.boxTextMargin | 5
-    };
-    svgDraw.drawText(diagram2, labelData);
-    yPos += 20;
-  });
-}
-const conf = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey;
-const LEFT_MARGIN = conf.leftMargin;
 const draw = function(text, id, version, diagObj) {
-  const conf2 = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey;
-  const securityLevel = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().securityLevel;
+  var _a, _b;
+  const conf = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)();
+  const LEFT_MARGIN = conf.leftMargin ?? 50;
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("timeline", diagObj.db);
+  const securityLevel = conf.securityLevel;
   let sandboxElement;
   if (securityLevel === "sandbox") {
     sandboxElement = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)("#i" + id);
   }
   const root = securityLevel === "sandbox" ? (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(sandboxElement.nodes()[0].contentDocument.body) : (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)("body");
-  bounds.init();
-  const diagram2 = root.select("#" + id);
-  svgDraw.initGraphics(diagram2);
+  const svg = root.select("#" + id);
+  svg.append("g");
   const tasks2 = diagObj.db.getTasks();
-  const title = diagObj.db.getDiagramTitle();
-  const actorNames = diagObj.db.getActors();
-  for (const member in actors) {
-    delete actors[member];
-  }
-  let actorPos = 0;
-  actorNames.forEach((actorName) => {
-    actors[actorName] = {
-      color: conf2.actorColours[actorPos % conf2.actorColours.length],
-      position: actorPos
-    };
-    actorPos++;
-  });
-  drawActorLegend(diagram2);
-  bounds.insert(0, 0, LEFT_MARGIN, Object.keys(actors).length * 50);
-  drawTasks(diagram2, tasks2, 0);
-  const box = bounds.getBounds();
-  if (title) {
-    diagram2.append("text").text(title).attr("x", LEFT_MARGIN).attr("font-size", "4ex").attr("font-weight", "bold").attr("y", 25);
-  }
-  const height = box.stopy - box.starty + 2 * conf2.diagramMarginY;
-  const width = LEFT_MARGIN + box.stopx + 2 * conf2.diagramMarginX;
-  (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.i)(diagram2, height, width, conf2.useMaxWidth);
-  diagram2.append("line").attr("x1", LEFT_MARGIN).attr("y1", conf2.height * 4).attr("x2", width - LEFT_MARGIN - 4).attr("y2", conf2.height * 4).attr("stroke-width", 4).attr("stroke", "black").attr("marker-end", "url(#arrowhead)");
-  const extraVertForTitle = title ? 70 : 0;
-  diagram2.attr("viewBox", `${box.startx} -25 ${width} ${height + extraVertForTitle}`);
-  diagram2.attr("preserveAspectRatio", "xMinYMin meet");
-  diagram2.attr("height", height + extraVertForTitle + 25);
-};
-const bounds = {
-  data: {
-    startx: void 0,
-    stopx: void 0,
-    starty: void 0,
-    stopy: void 0
-  },
-  verticalPos: 0,
-  sequenceItems: [],
-  init: function() {
-    this.sequenceItems = [];
-    this.data = {
-      startx: void 0,
-      stopx: void 0,
-      starty: void 0,
-      stopy: void 0
-    };
-    this.verticalPos = 0;
-  },
-  updateVal: function(obj, key, val, fun) {
-    if (obj[key] === void 0) {
-      obj[key] = val;
-    } else {
-      obj[key] = fun(val, obj[key]);
-    }
-  },
-  updateBounds: function(startx, starty, stopx, stopy) {
-    const conf2 = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey;
-    const _self = this;
-    let cnt = 0;
-    function updateFn(type) {
-      return function updateItemBounds(item) {
-        cnt++;
-        const n = _self.sequenceItems.length - cnt + 1;
-        _self.updateVal(item, "starty", starty - n * conf2.boxMargin, Math.min);
-        _self.updateVal(item, "stopy", stopy + n * conf2.boxMargin, Math.max);
-        _self.updateVal(bounds.data, "startx", startx - n * conf2.boxMargin, Math.min);
-        _self.updateVal(bounds.data, "stopx", stopx + n * conf2.boxMargin, Math.max);
-        if (!(type === "activation")) {
-          _self.updateVal(item, "startx", startx - n * conf2.boxMargin, Math.min);
-          _self.updateVal(item, "stopx", stopx + n * conf2.boxMargin, Math.max);
-          _self.updateVal(bounds.data, "starty", starty - n * conf2.boxMargin, Math.min);
-          _self.updateVal(bounds.data, "stopy", stopy + n * conf2.boxMargin, Math.max);
-        }
-      };
-    }
-    this.sequenceItems.forEach(updateFn());
-  },
-  insert: function(startx, starty, stopx, stopy) {
-    const _startx = Math.min(startx, stopx);
-    const _stopx = Math.max(startx, stopx);
-    const _starty = Math.min(starty, stopy);
-    const _stopy = Math.max(starty, stopy);
-    this.updateVal(bounds.data, "startx", _startx, Math.min);
-    this.updateVal(bounds.data, "starty", _starty, Math.min);
-    this.updateVal(bounds.data, "stopx", _stopx, Math.max);
-    this.updateVal(bounds.data, "stopy", _stopy, Math.max);
-    this.updateBounds(_startx, _starty, _stopx, _stopy);
-  },
-  bumpVerticalPos: function(bump) {
-    this.verticalPos = this.verticalPos + bump;
-    this.data.stopy = this.verticalPos;
-  },
-  getVerticalPos: function() {
-    return this.verticalPos;
-  },
-  getBounds: function() {
-    return this.data;
-  }
-};
-const fills = conf.sectionFills;
-const textColours = conf.sectionColours;
-const drawTasks = function(diagram2, tasks2, verticalPos) {
-  const conf2 = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.c)().journey;
-  let lastSection = "";
-  const sectionVHeight = conf2.height * 2 + conf2.diagramMarginY;
-  const taskPos = verticalPos + sectionVHeight;
+  const title = diagObj.db.getCommonDb().getDiagramTitle();
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("task", tasks2);
+  svgDraw.initGraphics(svg);
+  const sections2 = diagObj.db.getSections();
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("sections", sections2);
+  let maxSectionHeight = 0;
+  let maxTaskHeight = 0;
+  let depthY = 0;
+  let sectionBeginY = 0;
+  let masterX = 50 + LEFT_MARGIN;
+  let masterY = 50;
+  sectionBeginY = 50;
   let sectionNumber = 0;
-  let fill = "#CCC";
-  let colour = "black";
-  let num = 0;
+  let hasSections = true;
+  sections2.forEach(function(section) {
+    const sectionNode = {
+      number: sectionNumber,
+      descr: section,
+      section: sectionNumber,
+      width: 150,
+      padding: 20,
+      maxHeight: maxSectionHeight
+    };
+    const sectionHeight = svgDraw.getVirtualNodeHeight(svg, sectionNode, conf);
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("sectionHeight before draw", sectionHeight);
+    maxSectionHeight = Math.max(maxSectionHeight, sectionHeight + 20);
+  });
+  let maxEventCount = 0;
+  let maxEventLineLength = 0;
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("tasks.length", tasks2.length);
   for (const [i, task] of tasks2.entries()) {
-    if (lastSection !== task.section) {
-      fill = fills[sectionNumber % fills.length];
-      num = sectionNumber % fills.length;
-      colour = textColours[sectionNumber % textColours.length];
-      let taskInSectionCount = 0;
-      const currentSection2 = task.section;
-      for (let taskIndex = i; taskIndex < tasks2.length; taskIndex++) {
-        if (tasks2[taskIndex].section == currentSection2) {
-          taskInSectionCount = taskInSectionCount + 1;
-        } else {
-          break;
-        }
-      }
-      const section = {
-        x: i * conf2.taskMargin + i * conf2.width + LEFT_MARGIN,
-        y: 50,
-        text: task.section,
-        fill,
-        num,
-        colour,
-        taskCount: taskInSectionCount
+    const taskNode = {
+      number: i,
+      descr: task,
+      section: task.section,
+      width: 150,
+      padding: 20,
+      maxHeight: maxTaskHeight
+    };
+    const taskHeight = svgDraw.getVirtualNodeHeight(svg, taskNode, conf);
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("taskHeight before draw", taskHeight);
+    maxTaskHeight = Math.max(maxTaskHeight, taskHeight + 20);
+    maxEventCount = Math.max(maxEventCount, task.events.length);
+    let maxEventLineLengthTemp = 0;
+    for (let j = 0; j < task.events.length; j++) {
+      const event = task.events[j];
+      const eventNode = {
+        descr: event,
+        section: task.section,
+        number: task.section,
+        width: 150,
+        padding: 20,
+        maxHeight: 50
       };
-      svgDraw.drawSection(diagram2, section, conf2);
-      lastSection = task.section;
-      sectionNumber++;
+      maxEventLineLengthTemp += svgDraw.getVirtualNodeHeight(svg, eventNode, conf);
     }
-    const taskActors = task.people.reduce((acc, actorName) => {
-      if (actors[actorName]) {
-        acc[actorName] = actors[actorName];
-      }
-      return acc;
-    }, {});
-    task.x = i * conf2.taskMargin + i * conf2.width + LEFT_MARGIN;
-    task.y = taskPos;
-    task.width = conf2.diagramMarginX;
-    task.height = conf2.diagramMarginY;
-    task.colour = colour;
-    task.fill = fill;
-    task.num = num;
-    task.actors = taskActors;
-    svgDraw.drawTask(diagram2, task, conf2);
-    bounds.insert(task.x, task.y, task.x + task.width + conf2.taskMargin, 300 + 5 * 30);
+    maxEventLineLength = Math.max(maxEventLineLength, maxEventLineLengthTemp);
   }
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("maxSectionHeight before draw", maxSectionHeight);
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("maxTaskHeight before draw", maxTaskHeight);
+  if (sections2 && sections2.length > 0) {
+    sections2.forEach((section) => {
+      const tasksForSection = tasks2.filter((task) => task.section === section);
+      const sectionNode = {
+        number: sectionNumber,
+        descr: section,
+        section: sectionNumber,
+        width: 200 * Math.max(tasksForSection.length, 1) - 50,
+        padding: 20,
+        maxHeight: maxSectionHeight
+      };
+      _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("sectionNode", sectionNode);
+      const sectionNodeWrapper = svg.append("g");
+      const node = svgDraw.drawNode(sectionNodeWrapper, sectionNode, sectionNumber, conf);
+      _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("sectionNode output", node);
+      sectionNodeWrapper.attr("transform", `translate(${masterX}, ${sectionBeginY})`);
+      masterY += maxSectionHeight + 50;
+      if (tasksForSection.length > 0) {
+        drawTasks(
+          svg,
+          tasksForSection,
+          sectionNumber,
+          masterX,
+          masterY,
+          maxTaskHeight,
+          conf,
+          maxEventCount,
+          maxEventLineLength,
+          maxSectionHeight,
+          false
+        );
+      }
+      masterX += 200 * Math.max(tasksForSection.length, 1);
+      masterY = sectionBeginY;
+      sectionNumber++;
+    });
+  } else {
+    hasSections = false;
+    drawTasks(
+      svg,
+      tasks2,
+      sectionNumber,
+      masterX,
+      masterY,
+      maxTaskHeight,
+      conf,
+      maxEventCount,
+      maxEventLineLength,
+      maxSectionHeight,
+      true
+    );
+  }
+  const box = svg.node().getBBox();
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("bounds", box);
+  if (title) {
+    svg.append("text").text(title).attr("x", box.width / 2 - LEFT_MARGIN).attr("font-size", "4ex").attr("font-weight", "bold").attr("y", 20);
+  }
+  depthY = hasSections ? maxSectionHeight + maxTaskHeight + 150 : maxTaskHeight + 100;
+  const lineWrapper = svg.append("g").attr("class", "lineWrapper");
+  lineWrapper.append("line").attr("x1", LEFT_MARGIN).attr("y1", depthY).attr("x2", box.width + 3 * LEFT_MARGIN).attr("y2", depthY).attr("stroke-width", 4).attr("stroke", "black").attr("marker-end", "url(#arrowhead)");
+  (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.o)(
+    void 0,
+    svg,
+    ((_a = conf.timeline) == null ? void 0 : _a.padding) ?? 50,
+    ((_b = conf.timeline) == null ? void 0 : _b.useMaxWidth) ?? false
+  );
+};
+const drawTasks = function(diagram2, tasks2, sectionColor, masterX, masterY, maxTaskHeight, conf, maxEventCount, maxEventLineLength, maxSectionHeight, isWithoutSections) {
+  var _a;
+  for (const task of tasks2) {
+    const taskNode = {
+      descr: task.task,
+      section: sectionColor,
+      number: sectionColor,
+      width: 150,
+      padding: 20,
+      maxHeight: maxTaskHeight
+    };
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("taskNode", taskNode);
+    const taskWrapper = diagram2.append("g").attr("class", "taskWrapper");
+    const node = svgDraw.drawNode(taskWrapper, taskNode, sectionColor, conf);
+    const taskHeight = node.height;
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("taskHeight after draw", taskHeight);
+    taskWrapper.attr("transform", `translate(${masterX}, ${masterY})`);
+    maxTaskHeight = Math.max(maxTaskHeight, taskHeight);
+    if (task.events) {
+      const lineWrapper = diagram2.append("g").attr("class", "lineWrapper");
+      let lineLength = maxTaskHeight;
+      masterY += 100;
+      lineLength = lineLength + drawEvents(diagram2, task.events, sectionColor, masterX, masterY, conf);
+      masterY -= 100;
+      lineWrapper.append("line").attr("x1", masterX + 190 / 2).attr("y1", masterY + maxTaskHeight).attr("x2", masterX + 190 / 2).attr(
+        "y2",
+        masterY + maxTaskHeight + (isWithoutSections ? maxTaskHeight : maxSectionHeight) + maxEventLineLength + 120
+      ).attr("stroke-width", 2).attr("stroke", "black").attr("marker-end", "url(#arrowhead)").attr("stroke-dasharray", "5,5");
+    }
+    masterX = masterX + 200;
+    if (isWithoutSections && !((_a = conf.timeline) == null ? void 0 : _a.disableMulticolor)) {
+      sectionColor++;
+    }
+  }
+  masterY = masterY - 10;
+};
+const drawEvents = function(diagram2, events, sectionColor, masterX, masterY, conf) {
+  let maxEventHeight = 0;
+  const eventBeginY = masterY;
+  masterY = masterY + 100;
+  for (const event of events) {
+    const eventNode = {
+      descr: event,
+      section: sectionColor,
+      number: sectionColor,
+      width: 150,
+      padding: 20,
+      maxHeight: 50
+    };
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_4__.l.debug("eventNode", eventNode);
+    const eventWrapper = diagram2.append("g").attr("class", "eventWrapper");
+    const node = svgDraw.drawNode(eventWrapper, eventNode, sectionColor, conf);
+    const eventHeight = node.height;
+    maxEventHeight = maxEventHeight + eventHeight;
+    eventWrapper.attr("transform", `translate(${masterX}, ${masterY})`);
+    masterY = masterY + 10 + eventHeight;
+  }
+  masterY = eventBeginY;
+  return maxEventHeight;
 };
 const renderer = {
-  setConf,
+  setConf: () => {
+  },
   draw
 };
-const diagram = {
-  parser: parser$1,
-  db,
-  renderer,
-  styles,
-  init: (cnf) => {
-    renderer.setConf(cnf.journey);
-    db.clear();
-  }
-};
-
-
-
-/***/ }),
-
-/***/ 43317:
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   a: () => (/* binding */ drawBackgroundRect),
-/* harmony export */   b: () => (/* binding */ drawEmbeddedImage),
-/* harmony export */   c: () => (/* binding */ drawImage),
-/* harmony export */   d: () => (/* binding */ drawRect),
-/* harmony export */   e: () => (/* binding */ getTextObj),
-/* harmony export */   f: () => (/* binding */ drawText),
-/* harmony export */   g: () => (/* binding */ getNoteRect)
-/* harmony export */ });
-/* harmony import */ var _braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(17967);
-/* harmony import */ var _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(36690);
-
-
-const drawRect = (element, rectData) => {
-  const rectElement = element.append("rect");
-  rectElement.attr("x", rectData.x);
-  rectElement.attr("y", rectData.y);
-  rectElement.attr("fill", rectData.fill);
-  rectElement.attr("stroke", rectData.stroke);
-  rectElement.attr("width", rectData.width);
-  rectElement.attr("height", rectData.height);
-  rectData.rx !== void 0 && rectElement.attr("rx", rectData.rx);
-  rectData.ry !== void 0 && rectElement.attr("ry", rectData.ry);
-  if (rectData.attrs !== void 0) {
-    for (const attrKey in rectData.attrs) {
-      rectElement.attr(attrKey, rectData.attrs[attrKey]);
+const genSections = (options) => {
+  let sections2 = "";
+  for (let i = 0; i < options.THEME_COLOR_LIMIT; i++) {
+    options["lineColor" + i] = options["lineColor" + i] || options["cScaleInv" + i];
+    if ((0,khroma__WEBPACK_IMPORTED_MODULE_5__/* ["default"] */ .Z)(options["lineColor" + i])) {
+      options["lineColor" + i] = (0,khroma__WEBPACK_IMPORTED_MODULE_6__/* ["default"] */ .Z)(options["lineColor" + i], 20);
+    } else {
+      options["lineColor" + i] = (0,khroma__WEBPACK_IMPORTED_MODULE_7__/* ["default"] */ .Z)(options["lineColor" + i], 20);
     }
   }
-  rectData.class !== void 0 && rectElement.attr("class", rectData.class);
-  return rectElement;
+  for (let i = 0; i < options.THEME_COLOR_LIMIT; i++) {
+    const sw = "" + (17 - 3 * i);
+    sections2 += `
+    .section-${i - 1} rect, .section-${i - 1} path, .section-${i - 1} circle, .section-${i - 1} path  {
+      fill: ${options["cScale" + i]};
+    }
+    .section-${i - 1} text {
+     fill: ${options["cScaleLabel" + i]};
+    }
+    .node-icon-${i - 1} {
+      font-size: 40px;
+      color: ${options["cScaleLabel" + i]};
+    }
+    .section-edge-${i - 1}{
+      stroke: ${options["cScale" + i]};
+    }
+    .edge-depth-${i - 1}{
+      stroke-width: ${sw};
+    }
+    .section-${i - 1} line {
+      stroke: ${options["cScaleInv" + i]} ;
+      stroke-width: 3;
+    }
+
+    .lineWrapper line{
+      stroke: ${options["cScaleLabel" + i]} ;
+    }
+
+    .disabled, .disabled circle, .disabled text {
+      fill: lightgray;
+    }
+    .disabled text {
+      fill: #efefef;
+    }
+    `;
+  }
+  return sections2;
 };
-const drawBackgroundRect = (element, bounds) => {
-  const rectData = {
-    x: bounds.startx,
-    y: bounds.starty,
-    width: bounds.stopx - bounds.startx,
-    height: bounds.stopy - bounds.starty,
-    fill: bounds.fill,
-    stroke: bounds.stroke,
-    class: "rect"
-  };
-  const rectElement = drawRect(element, rectData);
-  rectElement.lower();
-};
-const drawText = (element, textData) => {
-  const nText = textData.text.replace(_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.H, " ");
-  const textElem = element.append("text");
-  textElem.attr("x", textData.x);
-  textElem.attr("y", textData.y);
-  textElem.attr("class", "legend");
-  textElem.style("text-anchor", textData.anchor);
-  textData.class !== void 0 && textElem.attr("class", textData.class);
-  const tspan = textElem.append("tspan");
-  tspan.attr("x", textData.x + textData.textMargin * 2);
-  tspan.text(nText);
-  return textElem;
-};
-const drawImage = (elem, x, y, link) => {
-  const imageElement = elem.append("image");
-  imageElement.attr("x", x);
-  imageElement.attr("y", y);
-  const sanitizedLink = (0,_braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_0__/* .sanitizeUrl */ .Nm)(link);
-  imageElement.attr("xlink:href", sanitizedLink);
-};
-const drawEmbeddedImage = (element, x, y, link) => {
-  const imageElement = element.append("use");
-  imageElement.attr("x", x);
-  imageElement.attr("y", y);
-  const sanitizedLink = (0,_braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_0__/* .sanitizeUrl */ .Nm)(link);
-  imageElement.attr("xlink:href", `#${sanitizedLink}`);
-};
-const getNoteRect = () => {
-  const noteRectData = {
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 100,
-    fill: "#EDF2AE",
-    stroke: "#666",
-    anchor: "start",
-    rx: 0,
-    ry: 0
-  };
-  return noteRectData;
-};
-const getTextObj = () => {
-  const testObject = {
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 100,
-    "text-anchor": "start",
-    style: "#666",
-    textMargin: 0,
-    rx: 0,
-    ry: 0,
-    tspan: true
-  };
-  return testObject;
+const getStyles = (options) => `
+  .edge {
+    stroke-width: 3;
+  }
+  ${genSections(options)}
+  .section-root rect, .section-root path, .section-root circle  {
+    fill: ${options.git0};
+  }
+  .section-root text {
+    fill: ${options.gitBranchLabel0};
+  }
+  .icon-container {
+    height:100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .edge {
+    fill: none;
+  }
+  .eventWrapper  {
+   filter: brightness(120%);
+  }
+`;
+const styles = getStyles;
+const diagram = {
+  db,
+  renderer,
+  parser: parser$1,
+  styles
 };
 
 

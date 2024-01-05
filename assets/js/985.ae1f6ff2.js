@@ -8960,7 +8960,7 @@ function values(object) {
 /* harmony import */ var dagre_d3_es_src_graphlib_index_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(45625);
 /* harmony import */ var dayjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(27484);
 /* harmony import */ var _braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(17967);
-/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(20683);
+/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(22424);
 
 
 

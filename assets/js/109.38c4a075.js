@@ -1,6 +1,6 @@
 "use strict";
-exports.id = 7;
-exports.ids = [7];
+exports.id = 109;
+exports.ids = [109];
 exports.modules = {
 
 /***/ 41644:
@@ -8948,211 +8948,394 @@ function values(object) {
 
 /***/ }),
 
-/***/ 21007:
+/***/ 109:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
-
-// EXPORTS
-__webpack_require__.d(__webpack_exports__, {
-  diagram: () => (/* binding */ diagram)
-});
-
-// EXTERNAL MODULE: ./node_modules/mermaid/dist/mermaid-934d9bea.js + 3 modules
-var mermaid_934d9bea = __webpack_require__(36690);
-// EXTERNAL MODULE: ./node_modules/dagre-d3-es/src/graphlib/index.js
-var graphlib = __webpack_require__(45625);
-// EXTERNAL MODULE: ./node_modules/d3/src/index.js + 197 modules
-var src = __webpack_require__(64218);
-// EXTERNAL MODULE: ./node_modules/dagre-d3-es/src/dagre/index.js + 64 modules
-var dagre = __webpack_require__(41644);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/stringify.js
-
-/**
- * Convert array of 16 byte values to UUID string format of the form:
- * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
- */
-
-const byteToHex = [];
-
-for (let i = 0; i < 256; ++i) {
-  byteToHex.push((i + 0x100).toString(16).slice(1));
-}
-
-function unsafeStringify(arr, offset = 0) {
-  // Note: Be careful editing this code!  It's been tuned for performance
-  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
-  return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
-}
-
-function stringify(arr, offset = 0) {
-  const uuid = unsafeStringify(arr, offset); // Consistency check for valid UUID.  If this throws, it's likely due to one
-  // of the following:
-  // - One or more input array values don't map to a hex octet (leading to
-  // "undefined" in the uuid)
-  // - Invalid input values for the RFC `version` or `variant` fields
-
-  if (!validate(uuid)) {
-    throw TypeError('Stringified UUID is invalid');
-  }
-
-  return uuid;
-}
-
-/* harmony default export */ const esm_node_stringify = ((/* unused pure expression or super */ null && (stringify)));
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/regex.js
-/* harmony default export */ const regex = (/^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/validate.js
-
-
-function validate_validate(uuid) {
-  return typeof uuid === 'string' && regex.test(uuid);
-}
-
-/* harmony default export */ const esm_node_validate = (validate_validate);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/parse.js
-
-
-function parse(uuid) {
-  if (!esm_node_validate(uuid)) {
-    throw TypeError('Invalid UUID');
-  }
-
-  let v;
-  const arr = new Uint8Array(16); // Parse ########-....-....-....-............
-
-  arr[0] = (v = parseInt(uuid.slice(0, 8), 16)) >>> 24;
-  arr[1] = v >>> 16 & 0xff;
-  arr[2] = v >>> 8 & 0xff;
-  arr[3] = v & 0xff; // Parse ........-####-....-....-............
-
-  arr[4] = (v = parseInt(uuid.slice(9, 13), 16)) >>> 8;
-  arr[5] = v & 0xff; // Parse ........-....-####-....-............
-
-  arr[6] = (v = parseInt(uuid.slice(14, 18), 16)) >>> 8;
-  arr[7] = v & 0xff; // Parse ........-....-....-####-............
-
-  arr[8] = (v = parseInt(uuid.slice(19, 23), 16)) >>> 8;
-  arr[9] = v & 0xff; // Parse ........-....-....-....-############
-  // (Use "/" to avoid 32-bit truncation when bit-shifting high-order bytes)
-
-  arr[10] = (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff;
-  arr[11] = v / 0x100000000 & 0xff;
-  arr[12] = v >>> 24 & 0xff;
-  arr[13] = v >>> 16 & 0xff;
-  arr[14] = v >>> 8 & 0xff;
-  arr[15] = v & 0xff;
-  return arr;
-}
-
-/* harmony default export */ const esm_node_parse = (parse);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/v35.js
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   diagram: () => (/* binding */ diagram)
+/* harmony export */ });
+/* harmony import */ var _styles_4ba6ed67_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(54706);
+/* harmony import */ var d3__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(64218);
+/* harmony import */ var dagre_d3_es_src_dagre_index_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(41644);
+/* harmony import */ var dagre_d3_es_src_graphlib_index_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(45625);
+/* harmony import */ var _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(36690);
+/* harmony import */ var dayjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(27484);
+/* harmony import */ var _braintree_sanitize_url__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(17967);
+/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(22424);
 
 
 
-function stringToBytes(str) {
-  str = unescape(encodeURIComponent(str)); // UTF8 escape
 
-  const bytes = [];
 
-  for (let i = 0; i < str.length; ++i) {
-    bytes.push(str.charCodeAt(i));
-  }
 
-  return bytes;
-}
 
-const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-const URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
-function v35(name, version, hashfunc) {
-  function generateUUID(value, namespace, buf, offset) {
-    var _namespace;
 
-    if (typeof value === 'string') {
-      value = stringToBytes(value);
+
+
+
+
+
+
+let edgeCount = 0;
+const drawEdge = function(elem, path, relation, conf, diagObj) {
+  const getRelationType = function(type) {
+    switch (type) {
+      case diagObj.db.relationType.AGGREGATION:
+        return "aggregation";
+      case diagObj.db.relationType.EXTENSION:
+        return "extension";
+      case diagObj.db.relationType.COMPOSITION:
+        return "composition";
+      case diagObj.db.relationType.DEPENDENCY:
+        return "dependency";
+      case diagObj.db.relationType.LOLLIPOP:
+        return "lollipop";
     }
-
-    if (typeof namespace === 'string') {
-      namespace = esm_node_parse(namespace);
-    }
-
-    if (((_namespace = namespace) === null || _namespace === void 0 ? void 0 : _namespace.length) !== 16) {
-      throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
-    } // Compute hash of namespace and value, Per 4.3
-    // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
-    // hashfunc([...namespace, ... value])`
-
-
-    let bytes = new Uint8Array(16 + value.length);
-    bytes.set(namespace);
-    bytes.set(value, namespace.length);
-    bytes = hashfunc(bytes);
-    bytes[6] = bytes[6] & 0x0f | version;
-    bytes[8] = bytes[8] & 0x3f | 0x80;
-
-    if (buf) {
-      offset = offset || 0;
-
-      for (let i = 0; i < 16; ++i) {
-        buf[offset + i] = bytes[i];
-      }
-
-      return buf;
-    }
-
-    return unsafeStringify(bytes);
-  } // Function#name is not settable on some platforms (#270)
-
-
-  try {
-    generateUUID.name = name; // eslint-disable-next-line no-empty
-  } catch (err) {} // For CommonJS default export support
-
-
-  generateUUID.DNS = DNS;
-  generateUUID.URL = URL;
-  return generateUUID;
-}
-// EXTERNAL MODULE: external "crypto"
-var external_crypto_ = __webpack_require__(6113);
-var external_crypto_default = /*#__PURE__*/__webpack_require__.n(external_crypto_);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/sha1.js
-
-
-function sha1(bytes) {
-  if (Array.isArray(bytes)) {
-    bytes = Buffer.from(bytes);
-  } else if (typeof bytes === 'string') {
-    bytes = Buffer.from(bytes, 'utf8');
+  };
+  path.points = path.points.filter((p) => !Number.isNaN(p.y));
+  const lineData = path.points;
+  const lineFunction = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .line */ .jvg)().x(function(d) {
+    return d.x;
+  }).y(function(d) {
+    return d.y;
+  }).curve(d3__WEBPACK_IMPORTED_MODULE_0__/* .curveBasis */ .$0Z);
+  const svgPath = elem.append("path").attr("d", lineFunction(lineData)).attr("id", "edge" + edgeCount).attr("class", "relation");
+  let url = "";
+  if (conf.arrowMarkerAbsolute) {
+    url = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.search;
+    url = url.replace(/\(/g, "\\(");
+    url = url.replace(/\)/g, "\\)");
   }
+  if (relation.relation.lineType == 1) {
+    svgPath.attr("class", "relation dashed-line");
+  }
+  if (relation.relation.lineType == 10) {
+    svgPath.attr("class", "relation dotted-line");
+  }
+  if (relation.relation.type1 !== "none") {
+    svgPath.attr(
+      "marker-start",
+      "url(" + url + "#" + getRelationType(relation.relation.type1) + "Start)"
+    );
+  }
+  if (relation.relation.type2 !== "none") {
+    svgPath.attr(
+      "marker-end",
+      "url(" + url + "#" + getRelationType(relation.relation.type2) + "End)"
+    );
+  }
+  let x, y;
+  const l = path.points.length;
+  let labelPosition = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.u.calcLabelPosition(path.points);
+  x = labelPosition.x;
+  y = labelPosition.y;
+  let p1_card_x, p1_card_y;
+  let p2_card_x, p2_card_y;
+  if (l % 2 !== 0 && l > 1) {
+    let cardinality_1_point = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.u.calcCardinalityPosition(
+      relation.relation.type1 !== "none",
+      path.points,
+      path.points[0]
+    );
+    let cardinality_2_point = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.u.calcCardinalityPosition(
+      relation.relation.type2 !== "none",
+      path.points,
+      path.points[l - 1]
+    );
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("cardinality_1_point " + JSON.stringify(cardinality_1_point));
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("cardinality_2_point " + JSON.stringify(cardinality_2_point));
+    p1_card_x = cardinality_1_point.x;
+    p1_card_y = cardinality_1_point.y;
+    p2_card_x = cardinality_2_point.x;
+    p2_card_y = cardinality_2_point.y;
+  }
+  if (relation.title !== void 0) {
+    const g = elem.append("g").attr("class", "classLabel");
+    const label = g.append("text").attr("class", "label").attr("x", x).attr("y", y).attr("fill", "red").attr("text-anchor", "middle").text(relation.title);
+    window.label = label;
+    const bounds = label.node().getBBox();
+    g.insert("rect", ":first-child").attr("class", "box").attr("x", bounds.x - conf.padding / 2).attr("y", bounds.y - conf.padding / 2).attr("width", bounds.width + conf.padding).attr("height", bounds.height + conf.padding);
+  }
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.info("Rendering relation " + JSON.stringify(relation));
+  if (relation.relationTitle1 !== void 0 && relation.relationTitle1 !== "none") {
+    const g = elem.append("g").attr("class", "cardinality");
+    g.append("text").attr("class", "type1").attr("x", p1_card_x).attr("y", p1_card_y).attr("fill", "black").attr("font-size", "6").text(relation.relationTitle1);
+  }
+  if (relation.relationTitle2 !== void 0 && relation.relationTitle2 !== "none") {
+    const g = elem.append("g").attr("class", "cardinality");
+    g.append("text").attr("class", "type2").attr("x", p2_card_x).attr("y", p2_card_y).attr("fill", "black").attr("font-size", "6").text(relation.relationTitle2);
+  }
+  edgeCount++;
+};
+const drawClass = function(elem, classDef, conf, diagObj) {
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("Rendering class ", classDef, conf);
+  const id = classDef.id;
+  const classInfo = {
+    id,
+    label: classDef.id,
+    width: 0,
+    height: 0
+  };
+  const g = elem.append("g").attr("id", diagObj.db.lookUpDomId(id)).attr("class", "classGroup");
+  let title;
+  if (classDef.link) {
+    title = g.append("svg:a").attr("xlink:href", classDef.link).attr("target", classDef.linkTarget).append("text").attr("y", conf.textHeight + conf.padding).attr("x", 0);
+  } else {
+    title = g.append("text").attr("y", conf.textHeight + conf.padding).attr("x", 0);
+  }
+  let isFirst = true;
+  classDef.annotations.forEach(function(member) {
+    const titleText2 = title.append("tspan").text("«" + member + "»");
+    if (!isFirst) {
+      titleText2.attr("dy", conf.textHeight);
+    }
+    isFirst = false;
+  });
+  let classTitleString = getClassTitleString(classDef);
+  const classTitle = title.append("tspan").text(classTitleString).attr("class", "title");
+  if (!isFirst) {
+    classTitle.attr("dy", conf.textHeight);
+  }
+  const titleHeight = title.node().getBBox().height;
+  let membersLine;
+  let membersBox;
+  let methodsLine;
+  if (classDef.members.length > 0) {
+    membersLine = g.append("line").attr("x1", 0).attr("y1", conf.padding + titleHeight + conf.dividerMargin / 2).attr("y2", conf.padding + titleHeight + conf.dividerMargin / 2);
+    const members = g.append("text").attr("x", conf.padding).attr("y", titleHeight + conf.dividerMargin + conf.textHeight).attr("fill", "white").attr("class", "classText");
+    isFirst = true;
+    classDef.members.forEach(function(member) {
+      addTspan(members, member, isFirst, conf);
+      isFirst = false;
+    });
+    membersBox = members.node().getBBox();
+  }
+  if (classDef.methods.length > 0) {
+    methodsLine = g.append("line").attr("x1", 0).attr("y1", conf.padding + titleHeight + conf.dividerMargin + membersBox.height).attr("y2", conf.padding + titleHeight + conf.dividerMargin + membersBox.height);
+    const methods = g.append("text").attr("x", conf.padding).attr("y", titleHeight + 2 * conf.dividerMargin + membersBox.height + conf.textHeight).attr("fill", "white").attr("class", "classText");
+    isFirst = true;
+    classDef.methods.forEach(function(method) {
+      addTspan(methods, method, isFirst, conf);
+      isFirst = false;
+    });
+  }
+  const classBox = g.node().getBBox();
+  var cssClassStr = " ";
+  if (classDef.cssClasses.length > 0) {
+    cssClassStr = cssClassStr + classDef.cssClasses.join(" ");
+  }
+  const rect = g.insert("rect", ":first-child").attr("x", 0).attr("y", 0).attr("width", classBox.width + 2 * conf.padding).attr("height", classBox.height + conf.padding + 0.5 * conf.dividerMargin).attr("class", cssClassStr);
+  const rectWidth = rect.node().getBBox().width;
+  title.node().childNodes.forEach(function(x) {
+    x.setAttribute("x", (rectWidth - x.getBBox().width) / 2);
+  });
+  if (classDef.tooltip) {
+    title.insert("title").text(classDef.tooltip);
+  }
+  if (membersLine) {
+    membersLine.attr("x2", rectWidth);
+  }
+  if (methodsLine) {
+    methodsLine.attr("x2", rectWidth);
+  }
+  classInfo.width = rectWidth;
+  classInfo.height = classBox.height + conf.padding + 0.5 * conf.dividerMargin;
+  return classInfo;
+};
+const getClassTitleString = function(classDef) {
+  let classTitleString = classDef.id;
+  if (classDef.type) {
+    classTitleString += "<" + (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.v)(classDef.type) + ">";
+  }
+  return classTitleString;
+};
+const drawNote = function(elem, note, conf, diagObj) {
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("Rendering note ", note, conf);
+  const id = note.id;
+  const noteInfo = {
+    id,
+    text: note.text,
+    width: 0,
+    height: 0
+  };
+  const g = elem.append("g").attr("id", id).attr("class", "classGroup");
+  let text = g.append("text").attr("y", conf.textHeight + conf.padding).attr("x", 0);
+  const lines = JSON.parse(`"${note.text}"`).split("\n");
+  lines.forEach(function(line2) {
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug(`Adding line: ${line2}`);
+    text.append("tspan").text(line2).attr("class", "title").attr("dy", conf.textHeight);
+  });
+  const noteBox = g.node().getBBox();
+  const rect = g.insert("rect", ":first-child").attr("x", 0).attr("y", 0).attr("width", noteBox.width + 2 * conf.padding).attr(
+    "height",
+    noteBox.height + lines.length * conf.textHeight + conf.padding + 0.5 * conf.dividerMargin
+  );
+  const rectWidth = rect.node().getBBox().width;
+  text.node().childNodes.forEach(function(x) {
+    x.setAttribute("x", (rectWidth - x.getBBox().width) / 2);
+  });
+  noteInfo.width = rectWidth;
+  noteInfo.height = noteBox.height + lines.length * conf.textHeight + conf.padding + 0.5 * conf.dividerMargin;
+  return noteInfo;
+};
+const addTspan = function(textEl, member, isFirst, conf) {
+  const { displayText, cssStyle } = member.getDisplayDetails();
+  const tSpan = textEl.append("tspan").attr("x", conf.padding).text(displayText);
+  if (cssStyle !== "") {
+    tSpan.attr("style", member.cssStyle);
+  }
+  if (!isFirst) {
+    tSpan.attr("dy", conf.textHeight);
+  }
+};
+const svgDraw = {
+  getClassTitleString,
+  drawClass,
+  drawEdge,
+  drawNote
+};
+let idCache = {};
+const padding = 20;
+const getGraphId = function(label) {
+  const foundEntry = Object.entries(idCache).find((entry) => entry[1].label === label);
+  if (foundEntry) {
+    return foundEntry[0];
+  }
+};
+const insertMarkers = function(elem) {
+  elem.append("defs").append("marker").attr("id", "extensionStart").attr("class", "extension").attr("refX", 0).attr("refY", 7).attr("markerWidth", 190).attr("markerHeight", 240).attr("orient", "auto").append("path").attr("d", "M 1,7 L18,13 V 1 Z");
+  elem.append("defs").append("marker").attr("id", "extensionEnd").attr("refX", 19).attr("refY", 7).attr("markerWidth", 20).attr("markerHeight", 28).attr("orient", "auto").append("path").attr("d", "M 1,1 V 13 L18,7 Z");
+  elem.append("defs").append("marker").attr("id", "compositionStart").attr("class", "extension").attr("refX", 0).attr("refY", 7).attr("markerWidth", 190).attr("markerHeight", 240).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
+  elem.append("defs").append("marker").attr("id", "compositionEnd").attr("refX", 19).attr("refY", 7).attr("markerWidth", 20).attr("markerHeight", 28).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
+  elem.append("defs").append("marker").attr("id", "aggregationStart").attr("class", "extension").attr("refX", 0).attr("refY", 7).attr("markerWidth", 190).attr("markerHeight", 240).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
+  elem.append("defs").append("marker").attr("id", "aggregationEnd").attr("refX", 19).attr("refY", 7).attr("markerWidth", 20).attr("markerHeight", 28).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
+  elem.append("defs").append("marker").attr("id", "dependencyStart").attr("class", "extension").attr("refX", 0).attr("refY", 7).attr("markerWidth", 190).attr("markerHeight", 240).attr("orient", "auto").append("path").attr("d", "M 5,7 L9,13 L1,7 L9,1 Z");
+  elem.append("defs").append("marker").attr("id", "dependencyEnd").attr("refX", 19).attr("refY", 7).attr("markerWidth", 20).attr("markerHeight", 28).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L14,7 L9,1 Z");
+};
+const draw = function(text, id, _version, diagObj) {
+  const conf = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.c)().class;
+  idCache = {};
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.info("Rendering diagram " + text);
+  const securityLevel = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.c)().securityLevel;
+  let sandboxElement;
+  if (securityLevel === "sandbox") {
+    sandboxElement = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)("#i" + id);
+  }
+  const root = securityLevel === "sandbox" ? (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(sandboxElement.nodes()[0].contentDocument.body) : (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)("body");
+  const diagram2 = root.select(`[id='${id}']`);
+  insertMarkers(diagram2);
+  const g = new dagre_d3_es_src_graphlib_index_js__WEBPACK_IMPORTED_MODULE_2__/* .Graph */ .k({
+    multigraph: true
+  });
+  g.setGraph({
+    isMultiGraph: true
+  });
+  g.setDefaultEdgeLabel(function() {
+    return {};
+  });
+  const classes = diagObj.db.getClasses();
+  const keys = Object.keys(classes);
+  for (const key of keys) {
+    const classDef = classes[key];
+    const node = svgDraw.drawClass(diagram2, classDef, conf, diagObj);
+    idCache[node.id] = node;
+    g.setNode(node.id, node);
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.info("Org height: " + node.height);
+  }
+  const relations = diagObj.db.getRelations();
+  relations.forEach(function(relation) {
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.info(
+      "tjoho" + getGraphId(relation.id1) + getGraphId(relation.id2) + JSON.stringify(relation)
+    );
+    g.setEdge(
+      getGraphId(relation.id1),
+      getGraphId(relation.id2),
+      {
+        relation
+      },
+      relation.title || "DEFAULT"
+    );
+  });
+  const notes = diagObj.db.getNotes();
+  notes.forEach(function(note) {
+    _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug(`Adding note: ${JSON.stringify(note)}`);
+    const node = svgDraw.drawNote(diagram2, note, conf, diagObj);
+    idCache[node.id] = node;
+    g.setNode(node.id, node);
+    if (note.class && note.class in classes) {
+      g.setEdge(
+        note.id,
+        getGraphId(note.class),
+        {
+          relation: {
+            id1: note.id,
+            id2: note.class,
+            relation: {
+              type1: "none",
+              type2: "none",
+              lineType: 10
+            }
+          }
+        },
+        "DEFAULT"
+      );
+    }
+  });
+  (0,dagre_d3_es_src_dagre_index_js__WEBPACK_IMPORTED_MODULE_1__/* .layout */ .bK)(g);
+  g.nodes().forEach(function(v) {
+    if (v !== void 0 && g.node(v) !== void 0) {
+      _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("Node " + v + ": " + JSON.stringify(g.node(v)));
+      root.select("#" + (diagObj.db.lookUpDomId(v) || v)).attr(
+        "transform",
+        "translate(" + (g.node(v).x - g.node(v).width / 2) + "," + (g.node(v).y - g.node(v).height / 2) + " )"
+      );
+    }
+  });
+  g.edges().forEach(function(e) {
+    if (e !== void 0 && g.edge(e) !== void 0) {
+      _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug("Edge " + e.v + " -> " + e.w + ": " + JSON.stringify(g.edge(e)));
+      svgDraw.drawEdge(diagram2, g.edge(e), g.edge(e).relation, conf, diagObj);
+    }
+  });
+  const svgBounds = diagram2.node().getBBox();
+  const width = svgBounds.width + padding * 2;
+  const height = svgBounds.height + padding * 2;
+  (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.i)(diagram2, height, width, conf.useMaxWidth);
+  const vBox = `${svgBounds.x - padding} ${svgBounds.y - padding} ${width} ${height}`;
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_6__.l.debug(`viewBox ${vBox}`);
+  diagram2.attr("viewBox", vBox);
+};
+const renderer = {
+  draw
+};
+const diagram = {
+  parser: _styles_4ba6ed67_js__WEBPACK_IMPORTED_MODULE_7__.p,
+  db: _styles_4ba6ed67_js__WEBPACK_IMPORTED_MODULE_7__.d,
+  renderer,
+  styles: _styles_4ba6ed67_js__WEBPACK_IMPORTED_MODULE_7__.s,
+  init: (cnf) => {
+    if (!cnf.class) {
+      cnf.class = {};
+    }
+    cnf.class.arrowMarkerAbsolute = cnf.arrowMarkerAbsolute;
+    _styles_4ba6ed67_js__WEBPACK_IMPORTED_MODULE_7__.d.clear();
+  }
+};
 
-  return external_crypto_default().createHash('sha1').update(bytes).digest();
-}
-
-/* harmony default export */ const esm_node_sha1 = (sha1);
-;// CONCATENATED MODULE: ./node_modules/uuid/dist/esm-node/v5.js
 
 
-const v5 = v35('v5', 0x50, esm_node_sha1);
-/* harmony default export */ const esm_node_v5 = (v5);
-// EXTERNAL MODULE: ./node_modules/dayjs/dayjs.min.js
-var dayjs_min = __webpack_require__(27484);
-// EXTERNAL MODULE: ./node_modules/@braintree/sanitize-url/dist/index.js
-var dist = __webpack_require__(17967);
-// EXTERNAL MODULE: ./node_modules/dompurify/dist/purify.es.js
-var purify_es = __webpack_require__(20683);
-;// CONCATENATED MODULE: ./node_modules/mermaid/dist/erDiagram-9cfc3649.js
+/***/ }),
 
+/***/ 54706:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
-
-
-
-
-
-
-
-
-
-
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   d: () => (/* binding */ db),
+/* harmony export */   p: () => (/* binding */ parser$1),
+/* harmony export */   s: () => (/* binding */ styles)
+/* harmony export */ });
+/* harmony import */ var d3__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(64218);
+/* harmony import */ var _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(36690);
 
 
 var parser = function() {
@@ -9160,138 +9343,233 @@ var parser = function() {
     for (o2 = o2 || {}, l = k.length; l--; o2[k[l]] = v)
       ;
     return o2;
-  }, $V0 = [6, 8, 10, 20, 22, 24, 26, 27, 28], $V1 = [1, 10], $V2 = [1, 11], $V3 = [1, 12], $V4 = [1, 13], $V5 = [1, 14], $V6 = [1, 15], $V7 = [1, 21], $V8 = [1, 22], $V9 = [1, 23], $Va = [1, 24], $Vb = [1, 25], $Vc = [6, 8, 10, 13, 15, 18, 19, 20, 22, 24, 26, 27, 28, 41, 42, 43, 44, 45], $Vd = [1, 34], $Ve = [27, 28, 46, 47], $Vf = [41, 42, 43, 44, 45], $Vg = [17, 34], $Vh = [1, 54], $Vi = [1, 53], $Vj = [17, 34, 36, 38];
+  }, $V0 = [1, 16], $V1 = [1, 17], $V2 = [1, 18], $V3 = [1, 37], $V4 = [1, 38], $V5 = [1, 24], $V6 = [1, 22], $V7 = [1, 23], $V8 = [1, 29], $V9 = [1, 30], $Va = [1, 31], $Vb = [1, 32], $Vc = [1, 33], $Vd = [1, 34], $Ve = [1, 25], $Vf = [1, 26], $Vg = [1, 27], $Vh = [1, 28], $Vi = [1, 42], $Vj = [1, 39], $Vk = [1, 40], $Vl = [1, 41], $Vm = [1, 43], $Vn = [1, 9], $Vo = [1, 8, 9], $Vp = [1, 54], $Vq = [1, 55], $Vr = [1, 56], $Vs = [1, 57], $Vt = [1, 58], $Vu = [1, 59], $Vv = [1, 60], $Vw = [1, 8, 9, 38], $Vx = [1, 71], $Vy = [1, 8, 9, 12, 13, 21, 36, 38, 41, 58, 59, 60, 61, 62, 63, 64, 69, 71], $Vz = [1, 8, 9, 12, 13, 19, 21, 36, 38, 41, 45, 58, 59, 60, 61, 62, 63, 64, 69, 71, 84, 86, 87, 88, 89], $VA = [13, 84, 86, 87, 88, 89], $VB = [13, 63, 64, 84, 86, 87, 88, 89], $VC = [13, 58, 59, 60, 61, 62, 84, 86, 87, 88, 89], $VD = [1, 90], $VE = [1, 8, 9, 36, 38, 41], $VF = [1, 8, 9, 21];
   var parser2 = {
     trace: function trace() {
     },
     yy: {},
-    symbols_: { "error": 2, "start": 3, "ER_DIAGRAM": 4, "document": 5, "EOF": 6, "line": 7, "SPACE": 8, "statement": 9, "NEWLINE": 10, "entityName": 11, "relSpec": 12, ":": 13, "role": 14, "BLOCK_START": 15, "attributes": 16, "BLOCK_STOP": 17, "SQS": 18, "SQE": 19, "title": 20, "title_value": 21, "acc_title": 22, "acc_title_value": 23, "acc_descr": 24, "acc_descr_value": 25, "acc_descr_multiline_value": 26, "ALPHANUM": 27, "ENTITY_NAME": 28, "attribute": 29, "attributeType": 30, "attributeName": 31, "attributeKeyTypeList": 32, "attributeComment": 33, "ATTRIBUTE_WORD": 34, "attributeKeyType": 35, "COMMA": 36, "ATTRIBUTE_KEY": 37, "COMMENT": 38, "cardinality": 39, "relType": 40, "ZERO_OR_ONE": 41, "ZERO_OR_MORE": 42, "ONE_OR_MORE": 43, "ONLY_ONE": 44, "MD_PARENT": 45, "NON_IDENTIFYING": 46, "IDENTIFYING": 47, "WORD": 48, "$accept": 0, "$end": 1 },
-    terminals_: { 2: "error", 4: "ER_DIAGRAM", 6: "EOF", 8: "SPACE", 10: "NEWLINE", 13: ":", 15: "BLOCK_START", 17: "BLOCK_STOP", 18: "SQS", 19: "SQE", 20: "title", 21: "title_value", 22: "acc_title", 23: "acc_title_value", 24: "acc_descr", 25: "acc_descr_value", 26: "acc_descr_multiline_value", 27: "ALPHANUM", 28: "ENTITY_NAME", 34: "ATTRIBUTE_WORD", 36: "COMMA", 37: "ATTRIBUTE_KEY", 38: "COMMENT", 41: "ZERO_OR_ONE", 42: "ZERO_OR_MORE", 43: "ONE_OR_MORE", 44: "ONLY_ONE", 45: "MD_PARENT", 46: "NON_IDENTIFYING", 47: "IDENTIFYING", 48: "WORD" },
-    productions_: [0, [3, 3], [5, 0], [5, 2], [7, 2], [7, 1], [7, 1], [7, 1], [9, 5], [9, 4], [9, 3], [9, 1], [9, 7], [9, 6], [9, 4], [9, 2], [9, 2], [9, 2], [9, 1], [11, 1], [11, 1], [16, 1], [16, 2], [29, 2], [29, 3], [29, 3], [29, 4], [30, 1], [31, 1], [32, 1], [32, 3], [35, 1], [33, 1], [12, 3], [39, 1], [39, 1], [39, 1], [39, 1], [39, 1], [40, 1], [40, 1], [14, 1], [14, 1], [14, 1]],
+    symbols_: { "error": 2, "start": 3, "mermaidDoc": 4, "statements": 5, "graphConfig": 6, "CLASS_DIAGRAM": 7, "NEWLINE": 8, "EOF": 9, "statement": 10, "classLabel": 11, "SQS": 12, "STR": 13, "SQE": 14, "namespaceName": 15, "alphaNumToken": 16, "className": 17, "classLiteralName": 18, "GENERICTYPE": 19, "relationStatement": 20, "LABEL": 21, "namespaceStatement": 22, "classStatement": 23, "memberStatement": 24, "annotationStatement": 25, "clickStatement": 26, "cssClassStatement": 27, "noteStatement": 28, "direction": 29, "acc_title": 30, "acc_title_value": 31, "acc_descr": 32, "acc_descr_value": 33, "acc_descr_multiline_value": 34, "namespaceIdentifier": 35, "STRUCT_START": 36, "classStatements": 37, "STRUCT_STOP": 38, "NAMESPACE": 39, "classIdentifier": 40, "STYLE_SEPARATOR": 41, "members": 42, "CLASS": 43, "ANNOTATION_START": 44, "ANNOTATION_END": 45, "MEMBER": 46, "SEPARATOR": 47, "relation": 48, "NOTE_FOR": 49, "noteText": 50, "NOTE": 51, "direction_tb": 52, "direction_bt": 53, "direction_rl": 54, "direction_lr": 55, "relationType": 56, "lineType": 57, "AGGREGATION": 58, "EXTENSION": 59, "COMPOSITION": 60, "DEPENDENCY": 61, "LOLLIPOP": 62, "LINE": 63, "DOTTED_LINE": 64, "CALLBACK": 65, "LINK": 66, "LINK_TARGET": 67, "CLICK": 68, "CALLBACK_NAME": 69, "CALLBACK_ARGS": 70, "HREF": 71, "CSSCLASS": 72, "commentToken": 73, "textToken": 74, "graphCodeTokens": 75, "textNoTagsToken": 76, "TAGSTART": 77, "TAGEND": 78, "==": 79, "--": 80, "PCT": 81, "DEFAULT": 82, "SPACE": 83, "MINUS": 84, "keywords": 85, "UNICODE_TEXT": 86, "NUM": 87, "ALPHA": 88, "BQUOTE_STR": 89, "$accept": 0, "$end": 1 },
+    terminals_: { 2: "error", 7: "CLASS_DIAGRAM", 8: "NEWLINE", 9: "EOF", 12: "SQS", 13: "STR", 14: "SQE", 19: "GENERICTYPE", 21: "LABEL", 30: "acc_title", 31: "acc_title_value", 32: "acc_descr", 33: "acc_descr_value", 34: "acc_descr_multiline_value", 36: "STRUCT_START", 38: "STRUCT_STOP", 39: "NAMESPACE", 41: "STYLE_SEPARATOR", 43: "CLASS", 44: "ANNOTATION_START", 45: "ANNOTATION_END", 46: "MEMBER", 47: "SEPARATOR", 49: "NOTE_FOR", 51: "NOTE", 52: "direction_tb", 53: "direction_bt", 54: "direction_rl", 55: "direction_lr", 58: "AGGREGATION", 59: "EXTENSION", 60: "COMPOSITION", 61: "DEPENDENCY", 62: "LOLLIPOP", 63: "LINE", 64: "DOTTED_LINE", 65: "CALLBACK", 66: "LINK", 67: "LINK_TARGET", 68: "CLICK", 69: "CALLBACK_NAME", 70: "CALLBACK_ARGS", 71: "HREF", 72: "CSSCLASS", 75: "graphCodeTokens", 77: "TAGSTART", 78: "TAGEND", 79: "==", 80: "--", 81: "PCT", 82: "DEFAULT", 83: "SPACE", 84: "MINUS", 85: "keywords", 86: "UNICODE_TEXT", 87: "NUM", 88: "ALPHA", 89: "BQUOTE_STR" },
+    productions_: [0, [3, 1], [3, 1], [4, 1], [6, 4], [5, 1], [5, 2], [5, 3], [11, 3], [15, 1], [15, 2], [17, 1], [17, 1], [17, 2], [17, 2], [17, 2], [10, 1], [10, 2], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 2], [10, 2], [10, 1], [22, 4], [22, 5], [35, 2], [37, 1], [37, 2], [37, 3], [23, 1], [23, 3], [23, 4], [23, 6], [40, 2], [40, 3], [25, 4], [42, 1], [42, 2], [24, 1], [24, 2], [24, 1], [24, 1], [20, 3], [20, 4], [20, 4], [20, 5], [28, 3], [28, 2], [29, 1], [29, 1], [29, 1], [29, 1], [48, 3], [48, 2], [48, 2], [48, 1], [56, 1], [56, 1], [56, 1], [56, 1], [56, 1], [57, 1], [57, 1], [26, 3], [26, 4], [26, 3], [26, 4], [26, 4], [26, 5], [26, 3], [26, 4], [26, 4], [26, 5], [26, 4], [26, 5], [26, 5], [26, 6], [27, 3], [73, 1], [73, 1], [74, 1], [74, 1], [74, 1], [74, 1], [74, 1], [74, 1], [74, 1], [76, 1], [76, 1], [76, 1], [76, 1], [16, 1], [16, 1], [16, 1], [16, 1], [18, 1], [50, 1]],
     performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$) {
       var $0 = $$.length - 1;
       switch (yystate) {
-        case 1:
-          break;
-        case 2:
-          this.$ = [];
-          break;
-        case 3:
-          $$[$0 - 1].push($$[$0]);
+        case 8:
           this.$ = $$[$0 - 1];
           break;
-        case 4:
-        case 5:
+        case 9:
+        case 11:
+        case 12:
           this.$ = $$[$0];
           break;
-        case 6:
-        case 7:
-          this.$ = [];
-          break;
-        case 8:
-          yy.addEntity($$[$0 - 4]);
-          yy.addEntity($$[$0 - 2]);
-          yy.addRelationship($$[$0 - 4], $$[$0], $$[$0 - 2], $$[$0 - 3]);
-          break;
-        case 9:
-          yy.addEntity($$[$0 - 3]);
-          yy.addAttributes($$[$0 - 3], $$[$0 - 1]);
-          break;
         case 10:
-          yy.addEntity($$[$0 - 2]);
-          break;
-        case 11:
-          yy.addEntity($$[$0]);
-          break;
-        case 12:
-          yy.addEntity($$[$0 - 6], $$[$0 - 4]);
-          yy.addAttributes($$[$0 - 6], $$[$0 - 1]);
-          break;
         case 13:
-          yy.addEntity($$[$0 - 5], $$[$0 - 3]);
+          this.$ = $$[$0 - 1] + $$[$0];
           break;
         case 14:
-          yy.addEntity($$[$0 - 3], $$[$0 - 1]);
-          break;
         case 15:
+          this.$ = $$[$0 - 1] + "~" + $$[$0] + "~";
+          break;
         case 16:
+          yy.addRelation($$[$0]);
+          break;
+        case 17:
+          $$[$0 - 1].title = yy.cleanupLabel($$[$0]);
+          yy.addRelation($$[$0 - 1]);
+          break;
+        case 26:
           this.$ = $$[$0].trim();
           yy.setAccTitle(this.$);
           break;
-        case 17:
-        case 18:
+        case 27:
+        case 28:
           this.$ = $$[$0].trim();
           yy.setAccDescription(this.$);
           break;
-        case 19:
-        case 43:
-          this.$ = $$[$0];
-          break;
-        case 20:
-        case 41:
-        case 42:
-          this.$ = $$[$0].replace(/"/g, "");
-          break;
-        case 21:
         case 29:
+          yy.addClassesToNamespace($$[$0 - 3], $$[$0 - 1]);
+          break;
+        case 30:
+          yy.addClassesToNamespace($$[$0 - 4], $$[$0 - 1]);
+          break;
+        case 31:
+          this.$ = $$[$0];
+          yy.addNamespace($$[$0]);
+          break;
+        case 32:
           this.$ = [$$[$0]];
           break;
-        case 22:
+        case 33:
+          this.$ = [$$[$0 - 1]];
+          break;
+        case 34:
+          $$[$0].unshift($$[$0 - 2]);
+          this.$ = $$[$0];
+          break;
+        case 36:
+          yy.setCssClass($$[$0 - 2], $$[$0]);
+          break;
+        case 37:
+          yy.addMembers($$[$0 - 3], $$[$0 - 1]);
+          break;
+        case 38:
+          yy.setCssClass($$[$0 - 5], $$[$0 - 3]);
+          yy.addMembers($$[$0 - 5], $$[$0 - 1]);
+          break;
+        case 39:
+          this.$ = $$[$0];
+          yy.addClass($$[$0]);
+          break;
+        case 40:
+          this.$ = $$[$0 - 1];
+          yy.addClass($$[$0 - 1]);
+          yy.setClassLabel($$[$0 - 1], $$[$0]);
+          break;
+        case 41:
+          yy.addAnnotation($$[$0], $$[$0 - 2]);
+          break;
+        case 42:
+          this.$ = [$$[$0]];
+          break;
+        case 43:
           $$[$0].push($$[$0 - 1]);
           this.$ = $$[$0];
           break;
-        case 23:
-          this.$ = { attributeType: $$[$0 - 1], attributeName: $$[$0] };
+        case 44:
           break;
-        case 24:
-          this.$ = { attributeType: $$[$0 - 2], attributeName: $$[$0 - 1], attributeKeyTypeList: $$[$0] };
+        case 45:
+          yy.addMember($$[$0 - 1], yy.cleanupLabel($$[$0]));
           break;
-        case 25:
-          this.$ = { attributeType: $$[$0 - 2], attributeName: $$[$0 - 1], attributeComment: $$[$0] };
+        case 46:
           break;
-        case 26:
-          this.$ = { attributeType: $$[$0 - 3], attributeName: $$[$0 - 2], attributeKeyTypeList: $$[$0 - 1], attributeComment: $$[$0] };
+        case 47:
           break;
-        case 27:
-        case 28:
-        case 31:
-          this.$ = $$[$0];
+        case 48:
+          this.$ = { "id1": $$[$0 - 2], "id2": $$[$0], relation: $$[$0 - 1], relationTitle1: "none", relationTitle2: "none" };
           break;
-        case 30:
-          $$[$0 - 2].push($$[$0]);
+        case 49:
+          this.$ = { id1: $$[$0 - 3], id2: $$[$0], relation: $$[$0 - 1], relationTitle1: $$[$0 - 2], relationTitle2: "none" };
+          break;
+        case 50:
+          this.$ = { id1: $$[$0 - 3], id2: $$[$0], relation: $$[$0 - 2], relationTitle1: "none", relationTitle2: $$[$0 - 1] };
+          break;
+        case 51:
+          this.$ = { id1: $$[$0 - 4], id2: $$[$0], relation: $$[$0 - 2], relationTitle1: $$[$0 - 3], relationTitle2: $$[$0 - 1] };
+          break;
+        case 52:
+          yy.addNote($$[$0], $$[$0 - 1]);
+          break;
+        case 53:
+          yy.addNote($$[$0]);
+          break;
+        case 54:
+          yy.setDirection("TB");
+          break;
+        case 55:
+          yy.setDirection("BT");
+          break;
+        case 56:
+          yy.setDirection("RL");
+          break;
+        case 57:
+          yy.setDirection("LR");
+          break;
+        case 58:
+          this.$ = { type1: $$[$0 - 2], type2: $$[$0], lineType: $$[$0 - 1] };
+          break;
+        case 59:
+          this.$ = { type1: "none", type2: $$[$0], lineType: $$[$0 - 1] };
+          break;
+        case 60:
+          this.$ = { type1: $$[$0 - 1], type2: "none", lineType: $$[$0] };
+          break;
+        case 61:
+          this.$ = { type1: "none", type2: "none", lineType: $$[$0] };
+          break;
+        case 62:
+          this.$ = yy.relationType.AGGREGATION;
+          break;
+        case 63:
+          this.$ = yy.relationType.EXTENSION;
+          break;
+        case 64:
+          this.$ = yy.relationType.COMPOSITION;
+          break;
+        case 65:
+          this.$ = yy.relationType.DEPENDENCY;
+          break;
+        case 66:
+          this.$ = yy.relationType.LOLLIPOP;
+          break;
+        case 67:
+          this.$ = yy.lineType.LINE;
+          break;
+        case 68:
+          this.$ = yy.lineType.DOTTED_LINE;
+          break;
+        case 69:
+        case 75:
           this.$ = $$[$0 - 2];
+          yy.setClickEvent($$[$0 - 1], $$[$0]);
           break;
-        case 32:
-          this.$ = $$[$0].replace(/"/g, "");
+        case 70:
+        case 76:
+          this.$ = $$[$0 - 3];
+          yy.setClickEvent($$[$0 - 2], $$[$0 - 1]);
+          yy.setTooltip($$[$0 - 2], $$[$0]);
           break;
-        case 33:
-          this.$ = { cardA: $$[$0], relType: $$[$0 - 1], cardB: $$[$0 - 2] };
+        case 71:
+          this.$ = $$[$0 - 2];
+          yy.setLink($$[$0 - 1], $$[$0]);
           break;
-        case 34:
-          this.$ = yy.Cardinality.ZERO_OR_ONE;
+        case 72:
+          this.$ = $$[$0 - 3];
+          yy.setLink($$[$0 - 2], $$[$0 - 1], $$[$0]);
           break;
-        case 35:
-          this.$ = yy.Cardinality.ZERO_OR_MORE;
+        case 73:
+          this.$ = $$[$0 - 3];
+          yy.setLink($$[$0 - 2], $$[$0 - 1]);
+          yy.setTooltip($$[$0 - 2], $$[$0]);
           break;
-        case 36:
-          this.$ = yy.Cardinality.ONE_OR_MORE;
+        case 74:
+          this.$ = $$[$0 - 4];
+          yy.setLink($$[$0 - 3], $$[$0 - 2], $$[$0]);
+          yy.setTooltip($$[$0 - 3], $$[$0 - 1]);
           break;
-        case 37:
-          this.$ = yy.Cardinality.ONLY_ONE;
+        case 77:
+          this.$ = $$[$0 - 3];
+          yy.setClickEvent($$[$0 - 2], $$[$0 - 1], $$[$0]);
           break;
-        case 38:
-          this.$ = yy.Cardinality.MD_PARENT;
+        case 78:
+          this.$ = $$[$0 - 4];
+          yy.setClickEvent($$[$0 - 3], $$[$0 - 2], $$[$0 - 1]);
+          yy.setTooltip($$[$0 - 3], $$[$0]);
           break;
-        case 39:
-          this.$ = yy.Identification.NON_IDENTIFYING;
+        case 79:
+          this.$ = $$[$0 - 3];
+          yy.setLink($$[$0 - 2], $$[$0]);
           break;
-        case 40:
-          this.$ = yy.Identification.IDENTIFYING;
+        case 80:
+          this.$ = $$[$0 - 4];
+          yy.setLink($$[$0 - 3], $$[$0 - 1], $$[$0]);
+          break;
+        case 81:
+          this.$ = $$[$0 - 4];
+          yy.setLink($$[$0 - 3], $$[$0 - 1]);
+          yy.setTooltip($$[$0 - 3], $$[$0]);
+          break;
+        case 82:
+          this.$ = $$[$0 - 5];
+          yy.setLink($$[$0 - 4], $$[$0 - 2], $$[$0]);
+          yy.setTooltip($$[$0 - 4], $$[$0 - 1]);
+          break;
+        case 83:
+          yy.setCssClass($$[$0 - 1], $$[$0]);
           break;
       }
     },
-    table: [{ 3: 1, 4: [1, 2] }, { 1: [3] }, o($V0, [2, 2], { 5: 3 }), { 6: [1, 4], 7: 5, 8: [1, 6], 9: 7, 10: [1, 8], 11: 9, 20: $V1, 22: $V2, 24: $V3, 26: $V4, 27: $V5, 28: $V6 }, o($V0, [2, 7], { 1: [2, 1] }), o($V0, [2, 3]), { 9: 16, 11: 9, 20: $V1, 22: $V2, 24: $V3, 26: $V4, 27: $V5, 28: $V6 }, o($V0, [2, 5]), o($V0, [2, 6]), o($V0, [2, 11], { 12: 17, 39: 20, 15: [1, 18], 18: [1, 19], 41: $V7, 42: $V8, 43: $V9, 44: $Va, 45: $Vb }), { 21: [1, 26] }, { 23: [1, 27] }, { 25: [1, 28] }, o($V0, [2, 18]), o($Vc, [2, 19]), o($Vc, [2, 20]), o($V0, [2, 4]), { 11: 29, 27: $V5, 28: $V6 }, { 16: 30, 17: [1, 31], 29: 32, 30: 33, 34: $Vd }, { 11: 35, 27: $V5, 28: $V6 }, { 40: 36, 46: [1, 37], 47: [1, 38] }, o($Ve, [2, 34]), o($Ve, [2, 35]), o($Ve, [2, 36]), o($Ve, [2, 37]), o($Ve, [2, 38]), o($V0, [2, 15]), o($V0, [2, 16]), o($V0, [2, 17]), { 13: [1, 39] }, { 17: [1, 40] }, o($V0, [2, 10]), { 16: 41, 17: [2, 21], 29: 32, 30: 33, 34: $Vd }, { 31: 42, 34: [1, 43] }, { 34: [2, 27] }, { 19: [1, 44] }, { 39: 45, 41: $V7, 42: $V8, 43: $V9, 44: $Va, 45: $Vb }, o($Vf, [2, 39]), o($Vf, [2, 40]), { 14: 46, 27: [1, 49], 28: [1, 48], 48: [1, 47] }, o($V0, [2, 9]), { 17: [2, 22] }, o($Vg, [2, 23], { 32: 50, 33: 51, 35: 52, 37: $Vh, 38: $Vi }), o([17, 34, 37, 38], [2, 28]), o($V0, [2, 14], { 15: [1, 55] }), o([27, 28], [2, 33]), o($V0, [2, 8]), o($V0, [2, 41]), o($V0, [2, 42]), o($V0, [2, 43]), o($Vg, [2, 24], { 33: 56, 36: [1, 57], 38: $Vi }), o($Vg, [2, 25]), o($Vj, [2, 29]), o($Vg, [2, 32]), o($Vj, [2, 31]), { 16: 58, 17: [1, 59], 29: 32, 30: 33, 34: $Vd }, o($Vg, [2, 26]), { 35: 60, 37: $Vh }, { 17: [1, 61] }, o($V0, [2, 13]), o($Vj, [2, 30]), o($V0, [2, 12])],
-    defaultActions: { 34: [2, 27], 41: [2, 22] },
+    table: [{ 3: 1, 4: 2, 5: 3, 6: 4, 7: [1, 6], 10: 5, 16: 35, 17: 19, 18: 36, 20: 7, 22: 8, 23: 9, 24: 10, 25: 11, 26: 12, 27: 13, 28: 14, 29: 15, 30: $V0, 32: $V1, 34: $V2, 35: 20, 39: $V3, 40: 21, 43: $V4, 44: $V5, 46: $V6, 47: $V7, 49: $V8, 51: $V9, 52: $Va, 53: $Vb, 54: $Vc, 55: $Vd, 65: $Ve, 66: $Vf, 68: $Vg, 72: $Vh, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 1: [3] }, { 1: [2, 1] }, { 1: [2, 2] }, { 1: [2, 3] }, o($Vn, [2, 5], { 8: [1, 44] }), { 8: [1, 45] }, o($Vo, [2, 16], { 21: [1, 46] }), o($Vo, [2, 18]), o($Vo, [2, 19]), o($Vo, [2, 20]), o($Vo, [2, 21]), o($Vo, [2, 22]), o($Vo, [2, 23]), o($Vo, [2, 24]), o($Vo, [2, 25]), { 31: [1, 47] }, { 33: [1, 48] }, o($Vo, [2, 28]), o($Vo, [2, 44], { 48: 49, 56: 52, 57: 53, 13: [1, 50], 21: [1, 51], 58: $Vp, 59: $Vq, 60: $Vr, 61: $Vs, 62: $Vt, 63: $Vu, 64: $Vv }), { 36: [1, 61] }, o($Vw, [2, 35], { 36: [1, 63], 41: [1, 62] }), o($Vo, [2, 46]), o($Vo, [2, 47]), { 16: 64, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl }, { 16: 35, 17: 65, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 16: 35, 17: 66, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 16: 35, 17: 67, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 13: [1, 68] }, { 16: 35, 17: 69, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 13: $Vx, 50: 70 }, o($Vo, [2, 54]), o($Vo, [2, 55]), o($Vo, [2, 56]), o($Vo, [2, 57]), o($Vy, [2, 11], { 16: 35, 18: 36, 17: 72, 19: [1, 73], 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }), o($Vy, [2, 12], { 19: [1, 74] }), { 15: 75, 16: 76, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl }, { 16: 35, 17: 77, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, o($Vz, [2, 97]), o($Vz, [2, 98]), o($Vz, [2, 99]), o($Vz, [2, 100]), o([1, 8, 9, 12, 13, 19, 21, 36, 38, 41, 58, 59, 60, 61, 62, 63, 64, 69, 71], [2, 101]), o($Vn, [2, 6], { 10: 5, 20: 7, 22: 8, 23: 9, 24: 10, 25: 11, 26: 12, 27: 13, 28: 14, 29: 15, 17: 19, 35: 20, 40: 21, 16: 35, 18: 36, 5: 78, 30: $V0, 32: $V1, 34: $V2, 39: $V3, 43: $V4, 44: $V5, 46: $V6, 47: $V7, 49: $V8, 51: $V9, 52: $Va, 53: $Vb, 54: $Vc, 55: $Vd, 65: $Ve, 66: $Vf, 68: $Vg, 72: $Vh, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }), { 5: 79, 10: 5, 16: 35, 17: 19, 18: 36, 20: 7, 22: 8, 23: 9, 24: 10, 25: 11, 26: 12, 27: 13, 28: 14, 29: 15, 30: $V0, 32: $V1, 34: $V2, 35: 20, 39: $V3, 40: 21, 43: $V4, 44: $V5, 46: $V6, 47: $V7, 49: $V8, 51: $V9, 52: $Va, 53: $Vb, 54: $Vc, 55: $Vd, 65: $Ve, 66: $Vf, 68: $Vg, 72: $Vh, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, o($Vo, [2, 17]), o($Vo, [2, 26]), o($Vo, [2, 27]), { 13: [1, 81], 16: 35, 17: 80, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 48: 82, 56: 52, 57: 53, 58: $Vp, 59: $Vq, 60: $Vr, 61: $Vs, 62: $Vt, 63: $Vu, 64: $Vv }, o($Vo, [2, 45]), { 57: 83, 63: $Vu, 64: $Vv }, o($VA, [2, 61], { 56: 84, 58: $Vp, 59: $Vq, 60: $Vr, 61: $Vs, 62: $Vt }), o($VB, [2, 62]), o($VB, [2, 63]), o($VB, [2, 64]), o($VB, [2, 65]), o($VB, [2, 66]), o($VC, [2, 67]), o($VC, [2, 68]), { 8: [1, 86], 23: 87, 37: 85, 40: 21, 43: $V4 }, { 16: 88, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl }, { 42: 89, 46: $VD }, { 45: [1, 91] }, { 13: [1, 92] }, { 13: [1, 93] }, { 69: [1, 94], 71: [1, 95] }, { 16: 96, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl }, { 13: $Vx, 50: 97 }, o($Vo, [2, 53]), o($Vo, [2, 102]), o($Vy, [2, 13]), o($Vy, [2, 14]), o($Vy, [2, 15]), { 36: [2, 31] }, { 15: 98, 16: 76, 36: [2, 9], 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl }, o($VE, [2, 39], { 11: 99, 12: [1, 100] }), o($Vn, [2, 7]), { 9: [1, 101] }, o($VF, [2, 48]), { 16: 35, 17: 102, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, { 13: [1, 104], 16: 35, 17: 103, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, o($VA, [2, 60], { 56: 105, 58: $Vp, 59: $Vq, 60: $Vr, 61: $Vs, 62: $Vt }), o($VA, [2, 59]), { 38: [1, 106] }, { 23: 87, 37: 107, 40: 21, 43: $V4 }, { 8: [1, 108], 38: [2, 32] }, o($Vw, [2, 36], { 36: [1, 109] }), { 38: [1, 110] }, { 38: [2, 42], 42: 111, 46: $VD }, { 16: 35, 17: 112, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, o($Vo, [2, 69], { 13: [1, 113] }), o($Vo, [2, 71], { 13: [1, 115], 67: [1, 114] }), o($Vo, [2, 75], { 13: [1, 116], 70: [1, 117] }), { 13: [1, 118] }, o($Vo, [2, 83]), o($Vo, [2, 52]), { 36: [2, 10] }, o($VE, [2, 40]), { 13: [1, 119] }, { 1: [2, 4] }, o($VF, [2, 50]), o($VF, [2, 49]), { 16: 35, 17: 120, 18: 36, 84: $Vi, 86: $Vj, 87: $Vk, 88: $Vl, 89: $Vm }, o($VA, [2, 58]), o($Vo, [2, 29]), { 38: [1, 121] }, { 23: 87, 37: 122, 38: [2, 33], 40: 21, 43: $V4 }, { 42: 123, 46: $VD }, o($Vw, [2, 37]), { 38: [2, 43] }, o($Vo, [2, 41]), o($Vo, [2, 70]), o($Vo, [2, 72]), o($Vo, [2, 73], { 67: [1, 124] }), o($Vo, [2, 76]), o($Vo, [2, 77], { 13: [1, 125] }), o($Vo, [2, 79], { 13: [1, 127], 67: [1, 126] }), { 14: [1, 128] }, o($VF, [2, 51]), o($Vo, [2, 30]), { 38: [2, 34] }, { 38: [1, 129] }, o($Vo, [2, 74]), o($Vo, [2, 78]), o($Vo, [2, 80]), o($Vo, [2, 81], { 67: [1, 130] }), o($VE, [2, 8]), o($Vw, [2, 38]), o($Vo, [2, 82])],
+    defaultActions: { 2: [2, 1], 3: [2, 2], 4: [2, 3], 75: [2, 31], 98: [2, 10], 101: [2, 4], 111: [2, 43], 122: [2, 34] },
     parseError: function parseError(str, hash) {
       if (hash.recoverable) {
         this.trace(str);
@@ -9710,133 +9988,222 @@ var parser = function() {
       stateStackSize: function stateStackSize() {
         return this.conditionStack.length;
       },
-      options: { "case-insensitive": true },
+      options: {},
       performAction: function anonymous(yy, yy_, $avoiding_name_collisions, YY_START) {
         switch ($avoiding_name_collisions) {
           case 0:
-            this.begin("acc_title");
-            return 22;
+            return 52;
           case 1:
-            this.popState();
-            return "acc_title_value";
+            return 53;
           case 2:
-            this.begin("acc_descr");
-            return 24;
+            return 54;
           case 3:
-            this.popState();
-            return "acc_descr_value";
+            return 55;
           case 4:
-            this.begin("acc_descr_multiline");
             break;
           case 5:
-            this.popState();
             break;
           case 6:
-            return "acc_descr_multiline_value";
+            this.begin("acc_title");
+            return 30;
           case 7:
-            return 10;
+            this.popState();
+            return "acc_title_value";
           case 8:
-            break;
+            this.begin("acc_descr");
+            return 32;
           case 9:
-            return 8;
+            this.popState();
+            return "acc_descr_value";
           case 10:
-            return 28;
-          case 11:
-            return 48;
-          case 12:
-            return 4;
-          case 13:
-            this.begin("block");
-            return 15;
-          case 14:
-            return 36;
-          case 15:
+            this.begin("acc_descr_multiline");
             break;
+          case 11:
+            this.popState();
+            break;
+          case 12:
+            return "acc_descr_multiline_value";
+          case 13:
+            return 8;
+          case 14:
+            break;
+          case 15:
+            return 7;
           case 16:
-            return 37;
+            return 7;
           case 17:
-            return 34;
+            return "EDGE_STATE";
           case 18:
-            return 34;
+            this.begin("callback_name");
+            break;
           case 19:
-            return 38;
+            this.popState();
+            break;
           case 20:
+            this.popState();
+            this.begin("callback_args");
             break;
           case 21:
-            this.popState();
-            return 17;
+            return 69;
           case 22:
-            return yy_.yytext[0];
+            this.popState();
+            break;
           case 23:
-            return 18;
+            return 70;
           case 24:
-            return 19;
+            this.popState();
+            break;
           case 25:
-            return 41;
+            return "STR";
           case 26:
-            return 43;
+            this.begin("string");
+            break;
           case 27:
-            return 43;
+            this.begin("namespace");
+            return 39;
           case 28:
-            return 43;
+            this.popState();
+            return 8;
           case 29:
-            return 41;
+            break;
           case 30:
-            return 41;
+            this.begin("namespace-body");
+            return 36;
           case 31:
-            return 42;
+            this.popState();
+            return 38;
           case 32:
-            return 42;
+            return "EOF_IN_STRUCT";
           case 33:
-            return 42;
+            return 8;
           case 34:
-            return 42;
+            break;
           case 35:
-            return 42;
+            return "EDGE_STATE";
           case 36:
+            this.begin("class");
             return 43;
           case 37:
-            return 42;
+            this.popState();
+            return 8;
           case 38:
-            return 43;
+            break;
           case 39:
-            return 44;
+            this.popState();
+            this.popState();
+            return 38;
           case 40:
-            return 44;
+            this.begin("class-body");
+            return 36;
           case 41:
-            return 44;
+            this.popState();
+            return 38;
           case 42:
-            return 44;
+            return "EOF_IN_STRUCT";
           case 43:
-            return 41;
+            return "EDGE_STATE";
           case 44:
-            return 42;
+            return "OPEN_IN_STRUCT";
           case 45:
-            return 43;
+            break;
           case 46:
-            return 45;
+            return "MEMBER";
           case 47:
-            return 46;
+            return 72;
           case 48:
-            return 47;
+            return 65;
           case 49:
-            return 47;
+            return 66;
           case 50:
-            return 46;
+            return 68;
           case 51:
-            return 46;
+            return 49;
           case 52:
-            return 46;
+            return 51;
           case 53:
-            return 27;
+            return 44;
           case 54:
-            return yy_.yytext[0];
+            return 45;
           case 55:
-            return 6;
+            return 71;
+          case 56:
+            this.popState();
+            break;
+          case 57:
+            return "GENERICTYPE";
+          case 58:
+            this.begin("generic");
+            break;
+          case 59:
+            this.popState();
+            break;
+          case 60:
+            return "BQUOTE_STR";
+          case 61:
+            this.begin("bqstring");
+            break;
+          case 62:
+            return 67;
+          case 63:
+            return 67;
+          case 64:
+            return 67;
+          case 65:
+            return 67;
+          case 66:
+            return 59;
+          case 67:
+            return 59;
+          case 68:
+            return 61;
+          case 69:
+            return 61;
+          case 70:
+            return 60;
+          case 71:
+            return 58;
+          case 72:
+            return 62;
+          case 73:
+            return 63;
+          case 74:
+            return 64;
+          case 75:
+            return 21;
+          case 76:
+            return 41;
+          case 77:
+            return 84;
+          case 78:
+            return "DOT";
+          case 79:
+            return "PLUS";
+          case 80:
+            return 81;
+          case 81:
+            return "EQUALS";
+          case 82:
+            return "EQUALS";
+          case 83:
+            return 88;
+          case 84:
+            return 12;
+          case 85:
+            return 14;
+          case 86:
+            return "PUNCTUATION";
+          case 87:
+            return 87;
+          case 88:
+            return 86;
+          case 89:
+            return 83;
+          case 90:
+            return 9;
         }
       },
-      rules: [/^(?:accTitle\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*:\s*)/i, /^(?:(?!\n||)*[^\n]*)/i, /^(?:accDescr\s*\{\s*)/i, /^(?:[\}])/i, /^(?:[^\}]*)/i, /^(?:[\n]+)/i, /^(?:\s+)/i, /^(?:[\s]+)/i, /^(?:"[^"%\r\n\v\b\\]+")/i, /^(?:"[^"]*")/i, /^(?:erDiagram\b)/i, /^(?:\{)/i, /^(?:,)/i, /^(?:\s+)/i, /^(?:\b((?:PK)|(?:FK)|(?:UK))\b)/i, /^(?:(.*?)[~](.*?)*[~])/i, /^(?:[\*A-Za-z_][A-Za-z0-9\-_\[\]\(\)]*)/i, /^(?:"[^"]*")/i, /^(?:[\n]+)/i, /^(?:\})/i, /^(?:.)/i, /^(?:\[)/i, /^(?:\])/i, /^(?:one or zero\b)/i, /^(?:one or more\b)/i, /^(?:one or many\b)/i, /^(?:1\+)/i, /^(?:\|o\b)/i, /^(?:zero or one\b)/i, /^(?:zero or more\b)/i, /^(?:zero or many\b)/i, /^(?:0\+)/i, /^(?:\}o\b)/i, /^(?:many\(0\))/i, /^(?:many\(1\))/i, /^(?:many\b)/i, /^(?:\}\|)/i, /^(?:one\b)/i, /^(?:only one\b)/i, /^(?:1\b)/i, /^(?:\|\|)/i, /^(?:o\|)/i, /^(?:o\{)/i, /^(?:\|\{)/i, /^(?:\s*u\b)/i, /^(?:\.\.)/i, /^(?:--)/i, /^(?:to\b)/i, /^(?:optionally to\b)/i, /^(?:\.-)/i, /^(?:-\.)/i, /^(?:[A-Za-z_][A-Za-z0-9\-_]*)/i, /^(?:.)/i, /^(?:$)/i],
-      conditions: { "acc_descr_multiline": { "rules": [5, 6], "inclusive": false }, "acc_descr": { "rules": [3], "inclusive": false }, "acc_title": { "rules": [1], "inclusive": false }, "block": { "rules": [14, 15, 16, 17, 18, 19, 20, 21, 22], "inclusive": false }, "INITIAL": { "rules": [0, 2, 4, 7, 8, 9, 10, 11, 12, 13, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55], "inclusive": true } }
+      rules: [/^(?:.*direction\s+TB[^\n]*)/, /^(?:.*direction\s+BT[^\n]*)/, /^(?:.*direction\s+RL[^\n]*)/, /^(?:.*direction\s+LR[^\n]*)/, /^(?:%%(?!\{)*[^\n]*(\r?\n?)+)/, /^(?:%%[^\n]*(\r?\n)*)/, /^(?:accTitle\s*:\s*)/, /^(?:(?!\n||)*[^\n]*)/, /^(?:accDescr\s*:\s*)/, /^(?:(?!\n||)*[^\n]*)/, /^(?:accDescr\s*\{\s*)/, /^(?:[\}])/, /^(?:[^\}]*)/, /^(?:\s*(\r?\n)+)/, /^(?:\s+)/, /^(?:classDiagram-v2\b)/, /^(?:classDiagram\b)/, /^(?:\[\*\])/, /^(?:call[\s]+)/, /^(?:\([\s]*\))/, /^(?:\()/, /^(?:[^(]*)/, /^(?:\))/, /^(?:[^)]*)/, /^(?:["])/, /^(?:[^"]*)/, /^(?:["])/, /^(?:namespace\b)/, /^(?:\s*(\r?\n)+)/, /^(?:\s+)/, /^(?:[{])/, /^(?:[}])/, /^(?:$)/, /^(?:\s*(\r?\n)+)/, /^(?:\s+)/, /^(?:\[\*\])/, /^(?:class\b)/, /^(?:\s*(\r?\n)+)/, /^(?:\s+)/, /^(?:[}])/, /^(?:[{])/, /^(?:[}])/, /^(?:$)/, /^(?:\[\*\])/, /^(?:[{])/, /^(?:[\n])/, /^(?:[^{}\n]*)/, /^(?:cssClass\b)/, /^(?:callback\b)/, /^(?:link\b)/, /^(?:click\b)/, /^(?:note for\b)/, /^(?:note\b)/, /^(?:<<)/, /^(?:>>)/, /^(?:href\b)/, /^(?:[~])/, /^(?:[^~]*)/, /^(?:~)/, /^(?:[`])/, /^(?:[^`]+)/, /^(?:[`])/, /^(?:_self\b)/, /^(?:_blank\b)/, /^(?:_parent\b)/, /^(?:_top\b)/, /^(?:\s*<\|)/, /^(?:\s*\|>)/, /^(?:\s*>)/, /^(?:\s*<)/, /^(?:\s*\*)/, /^(?:\s*o\b)/, /^(?:\s*\(\))/, /^(?:--)/, /^(?:\.\.)/, /^(?::{1}[^:\n;]+)/, /^(?::{3})/, /^(?:-)/, /^(?:\.)/, /^(?:\+)/, /^(?:%)/, /^(?:=)/, /^(?:=)/, /^(?:\w+)/, /^(?:\[)/, /^(?:\])/, /^(?:[!"#$%&'*+,-.`?\\/])/, /^(?:[0-9]+)/, /^(?:[\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6]|[\u00F8-\u02C1\u02C6-\u02D1\u02E0-\u02E4\u02EC\u02EE\u0370-\u0374\u0376\u0377]|[\u037A-\u037D\u0386\u0388-\u038A\u038C\u038E-\u03A1\u03A3-\u03F5]|[\u03F7-\u0481\u048A-\u0527\u0531-\u0556\u0559\u0561-\u0587\u05D0-\u05EA]|[\u05F0-\u05F2\u0620-\u064A\u066E\u066F\u0671-\u06D3\u06D5\u06E5\u06E6\u06EE]|[\u06EF\u06FA-\u06FC\u06FF\u0710\u0712-\u072F\u074D-\u07A5\u07B1\u07CA-\u07EA]|[\u07F4\u07F5\u07FA\u0800-\u0815\u081A\u0824\u0828\u0840-\u0858\u08A0]|[\u08A2-\u08AC\u0904-\u0939\u093D\u0950\u0958-\u0961\u0971-\u0977]|[\u0979-\u097F\u0985-\u098C\u098F\u0990\u0993-\u09A8\u09AA-\u09B0\u09B2]|[\u09B6-\u09B9\u09BD\u09CE\u09DC\u09DD\u09DF-\u09E1\u09F0\u09F1\u0A05-\u0A0A]|[\u0A0F\u0A10\u0A13-\u0A28\u0A2A-\u0A30\u0A32\u0A33\u0A35\u0A36\u0A38\u0A39]|[\u0A59-\u0A5C\u0A5E\u0A72-\u0A74\u0A85-\u0A8D\u0A8F-\u0A91\u0A93-\u0AA8]|[\u0AAA-\u0AB0\u0AB2\u0AB3\u0AB5-\u0AB9\u0ABD\u0AD0\u0AE0\u0AE1\u0B05-\u0B0C]|[\u0B0F\u0B10\u0B13-\u0B28\u0B2A-\u0B30\u0B32\u0B33\u0B35-\u0B39\u0B3D\u0B5C]|[\u0B5D\u0B5F-\u0B61\u0B71\u0B83\u0B85-\u0B8A\u0B8E-\u0B90\u0B92-\u0B95\u0B99]|[\u0B9A\u0B9C\u0B9E\u0B9F\u0BA3\u0BA4\u0BA8-\u0BAA\u0BAE-\u0BB9\u0BD0]|[\u0C05-\u0C0C\u0C0E-\u0C10\u0C12-\u0C28\u0C2A-\u0C33\u0C35-\u0C39\u0C3D]|[\u0C58\u0C59\u0C60\u0C61\u0C85-\u0C8C\u0C8E-\u0C90\u0C92-\u0CA8\u0CAA-\u0CB3]|[\u0CB5-\u0CB9\u0CBD\u0CDE\u0CE0\u0CE1\u0CF1\u0CF2\u0D05-\u0D0C\u0D0E-\u0D10]|[\u0D12-\u0D3A\u0D3D\u0D4E\u0D60\u0D61\u0D7A-\u0D7F\u0D85-\u0D96\u0D9A-\u0DB1]|[\u0DB3-\u0DBB\u0DBD\u0DC0-\u0DC6\u0E01-\u0E30\u0E32\u0E33\u0E40-\u0E46\u0E81]|[\u0E82\u0E84\u0E87\u0E88\u0E8A\u0E8D\u0E94-\u0E97\u0E99-\u0E9F\u0EA1-\u0EA3]|[\u0EA5\u0EA7\u0EAA\u0EAB\u0EAD-\u0EB0\u0EB2\u0EB3\u0EBD\u0EC0-\u0EC4\u0EC6]|[\u0EDC-\u0EDF\u0F00\u0F40-\u0F47\u0F49-\u0F6C\u0F88-\u0F8C\u1000-\u102A]|[\u103F\u1050-\u1055\u105A-\u105D\u1061\u1065\u1066\u106E-\u1070\u1075-\u1081]|[\u108E\u10A0-\u10C5\u10C7\u10CD\u10D0-\u10FA\u10FC-\u1248\u124A-\u124D]|[\u1250-\u1256\u1258\u125A-\u125D\u1260-\u1288\u128A-\u128D\u1290-\u12B0]|[\u12B2-\u12B5\u12B8-\u12BE\u12C0\u12C2-\u12C5\u12C8-\u12D6\u12D8-\u1310]|[\u1312-\u1315\u1318-\u135A\u1380-\u138F\u13A0-\u13F4\u1401-\u166C]|[\u166F-\u167F\u1681-\u169A\u16A0-\u16EA\u1700-\u170C\u170E-\u1711]|[\u1720-\u1731\u1740-\u1751\u1760-\u176C\u176E-\u1770\u1780-\u17B3\u17D7]|[\u17DC\u1820-\u1877\u1880-\u18A8\u18AA\u18B0-\u18F5\u1900-\u191C]|[\u1950-\u196D\u1970-\u1974\u1980-\u19AB\u19C1-\u19C7\u1A00-\u1A16]|[\u1A20-\u1A54\u1AA7\u1B05-\u1B33\u1B45-\u1B4B\u1B83-\u1BA0\u1BAE\u1BAF]|[\u1BBA-\u1BE5\u1C00-\u1C23\u1C4D-\u1C4F\u1C5A-\u1C7D\u1CE9-\u1CEC]|[\u1CEE-\u1CF1\u1CF5\u1CF6\u1D00-\u1DBF\u1E00-\u1F15\u1F18-\u1F1D]|[\u1F20-\u1F45\u1F48-\u1F4D\u1F50-\u1F57\u1F59\u1F5B\u1F5D\u1F5F-\u1F7D]|[\u1F80-\u1FB4\u1FB6-\u1FBC\u1FBE\u1FC2-\u1FC4\u1FC6-\u1FCC\u1FD0-\u1FD3]|[\u1FD6-\u1FDB\u1FE0-\u1FEC\u1FF2-\u1FF4\u1FF6-\u1FFC\u2071\u207F]|[\u2090-\u209C\u2102\u2107\u210A-\u2113\u2115\u2119-\u211D\u2124\u2126\u2128]|[\u212A-\u212D\u212F-\u2139\u213C-\u213F\u2145-\u2149\u214E\u2183\u2184]|[\u2C00-\u2C2E\u2C30-\u2C5E\u2C60-\u2CE4\u2CEB-\u2CEE\u2CF2\u2CF3]|[\u2D00-\u2D25\u2D27\u2D2D\u2D30-\u2D67\u2D6F\u2D80-\u2D96\u2DA0-\u2DA6]|[\u2DA8-\u2DAE\u2DB0-\u2DB6\u2DB8-\u2DBE\u2DC0-\u2DC6\u2DC8-\u2DCE]|[\u2DD0-\u2DD6\u2DD8-\u2DDE\u2E2F\u3005\u3006\u3031-\u3035\u303B\u303C]|[\u3041-\u3096\u309D-\u309F\u30A1-\u30FA\u30FC-\u30FF\u3105-\u312D]|[\u3131-\u318E\u31A0-\u31BA\u31F0-\u31FF\u3400-\u4DB5\u4E00-\u9FCC]|[\uA000-\uA48C\uA4D0-\uA4FD\uA500-\uA60C\uA610-\uA61F\uA62A\uA62B]|[\uA640-\uA66E\uA67F-\uA697\uA6A0-\uA6E5\uA717-\uA71F\uA722-\uA788]|[\uA78B-\uA78E\uA790-\uA793\uA7A0-\uA7AA\uA7F8-\uA801\uA803-\uA805]|[\uA807-\uA80A\uA80C-\uA822\uA840-\uA873\uA882-\uA8B3\uA8F2-\uA8F7\uA8FB]|[\uA90A-\uA925\uA930-\uA946\uA960-\uA97C\uA984-\uA9B2\uA9CF\uAA00-\uAA28]|[\uAA40-\uAA42\uAA44-\uAA4B\uAA60-\uAA76\uAA7A\uAA80-\uAAAF\uAAB1\uAAB5]|[\uAAB6\uAAB9-\uAABD\uAAC0\uAAC2\uAADB-\uAADD\uAAE0-\uAAEA\uAAF2-\uAAF4]|[\uAB01-\uAB06\uAB09-\uAB0E\uAB11-\uAB16\uAB20-\uAB26\uAB28-\uAB2E]|[\uABC0-\uABE2\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFA6D]|[\uFA70-\uFAD9\uFB00-\uFB06\uFB13-\uFB17\uFB1D\uFB1F-\uFB28\uFB2A-\uFB36]|[\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFBB1\uFBD3-\uFD3D]|[\uFD50-\uFD8F\uFD92-\uFDC7\uFDF0-\uFDFB\uFE70-\uFE74\uFE76-\uFEFC]|[\uFF21-\uFF3A\uFF41-\uFF5A\uFF66-\uFFBE\uFFC2-\uFFC7\uFFCA-\uFFCF]|[\uFFD2-\uFFD7\uFFDA-\uFFDC])/, /^(?:\s)/, /^(?:$)/],
+      conditions: { "namespace-body": { "rules": [26, 31, 32, 33, 34, 35, 36, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "namespace": { "rules": [26, 27, 28, 29, 30, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "class-body": { "rules": [26, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "class": { "rules": [26, 37, 38, 39, 40, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "acc_descr_multiline": { "rules": [11, 12, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "acc_descr": { "rules": [9, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "acc_title": { "rules": [7, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "callback_args": { "rules": [22, 23, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "callback_name": { "rules": [19, 20, 21, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "href": { "rules": [26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "struct": { "rules": [26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "generic": { "rules": [26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "bqstring": { "rules": [26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "string": { "rules": [24, 25, 26, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": false }, "INITIAL": { "rules": [0, 1, 2, 3, 4, 5, 6, 8, 10, 13, 14, 15, 16, 17, 18, 26, 27, 36, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], "inclusive": true } }
     };
     return lexer2;
   }();
@@ -9849,471 +10216,561 @@ var parser = function() {
   return new Parser();
 }();
 parser.parser = parser;
-const erParser = parser;
-let entities = {};
-let relationships = [];
-const Cardinality = {
-  ZERO_OR_ONE: "ZERO_OR_ONE",
-  ZERO_OR_MORE: "ZERO_OR_MORE",
-  ONE_OR_MORE: "ONE_OR_MORE",
-  ONLY_ONE: "ONLY_ONE",
-  MD_PARENT: "MD_PARENT"
-};
-const Identification = {
-  NON_IDENTIFYING: "NON_IDENTIFYING",
-  IDENTIFYING: "IDENTIFYING"
-};
-const addEntity = function(name, alias = void 0) {
-  if (entities[name] === void 0) {
-    entities[name] = { attributes: [], alias };
-    mermaid_934d9bea.l.info("Added new entity :", name);
-  } else if (entities[name] && !entities[name].alias && alias) {
-    entities[name].alias = alias;
-    mermaid_934d9bea.l.info(`Add alias '${alias}' to entity '${name}'`);
+const parser$1 = parser;
+const visibilityValues = ["#", "+", "~", "-", ""];
+class ClassMember {
+  constructor(input, memberType) {
+    this.memberType = memberType;
+    this.visibility = "";
+    this.classifier = "";
+    const sanitizedInput = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.d)(input, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+    this.parseMember(sanitizedInput);
   }
-  return entities[name];
-};
-const getEntities = () => entities;
-const addAttributes = function(entityName, attribs) {
-  let entity = addEntity(entityName);
-  let i;
-  for (i = attribs.length - 1; i >= 0; i--) {
-    entity.attributes.push(attribs[i]);
-    mermaid_934d9bea.l.debug("Added attribute ", attribs[i].attributeName);
+  getDisplayDetails() {
+    let displayText = this.visibility + (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.v)(this.id);
+    if (this.memberType === "method") {
+      displayText += `(${(0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.v)(this.parameters.trim())})`;
+      if (this.returnType) {
+        displayText += " : " + (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.v)(this.returnType);
+      }
+    }
+    displayText = displayText.trim();
+    const cssStyle = this.parseClassifier();
+    return {
+      displayText,
+      cssStyle
+    };
   }
+  parseMember(input) {
+    let potentialClassifier = "";
+    if (this.memberType === "method") {
+      const methodRegEx = /([#+~-])?(.+)\((.*)\)([\s$*])?(.*)([$*])?/;
+      const match = input.match(methodRegEx);
+      if (match) {
+        const detectedVisibility = match[1] ? match[1].trim() : "";
+        if (visibilityValues.includes(detectedVisibility)) {
+          this.visibility = detectedVisibility;
+        }
+        this.id = match[2].trim();
+        this.parameters = match[3] ? match[3].trim() : "";
+        potentialClassifier = match[4] ? match[4].trim() : "";
+        this.returnType = match[5] ? match[5].trim() : "";
+        if (potentialClassifier === "") {
+          const lastChar = this.returnType.substring(this.returnType.length - 1);
+          if (lastChar.match(/[$*]/)) {
+            potentialClassifier = lastChar;
+            this.returnType = this.returnType.substring(0, this.returnType.length - 1);
+          }
+        }
+      }
+    } else {
+      const length = input.length;
+      const firstChar = input.substring(0, 1);
+      const lastChar = input.substring(length - 1);
+      if (visibilityValues.includes(firstChar)) {
+        this.visibility = firstChar;
+      }
+      if (lastChar.match(/[*?]/)) {
+        potentialClassifier = lastChar;
+      }
+      this.id = input.substring(
+        this.visibility === "" ? 0 : 1,
+        potentialClassifier === "" ? length : length - 1
+      );
+    }
+    this.classifier = potentialClassifier;
+  }
+  parseClassifier() {
+    switch (this.classifier) {
+      case "*":
+        return "font-style:italic;";
+      case "$":
+        return "text-decoration:underline;";
+      default:
+        return "";
+    }
+  }
+}
+const MERMAID_DOM_ID_PREFIX = "classId-";
+let relations = [];
+let classes = {};
+let notes = [];
+let classCounter = 0;
+let namespaces = {};
+let namespaceCounter = 0;
+let functions = [];
+const sanitizeText = (txt) => _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(txt, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+const splitClassNameAndType = function(_id) {
+  const id = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(_id, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  let genericType = "";
+  let className = id;
+  if (id.indexOf("~") > 0) {
+    const split = id.split("~");
+    className = sanitizeText(split[0]);
+    genericType = sanitizeText(split[1]);
+  }
+  return { className, type: genericType };
 };
-const addRelationship = function(entA, rolA, entB, rSpec) {
-  let rel = {
-    entityA: entA,
-    roleA: rolA,
-    entityB: entB,
-    relSpec: rSpec
+const setClassLabel = function(_id, label) {
+  const id = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(_id, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  if (label) {
+    label = sanitizeText(label);
+  }
+  const { className } = splitClassNameAndType(id);
+  classes[className].label = label;
+};
+const addClass = function(_id) {
+  const id = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(_id, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  const { className, type } = splitClassNameAndType(id);
+  if (Object.hasOwn(classes, className)) {
+    return;
+  }
+  const name = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(className, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  classes[name] = {
+    id: name,
+    type,
+    label: name,
+    cssClasses: [],
+    methods: [],
+    members: [],
+    annotations: [],
+    domId: MERMAID_DOM_ID_PREFIX + name + "-" + classCounter
   };
-  relationships.push(rel);
-  mermaid_934d9bea.l.debug("Added new relationship :", rel);
+  classCounter++;
 };
-const getRelationships = () => relationships;
+const lookUpDomId = function(_id) {
+  const id = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(_id, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  if (id in classes) {
+    return classes[id].domId;
+  }
+  throw new Error("Class not found: " + id);
+};
 const clear = function() {
-  entities = {};
-  relationships = [];
-  (0,mermaid_934d9bea.t)();
+  relations = [];
+  classes = {};
+  notes = [];
+  functions = [];
+  functions.push(setupToolTips);
+  namespaces = {};
+  namespaceCounter = 0;
+  (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.t)();
 };
-const erDb = {
-  Cardinality,
-  Identification,
-  getConfig: () => (0,mermaid_934d9bea.c)().er,
-  addEntity,
-  addAttributes,
-  getEntities,
-  addRelationship,
-  getRelationships,
-  clear,
-  setAccTitle: mermaid_934d9bea.s,
-  getAccTitle: mermaid_934d9bea.g,
-  setAccDescription: mermaid_934d9bea.b,
-  getAccDescription: mermaid_934d9bea.a,
-  setDiagramTitle: mermaid_934d9bea.q,
-  getDiagramTitle: mermaid_934d9bea.r
+const getClass = function(id) {
+  return classes[id];
 };
-const ERMarkers = {
-  ONLY_ONE_START: "ONLY_ONE_START",
-  ONLY_ONE_END: "ONLY_ONE_END",
-  ZERO_OR_ONE_START: "ZERO_OR_ONE_START",
-  ZERO_OR_ONE_END: "ZERO_OR_ONE_END",
-  ONE_OR_MORE_START: "ONE_OR_MORE_START",
-  ONE_OR_MORE_END: "ONE_OR_MORE_END",
-  ZERO_OR_MORE_START: "ZERO_OR_MORE_START",
-  ZERO_OR_MORE_END: "ZERO_OR_MORE_END",
-  MD_PARENT_END: "MD_PARENT_END",
-  MD_PARENT_START: "MD_PARENT_START"
+const getClasses = function() {
+  return classes;
 };
-const insertMarkers = function(elem, conf2) {
-  let marker;
-  elem.append("defs").append("marker").attr("id", ERMarkers.MD_PARENT_START).attr("refX", 0).attr("refY", 7).attr("markerWidth", 190).attr("markerHeight", 240).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
-  elem.append("defs").append("marker").attr("id", ERMarkers.MD_PARENT_END).attr("refX", 19).attr("refY", 7).attr("markerWidth", 20).attr("markerHeight", 28).attr("orient", "auto").append("path").attr("d", "M 18,7 L9,13 L1,7 L9,1 Z");
-  elem.append("defs").append("marker").attr("id", ERMarkers.ONLY_ONE_START).attr("refX", 0).attr("refY", 9).attr("markerWidth", 18).attr("markerHeight", 18).attr("orient", "auto").append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M9,0 L9,18 M15,0 L15,18");
-  elem.append("defs").append("marker").attr("id", ERMarkers.ONLY_ONE_END).attr("refX", 18).attr("refY", 9).attr("markerWidth", 18).attr("markerHeight", 18).attr("orient", "auto").append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M3,0 L3,18 M9,0 L9,18");
-  marker = elem.append("defs").append("marker").attr("id", ERMarkers.ZERO_OR_ONE_START).attr("refX", 0).attr("refY", 9).attr("markerWidth", 30).attr("markerHeight", 18).attr("orient", "auto");
-  marker.append("circle").attr("stroke", conf2.stroke).attr("fill", "white").attr("cx", 21).attr("cy", 9).attr("r", 6);
-  marker.append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M9,0 L9,18");
-  marker = elem.append("defs").append("marker").attr("id", ERMarkers.ZERO_OR_ONE_END).attr("refX", 30).attr("refY", 9).attr("markerWidth", 30).attr("markerHeight", 18).attr("orient", "auto");
-  marker.append("circle").attr("stroke", conf2.stroke).attr("fill", "white").attr("cx", 9).attr("cy", 9).attr("r", 6);
-  marker.append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M21,0 L21,18");
-  elem.append("defs").append("marker").attr("id", ERMarkers.ONE_OR_MORE_START).attr("refX", 18).attr("refY", 18).attr("markerWidth", 45).attr("markerHeight", 36).attr("orient", "auto").append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M0,18 Q 18,0 36,18 Q 18,36 0,18 M42,9 L42,27");
-  elem.append("defs").append("marker").attr("id", ERMarkers.ONE_OR_MORE_END).attr("refX", 27).attr("refY", 18).attr("markerWidth", 45).attr("markerHeight", 36).attr("orient", "auto").append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M3,9 L3,27 M9,18 Q27,0 45,18 Q27,36 9,18");
-  marker = elem.append("defs").append("marker").attr("id", ERMarkers.ZERO_OR_MORE_START).attr("refX", 18).attr("refY", 18).attr("markerWidth", 57).attr("markerHeight", 36).attr("orient", "auto");
-  marker.append("circle").attr("stroke", conf2.stroke).attr("fill", "white").attr("cx", 48).attr("cy", 18).attr("r", 6);
-  marker.append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M0,18 Q18,0 36,18 Q18,36 0,18");
-  marker = elem.append("defs").append("marker").attr("id", ERMarkers.ZERO_OR_MORE_END).attr("refX", 39).attr("refY", 18).attr("markerWidth", 57).attr("markerHeight", 36).attr("orient", "auto");
-  marker.append("circle").attr("stroke", conf2.stroke).attr("fill", "white").attr("cx", 9).attr("cy", 18).attr("r", 6);
-  marker.append("path").attr("stroke", conf2.stroke).attr("fill", "none").attr("d", "M21,18 Q39,0 57,18 Q39,36 21,18");
-  return;
+const getRelations = function() {
+  return relations;
 };
-const erMarkers = {
-  ERMarkers,
-  insertMarkers
+const getNotes = function() {
+  return notes;
 };
-const BAD_ID_CHARS_REGEXP = /[^\dA-Za-z](\W)*/g;
-let conf = {};
-let entityNameIds = /* @__PURE__ */ new Map();
-const setConf = function(cnf) {
-  const keys = Object.keys(cnf);
-  for (const key of keys) {
-    conf[key] = cnf[key];
+const addRelation = function(relation) {
+  _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.l.debug("Adding relation: " + JSON.stringify(relation));
+  addClass(relation.id1);
+  addClass(relation.id2);
+  relation.id1 = splitClassNameAndType(relation.id1).className;
+  relation.id2 = splitClassNameAndType(relation.id2).className;
+  relation.relationTitle1 = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(relation.relationTitle1.trim(), (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  relation.relationTitle2 = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(relation.relationTitle2.trim(), (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  relations.push(relation);
+};
+const addAnnotation = function(className, annotation) {
+  const validatedClassName = splitClassNameAndType(className).className;
+  classes[validatedClassName].annotations.push(annotation);
+};
+const addMember = function(className, member) {
+  addClass(className);
+  const validatedClassName = splitClassNameAndType(className).className;
+  const theClass = classes[validatedClassName];
+  if (typeof member === "string") {
+    const memberString = member.trim();
+    if (memberString.startsWith("<<") && memberString.endsWith(">>")) {
+      theClass.annotations.push(sanitizeText(memberString.substring(2, memberString.length - 2)));
+    } else if (memberString.indexOf(")") > 0) {
+      theClass.methods.push(new ClassMember(memberString, "method"));
+    } else if (memberString) {
+      theClass.members.push(new ClassMember(memberString, "attribute"));
+    }
   }
 };
-const drawAttributes = (groupNode, entityTextNode, attributes) => {
-  const heightPadding = conf.entityPadding / 3;
-  const widthPadding = conf.entityPadding / 3;
-  const attrFontSize = conf.fontSize * 0.85;
-  const labelBBox = entityTextNode.node().getBBox();
-  const attributeNodes = [];
-  let hasKeyType = false;
-  let hasComment = false;
-  let maxTypeWidth = 0;
-  let maxNameWidth = 0;
-  let maxKeyWidth = 0;
-  let maxCommentWidth = 0;
-  let cumulativeHeight = labelBBox.height + heightPadding * 2;
-  let attrNum = 1;
-  attributes.forEach((item) => {
-    if (item.attributeKeyTypeList !== void 0 && item.attributeKeyTypeList.length > 0) {
-      hasKeyType = true;
-    }
-    if (item.attributeComment !== void 0) {
-      hasComment = true;
-    }
-  });
-  attributes.forEach((item) => {
-    const attrPrefix = `${entityTextNode.node().id}-attr-${attrNum}`;
-    let nodeHeight = 0;
-    const attributeType = (0,mermaid_934d9bea.v)(item.attributeType);
-    const typeNode = groupNode.append("text").classed("er entityLabel", true).attr("id", `${attrPrefix}-type`).attr("x", 0).attr("y", 0).style("dominant-baseline", "middle").style("text-anchor", "left").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", attrFontSize + "px").text(attributeType);
-    const nameNode = groupNode.append("text").classed("er entityLabel", true).attr("id", `${attrPrefix}-name`).attr("x", 0).attr("y", 0).style("dominant-baseline", "middle").style("text-anchor", "left").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", attrFontSize + "px").text(item.attributeName);
-    const attributeNode = {};
-    attributeNode.tn = typeNode;
-    attributeNode.nn = nameNode;
-    const typeBBox = typeNode.node().getBBox();
-    const nameBBox = nameNode.node().getBBox();
-    maxTypeWidth = Math.max(maxTypeWidth, typeBBox.width);
-    maxNameWidth = Math.max(maxNameWidth, nameBBox.width);
-    nodeHeight = Math.max(typeBBox.height, nameBBox.height);
-    if (hasKeyType) {
-      const keyTypeNodeText = item.attributeKeyTypeList !== void 0 ? item.attributeKeyTypeList.join(",") : "";
-      const keyTypeNode = groupNode.append("text").classed("er entityLabel", true).attr("id", `${attrPrefix}-key`).attr("x", 0).attr("y", 0).style("dominant-baseline", "middle").style("text-anchor", "left").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", attrFontSize + "px").text(keyTypeNodeText);
-      attributeNode.kn = keyTypeNode;
-      const keyTypeBBox = keyTypeNode.node().getBBox();
-      maxKeyWidth = Math.max(maxKeyWidth, keyTypeBBox.width);
-      nodeHeight = Math.max(nodeHeight, keyTypeBBox.height);
-    }
-    if (hasComment) {
-      const commentNode = groupNode.append("text").classed("er entityLabel", true).attr("id", `${attrPrefix}-comment`).attr("x", 0).attr("y", 0).style("dominant-baseline", "middle").style("text-anchor", "left").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", attrFontSize + "px").text(item.attributeComment || "");
-      attributeNode.cn = commentNode;
-      const commentNodeBBox = commentNode.node().getBBox();
-      maxCommentWidth = Math.max(maxCommentWidth, commentNodeBBox.width);
-      nodeHeight = Math.max(nodeHeight, commentNodeBBox.height);
-    }
-    attributeNode.height = nodeHeight;
-    attributeNodes.push(attributeNode);
-    cumulativeHeight += nodeHeight + heightPadding * 2;
-    attrNum += 1;
-  });
-  let widthPaddingFactor = 4;
-  if (hasKeyType) {
-    widthPaddingFactor += 2;
+const addMembers = function(className, members) {
+  if (Array.isArray(members)) {
+    members.reverse();
+    members.forEach((member) => addMember(className, member));
   }
-  if (hasComment) {
-    widthPaddingFactor += 2;
-  }
-  const maxWidth = maxTypeWidth + maxNameWidth + maxKeyWidth + maxCommentWidth;
-  const bBox = {
-    width: Math.max(
-      conf.minEntityWidth,
-      Math.max(
-        labelBBox.width + conf.entityPadding * 2,
-        maxWidth + widthPadding * widthPaddingFactor
-      )
-    ),
-    height: attributes.length > 0 ? cumulativeHeight : Math.max(conf.minEntityHeight, labelBBox.height + conf.entityPadding * 2)
+};
+const addNote = function(text, className) {
+  const note = {
+    id: `note${notes.length}`,
+    class: className,
+    text
   };
-  if (attributes.length > 0) {
-    const spareColumnWidth = Math.max(
-      0,
-      (bBox.width - maxWidth - widthPadding * widthPaddingFactor) / (widthPaddingFactor / 2)
-    );
-    entityTextNode.attr(
-      "transform",
-      "translate(" + bBox.width / 2 + "," + (heightPadding + labelBBox.height / 2) + ")"
-    );
-    let heightOffset = labelBBox.height + heightPadding * 2;
-    let attribStyle = "attributeBoxOdd";
-    attributeNodes.forEach((attributeNode) => {
-      const alignY = heightOffset + heightPadding + attributeNode.height / 2;
-      attributeNode.tn.attr("transform", "translate(" + widthPadding + "," + alignY + ")");
-      const typeRect = groupNode.insert("rect", "#" + attributeNode.tn.node().id).classed(`er ${attribStyle}`, true).attr("x", 0).attr("y", heightOffset).attr("width", maxTypeWidth + widthPadding * 2 + spareColumnWidth).attr("height", attributeNode.height + heightPadding * 2);
-      const nameXOffset = parseFloat(typeRect.attr("x")) + parseFloat(typeRect.attr("width"));
-      attributeNode.nn.attr(
-        "transform",
-        "translate(" + (nameXOffset + widthPadding) + "," + alignY + ")"
-      );
-      const nameRect = groupNode.insert("rect", "#" + attributeNode.nn.node().id).classed(`er ${attribStyle}`, true).attr("x", nameXOffset).attr("y", heightOffset).attr("width", maxNameWidth + widthPadding * 2 + spareColumnWidth).attr("height", attributeNode.height + heightPadding * 2);
-      let keyTypeAndCommentXOffset = parseFloat(nameRect.attr("x")) + parseFloat(nameRect.attr("width"));
-      if (hasKeyType) {
-        attributeNode.kn.attr(
-          "transform",
-          "translate(" + (keyTypeAndCommentXOffset + widthPadding) + "," + alignY + ")"
-        );
-        const keyTypeRect = groupNode.insert("rect", "#" + attributeNode.kn.node().id).classed(`er ${attribStyle}`, true).attr("x", keyTypeAndCommentXOffset).attr("y", heightOffset).attr("width", maxKeyWidth + widthPadding * 2 + spareColumnWidth).attr("height", attributeNode.height + heightPadding * 2);
-        keyTypeAndCommentXOffset = parseFloat(keyTypeRect.attr("x")) + parseFloat(keyTypeRect.attr("width"));
-      }
-      if (hasComment) {
-        attributeNode.cn.attr(
-          "transform",
-          "translate(" + (keyTypeAndCommentXOffset + widthPadding) + "," + alignY + ")"
-        );
-        groupNode.insert("rect", "#" + attributeNode.cn.node().id).classed(`er ${attribStyle}`, "true").attr("x", keyTypeAndCommentXOffset).attr("y", heightOffset).attr("width", maxCommentWidth + widthPadding * 2 + spareColumnWidth).attr("height", attributeNode.height + heightPadding * 2);
-      }
-      heightOffset += attributeNode.height + heightPadding * 2;
-      attribStyle = attribStyle === "attributeBoxOdd" ? "attributeBoxEven" : "attributeBoxOdd";
-    });
-  } else {
-    bBox.height = Math.max(conf.minEntityHeight, cumulativeHeight);
-    entityTextNode.attr("transform", "translate(" + bBox.width / 2 + "," + bBox.height / 2 + ")");
+  notes.push(note);
+};
+const cleanupLabel = function(label) {
+  if (label.startsWith(":")) {
+    label = label.substring(1);
   }
-  return bBox;
+  return sanitizeText(label.trim());
 };
-const drawEntities = function(svgNode, entities2, graph) {
-  const keys = Object.keys(entities2);
-  let firstOne;
-  keys.forEach(function(entityName) {
-    const entityId = generateId(entityName, "entity");
-    entityNameIds.set(entityName, entityId);
-    const groupNode = svgNode.append("g").attr("id", entityId);
-    firstOne = firstOne === void 0 ? entityId : firstOne;
-    const textId = "text-" + entityId;
-    const textNode = groupNode.append("text").classed("er entityLabel", true).attr("id", textId).attr("x", 0).attr("y", 0).style("dominant-baseline", "middle").style("text-anchor", "middle").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", conf.fontSize + "px").text(entities2[entityName].alias ?? entityName);
-    const { width: entityWidth, height: entityHeight } = drawAttributes(
-      groupNode,
-      textNode,
-      entities2[entityName].attributes
-    );
-    const rectNode = groupNode.insert("rect", "#" + textId).classed("er entityBox", true).attr("x", 0).attr("y", 0).attr("width", entityWidth).attr("height", entityHeight);
-    const rectBBox = rectNode.node().getBBox();
-    graph.setNode(entityId, {
-      width: rectBBox.width,
-      height: rectBBox.height,
-      shape: "rect",
-      id: entityId
-    });
-  });
-  return firstOne;
-};
-const adjustEntities = function(svgNode, graph) {
-  graph.nodes().forEach(function(v) {
-    if (v !== void 0 && graph.node(v) !== void 0) {
-      svgNode.select("#" + v).attr(
-        "transform",
-        "translate(" + (graph.node(v).x - graph.node(v).width / 2) + "," + (graph.node(v).y - graph.node(v).height / 2) + " )"
-      );
+const setCssClass = function(ids, className) {
+  ids.split(",").forEach(function(_id) {
+    let id = _id;
+    if (_id[0].match(/\d/)) {
+      id = MERMAID_DOM_ID_PREFIX + id;
+    }
+    if (classes[id] !== void 0) {
+      classes[id].cssClasses.push(className);
     }
   });
 };
-const getEdgeName = function(rel) {
-  return (rel.entityA + rel.roleA + rel.entityB).replace(/\s/g, "");
-};
-const addRelationships = function(relationships2, g) {
-  relationships2.forEach(function(r) {
-    g.setEdge(
-      entityNameIds.get(r.entityA),
-      entityNameIds.get(r.entityB),
-      { relationship: r },
-      getEdgeName(r)
-    );
+const setTooltip = function(ids, tooltip) {
+  ids.split(",").forEach(function(id) {
+    if (tooltip !== void 0) {
+      classes[id].tooltip = sanitizeText(tooltip);
+    }
   });
-  return relationships2;
 };
-let relCnt = 0;
-const drawRelationshipFromLayout = function(svg, rel, g, insert, diagObj) {
-  relCnt++;
-  const edge = g.edge(
-    entityNameIds.get(rel.entityA),
-    entityNameIds.get(rel.entityB),
-    getEdgeName(rel)
-  );
-  const lineFunction = (0,src/* line */.jvg)().x(function(d) {
-    return d.x;
-  }).y(function(d) {
-    return d.y;
-  }).curve(src/* curveBasis */.$0Z);
-  const svgPath = svg.insert("path", "#" + insert).classed("er relationshipLine", true).attr("d", lineFunction(edge.points)).style("stroke", conf.stroke).style("fill", "none");
-  if (rel.relSpec.relType === diagObj.db.Identification.NON_IDENTIFYING) {
-    svgPath.attr("stroke-dasharray", "8,8");
+const getTooltip = function(id, namespace) {
+  if (namespace) {
+    return namespaces[namespace].classes[id].tooltip;
   }
-  let url = "";
-  if (conf.arrowMarkerAbsolute) {
-    url = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.search;
-    url = url.replace(/\(/g, "\\(");
-    url = url.replace(/\)/g, "\\)");
-  }
-  switch (rel.relSpec.cardA) {
-    case diagObj.db.Cardinality.ZERO_OR_ONE:
-      svgPath.attr("marker-end", "url(" + url + "#" + erMarkers.ERMarkers.ZERO_OR_ONE_END + ")");
-      break;
-    case diagObj.db.Cardinality.ZERO_OR_MORE:
-      svgPath.attr("marker-end", "url(" + url + "#" + erMarkers.ERMarkers.ZERO_OR_MORE_END + ")");
-      break;
-    case diagObj.db.Cardinality.ONE_OR_MORE:
-      svgPath.attr("marker-end", "url(" + url + "#" + erMarkers.ERMarkers.ONE_OR_MORE_END + ")");
-      break;
-    case diagObj.db.Cardinality.ONLY_ONE:
-      svgPath.attr("marker-end", "url(" + url + "#" + erMarkers.ERMarkers.ONLY_ONE_END + ")");
-      break;
-    case diagObj.db.Cardinality.MD_PARENT:
-      svgPath.attr("marker-end", "url(" + url + "#" + erMarkers.ERMarkers.MD_PARENT_END + ")");
-      break;
-  }
-  switch (rel.relSpec.cardB) {
-    case diagObj.db.Cardinality.ZERO_OR_ONE:
-      svgPath.attr(
-        "marker-start",
-        "url(" + url + "#" + erMarkers.ERMarkers.ZERO_OR_ONE_START + ")"
-      );
-      break;
-    case diagObj.db.Cardinality.ZERO_OR_MORE:
-      svgPath.attr(
-        "marker-start",
-        "url(" + url + "#" + erMarkers.ERMarkers.ZERO_OR_MORE_START + ")"
-      );
-      break;
-    case diagObj.db.Cardinality.ONE_OR_MORE:
-      svgPath.attr(
-        "marker-start",
-        "url(" + url + "#" + erMarkers.ERMarkers.ONE_OR_MORE_START + ")"
-      );
-      break;
-    case diagObj.db.Cardinality.ONLY_ONE:
-      svgPath.attr("marker-start", "url(" + url + "#" + erMarkers.ERMarkers.ONLY_ONE_START + ")");
-      break;
-    case diagObj.db.Cardinality.MD_PARENT:
-      svgPath.attr("marker-start", "url(" + url + "#" + erMarkers.ERMarkers.MD_PARENT_START + ")");
-      break;
-  }
-  const len = svgPath.node().getTotalLength();
-  const labelPoint = svgPath.node().getPointAtLength(len * 0.5);
-  const labelId = "rel" + relCnt;
-  const labelNode = svg.append("text").classed("er relationshipLabel", true).attr("id", labelId).attr("x", labelPoint.x).attr("y", labelPoint.y).style("text-anchor", "middle").style("dominant-baseline", "middle").style("font-family", (0,mermaid_934d9bea.c)().fontFamily).style("font-size", conf.fontSize + "px").text(rel.roleA);
-  const labelBBox = labelNode.node().getBBox();
-  svg.insert("rect", "#" + labelId).classed("er relationshipLabelBox", true).attr("x", labelPoint.x - labelBBox.width / 2).attr("y", labelPoint.y - labelBBox.height / 2).attr("width", labelBBox.width).attr("height", labelBBox.height);
+  return classes[id].tooltip;
 };
-const draw = function(text, id, _version, diagObj) {
-  conf = (0,mermaid_934d9bea.c)().er;
-  mermaid_934d9bea.l.info("Drawing ER diagram");
-  const securityLevel = (0,mermaid_934d9bea.c)().securityLevel;
-  let sandboxElement;
-  if (securityLevel === "sandbox") {
-    sandboxElement = (0,src/* select */.Ys)("#i" + id);
-  }
-  const root = securityLevel === "sandbox" ? (0,src/* select */.Ys)(sandboxElement.nodes()[0].contentDocument.body) : (0,src/* select */.Ys)("body");
-  const svg = root.select(`[id='${id}']`);
-  erMarkers.insertMarkers(svg, conf);
-  let g;
-  g = new graphlib/* Graph */.k({
-    multigraph: true,
-    directed: true,
-    compound: false
-  }).setGraph({
-    rankdir: conf.layoutDirection,
-    marginx: 20,
-    marginy: 20,
-    nodesep: 100,
-    edgesep: 100,
-    ranksep: 100
-  }).setDefaultEdgeLabel(function() {
-    return {};
+const setLink = function(ids, linkStr, target) {
+  const config = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)();
+  ids.split(",").forEach(function(_id) {
+    let id = _id;
+    if (_id[0].match(/\d/)) {
+      id = MERMAID_DOM_ID_PREFIX + id;
+    }
+    if (classes[id] !== void 0) {
+      classes[id].link = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.u.formatUrl(linkStr, config);
+      if (config.securityLevel === "sandbox") {
+        classes[id].linkTarget = "_top";
+      } else if (typeof target === "string") {
+        classes[id].linkTarget = sanitizeText(target);
+      } else {
+        classes[id].linkTarget = "_blank";
+      }
+    }
   });
-  const firstEntity = drawEntities(svg, diagObj.db.getEntities(), g);
-  const relationships2 = addRelationships(diagObj.db.getRelationships(), g);
-  (0,dagre/* layout */.bK)(g);
-  adjustEntities(svg, g);
-  relationships2.forEach(function(rel) {
-    drawRelationshipFromLayout(svg, rel, g, firstEntity, diagObj);
-  });
-  const padding = conf.diagramPadding;
-  mermaid_934d9bea.u.insertTitle(svg, "entityTitleText", conf.titleTopMargin, diagObj.db.getDiagramTitle());
-  const svgBounds = svg.node().getBBox();
-  const width = svgBounds.width + padding * 2;
-  const height = svgBounds.height + padding * 2;
-  (0,mermaid_934d9bea.i)(svg, height, width, conf.useMaxWidth);
-  svg.attr("viewBox", `${svgBounds.x - padding} ${svgBounds.y - padding} ${width} ${height}`);
+  setCssClass(ids, "clickable");
 };
-const MERMAID_ERDIAGRAM_UUID = "28e9f9db-3c8d-5aa5-9faf-44286ae5937c";
-function generateId(str = "", prefix = "") {
-  const simplifiedStr = str.replace(BAD_ID_CHARS_REGEXP, "");
-  return `${strWithHyphen(prefix)}${strWithHyphen(simplifiedStr)}${esm_node_v5(
-    str,
-    MERMAID_ERDIAGRAM_UUID
-  )}`;
+const setClickEvent = function(ids, functionName, functionArgs) {
+  ids.split(",").forEach(function(id) {
+    setClickFunc(id, functionName, functionArgs);
+    classes[id].haveCallback = true;
+  });
+  setCssClass(ids, "clickable");
+};
+const setClickFunc = function(_domId, functionName, functionArgs) {
+  const domId = _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.e.sanitizeText(_domId, (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)());
+  const config = (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)();
+  if (config.securityLevel !== "loose") {
+    return;
+  }
+  if (functionName === void 0) {
+    return;
+  }
+  const id = domId;
+  if (classes[id] !== void 0) {
+    const elemId = lookUpDomId(id);
+    let argList = [];
+    if (typeof functionArgs === "string") {
+      argList = functionArgs.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+      for (let i = 0; i < argList.length; i++) {
+        let item = argList[i].trim();
+        if (item.charAt(0) === '"' && item.charAt(item.length - 1) === '"') {
+          item = item.substr(1, item.length - 2);
+        }
+        argList[i] = item;
+      }
+    }
+    if (argList.length === 0) {
+      argList.push(elemId);
+    }
+    functions.push(function() {
+      const elem = document.querySelector(`[id="${elemId}"]`);
+      if (elem !== null) {
+        elem.addEventListener(
+          "click",
+          function() {
+            _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.u.runFunc(functionName, ...argList);
+          },
+          false
+        );
+      }
+    });
+  }
+};
+const bindFunctions = function(element) {
+  functions.forEach(function(fun) {
+    fun(element);
+  });
+};
+const lineType = {
+  LINE: 0,
+  DOTTED_LINE: 1
+};
+const relationType = {
+  AGGREGATION: 0,
+  EXTENSION: 1,
+  COMPOSITION: 2,
+  DEPENDENCY: 3,
+  LOLLIPOP: 4
+};
+const setupToolTips = function(element) {
+  let tooltipElem = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(".mermaidTooltip");
+  if ((tooltipElem._groups || tooltipElem)[0][0] === null) {
+    tooltipElem = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)("body").append("div").attr("class", "mermaidTooltip").style("opacity", 0);
+  }
+  const svg = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(element).select("svg");
+  const nodes = svg.selectAll("g.node");
+  nodes.on("mouseover", function() {
+    const el = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(this);
+    const title = el.attr("title");
+    if (title === null) {
+      return;
+    }
+    const rect = this.getBoundingClientRect();
+    tooltipElem.transition().duration(200).style("opacity", ".9");
+    tooltipElem.text(el.attr("title")).style("left", window.scrollX + rect.left + (rect.right - rect.left) / 2 + "px").style("top", window.scrollY + rect.top - 14 + document.body.scrollTop + "px");
+    tooltipElem.html(tooltipElem.html().replace(/&lt;br\/&gt;/g, "<br/>"));
+    el.classed("hover", true);
+  }).on("mouseout", function() {
+    tooltipElem.transition().duration(500).style("opacity", 0);
+    const el = (0,d3__WEBPACK_IMPORTED_MODULE_0__/* .select */ .Ys)(this);
+    el.classed("hover", false);
+  });
+};
+functions.push(setupToolTips);
+let direction = "TB";
+const getDirection = () => direction;
+const setDirection = (dir) => {
+  direction = dir;
+};
+const addNamespace = function(id) {
+  if (namespaces[id] !== void 0) {
+    return;
+  }
+  namespaces[id] = {
+    id,
+    classes: {},
+    children: {},
+    domId: MERMAID_DOM_ID_PREFIX + id + "-" + namespaceCounter
+  };
+  namespaceCounter++;
+};
+const getNamespace = function(name) {
+  return namespaces[name];
+};
+const getNamespaces = function() {
+  return namespaces;
+};
+const addClassesToNamespace = function(id, classNames) {
+  if (namespaces[id] !== void 0) {
+    classNames.map((className) => {
+      classes[className].parent = id;
+      namespaces[id].classes[className] = classes[className];
+    });
+  }
+};
+const db = {
+  setAccTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.s,
+  getAccTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.g,
+  getAccDescription: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.a,
+  setAccDescription: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.b,
+  getConfig: () => (0,_mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.c)().class,
+  addClass,
+  bindFunctions,
+  clear,
+  getClass,
+  getClasses,
+  getNotes,
+  addAnnotation,
+  addNote,
+  getRelations,
+  addRelation,
+  getDirection,
+  setDirection,
+  addMember,
+  addMembers,
+  cleanupLabel,
+  lineType,
+  relationType,
+  setClickEvent,
+  setCssClass,
+  setLink,
+  getTooltip,
+  setTooltip,
+  lookUpDomId,
+  setDiagramTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.q,
+  getDiagramTitle: _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_1__.r,
+  setClassLabel,
+  addNamespace,
+  addClassesToNamespace,
+  getNamespace,
+  getNamespaces
+};
+const getStyles = (options) => `g.classGroup text {
+  fill: ${options.nodeBorder || options.classText};
+  stroke: none;
+  font-family: ${options.fontFamily};
+  font-size: 10px;
+
+  .title {
+    font-weight: bolder;
+  }
+
 }
-function strWithHyphen(str = "") {
-  return str.length > 0 ? `${str}-` : "";
+
+.nodeLabel, .edgeLabel {
+  color: ${options.classText};
 }
-const erRenderer = {
-  setConf,
-  draw
-};
-const getStyles = (options) => `
-  .entityBox {
+.edgeLabel .label rect {
+  fill: ${options.mainBkg};
+}
+.label text {
+  fill: ${options.classText};
+}
+.edgeLabel .label span {
+  background: ${options.mainBkg};
+}
+
+.classTitle {
+  font-weight: bolder;
+}
+.node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
     fill: ${options.mainBkg};
     stroke: ${options.nodeBorder};
+    stroke-width: 1px;
   }
 
-  .attributeBoxOdd {
-    fill: ${options.attributeBackgroundColorOdd};
-    stroke: ${options.nodeBorder};
-  }
 
-  .attributeBoxEven {
-    fill:  ${options.attributeBackgroundColorEven};
-    stroke: ${options.nodeBorder};
-  }
+.divider {
+  stroke: ${options.nodeBorder};
+  stroke-width: 1;
+}
 
-  .relationshipLabelBox {
-    fill: ${options.tertiaryColor};
-    opacity: 0.7;
-    background-color: ${options.tertiaryColor};
-      rect {
-        opacity: 0.5;
-      }
-  }
+g.clickable {
+  cursor: pointer;
+}
 
-    .relationshipLine {
-      stroke: ${options.lineColor};
-    }
+g.classGroup rect {
+  fill: ${options.mainBkg};
+  stroke: ${options.nodeBorder};
+}
 
-  .entityTitleText {
-    text-anchor: middle;
-    font-size: 18px;
-    fill: ${options.textColor};
-  }    
-  #MD_PARENT_START {
-    fill: #f5f5f5 !important;
-    stroke: ${options.lineColor} !important;
-    stroke-width: 1;
-  }
-  #MD_PARENT_END {
-    fill: #f5f5f5 !important;
-    stroke: ${options.lineColor} !important;
-    stroke-width: 1;
-  }
-  
+g.classGroup line {
+  stroke: ${options.nodeBorder};
+  stroke-width: 1;
+}
+
+.classLabel .box {
+  stroke: none;
+  stroke-width: 0;
+  fill: ${options.mainBkg};
+  opacity: 0.5;
+}
+
+.classLabel .label {
+  fill: ${options.nodeBorder};
+  font-size: 10px;
+}
+
+.relation {
+  stroke: ${options.lineColor};
+  stroke-width: 1;
+  fill: none;
+}
+
+.dashed-line{
+  stroke-dasharray: 3;
+}
+
+.dotted-line{
+  stroke-dasharray: 1 2;
+}
+
+#compositionStart, .composition {
+  fill: ${options.lineColor} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#compositionEnd, .composition {
+  fill: ${options.lineColor} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#dependencyStart, .dependency {
+  fill: ${options.lineColor} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#dependencyStart, .dependency {
+  fill: ${options.lineColor} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#extensionStart, .extension {
+  fill: transparent !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#extensionEnd, .extension {
+  fill: transparent !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#aggregationStart, .aggregation {
+  fill: transparent !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#aggregationEnd, .aggregation {
+  fill: transparent !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#lollipopStart, .lollipop {
+  fill: ${options.mainBkg} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+#lollipopEnd, .lollipop {
+  fill: ${options.mainBkg} !important;
+  stroke: ${options.lineColor} !important;
+  stroke-width: 1;
+}
+
+.edgeTerminals {
+  font-size: 11px;
+}
+
+.classTitleText {
+  text-anchor: middle;
+  font-size: 18px;
+  fill: ${options.textColor};
+}
 `;
-const erStyles = getStyles;
-const diagram = {
-  parser: erParser,
-  db: erDb,
-  renderer: erRenderer,
-  styles: erStyles
-};
+const styles = getStyles;
 
 
 
