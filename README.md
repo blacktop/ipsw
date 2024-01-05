@@ -128,6 +128,10 @@ Here are ways to get in touch with the `ipsw` community:
 
 Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
 
+## Stargazers
+
+[![Stargazers over time](https://starchart.cc/blacktop/ipsw.svg?variant=adaptive)](https://starchart.cc/blacktop/ipsw)
+
 ## License
 
 MIT Copyright (c) 2018-2024 **blacktop**
