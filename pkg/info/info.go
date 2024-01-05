@@ -361,7 +361,9 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
 		for _, bi := range i.Plists.BuildIdentities {
 			if fsOS, ok := bi.Manifest["OS"]; ok {
-				dmgs = append(dmgs, fsOS.Info["Path"].(string))
+				if strings.Contains(bi.Info.RestoreBehavior, "Update") {
+					dmgs = append(dmgs, fsOS.Info["Path"].(string))
+				}
 			}
 		}
 		dmgs = utils.Unique(dmgs)
