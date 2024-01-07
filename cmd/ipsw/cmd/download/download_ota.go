@@ -26,19 +26,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
@@ -348,114 +343,46 @@ var otaDLCmd = &cobra.Command{
 						"model":   strings.Join(o.SupportedDeviceModels, " "),
 					}).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
 
-					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to open remote zip to OTA: %v", err)
+					config := &extract.Config{
+						URL:          o.BaseURL + o.RelativePath,
+						Pattern:      remotePattern,
+						Proxy:        proxy,
+						Insecure:     insecure,
+						DriverKit:    dyldDriverKit,
+						KernelDevice: device,
+						Flatten:      flat,
+						Progress:     true,
+						Output:       destPath,
 					}
-					inf, err := info.ParseZipFiles(zr.File)
-					if err != nil {
-						return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
-					}
-					folder, err := inf.GetFolder()
-					if err != nil {
-						log.Errorf("failed to get folder from remote zip metadata: %v", err)
-					}
-					folder = filepath.Join(destPath, folder)
 
-					if remoteKernel { // REMOTE KERNEL MODE
+					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
-						artifacts, err := kernelcache.RemoteParse(zr, folder)
+						out, err := extract.Kernelcache(config)
 						if err != nil {
-							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
+							return fmt.Errorf("failed to extract kernelcache: %v", err)
 						}
-						for kc := range artifacts {
-							utils.Indent(log.Info, 2)("Extracted " + kc)
+						for fn := range out {
+							utils.Indent(log.Info, 2)("Created " + fn)
 						}
 					}
-					if remoteDyld { // REMOTE DSC MODE
-						found := false
-						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
-							log.Info("Extracting remote dyld_shared_cache")
-							artifacts, err := dyld.ExtractFromRemoteCryptex(zr, folder, dyldArches, dyldDriverKit)
-							if err != nil {
-								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
-							}
-							if len(artifacts) > 0 {
-								found = true
-							}
-							for _, artifact := range artifacts {
-								utils.Indent(log.Info, 2)("Extracted " + filepath.Base(artifact))
-							}
-						}
-						if !found {
-							var dscRegex string
-							if dyldDriverKit {
-								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.DriverKitCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-							} else {
-								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-							}
-							// hack: to get a priori list of files to extract (so we know when to stop)
-							rfiles, err := ota.RemoteList(zr)
-							if err != nil {
-								return fmt.Errorf("failed to list remote OTA files: %v", err)
-							}
-
-							var matches []string
-							for _, rf := range rfiles {
-								if regexp.MustCompile(dscRegex).MatchString(rf.Name()) {
-									matches = append(matches, rf.Name())
-								}
-							}
-
-							log.Info("Extracting remote dyld_shared_cache(s) (can be a bit CPU intensive)")
-							err = ota.RemoteExtract(zr, dscRegex, folder, func(path string) bool {
-								for i, v := range matches {
-									if strings.HasSuffix(v, filepath.Base(path)) {
-										matches = append(matches[:i], matches[i+1:]...)
-									}
-								}
-								return len(matches) == 0 // stop if we've extracted all matches
-							})
-							if err != nil {
-								return fmt.Errorf("failed to download dyld_shared_cache(s) from remote OTA: %v", err)
-							}
-						}
-					}
-					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE
-						re, err := regexp.Compile(remotePattern)
-						if err != nil {
-							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
-						}
+					if len(remotePattern) > 0 {
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if _, err := utils.SearchZip(zr.File, re, folder, flat, true); err != nil {
-							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
-							rfiles, err := ota.RemoteList(zr)
-							if err != nil {
-								return fmt.Errorf("failed to list remote OTA files: %v", err)
-							}
-							var matches []string
-							for _, rf := range rfiles {
-								if re.MatchString(rf.Name()) {
-									matches = append(matches, rf.Name())
-								}
-							}
-							if len(matches) == 0 {
-								return fmt.Errorf("no files matched pattern %#v in remote OTA zip", remotePattern)
-							}
-							err = ota.RemoteExtract(zr, remotePattern, folder, func(path string) bool {
-								for i, v := range matches {
-									if strings.HasSuffix(v, filepath.Base(path)) {
-										matches = append(matches[:i], matches[i+1:]...)
-									}
-								}
-								return len(matches) == 0 // stop if we've extracted all matches
-							})
-							if err != nil {
-								return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
-							}
+						out, err := extract.Search(config)
+						if err != nil {
+							return err
+						}
+						for _, f := range out {
+							utils.Indent(log.Info, 2)("Created " + f)
+						}
+					}
+					if remoteDyld {
+						log.Info("Extracting dyld_shared_cache")
+						out, err := extract.DSC(config)
+						if err != nil {
+							return err
+						}
+						for _, f := range out {
+							utils.Indent(log.Info, 2)("Created " + f)
 						}
 					}
 				}

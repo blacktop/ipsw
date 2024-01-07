@@ -55,6 +55,7 @@ func init() {
 	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
 	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
+	extractCmd.Flags().String("device", "", "Device to extract kernel for (e.g. iPhone10,6)")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{
 			"app\tAppOS",
@@ -82,6 +83,7 @@ func init() {
 	viper.BindPFlag("extract.json", extractCmd.Flags().Lookup("json"))
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
 	viper.BindPFlag("extract.driverkit", extractCmd.Flags().Lookup("driverkit"))
+	viper.BindPFlag("extract.device", extractCmd.Flags().Lookup("device"))
 }
 
 // extractCmd represents the extract command
@@ -118,22 +120,27 @@ var extractCmd = &cobra.Command{
 			return fmt.Errorf("--pattern or -p must be used with --files or -f")
 		} else if viper.GetBool("extract.driverkit") && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--driverkit can only be used with --dyld or -d")
+		} else if viper.GetString("extract.device") != "" && !viper.GetBool("extract.kernel") {
+			return fmt.Errorf("--device can only be used with --kernel or -k")
+		} else if viper.GetBool("extract.sys-ver") && viper.GetBool("extract.remote") {
+			return fmt.Errorf("--sys-ver can NOT be used with a --remote IPSW/OTA")
 		}
 
 		config := &extract.Config{
-			IPSW:      "",
-			URL:       "",
-			Pattern:   viper.GetString("extract.pattern"),
-			Arches:    viper.GetStringSlice("extract.dyld-arch"),
-			DriverKit: viper.GetBool("extract.driverkit"),
-			Proxy:     viper.GetString("extract.proxy"),
-			Insecure:  viper.GetBool("extract.insecure"),
-			DMGs:      false,
-			DmgType:   viper.GetString("extract.dmg"),
-			Flatten:   viper.GetBool("extract.flat"),
-			Progress:  true,
-			Output:    viper.GetString("extract.output"),
-			JSON:      viper.GetBool("extract.json"),
+			IPSW:         "",
+			URL:          "",
+			Pattern:      viper.GetString("extract.pattern"),
+			Arches:       viper.GetStringSlice("extract.dyld-arch"),
+			DriverKit:    viper.GetBool("extract.driverkit"),
+			KernelDevice: viper.GetString("extract.device"),
+			Proxy:        viper.GetString("extract.proxy"),
+			Insecure:     viper.GetBool("extract.insecure"),
+			DMGs:         false,
+			DmgType:      viper.GetString("extract.dmg"),
+			Flatten:      viper.GetBool("extract.flat"),
+			Progress:     true,
+			Output:       viper.GetString("extract.output"),
+			JSON:         viper.GetBool("extract.json"),
 		}
 
 		if viper.GetBool("extract.remote") {
@@ -146,13 +153,15 @@ var extractCmd = &cobra.Command{
 			if typ == "OTA" {
 				log.Warn("Extracting from OTA may not work (you should try the `ipsw ota extract` command)")
 			}
+		} else {
+			return err
 		}
 
 		if viper.GetBool("extract.kernel") {
 			log.Info("Extracting kernelcache")
 			out, err := extract.Kernelcache(config)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to extract kernelcache: %v", err)
 			}
 			if viper.GetBool("extract.json") {
 				dat, err := json.Marshal(out)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -423,7 +424,12 @@ func (i *Info) GetCPU(board string) string {
 }
 
 // GetFolder returns a folder name for all the devices included in an IPSW
-func (i *Info) GetFolder() (string, error) {
+func (i *Info) GetFolder(device ...string) (string, error) {
+	var dev string
+	if len(device) > 0 && len(device[0]) > 0 {
+		dev = device[0]
+	}
+
 	var devs []string
 	if len(i.DeviceTrees) > 0 {
 		for _, dtree := range i.DeviceTrees {
@@ -433,13 +439,22 @@ func (i *Info) GetFolder() (string, error) {
 			}
 			devs = append(devs, dt.ProductType)
 		}
+
 		devs = utils.SortDevices(utils.Unique(devs))
+
+		if len(dev) > 0 {
+			if slices.Contains(devs, dev) {
+				return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, dev), nil
+			} else {
+				return "", fmt.Errorf("device %s not found in IPSW/OTA", dev)
+			}
+		}
+
 		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
-	} else {
-		sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
-		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
 	}
-	// return "", fmt.Errorf("no devices found")
+
+	sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
+	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
 }
 
 // GetFolders returns a list of the IPSW name folders

@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
@@ -37,6 +36,8 @@ type Config struct {
 	Arches []string `json:"arches,omitempty"`
 	// extract the DriverKit DSCs
 	DriverKit bool `json:"driver_kit,omitempty"`
+	// extract a single device's kernelcache
+	KernelDevice string `json:"kernel_device,omitempty"`
 	// http proxy to use
 	Proxy string `json:"proxy,omitempty"`
 	// don't verify the certificate chain
@@ -54,6 +55,8 @@ type Config struct {
 	Output string `json:"output,omitempty"`
 	// output as JSON
 	JSON bool `json:"json,omitempty"`
+
+	info *info.Info
 }
 
 func isURL(str string) bool {
@@ -62,16 +65,18 @@ func isURL(str string) bool {
 }
 
 func getFolder(c *Config) (*info.Info, string, error) {
-	c.IPSW = filepath.Clean(c.IPSW)
-	i, err := info.Parse(c.IPSW)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+	if c.info != nil {
+		var err error
+		c.info, err = info.Parse(filepath.Clean(c.IPSW))
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+		}
 	}
-	folder, err := i.GetFolder()
+	folder, err := c.info.GetFolder(c.KernelDevice)
 	if err != nil {
-		log.Errorf("failed to get folder from IPSW metadata: %v", err)
+		return c.info, folder, fmt.Errorf("failed to get folder from IPSW metadata: %v", err)
 	}
-	return i, folder, nil
+	return c.info, folder, nil
 }
 
 func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
@@ -82,34 +87,37 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("unable to download remote zip: %v", err)
 	}
-	i, err := info.ParseZipFiles(zr.File)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
+	if c.info != nil {
+		c.info, err = info.ParseZipFiles(zr.File)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
+		}
 	}
-	folder, err := i.GetFolder()
+	folder, err := c.info.GetFolder(c.KernelDevice)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to get folder from remote zip metadata: %v", err)
 	}
-	return i, zr, folder, nil
+	return c.info, zr, folder, nil
 }
 
 // FirmwareType returns the type of the firmware: IPSW or OTA
 func FirmwareType(c *Config) (string, error) {
+	var err error
 	if len(c.IPSW) > 0 {
-		i, _, err := getFolder(c)
+		c.info, err = info.Parse(filepath.Clean(c.IPSW))
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
 		}
-		return i.Plists.Type, nil
+		return c.info.Plists.Type, nil
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return "", fmt.Errorf("invalid URL provided: %s", c.URL)
 		}
-		i, _, _, err := getRemoteFolder(c)
+		c.info, _, _, err = getRemoteFolder(c)
 		if err != nil {
 			return "", err
 		}
-		return i.Plists.Type, nil
+		return c.info.Plists.Type, nil
 	}
 	return "", fmt.Errorf("no IPSW or URL provided")
 }
@@ -121,7 +129,7 @@ func Kernelcache(c *Config) (map[string][]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return kernelcache.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder))
+		return kernelcache.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.KernelDevice)
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
@@ -130,7 +138,7 @@ func Kernelcache(c *Config) (map[string][]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return kernelcache.RemoteParse(zr, filepath.Join(filepath.Clean(c.Output), folder))
+		return kernelcache.RemoteParse(zr, filepath.Join(filepath.Clean(c.Output), folder), c.KernelDevice)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }

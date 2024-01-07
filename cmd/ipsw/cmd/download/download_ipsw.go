@@ -337,24 +337,25 @@ var ipswCmd = &cobra.Command{
 					}).Info("Parsing remote IPSW")
 
 					config := &extract.Config{
-						IPSW:     "",
-						URL:      ipsw.URL,
-						Pattern:  remotePattern,
-						Arches:   dyldArches,
-						Proxy:    proxy,
-						Insecure: insecure,
-						DMGs:     false,
-						DmgType:  "",
-						Flatten:  flat,
-						Progress: true,
-						Output:   output,
+						IPSW:         "",
+						URL:          ipsw.URL,
+						Pattern:      remotePattern,
+						Arches:       dyldArches,
+						KernelDevice: device,
+						Proxy:        proxy,
+						Insecure:     insecure,
+						DMGs:         false,
+						DmgType:      "",
+						Flatten:      flat,
+						Progress:     true,
+						Output:       output,
 					}
 
 					// REMOTE KERNEL MODE
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
 						if out, err := extract.Kernelcache(config); err != nil {
-							return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+							return err
 						} else {
 							for fn := range out {
 								utils.Indent(log.Info, 2)("Created " + fn)

@@ -281,10 +281,10 @@ func (d *Diff) unmountSystemOsDMGs() error {
 }
 
 func (d *Diff) parseKernelcache() error {
-	if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder); err != nil {
+	if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
 		return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
 	}
-	if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder); err != nil {
+	if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
 		return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
 	}
 
