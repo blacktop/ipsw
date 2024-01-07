@@ -623,7 +623,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 	// extract files that match regex pattern
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.WithError(err).Errorf("failed to walk %s", mountPoint)
+			log.WithError(err).Debugf("failed to walk %s", mountPoint)
 			return nil // keep going
 		}
 		if info.IsDir() {

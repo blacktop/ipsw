@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -114,59 +115,26 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	return &cc, nil
 }
 
-// Extract extracts and decompresses a kernelcache from ipsw
-func Extract(ipsw, destPath string) (map[string][]string, error) {
-	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
+// Parse parses the compressed kernelcache Img4 data
+func Parse(r io.ReadCloser) ([]byte, error) {
+	var buf bytes.Buffer
+
+	if _, err := r.Read(buf.Bytes()); err != nil {
+		return nil, errors.Wrap(err, "failed to read data")
+	}
+
+	kcomp, err := ParseImg4Data(buf.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
+		return nil, errors.Wrap(err, "failed parse kernelcache img4")
 	}
-	defer os.RemoveAll(tmpDIR)
 
-	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
-		return strings.Contains(f.Name, "kernelcache")
-	})
+	dec, err := DecompressData(kcomp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unzip kernelcache: %v", err)
+		return nil, errors.Wrap(err, "failed to decompress kernelcache")
 	}
+	r.Close()
 
-	i, err := info.Parse(ipsw)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse ipsw info: %v", err)
-	}
-
-	artifacts := make(map[string][]string)
-	for _, kcache := range kcaches {
-		fname := i.GetKernelCacheFileName(kcache)
-		fname = filepath.Join(destPath, fname)
-		fname = filepath.Clean(fname)
-
-		content, err := os.ReadFile(kcache)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read Kernelcache")
-		}
-
-		kc, err := ParseImg4Data(content)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse im4p kernelcache data: %v", err)
-		}
-
-		dec, err := DecompressData(kc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decompress kernelcache data: %v", err)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory: %v", err)
-		}
-		if err := os.WriteFile(fname, dec, 0660); err != nil {
-			return nil, fmt.Errorf("failed to write decompressed kernelcache: %v", err)
-		}
-		os.Remove(kcache)
-
-		artifacts[fname] = i.GetDevicesForKernelCache(kcache)
-	}
-
-	return artifacts, nil
+	return dec, nil
 }
 
 // Decompress decompresses a compressed kernelcache
@@ -322,8 +290,67 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 	return []byte{}, errors.New("unsupported compression")
 }
 
+// Extract extracts and decompresses a kernelcache from ipsw
+func Extract(ipsw, destPath, device string) (map[string][]string, error) {
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
+		return strings.Contains(f.Name, "kernelcache")
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to unzip kernelcache: %v", err)
+	}
+
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ipsw info: %v", err)
+	}
+
+	artifacts := make(map[string][]string)
+	for _, kcache := range kcaches {
+		if len(device) > 0 && !slices.Contains(i.GetDevicesForKernelCache(kcache), device) {
+			os.Remove(kcache)
+			continue // skip if kernel not for given device
+		}
+		fname := i.GetKernelCacheFileName(kcache)
+		fname = filepath.Join(destPath, fname)
+		fname = filepath.Clean(fname)
+
+		content, err := os.ReadFile(kcache)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read Kernelcache")
+		}
+
+		kc, err := ParseImg4Data(content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse im4p kernelcache data: %v", err)
+		}
+
+		dec, err := DecompressData(kc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompress kernelcache data: %v", err)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory: %v", err)
+		}
+		if err := os.WriteFile(fname, dec, 0660); err != nil {
+			return nil, fmt.Errorf("failed to write decompressed kernelcache: %v", err)
+		}
+		os.Remove(kcache)
+
+		artifacts[fname] = i.GetDevicesForKernelCache(kcache)
+	}
+
+	return artifacts, nil
+}
+
 // RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(zr *zip.Reader, destPath string) (map[string][]string, error) {
+func RemoteParse(zr *zip.Reader, destPath, device string) (map[string][]string, error) {
 	i, err := info.ParseZipFiles(zr.File)
 	if err != nil {
 		return nil, err
@@ -334,6 +361,9 @@ func RemoteParse(zr *zip.Reader, destPath string) (map[string][]string, error) {
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
 			fname := filepath.Join(destPath, filepath.Clean(i.GetKernelCacheFileName(f.Name)))
+			if len(device) > 0 && !slices.Contains(i.GetDevicesForKernelCache(f.Name), device) {
+				continue // skip if kernel not for given device
+			}
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				kdata := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
@@ -367,28 +397,6 @@ func RemoteParse(zr *zip.Reader, destPath string) (map[string][]string, error) {
 	}
 
 	return artifacts, nil
-}
-
-// Parse parses the compressed kernelcache Img4 data
-func Parse(r io.ReadCloser) ([]byte, error) {
-	var buf bytes.Buffer
-
-	if _, err := r.Read(buf.Bytes()); err != nil {
-		return nil, errors.Wrap(err, "failed to read data")
-	}
-
-	kcomp, err := ParseImg4Data(buf.Bytes())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed parse kernelcache img4")
-	}
-
-	dec, err := DecompressData(kcomp)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decompress kernelcache")
-	}
-	r.Close()
-
-	return dec, nil
 }
 
 func GetVersion(m *macho.File) (*Version, error) {
