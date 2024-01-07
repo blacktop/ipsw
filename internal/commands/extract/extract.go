@@ -65,7 +65,7 @@ func isURL(str string) bool {
 }
 
 func getFolder(c *Config) (*info.Info, string, error) {
-	if c.info != nil {
+	if c.info == nil {
 		var err error
 		c.info, err = info.Parse(filepath.Clean(c.IPSW))
 		if err != nil {
@@ -87,7 +87,7 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("unable to download remote zip: %v", err)
 	}
-	if c.info != nil {
+	if c.info == nil {
 		c.info, err = info.ParseZipFiles(zr.File)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)

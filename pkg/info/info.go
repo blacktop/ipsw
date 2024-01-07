@@ -446,7 +446,7 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 			if slices.Contains(devs, dev) {
 				return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, dev), nil
 			} else {
-				return "", fmt.Errorf("device %s not found in IPSW/OTA", dev)
+				return "", fmt.Errorf("device '%s' not found in IPSW/OTA", dev)
 			}
 		}
 
