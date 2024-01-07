@@ -92,7 +92,6 @@ var extractCmd = &cobra.Command{
 	Aliases:       []string{"e", "ex"},
 	Short:         "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
