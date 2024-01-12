@@ -17,6 +17,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
 ### Options
 
 ```
+      --device string           Device to extract kernel for (e.g. iPhone10,6)
       --dmg string              Extract DMG file (app, sys, fs)
       --driverkit               Extract DriverKit dyld_shared_cache
       --dtree                   Extract DeviceTree

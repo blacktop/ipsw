@@ -23,7 +23,7 @@ Download and Parse IPSWs (and SO much more)
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
-* [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or a MachO binary
+* [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or MachO
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
@@ -44,6 +44,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw pongo](/docs/cli/ipsw/pongo)	 - PongoOS Terminal
 * [ipsw sepfw](/docs/cli/ipsw/sepfw)	 - Dump MachOs
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
+* [ipsw swift-dump](/docs/cli/ipsw/swift-dump)	 - 🚧 Swift class-dump a dylib from a DSC or MachO
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
 * [ipsw update](/docs/cli/ipsw/update)	 - Download an ipsw update if one exists
 * [ipsw version](/docs/cli/ipsw/version)	 - Print the version number of ipsw

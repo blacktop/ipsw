@@ -1,34 +1,34 @@
 ---
-id: class-dump
-title: class-dump
+id: swift-dump
+title: swift-dump
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: class-dump
-description: ObjC class-dump a dylib from a DSC or MachO
+sidebar_label: swift-dump
+description: 🚧 Swift class-dump a dylib from a DSC or MachO
 ---
-## ipsw class-dump
+## ipsw swift-dump
 
-ObjC class-dump a dylib from a DSC or MachO
+🚧 Swift class-dump a dylib from a DSC or MachO
 
 ```
-ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
+ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ```
 
 ### Options
 
 ```
+      --all             Dump all other Swift sections/info
       --arch string     Which architecture to use for fat/universal MachO
-  -a, --cat string      Dump category (regex)
-  -c, --class string    Dump class (regex)
+  -a, --ass string      Dump associated type (regex)
+      --demangle        Demangle symbol names
       --deps            Dump imported private frameworks
-      --headers         Dump ObjC headers
-  -h, --help            help for class-dump
+  -e, --ext string      Dump extension (regex)
+  -h, --help            help for swift-dump
+  -i, --interface       Dump Swift Interface
   -o, --output string   Folder to write headers to
   -p, --proto string    Dump protocol (regex)
-      --re              RE verbosity (with addresses)
-      --refs            Dump ObjC references too
       --theme string    Color theme (nord, github, etc) (default "nord")
-  -x, --xcfw            🚧 Generate a XCFramework for the dylib
+  -y, --type string     Dump type (regex)
 ```
 
 ### Options inherited from parent commands
