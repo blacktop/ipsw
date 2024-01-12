@@ -287,12 +287,12 @@ func (o *ObjC) Dump() error {
 		ms = append(ms, o.deps...)
 	}
 	for _, m := range ms {
-		if info, err := m.GetObjCImageInfo(); err == nil {
-			fmt.Println(info.Flags)
-		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return err
-		}
 		if o.conf.Verbose {
+			if info, err := m.GetObjCImageInfo(); err == nil {
+				fmt.Println(info.Flags)
+			} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+				return err
+			}
 			fmt.Println(m.GetObjCToc())
 		}
 		/* ObjC Protocols */

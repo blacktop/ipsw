@@ -47,6 +47,7 @@ func init() {
 	swiftDumpCmd.Flags().BoolP("interface", "i", false, "Dump Swift Interface")
 	swiftDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	swiftDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names")
+	swiftDumpCmd.Flags().Bool("all", false, "Dump all other Swift sections/info")
 	swiftDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
 	swiftDumpCmd.MarkFlagDirname("output")
 	swiftDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
@@ -63,6 +64,7 @@ func init() {
 	viper.BindPFlag("swift-dump.interface", swiftDumpCmd.Flags().Lookup("interface"))
 	viper.BindPFlag("swift-dump.deps", swiftDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("swift-dump.demangle", swiftDumpCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("swift-dump.all", swiftDumpCmd.Flags().Lookup("all"))
 	viper.BindPFlag("swift-dump.output", swiftDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("swift-dump.theme", swiftDumpCmd.Flags().Lookup("theme"))
 	viper.BindPFlag("swift-dump.type", swiftDumpCmd.Flags().Lookup("type"))
@@ -115,6 +117,7 @@ var swiftDumpCmd = &cobra.Command{
 		conf := mcmd.SwiftConfig{
 			Verbose: Verbose,
 			// Addrs:       viper.GetBool("swift-dump.re"),
+			All:         viper.GetBool("swift-dump.all"),
 			Interface:   viper.GetBool("swift-dump.interface"),
 			Deps:        viper.GetBool("swift-dump.deps"),
 			Demangle:    doDemangle,

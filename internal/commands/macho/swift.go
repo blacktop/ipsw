@@ -24,6 +24,7 @@ type SwiftConfig struct {
 	Name      string
 	Verbose   bool
 	Addrs     bool // TODO: implement in swift string formatters
+	All       bool
 	Interface bool
 	Deps      bool
 	Demangle  bool
@@ -347,7 +348,7 @@ func (s *Swift) Dump() error {
 		if typs, err := m.GetSwiftTypes(); err == nil {
 			if s.conf.Verbose {
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, "/********\n* TYPES *\n********/\n\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, "/********\n* TYPES *\n********/\n\n", "swift", "terminal256", s.conf.Theme)
 				} else {
 					fmt.Println("TYPES")
 					fmt.Print("-----\n\n")
@@ -366,9 +367,9 @@ func (s *Swift) Dump() error {
 					}
 				}
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
 					if i < (toc.Types-1) && (toc.Protocols > 0 || toc.ProtocolConformances > 0) { // skip last type if others follow
-						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
 					} else {
 						fmt.Println()
 					}
@@ -383,7 +384,7 @@ func (s *Swift) Dump() error {
 		if protos, err := m.GetSwiftProtocols(); err == nil {
 			if s.conf.Verbose {
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, "/************\n* PROTOCOLS *\n************/\n\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, "/************\n* PROTOCOLS *\n************/\n\n", "swift", "terminal256", s.conf.Theme)
 				} else {
 					fmt.Println("PROTOCOLS")
 					fmt.Print("---------\n\n")
@@ -402,9 +403,9 @@ func (s *Swift) Dump() error {
 					}
 				}
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
 					if i < (toc.Protocols-1) && toc.ProtocolConformances > 0 { // skip last type if others follow
-						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
 					} else {
 						fmt.Println()
 					}
@@ -419,7 +420,7 @@ func (s *Swift) Dump() error {
 		if protos, err := m.GetSwiftProtocolConformances(); err == nil {
 			if s.conf.Verbose {
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, "/************************\n* PROTOCOL CONFORMANCES *\n************************/\n\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, "/************************\n* PROTOCOL CONFORMANCES *\n************************/\n\n", "swift", "terminal256", s.conf.Theme)
 				} else {
 					fmt.Println("PROTOCOL CONFORMANCES")
 					fmt.Print("---------------------\n\n")
@@ -438,9 +439,9 @@ func (s *Swift) Dump() error {
 					}
 				}
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
 					if i < (toc.ProtocolConformances - 1) { // skip last type if others follow
-						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
 					} else {
 						fmt.Println()
 					}
@@ -455,7 +456,7 @@ func (s *Swift) Dump() error {
 		if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
 			if s.conf.Verbose {
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, "/*******************\n* ASSOCIATED TYPES *\n*******************/\n\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, "/*******************\n* ASSOCIATED TYPES *\n*******************/\n\n", "swift", "terminal256", s.conf.Theme)
 				} else {
 					fmt.Println("ASSOCIATED TYPES")
 					fmt.Print("---------------------\n\n")
@@ -474,14 +475,147 @@ func (s *Swift) Dump() error {
 					}
 				}
 				if s.conf.Color {
-					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+					quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
+					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
 				} else {
 					fmt.Println(sout + "\n")
 				}
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
 			log.Errorf("failed to parse swift associated types: %v", err)
+		}
+		if s.conf.All {
+			fmt.Println("Swift (Other Sections)")
+			fmt.Println("======================")
+			fmt.Println()
+			if entry, err := m.GetSwiftEntry(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_entry",
+				}).Info("Swift Entry")
+				fmt.Println()
+				fmt.Printf("%#x: entry\n\n", entry)
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift entrypoint: %v", err)
+			}
+			if bins, err := m.GetSwiftBuiltinTypes(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_builtin",
+				}).Info("Swift Builtin Types")
+				fmt.Println()
+				for _, bin := range bins {
+					if s.conf.Verbose {
+						sout = bin.Verbose()
+						if s.conf.Demangle {
+							sout = swift.DemangleBlob(sout)
+						}
+					} else {
+						sout = bin.String()
+						if s.conf.Demangle {
+							sout = swift.DemangleSimpleBlob(bin.String())
+						}
+					}
+					if s.conf.Color {
+						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
+					} else {
+						fmt.Println(sout + "\n")
+					}
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift built-in types: %v", err)
+			}
+			if metadatas, err := m.GetSwiftColocateMetadata(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__textg_swiftm",
+				}).Info("Swift Colocate Metadata")
+				fmt.Println()
+				for _, md := range metadatas {
+					fmt.Println(md.Verbose())
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift colocate metadata: %v", err)
+			}
+			if mpenums, err := m.GetSwiftMultiPayloadEnums(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_mpenum",
+				}).Info("Swift MultiPayload Enums")
+				fmt.Println()
+				for _, mpenum := range mpenums {
+					sout = mpenum.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(mpenum.String())
+					}
+					if s.conf.Color {
+						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
+					} else {
+						fmt.Println(sout + "\n")
+					}
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift multi-payload enums: %v", err)
+			}
+			if closures, err := m.GetSwiftClosures(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_capture",
+				}).Info("Swift Closures")
+				fmt.Println()
+				for _, closure := range closures {
+					sout = closure.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(closure.String())
+					}
+					if s.conf.Color {
+						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", s.conf.Theme)
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", s.conf.Theme)
+					} else {
+						fmt.Println(sout + "\n")
+					}
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift closures: %v", err)
+			}
+			if rep, err := m.GetSwiftDynamicReplacementInfo(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_replace",
+				}).Info("Swift Dynamic Replacement Info")
+				fmt.Println()
+				if rep != nil {
+					fmt.Println(rep)
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift dynamic replacement info: %v", err)
+			}
+			if rep, err := m.GetSwiftDynamicReplacementInfoForOpaqueTypes(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_replac2",
+				}).Info("Swift Dynamic Replacement Info For Opaque Types")
+				fmt.Println()
+				if rep != nil {
+					fmt.Println(rep)
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift dynamic replacement info opaque types: %v", err)
+			}
+			if afuncs, err := m.GetSwiftAccessibleFunctions(); err == nil {
+				log.WithFields(log.Fields{
+					"segment": "__TEXT",
+					"section": "__swift5_acfuncs",
+				}).Info("Swift Accessible Functions")
+				fmt.Println()
+				for _, afunc := range afuncs {
+					fmt.Println(afunc)
+				}
+			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+				log.Errorf("failed to parse swift accessible functions: %v", err)
+			}
 		}
 	}
 
