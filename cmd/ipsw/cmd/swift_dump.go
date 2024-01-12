@@ -24,17 +24,19 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,53 +44,143 @@ import (
 func init() {
 	rootCmd.AddCommand(swiftDumpCmd)
 
+	swiftDumpCmd.Flags().BoolP("interface", "i", false, "Dump Swift Interface")
+	swiftDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	swiftDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names")
-	// swiftDumpCmd.Flags().StringP("class", "c", "", "Dump class")
-	// swiftDumpCmd.Flags().StringP("proto", "p", "", "Dump protocol")
-	// swiftDumpCmd.Flags().StringP("cat", "t", "", "Dump category")
+	swiftDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
+	swiftDumpCmd.MarkFlagDirname("output")
+	swiftDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
+	swiftDumpCmd.RegisterFlagCompletionFunc("theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
+	})
+	swiftDumpCmd.Flags().StringP("type", "y", "", "Dump type (regex)")
+	swiftDumpCmd.Flags().StringP("proto", "p", "", "Dump protocol (regex)")
+	swiftDumpCmd.Flags().StringP("ext", "e", "", "Dump extension (regex)")
+	swiftDumpCmd.Flags().StringP("ass", "a", "", "Dump associated type (regex)")
+	// swiftDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
+	swiftDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
+
+	viper.BindPFlag("swift-dump.interface", swiftDumpCmd.Flags().Lookup("interface"))
+	viper.BindPFlag("swift-dump.deps", swiftDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("swift-dump.demangle", swiftDumpCmd.Flags().Lookup("demangle"))
-	// viper.BindPFlag("swift-dump.class", swiftDumpCmd.Flags().Lookup("class"))
-	// viper.BindPFlag("swift-dump.proto", swiftDumpCmd.Flags().Lookup("proto"))
-	// viper.BindPFlag("swift-dump.cat", swiftDumpCmd.Flags().Lookup("cat"))
-	// swiftDumpCmd.MarkFlagsMutuallyExclusive("class", "proto", "cat")
+	viper.BindPFlag("swift-dump.output", swiftDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("swift-dump.theme", swiftDumpCmd.Flags().Lookup("theme"))
+	viper.BindPFlag("swift-dump.type", swiftDumpCmd.Flags().Lookup("type"))
+	viper.BindPFlag("swift-dump.proto", swiftDumpCmd.Flags().Lookup("proto"))
+	viper.BindPFlag("swift-dump.ext", swiftDumpCmd.Flags().Lookup("ext"))
+	viper.BindPFlag("swift-dump.ass", swiftDumpCmd.Flags().Lookup("ass"))
+	// viper.BindPFlag("swift-dump.re", swiftDumpCmd.Flags().Lookup("re"))
+	viper.BindPFlag("swift-dump.arch", swiftDumpCmd.Flags().Lookup("arch"))
 }
 
 // swiftDumpCmd represents the swiftDump command
 var swiftDumpCmd = &cobra.Command{
 	Use:     "swift-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"sd"},
-	Short:   "Swift class-dump a dylib from a DSC or MachO",
+	Short:   "🚧 Swift class-dump a dylib from a DSC or MachO",
 	Args:    cobra.MinimumNArgs(1),
-	Hidden:  true,
-	// ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// 	if len(args) == 1 {
-	// 		return getImages(args[0]), cobra.ShellCompDirectiveDefault
-	// 	}
-	// 	return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
-	// },
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
-		// var header, footer string
+		var s *mcmd.Swift
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		color.NoColor = NoColor
+
+		if viper.GetBool("swift-dump.interface") &&
+			(viper.GetString("swift-dump.type") != "" ||
+				viper.GetString("swift-dump.proto") != "" ||
+				viper.GetString("swift-dump.ext") != "") ||
+			viper.GetString("swift-dump.ass") != "" {
+			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
+		}
+
+		if len(viper.GetString("class-dump.output")) > 0 {
+			if err := os.MkdirAll(viper.GetString("class-dump.output"), 0o750); err != nil {
+				return err
+			}
+		}
 
 		doDemangle := viper.GetBool("swift-dump.demangle")
-		// dumpClass := viper.GetString("swift-dump.class")
-		// dumpProto := viper.GetString("swift-dump.proto")
-		// dumpCat := viper.GetString("swift-dump.cat")
 
-		if ok, _ := magic.IsMachO(args[0]); ok {
-			m, err := macho.Open(args[0])
+		conf := mcmd.SwiftConfig{
+			Verbose: Verbose,
+			// Addrs:       viper.GetBool("swift-dump.re"),
+			Interface:   viper.GetBool("swift-dump.interface"),
+			Deps:        viper.GetBool("swift-dump.deps"),
+			Demangle:    doDemangle,
+			IpswVersion: fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
+			Color:       Color && !NoColor,
+			Theme:       viper.GetString("swift-dump.theme"),
+			Output:      viper.GetString("swift-dump.output"),
+		}
+
+		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
+			machoPath := filepath.Clean(args[0])
+			// first check for fat file
+			fat, err := macho.OpenFat(machoPath)
+			if err != nil && err != macho.ErrNotFat {
+				return err
+			}
+			if err == macho.ErrNotFat {
+				m, err = macho.Open(machoPath)
+				if err != nil {
+					return err
+				}
+			} else {
+				var options []string
+				var shortOptions []string
+				for _, arch := range fat.Arches {
+					options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+					shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
+				}
+
+				if len(viper.GetString("class-dump.arch")) > 0 {
+					found := false
+					for i, opt := range shortOptions {
+						if strings.Contains(strings.ToLower(opt), strings.ToLower(viper.GetString("class-dump.arch"))) {
+							m = fat.Arches[i].File
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("--arch '%s' not found in: %s", viper.GetString("class-dump.arch"), strings.Join(shortOptions, ", "))
+					}
+				} else {
+					choice := 0
+					prompt := &survey.Select{
+						Message: "Detected a universal MachO file, please select an architecture to analyze:",
+						Options: options,
+					}
+					survey.AskOne(prompt, &choice)
+					m = fat.Arches[choice].File
+				}
+			}
+			if viper.GetBool("class-dump.deps") {
+				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
+			}
+
+			conf.Name = filepath.Base(machoPath)
+
+			s, err = mcmd.NewSwift(m, nil, &conf)
 			if err != nil {
 				return err
 			}
-			defer m.Close()
-		} else {
+		} else { /* DSC file */
+			if len(args) < 2 {
+				return fmt.Errorf("must provide an in-cache DYLIB to dump")
+			}
+
 			f, err := dyld.Open(args[0])
 			if err != nil {
 				return err
@@ -124,152 +216,48 @@ var swiftDumpCmd = &cobra.Command{
 					}
 				}
 			}
+
+			conf.Name = filepath.Base(image.Name)
+
+			s, err = mcmd.NewSwift(m, f, &conf)
+			if err != nil {
+				return err
+			}
 		}
 
-		if m.HasSwift() {
-			toc := m.GetSwiftTOC()
-			if err := m.PreCache(); err != nil { // cache fields and types
-				log.Errorf("failed to precache swift fields/types: %v", err)
+		if viper.GetBool("swift-dump.interface") {
+			return s.Interface()
+		}
+
+		if viper.GetString("swift-dump.type") != "" {
+			if err := s.DumpType(viper.GetString("class-dump.type")); err != nil {
+				return err
 			}
-			var sout string
-			if typs, err := m.GetSwiftTypes(); err == nil {
-				if Verbose {
-					if Color {
-						quick.Highlight(os.Stdout, "/********\n* TYPES *\n********/\n\n", "swift", "terminal256", "nord")
-					} else {
-						fmt.Println("TYPES")
-						fmt.Print("-----\n\n")
-					}
-				}
-				for i, typ := range typs {
-					if Verbose {
-						sout = typ.Verbose()
-						if doDemangle {
-							sout = swift.DemangleBlob(sout)
-						}
-					} else {
-						sout = typ.String()
-						if doDemangle {
-							sout = swift.DemangleSimpleBlob(typ.String())
-						}
-					}
-					if Color {
-						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-						if i < (toc.Types-1) && (toc.Protocols > 0 || toc.ProtocolConformances > 0) { // skip last type if others follow
-							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println()
-						}
-					} else {
-						fmt.Println(sout + "\n")
-					}
-				}
-			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift types: %v", err)
+		}
+
+		if viper.GetString("swift-dump.proto") != "" {
+			if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
+				return err
 			}
-			if protos, err := m.GetSwiftProtocols(); err == nil {
-				if Verbose {
-					if Color {
-						quick.Highlight(os.Stdout, "/************\n* PROTOCOLS *\n************/\n\n", "swift", "terminal256", "nord")
-					} else {
-						fmt.Println("PROTOCOLS")
-						fmt.Print("---------\n\n")
-					}
-				}
-				for i, proto := range protos {
-					if Verbose {
-						sout = proto.Verbose()
-						if doDemangle {
-							sout = swift.DemangleBlob(sout)
-						}
-					} else {
-						sout = proto.String()
-						if doDemangle {
-							sout = swift.DemangleSimpleBlob(proto.String())
-						}
-					}
-					if Color {
-						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-						if i < (toc.Protocols-1) && toc.ProtocolConformances > 0 { // skip last type if others follow
-							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println()
-						}
-					} else {
-						fmt.Println(sout + "\n")
-					}
-				}
-			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift protocols: %v", err)
+		}
+
+		if viper.GetString("swift-dump.ext") != "" {
+			if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
+				return err
 			}
-			if protos, err := m.GetSwiftProtocolConformances(); err == nil {
-				if Verbose {
-					if Color {
-						quick.Highlight(os.Stdout, "/************************\n* PROTOCOL CONFORMANCES *\n************************/\n\n", "swift", "terminal256", "nord")
-					} else {
-						fmt.Println("PROTOCOL CONFORMANCES")
-						fmt.Print("---------------------\n\n")
-					}
-				}
-				for i, proto := range protos {
-					if Verbose {
-						sout = proto.Verbose()
-						if doDemangle {
-							sout = swift.DemangleBlob(sout)
-						}
-					} else {
-						sout = proto.String()
-						if doDemangle {
-							sout = swift.DemangleSimpleBlob(proto.String())
-						}
-					}
-					if Color {
-						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-						if i < (toc.ProtocolConformances - 1) { // skip last type if others follow
-							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println()
-						}
-					} else {
-						fmt.Println(sout + "\n")
-					}
-				}
-			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift protocol conformances: %v", err)
+		}
+
+		if viper.GetString("swift-dump.ass") != "" {
+			if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
+				return err
 			}
-			if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
-				if Verbose {
-					if Color {
-						quick.Highlight(os.Stdout, "/*******************\n* ASSOCIATED TYPES *\n*******************/\n\n", "swift", "terminal256", "nord")
-					} else {
-						fmt.Println("ASSOCIATED TYPES")
-						fmt.Print("---------------------\n\n")
-					}
-				}
-				for _, at := range asstyps {
-					if Verbose {
-						sout = at.Verbose()
-						if doDemangle {
-							sout = swift.DemangleBlob(sout)
-						}
-					} else {
-						sout = at.String()
-						if doDemangle {
-							sout = swift.DemangleSimpleBlob(at.String())
-						}
-					}
-					if Color {
-						quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-					} else {
-						fmt.Println(sout + "\n")
-					}
-				}
-			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift associated types: %v", err)
-			}
-		} else {
-			log.Warn("no swift")
+		}
+
+		if viper.GetString("swift-dump.type") == "" &&
+			viper.GetString("swift-dump.proto") == "" &&
+			viper.GetString("cswiftlass-dump.ext") == "" &&
+			viper.GetString("cswiftlass-dump.ass") == "" {
+			return s.Dump()
 		}
 
 		return nil

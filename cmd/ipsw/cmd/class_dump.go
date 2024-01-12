@@ -62,7 +62,7 @@ func init() {
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
 	classDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
 	classDumpCmd.MarkFlagDirname("output")
-	classDumpCmd.Flags().StringP("theme", "t", "nord", "Color theme (nord, github, etc)")
+	classDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
 	classDumpCmd.RegisterFlagCompletionFunc("theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
 	})
@@ -91,7 +91,7 @@ var classDumpCmd = &cobra.Command{
 	// TODO: is this too much magic? (should we be explicit about what the input is?)
 	Use:     "class-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"cd"},
-	Short:   "ObjC class-dump a dylib from a DSC or a MachO binary",
+	Short:   "ObjC class-dump a dylib from a DSC or MachO",
 	Args:    cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
