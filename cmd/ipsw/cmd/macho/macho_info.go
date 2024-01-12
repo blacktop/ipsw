@@ -51,7 +51,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -68,15 +67,13 @@ const (
 	onlySig          = 1 << 2
 	onlyEnt          = 1 << 3
 	onlyObjC         = 1 << 4
-	onlyObjCRefs     = 1 << 5
-	onlySwift        = 1 << 6
-	onlySwiftAll     = 1 << 7
-	onlySymbols      = 1 << 8
-	onlyFixups       = 1 << 9
-	onlyFuncStarts   = 1 << 10
-	onlyStrings      = 1 << 11
-	onlySplitSeg     = 1 << 12
-	onlyBitCode      = 1 << 13
+	onlySwift        = 1 << 5
+	onlySymbols      = 1 << 6
+	onlyFixups       = 1 << 7
+	onlyFuncStarts   = 1 << 8
+	onlyStrings      = 1 << 9
+	onlySplitSeg     = 1 << 10
+	onlyBitCode      = 1 << 11
 )
 
 func init() {
@@ -184,7 +181,7 @@ var machoInfoCmd = &cobra.Command{
 		showHeader := viper.GetBool("macho.info.header")
 		showLoadCommands := viper.GetBool("macho.info.loads")
 		showSignature := viper.GetBool("macho.info.sig")
-		showCert := viper.GetBool("macho.info.dump-cert")
+		dumpCert := viper.GetBool("macho.info.dump-cert")
 		showEntitlements := viper.GetBool("macho.info.ent")
 		showObjC := viper.GetBool("macho.info.objc")
 		showObjcRefs := viper.GetBool("macho.info.objc-refs")
@@ -210,8 +207,8 @@ var machoInfoCmd = &cobra.Command{
 
 		var options uint32
 		for i, opt := range []bool{
-			showHeader, showLoadCommands, showSignature, showEntitlements, showObjC, showObjcRefs, showSwift,
-			showSwiftAll, showSymbols, showFixups, showFuncStarts, showStrings, showSplitSeg, showBitCode,
+			showHeader, showLoadCommands, showSignature, showEntitlements, showObjC, showSwift,
+			showSymbols, showFixups, showFuncStarts, showStrings, showSplitSeg, showBitCode,
 		} {
 			if opt {
 				options |= 1 << i
@@ -244,16 +241,16 @@ var machoInfoCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			var options []string
-			var shortOptions []string
+			var arches []string
+			var shortArches []string
 			for _, arch := range fat.Arches {
-				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-				shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
+				arches = append(arches, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+				shortArches = append(shortArches, strings.ToLower(arch.SubCPU.String(arch.CPU)))
 			}
 
 			if len(selectedArch) > 0 {
 				found := false
-				for i, opt := range shortOptions {
+				for i, opt := range shortArches {
 					if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
 						m = fat.Arches[i].File
 						found = true
@@ -261,13 +258,13 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 				if !found {
-					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
+					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortArches, ", "))
 				}
 			} else {
 				choice := 0
 				prompt := &survey.Select{
 					Message: "Detected a universal MachO file, please select an architecture to analyze:",
-					Options: options,
+					Options: arches,
 				}
 				survey.AskOne(prompt, &choice)
 				m = fat.Arches[choice].File
@@ -279,7 +276,7 @@ var machoInfoCmd = &cobra.Command{
 			folder = extractPath
 		}
 
-		if showCert {
+		if dumpCert {
 			if cs := m.CodeSignature(); cs != nil {
 				if len(m.CodeSignature().CMSSignature) > 0 {
 					// parse cert
@@ -711,7 +708,7 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no code signature data")
 			}
-			fmt.Println()
+			println()
 		}
 
 		if showEntitlements {
@@ -730,6 +727,7 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no entitlements")
 			}
+			println()
 		}
 
 		if showObjC {
@@ -754,7 +752,7 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no objc")
 			}
-			fmt.Println()
+			println()
 		}
 
 		if showSwift {
@@ -763,284 +761,24 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=====")
 			}
 			if m.HasSwift() {
-				toc := m.GetSwiftTOC()
-				if err := m.PreCache(); err != nil { // cache fields and types
-					log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(machoPath), err)
+				s, err := mcmd.NewSwift(m, nil, &mcmd.SwiftConfig{
+					Verbose:  viper.GetBool("verbose"),
+					Addrs:    true,
+					All:      showSwiftAll,
+					Demangle: doDemangle,
+					Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+					Theme:    "nord",
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create Swift object: %v", err)
 				}
-				var sout string
-				if typs, err := m.GetSwiftTypes(); err == nil {
-					if verbose {
-						if color {
-							quick.Highlight(os.Stdout, "/********\n* TYPES *\n********/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println("TYPES")
-							fmt.Print("-----\n\n")
-						}
-					}
-					for i, typ := range typs {
-						if verbose {
-							sout = typ.Verbose()
-							if doDemangle {
-								sout = swift.DemangleBlob(sout)
-							}
-						} else {
-							sout = typ.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(typ.String())
-							}
-						}
-						if color {
-							quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-							if i < (toc.Types-1) && (toc.Protocols > 0 || toc.ProtocolConformances > 0) { // skip last type if others follow
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println()
-							}
-						} else {
-							fmt.Println(sout + "\n")
-						}
-					}
-				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-					log.Errorf("failed to parse swift types for %s: %v", filepath.Base(machoPath), err)
-				}
-				if protos, err := m.GetSwiftProtocols(); err == nil {
-					if verbose {
-						if color {
-							quick.Highlight(os.Stdout, "/************\n* PROTOCOLS *\n************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println("PROTOCOLS")
-							fmt.Print("---------\n\n")
-						}
-					}
-					for i, proto := range protos {
-						if verbose {
-							sout = proto.Verbose()
-							if doDemangle {
-								sout = swift.DemangleBlob(sout)
-							}
-						} else {
-							sout = proto.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(proto.String())
-							}
-						}
-						if color {
-							quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-							if i < (toc.Protocols-1) && toc.ProtocolConformances > 0 { // skip last type if others follow
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println()
-							}
-						} else {
-							fmt.Println(sout + "\n")
-						}
-					}
-				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-					log.Errorf("failed to parse swift protocols for %s: %v", filepath.Base(machoPath), err)
-				}
-				if protos, err := m.GetSwiftProtocolConformances(); err == nil {
-					if verbose {
-						if color {
-							quick.Highlight(os.Stdout, "/************************\n* PROTOCOL CONFORMANCES *\n************************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println("PROTOCOL CONFORMANCES")
-							fmt.Print("---------------------\n\n")
-						}
-					}
-					for i, proto := range protos {
-						if verbose {
-							sout = proto.Verbose()
-							if doDemangle {
-								sout = swift.DemangleBlob(sout)
-							}
-						} else {
-							sout = proto.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(proto.String())
-							}
-						}
-						if color {
-							quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-							if i < (toc.ProtocolConformances - 1) { // skip last type if others follow
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println()
-							}
-						} else {
-							fmt.Println(sout + "\n")
-						}
-					}
-				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-					log.Errorf("failed to parse swift protocol conformances for %s: %v", filepath.Base(machoPath), err)
-				}
-				if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
-					if verbose {
-						if color {
-							quick.Highlight(os.Stdout, "/*******************\n* ASSOCIATED TYPES *\n*******************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println("ASSOCIATED TYPES")
-							fmt.Print("---------------------\n\n")
-						}
-					}
-					for _, at := range asstyps {
-						if verbose {
-							sout = at.Verbose()
-							if doDemangle {
-								sout = swift.DemangleBlob(sout)
-							}
-						} else {
-							sout = at.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(at.String())
-							}
-						}
-						if color {
-							quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-						} else {
-							fmt.Println(sout + "\n")
-						}
-					}
-				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-					log.Errorf("failed to parse swift associated types for %s: %v", filepath.Base(machoPath), err)
-				}
-				if showSwiftAll {
-					fmt.Println("Swift (Other Sections)")
-					fmt.Println("======================")
-					fmt.Println()
-					if entry, err := m.GetSwiftEntry(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_entry",
-						}).Info("Swift Entry")
-						fmt.Println()
-						fmt.Printf("%#x: entry\n\n", entry)
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift entrypoint for %s: %v", filepath.Base(machoPath), err)
-					}
-					if bins, err := m.GetSwiftBuiltinTypes(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_builtin",
-						}).Info("Swift Builtin Types")
-						fmt.Println()
-						for _, bin := range bins {
-							if verbose {
-								sout = bin.Verbose()
-								if doDemangle {
-									sout = swift.DemangleBlob(sout)
-								}
-							} else {
-								sout = bin.String()
-								if doDemangle {
-									sout = swift.DemangleSimpleBlob(bin.String())
-								}
-							}
-							if color {
-								quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println(sout + "\n")
-							}
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift built-in types for %s: %v", filepath.Base(machoPath), err)
-					}
-					if metadatas, err := m.GetSwiftColocateMetadata(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__textg_swiftm",
-						}).Info("Swift Colocate Metadata")
-						fmt.Println()
-						for _, md := range metadatas {
-							fmt.Println(md.Verbose())
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift colocate metadata for %s: %v", filepath.Base(machoPath), err)
-					}
-					if mpenums, err := m.GetSwiftMultiPayloadEnums(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_mpenum",
-						}).Info("Swift MultiPayload Enums")
-						fmt.Println()
-						for _, mpenum := range mpenums {
-							sout = mpenum.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(mpenum.String())
-							}
-							if color {
-								quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println(sout + "\n")
-							}
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift multi-payload enums for %s: %v", filepath.Base(machoPath), err)
-					}
-					if closures, err := m.GetSwiftClosures(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_capture",
-						}).Info("Swift Closures")
-						fmt.Println()
-						for _, closure := range closures {
-							sout = closure.String()
-							if doDemangle {
-								sout = swift.DemangleSimpleBlob(closure.String())
-							}
-							if color {
-								quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-							} else {
-								fmt.Println(sout + "\n")
-							}
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift closures for %s: %v", filepath.Base(machoPath), err)
-					}
-					if rep, err := m.GetSwiftDynamicReplacementInfo(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_replace",
-						}).Info("Swift Dynamic Replacement Info")
-						fmt.Println()
-						if rep != nil {
-							fmt.Println(rep)
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift dynamic replacement info for %s: %v", filepath.Base(machoPath), err)
-					}
-					if rep, err := m.GetSwiftDynamicReplacementInfoForOpaqueTypes(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_replac2",
-						}).Info("Swift Dynamic Replacement Info For Opaque Types")
-						fmt.Println()
-						if rep != nil {
-							fmt.Println(rep)
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift dynamic replacement info opaque types for %s: %v", filepath.Base(machoPath), err)
-					}
-					if afuncs, err := m.GetSwiftAccessibleFunctions(); err == nil {
-						log.WithFields(log.Fields{
-							"segment": "__TEXT",
-							"section": "__swift5_acfuncs",
-						}).Info("Swift Accessible Functions")
-						fmt.Println()
-						for _, afunc := range afuncs {
-							fmt.Println(afunc)
-						}
-					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift accessible functions for %s: %v", filepath.Base(machoPath), err)
-					}
+				if err := s.Dump(); err != nil {
+					return fmt.Errorf("failed to dump swift data: %v", err)
 				}
 			} else {
 				fmt.Println("  - no swift")
 			}
-			fmt.Println()
+			println()
 		}
 
 		if showFuncStarts {
@@ -1059,6 +797,7 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no function starts")
 			}
+			println()
 		}
 
 		if showSymbols {
@@ -1154,6 +893,7 @@ var machoInfoCmd = &cobra.Command{
 				}
 				w.Flush()
 			}
+			println()
 		}
 
 		if showFixups {
@@ -1162,7 +902,6 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("======")
 			}
 			if m.HasFixups() {
-
 				dcf, err := m.DyldChainedFixups()
 				if err != nil {
 					return err
@@ -1202,6 +941,7 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no fixups")
 			}
+			println()
 		}
 
 		if showStrings {
@@ -1239,7 +979,7 @@ var machoInfoCmd = &cobra.Command{
 						s = strings.Trim(s, "\x00")
 
 						if len(s) > 0 {
-							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
+							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) { // TODO: does this skip unicode strings?
 								continue // skip non-ascii strings when dumping __TEXT.__const
 							}
 							fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
@@ -1247,6 +987,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 			}
+
 			if cfstrs, err := m.GetCFStrings(); err == nil {
 				if len(cfstrs) > 0 {
 					fmt.Printf("\nCFStrings\n")
@@ -1256,25 +997,25 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 			}
-			if info, err := m.GetObjCImageInfo(); err == nil {
-				if info != nil && info.HasSwift() {
-					if ss, err := mcmd.FindSwiftStrings(m); err == nil {
-						if len(ss) > 0 {
-							fmt.Printf("\nSwift Strings\n")
-							fmt.Println("-------------")
-						}
-						// sort by address
-						addrs := make([]uint64, 0, len(ss))
-						for addr := range ss {
-							addrs = append(addrs, addr)
-						}
-						slices.Sort(addrs)
-						for _, addr := range addrs {
-							fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", ss[addr])))
-						}
+
+			if m.HasSwift() {
+				if ss, err := mcmd.FindSwiftStrings(m); err == nil {
+					if len(ss) > 0 {
+						fmt.Printf("\nSwift Strings\n")
+						fmt.Println("-------------")
+					}
+					// sort by address
+					addrs := make([]uint64, 0, len(ss))
+					for addr := range ss {
+						addrs = append(addrs, addr)
+					}
+					slices.Sort(addrs)
+					for _, addr := range addrs {
+						fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", ss[addr])))
 					}
 				}
 			}
+			println()
 		}
 
 		if showSplitSeg {
