@@ -1626,13 +1626,22 @@ func (f *File) Image(name string) (*CacheImage, error) {
 		return f.Images[idx], nil
 	}
 	// slow path
+	var matches []*CacheImage
 	for _, i := range f.Images {
 		if strings.EqualFold(strings.ToLower(i.Name), strings.ToLower(name)) {
-			return i, nil
+			matches = append(matches, i)
+		} else if strings.EqualFold(strings.ToLower(filepath.Base(i.Name)), strings.ToLower(name)) {
+			matches = append(matches, i)
 		}
-		if strings.EqualFold(strings.ToLower(filepath.Base(i.Name)), strings.ToLower(name)) {
-			return i, nil
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	} else if len(matches) > 1 {
+		var names []string
+		for _, m := range matches {
+			names = append(names, m.Name)
 		}
+		return nil, fmt.Errorf("multiple images found for %s (please supply FULL path):\n\t- %s", name, strings.Join(names, "\n\t- "))
 	}
 	return nil, fmt.Errorf("image %s not found in cache", name)
 }
