@@ -26,7 +26,7 @@ jobs:
   #   steps:
   #     - name: Cache beta IPSW
   #       id: cache-beta-ipsw
-  #       uses: actions/cache@v3
+  #       uses: actions/cache@v4
   #       with:
   #         path: |
   #           ~/beta
@@ -63,7 +63,7 @@ jobs:
       # - name: Cache beta IPSW
       #   id: cache-beta-ipsw
       #   if: matrix.platform == 'macos-13'
-      #   uses: actions/cache@v3
+      #   uses: actions/cache@v4
       #   with:
       #     path: |
       #       ~/beta
@@ -83,7 +83,7 @@ jobs:
       #     key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
       - name: Cache go.mod (macOS)
         if: matrix.platform == 'macos-13'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/Library/Caches/go-build
@@ -93,7 +93,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Cache go.mod (Linux)
         if: matrix.platform == 'ubuntu-latest'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -103,7 +103,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Cache go.mod (Windows)
         if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~\AppData\Local\go-build
