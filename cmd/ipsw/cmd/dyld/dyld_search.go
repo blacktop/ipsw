@@ -38,8 +38,10 @@ func init() {
 	DyldCmd.AddCommand(dyldSearchCmd)
 
 	dyldSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
+	dyldSearchCmd.Flags().StringP("import", "i", "", "Search for specific import regex")
 	dyldSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
 	viper.BindPFlag("dyld.search.load-command", dyldSearchCmd.Flags().Lookup("load-command"))
+	viper.BindPFlag("dyld.search.import", dyldSearchCmd.Flags().Lookup("import"))
 	viper.BindPFlag("dyld.search.section", dyldSearchCmd.Flags().Lookup("section"))
 }
 
@@ -62,9 +64,10 @@ var dyldSearchCmd = &cobra.Command{
 
 		// flags
 		loadCmdReStr := viper.GetString("dyld.search.load-command")
+		importReStr := viper.GetString("dyld.search.import")
 		sectionReStr := viper.GetString("dyld.search.section")
 		// verify flags
-		if loadCmdReStr == "" && sectionReStr == "" {
+		if loadCmdReStr == "" && importReStr == "" && sectionReStr == "" {
 			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
@@ -106,6 +109,18 @@ var dyldSearchCmd = &cobra.Command{
 				for _, lc := range m.Loads {
 					if re.MatchString(lc.Command().String()) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), lc.Command())
+					}
+				}
+			}
+			if importReStr != "" {
+				re, err := regexp.Compile(importReStr)
+				if err != nil {
+					return fmt.Errorf("invalid regex '%s': %w", importReStr, err)
+				}
+				for _, imp := range m.ImportedLibraries() {
+					if re.MatchString(imp) {
+						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("import"), imp)
+						break
 					}
 				}
 			}

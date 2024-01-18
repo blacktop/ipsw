@@ -60,7 +60,7 @@ func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
 	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
 	machoSearchCmd.Flags().StringP("launch-const", "t", "", "Search for launch constraint regex")
-	machoSearchCmd.Flags().StringP("import", "i", "", "Search for specific section regex")
+	machoSearchCmd.Flags().StringP("import", "i", "", "Search for specific import regex")
 	machoSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
 	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
