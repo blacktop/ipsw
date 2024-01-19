@@ -64,19 +64,19 @@ type Context struct {
 
 // Diff is the diff
 type Diff struct {
-	Title string
+	Title string `json:"title,omitempty"`
 
-	Old Context
-	New Context
+	Old Context `json:"-"`
+	New Context `json:"-"`
 
-	Kexts   *mcmd.MachoDiff
-	KDKs    string
-	Ents    string
-	Dylibs  *mcmd.MachoDiff
-	Machos  *mcmd.MachoDiff
-	Launchd string
+	Kexts   *mcmd.MachoDiff `json:"kexts,omitempty"`
+	KDKs    string          `json:"kdks,omitempty"`
+	Ents    string          `json:"ents,omitempty"`
+	Dylibs  *mcmd.MachoDiff `json:"dylibs,omitempty"`
+	Machos  *mcmd.MachoDiff `json:"machos,omitempty"`
+	Launchd string          `json:"launchd,omitempty"`
 
-	tmpDir string
+	tmpDir string `json:"-"`
 }
 
 // New news the diff
@@ -404,25 +404,15 @@ func (d *Diff) parseDSC() error {
 
 	/* DIFF WEBKIT*/
 
-	image, err := dscOLD.Image("WebKit")
+	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
 	if err != nil {
-		return fmt.Errorf("image not in %s: %v", oldDSCes[0], err)
+		return fmt.Errorf("failed to get WebKit version: %v", err)
 	}
-	m, err := image.GetPartialMacho()
-	if err != nil {
-		return err
-	}
-	d.Old.Webkit = m.SourceVersion().Version.String()
 
-	image, err = dscNEW.Image("WebKit")
+	d.New.Webkit, err = dcmd.GetWebkitVersion(dscNEW)
 	if err != nil {
-		return fmt.Errorf("image not in %s: %v", newDSCes[0], err)
+		return fmt.Errorf("failed to get WebKit version: %v", err)
 	}
-	m, err = image.GetPartialMacho()
-	if err != nil {
-		return err
-	}
-	d.New.Webkit = m.SourceVersion().Version.String()
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
 		Markdown: true,
