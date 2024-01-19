@@ -2,6 +2,7 @@ package diff
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -228,6 +229,27 @@ func (d *Diff) String() string {
 	}
 
 	return tmptout.String()
+}
+
+// ToJSON saves the diff as a JSON file
+func (d *Diff) ToJSON(folder string) error {
+	dat, err := json.MarshalIndent(d, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if len(folder) > 0 {
+		if err := os.MkdirAll(folder, 0755); err != nil {
+			return err
+		}
+		fname := filepath.Join(folder, fmt.Sprintf("%s.json", d.Title))
+		log.Infof("Creating JSON diff file: %s", fname)
+		return os.WriteFile(fname, dat, 0644)
+	}
+
+	fmt.Println(string(dat))
+
+	return nil
 }
 
 func (d *Diff) ToHTML(folder string) error {

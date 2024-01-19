@@ -16,14 +16,14 @@ type DiffConfig struct {
 }
 
 type MachoDiff struct {
-	New     []string
-	Removed []string
-	Updated map[string]string
+	New     []string          `json:"new,omitempty"`
+	Removed []string          `json:"removed,omitempty"`
+	Updated map[string]string `json:"updated,omitempty"`
 }
 
 type section struct {
-	Name string
-	Size uint64
+	Name string `json:"name,omitempty"`
+	Size uint64 `json:"size,omitempty"`
 }
 
 type DiffInfo struct {

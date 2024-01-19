@@ -35,12 +35,14 @@ func init() {
 	rootCmd.AddCommand(diffCmd)
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
 	diffCmd.Flags().Bool("html", false, "Save diff as HTML file")
+	diffCmd.Flags().Bool("json", false, "Save diff as JSON file")
 	diffCmd.Flags().StringArrayP("kdk", "k", []string{}, "Path to KDKs to diff")
 	diffCmd.Flags().Bool("launchd", false, "Diff launchd configs")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	diffCmd.MarkFlagDirname("output")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
 	viper.BindPFlag("diff.html", diffCmd.Flags().Lookup("html"))
+	viper.BindPFlag("diff.json", diffCmd.Flags().Lookup("json"))
 	viper.BindPFlag("diff.kdk", diffCmd.Flags().Lookup("kdk"))
 	viper.BindPFlag("diff.launchd", diffCmd.Flags().Lookup("launchd"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
@@ -61,6 +63,8 @@ var diffCmd = &cobra.Command{
 
 		if viper.GetBool("diff.html") && viper.GetString("diff.output") == "" {
 			return fmt.Errorf("you must specify an --output folder when saving as HTML")
+		} else if viper.GetBool("diff.html") && viper.GetBool("diff.json") {
+			return fmt.Errorf("you cannot save as both --html and --json")
 		}
 
 		if len(viper.GetStringSlice("diff.kdk")) > 0 && len(viper.GetStringSlice("diff.kdk")) != 2 {
@@ -76,6 +80,13 @@ var diffCmd = &cobra.Command{
 
 		if err := d.Diff(viper.GetBool("diff.launchd")); err != nil {
 			return err
+		}
+
+		if viper.GetBool("diff.json") {
+			if err := d.ToJSON(viper.GetString("diff.output")); err != nil {
+				log.Errorf("failed to create JSON diff: %s", err)
+			}
+			return nil
 		}
 
 		if viper.GetString("diff.output") != "" {
