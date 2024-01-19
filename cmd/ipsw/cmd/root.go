@@ -48,10 +48,6 @@ var (
 	cfgFile string
 	// Verbose boolean flag for verbose logging
 	Verbose bool
-	// Color boolean flag for colorized output
-	Color bool
-	// NoColor boolean flag for no colorized output
-	NoColor bool
 	// AppVersion stores the plugin's version
 	AppVersion string
 	// AppBuildTime stores the plugin's build time
@@ -85,14 +81,14 @@ func init() {
 	// Flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/ipsw/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
-	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
-	rootCmd.PersistentFlags().BoolVar(&NoColor, "no-color", false, "disable colorize output")
+	rootCmd.PersistentFlags().Bool("color", false, "colorize output")
+	rootCmd.PersistentFlags().Bool("no-color", false, "disable colorize output")
 	rootCmd.PersistentFlags().String("diff-tool", "", "git diff tool (for --diff commands)")
 	rootCmd.PersistentFlags().MarkHidden("diff-tool")
-	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
-	viper.BindPFlag("color", rootCmd.Flags().Lookup("color"))
-	viper.BindPFlag("no-color", rootCmd.Flags().Lookup("no-color"))
-	viper.BindPFlag("diff-tool", rootCmd.Flags().Lookup("diff-tool"))
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("color", rootCmd.PersistentFlags().Lookup("color"))
+	viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
+	viper.BindPFlag("diff-tool", rootCmd.PersistentFlags().Lookup("diff-tool"))
 	viper.BindEnv("color", "CLICOLOR")
 	viper.BindEnv("no-color", "NO_COLOR")
 	// Add subcommand groups
