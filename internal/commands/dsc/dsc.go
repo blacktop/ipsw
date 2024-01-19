@@ -688,7 +688,7 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 
 // GetWebkitVersion returns the WebKit version from a dyld_shared_cache file
 func GetWebkitVersion(f *dyld.File) (string, error) {
-	image, err := f.Image("WebKit")
+	image, err := f.Image("/System/Library/Frameworks/WebKit.framework/WebKit")
 	if err != nil {
 		return "", fmt.Errorf("image not in DSC: %v", err)
 	}
