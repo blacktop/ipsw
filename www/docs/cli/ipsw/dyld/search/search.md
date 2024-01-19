@@ -18,6 +18,7 @@ ipsw dyld search <DSC> [flags]
 
 ```
   -h, --help                  help for search
+  -i, --import string         Search for specific import regex
   -l, --load-command string   Search for specific load command regex
   -x, --section string        Search for specific section regex
 ```

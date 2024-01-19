@@ -80,6 +80,7 @@ Available Commands:
   mount           Mount DMG from IPSW
   ota             Parse OTAs
   plist           Dump plist as JSON
+  pongo           PongoOS Terminal
   sepfw           Dump MachOs
   ssh             SSH into a jailbroken device
   swift-dump      🚧 Swift class-dump a dylib from a DSC or MachO

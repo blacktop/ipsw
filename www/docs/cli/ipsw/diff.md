@@ -19,6 +19,7 @@ ipsw diff <IPSW> <IPSW> [flags]
 ```
   -h, --help              help for diff
       --html              Save diff as HTML file
+      --json              Save diff as JSON file
   -k, --kdk stringArray   Path to KDKs to diff
       --launchd           Diff launchd configs
   -o, --output string     Folder to save diff output
