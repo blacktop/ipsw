@@ -93,10 +93,10 @@ var swiftDumpCmd = &cobra.Command{
 		var m *macho.File
 		var s *mcmd.Swift
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = NoColor
+		color.NoColor = viper.GetBool("no-color")
 
 		if viper.GetBool("swift-dump.interface") &&
 			(viper.GetString("swift-dump.type") != "" ||
@@ -122,7 +122,7 @@ var swiftDumpCmd = &cobra.Command{
 			Deps:        viper.GetBool("swift-dump.deps"),
 			Demangle:    doDemangle,
 			IpswVersion: fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
-			Color:       Color && !NoColor,
+			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("swift-dump.theme"),
 			Output:      viper.GetString("swift-dump.output"),
 		}

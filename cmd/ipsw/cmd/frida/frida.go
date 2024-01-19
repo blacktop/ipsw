@@ -42,6 +42,7 @@ var FridaCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
+		viper.BindPFlag("no-color", cmd.Flags().Lookup("no-color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
 		viper.BindPFlag("frida.udid", cmd.Flags().Lookup("udid"))
 		viper.BindPFlag("diff-tool", cmd.Flags().Lookup("diff-tool"))
