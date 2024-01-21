@@ -492,6 +492,8 @@ sboms:
 
 nix:
   - name: ipsw
+    ids:
+      - default_archive
     repository:
       owner: goreleaser
       name: nur
