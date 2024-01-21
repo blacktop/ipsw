@@ -305,7 +305,6 @@ archives:
       - completions/ipsw/*
       - manpages/*
       - config.example.yml
-    wrap_in_directory: true
   - id: extras_archive
     builds:
       - darwin_extras_build
@@ -326,7 +325,6 @@ archives:
       - completions/ipsw/*
       - manpages/*
       - config.example.yml
-    wrap_in_directory: true
   - id: frida_archive
     builds:
       - darwin_frida_build
@@ -345,7 +343,6 @@ archives:
       - completions/ipsw/*
       - manpages/*
       - config.example.yml
-    wrap_in_directory: true
   - id: daemon_archive
     builds:
       - darwin_daemon_build
@@ -371,7 +368,6 @@ archives:
       - LICENSE
       - completions/ipswd/*
       - config.example.yml
-    wrap_in_directory: true
 
 brews:
   - repository:
@@ -499,7 +495,7 @@ nix:
       name: nur
     homepage: https://github.com/blacktop/ipsw
     description: iOS/macOS Research Swiss Army Knife
-    path: pkgs/blacktop/default.nix
+    path: pkgs/ipsw/default.nix
     license: mit
     extra_install: |-
       installManPage ./manpages/ipsw.1.gz
@@ -518,8 +514,6 @@ aurs:
     backup:
       - etc/ipsw.conf
     package: |-
-      cd ipsw_${pkgver}_linux_${CHOST%%-*}
-
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
 
@@ -553,8 +547,6 @@ aurs:
     backup:
       - etc/ipsw.conf
     package: |-
-      cd ipswd_${pkgver}_linux_${CHOST%%-*}
-
       # bin
       install -Dm755 "./ipswd" "${pkgdir}/usr/bin/ipswd"
 
