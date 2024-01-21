@@ -103,7 +103,12 @@ var extractCmd = &cobra.Command{
 		}
 
 		// validate args
-		if len(viper.GetStringSlice("extract.dyld-arch")) > 0 && !viper.GetBool("extract.dyld") {
+		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && !viper.GetBool("extract.dmg") &&
+			!viper.GetBool("extract.dtree") && !viper.GetBool("extract.iboot") && !viper.GetBool("extract.sep") &&
+			!viper.GetBool("extract.sptm") && !viper.GetBool("extract.kbag") && !viper.GetBool("extract.sys-ver") &&
+			len(viper.GetString("extract.pattern")) == 0 {
+			return fmt.Errorf("must specify at least one flag to specify what to extract")
+		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--dyld-arch or -a can only be used with --dyld or -d")
 		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 {
 			for _, arch := range viper.GetStringSlice("extract.dyld-arch") {

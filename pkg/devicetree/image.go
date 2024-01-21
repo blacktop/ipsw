@@ -101,6 +101,9 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	dtree, err := parseDeviceTree(r)
 	if err != nil {
+		if len(i.KbagData) > 0 {
+			return nil, ErrEncryptedDeviceTree
+		}
 		return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
 	}
 

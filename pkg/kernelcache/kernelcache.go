@@ -287,7 +287,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		return cc.Data, nil
 	}
 
-	return []byte{}, errors.New("unsupported compression")
+	return []byte{}, errors.New("unsupported compression (possibly encrypted)")
 }
 
 // Extract extracts and decompresses a kernelcache from ipsw
