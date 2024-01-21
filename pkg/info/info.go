@@ -604,7 +604,11 @@ func Parse(ipswPath string) (*Info, error) {
 	}
 	i.DeviceTrees, err = devicetree.Parse(ipswPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse devicetree: %v", err)
+		if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
+			log.Error(err.Error())
+		} else {
+			log.Errorf("failed to parse devicetree: %v", err)
+		}
 	}
 
 	return i, nil

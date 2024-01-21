@@ -23,10 +23,11 @@ import (
 
 // Img4 DeviceTree object
 type Img4 struct {
-	IM4P    string
-	Name    string
-	Version string
-	Data    []byte
+	IM4P     string
+	Name     string
+	Version  string
+	Data     []byte
+	KbagData []byte `asn1:"optional"`
 }
 
 // Node object
