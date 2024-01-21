@@ -495,7 +495,7 @@ nix:
     ids:
       - default_archive
     repository:
-      owner: goreleaser
+      owner: blacktop
       name: nur
     homepage: https://github.com/blacktop/ipsw
     description: iOS/macOS Research Swiss Army Knife
