@@ -490,6 +490,19 @@ signs:
 sboms:
   - artifacts: archive
 
+nix:
+  - name: ipsw
+    repository:
+      owner: goreleaser
+      name: nur
+    homepage: https://github.com/blacktop/ipsw
+    description: iOS/macOS Research Swiss Army Knife
+    path: pkgs/blacktop/default.nix
+    license: mit
+    extra_install: |-
+      installManPage ./manpages/ipsw.1.gz
+      installShellCompletion ./completions/*
+
 aurs:
   - ids:
       - default_archive
