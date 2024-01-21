@@ -499,7 +499,7 @@ nix:
     license: mit
     extra_install: |-
       installManPage ./manpages/ipsw.1.gz
-      installShellCompletion ./completions/*
+      installShellCompletion ./completions/ipsw/*
 
 aurs:
   - ids:
