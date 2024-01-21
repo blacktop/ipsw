@@ -111,7 +111,7 @@ pacman -U ipsw-bin
 
 ## Install nix package from [NUR](https://github.com/nix-community/NUR)
 
-See <https://github.com/blacktop/nur>
+See [github:blacktop/nur](https://github.com/blacktop/nur)
 
 ## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
