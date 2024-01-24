@@ -58,6 +58,7 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	otaDLCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	otaDLCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
@@ -73,6 +74,7 @@ func init() {
 	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.delta", otaDLCmd.Flags().Lookup("delta"))
 	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("download.ota.urls", otaDLCmd.Flags().Lookup("urls"))
@@ -253,6 +255,7 @@ var otaDLCmd = &cobra.Command{
 		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform:        strings.ToLower(platform),
 			Beta:            getBeta,
+			Delta:           viper.GetBool("download.ota.delta"),
 			RSR:             getRSR,
 			Device:          device,
 			Model:           model,

@@ -78,6 +78,7 @@ type Ota struct {
 type OtaConf struct {
 	Platform        string
 	Beta            bool
+	Delta           bool
 	RSR             bool
 	Device          string
 	Model           string
@@ -411,7 +412,7 @@ func (o *Ota) getRequests(atype assetType, audienceID string) (reqs []pallasRequ
 		CompatibilityVersion: 20,
 	}
 
-	if o.Config.Version.Original() != "0" {
+	if o.Config.Version.Original() != "0" && !o.Config.Delta {
 		req.RequestedProductVersion = o.Config.Version.Original()
 		req.Supervised = true
 		req.DelayRequested = false
