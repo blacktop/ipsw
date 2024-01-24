@@ -22,8 +22,8 @@ dev-deps: ## Install the dev dependencies
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
 	mkdir /tmp/homebrew
-	cd /tmp/homebrew; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
-	sudo mv /tmp/homebrew/homebrew /usr/local/homebrew
+	cd /tmp; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
+	sudo mv /tmp/homebrew /usr/local/homebrew
 	arch -x86_64 /usr/local/homebrew/bin/brew install unicorn libusb
 
 .PHONY: setup
