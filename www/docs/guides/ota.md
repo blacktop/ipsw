@@ -13,7 +13,7 @@ hide_table_of_contents: true
 
 To only download the OTA's `dyld_shared_cache(s)` and `kernelcache`
 
-```bash 
+```bash
 ❯ ipsw download ota --platform ios --device iPhone15,2 --beta --dyld --kernel
 ```
 
@@ -24,8 +24,8 @@ If you are downloading OTAs for iOS16.x or macOS13.x or newer this will only wor
 To download the latest RSR (Rapid Security Release) OTA
 
 ```bash
-❯ ipsw download ota --platform ios --device iPhone15,2 --build 20C5049e --beta --rsr 
-   • Getting iOS 16.2 OTA      build=20C7750490e device=iPhone15,2 model=D73AP type="iOS162BetaRSR" 
+❯ ipsw download ota --platform ios --device iPhone15,2 --build 20C5049e --beta --rsr
+   • Getting iOS 16.2 OTA      build=20C7750490e device=iPhone15,2 model=D73AP type="iOS162BetaRSR"
         92.97 MiB / 92.97 MiB [==========================================================| ✅  ] 58.85 MiB/s
 ```
 
@@ -41,7 +41,7 @@ The `--build` flag is required for RSR OTAs
 ```markdown
 [OTA Info]
 ==========
-Version        = 16.2 
+Version        = 16.2
 BuildVersion   = 20C5058d
 OS Type        = Beta
 FileSystem     = 098-19014-027.dmg (Type: APFS)
@@ -106,7 +106,7 @@ See if `dyld` is in the OTA files
 #### Extract file(s) from OTA RIDIFF10 cryptex volumes
 
 ```bash
-❯ ipsw ota patch iPhone15,2_1418867a3b673659e7bcd30c3823ff997b4ba990.zip --output /tmp/PATCHES
+❯ ipsw ota patch rsr iPhone15,2_1418867a3b673659e7bcd30c3823ff997b4ba990.zip --output /tmp/PATCHES
    • Patching cryptex-app to /tmp/PATCHES/20C5058d__iPhone15,2/AppOS/098-19380-032.dmg
    • Patching cryptex-system-arm64e to /tmp/PATCHES/20C5058d__iPhone15,2/SystemOS/098-18456-028.dmg
 ```
@@ -149,7 +149,7 @@ You must first download and "patch" the base OTA file
 ❯ ipsw download ota --platform ios --device iPhone15,2 --beta
 ```
 ```bash
-❯ ipsw ota patch iPhone15,2_17280b5c6122ee9c11e60081a2610e9766e8b892.zip --output /tmp/PATCHES
+❯ ipsw ota patch rsr iPhone15,2_17280b5c6122ee9c11e60081a2610e9766e8b892.zip --output /tmp/PATCHES
    • Patching cryptex-app to /tmp/PATCHES/20C5049e__iPhone15,2/AppOS/098-19380-026.dmg
    • Patching cryptex-system-arm64e to /tmp/PATCHES/20C5049e__iPhone15,2/SystemOS/098-18456-023.dmg
 ```
@@ -157,7 +157,7 @@ You must first download and "patch" the base OTA file
 Now download the corresponding RSR OTA patch that belongs to the base OTA file
 
 ```bash
-❯ ipsw download ota --platform ios --device iPhone15,2 --build 20D5024e --beta --rsr 
+❯ ipsw download ota --platform ios --device iPhone15,2 --build 20D5024e --beta --rsr
 ```
 
 :::info
@@ -171,7 +171,7 @@ To get the `--build` value, you can use `ipsw download ota --show-latest-build` 
 Now apply the patch to the base OTA file
 
 ```bash
-❯ ipsw ota patch --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/PATCHES/ RSR_OTA.zip 
+❯ ipsw ota patch rsr --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/PATCHES/ RSR_OTA.zip
    • Patching cryptex-app to /tmp/PATCHES/20C7750490e__iPhone15,2/AppOS/098-50146-002.dmg
    • Patching cryptex-system-arm64e to /tmp/PATCHES/20C7750490e__iPhone15,2/SystemOS/098-50080-002.dmg
 ```
@@ -190,5 +190,5 @@ Now apply the patch to the base OTA file
 Now you have the RSR patched files ready to start diffing :smirk: :tada:
 
 :::caution NOTE
-For now the `ipsw ota patch` command will only work on **macOS Ventura** as it calls into a private API to apply the patch.  We plan on adding cross-platform support in the future.
+For now the `ipsw ota patch rsr` command will only work on **macOS Ventura** as it calls into a private API to apply the patch.  We plan on adding cross-platform support in the future.
 :::
