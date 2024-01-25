@@ -86,13 +86,13 @@ func Patch(patch, target, output string) (err error) {
 	if _, err := r.Read(compControl); err != nil {
 		return err
 	}
-
 	var cbuf bytes.Buffer
 	if err := pbzx.Extract(context.Background(), bytes.NewReader(compControl), &cbuf, runtime.NumCPU()); err != nil {
 		return err
 	}
 	cr := bytes.NewReader(cbuf.Bytes())
 
+	// parse controls
 	in := make([]byte, 8)
 	var controls []Control
 	for {
@@ -126,7 +126,6 @@ func Patch(patch, target, output string) (err error) {
 	if _, err := r.Read(compDiff); err != nil {
 		return err
 	}
-
 	var dbuf bytes.Buffer
 	if err := pbzx.Extract(context.Background(), bytes.NewReader(compDiff), &dbuf, runtime.NumCPU()); err != nil {
 		return err
@@ -195,6 +194,7 @@ func Patch(patch, target, output string) (err error) {
 		log.Errorf("output file SHA1 does not match expected SHA1 from patch: got %s, expected %s", hex.EncodeToString(sha1Hash.Sum(nil)), hex.EncodeToString(header.ResultSHA1[:]))
 	}
 
+	// write output
 	if err := os.MkdirAll(output, 0o750); err != nil {
 		return err
 	}
