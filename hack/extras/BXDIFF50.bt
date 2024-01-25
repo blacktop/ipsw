@@ -1,0 +1,45 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: BXDIFF50.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: BXDIFF50 is a propritary Apple binary format used for patching system components during an OTA upgrade.
+//  Category: Archive
+// File Mask:
+//  ID Bytes: BXDIFF50
+//   History:
+//------------------------------------------------
+
+typedef ubyte Sha1[20]<read = readSha1, format = hex>;
+
+string readSha1(Sha1 sha1)
+{
+    string ret;
+    string tmp;
+    int i;
+
+    for(i = 0; i<20; i++) {
+        SPrintf(tmp, "%.2X", sha1[i]);
+        ret += tmp;
+    }
+
+    return ret;
+}
+
+typedef struct
+{
+  char magic[8]<bgcolor = cLtYellow>; // "BXDIFF50"
+  uint64 version;
+  uint64 patchedFileSize;
+  uint64 controlSize;
+  uint64 extraSize;
+  Sha1 resultSHA1;
+  uint64 diffSize;
+  Sha1 targetSHA1;
+} Header;
+
+Header header;
+ubyte controlData[header.controlSize]<bgcolor = cLtBlue>;
+ubyte diffDataCompressed[header.diffSize]<bgcolor = cLtPurple>;
+ubyte extraDataCompressed[header.extraSize]<bgcolor = cLtAqua>;
