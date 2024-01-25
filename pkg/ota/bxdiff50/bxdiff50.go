@@ -77,7 +77,7 @@ func Patch(patch, target, output string) (err error) {
 		return err
 	}
 	if !bytes.Equal(sha1Hash.Sum(nil), header.TargetSHA1[:]) {
-		return errors.New("input file SHA1 does not match expected SHA1 from patch: got " + hex.EncodeToString(sha1Hash.Sum(nil)) + " expected " + hex.EncodeToString(header.TargetSHA1[:]) + ": final " + hex.EncodeToString(header.ResultSHA1[:]))
+		log.Errorf("input file SHA1 does not match expected SHA1 from patch: got %s, expected %s", hex.EncodeToString(sha1Hash.Sum(nil)), hex.EncodeToString(header.TargetSHA1[:]))
 	}
 	tf.Seek(0, io.SeekStart) // rewind
 
@@ -192,13 +192,13 @@ func Patch(patch, target, output string) (err error) {
 		return err
 	}
 	if !bytes.Equal(sha1Hash.Sum(nil), header.ResultSHA1[:]) {
-		return errors.New("output file SHA1 does not match expected SHA1 from patch")
+		log.Errorf("output file SHA1 does not match expected SHA1 from patch: got %s, expected %s", hex.EncodeToString(sha1Hash.Sum(nil)), hex.EncodeToString(header.ResultSHA1[:]))
 	}
 
 	if err := os.MkdirAll(output, 0o750); err != nil {
 		return err
 	}
-	fname := filepath.Join(output, target+".patched")
+	fname := filepath.Join(output, filepath.Base(target)+".patched")
 	log.Infof("Writing patched file to: %s", fname)
 	return os.WriteFile(fname, obuf.Bytes(), 0o660)
 }
