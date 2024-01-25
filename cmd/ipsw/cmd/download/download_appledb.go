@@ -40,7 +40,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var supportedOSes = []string{"audioOS", "bridgeOS", "iOS", "iPadOS", "iPodOS", "macOS", "tvOS", "watchOS"}
+var supportedOSes = []string{"audioOS", "bridgeOS", "iOS", "iPadOS", "iPodOS", "macOS", "tvOS", "watchOS", "visionOS"}
 var supportedRsrOSes = []string{"iOS", "iPadOS", "macOS"}
 var supportedFWs = []string{"ipsw", "ota", "rsr"}
 
