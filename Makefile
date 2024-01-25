@@ -17,7 +17,7 @@ dev-deps: ## Install the dev dependencies
 	$(GO_BIN) install github.com/spf13/cobra-cli@latest
 	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
 	$(GO_BIN) get -d golang.org/x/tools/cmd/stringer
-	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
+	$(GO_BIN) install github.com/caarlos0/svu@v1.4.1
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
