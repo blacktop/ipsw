@@ -1125,7 +1125,36 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 		}
 	case 5:
-		log.Errorf("slide info version: %d, was added to macOS 14.4beta1 and I'm still working on REing it (stay tuned 😉)", slideInfoVersion)
+		log.Warnf("slide info version: %d, was added to macOS 14.4beta1 and I'm still working on REing it (stay tuned 😉)", slideInfoVersion)
+		for {
+			slideInfo := CacheSlideInfo5{}
+			if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
+				return nil, err
+			}
+
+			f.SlideInfo = slideInfo
+
+			if !parsePages {
+				return nil, nil
+			}
+
+			output(dump, "slide info version = %d\n", slideInfo.Version)
+			output(dump, "page_size          = %#x\n", slideInfo.PageSize)
+			output(dump, "page_starts_count  = %d\n", slideInfo.PageStartsCount)
+			output(dump, "auth_value_add     = %#x\n", slideInfo.AuthValueAdd)
+			output(dump, "\n")
+
+			if slideInfo.Version != 5 {
+				output(dump, "\n")
+				break
+			}
+
+			starts := make([]uint16, slideInfo.PageStartsCount)
+			if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
+				return nil, err
+			}
+			_ = starts
+		}
 	default:
 		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
