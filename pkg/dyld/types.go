@@ -516,6 +516,26 @@ func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 	return value
 }
 
+type CacheSlideInfo5 struct {
+	Version         uint32 `json:"slide_version,omitempty"` // currently 5
+	PageSize        uint32 `json:"page_size,omitempty"`     // currently 16384
+	PageStartsCount uint32 `json:"page_starts_count,omitempty"`
+	_               uint32 // padding for 64bit alignment
+	AuthValueAdd    uint64 `json:"auth_value_add,omitempty"`
+	// PageStarts      []uint16 /* len() = page_starts_count */
+}
+
+func (i CacheSlideInfo5) GetVersion() uint32 {
+	return i.Version
+}
+func (i CacheSlideInfo5) GetPageSize() uint32 {
+	return i.PageSize
+}
+func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
+	pointer := CacheSlidePointer3(ptr)
+	return i.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
+}
+
 const (
 	DYLD_CACHE_SLIDE4_PAGE_NO_REBASE = 0xFFFF // page has no rebasing
 	DYLD_CACHE_SLIDE4_PAGE_INDEX     = 0x7FFF // mask of page_starts[] values

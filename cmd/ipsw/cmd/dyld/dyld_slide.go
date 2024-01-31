@@ -152,6 +152,9 @@ var SlideCmd = &cobra.Command{
 							}
 							enc.Encode(rebases)
 						} else {
+							if viper.GetBool("verbose") {
+								fmt.Println(extMapping.String())
+							}
 							f.DumpSlideInfo(uuid, extMapping)
 						}
 					}
