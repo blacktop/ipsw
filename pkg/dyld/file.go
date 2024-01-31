@@ -1124,6 +1124,8 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				rebaseChainV4(pageOffset, start*4)
 			}
 		}
+	case 5:
+		log.Errorf("slide info version: %d, was added to macOS 14.4beta1 and I'm still working on REing it (stay tuned 😉)", slideInfoVersion)
 	default:
 		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
