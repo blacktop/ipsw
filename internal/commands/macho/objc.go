@@ -696,7 +696,9 @@ func (o *ObjC) XCFramework() error {
 		return fmt.Errorf("failed to create %s: %w", filepath.Join(xcfolder, "Info.plist"), err)
 	}
 	defer f.Close()
-	if err := plist.NewEncoder(f).Encode(XCFrameworkInfoPlist{
+	enc := plist.NewEncoder(f)
+	enc.Indent("    ")
+	if err := enc.Encode(XCFrameworkInfoPlist{
 		AvailableLibraries: []XCFrameworkAvailableLibrary{
 			{
 				BinaryPath:               o.conf.Name + ".framework/" + o.conf.Name + ".tbd",
@@ -740,8 +742,8 @@ func (o *ObjC) XCFramework() error {
 	/* generate modulemap */
 	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), []byte(fmt.Sprintf(
 		"module %s [system] {\n"+
-			"header \"Headers/%s.h\"\n"+ // NOTE: this SHOULD be the umbrella header
-			"export *\n"+
+			"    header \"Headers/%s.h\"\n"+ // NOTE: this SHOULD be the umbrella header
+			"    export *\n"+
 			"}\n", o.conf.Name, o.conf.Name,
 	)), 0o660); err != nil {
 		return fmt.Errorf("failed to write module.modulemap file: %v", err)
@@ -752,7 +754,9 @@ func (o *ObjC) XCFramework() error {
 		return fmt.Errorf("failed to create %s: %w", filepath.Join(fwfolder, "Info.plist"), err)
 	}
 	defer f2.Close()
-	if err := plist.NewEncoder(f2).Encode(XCFrameworkLibraryInfoPlist{
+	enc = plist.NewEncoder(f2)
+	enc.Indent("    ")
+	if err := enc.Encode(XCFrameworkLibraryInfoPlist{
 		BuildMachineOSBuild:           "23C52",
 		CFBundleDevelopmentRegion:     "English",
 		CFBundleExecutable:            o.conf.Name + ".tbd",
