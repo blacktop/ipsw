@@ -16,6 +16,7 @@ const assetSetListURL = "https://gdmf.apple.com/v2/pmv"
 
 type AssetSet struct {
 	ProductVersion   string   `json:"ProductVersion,omitempty"`
+	Build            string   `json:"Build,omitempty"`
 	PostingDate      string   `json:"PostingDate,omitempty"`
 	ExpirationDate   string   `json:"ExpirationDate,omitempty"`
 	SupportedDevices []string `json:"SupportedDevices,omitempty"`
@@ -92,8 +93,30 @@ func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
 	return nil
 }
 
-// LatestVersion returns the newest released version
+// GetDevicesForBuild returns the supported devices for a given build
+func (a *AssetSets) GetDevicesForBuild(build string, typ string) []string {
+	for _, asset := range a.AssetSets[typ] {
+		if asset.Build == build {
+			sort.Strings(asset.SupportedDevices)
+			return asset.SupportedDevices
+		}
+	}
+	return nil
+}
+
+// LatestVersion returns the newest released version for a given platform
 func (a *AssetSets) LatestVersion(platform string) string {
+	v, _ := a.latest(platform)
+	return v
+}
+
+// LatestBuild returns the newest released build for a given platform
+func (a *AssetSets) LatestBuild(platform string) string {
+	_, b := a.latest(platform)
+	return b
+}
+
+func (a *AssetSets) latest(platform string) (string, string) {
 	var typ string
 	var versionsRaw []string
 
@@ -106,33 +129,41 @@ func (a *AssetSets) LatestVersion(platform string) string {
 		typ = "macOS"
 	}
 
+	v2b := make(map[string]string)
+
 	for _, asset := range a.PublicAssetSets[typ] {
 		switch platform {
 		case "accessory":
 			fallthrough
 		case "ios":
 			if utils.StrSliceContains(asset.SupportedDevices, "iP") {
+				v2b[asset.ProductVersion] = asset.Build
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "watchos":
 			if utils.StrSliceContains(asset.SupportedDevices, "Watch") {
+				v2b[asset.ProductVersion] = asset.Build
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "audioos":
 			if utils.StrSliceContains(asset.SupportedDevices, "AudioAccessory") {
+				v2b[asset.ProductVersion] = asset.Build
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "tvos":
 			if utils.StrSliceContains(asset.SupportedDevices, "AppleTV") {
+				v2b[asset.ProductVersion] = asset.Build
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "visionos":
 			if utils.StrSliceContains(asset.SupportedDevices, "Reality") {
+				v2b[asset.ProductVersion] = asset.Build
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "recovery":
 			fallthrough
 		case "macos":
+			v2b[asset.ProductVersion] = asset.Build
 			versionsRaw = append(versionsRaw, asset.ProductVersion)
 		}
 	}
@@ -142,7 +173,7 @@ func (a *AssetSets) LatestVersion(platform string) string {
 	for i, raw := range versionsRaw {
 		v, err := version.NewVersion(raw)
 		if err != nil {
-			return "failed to get latest version"
+			return "failed to get latest", "failed to get latest"
 		}
 
 		versions[i] = v
@@ -150,5 +181,5 @@ func (a *AssetSets) LatestVersion(platform string) string {
 
 	sort.Sort(version.Collection(versions))
 
-	return versions[len(versions)-1].Original()
+	return versions[len(versions)-1].Original(), v2b[versions[len(versions)-1].Original()]
 }
