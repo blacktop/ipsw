@@ -151,9 +151,6 @@ var ipswCmd = &cobra.Command{
 				}
 			}
 		}
-		if showLatestBuild && len(device) == 0 {
-			return errors.New("--show-latest-build requires --device to be set")
-		}
 
 		if viper.GetBool("download.ipsw.usb") {
 			dev, err := utils.PickDevice()
@@ -206,35 +203,14 @@ var ipswCmd = &cobra.Command{
 						fmt.Println(assets.LatestVersion("macos"))
 					}
 					if showLatestBuild {
-						itunes, err = download.NewMacOsXML()
-						if err != nil {
-							return fmt.Errorf("failed to create itunes API: %v", err)
-						}
-						latestBuild, err := itunes.GetLatestBuild()
-						if err != nil {
-							return fmt.Errorf("failed to get latest iOS build: %v", err)
-						}
-						fmt.Println(latestBuild)
+						fmt.Println(assets.LatestBuild("macos"))
 					}
 				} else { // iOS
-					latestVersion := assets.LatestVersion("ios")
 					if showLatestVersion {
-						fmt.Println(latestVersion)
+						fmt.Println(assets.LatestVersion("ios"))
 					}
 					if showLatestBuild {
-						itunes, err = download.NewiTunesVersionMaster()
-						if err != nil {
-							return fmt.Errorf("failed to create itunes API: %v", err)
-						}
-						latestBuild, err := itunes.GetLatestBuilds(device)
-						if err != nil {
-							return fmt.Errorf("failed to get latest iOS build: %v", err)
-						}
-						if len(latestBuild) > 0 {
-							fmt.Println(latestBuild[0].BuildID)
-						} else {
-							fmt.Println("No build found for device: " + device)
-						}
+						fmt.Println(assets.LatestBuild("ios"))
 					}
 				}
 			}
