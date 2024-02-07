@@ -1,5 +1,7 @@
+//go:build sandbox
+
 /*
-Copyright © 2023 blacktop
+Copyright © 2024 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,17 +42,17 @@ import (
 )
 
 func init() {
-	SbCmd.AddCommand(diffCmd)
+	SbCmd.AddCommand(sbDiffCmd)
 
-	diffCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
-	diffCmd.MarkZshCompPositionalArgumentFile(2, "*.ipsw", "*.zip")
-	diffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	sbDiffCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
+	sbDiffCmd.MarkZshCompPositionalArgumentFile(2, "*.ipsw", "*.zip")
+	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
 }
 
-// diffCmd represents the diff command
-var diffCmd = &cobra.Command{
+// sbDiffCmd represents the diff command
+var sbDiffCmd = &cobra.Command{
 	Use:           "diff <IPSW> <IPSW>",
 	Short:         "Diff the sandbox profiles between two macOS IPSWs",
 	Aliases:       []string{"d"},

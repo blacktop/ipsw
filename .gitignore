@@ -61,8 +61,8 @@ venv/
 unicorn2/
 
 # 🤫
-cmd/ipsw/cmd/kernel/kernel_sbdec.go
-cmd/ipsw/cmd/kernel/kernel_sbopts.go
-cmd/ipsw/cmd/kernel/kernel_libsandbox.go
 cmd/ipsw/cmd/sb/sb_cmpl.go
+cmd/ipsw/cmd/sb/sb_database.go
+cmd/ipsw/cmd/sb/sb_dec.go
+cmd/ipsw/cmd/sb/sb_opts.go
 pkg/sandbox/
