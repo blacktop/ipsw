@@ -30,6 +30,7 @@ ipsw download ota [options] [flags]
 
 ```
       --beta                    Download Beta OTAs
+      --delta                   Download Delta OTAs
       --driver-kit              Extract DriverKit dyld_shared_cache(s) from remote OTA zip
       --dyld                    Extract dyld_shared_cache(s) from remote OTA zip
   -a, --dyld-arch stringArray   dyld_shared_cache architecture(s) to remote extract
