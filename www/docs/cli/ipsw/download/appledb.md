@@ -36,7 +36,7 @@ ipsw download appledb [flags]
   -j, --json                  Dump DB query results as JSON
       --kernel                Extract kernelcache from remote IPSW
       --latest                Download latest IPSWs
-      --os stringArray        Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS)
+      --os stringArray        Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS, visionOS)
   -o, --output string         Folder to download files to
       --pattern string        Download remote files that match regex
   -p, --prereq-build string   OTA prerequisite build

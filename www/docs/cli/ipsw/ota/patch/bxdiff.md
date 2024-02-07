@@ -1,23 +1,25 @@
 ---
-id: ota
-title: ota
+id: bxdiff
+title: bxdiff
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ota
-description: Parse OTAs
+sidebar_label: bxdiff
+description: Patch BXDIFF50 OTAs
 ---
-## ipsw ota
+## ipsw ota patch bxdiff
 
-Parse OTAs
+Patch BXDIFF50 OTAs
 
 ```
-ipsw ota [flags]
+ipsw ota patch bxdiff <DELTA> <TARGET> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ota
+  -h, --help            help for bxdiff
+  -o, --output string   Output folder
+  -s, --single          Patch single file
 ```
 
 ### Options inherited from parent commands
@@ -31,9 +33,5 @@ ipsw ota [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw ota extract](/docs/cli/ipsw/ota/extract)	 - Extract OTA payload files
-* [ipsw ota info](/docs/cli/ipsw/ota/info)	 - Display OTA metadata
-* [ipsw ota ls](/docs/cli/ipsw/ota/ls)	 - List OTA files
 * [ipsw ota patch](/docs/cli/ipsw/ota/patch)	 - Patch OTAs
 
