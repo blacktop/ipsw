@@ -108,7 +108,7 @@ var fridaObjcCmd = &cobra.Command{
 		var dev *frida.Device
 
 		if len(udid) > 0 {
-			dev, err = mgr.DeviceByID(udid)
+			dev, err = frida.DeviceByID(udid)
 			if err != nil {
 				return fmt.Errorf("failed to get device by id %s: %v", udid, err)
 			}
@@ -120,11 +120,15 @@ var fridaObjcCmd = &cobra.Command{
 			if len(devices) == 0 {
 				return fmt.Errorf("no devices found")
 			} else if len(devices) == 1 {
-				dev = devices[0]
+				dev, err = frida.DeviceByID(devices[0].ID())
+				if err != nil {
+					return fmt.Errorf("failed to get device %s: %v", devices[0].Name(), err)
+				}
 			} else {
 				var selected int
 				var choices []string
-				for _, d := range devices {
+				for _, device := range devices {
+					d, _ := frida.DeviceByID(device.ID())
 					choices = append(choices, fmt.Sprintf("[%-6s] %s (%s)", strings.ToUpper(d.DeviceType().String()), d.Name(), d.ID()))
 				}
 				prompt := &survey.Select{
@@ -135,7 +139,10 @@ var fridaObjcCmd = &cobra.Command{
 					log.Warn("Exiting...")
 					os.Exit(0)
 				}
-				dev = devices[selected]
+				dev, err = frida.DeviceByID(devices[selected].ID())
+				if err != nil {
+					return fmt.Errorf("failed to get device %s: %v", devices[selected].Name(), err)
+				}
 			}
 		}
 
