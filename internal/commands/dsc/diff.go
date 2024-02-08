@@ -24,7 +24,7 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *macho.DiffConfig) (*macho.MachoDif
 		if err != nil {
 			return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
 		}
-		prev[img.Name] = macho.GenerateDiffInfo(m)
+		prev[img.Name] = macho.GenerateDiffInfo(m, conf)
 	}
 
 	var prevFiles []string
@@ -42,7 +42,7 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *macho.DiffConfig) (*macho.MachoDif
 		if err != nil {
 			return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
 		}
-		next[img.Name] = macho.GenerateDiffInfo(m)
+		next[img.Name] = macho.GenerateDiffInfo(m, conf)
 	}
 
 	var nextFiles []string

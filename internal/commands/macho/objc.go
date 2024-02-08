@@ -804,9 +804,9 @@ func writeHeader(hdr *headerInfo) error {
 		hdr.Name,
 		hdr.Name)
 	if !hdr.IsUmbrella {
-		out += fmt.Sprintf("@import Foundation;\n")
+		out += "@import Foundation;\n"
 	}
-	out += fmt.Sprintf("\n")
+	out += "\n"
 	if len(hdr.Imports.Imports) > 0 {
 		for _, imp := range hdr.Imports.Imports {
 			out += fmt.Sprintf("#include \"%s\"\n", imp)
@@ -818,7 +818,7 @@ func writeHeader(hdr *headerInfo) error {
 		}
 	}
 	if len(hdr.Imports.Imports) > 0 || len(hdr.Imports.Locals) > 0 {
-		out += fmt.Sprintf("\n")
+		out += "\n"
 	}
 	if len(hdr.Imports.Classes) > 0 {
 		out += fmt.Sprintf("@class %s;\n", strings.Join(hdr.Imports.Classes, ", "))
@@ -827,7 +827,7 @@ func writeHeader(hdr *headerInfo) error {
 		out += fmt.Sprintf("@protocol %s;\n", strings.Join(hdr.Imports.Protos, ", "))
 	}
 	if len(hdr.Imports.Classes) > 0 || len(hdr.Imports.Protos) > 0 {
-		out += fmt.Sprintf("\n")
+		out += "\n"
 	}
 	out += fmt.Sprintf("%s\n", hdr.Object)
 	out += fmt.Sprintf("#endif /* %s_h */\n", hdr.Name)

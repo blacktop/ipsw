@@ -35,9 +35,9 @@ const diffMarkdownTemplate = `
 {{- end }}
 {{- if .Kexts.Updated }}
 			- [⬆️ Updated ({{ len .Kexts.Updated }})](#️-updated)
-{{- end }}		
+{{- end }}
 	- [Machos](#machos)
-{{- if .Machos }}	
+{{- if .Machos }}
 {{- if .Machos.New }}
 		- [🆕 NEW ({{ len .Machos.New }})](#-new-1)
 {{- end }}
@@ -54,7 +54,7 @@ const diffMarkdownTemplate = `
 	- [DSC](#dsc)
 		- [WebKit](#webkit)
 		- [Dylibs](#dylibs)
-{{- if .Dylibs }}			
+{{- if .Dylibs }}
 {{- if .Dylibs.New }}
 			- [🆕 NEW ({{ len .Dylibs.New }})](#-new-2)
 {{- end }}
@@ -232,17 +232,17 @@ func (d *Diff) String() string {
 }
 
 // ToJSON saves the diff as a JSON file
-func (d *Diff) ToJSON(folder string) error {
+func (d *Diff) ToJSON() error {
 	dat, err := json.MarshalIndent(d, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if len(folder) > 0 {
-		if err := os.MkdirAll(folder, 0755); err != nil {
+	if len(d.conf.Output) > 0 {
+		if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 			return err
 		}
-		fname := filepath.Join(folder, fmt.Sprintf("%s.json", d.Title))
+		fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.json", d.Title))
 		log.Infof("Creating JSON diff file: %s", fname)
 		return os.WriteFile(fname, dat, 0644)
 	}
@@ -252,7 +252,7 @@ func (d *Diff) ToJSON(folder string) error {
 	return nil
 }
 
-func (d *Diff) ToHTML(folder string) error {
+func (d *Diff) ToHTML() error {
 	htmlHeader := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -287,11 +287,11 @@ func (d *Diff) ToHTML(folder string) error {
 		return err
 	}
 
-	if err := os.MkdirAll(folder, 0755); err != nil {
+	if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 		return err
 	}
 
-	fname := filepath.Join(folder, fmt.Sprintf("%s.html", d.Title))
+	fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.html", d.Title))
 	log.Infof("Creating HTML diff file: %s", fname)
 	return os.WriteFile(fname, htmlBuf.Bytes(), 0644)
 }

@@ -25,12 +25,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
-const (
-	systemOsDmg   = "sys"
-	appOsDmg      = "app"
-	fileSystemDmg = "fs"
-)
-
 type kernel struct {
 	Path    string
 	Version *kernelcache.Version
@@ -41,6 +35,16 @@ type mount struct {
 	DmgPath   string
 	MountPath string
 	IsMounted bool
+}
+
+type Config struct {
+	Title   string
+	IpswOld string
+	IpswNew string
+	KDKs    []string
+	LaunchD bool
+	Filter  []string
+	Output  string
 }
 
 // Context is the context for the diff
@@ -77,45 +81,48 @@ type Diff struct {
 	Launchd string          `json:"launchd,omitempty"`
 
 	tmpDir string `json:"-"`
+	conf   *Config
 }
 
 // New news the diff
-func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
-	if len(kdks) == 0 {
+func New(conf *Config) *Diff {
+	if len(conf.KDKs) == 0 {
 		return &Diff{
-			Title: title,
+			Title: conf.Title,
 			Old: Context{
-				IPSWPath: ipswOld,
+				IPSWPath: conf.IpswOld,
 				Mount:    make(map[string]mount),
 			},
 			New: Context{
-				IPSWPath: ipswNew,
+				IPSWPath: conf.IpswNew,
 				Mount:    make(map[string]mount),
 			},
+			conf: conf,
 		}
 	}
 	return &Diff{
-		Title: title,
+		Title: conf.Title,
 		Old: Context{
-			IPSWPath: ipswOld,
+			IPSWPath: conf.IpswOld,
 			Mount:    make(map[string]mount),
-			KDK:      kdks[0],
+			KDK:      conf.KDKs[0],
 		},
 		New: Context{
-			IPSWPath: ipswNew,
+			IPSWPath: conf.IpswNew,
 			Mount:    make(map[string]mount),
-			KDK:      kdks[1],
+			KDK:      conf.KDKs[1],
 		},
+		conf: conf,
 	}
 }
 
 // Save saves the diff
-func (d *Diff) Save(folder string) error {
-	if err := os.MkdirAll(folder, 0755); err != nil {
+func (d *Diff) Save() error {
+	if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 		return err
 	}
 
-	fname := filepath.Join(folder, fmt.Sprintf("%s.md", d.Title))
+	fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.md", d.Title))
 	log.Infof("Creating diff file: %s", fname)
 	f, err := os.Create(fname)
 	if err != nil {
@@ -162,7 +169,7 @@ func (d *Diff) getInfo() (err error) {
 }
 
 // Diff diffs the diff
-func (d *Diff) Diff(launchd bool) (err error) {
+func (d *Diff) Diff() (err error) {
 
 	d.tmpDir, err = os.MkdirTemp(os.TempDir(), "ipsw-diff")
 	if err != nil {
@@ -201,7 +208,7 @@ func (d *Diff) Diff(launchd bool) (err error) {
 		return fmt.Errorf("failed to parse MachOs: %v", err)
 	}
 
-	if launchd {
+	if d.conf.LaunchD {
 		log.Info("Diffing launchd PLIST")
 		if err := d.parseLaunchdPlists(); err != nil {
 			return fmt.Errorf("failed to parse launchd config plists: %v", err)
@@ -338,6 +345,7 @@ func (d *Diff) parseKernelcache() error {
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
+		Filter:   d.conf.Filter,
 	})
 	if err != nil {
 		return err
@@ -426,6 +434,7 @@ func (d *Diff) parseDSC() error {
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
+		Filter:   d.conf.Filter,
 	})
 	if err != nil {
 		return err
@@ -457,6 +466,7 @@ func (d *Diff) parseMachos() (err error) {
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
+		Filter:   d.conf.Filter,
 	})
 	return
 }

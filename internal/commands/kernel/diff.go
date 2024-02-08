@@ -26,7 +26,7 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 			}
-			prev[fe.EntryID] = mcmd.GenerateDiffInfo(mfe)
+			prev[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf)
 		}
 	}
 
@@ -46,7 +46,7 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 			}
-			next[fe.EntryID] = mcmd.GenerateDiffInfo(mfe)
+			next[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf)
 		}
 	}
 

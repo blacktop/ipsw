@@ -13,6 +13,7 @@ type DiffConfig struct {
 	Markdown bool
 	Color    bool
 	DiffTool string
+	Filter   []string
 }
 
 type MachoDiff struct {
@@ -34,9 +35,14 @@ type DiffInfo struct {
 	Functions int
 }
 
-func GenerateDiffInfo(m *macho.File) *DiffInfo {
+func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	var secs []section
 	for _, s := range m.Sections {
+		if len(conf.Filter) > 0 {
+			if !slices.Contains(conf.Filter, s.Seg+"."+s.Name) {
+				continue
+			}
+		}
 		secs = append(secs, section{
 			Name: s.Seg + "." + s.Name,
 			Size: s.Size,
@@ -118,7 +124,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 	prev := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(oldIPSW, func(path string, m *macho.File) error {
-		prev[path] = GenerateDiffInfo(m)
+		prev[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
@@ -135,7 +141,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 	next := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(newIPSW, func(path string, m *macho.File) error {
-		next[path] = GenerateDiffInfo(m)
+		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
