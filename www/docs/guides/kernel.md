@@ -46,6 +46,10 @@ Decompress a previously extracted **kernelcache**
 ❯ ipsw kernel dec kernelcache.release.iphone11
 ```
 
+:::info
+This only works when you have pull them directly out of the IPSW zip as a im4p file *(you should just use `ipsw extract --kernel IPSW` instead)*
+:::
+
 ### **kernel extract**
 
 Extract KEXT(s) from kernelcache
@@ -76,10 +80,10 @@ Dump them all
       • Created /tmp/KEXTs/com.apple.driver.AppleARMPlatform
       • Created /tmp/KEXTs/com.apple.driver.AppleARMWatchdogTimer
       <SNIP>
-```      
+```
 
 :::info
-This only works on the modern `MH_FILESET` kernelcaches
+This only works on the modern `MH_FILESET` kernelcaches and is the same thing as `ipsw macho info KERNELCACHE --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry`
 :::
 
 ### **kernel kexts**
@@ -115,40 +119,6 @@ com.apple.AGXFirmwareKextRTBuddy64 (187.3390.17.2)
 com.apple.AGXG14P (187.3390.17.2)
 com.apple.AUC (1.0)
 <SNIP>
-```
-
-### **kernel sbopts**
-
-List kernel sandbox operations
-
-```bash
-❯ ipsw kernel sbopts 18A8395/kernelcache # iOS 14.1
-```
-
-Diff two kernelcache's sandbox operations
-
-```bash
-❯ ipsw kernel sbopts --diff 18A8395/kernelcache 18E5178a/kernelcache # iOS 14.1 vs. iOS 14.5beta4
-   • Differences found
-+mach-task*
-+mach-task-inspect
-
-+mach-task-read
-
-+process-codesigning*
-+process-codesigning-blob-get
-+process-codesigning-cdhash-get
-+process-codesigning-entitlements-blob-get
-+process-codesigning-identity-get
-
-+process-codesigning-teamid-get
-+process-codesigning-text-offset-get
-
-+socket-option*
-+socket-option-get
-+socket-option-set
-
-+system-fcntl
 ```
 
 ### **kernel diff**
@@ -699,5 +669,13 @@ Diff two versions of a struct
 ```cpp
 ❌ removed:
     task_control_port_options_t task_control_port_options;	// @ 0xc4
-```   
+```
 
+Diff **ALL** structs
+
+```bash
+❯ ipsw kernel dwarf --diff
+? Which KDKs would you like to diff (select 2): /Library/Developer/KDKs/KDK_14.4_23E5180j.kdk, /Library/Developer/KDKs/KDK_14.4_23E5191e.kdk
+? Choose a kernel type to diff: kernel.release.t6030
+   • Diffing all structs
+```
