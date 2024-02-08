@@ -57,7 +57,7 @@ func init() {
 // xcodeCmd represents the xcode command
 var xcodeCmd = &cobra.Command{
 	Use:           "xcode",
-	Short:         "Download XCode",
+	Short:         "🚧 Download XCode 🚧",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,

@@ -163,7 +163,7 @@ func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, 
 	if err != nil {
 		dmgPath, err = i.GetFileSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get File System DMG: %v", err)
+			return nil, fmt.Errorf("failed to get DMG containing the dyld_shared_caches: %v", err)
 		}
 	}
 

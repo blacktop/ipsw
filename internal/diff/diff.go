@@ -220,7 +220,15 @@ func (d *Diff) Diff(launchd bool) (err error) {
 func mountDMG(ctx *Context) (err error) {
 	ctx.SystemOsDmgPath, err = ctx.Info.GetSystemOsDmg()
 	if err != nil {
-		return fmt.Errorf("failed to get SystemOS DMG: %v", err)
+		if errors.Is(err, info.ErrorCryptexNotFound) {
+			utils.Indent(log.Warn, 2)("failed to get SystemOS DMG; trying filesystem DMG")
+			ctx.SystemOsDmgPath, err = ctx.Info.GetFileSystemOsDmg()
+			if err != nil {
+				return fmt.Errorf("failed to get filesystem DMG: %v", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get SystemOS DMG: %v", err)
+		}
 	}
 	if _, err := os.Stat(ctx.SystemOsDmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ctx.IPSWPath, "", func(f *zip.File) bool {
