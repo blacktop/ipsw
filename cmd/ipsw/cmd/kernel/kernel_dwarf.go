@@ -171,15 +171,23 @@ func init() {
 	// dwarfCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dwarfCmd.Flags().BoolP("diff", "d", false, "Diff two structs")
 	dwarfCmd.Flags().BoolP("md", "m", false, "Markdown diff output")
+	dwarfCmd.Flags().Bool("no-off", false, "Do NOT display struct field offsets in output")
 	dwarfCmd.Flags().StringP("type", "t", "", "Type to lookup")
 	dwarfCmd.Flags().StringP("name", "n", "", "Name to lookup")
+	dwarfCmd.Flags().Bool("all", false, "Dump all types")
+	dwarfCmd.Flags().Bool("structs", false, "Dump all structs")
+	dwarfCmd.Flags().Bool("enums", false, "Dump all enums")
 	// viper.BindPFlag("kernel.dwarf.arch", dwarfCmd.Flags().Lookup("arch"))
 	// viper.BindPFlag("kernel.dwarf.pretty", dwarfCmd.Flags().Lookup("pretty"))
 	// viper.BindPFlag("kernel.dwarf.json", dwarfCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.dwarf.diff", dwarfCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("kernel.dwarf.md", dwarfCmd.Flags().Lookup("md"))
+	viper.BindPFlag("kernel.dwarf.no-off", dwarfCmd.Flags().Lookup("no-off"))
 	viper.BindPFlag("kernel.dwarf.type", dwarfCmd.Flags().Lookup("type"))
 	viper.BindPFlag("kernel.dwarf.name", dwarfCmd.Flags().Lookup("name"))
+	viper.BindPFlag("kernel.dwarf.all", dwarfCmd.Flags().Lookup("all"))
+	viper.BindPFlag("kernel.dwarf.structs", dwarfCmd.Flags().Lookup("structs"))
+	viper.BindPFlag("kernel.dwarf.enums", dwarfCmd.Flags().Lookup("enums"))
 	dwarfCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -208,6 +216,7 @@ var dwarfCmd = &cobra.Command{
 		// prettyJSON := viper.GetBool("kernel.dwarf.pretty")
 		// outAsJSON := viper.GetBool("kernel.dwarf.json")
 		doDiff := viper.GetBool("kernel.dwarf.diff")
+		noOffsets := viper.GetBool("kernel.dwarf.no-off")
 		// validate args
 		if len(viper.GetString("kernel.dwarf.type")) > 0 && len(viper.GetString("kernel.dwarf.name")) > 0 {
 			return fmt.Errorf("cannot specify both --type and --name")
@@ -234,12 +243,12 @@ var dwarfCmd = &cobra.Command{
 			}
 
 			if len(viper.GetString("kernel.dwarf.type")) > 0 {
-				t1, _, err := dwarf.GetType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+				t1, _, err := dwarf.GetType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"), !noOffsets)
 				if err != nil {
 					return err
 				}
 
-				t2, _, err := dwarf.GetType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"))
+				t2, _, err := dwarf.GetType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"), !noOffsets)
 				if err != nil {
 					return err
 				}
@@ -260,11 +269,25 @@ var dwarfCmd = &cobra.Command{
 					fmt.Println(out)
 				}
 			} else { // diff ALL structs
+				out, err := dwarf.DiffEnums(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
+					Markdown:    viper.GetBool("kernel.dwarf.md"),
+					Color:       viper.GetBool("color"),
+					DiffTool:    viper.GetString("diff-tool"),
+					ShowOffsets: !noOffsets,
+				})
+				if err != nil {
+					return fmt.Errorf("failed diffing enums: %s", err)
+				}
+				if len(out) > 0 {
+					log.Info("Diffing all enums")
+					fmt.Println(out)
+				}
 				log.Info("Diffing all structs")
-				out, err := dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
-					Markdown: viper.GetBool("kernel.dwarf.md"),
-					Color:    viper.GetBool("color"),
-					DiffTool: viper.GetString("diff-tool"),
+				out, err = dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
+					Markdown:    viper.GetBool("kernel.dwarf.md"),
+					Color:       viper.GetBool("color"),
+					DiffTool:    viper.GetString("diff-tool"),
+					ShowOffsets: !noOffsets,
 				})
 				if err != nil {
 					return fmt.Errorf("failed diffing structs: %s", err)
@@ -293,7 +316,7 @@ var dwarfCmd = &cobra.Command{
 		}
 
 		if len(viper.GetString("kernel.dwarf.type")) > 0 {
-			typstr, file, err := dwarf.GetType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+			typstr, file, err := dwarf.GetType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"), !noOffsets)
 			if err != nil {
 				return err
 			}
@@ -320,6 +343,31 @@ var dwarfCmd = &cobra.Command{
 				}
 			}
 			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color")))
+		}
+
+		if viper.GetBool("kernel.dwarf.all") {
+			dwarf.DumpAllTypes(filepath.Clean(args[0]), &dwarf.Config{
+				Markdown:    viper.GetBool("kernel.dwarf.md"),
+				Color:       viper.GetBool("color"),
+				DiffTool:    viper.GetString("diff-tool"),
+				ShowOffsets: !noOffsets,
+			})
+		}
+		if viper.GetBool("kernel.dwarf.structs") {
+			dwarf.DumpAllStructs(filepath.Clean(args[0]), &dwarf.Config{
+				Markdown:    viper.GetBool("kernel.dwarf.md"),
+				Color:       viper.GetBool("color"),
+				DiffTool:    viper.GetString("diff-tool"),
+				ShowOffsets: !noOffsets,
+			})
+		}
+		if viper.GetBool("kernel.dwarf.enums") {
+			dwarf.DumpAllEnums(filepath.Clean(args[0]), &dwarf.Config{
+				Markdown:    viper.GetBool("kernel.dwarf.md"),
+				Color:       viper.GetBool("color"),
+				DiffTool:    viper.GetString("diff-tool"),
+				ShowOffsets: !noOffsets,
+			})
 		}
 
 		return nil

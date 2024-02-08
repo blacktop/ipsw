@@ -11,9 +11,10 @@ import (
 )
 
 type Config struct {
-	Markdown bool
-	Color    bool
-	DiffTool string
+	Markdown    bool
+	Color       bool
+	DiffTool    string
+	ShowOffsets bool
 }
 
 func GetAllStructs(path string) (<-chan *dwf.StructType, error) {
@@ -53,6 +54,46 @@ func GetAllStructs(path string) (<-chan *dwf.StructType, error) {
 					continue
 				}
 				out <- st
+			}
+		}
+		close(out)
+	}()
+
+	return out, nil
+}
+
+func GetAllEnums(path string) (<-chan *dwf.EnumType, error) {
+	out := make(chan *dwf.EnumType)
+
+	m, err := macho.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return nil, err
+	}
+
+	r := df.Reader()
+
+	go func() {
+		for {
+			entry, err := r.Next()
+			if err != nil {
+				break
+			}
+			if entry == nil {
+				break
+			}
+
+			if entry.Tag == dwf.TagEnumerationType {
+				typ, err := df.Type(entry.Offset)
+				if err != nil {
+					continue
+				}
+				out <- typ.(*dwf.EnumType)
 			}
 		}
 		close(out)
@@ -114,7 +155,7 @@ func GetName(path, name string) (ft *dwf.FuncType, filename string, err error) {
 	return
 }
 
-func GetType(path, name string) (typeStr string, filename string, err error) {
+func GetType(path, name string, showOffsets bool) (typeStr string, filename string, err error) {
 	m, err := macho.Open(path)
 	if err != nil {
 		return "", "", err
@@ -160,7 +201,7 @@ func GetType(path, name string) (typeStr string, filename string, err error) {
 		if t.Incomplete {
 			return "", "", fmt.Errorf("type %s is incomplete", name)
 		}
-		return t.Defn(), filename, nil
+		return t.Defn(showOffsets), filename, nil
 	case *dwf.ArrayType:
 		return t.String(), filename, nil
 	case *dwf.PtrType:
@@ -210,9 +251,9 @@ func DiffStructures(prevMachO, currMachO string, conf *Config) (string, error) {
 				off, err := df.LookupType(t.StructName)
 				if err != nil {
 					if conf.Markdown {
-						buf.WriteString(fmt.Sprintf("#### %s\n\n```c\n%s\n```\n", t.StructName, utils.ClangFormat(t.Defn(), t.StructName+".h", false)))
+						buf.WriteString(fmt.Sprintf("#### %s\n\n```c\n%s\n```\n", t.StructName, utils.ClangFormat(t.Defn(conf.ShowOffsets), t.StructName+".h", false)))
 					} else {
-						buf.WriteString(fmt.Sprintf("NEW: %s\n\n%s\n", t.StructName, utils.ClangFormat(t.Defn(), t.StructName+".h", conf.Color)))
+						buf.WriteString(fmt.Sprintf("NEW: %s\n\n%s\n", t.StructName, utils.ClangFormat(t.Defn(conf.ShowOffsets), t.StructName+".h", conf.Color)))
 					}
 					continue // not found in older version
 				}
@@ -235,7 +276,7 @@ func DiffStructures(prevMachO, currMachO string, conf *Config) (string, error) {
 						continue
 					}
 					if conf.Markdown {
-						out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: false, Tool: "git"})
+						out, err := utils.GitDiff(st.Defn(conf.ShowOffsets), t.Defn(conf.ShowOffsets), &utils.GitDiffConfig{Color: false, Tool: "git"})
 						if err != nil {
 							return "", err
 						}
@@ -243,7 +284,7 @@ func DiffStructures(prevMachO, currMachO string, conf *Config) (string, error) {
 							buf.WriteString(fmt.Sprintf("#### %s\n\n```diff\n%s\n```\n", t.StructName, out))
 						}
 					} else {
-						out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+						out, err := utils.GitDiff(st.Defn(conf.ShowOffsets), t.Defn(conf.ShowOffsets), &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
 						if err != nil {
 							return "", err
 						}
@@ -260,4 +301,147 @@ func DiffStructures(prevMachO, currMachO string, conf *Config) (string, error) {
 	buf.Flush()
 
 	return dat.String(), nil
+}
+
+func DiffEnums(prevMachO, currMachO string, conf *Config) (string, error) {
+	var dat bytes.Buffer
+	buf := bufio.NewWriter(&dat)
+
+	m, err := macho.Open(prevMachO)
+	if err != nil {
+		return "", err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return "", err
+	}
+
+	r := df.Reader()
+
+	types, err := GetAllEnums(currMachO)
+	if err != nil {
+		return "", err
+	}
+
+	seen := make(map[string]bool)
+
+	for t := range types {
+		if len(t.EnumName) > 0 {
+			if _, ok := seen[t.EnumName]; !ok {
+				seen[t.EnumName] = true
+				off, err := df.LookupType(t.EnumName)
+				if err != nil {
+					if conf.Markdown {
+						buf.WriteString(fmt.Sprintf("#### %s\n\n```c\n%s\n```\n", t.EnumName, utils.ClangFormat(t.String(), t.EnumName+".h", false)))
+					} else {
+						buf.WriteString(fmt.Sprintf("NEW: %s\n\n%s\n", t.EnumName, utils.ClangFormat(t.String(), t.EnumName+".h", conf.Color)))
+					}
+					continue // not found in older version
+				}
+
+				r.Seek(off)
+
+				entry, err := r.Next()
+				if err != nil {
+					return "", err
+				}
+
+				var enum *dwf.EnumType
+				if entry.Tag == dwf.TagStructType {
+					typ, err := df.Type(entry.Offset)
+					if err != nil {
+						return "", err
+					}
+					enum = typ.(*dwf.EnumType)
+					if conf.Markdown {
+						out, err := utils.GitDiff(enum.String(), t.String(), &utils.GitDiffConfig{Color: false, Tool: "git"})
+						if err != nil {
+							return "", err
+						}
+						if len(out) > 0 {
+							buf.WriteString(fmt.Sprintf("#### %s\n\n```diff\n%s\n```\n", t.EnumName, out))
+						}
+					} else {
+						out, err := utils.GitDiff(enum.String(), t.String(), &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+						if err != nil {
+							return "", err
+						}
+						if len(out) > 0 {
+							buf.WriteString(fmt.Sprintf("DIFF: %s\n\n%s\n", t.EnumName, out))
+						}
+					}
+
+				}
+			}
+		}
+	}
+
+	buf.Flush()
+
+	return dat.String(), nil
+}
+
+func DumpAllStructs(path string, conf *Config) error {
+	types, err := GetAllStructs(path)
+	if err != nil {
+		return err
+	}
+
+	for t := range types {
+		fmt.Println(utils.ClangFormat(t.Defn(conf.ShowOffsets), t.StructName+".h", conf.Color))
+		println()
+	}
+
+	return nil
+}
+
+func DumpAllEnums(path string, conf *Config) error {
+	types, err := GetAllEnums(path)
+	if err != nil {
+		return err
+	}
+
+	for t := range types {
+		fmt.Println(utils.ClangFormat(t.String(), t.Name+".h", conf.Color))
+		println()
+	}
+
+	return nil
+}
+
+func DumpAllTypes(path string, conf *Config) error {
+	m, err := macho.Open(path)
+	if err != nil {
+		return err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return err
+	}
+
+	r := df.Reader()
+
+	for {
+		entry, err := r.Next()
+		if err != nil {
+			break
+		}
+		if entry == nil {
+			break
+		}
+
+		typ, err := df.Type(entry.Offset)
+		if err != nil {
+			continue
+		}
+
+		fmt.Println(utils.ClangFormat(typ.String()+";", typ.Common().Name+".h", conf.Color))
+		println()
+	}
+
+	return nil
 }
