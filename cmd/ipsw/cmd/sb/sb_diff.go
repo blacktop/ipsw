@@ -78,20 +78,25 @@ var sbDiffCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse IPSW %s: %v", ipswPath, err)
 			}
 
-			appDMG, err := i.GetAppOsDmg()
-			if err != nil {
+			var dmgs []string
+
+			if appDMG, err := i.GetAppOsDmg(); err != nil {
 				return fmt.Errorf("failed to get filesystem DMG path: %v", err)
+			} else {
+				dmgs = append(dmgs, appDMG)
 			}
-			fsDMG, err := i.GetFileSystemOsDmg()
-			if err != nil {
+			if fsDMG, err := i.GetFileSystemOsDmg(); err != nil {
 				return fmt.Errorf("failed to get filesystem DMG path: %v", err)
+			} else {
+				dmgs = append(dmgs, fsDMG)
 			}
-			sysDMG, err := i.GetSystemOsDmg()
-			if err != nil {
+			if sysDMG, err := i.GetSystemOsDmg(); err != nil {
 				return fmt.Errorf("failed to get filesystem DMG path: %v", err)
+			} else {
+				dmgs = append(dmgs, sysDMG)
 			}
 
-			for _, dmgPath := range []string{appDMG, fsDMG, sysDMG} {
+			for _, dmgPath := range dmgs {
 				// check if filesystem DMG already exists (due to previous mount command)
 				if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 					dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {

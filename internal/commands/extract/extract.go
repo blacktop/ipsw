@@ -304,12 +304,12 @@ func DMG(c *Config) ([]string, error) {
 	case "app":
 		dmgPath, err = i.GetAppOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to find app DMG in IPSW: %v", err)
+			return nil, fmt.Errorf("failed to find appOS DMG in IPSW: %v", err)
 		}
 	case "sys":
 		dmgPath, err = i.GetSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to find system DMG in IPSW: %v", err)
+			return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %v", err)
 		}
 	case "fs":
 		dmgPath, err = i.GetFileSystemOsDmg()

@@ -3,12 +3,14 @@ package mount
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 )
@@ -58,7 +60,15 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 	case "sys":
 		dmgPath, err = i.GetSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get SystemOS DMG: %v", err)
+			if errors.Is(err, info.ErrorCryptexNotFound) {
+				log.Warn("failed to get SystemOS DMG; trying filesystem DMG")
+				dmgPath, err = i.GetFileSystemOsDmg()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to get SystemOS DMG: %v", err)
+			}
 		}
 	case "app":
 		dmgPath, err = i.GetAppOsDmg()
