@@ -132,6 +132,7 @@ var machoSearchCmd = &cobra.Command{
 				for _, lc := range m.Loads {
 					if re.MatchString(lc.Command().String()) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("load"), lc.Command())
+						fmt.Printf("\t%s\n", lc)
 						break
 					}
 				}
