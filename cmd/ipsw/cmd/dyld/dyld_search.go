@@ -57,8 +57,6 @@ var dyldSearchCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		fmt.Printf("--no-color: %t\n", viper.GetBool("no-color"))
-
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -111,6 +109,7 @@ var dyldSearchCmd = &cobra.Command{
 				for _, lc := range m.Loads {
 					if re.MatchString(lc.Command().String()) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), lc.Command())
+						fmt.Printf("\t%s\n", lc)
 					}
 				}
 			}
