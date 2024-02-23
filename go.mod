@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/PuerkitoBio/goquery v1.9.0
 	github.com/alecthomas/chroma/v2 v2.12.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.2.0
