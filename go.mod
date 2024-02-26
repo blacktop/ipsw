@@ -32,7 +32,7 @@ require (
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/gomarkdown/markdown v0.0.0-20231222211730-1d6d20845b47
-	github.com/google/gousb v1.1.2
+	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/invopop/jsonschema v0.12.0
