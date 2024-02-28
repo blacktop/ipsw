@@ -26,7 +26,7 @@ const diffMarkdownTemplate = `
 	- [IPSWs](#ipsws)
 	- [Kernel](#kernel)
 		- [Version](#version)
-{{ if .Kexts }}
+{{- if .Kexts }}
 		- [Kexts](#kexts)
 {{- if .Kexts.New }}
 			- [🆕 NEW ({{ len .Kexts.New }})](#-new)
@@ -51,20 +51,20 @@ const diffMarkdownTemplate = `
 {{- end }}
 {{- end }}
 {{- if .Ents }}
-		- [Entitlements](#entitlements)
+		- [🔑 Entitlements](#entitlements)
 {{- end }}
 	- [DSC](#dsc)
 		- [WebKit](#webkit)
 		- [Dylibs](#dylibs)
 {{- if .Dylibs }}
 {{- if .Dylibs.New }}
-			- [🆕 NEW ({{ len .Dylibs.New }})](#-new-2)
+		  - [🆕 NEW ({{ len .Dylibs.New }})](#-new-2)
 {{- end }}
 {{- if .Dylibs.Removed }}
-			- [❌ Removed ({{ len .Dylibs.Removed }})](#️-removed-2)
+		  - [❌ Removed ({{ len .Dylibs.Removed }})](#️-removed-2)
 {{- end }}
 {{- if .Dylibs.Updated }}
-			- [⬆️ Updated ({{ len .Dylibs.Updated }})](#️-updated-2)
+		  - [⬆️ Updated ({{ len .Dylibs.Updated }})](#️-updated-2)
 {{- end }}
 {{- end }}
 
@@ -149,6 +149,16 @@ const diffMarkdownTemplate = `
 </details>
 {{ end -}}
 {{ end -}}
+{{ if .Ents }}
+### 🔑 Entitlements
+<details>
+  <summary><i>View Entitlements</i></summary>
+
+  {{ .Ents | noescape }}
+
+</details>
+{{ end -}}
+
 {{- if .Firmwares }}
 ## Firmwares
 {{ if .Firmwares.New }}
@@ -177,15 +187,7 @@ const diffMarkdownTemplate = `
 </details>
 {{ end -}}
 {{ end -}}
-{{ if .Ents }}
-### Entitlements
-<details>
-  <summary><i>View Entitlements</i></summary>
 
-  {{ .Ents | noescape }}
-
-</details>
-{{ end -}}
 {{ if .Launchd }}
 ## launchd Config
 {{ .Launchd | noescape }}
