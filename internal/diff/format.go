@@ -26,6 +26,7 @@ const diffMarkdownTemplate = `
 	- [IPSWs](#ipsws)
 	- [Kernel](#kernel)
 		- [Version](#version)
+{{ if .Kexts }}
 		- [Kexts](#kexts)
 {{- if .Kexts.New }}
 			- [🆕 NEW ({{ len .Kexts.New }})](#-new)
@@ -35,6 +36,7 @@ const diffMarkdownTemplate = `
 {{- end }}
 {{- if .Kexts.Updated }}
 			- [⬆️ Updated ({{ len .Kexts.Updated }})](#️-updated)
+{{- end }}
 {{- end }}
 	- [Machos](#machos)
 {{- if .Machos }}
@@ -75,14 +77,15 @@ const diffMarkdownTemplate = `
 - {{ .New.IPSWPath | base }}
 
 ## Kernel
-
+{{ if .Old.Kernel.Version }}
 ### Version
 
 | iOS                                     | Version                                 | Build                                | Date                                  |
 | :-------------------------------------- | :-------------------------------------- | :----------------------------------- | :------------------------------------ |
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Kernel.Version.KernelVersion.Darwin }} | {{ .Old.Kernel.Version.KernelVersion.XNU }} | {{ .Old.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Kernel.Version.KernelVersion.Darwin }} | {{ .New.Kernel.Version.KernelVersion.XNU }} | {{ .New.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
-
+{{ end -}}
+{{ if .Kexts }}
 ### Kexts
 {{ if .Kexts.New }}
 ### 🆕 NEW
@@ -109,14 +112,14 @@ const diffMarkdownTemplate = `
 
 </details>
 {{ end -}}
-
+{{ end -}}
 {{ if .KDKs }}
 ## KDKs
 - {{ .Old.KDK | code}}
 - {{ .New.KDK | code}}
 
 {{ .KDKs | noescape }}
-{{end -}}
+{{ end -}}
 
 {{- if .Machos }}
 ## MachOs
@@ -146,6 +149,34 @@ const diffMarkdownTemplate = `
 </details>
 {{ end -}}
 {{ end -}}
+{{- if .Firmwares }}
+## Firmwares
+{{ if .Firmwares.New }}
+### 🆕 NEW
+{{ range .Firmwares.New }}
+- {{ . | code }}
+{{ end }}
+{{ end -}}
+{{- if .Firmwares.Removed }}
+### ❌ Removed
+{{ range .Firmwares.Removed }}
+- {{ . | code }}
+{{ end }}
+{{ end -}}
+{{- if .Firmwares.Updated }}
+### ⬆️ Updated
+<details>
+  <summary><i>View Updated</i></summary>
+
+{{ range $key, $value := .Firmwares.Updated }}
+#### {{ $key | base }}
+> {{ $key | code }}
+{{ $value | noescape }}
+{{ end }}
+
+</details>
+{{ end -}}
+{{ end -}}
 {{ if .Ents }}
 ### Entitlements
 <details>
@@ -162,13 +193,14 @@ const diffMarkdownTemplate = `
 
 ## DSC
 
+{{ if .Old.Webkit }}
 ### WebKit
 
 | iOS                                     | Version           |
 | :-------------------------------------- | :---------------- |
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Webkit }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Webkit }} |
-
+{{ end -}}
 {{- if .Dylibs }}
 ### Dylibs
 {{ if .Dylibs.New }}

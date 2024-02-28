@@ -38,13 +38,14 @@ type mount struct {
 }
 
 type Config struct {
-	Title   string
-	IpswOld string
-	IpswNew string
-	KDKs    []string
-	LaunchD bool
-	Filter  []string
-	Output  string
+	Title    string
+	IpswOld  string
+	IpswNew  string
+	KDKs     []string
+	LaunchD  bool
+	Firmware bool
+	Filter   []string
+	Output   string
 }
 
 // Context is the context for the diff
@@ -73,12 +74,13 @@ type Diff struct {
 	Old Context `json:"-"`
 	New Context `json:"-"`
 
-	Kexts   *mcmd.MachoDiff `json:"kexts,omitempty"`
-	KDKs    string          `json:"kdks,omitempty"`
-	Ents    string          `json:"ents,omitempty"`
-	Dylibs  *mcmd.MachoDiff `json:"dylibs,omitempty"`
-	Machos  *mcmd.MachoDiff `json:"machos,omitempty"`
-	Launchd string          `json:"launchd,omitempty"`
+	Kexts     *mcmd.MachoDiff `json:"kexts,omitempty"`
+	KDKs      string          `json:"kdks,omitempty"`
+	Ents      string          `json:"ents,omitempty"`
+	Dylibs    *mcmd.MachoDiff `json:"dylibs,omitempty"`
+	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
+	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
+	Launchd   string          `json:"launchd,omitempty"`
 
 	tmpDir string `json:"-"`
 	conf   *Config
@@ -212,6 +214,13 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing launchd PLIST")
 		if err := d.parseLaunchdPlists(); err != nil {
 			return fmt.Errorf("failed to parse launchd config plists: %v", err)
+		}
+	}
+
+	if d.conf.Firmware {
+		log.Info("Diffing Firmware")
+		if err := d.parseFirmwares(); err != nil {
+			return err
 		}
 	}
 
@@ -492,4 +501,14 @@ func (d *Diff) parseLaunchdPlists() error {
 	}
 
 	return nil
+}
+
+func (d *Diff) parseFirmwares() (err error) {
+	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+		Filter:   d.conf.Filter,
+	})
+	return
 }

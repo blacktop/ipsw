@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -72,4 +73,42 @@ func DecryptPayload(path, output string, iv, key []byte) error {
 	}
 
 	return nil
+}
+
+func ExtractPayload(in, out string, isImg4 bool) error {
+	f, err := os.Open(in)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %s", err)
+	}
+	defer f.Close()
+
+	var dat []byte
+
+	if isImg4 {
+		i, err := img4.ParseImg4(f)
+		if err != nil {
+			return fmt.Errorf("failed to parse IMG4: %s", err)
+		}
+		dat = i.IM4P.Data
+	} else {
+		i, err := img4.ParseIm4p(f)
+		if err != nil {
+			return fmt.Errorf("failed to parse IM4P: %s", err)
+		}
+		dat = i.Data
+	}
+
+	if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(out), err)
+	}
+
+	if bytes.Contains(dat[:4], []byte("bvx2")) {
+		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+		dat, err = lzfse.NewDecoder(dat).DecodeBuffer()
+		if err != nil {
+			return fmt.Errorf("failed to lzfse decompress %s: %v", in, err)
+		}
+	}
+
+	return os.WriteFile(out, dat, 0o660)
 }
