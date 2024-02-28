@@ -52,7 +52,6 @@ func init() {
 	ipswCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
-	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	ipswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
@@ -69,7 +68,6 @@ func init() {
 	viper.BindPFlag("download.ipsw.dyld-arch", ipswCmd.Flags().Lookup("dyld-arch"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
-	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ipsw.urls", ipswCmd.Flags().Lookup("urls"))
@@ -138,7 +136,6 @@ var ipswCmd = &cobra.Command{
 		remotePattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
-		// beta := viper.GetBool("download.ipsw.beta")
 
 		// verify args
 		if len(dyldArches) > 0 && !remoteDSC {
