@@ -11,6 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -120,6 +121,36 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 		log.Info("Scanning AppOS")
 		if err := scanDmg(ipswPath, appOS, "AppOS", handler); err != nil {
 			return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+		}
+	}
+
+	return nil
+}
+
+// ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p firmware macho file found
+func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_im4p")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory to store im4ps: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	im4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
+		return filepath.Ext(f.Name) == ".im4p"
+	})
+	if err != nil {
+		return fmt.Errorf("failed to unzip im4p: %v", err)
+	}
+
+	for _, im4p := range im4ps {
+		if err := icmd.ExtractPayload(im4p, im4p, false); err != nil {
+			return fmt.Errorf("failed to extract im4p payload: %v", err)
+		}
+		if m, err := macho.Open(im4p); err == nil {
+			if err := handler(filepath.Base(im4p), m); err != nil {
+				return fmt.Errorf("failed to handle macho %s: %v", im4p, err)
+			}
+			m.Close()
 		}
 	}
 
