@@ -17,6 +17,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/go-git/go-git/v5"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -228,11 +230,27 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 
 	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Git cloning local 'appledb' to %s", filepath.Join(q.ConfigDir, "appledb")))
-		if _, err := utils.GitClone(AppleDBGitURL, filepath.Join(q.ConfigDir, "appledb")); err != nil {
+		if _, err := git.PlainClone(filepath.Join(q.ConfigDir, "appledb"), false, &git.CloneOptions{
+			URL:      AppleDBGitURL,
+			Depth:    1,
+			Progress: os.Stderr,
+		}); err != nil {
 			return nil, fmt.Errorf("failed to create local copy of 'appledb' repo: %v", err)
 		}
 	} else {
-		if _, err := utils.GitRefresh(filepath.Join(q.ConfigDir, "appledb")); err != nil {
+		r, err := git.PlainOpen(filepath.Join(q.ConfigDir, "appledb"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open local copy of 'appledb' repo: %v", err)
+		}
+
+		w, err := r.Worktree()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get worktree of local copy of 'appledb' repo: %v", err)
+		}
+
+		if err = w.Pull(&git.PullOptions{
+			Progress: os.Stderr,
+		}); err != nil && errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return nil, fmt.Errorf("failed to update local copy of 'appledb' repo: %v", err)
 		}
 	}
