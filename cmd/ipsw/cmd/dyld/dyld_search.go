@@ -28,6 +28,7 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -99,11 +100,21 @@ var dyldSearchCmd = &cobra.Command{
 			return fmt.Errorf("failed to open dyld shared cache %s: %w", dscPath, err)
 		}
 
+		var m *macho.File
+
 		for _, img := range f.Images {
-			m, err := img.GetMacho()
-			if err != nil {
-				return err
+			if loadCmdReStr != "" {
+				m, err = img.GetMacho()
+				if err != nil {
+					return err
+				}
+			} else { // use partial macho for speed
+				m, err = img.GetPartialMacho()
+				if err != nil {
+					return err
+				}
 			}
+
 			if uuidStr != "" {
 				if img.UUID.String() == uuidStr {
 					fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("uuid"), img.UUID)
