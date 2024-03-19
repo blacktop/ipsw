@@ -40,9 +40,11 @@ func init() {
 	dyldSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
 	dyldSearchCmd.Flags().StringP("import", "i", "", "Search for specific import regex")
 	dyldSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
+	dyldSearchCmd.Flags().StringP("uuid", "u", "", "Search for dylib by UUID")
 	viper.BindPFlag("dyld.search.load-command", dyldSearchCmd.Flags().Lookup("load-command"))
 	viper.BindPFlag("dyld.search.import", dyldSearchCmd.Flags().Lookup("import"))
 	viper.BindPFlag("dyld.search.section", dyldSearchCmd.Flags().Lookup("section"))
+	viper.BindPFlag("dyld.search.uuid", dyldSearchCmd.Flags().Lookup("uuid"))
 }
 
 // dyldSearchCmd represents the search command
@@ -66,8 +68,9 @@ var dyldSearchCmd = &cobra.Command{
 		loadCmdReStr := viper.GetString("dyld.search.load-command")
 		importReStr := viper.GetString("dyld.search.import")
 		sectionReStr := viper.GetString("dyld.search.section")
+		uuidStr := viper.GetString("dyld.search.uuid")
 		// verify flags
-		if loadCmdReStr == "" && importReStr == "" && sectionReStr == "" {
+		if loadCmdReStr == "" && importReStr == "" && sectionReStr == "" && uuidStr == "" {
 			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
@@ -100,6 +103,11 @@ var dyldSearchCmd = &cobra.Command{
 			m, err := img.GetMacho()
 			if err != nil {
 				return err
+			}
+			if uuidStr != "" {
+				if img.UUID.String() == uuidStr {
+					fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("uuid"), img.UUID)
+				}
 			}
 			if loadCmdReStr != "" {
 				re, err := regexp.Compile(loadCmdReStr)
