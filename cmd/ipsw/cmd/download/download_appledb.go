@@ -263,7 +263,7 @@ var downloadAppledbCmd = &cobra.Command{
 				return fmt.Errorf("failed to marshal json: %v", err)
 			}
 
-			if viper.GetBool("color") {
+			if viper.GetBool("color") && !viper.GetBool("no-color") {
 				if err := quick.Highlight(os.Stdout, string(jsonData)+"\n", "json", "terminal256", "nord"); err != nil {
 					return fmt.Errorf("failed to highlight json: %v", err)
 				}

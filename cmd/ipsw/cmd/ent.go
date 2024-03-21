@@ -208,7 +208,7 @@ var entCmd = &cobra.Command{
 				}
 			} else { // DIFF ENTITLEMENT DATABASES
 				log.Info("Diffing entitlement databases...")
-				out, err := ent.DiffDatabases(entDBs[0], entDBs[1], &ent.Config{Markdown: markdown, Color: viper.GetBool("color")})
+				out, err := ent.DiffDatabases(entDBs[0], entDBs[1], &ent.Config{Markdown: markdown, Color: viper.GetBool("color") && !viper.GetBool("no-color")})
 				if err != nil {
 					return fmt.Errorf("failed to diff entitlement databases: %v", err)
 				}
@@ -303,7 +303,7 @@ var entCmd = &cobra.Command{
 			for _, entDB := range entDBs {
 				for f, ent := range entDB {
 					if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
-						if viper.GetBool("color") {
+						if viper.GetBool("color") && !viper.GetBool("no-color") {
 							fmt.Print(color.New(color.Bold).Sprintf("\n%s\n\n", f))
 							if len(ent) > 0 {
 								quick.Highlight(os.Stdout, ent, "xml", "terminal256", "nord")
@@ -327,7 +327,7 @@ var entCmd = &cobra.Command{
 					if len(ent) == 0 {
 						continue
 					}
-					if viper.GetBool("color") {
+					if viper.GetBool("color") && !viper.GetBool("no-color") {
 						fmt.Print(color.New(color.Bold).Sprintf("\n%s\n\n", f))
 						quick.Highlight(os.Stdout, ent, "xml", "terminal256", "nord")
 					} else {

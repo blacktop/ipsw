@@ -174,7 +174,7 @@ var sbDiffCmd = &cobra.Command{
 		for _, f := range files {
 			newSbData := sbDBs[1][f]
 			if oldSbData, ok := sbDBs[0][f]; ok {
-				out, err := utils.GitDiff(oldSbData+"\n", newSbData+"\n", &utils.GitDiffConfig{Color: viper.GetBool("color")})
+				out, err := utils.GitDiff(oldSbData+"\n", newSbData+"\n", &utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color")})
 				if err != nil {
 					return fmt.Errorf("failed to diff %s: %v", f, err)
 				}

@@ -67,7 +67,7 @@ var SymAddrCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
-		useColor := viper.GetBool("color")
+		useColor := viper.GetBool("color") && !viper.GetBool("no-color")
 		color.NoColor = !useColor
 
 		imageName, _ := cmd.Flags().GetString("image")
