@@ -319,7 +319,7 @@ var dyldInfoCmd = &cobra.Command{
 					}
 					w.Flush()
 
-					if viper.GetBool("color") {
+					if viper.GetBool("color") && !viper.GetBool("no-color") {
 						if err := quick.Highlight(os.Stdout, buf.String(), "md", "terminal256", "nord"); err != nil {
 							return err
 						}
@@ -352,7 +352,7 @@ var dyldInfoCmd = &cobra.Command{
 					out, err := utils.GitDiff(
 						strings.Join(dout1, "\n")+"\n",
 						strings.Join(dout2, "\n")+"\n",
-						&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
+						&utils.GitDiffConfig{Color:viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
 					if err != nil {
 						return err
 					}

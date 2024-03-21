@@ -190,7 +190,7 @@ var DisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        viper.GetBool("color"),
+						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 					})
 
 					if !quiet {
@@ -286,7 +286,7 @@ var DisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        viper.GetBool("color"),
+					Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 				})
 
 				if !quiet {
@@ -395,7 +395,7 @@ var DisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
-				Color:        viper.GetBool("color"),
+				Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 			})
 
 			if !quiet {

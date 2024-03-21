@@ -264,7 +264,7 @@ var MachoCmd = &cobra.Command{
 							Verbose:  verbose,
 							Addrs:    true,
 							ObjcRefs: showObjcRefs,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 							Theme:    "nord",
 						})
 						if err != nil {
@@ -312,7 +312,7 @@ var MachoCmd = &cobra.Command{
 							Addrs:    true,
 							All:      showSwiftAll,
 							Demangle: doDemangle,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 							Theme:    "nord",
 						})
 						if err != nil {

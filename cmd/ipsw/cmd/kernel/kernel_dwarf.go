@@ -257,7 +257,7 @@ var dwarfCmd = &cobra.Command{
 					return fmt.Errorf("could not find type '%s' in one or both of the files", viper.GetString("kernel.dwarf.type"))
 				}
 
-				out, err := utils.GitDiff(t1, t2, &utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
+				out, err := utils.GitDiff(t1, t2, &utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
 				if err != nil {
 					return err
 				}
@@ -271,7 +271,7 @@ var dwarfCmd = &cobra.Command{
 			} else { // diff ALL structs
 				out, err := dwarf.DiffEnums(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
 					Markdown:    viper.GetBool("kernel.dwarf.md"),
-					Color:       viper.GetBool("color"),
+					Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 					DiffTool:    viper.GetString("diff-tool"),
 					ShowOffsets: !noOffsets,
 				})
@@ -285,7 +285,7 @@ var dwarfCmd = &cobra.Command{
 				log.Info("Diffing all structs")
 				out, err = dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
 					Markdown:    viper.GetBool("kernel.dwarf.md"),
-					Color:       viper.GetBool("color"),
+					Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 					DiffTool:    viper.GetString("diff-tool"),
 					ShowOffsets: !noOffsets,
 				})
@@ -327,7 +327,7 @@ var dwarfCmd = &cobra.Command{
 					log.WithField("file", file).Info(viper.GetString("kernel.dwarf.type"))
 				}
 			}
-			fmt.Println(utils.ClangFormat(typstr, viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color")))
+			fmt.Println(utils.ClangFormat(typstr, viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
 		}
 
 		if len(viper.GetString("kernel.dwarf.name")) > 0 {
@@ -342,13 +342,13 @@ var dwarfCmd = &cobra.Command{
 					log.WithField("file", file).Info(viper.GetString("kernel.dwarf.name"))
 				}
 			}
-			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color")))
+			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
 		}
 
 		if viper.GetBool("kernel.dwarf.all") {
 			dwarf.DumpAllTypes(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color"),
+				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			})
@@ -356,7 +356,7 @@ var dwarfCmd = &cobra.Command{
 		if viper.GetBool("kernel.dwarf.structs") {
 			dwarf.DumpAllStructs(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color"),
+				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			})
@@ -364,7 +364,7 @@ var dwarfCmd = &cobra.Command{
 		if viper.GetBool("kernel.dwarf.enums") {
 			dwarf.DumpAllEnums(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color"),
+				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			})

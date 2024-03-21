@@ -171,7 +171,7 @@ var machoInfoCmd = &cobra.Command{
 
 		// flags
 		verbose := viper.GetBool("verbose")
-		color := viper.GetBool("color")
+		color := viper.GetBool("color") && !viper.GetBool("no-color")
 
 		selectedArch := viper.GetString("macho.info.arch")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
@@ -740,7 +740,7 @@ var machoInfoCmd = &cobra.Command{
 					Verbose:  viper.GetBool("verbose"),
 					Addrs:    true,
 					ObjcRefs: showObjcRefs,
-					Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 					Theme:    "nord",
 				})
 				if err != nil {
@@ -766,7 +766,7 @@ var machoInfoCmd = &cobra.Command{
 					Addrs:    true,
 					All:      showSwiftAll,
 					Demangle: doDemangle,
-					Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 					Theme:    "nord",
 				})
 				if err != nil {
