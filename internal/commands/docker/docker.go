@@ -107,12 +107,12 @@ func (c *Client) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create container: %w", err)
 	}
 
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 
 	go func() {
-		out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{
+		out, err := cli.ContainerLogs(ctx, resp.ID, container.LogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
