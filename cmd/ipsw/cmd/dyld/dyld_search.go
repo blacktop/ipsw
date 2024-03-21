@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -116,7 +117,7 @@ var dyldSearchCmd = &cobra.Command{
 			}
 
 			if uuidStr != "" {
-				if img.UUID.String() == uuidStr {
+				if strings.EqualFold(img.UUID.String(), uuidStr) {
 					fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("uuid"), img.UUID)
 				}
 			}
