@@ -20,6 +20,10 @@ import (
 	"github.com/fatih/color"
 )
 
+// REFERENCES:
+//     - https://developer.apple.com/documentation/xcode/interpreting-the-json-format-of-a-crash-report
+//     - https://github.com/zed-industries/zed/blob/main/crates/collab/src/api/ips_file.rs
+
 //go:embed data/log_type.gz
 var logTypeData []byte
 
