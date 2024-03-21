@@ -61,6 +61,15 @@ var symbolicateCmd = &cobra.Command{
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 
+		if filepath.Ext(args[0]) == ".ips" {
+			out, err := crashlog.OpenIPS(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Println(out)
+			return nil
+		}
+
 		crashLog, err := crashlog.Open(args[0])
 		if err != nil {
 			return err
