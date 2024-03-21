@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -62,6 +63,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("launch-const", "t", "", "Search for launch constraint regex")
 	machoSearchCmd.Flags().StringP("import", "i", "", "Search for specific import regex")
 	machoSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
+	machoSearchCmd.Flags().StringP("uuid", "u", "", "Search for MachO by UUID")
 	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class regex")
@@ -76,6 +78,7 @@ func init() {
 	viper.BindPFlag("macho.search.launch-const", machoSearchCmd.Flags().Lookup("launch-const"))
 	viper.BindPFlag("macho.search.import", machoSearchCmd.Flags().Lookup("import"))
 	viper.BindPFlag("macho.search.section", machoSearchCmd.Flags().Lookup("section"))
+	viper.BindPFlag("macho.search.uuid", machoSearchCmd.Flags().Lookup("uuid"))
 	viper.BindPFlag("macho.search.sym", machoSearchCmd.Flags().Lookup("sym"))
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
 	viper.BindPFlag("macho.search.class", machoSearchCmd.Flags().Lookup("class"))
@@ -103,6 +106,7 @@ var machoSearchCmd = &cobra.Command{
 		launchConstReStr := viper.GetString("macho.search.launch-const")
 		importReStr := viper.GetString("macho.search.import")
 		sectionReStr := viper.GetString("macho.search.section")
+		uuidStr := viper.GetString("macho.search.uuid")
 		symReStr := viper.GetString("macho.search.sym")
 		protoReStr := viper.GetString("macho.search.protocol")
 		classReStr := viper.GetString("macho.search.class")
@@ -114,6 +118,7 @@ var machoSearchCmd = &cobra.Command{
 			launchConstReStr == "" &&
 			importReStr == "" &&
 			sectionReStr == "" &&
+			uuidStr == "" &&
 			symReStr == "" &&
 			protoReStr == "" &&
 			classReStr == "" &&
@@ -215,6 +220,11 @@ var machoSearchCmd = &cobra.Command{
 						fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("load"), fmt.Sprintf("%s.%s", sec.Seg, sec.Name))
 						break
 					}
+				}
+			}
+			if uuidStr != "" {
+				if strings.EqualFold(m.UUID().UUID.String(), uuidStr) {
+					fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("uuid"), uuidStr)
 				}
 			}
 			if symReStr != "" {
