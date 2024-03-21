@@ -11,10 +11,17 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 //go:embed data/log_type.gz
 var logTypeData []byte
+
+var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorBold = color.New(color.Bold).SprintfFunc()
+var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 
 type LogType struct {
 	Name       string `json:"name"`
@@ -180,30 +187,34 @@ type Process struct {
 }
 
 type Thread struct {
-	ID                 int       `json:"id"`
-	Name               string    `json:"name,omitempty"`
-	State              []string  `json:"state"`
-	Continuation       []int     `json:"continuation,omitempty"`
-	Queue              string    `json:"queue,omitempty"`
-	DispatchQueueLabel string    `json:"dispatch_queue_label,omitempty"`
-	SchedFlags         []string  `json:"schedFlags,omitempty"`
-	BasePriority       int       `json:"basePriority"`
-	UserFrames         [][]int   `json:"userFrames"`
-	KernelFrames       [][]int   `json:"kernelFrames,omitempty"`
-	WaitEvent          []float64 `json:"waitEvent,omitempty"`
-	QosRequested       string    `json:"qosRequested,omitempty"`
-	QosEffective       string    `json:"qosEffective,omitempty"`
-	UserTime           float64   `json:"userTime"`
-	UserUsec           int       `json:"user_usec"`
-	SystemTime         int       `json:"systemTime"`
-	SystemUsec         int       `json:"system_usec"`
-	SchedPriority      int       `json:"schedPriority"`
+	ID                 int          `json:"id"`
+	Name               string       `json:"name,omitempty"`
+	State              []string     `json:"state"`
+	Continuation       []int        `json:"continuation,omitempty"`
+	Queue              string       `json:"queue,omitempty"`
+	DispatchQueueLabel string       `json:"dispatch_queue_label,omitempty"`
+	SchedFlags         []string     `json:"schedFlags,omitempty"`
+	BasePriority       int          `json:"basePriority"`
+	UserFrames         []PanicFrame `json:"userFrames"`
+	KernelFrames       []PanicFrame `json:"kernelFrames,omitempty"`
+	WaitEvent          []float64    `json:"waitEvent,omitempty"`
+	QosRequested       string       `json:"qosRequested,omitempty"`
+	QosEffective       string       `json:"qosEffective,omitempty"`
+	UserTime           float64      `json:"userTime"`
+	UserUsec           int          `json:"user_usec"`
+	SystemTime         int          `json:"systemTime"`
+	SystemUsec         int          `json:"system_usec"`
+	SchedPriority      int          `json:"schedPriority"`
 }
 
 type BinaryImage struct {
-	UUID   string  `json:"uuid,omitempty"`
-	Base   float64 `json:"base,omitempty"`
-	Source string  `json:"source,omitempty"`
+	Arch   string `json:"arch,omitempty"`
+	Base   int64  `json:"base,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Path   string `json:"path,omitempty"`
+	Size   int    `json:"size,omitempty"`
+	Source string `json:"source,omitempty"`
+	UUID   string `json:"uuid,omitempty"`
 }
 
 func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
@@ -213,7 +224,7 @@ func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
 	}
 	*bi = BinaryImage{
 		UUID: s[0].(string),
-		Base: s[1].(float64),
+		Base: int64(s[1].(float64)),
 	}
 	switch s[2].(string) {
 	case "P":
@@ -322,6 +333,27 @@ type Frame struct {
 	ImageOffset    int    `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	SymbolLocation int    `json:"symbolLocation,omitempty"`
+}
+
+type PanicFrame struct {
+	ImageIndex     int    `json:"imageIndex,omitempty"`
+	ImageName      string `json:"imageName,omitempty"`
+	ImageOffset    int    `json:"imageOffset,omitempty"`
+	Symbol         string `json:"symbol,omitempty"`
+	SymbolLocation int    `json:"symbolLocation,omitempty"`
+}
+
+func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
+	var s [2]int
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*pf = PanicFrame{
+		ImageIndex:  s[0],
+		ImageName:   fmt.Sprintf("image_%d", s[0]),
+		ImageOffset: s[1],
+	}
+	return nil
 }
 
 type Termination struct {
@@ -446,15 +478,17 @@ func OpenIPS(in string) (*Ips, error) {
 		return nil, err
 	}
 
+	if len(ips.Payload.Product) == 0 {
+		ips.Payload.Product = ips.Payload.ModelCode
+	}
+
 	return &ips, nil
 }
 
-func (i *Ips) String() string {
-	var out string
-
+func (i *Ips) Symbolicate(path string) error {
 	db, err := GetLogTypes()
 	if err != nil {
-		return "failed to get log types: " + err.Error()
+		return fmt.Errorf("failed to get log types: %w", err)
 	}
 
 	if bt, ok := (*db)[i.Header.BugType]; ok {
@@ -464,8 +498,14 @@ func (i *Ips) String() string {
 		}
 	}
 
+	return nil
+}
+
+func (i *Ips) String() string {
+	var out string
+
 	switch i.Header.BugType {
-	case "Panic":
+	case "Panic", "210":
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType, i.Payload.Product, i.Payload.Build)
 		out += i.Payload.PanicString
 		out += i.Payload.OtherString + "\n"
@@ -476,39 +516,52 @@ func (i *Ips) String() string {
 		sort.Ints(pids)
 		for pid := range pids {
 			p := i.Payload.ProcessByPid[pid]
-			out += fmt.Sprintf("Process: %s [%d]\n", p.Name, p.ID)
+			out += fmt.Sprintf("Process: %s [%s]\n", colorImage(p.Name), colorBold("%d", p.ID))
 			for _, t := range p.ThreadByID {
-				out += fmt.Sprintf("  Thread %d", t.ID)
+				out += fmt.Sprintf("  Thread: %s\n", colorBold("%d", t.ID))
 				if len(t.Name) > 0 {
-					out += fmt.Sprintf(" name: %s", t.Name)
-					if len(t.DispatchQueueLabel) > 0 {
-						out += ","
-					}
+					out += fmt.Sprintf("    %s\n", colorField(t.Name))
 				}
 				if len(t.DispatchQueueLabel) > 0 {
-					out += fmt.Sprintf(" queue: %s", t.DispatchQueueLabel)
+					out += fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel)
 				}
-				out += "\n"
-				out += fmt.Sprintf("    User Time: %f (%d)\n", t.UserTime, t.UserUsec)
-				out += fmt.Sprintf("    System Time: %d (%d)\n", t.SystemTime, t.SystemUsec)
-				out += fmt.Sprintf("    Base Priority: %d\n", t.BasePriority)
-				out += fmt.Sprintf("    State: %s\n", t.State)
+				out += fmt.Sprintf("    State:          %s\n", strings.Join(t.State, ", "))
+				out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
+				out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
+				out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
+				out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
 				if len(t.UserFrames) > 0 {
 					out += "    User Frames:\n"
+					buf := bytes.NewBufferString("")
+					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.UserFrames {
-						out += fmt.Sprintf("      %02d: %v\n", idx, f)
+						symloc := ""
+						if f.SymbolLocation > 0 {
+							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+						}
+						fmt.Fprintf(w, "      %02d: %s\t%#x %s%s\n", idx, f.ImageName, f.ImageOffset, f.Symbol, symloc)
 					}
+					w.Flush()
+					out += buf.String()
 				}
 				if len(t.KernelFrames) > 0 {
 					out += "    Kernel Frames:\n"
+					buf := bytes.NewBufferString("")
+					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.KernelFrames {
-						out += fmt.Sprintf("      %02d: %v\n", idx, f)
+						symloc := ""
+						if f.SymbolLocation > 0 {
+							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+						}
+						fmt.Fprintf(w, "      %02d: %s\t%#x %s%s\n", idx, f.ImageName, f.ImageOffset, f.Symbol, symloc)
 					}
+					w.Flush()
+					out += buf.String()
 				}
 			}
 			out += "\n"
 		}
-	case "Crash":
+	case "Crash", "309":
 		out = fmt.Sprintf("[%s] - %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType)
 		out += fmt.Sprintf(
 			"Process:             %s [%d]\n"+
@@ -562,7 +615,11 @@ func (i *Ips) String() string {
 				buf := bytes.NewBufferString("")
 				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 				for idx, f := range t.Frames {
-					fmt.Fprintf(w, "  %02d: %s\t%#x %s + %d\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+int64(f.ImageOffset), f.Symbol, f.SymbolLocation)
+					symloc := ""
+					if f.SymbolLocation > 0 {
+						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+					}
+					fmt.Fprintf(w, "  %02d: %s\t%#x %s%s\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+int64(f.ImageOffset), f.Symbol, symloc)
 				}
 				w.Flush()
 				out += buf.String()
