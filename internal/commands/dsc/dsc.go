@@ -13,6 +13,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
@@ -724,4 +725,26 @@ func GetUserAgent(f *dyld.File, sysVer *extract.SystemVersionPlist) (string, err
 	// 	return "", fmt.Errorf("failed to create MachO for image %s: %v", image.Name, err)
 	// }
 	return "", nil
+}
+
+func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
+	ctx, err := mount.DmgInIPSW(ipswPath, "fs")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to mount IPSW: %v", err)
+	}
+
+	dscs, err := dyld.GetDscPathsInMount(ctx.MountPoint, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get DSC paths in %s: %v", ctx.MountPoint, err)
+	}
+	if len(dscs) == 0 {
+		return nil, nil, fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", ctx.MountPoint)
+	}
+
+	f, err := dyld.Open(dscs[0])
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open DSC: %v", err)
+	}
+
+	return ctx, f, nil
 }

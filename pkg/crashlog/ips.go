@@ -5,13 +5,18 @@ import (
 	"compress/gzip"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/fatih/color"
 )
 
@@ -22,6 +27,8 @@ var colorAddr = color.New(color.Faint).SprintfFunc()
 var colorBold = color.New(color.Bold).SprintfFunc()
 var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+
+var ErrDone = errors.New("done")
 
 type LogType struct {
 	Name       string `json:"name"`
@@ -209,24 +216,29 @@ type Thread struct {
 
 type BinaryImage struct {
 	Arch   string `json:"arch,omitempty"`
-	Base   int64  `json:"base,omitempty"`
+	Base   uint64 `json:"base,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Path   string `json:"path,omitempty"`
-	Size   int    `json:"size,omitempty"`
+	Size   uint64 `json:"size,omitempty"`
 	Source string `json:"source,omitempty"`
 	UUID   string `json:"uuid,omitempty"`
 }
 
 func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
-	var s [3]any
-	if err := json.Unmarshal(b, &s); err != nil {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	*bi = BinaryImage{
-		UUID: s[0].(string),
-		Base: int64(s[1].(float64)),
+	if err := json.Unmarshal(raw[0], &bi.UUID); err != nil {
+		return err
 	}
-	switch s[2].(string) {
+	if err := json.Unmarshal(raw[1], &bi.Base); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw[2], &bi.Source); err != nil {
+		return err
+	}
+	switch bi.Source {
 	case "P":
 		bi.Source = "Process"
 	case "S":
@@ -242,7 +254,7 @@ func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
 	case "A":
 		bi.Source = "Absolute"
 	default:
-		return fmt.Errorf("invalid binary image source: %v", s[2])
+		return fmt.Errorf("invalid binary image source: %v", bi.Source)
 	}
 	return nil
 }
@@ -276,11 +288,11 @@ type Exception struct {
 }
 
 type Register struct {
-	Value             float64 `json:"value,omitempty"`
-	SymbolLocation    int     `json:"symbolLocation,omitempty"`
-	Symbol            string  `json:"symbol,omitempty"`
-	Description       string  `json:"description,omitempty"`
-	MatchesCrashFrame int     `json:"matchesCrashFrame,omitempty"`
+	Value             uint64 `json:"value,omitempty"`
+	SymbolLocation    int    `json:"symbolLocation,omitempty"`
+	Symbol            string `json:"symbol,omitempty"`
+	Description       string `json:"description,omitempty"`
+	MatchesCrashFrame int    `json:"matchesCrashFrame,omitempty"`
 }
 
 type ThreadState struct {
@@ -307,16 +319,16 @@ func (s ThreadState) String() string {
 			"   x28: %#016x   fp: %#016x   lr: %#016x\n"+
 			"    sp: %#016x   pc: %#016x cpsr: %#08x\n"+
 			"   esr: %#08x\n",
-		int64(s.X[0].Value), int64(s.X[1].Value), int64(s.X[2].Value), int64(s.X[3].Value),
-		int64(s.X[4].Value), int64(s.X[5].Value), int64(s.X[6].Value), int64(s.X[7].Value),
-		int64(s.X[8].Value), int64(s.X[9].Value), int64(s.X[10].Value), int64(s.X[11].Value),
-		int64(s.X[12].Value), int64(s.X[13].Value), int64(s.X[14].Value), int64(s.X[15].Value),
-		int64(s.X[16].Value), int64(s.X[17].Value), int64(s.X[18].Value), int64(s.X[19].Value),
-		int64(s.X[20].Value), int64(s.X[21].Value), int64(s.X[22].Value), int64(s.X[23].Value),
-		int64(s.X[24].Value), int64(s.X[25].Value), int64(s.X[26].Value), int64(s.X[27].Value),
-		int64(s.X[28].Value), int64(s.FP.Value), int64(s.LR.Value),
-		int64(s.SP.Value), int64(s.PC.Value), int64(s.CPSR.Value),
-		int64(s.ESR.Value))
+		s.X[0].Value, s.X[1].Value, s.X[2].Value, s.X[3].Value,
+		s.X[4].Value, s.X[5].Value, s.X[6].Value, s.X[7].Value,
+		s.X[8].Value, s.X[9].Value, s.X[10].Value, s.X[11].Value,
+		s.X[12].Value, s.X[13].Value, s.X[14].Value, s.X[15].Value,
+		s.X[16].Value, s.X[17].Value, s.X[18].Value, s.X[19].Value,
+		s.X[20].Value, s.X[21].Value, s.X[22].Value, s.X[23].Value,
+		s.X[24].Value, s.X[25].Value, s.X[26].Value, s.X[27].Value,
+		s.X[28].Value, s.FP.Value, s.LR.Value,
+		s.SP.Value, s.PC.Value, s.CPSR.Value,
+		s.ESR.Value)
 }
 
 type UserThread struct {
@@ -329,22 +341,22 @@ type UserThread struct {
 }
 
 type Frame struct {
-	ImageIndex     int    `json:"imageIndex,omitempty"`
-	ImageOffset    int    `json:"imageOffset,omitempty"`
+	ImageIndex     uint64 `json:"imageIndex,omitempty"`
+	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	SymbolLocation int    `json:"symbolLocation,omitempty"`
 }
 
 type PanicFrame struct {
-	ImageIndex     int    `json:"imageIndex,omitempty"`
+	ImageIndex     uint64 `json:"imageIndex,omitempty"`
 	ImageName      string `json:"imageName,omitempty"`
-	ImageOffset    int    `json:"imageOffset,omitempty"`
+	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	SymbolLocation int    `json:"symbolLocation,omitempty"`
 }
 
 func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
-	var s [2]int
+	var s [2]uint64
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
@@ -423,16 +435,16 @@ type IPSPayload struct {
 	Threads                []UserThread `json:"threads,omitempty"`
 	UsedImages             []struct {
 		Arch   string `json:"arch,omitempty"`
-		Base   int64  `json:"base,omitempty"`
+		Base   uint64 `json:"base,omitempty"`
 		Name   string `json:"name,omitempty"`
 		Path   string `json:"path,omitempty"`
-		Size   int    `json:"size,omitempty"`
+		Size   uint64 `json:"size,omitempty"`
 		Source string `json:"source,omitempty"`
 		UUID   string `json:"uuid,omitempty"`
 	} `json:"usedImages,omitempty"`
 	SharedCache struct {
-		Base int64  `json:"base,omitempty"`
-		Size int64  `json:"size,omitempty"`
+		Base uint64 `json:"base,omitempty"`
+		Size uint64 `json:"size,omitempty"`
 		UUID string `json:"uuid,omitempty"`
 	} `json:"sharedCache,omitempty"`
 	LegacyInfo struct {
@@ -485,7 +497,7 @@ func OpenIPS(in string) (*Ips, error) {
 	return &ips, nil
 }
 
-func (i *Ips) Symbolicate(path string) error {
+func (i *Ips) Symbolicate(ipswPath string) error {
 	db, err := GetLogTypes()
 	if err != nil {
 		return fmt.Errorf("failed to get log types: %w", err)
@@ -497,6 +509,83 @@ func (i *Ips) Symbolicate(path string) error {
 			i.Header.BugType += " (" + bt.Comment + ")"
 		}
 	}
+
+	total := len(i.Payload.BinaryImages)
+	for idx, img := range i.Payload.BinaryImages {
+		switch img.Source {
+		case "Absolute":
+			i.Payload.BinaryImages[idx].Name = "absolute"
+			total--
+		case "KernelCache":
+			i.Payload.BinaryImages[idx].Name = "kernelcache"
+			total--
+		case "SharedCache":
+			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache"
+			total--
+		}
+	}
+
+	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
+		if total == 0 {
+			return ErrDone
+		}
+		for idx, img := range i.Payload.BinaryImages {
+			if strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
+				i.Payload.BinaryImages[idx].Path = path
+				i.Payload.BinaryImages[idx].Name = path
+				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+				total--
+			}
+		}
+		return nil
+	}); err != nil {
+		if !errors.Is(err, ErrDone) {
+			return fmt.Errorf("failed to symbolicate: %w", err)
+		}
+	}
+
+	for idx, img := range i.Payload.BinaryImages {
+		if len(img.Name) == 0 {
+			fmt.Printf("idx: %d - %v\n", idx, img)
+		}
+	}
+
+	ctx, f, err := dsc.OpenFromIPSW(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to open DSC from IPSW: %w", err)
+	}
+	defer ctx.Unmount()
+
+	for pid, proc := range i.Payload.ProcessByPid {
+		for tid, thread := range proc.ThreadByID {
+			for idx, frame := range thread.UserFrames {
+				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				}
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
+					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
+					}
+					if sym, err := dsc.LookupSymbol(f, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+						if len(sym.Demanged) > 0 {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Demanged
+						} else {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+						}
+					}
+				}
+			}
+			for idx, frame := range thread.KernelFrames {
+				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				}
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+			}
+		}
+	}
+
+	f.Close()
 
 	return nil
 }
@@ -514,7 +603,7 @@ func (i *Ips) String() string {
 			pids = append(pids, pid)
 		}
 		sort.Ints(pids)
-		for pid := range pids {
+		for _, pid := range pids {
 			p := i.Payload.ProcessByPid[pid]
 			out += fmt.Sprintf("Process: %s [%s]\n", colorImage(p.Name), colorBold("%d", p.ID))
 			for _, t := range p.ThreadByID {
@@ -529,7 +618,7 @@ func (i *Ips) String() string {
 				out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
 				out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
 				out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
-				out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
+				// out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
 				if len(t.UserFrames) > 0 {
 					out += "    User Frames:\n"
 					buf := bytes.NewBufferString("")
@@ -619,7 +708,7 @@ func (i *Ips) String() string {
 					if f.SymbolLocation > 0 {
 						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 					}
-					fmt.Fprintf(w, "  %02d: %s\t%#x %s%s\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+int64(f.ImageOffset), f.Symbol, symloc)
+					fmt.Fprintf(w, "  %02d: %s\t%#x %s%s\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset, f.Symbol, symloc)
 				}
 				w.Flush()
 				out += buf.String()
@@ -634,7 +723,7 @@ func (i *Ips) String() string {
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 			for idx, f := range i.Payload.LastExceptionBacktrace {
-				fmt.Fprintf(w, "  %02d: %s\t%#x %s + %d\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+int64(f.ImageOffset), f.Symbol, f.SymbolLocation)
+				fmt.Fprintf(w, "  %02d: %s\t%#x %s + %d\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset, f.Symbol, f.SymbolLocation)
 			}
 			w.Flush()
 			out += buf.String() + "\n"
