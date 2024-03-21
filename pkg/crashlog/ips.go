@@ -594,7 +594,7 @@ func (i *Ips) String() string {
 	var out string
 
 	switch i.Header.BugType {
-	case "Panic", "210":
+	case "151", "Panic", "210":
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType, i.Payload.Product, i.Payload.Build)
 		out += i.Payload.PanicString
 		out += i.Payload.OtherString + "\n"
@@ -650,7 +650,7 @@ func (i *Ips) String() string {
 			}
 			out += "\n"
 		}
-	case "Crash", "309":
+	case "109", "Crash", "309", "327", "385":
 		out = fmt.Sprintf("[%s] - %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType)
 		out += fmt.Sprintf(
 			"Process:             %s [%d]\n"+
