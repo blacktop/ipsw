@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -468,7 +469,13 @@ func (i *Ips) String() string {
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType, i.Payload.Product, i.Payload.Build)
 		out += i.Payload.PanicString
 		out += i.Payload.OtherString + "\n"
-		for _, p := range i.Payload.ProcessByPid {
+		var pids []int
+		for pid := range i.Payload.ProcessByPid {
+			pids = append(pids, pid)
+		}
+		sort.Ints(pids)
+		for pid := range pids {
+			p := i.Payload.ProcessByPid[pid]
 			out += fmt.Sprintf("Process: %s [%d]\n", p.Name, p.ID)
 			for _, t := range p.ThreadByID {
 				out += fmt.Sprintf("  Thread %d", t.ID)
