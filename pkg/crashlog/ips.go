@@ -570,14 +570,27 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
 					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
-					}
-					if sym, err := dsc.LookupSymbol(f, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-						if len(sym.Demanged) > 0 {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Demanged
-						} else {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+						img.ParseLocalSymbols(false)
+						img.ParsePublicSymbols(false)
+						m, err := img.GetMacho()
+						if err != nil {
+							return fmt.Errorf("failed to get macho from image: %w", err)
+						}
+						if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+							if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+								delta := ""
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									delta = fmt.Sprintf(" + %d", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr)
+								}
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym + delta
+							} else {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%#x", fn.StartAddr)
+							}
 						}
 					}
+				} else {
+					// lookup symbol in MachO symbol map
+
 				}
 			}
 			for idx, frame := range thread.KernelFrames {

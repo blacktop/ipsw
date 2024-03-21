@@ -728,7 +728,7 @@ func GetUserAgent(f *dyld.File, sysVer *extract.SystemVersionPlist) (string, err
 }
 
 func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
-	ctx, err := mount.DmgInIPSW(ipswPath, "fs")
+	ctx, err := mount.DmgInIPSW(ipswPath, "sys")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to mount IPSW: %v", err)
 	}
@@ -738,7 +738,7 @@ func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
 		return nil, nil, fmt.Errorf("failed to get DSC paths in %s: %v", ctx.MountPoint, err)
 	}
 	if len(dscs) == 0 {
-		return nil, nil, fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", ctx.MountPoint)
+		return nil, nil, fmt.Errorf("no DSCs found in IPSW mount %s", ctx.MountPoint)
 	}
 
 	f, err := dyld.Open(dscs[0])

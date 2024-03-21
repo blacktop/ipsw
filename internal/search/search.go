@@ -85,7 +85,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 					}
 				}
 				if err := handler(strings.TrimPrefix(file, mountPoint), m); err != nil {
-					return fmt.Errorf("failed to handle macho %s: %v", file, err)
+					return fmt.Errorf("failed to handle macho %s: %w", file, err)
 				}
 			}
 			return nil
@@ -108,7 +108,7 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning filesystem")
 		if err := scanDmg(ipswPath, fsOS, "filesystem", handler); err != nil {
-			return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
