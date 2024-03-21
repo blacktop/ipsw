@@ -62,11 +62,20 @@ var symbolicateCmd = &cobra.Command{
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 
 		if filepath.Ext(args[0]) == ".ips" {
-			out, err := crashlog.OpenIPS(args[0])
+			ips, err := crashlog.OpenIPS(args[0])
 			if err != nil {
 				return err
 			}
-			fmt.Println(out)
+			if len(args) < 2 {
+				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
+			} else {
+				if err := ips.Symbolicate(filepath.Clean(args[1])); err != nil {
+					return err
+				}
+			}
+
+			fmt.Println(ips)
+
 			return nil
 		}
 
