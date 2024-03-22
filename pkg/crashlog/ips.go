@@ -662,7 +662,7 @@ func fmtState(states []string) string {
 		case "TH_WAIT", "TH_UNINT":
 			out = append(out, colorAddr(s))
 		case "TH_RUN", "TH_IDLE":
-			out = append(out, colorTime(s))
+			out = append(out, colorBold(s))
 		default:
 			out = append(out, s)
 		}
