@@ -47,7 +47,7 @@ func init() {
 
 // symbolicateCmd represents the symbolicate command
 var symbolicateCmd = &cobra.Command{
-	Use:     "symbolicate <CRASHLOG> <DSC>",
+	Use:     "symbolicate <CRASHLOG> [IPSW|DSC]",
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
 	Args:    cobra.MinimumNArgs(1),
@@ -61,7 +61,18 @@ var symbolicateCmd = &cobra.Command{
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 
-		if ips, err := crashlog.OpenIPS(args[0]); err == nil { // NEW JSON STYLE CRASHLOG
+		hdr, err := crashlog.ParseHeader(args[0])
+		if err != nil {
+			return err
+		}
+
+		switch hdr.BugType {
+		case "210", "309": // NEW JSON STYLE CRASHLOG
+			ips, err := crashlog.OpenIPS(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse IPS file: %v", err)
+			}
+
 			if len(args) < 2 {
 				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 			} else {
@@ -69,8 +80,9 @@ var symbolicateCmd = &cobra.Command{
 					return err
 				}
 			}
+
 			fmt.Println(ips)
-		} else { // OLD STYLE CRASHLOG
+		case "109": // OLD STYLE CRASHLOG
 			crashLog, err := crashlog.Open(args[0])
 			if err != nil {
 				return err
@@ -229,6 +241,8 @@ var symbolicateCmd = &cobra.Command{
 			} else {
 				log.Errorf("please supply a dyld_shared_cache for %s running %s (%s)", crashLog.HardwareModel, crashLog.OSVersion, crashLog.OSBuild)
 			}
+		default:
+			log.Errorf("unsupported crashlog type: %s - %s (notify author to add support)", hdr.BugType, hdr.BugTypeDesc)
 		}
 
 		return nil
