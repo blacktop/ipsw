@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/fatih/color"
@@ -27,6 +28,8 @@ import (
 //go:embed data/log_type.gz
 var logTypeData []byte
 
+var colorTime = color.New(color.Bold, color.FgHiGreen).SprintFunc()
+var colorError = color.New(color.Bold, color.FgHiRed).SprintFunc()
 var colorAddr = color.New(color.Faint).SprintfFunc()
 var colorBold = color.New(color.Bold).SprintfFunc()
 var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
@@ -311,28 +314,41 @@ type ThreadState struct {
 	FAR    Register   `json:"far,omitempty"`
 }
 
+func fmtAddr(val uint64) string {
+	if val == 0 {
+		return colorAddr("%#016x", val)
+	}
+	return fmt.Sprintf("%#016x", val)
+}
+func fmtAddrSmol(val uint64) string {
+	if val == 0 {
+		return colorAddr("%#08x", val)
+	}
+	return fmt.Sprintf("%#016x", val)
+}
+
 func (s ThreadState) String() string {
 	return fmt.Sprintf(
-		"    x0: %#016x   x1: %#016x   x2: %#016x   x3: %#016x\n"+
-			"    x4: %#016x   x5: %#016x   x6: %#016x   x7: %#016x\n"+
-			"    x8: %#016x   x9: %#016x  x10: %#016x  x11: %#016x\n"+
-			"   x12: %#016x  x13: %#016x  x14: %#016x  x15: %#016x\n"+
-			"   x16: %#016x  x17: %#016x  x18: %#016x  x19: %#016x\n"+
-			"   x20: %#016x  x21: %#016x  x22: %#016x  x23: %#016x\n"+
-			"   x24: %#016x  x25: %#016x  x26: %#016x  x27: %#016x\n"+
-			"   x28: %#016x   fp: %#016x   lr: %#016x\n"+
-			"    sp: %#016x   pc: %#016x cpsr: %#08x\n"+
+		"    x0: %s   x1: %s   x2: %s   x3: %s\n"+
+			"    x4: %s   x5: %s   x6: %s   x7: %s\n"+
+			"    x8: %s   x9: %s  x10: %s  x11: %s\n"+
+			"   x12: %s  x13: %s  x14: %s  x15: %s\n"+
+			"   x16: %s  x17: %s  x18: %s  x19: %s\n"+
+			"   x20: %s  x21: %s  x22: %s  x23: %s\n"+
+			"   x24: %s  x25: %s  x26: %s  x27: %s\n"+
+			"   x28: %s   fp: %s   lr: %s\n"+
+			"    sp: %s   pc: %s cpsr: %#08x\n"+
 			"   esr: %#08x\n",
-		s.X[0].Value, s.X[1].Value, s.X[2].Value, s.X[3].Value,
-		s.X[4].Value, s.X[5].Value, s.X[6].Value, s.X[7].Value,
-		s.X[8].Value, s.X[9].Value, s.X[10].Value, s.X[11].Value,
-		s.X[12].Value, s.X[13].Value, s.X[14].Value, s.X[15].Value,
-		s.X[16].Value, s.X[17].Value, s.X[18].Value, s.X[19].Value,
-		s.X[20].Value, s.X[21].Value, s.X[22].Value, s.X[23].Value,
-		s.X[24].Value, s.X[25].Value, s.X[26].Value, s.X[27].Value,
-		s.X[28].Value, s.FP.Value, s.LR.Value,
-		s.SP.Value, s.PC.Value, s.CPSR.Value,
-		s.ESR.Value)
+		fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
+		fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
+		fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
+		fmtAddr(s.X[12].Value), fmtAddr(s.X[13].Value), fmtAddr(s.X[14].Value), fmtAddr(s.X[15].Value),
+		fmtAddr(s.X[16].Value), fmtAddr(s.X[17].Value), fmtAddr(s.X[18].Value), fmtAddr(s.X[19].Value),
+		fmtAddr(s.X[20].Value), fmtAddr(s.X[21].Value), fmtAddr(s.X[22].Value), fmtAddr(s.X[23].Value),
+		fmtAddr(s.X[24].Value), fmtAddr(s.X[25].Value), fmtAddr(s.X[26].Value), fmtAddr(s.X[27].Value),
+		fmtAddr(s.X[28].Value), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
+		fmtAddr(s.SP.Value), fmtAddr(s.PC.Value), fmtAddrSmol(s.CPSR.Value),
+		fmtAddrSmol(s.ESR.Value))
 }
 
 type UserThread struct {
@@ -515,6 +531,8 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 	}
 
 	total := len(i.Payload.BinaryImages)
+
+	// add default binary image names
 	for idx, img := range i.Payload.BinaryImages {
 		switch img.Source {
 		case "Absolute":
@@ -529,15 +547,33 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 		}
 	}
 
+	machoFuncMap := make(map[string][]types.Function)
 	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
 		if total == 0 {
-			return ErrDone
+			return ErrDone // break
 		}
 		for idx, img := range i.Payload.BinaryImages {
+			var slide uint64
 			if strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
 				i.Payload.BinaryImages[idx].Path = path
 				i.Payload.BinaryImages[idx].Name = path
+				slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
 				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+				for _, fn := range m.GetFunctions() {
+					if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+						for _, sym := range syms {
+							fn.Name = sym.Name
+						}
+						fn.StartAddr += slide
+						fn.EndAddr += slide
+						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+					} else {
+						fn.StartAddr += slide
+						fn.EndAddr += slide
+						fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+					}
+				}
 				total--
 			}
 		}
@@ -568,6 +604,7 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 				}
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
+					// lookup symbol in DSC dylib
 					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
 						img.ParseLocalSymbols(false)
@@ -584,13 +621,23 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 								}
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym + delta
 							} else {
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%#x", fn.StartAddr)
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", fn.StartAddr)
 							}
 						}
 					}
 				} else {
 					// lookup symbol in MachO symbol map
-
+					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName]; ok {
+						for _, fn := range funcs {
+							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset && i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset < fn.EndAddr {
+								delta := ""
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									delta = fmt.Sprintf(" + %d", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr)
+								}
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name + delta
+							}
+						}
+					}
 				}
 			}
 			for idx, frame := range thread.KernelFrames {
@@ -607,12 +654,27 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 	return nil
 }
 
+func fmtState(states []string) string {
+	var out []string
+	for _, s := range states {
+		switch s {
+		case "TH_WAIT", "TH_UNINT":
+			out = append(out, colorAddr(s))
+		case "TH_RUN", "TH_IDLE":
+			out = append(out, colorTime(s))
+		default:
+			out = append(out, s)
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
 func (i *Ips) String() string {
 	var out string
 
 	switch i.Header.BugType {
 	case "151", "Panic", "210":
-		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType, i.Payload.Product, i.Payload.Build)
+		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugType), i.Payload.Product, i.Payload.Build)
 		out += i.Payload.PanicString
 		out += i.Payload.OtherString + "\n"
 		var pids []int
@@ -622,16 +684,16 @@ func (i *Ips) String() string {
 		sort.Ints(pids)
 		for _, pid := range pids {
 			p := i.Payload.ProcessByPid[pid]
-			out += fmt.Sprintf("Process: %s [%s]\n", colorImage(p.Name), colorBold("%d", p.ID))
+			out += fmt.Sprintf(colorField("Process:")+" %s [%s]\n", colorImage(p.Name), colorBold("%d", p.ID))
 			for _, t := range p.ThreadByID {
-				out += fmt.Sprintf("  Thread: %s\n", colorBold("%d", t.ID))
+				out += fmt.Sprintf(colorField("  Thread:")+" %s\n", colorBold("%d", t.ID))
 				if len(t.Name) > 0 {
-					out += fmt.Sprintf("    %s\n", colorField(t.Name))
+					out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
 				}
 				if len(t.DispatchQueueLabel) > 0 {
 					out += fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel)
 				}
-				out += fmt.Sprintf("    State:          %s\n", strings.Join(t.State, ", "))
+				out += fmt.Sprintf("    State:          %s\n", fmtState(t.State))
 				out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
 				out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
 				out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
@@ -645,7 +707,7 @@ func (i *Ips) String() string {
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%#x %s%s\n", idx, f.ImageName, f.ImageOffset, f.Symbol, symloc)
+						fmt.Fprintf(w, "      %02d: %s\t%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
 					}
 					w.Flush()
 					out += buf.String()
@@ -659,7 +721,7 @@ func (i *Ips) String() string {
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%#x %s%s\n", idx, f.ImageName, f.ImageOffset, f.Symbol, symloc)
+						fmt.Fprintf(w, "      %02d: %s\t%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
 					}
 					w.Flush()
 					out += buf.String()
@@ -668,23 +730,22 @@ func (i *Ips) String() string {
 			out += "\n"
 		}
 	case "109", "Crash", "309", "327", "385":
-		out = fmt.Sprintf("[%s] - %s\n\n", i.Header.Timestamp.Format("02Jan2006 15:04:05"), i.Header.BugType)
+		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugType))
 		out += fmt.Sprintf(
-			"Process:             %s [%d]\n"+
-				"Hardware Model:      %s\n"+
-				"OS Version:          %s\n"+
-				"BuildID:             %s\n"+
-				"LockdownMode:        %d\n",
-			i.Payload.ProcName,
-			i.Payload.PID,
+			colorField("Process:")+"             %s [%d]\n"+
+				colorField("Hardware Model:")+"      %s\n"+
+				colorField("OS Version:")+"          %s\n"+
+				colorField("BuildID:")+"             %s\n"+
+				colorField("LockdownMode:")+"        %d\n",
+			i.Payload.ProcName, i.Payload.PID,
 			i.Payload.ModelCode,
 			i.Payload.OsVersion.Train,
 			i.Payload.OsVersion.Build,
 			i.Payload.LockdownMode)
 		if i.Payload.SharedCache.Size > 0 {
-			out += fmt.Sprintf("Shared Cache:        %s base: %#x size: %d\n", i.Payload.SharedCache.UUID, i.Payload.SharedCache.Base, i.Payload.SharedCache.Size)
+			out += fmt.Sprintf(colorField("Shared Cache:")+"        %s %s %#x %s %d\n", i.Payload.SharedCache.UUID, colorField("base:"), i.Payload.SharedCache.Base, colorField("size:"), i.Payload.SharedCache.Size)
 		}
-		out += fmt.Sprintf("\nException Type:      %s (%s) %s\n", i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
+		out += fmt.Sprintf("\n%s      %s (%s) %s\n", colorField("Exception Type:"), i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
 		if len(i.Payload.Exception.Subtype) > 0 {
 			out += fmt.Sprintf("Exception Subtype:   %s\n", i.Payload.Exception.Subtype)
 		}
@@ -692,7 +753,7 @@ func (i *Ips) String() string {
 			out += fmt.Sprintf("VM Region Info: %s\n", i.Payload.VmRegionInfo)
 		}
 		if i.Payload.Asi != nil {
-			out += "ASI:\n"
+			out += colorField("ASI:\n")
 			for k, v := range i.Payload.Asi {
 				out += fmt.Sprintf("    %s:\n", k)
 				for _, s := range v {
@@ -702,7 +763,7 @@ func (i *Ips) String() string {
 			out += "\n"
 		}
 		for _, t := range i.Payload.Threads {
-			out += fmt.Sprintf("Thread %d:", t.ID)
+			out += fmt.Sprintf(colorField("Thread")+" %s:", colorBold("%d", t.ID))
 			if len(t.Name) > 0 {
 				out += fmt.Sprintf(" name: %s", t.Name)
 				if len(t.Queue) > 0 {
@@ -713,7 +774,7 @@ func (i *Ips) String() string {
 				out += fmt.Sprintf(" queue: %s", t.Queue)
 			}
 			if t.Triggered {
-				out += " (Crashed)\n"
+				out += colorError(" (Crashed)\n")
 			} else {
 				out += "\n"
 			}
@@ -725,22 +786,22 @@ func (i *Ips) String() string {
 					if f.SymbolLocation > 0 {
 						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 					}
-					fmt.Fprintf(w, "  %02d: %s\t%#x %s%s\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset, f.Symbol, symloc)
+					fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
 				}
 				w.Flush()
 				out += buf.String()
 			}
 			if t.Triggered {
-				out += fmt.Sprintf("Thread State:\n%s", t.ThreadState)
+				out += fmt.Sprintf(colorField("Thread State:")+"\n%s", t.ThreadState)
 			}
 			out += "\n"
 		}
 		if len(i.Payload.LastExceptionBacktrace) > 0 {
-			out += "Last Exception Backtrace:\n"
+			out += colorField("Last Exception Backtrace:\n")
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 			for idx, f := range i.Payload.LastExceptionBacktrace {
-				fmt.Fprintf(w, "  %02d: %s\t%#x %s + %d\n", idx, i.Payload.UsedImages[f.ImageIndex].Name, i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset, f.Symbol, f.SymbolLocation)
+				fmt.Fprintf(w, "  %02d: %s\t%s %s + %d\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), f.SymbolLocation)
 			}
 			w.Flush()
 			out += buf.String() + "\n"
