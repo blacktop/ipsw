@@ -339,7 +339,7 @@ func (s ThreadState) String() string {
 			"   x24: %s  x25: %s  x26: %s  x27: %s\n"+
 			"   x28: %s   fp: %s   lr: %s\n"+
 			"    sp: %s   pc: %s cpsr: %s\n"+
-			"   esr: %s\n",
+			"   esr: %s %s\n",
 		fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
 		fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
 		fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
@@ -349,7 +349,7 @@ func (s ThreadState) String() string {
 		fmtAddr(s.X[24].Value), fmtAddr(s.X[25].Value), fmtAddr(s.X[26].Value), fmtAddr(s.X[27].Value),
 		fmtAddr(s.X[28].Value), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
 		fmtAddr(s.SP.Value), fmtAddr(s.PC.Value), fmtAddrSmol(s.CPSR.Value),
-		fmtAddrSmol(s.ESR.Value))
+		fmtAddrSmol(s.ESR.Value), colorError(s.ESR.Description))
 }
 
 type UserThread struct {
@@ -775,10 +775,10 @@ func (i *Ips) String() string {
 		}
 		out += fmt.Sprintf("\n%s      %s (%s) %s\n", colorField("Exception Type:"), i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
 		if len(i.Payload.Exception.Subtype) > 0 {
-			out += fmt.Sprintf("Exception Subtype:   %s\n", i.Payload.Exception.Subtype)
+			out += fmt.Sprintf(colorField("Exception Subtype:")+"   %s\n", i.Payload.Exception.Subtype)
 		}
 		if len(i.Payload.VmRegionInfo) > 0 {
-			out += fmt.Sprintf("VM Region Info: %s\n", i.Payload.VmRegionInfo)
+			out += fmt.Sprintf(colorField("VM Region Info:")+" %s\n", i.Payload.VmRegionInfo)
 		}
 		if i.Payload.Asi != nil {
 			out += colorField("ASI:\n")
@@ -793,13 +793,13 @@ func (i *Ips) String() string {
 		for _, t := range i.Payload.Threads {
 			out += fmt.Sprintf(colorField("Thread")+" %s:", colorBold("%d", t.ID))
 			if len(t.Name) > 0 {
-				out += fmt.Sprintf(" name: %s", t.Name)
+				out += colorField(" name: ") + t.Name
 				if len(t.Queue) > 0 {
 					out += ","
 				}
 			}
 			if len(t.Queue) > 0 {
-				out += fmt.Sprintf(" queue: %s", t.Queue)
+				out += colorField(" queue: ") + t.Queue
 			}
 			if t.Triggered {
 				out += colorError(" (Crashed)\n")
@@ -820,7 +820,7 @@ func (i *Ips) String() string {
 				out += buf.String()
 			}
 			if t.Triggered {
-				out += fmt.Sprintf(colorField("Thread State:")+"\n%s", t.ThreadState)
+				out += colorField("Thread") + colorBold(" %d ", t.ID) + colorField(t.ThreadState.Flavor) + "\n" + t.ThreadState.String()
 			}
 			out += "\n"
 		}
@@ -835,7 +835,7 @@ func (i *Ips) String() string {
 			out += buf.String() + "\n"
 		}
 		if len(i.Payload.VMSummary) > 0 {
-			out += fmt.Sprintf("VM Summary: %s\n", i.Payload.VMSummary)
+			out += colorField("VM Summary:\n") + i.Payload.VMSummary
 		}
 	default:
 		return fmt.Sprintf("%s: (unsupported, notify author)", i.Header.BugType)
