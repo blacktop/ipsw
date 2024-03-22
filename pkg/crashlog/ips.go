@@ -217,7 +217,7 @@ type Thread struct {
 	QosEffective       string       `json:"qosEffective,omitempty"`
 	UserTime           float64      `json:"userTime"`
 	UserUsec           int          `json:"user_usec"`
-	SystemTime         int          `json:"systemTime"`
+	SystemTime         float64      `json:"systemTime"`
 	SystemUsec         int          `json:"system_usec"`
 	SchedPriority      int          `json:"schedPriority"`
 }
