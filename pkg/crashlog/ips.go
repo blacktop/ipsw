@@ -148,6 +148,7 @@ type IpsMetadata struct {
 	AppName          string    `json:"app_name,omitempty"`
 	AppVersion       string    `json:"app_version,omitempty"`
 	BugType          string    `json:"bug_type,omitempty"`
+	BugTypeDesc      string    `json:"bug_type_desc,omitempty"`
 	OsVersion        string    `json:"os_version,omitempty"`
 	BundleID         string    `json:"bundleID,omitempty"`
 	BuildVersion     string    `json:"build_version,omitempty"`
@@ -194,7 +195,7 @@ type Process struct {
 	CopyOnWriteFaults   int            `json:"copyOnWriteFaults"`
 	PageFaults          int            `json:"pageFaults"`
 	UserTimeTask        float64        `json:"userTimeTask"`
-	SystemTimeTask      int            `json:"systemTimeTask"`
+	SystemTimeTask      float64        `json:"systemTimeTask"`
 	Flags               []string       `json:"flags"`
 	ResidentMemoryBytes int            `json:"residentMemoryBytes"`
 	ThreadByID          map[int]Thread `json:"threadById,omitempty"`
@@ -324,7 +325,7 @@ func fmtAddrSmol(val uint64) string {
 	if val == 0 {
 		return colorAddr("%#08x", val)
 	}
-	return fmt.Sprintf("%#016x", val)
+	return fmt.Sprintf("%#08x", val)
 }
 
 func (s ThreadState) String() string {
@@ -337,8 +338,8 @@ func (s ThreadState) String() string {
 			"   x20: %s  x21: %s  x22: %s  x23: %s\n"+
 			"   x24: %s  x25: %s  x26: %s  x27: %s\n"+
 			"   x28: %s   fp: %s   lr: %s\n"+
-			"    sp: %s   pc: %s cpsr: %#08x\n"+
-			"   esr: %#08x\n",
+			"    sp: %s   pc: %s cpsr: %s\n"+
+			"   esr: %s\n",
 		fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
 		fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
 		fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
@@ -492,6 +493,32 @@ type IPSPayload struct {
 	Termination          Termination `json:"termination,omitempty"`
 }
 
+func ParseHeader(in string) (hdr *IpsMetadata, err error) {
+	f, err := os.Open(in)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if err := json.NewDecoder(f).Decode(&hdr); err != nil {
+		return nil, err
+	}
+
+	db, err := GetLogTypes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get log types database: %w", err)
+	}
+
+	if bt, ok := (*db)[hdr.BugType]; ok {
+		hdr.BugTypeDesc = bt.Name
+		if len(bt.Comment) > 0 {
+			hdr.BugTypeDesc = hdr.BugType + " (" + bt.Comment + ")"
+		}
+	}
+
+	return hdr, nil
+}
+
 func OpenIPS(in string) (*Ips, error) {
 	var ips Ips
 
@@ -514,22 +541,22 @@ func OpenIPS(in string) (*Ips, error) {
 		ips.Payload.Product = ips.Payload.ModelCode
 	}
 
+	db, err := GetLogTypes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get log types database: %w", err)
+	}
+
+	if bt, ok := (*db)[ips.Header.BugType]; ok {
+		ips.Header.BugTypeDesc = bt.Name
+		if len(bt.Comment) > 0 {
+			ips.Header.BugTypeDesc = ips.Header.BugType + " (" + bt.Comment + ")"
+		}
+	}
+
 	return &ips, nil
 }
 
 func (i *Ips) Symbolicate(ipswPath string) error {
-	db, err := GetLogTypes()
-	if err != nil {
-		return fmt.Errorf("failed to get log types: %w", err)
-	}
-
-	if bt, ok := (*db)[i.Header.BugType]; ok {
-		i.Header.BugType = bt.Name
-		if len(bt.Comment) > 0 {
-			i.Header.BugType += " (" + bt.Comment + ")"
-		}
-	}
-
 	total := len(i.Payload.BinaryImages)
 
 	// add default binary image names
@@ -674,8 +701,8 @@ func (i *Ips) String() string {
 	var out string
 
 	switch i.Header.BugType {
-	case "151", "Panic", "210":
-		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugType), i.Payload.Product, i.Payload.Build)
+	case "Panic", "210":
+		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
 		out += i.Payload.PanicString
 		out += i.Payload.OtherString + "\n"
 		var pids []int
@@ -730,8 +757,8 @@ func (i *Ips) String() string {
 			}
 			out += "\n"
 		}
-	case "109", "Crash", "309", "327", "385":
-		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugType))
+	case "Crash", "309":
+		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
 		out += fmt.Sprintf(
 			colorField("Process:")+"             %s [%d]\n"+
 				colorField("Hardware Model:")+"      %s\n"+
