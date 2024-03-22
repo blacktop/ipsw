@@ -584,11 +584,12 @@ func (i *Ips) Symbolicate(ipswPath string) error {
 		}
 	}
 
-	for idx, img := range i.Payload.BinaryImages {
-		if len(img.Name) == 0 {
-			fmt.Printf("idx: %d - %v\n", idx, img)
-		}
-	}
+	// // print any binary images that are missing names
+	// for idx, img := range i.Payload.BinaryImages {
+	// 	if len(img.Name) == 0 {
+	// 		fmt.Printf("idx: %d - %v\n", idx, img)
+	// 	}
+	// }
 
 	ctx, f, err := dsc.OpenFromIPSW(ipswPath)
 	if err != nil {
