@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -556,7 +557,7 @@ func OpenIPS(in string) (*Ips, error) {
 	return &ips, nil
 }
 
-func (i *Ips) Symbolicate(ipswPath string) error {
+func (i *Ips) Symbolicate210(ipswPath string) error {
 	total := len(i.Payload.BinaryImages)
 
 	// add default binary image names
@@ -697,6 +698,14 @@ func fmtState(states []string) string {
 	return strings.Join(out, ", ")
 }
 
+func colorVMSummary(in string) string {
+	separatorMatch := regexp.MustCompile(`=+`)
+	in = separatorMatch.ReplaceAllStringFunc(in, func(s string) string {
+		return colorField(s)
+	})
+	return in
+}
+
 func (i *Ips) String(verbose bool) string {
 	var out string
 
@@ -725,7 +734,7 @@ func (i *Ips) String(verbose bool) string {
 					continue
 				}
 			}
-			out += fmt.Sprintf(colorField("Process:")+" %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
+			out += fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
 			for _, t := range p.ThreadByID {
 				paniced = ""
 				if t.ID == p210.PanickedThread.TID {
@@ -735,7 +744,7 @@ func (i *Ips) String(verbose bool) string {
 						continue
 					}
 				}
-				out += fmt.Sprintf(colorField("  Thread:")+" %s%s\n", colorBold("%d", t.ID), paniced)
+				out += fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced)
 				if len(t.Name) > 0 {
 					out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
 				}
@@ -781,28 +790,28 @@ func (i *Ips) String(verbose bool) string {
 	case "Crash", "309":
 		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
 		out += fmt.Sprintf(
-			colorField("Process:")+"             %s [%d]\n"+
-				colorField("Hardware Model:")+"      %s\n"+
-				colorField("OS Version:")+"          %s\n"+
-				colorField("BuildID:")+"             %s\n"+
-				colorField("LockdownMode:")+"        %d\n",
+			colorField("Process")+":             %s [%d]\n"+
+				colorField("Hardware Model")+":      %s\n"+
+				colorField("OS Version")+":          %s\n"+
+				colorField("BuildID")+":             %s\n"+
+				colorField("LockdownMode")+":        %d\n",
 			i.Payload.ProcName, i.Payload.PID,
 			i.Payload.ModelCode,
 			i.Payload.OsVersion.Train,
 			i.Payload.OsVersion.Build,
 			i.Payload.LockdownMode)
 		if i.Payload.SharedCache.Size > 0 {
-			out += fmt.Sprintf(colorField("Shared Cache:")+"        %s %s %#x %s %d\n", i.Payload.SharedCache.UUID, colorField("base:"), i.Payload.SharedCache.Base, colorField("size:"), i.Payload.SharedCache.Size)
+			out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
 		}
-		out += fmt.Sprintf("\n%s      %s (%s) %s\n", colorField("Exception Type:"), i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
+		out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
 		if len(i.Payload.Exception.Subtype) > 0 {
-			out += fmt.Sprintf(colorField("Exception Subtype:")+"   %s\n", i.Payload.Exception.Subtype)
+			out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", i.Payload.Exception.Subtype)
 		}
 		if len(i.Payload.VmRegionInfo) > 0 {
-			out += fmt.Sprintf(colorField("VM Region Info:")+" %s\n", i.Payload.VmRegionInfo)
+			out += fmt.Sprintf(colorField("VM Region Info")+": %s\n", i.Payload.VmRegionInfo)
 		}
 		if i.Payload.Asi != nil {
-			out += colorField("ASI:\n")
+			out += colorField("ASI") + ":\n"
 			for k, v := range i.Payload.Asi {
 				out += fmt.Sprintf("    %s:\n", k)
 				for _, s := range v {
@@ -814,13 +823,13 @@ func (i *Ips) String(verbose bool) string {
 		for _, t := range i.Payload.Threads {
 			out += fmt.Sprintf(colorField("Thread")+" %s:", colorBold("%d", t.ID))
 			if len(t.Name) > 0 {
-				out += colorField(" name: ") + t.Name
+				out += colorField(" name") + ": " + t.Name
 				if len(t.Queue) > 0 {
 					out += ","
 				}
 			}
 			if len(t.Queue) > 0 {
-				out += colorField(" queue: ") + t.Queue
+				out += colorField(" queue") + ": " + t.Queue
 			}
 			if t.Triggered {
 				out += colorError(" (Crashed)\n")
@@ -846,7 +855,7 @@ func (i *Ips) String(verbose bool) string {
 			out += "\n"
 		}
 		if len(i.Payload.LastExceptionBacktrace) > 0 {
-			out += colorField("Last Exception Backtrace:\n")
+			out += colorField("Last Exception Backtrace") + ":\n"
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 			for idx, f := range i.Payload.LastExceptionBacktrace {
@@ -856,7 +865,7 @@ func (i *Ips) String(verbose bool) string {
 			out += buf.String() + "\n"
 		}
 		if len(i.Payload.VMSummary) > 0 {
-			out += colorField("VM Summary:\n") + i.Payload.VMSummary
+			out += colorField("VM Summary") + ":\n" + colorVMSummary(i.Payload.VMSummary)
 		}
 	default:
 		return fmt.Sprintf("%s: (unsupported, notify author)", i.Header.BugType)

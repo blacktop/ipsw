@@ -73,11 +73,13 @@ var symbolicateCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse IPS file: %v", err)
 			}
 
-			if len(args) < 2 {
+			if len(args) < 2 && hdr.BugType == "210" {
 				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 			} else {
-				if err := ips.Symbolicate(filepath.Clean(args[1])); err != nil {
-					return err
+				if hdr.BugType == "210" {
+					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
+						return err
+					}
 				}
 			}
 
