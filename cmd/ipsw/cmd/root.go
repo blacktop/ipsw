@@ -50,8 +50,8 @@ var (
 	Verbose bool
 	// AppVersion stores the plugin's version
 	AppVersion string
-	// AppBuildTime stores the plugin's build time
-	AppBuildTime string
+	// AppBuildCommit stores the plugin's build commit
+	AppBuildCommit string
 )
 
 // rootCmd represents the base command when called without any subcommands

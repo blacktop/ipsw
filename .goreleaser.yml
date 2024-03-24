@@ -27,7 +27,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
   - id: darwin_ios_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -41,7 +41,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
     hooks:
       post:
         - ./hack/make/codesign {{ .Path }}
@@ -72,7 +72,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
@@ -102,7 +102,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
@@ -127,7 +127,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
   # - id: linux_amd64_extras_build
   #   hooks:
   #     pre:
@@ -154,7 +154,7 @@ builds:
   #   mod_timestamp: "{{ .CommitTimestamp }}"
   #   flags:
   #     - -trimpath
-  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
   # - id: linux_arm64_extras_build
   #   hooks:
   #     pre:
@@ -181,7 +181,7 @@ builds:
   #   mod_timestamp: "{{ .CommitTimestamp }}"
   #   flags:
   #     - -trimpath
-  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
   - id: windows_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -206,7 +206,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
   # DAEMONS ###########################################################
   - id: darwin_daemon_build
     main: ./cmd/ipswd
@@ -221,7 +221,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Commit}}
   - id: linux_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
@@ -243,7 +243,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Commit}}
   - id: windows_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
@@ -268,7 +268,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Commit}}
 
 universal_binaries:
   - id: darwin_build

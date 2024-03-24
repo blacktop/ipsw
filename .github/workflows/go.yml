@@ -148,12 +148,12 @@ jobs:
       - name: Build (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          CGO_ENABLED=1 go build -o /usr/local/bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+          CGO_ENABLED=1 go build -o /usr/local/bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$GITHUB_SHA" ./cmd/ipsw
       - name: Build (macOS)
         if: matrix.platform == 'macos-13'
         run: |
           env | grep PATH
-          sudo CGO_ENABLED=1 go build -o /usr/local/sbin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+          sudo CGO_ENABLED=1 go build -o /usr/local/sbin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$GITHUB_SHA" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         env:

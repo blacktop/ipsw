@@ -132,7 +132,7 @@ var classDumpCmd = &cobra.Command{
 			Headers:     viper.GetBool("class-dump.headers"),
 			ObjcRefs:    viper.GetBool("class-dump.refs"),
 			Deps:        viper.GetBool("class-dump.deps"),
-			IpswVersion: fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
+			IpswVersion: fmt.Sprintf("Version: %s, BuildCommit: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildCommit)),
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("class-dump.theme"),
 			Output:      viper.GetString("class-dump.output"),
