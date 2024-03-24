@@ -81,7 +81,7 @@ var symbolicateCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Println(ips)
+			fmt.Println(ips.String(Verbose))
 		case "109": // OLD STYLE CRASHLOG
 			crashLog, err := crashlog.Open(args[0])
 			if err != nil {
