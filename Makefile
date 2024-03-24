@@ -1,6 +1,7 @@
 REPO=blacktop
 NAME=ipsw
 CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
+CUR_COMMIT=$(shell git rev-parse --short HEAD)
 LOCAL_VERSION=$(shell svu current)
 NEXT_VERSION=$(shell svu patch)
 GO_BIN=go
@@ -63,18 +64,18 @@ destroy: ## Remove release from the CUR_VERSION
 build: ## Build ipsw
 	@echo " > Building ipsw"
 	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" ./cmd/ipsw
+	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
 	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$(CUR_COMMIT)" ./cmd/ipsw
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
 build-linux: ## Build ipsw (linux)
 	@echo " > Building ipsw (linux)"
 	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" ./cmd/ipsw
+	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 	@echo " > Building ipswd (linux)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO_BIN) build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
 
