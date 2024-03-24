@@ -697,13 +697,18 @@ func fmtState(states []string) string {
 	return strings.Join(out, ", ")
 }
 
-func (i *Ips) String() string {
+func (i *Ips) String(verbose bool) string {
 	var out string
 
 	switch i.Header.BugType {
 	case "Panic", "210":
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
-		out += i.Payload.PanicString
+		p210, err := parsePanicString210(i.Payload.PanicString)
+		if err != nil {
+			out += i.Payload.PanicString
+		} else {
+			out += p210.String()
+		}
 		out += i.Payload.OtherString + "\n"
 		var pids []int
 		for pid := range i.Payload.ProcessByPid {
@@ -712,9 +717,25 @@ func (i *Ips) String() string {
 		sort.Ints(pids)
 		for _, pid := range pids {
 			p := i.Payload.ProcessByPid[pid]
-			out += fmt.Sprintf(colorField("Process:")+" %s [%s]\n", colorImage(p.Name), colorBold("%d", p.ID))
+			paniced := ""
+			if p.ID == p210.PanickedTask.PID {
+				paniced = colorError(" (Panicked)")
+			} else {
+				if !verbose {
+					continue
+				}
+			}
+			out += fmt.Sprintf(colorField("Process:")+" %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
 			for _, t := range p.ThreadByID {
-				out += fmt.Sprintf(colorField("  Thread:")+" %s\n", colorBold("%d", t.ID))
+				paniced = ""
+				if t.ID == p210.PanickedThread.TID {
+					paniced = colorError("       (Panicked)")
+				} else {
+					if !verbose {
+						continue
+					}
+				}
+				out += fmt.Sprintf(colorField("  Thread:")+" %s%s\n", colorBold("%d", t.ID), paniced)
 				if len(t.Name) > 0 {
 					out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
 				}
@@ -725,7 +746,7 @@ func (i *Ips) String() string {
 				out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
 				out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
 				out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
-				// out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
+				out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
 				if len(t.UserFrames) > 0 {
 					out += "    User Frames:\n"
 					buf := bytes.NewBufferString("")
