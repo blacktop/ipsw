@@ -591,21 +591,21 @@ func (p *Panic210) String() string {
 	}
 	return fmt.Sprintf(
 		"%s\n"+
-			colorField("Debugger Message:   ")+"%s\n"+
-			colorField("Memory ID:          ")+"%d\n"+
-			colorField("OS Release Type:    ")+"%s\n"+
-			colorField("OS Version:         ")+"%s\n"+
-			colorField("Kernel Version:     ")+"%s\n"+
-			colorField("KernelCache UUID:   ")+"%s\n"+
-			colorField("Kernel UUID:        ")+"%s\n"+
-			colorField("Boot Session UUID:  ")+"%s\n"+
-			colorField("iBoot Version:      ")+"%s\n"+
-			colorField("Secure Boot:        ")+"%t\n"+
-			colorField("Roots Installed:    ")+"%t\n"+
-			colorField("Paniclog Version:   ")+"%s\n"+
-			colorField("Kernel Slide:       ")+"%#x\n"+
-			colorField("Kernel Text Base:   ")+"%#x\n"+
-			colorField("Mach Absolute Time: ")+"%#x\n"+
+			colorField("Debugger Message")+":   %s\n"+
+			colorField("Memory ID")+":          %d\n"+
+			colorField("OS Release Type")+":    %s\n"+
+			colorField("OS Version")+":         %s\n"+
+			colorField("Kernel Version")+":     %s\n"+
+			colorField("KernelCache UUID")+":   %s\n"+
+			colorField("Kernel UUID")+":        %s\n"+
+			colorField("Boot Session UUID")+":  %s\n"+
+			colorField("iBoot Version")+":      %s\n"+
+			colorField("Secure Boot")+":        %t\n"+
+			colorField("Roots Installed")+":    %t\n"+
+			colorField("Paniclog Version")+":   %s\n"+
+			colorField("Kernel Slide")+":       %#x\n"+
+			colorField("Kernel Text Base")+":   %#x\n"+
+			colorField("Mach Absolute Time")+": %#x\n"+
 			"\n%s\n"+
 			"%s\n"+
 			"%s\n"+
