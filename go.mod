@@ -51,7 +51,7 @@ require (
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.21.0
-	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
+	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8
 	golang.org/x/net v0.22.0
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/sync v0.6.0
@@ -93,7 +93,7 @@ require (
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/danieljoos/wincred v1.2.1 // indirect
-	github.com/distribution/reference v0.5.0 // indirect
+	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -187,7 +187,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
-	modernc.org/libc v1.47.0 // indirect
+	modernc.org/libc v1.48.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
 	modernc.org/sqlite v1.29.5 // indirect
