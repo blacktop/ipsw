@@ -74,14 +74,10 @@ var SlideCmd = &cobra.Command{
 		}
 
 		if len(viper.GetString("dyld.slide.output")) > 0 {
-			fname := filepath.Join(viper.GetString("dyld.slide.output"), "slide_info.jsonl")
-			if viper.GetBool("dyld.slide.auth") {
-				fname = filepath.Join(viper.GetString("dyld.slide.output"), "slide_info_auth.json")
-			}
 			if err := os.MkdirAll(viper.GetString("dyld.slide.output"), 0750); err != nil {
 				return errors.Wrapf(err, "failed to create output directory %s", viper.GetString("dyld.slide.output"))
 			}
-			f, err := os.Create(fname)
+			f, err := os.Create(filepath.Join(viper.GetString("dyld.slide.output"), "slide_info.jsonl"))
 			if err != nil {
 				return errors.Wrapf(err, "failed to create output file %s", viper.GetString("dyld.slide.output"))
 			}
