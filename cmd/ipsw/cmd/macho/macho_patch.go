@@ -32,6 +32,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -513,8 +514,10 @@ func patchMacho(m *macho.File, machoPath, action, loadCommand string, args []str
 func init() {
 	MachoCmd.AddCommand(machoPatchCmd)
 	machoPatchCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
+	machoPatchCmd.Flags().BoolP("re-sign", "s", false, "Adhoc sign file")
 	machoPatchCmd.Flags().StringP("output", "o", "", "Output new file")
 	viper.BindPFlag("macho.patch.overwrite", machoPatchCmd.Flags().Lookup("overwrite"))
+	viper.BindPFlag("macho.patch.re-sign", machoPatchCmd.Flags().Lookup("re-sign"))
 	viper.BindPFlag("macho.patch.output", machoPatchCmd.Flags().Lookup("output"))
 }
 
@@ -551,6 +554,7 @@ var machoPatchCmd = &cobra.Command{
 
 		// flags
 		overwrite := viper.GetBool("macho.patch.overwrite")
+		reSign := viper.GetBool("macho.patch.re-sign")
 		output := viper.GetString("macho.patch.output")
 
 		var m *macho.File
@@ -626,7 +630,19 @@ var machoPatchCmd = &cobra.Command{
 			}
 		}
 
-		log.Warn("Code signature has been invalidated (MachO may need to be re-signed)")
+		yes := false
+		if !reSign {
+			log.Warn("Code signature has been invalidated (MachO may need to be re-signed)")
+			prompt := &survey.Confirm{
+				Message: fmt.Sprintf("Adhoc codesign %s?", output),
+				Default: false,
+			}
+			survey.AskOne(prompt, &yes)
+		}
+		if reSign || yes {
+			log.Infof("Adhoc signing MachO file: %s", output)
+			return mcmd.AdhocSign(output, output)
+		}
 
 		return nil
 	},
