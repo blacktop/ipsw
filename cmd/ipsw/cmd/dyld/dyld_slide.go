@@ -38,9 +38,9 @@ import (
 func init() {
 	DyldCmd.AddCommand(SlideCmd)
 	SlideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
-	SlideCmd.Flags().Bool("json", false, "Output as JSON")
+	SlideCmd.Flags().Bool("json", false, "Output as JSONL")
 	SlideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
-	SlideCmd.Flags().StringP("output", "o", "", "folder to save JSON output")
+	SlideCmd.Flags().StringP("output", "o", "", "folder to save JSONL output")
 	SlideCmd.MarkFlagDirname("output")
 
 	viper.BindPFlag("dyld.slide.auth", SlideCmd.Flags().Lookup("auth"))
