@@ -557,7 +557,7 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 		if utils.StrSliceHas(kcache, filepath.Base(kc)) {
 			for _, dtree := range i.DeviceTrees {
 				dt, _ := dtree.Summary()
-				if strings.ToLower(bconf) == strings.ToLower(dt.BoardConfig) {
+				if strings.EqualFold(bconf, dt.BoardConfig) {
 					devices = append(devices, dt.ProductType)
 				}
 			}
@@ -574,6 +574,8 @@ func getAbbreviatedDevList(devices []string) string {
 		return ""
 	} else if len(devices) == 1 {
 		return devices[0]
+	} else if strings.Contains(devices[0], "Mac") {
+		return "MacOS"
 	}
 
 	currentDev := devices[0]
