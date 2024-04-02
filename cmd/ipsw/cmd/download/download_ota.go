@@ -58,6 +58,7 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	otaDLCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	otaDLCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	otaDLCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
@@ -74,6 +75,7 @@ func init() {
 	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.latest", otaDLCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ota.delta", otaDLCmd.Flags().Lookup("delta"))
 	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
@@ -90,7 +92,7 @@ func init() {
 	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
 
 	otaDLCmd.MarkFlagDirname("output")
-	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta")
+	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
 	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
 	})
@@ -152,6 +154,7 @@ var otaDLCmd = &cobra.Command{
 		// flags
 		platform := viper.GetString("download.ota.platform")
 		getBeta := viper.GetBool("download.ota.beta")
+		getLatest := viper.GetBool("download.ota.latest")
 		getRSR := viper.GetBool("download.ota.rsr")
 		remoteDyld := viper.GetBool("download.ota.dyld")
 		dyldArches := viper.GetStringSlice("download.ota.dyld-arch")
@@ -255,6 +258,7 @@ var otaDLCmd = &cobra.Command{
 		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform:        strings.ToLower(platform),
 			Beta:            getBeta,
+			Latest:          getLatest,
 			Delta:           viper.GetBool("download.ota.delta"),
 			RSR:             getRSR,
 			Device:          device,
