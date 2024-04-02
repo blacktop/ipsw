@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package fw
 
 import (
 	"bytes"
@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // NOTE: https://www.blackhat.com/docs/us-16/materials/us-16-Mandt-Demystifying-The-Secure-Enclave-Processor.pdf
@@ -195,7 +196,7 @@ func (a application64) String() string {
 }
 
 func init() {
-	rootCmd.AddCommand(sepCmd)
+	FwCmd.AddCommand(sepCmd)
 }
 
 // sepCmd represents the sep command
@@ -207,7 +208,7 @@ var sepCmd = &cobra.Command{
 	// Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -275,7 +276,7 @@ var sepCmd = &cobra.Command{
 			if err := m.Export(fname, nil, 0, nil); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
-			if Verbose {
+			if viper.GetBool("verbose") {
 				fmt.Println(m.FileTOC.String())
 			}
 
@@ -292,7 +293,7 @@ var sepCmd = &cobra.Command{
 			if err := m.Export(fname, nil, 0, nil); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
-			if Verbose {
+			if viper.GetBool("verbose") {
 				fmt.Println(m.FileTOC.String())
 			}
 
@@ -311,7 +312,7 @@ var sepCmd = &cobra.Command{
 				if err := m.Export(fname, nil, 0, nil); err != nil {
 					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 				}
-				if Verbose {
+				if viper.GetBool("verbose") {
 					fmt.Println(m.FileTOC.String())
 				}
 			}
