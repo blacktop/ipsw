@@ -29,12 +29,17 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
 	FwCmd.AddCommand(gpuCmd)
+
+	gpuCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	gpuCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.gpu.output", gpuCmd.Flags().Lookup("output"))
 }
 
 const RTKitMagic = "rkosftab"
@@ -65,6 +70,9 @@ var gpuCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
+		output := viper.GetString("fw.gpu.output")
+
 		dat, err := os.ReadFile(filepath.Clean(args[0]))
 		if err != nil {
 			return err
@@ -78,7 +86,28 @@ var gpuCmd = &cobra.Command{
 		}
 
 		if string(hdr.Magic[:]) != RTKitMagic {
-			return fmt.Errorf("invalid RTKit header magic: %s; input file might be an im4p (extract via `ipsw img4 extract` first)", string(hdr.Magic[:]))
+			if !bytes.Contains(dat[:16], []byte("IM4P")) {
+				return fmt.Errorf("invalid RTKit header magic: %s; input file might be an im4p (extract via `ipsw img4 extract` first)", string(hdr.Magic[:]))
+			}
+			tmpDir, err := os.MkdirTemp(os.TempDir(), "gpu")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(tmpDir)
+			infile := filepath.Join(tmpDir, filepath.Clean(args[0])+".payload")
+			log.Warn("IM4P header detected, extracting payload")
+			if err := img4.ExtractPayload(filepath.Clean(args[0]), infile, false); err != nil {
+				return err
+			}
+			// reread the extracted file
+			dat, err = os.ReadFile(infile)
+			if err != nil {
+				return err
+			}
+			r = bytes.NewReader(dat)
+			if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+				return err
+			}
 		}
 
 		blobs := make([]RTKitBlob, hdr.NumBlobs)
@@ -87,14 +116,25 @@ var gpuCmd = &cobra.Command{
 		}
 
 		for _, blob := range blobs {
-			log.Infof("Name: %s Offset: 0x%x Size: 0x%x", string(blob.Name[:]), blob.Offset, blob.Size)
 			r.Seek(int64(blob.Offset), 0)
 			buf := make([]byte, blob.Size)
 			if _, err := r.Read(buf); err != nil {
 				return err
 			}
-			log.Infof("Writing %s.bin", string(blob.Name[:]))
-			if err := os.WriteFile(string(blob.Name[:])+".bin", buf, 0644); err != nil {
+
+			fname := string(blob.Name[:]) + ".bin"
+			if len(output) > 0 {
+				if err := os.MkdirAll(output, 0o750); err != nil {
+					return err
+				}
+				fname = filepath.Join(output, fname)
+			}
+			log.WithFields(log.Fields{
+				"name":   string(blob.Name[:]),
+				"size":   fmt.Sprintf("%#x", blob.Size),
+				"offset": fmt.Sprintf("%#x", blob.Offset),
+			}).Info("Extracting")
+			if err := os.WriteFile(fname, buf, 0o644); err != nil {
 				return err
 			}
 		}
