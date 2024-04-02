@@ -35,8 +35,9 @@ ipsw macho sign <MACHO> [flags]
   -f, --overwrite           Overwrite file
       --proxy string        HTTP/HTTPS proxy
   -p, --pw string           p12 cert password
+  -t, --team string         sign with team id
       --timeserver string   timeserver URL (default "http://timestamp.apple.com/ts01")
-  -t, --ts                  timestamp signature
+      --ts                  timestamp signature
 ```
 
 ### Options inherited from parent commands

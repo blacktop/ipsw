@@ -21,6 +21,7 @@ ipsw dyld search <DSC> [flags]
   -i, --import string         Search for specific import regex
   -l, --load-command string   Search for specific load command regex
   -x, --section string        Search for specific section regex
+  -u, --uuid string           Search for dylib by UUID
 ```
 
 ### Options inherited from parent commands

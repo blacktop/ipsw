@@ -39,6 +39,7 @@ ipsw download ota [options] [flags]
       --info                    Show all the latest OTAs available
   -j, --json                    Dump URLs as JSON only
   -k, --kernel                  Extract kernelcache from remote OTA zip
+      --latest                  Download latest OTAs
   -o, --output string           Folder to download files to
       --pattern string          Download remote files that match regex
   -p, --platform string         Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)

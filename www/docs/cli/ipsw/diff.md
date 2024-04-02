@@ -17,6 +17,8 @@ ipsw diff <IPSW> <IPSW> [flags]
 ### Options
 
 ```
+  -f, --filter strings    Filter MachO sections to diff (e.g. __TEXT.__text)
+      --fw                Diff other firmwares
   -h, --help              help for diff
       --html              Save diff as HTML file
       --json              Save diff as JSON file
