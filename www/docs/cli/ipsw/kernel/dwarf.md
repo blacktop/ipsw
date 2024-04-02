@@ -28,10 +28,14 @@ ipsw kernel dwarf <dSYM> [dSYM] [flags]
 ### Options
 
 ```
+      --all           Dump all types
   -d, --diff          Diff two structs
+      --enums         Dump all enums
   -h, --help          help for dwarf
   -m, --md            Markdown diff output
   -n, --name string   Name to lookup
+      --no-off        Do NOT display struct field offsets in output
+      --structs       Dump all structs
   -t, --type string   Type to lookup
 ```
 

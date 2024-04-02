@@ -28,6 +28,7 @@ ipsw macho search <IPSW> [flags]
   -x, --section string        Search for specific section regex
   -s, --sel string            Search for specific ObjC selector regex
   -m, --sym string            Search for specific symbol regex
+  -u, --uuid string           Search for MachO by UUID
 ```
 
 ### Options inherited from parent commands

@@ -1,23 +1,24 @@
 ---
-id: sepfw
-title: sepfw
+id: iboot
+title: iboot
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: sepfw
-description: Dump MachOs
+sidebar_label: iboot
+description: Dump firmwares
 ---
-## ipsw sepfw
+## ipsw fw iboot
 
-Dump MachOs
+Dump firmwares
 
 ```
-ipsw sepfw <SEP_FIRMWARE> [flags]
+ipsw fw iboot <IBOOT_BIN> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for sepfw
+  -h, --help            help for iboot
+  -o, --output string   Folder to extract files to
 ```
 
 ### Options inherited from parent commands
@@ -31,5 +32,5 @@ ipsw sepfw <SEP_FIRMWARE> [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw fw](/docs/cli/ipsw/fw)	 - Firmware commands
 
