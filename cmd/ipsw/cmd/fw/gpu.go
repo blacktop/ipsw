@@ -24,6 +24,7 @@ package fw
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -36,8 +37,10 @@ func init() {
 	FwCmd.AddCommand(gpuCmd)
 }
 
+const RTKitMagic = "rkosftab"
+
 type RTKitHeader struct {
-	_        [0x20]byte
+	_        [32]byte
 	Magic    [8]byte // "rkosftab"
 	NumBlobs uint32
 	_        uint32
@@ -72,6 +75,10 @@ var gpuCmd = &cobra.Command{
 		var hdr RTKitHeader
 		if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
 			return err
+		}
+
+		if string(hdr.Magic[:]) != RTKitMagic {
+			return fmt.Errorf("invalid RTKit header magic: %s; input file might be an im4p (extract via `ipsw img4 extract` first)", string(hdr.Magic[:]))
 		}
 
 		blobs := make([]RTKitBlob, hdr.NumBlobs)
