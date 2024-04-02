@@ -386,12 +386,19 @@ func (d *Diff) parseKernelcache() error {
 }
 
 func (d *Diff) parseKDKs() (err error) {
+	if !strings.Contains(d.Old.KDK, ".dSYM/Contents/Resources/DWARF") {
+		d.Old.KDK = filepath.Join(d.Old.KDK+".dSYM/Contents/Resources/DWARF", filepath.Base(d.Old.KDK))
+	}
+	if !strings.Contains(d.New.KDK, ".dSYM/Contents/Resources/DWARF") {
+		d.New.KDK = filepath.Join(d.New.KDK+".dSYM/Contents/Resources/DWARF", filepath.Base(d.New.KDK))
+	}
 	d.KDKs, err = dwarf.DiffStructures(d.Old.KDK, d.New.KDK, &dwarf.Config{
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
 	})
-
+	d.Old.KDK, _, _ = strings.Cut(strings.TrimPrefix(d.Old.KDK, "/Library/Developer/KDKs/"), ".dSYM/Contents/Resources/DWARF")
+	d.New.KDK, _, _ = strings.Cut(strings.TrimPrefix(d.New.KDK, "/Library/Developer/KDKs/"), ".dSYM/Contents/Resources/DWARF")
 	return
 }
 
