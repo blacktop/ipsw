@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package fw
 
 import (
 	"bytes"
@@ -35,10 +35,11 @@ import (
 	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	rootCmd.AddCommand(ibootCmd)
+	FwCmd.AddCommand(ibootCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -60,7 +61,7 @@ var ibootCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
