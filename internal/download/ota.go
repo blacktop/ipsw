@@ -78,6 +78,7 @@ type Ota struct {
 type OtaConf struct {
 	Platform        string
 	Beta            bool
+	Latest          bool
 	Delta           bool
 	RSR             bool
 	Device          string
@@ -249,8 +250,10 @@ func (o *Ota) GetLatest() *semver.Version {
 func (o *Ota) QueryPublicXML() []types.Asset {
 	var filtered []types.Asset
 	if o.Config.Version.Original() == "0" && o.Config.Build == "0" {
-		if latest := o.GetLatest(); latest != nil {
-			o.Config.Version = latest
+		if o.Config.Latest {
+			if latest := o.GetLatest(); latest != nil {
+				o.Config.Version = latest
+			}
 		}
 	}
 	for _, asset := range o.Assets {
