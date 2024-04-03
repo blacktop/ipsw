@@ -13,14 +13,8 @@ name: "CodeQL"
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
+    tags:
+      - "v*.*.*"
 
 jobs:
   analyze:
