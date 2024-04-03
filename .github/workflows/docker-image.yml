@@ -53,7 +53,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-            COMMIT=$GITHUB_SHA
+            COMMIT=${{ github.event.pull_request.head.sha || github.sha }}
       - name: Build and push DAEMON Docker image
         id: docker_daemon_build
         uses: docker/build-push-action@v5
@@ -68,4 +68,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-            COMMIT=$GITHUB_SHA
+            COMMIT=${{ github.event.pull_request.head.sha || github.sha }}
