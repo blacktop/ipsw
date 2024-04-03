@@ -1160,7 +1160,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 
 			delta := uint64(start)
 
-			if delta == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
+			if delta == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE {
 				output(dump, "page[% 5d]: no rebasing\n", i)
 				continue
 			}
