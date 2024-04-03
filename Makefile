@@ -4,21 +4,20 @@ CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
 CUR_COMMIT=$(shell git rev-parse --short HEAD)
 LOCAL_VERSION=$(shell svu current)
 NEXT_VERSION=$(shell svu patch)
-GO_BIN=go
 
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install $(GO_BIN) goreleaser zig unicorn libusb go-swagger/go-swagger/go-swagger
+	brew install go goreleaser zig unicorn libusb go-swagger/go-swagger/go-swagger
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
-	$(GO_BIN) install golang.org/x/tools/...@latest
-	$(GO_BIN) install github.com/spf13/cobra-cli@latest
-	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
-	$(GO_BIN) get -d golang.org/x/tools/cmd/stringer
-	$(GO_BIN) install github.com/caarlos0/svu@v1.4.1
+	@go install golang.org/x/tools/...@latest
+	@go install github.com/spf13/cobra-cli@latest
+	@go get -d golang.org/x/tools/cmd/cover
+	@go get -d golang.org/x/tools/cmd/stringer
+	@go install github.com/caarlos0/svu@v1.4.1
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
@@ -63,21 +62,21 @@ destroy: ## Remove release from the CUR_VERSION
 
 build: ## Build ipsw
 	@echo " > Building ipsw"
-	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
+	@go mod download
+	@CGO_ENABLED=1 go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
-	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$(CUR_COMMIT)" ./cmd/ipsw
+	@go mod download
+	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$(CUR_COMMIT)" ./cmd/ipsw
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
 build-linux: ## Build ipsw (linux)
 	@echo " > Building ipsw (linux)"
-	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
+	@go mod download
+	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 	@echo " > Building ipswd (linux)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO_BIN) build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
 
 
 .PHONY: docs
@@ -105,18 +104,18 @@ test-docs: ## Start local server hosting docusaurus docs
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
 	rm go.sum || true
-	$(GO_BIN) mod download
-	$(GO_BIN) mod tidy
+	go mod download
+	go mod tidy
 
 .PHONY: update_devs
 update_devs: ## Parse XCode database for new devices
 	@echo " > Updating device_traits.json"
-	$(GO_BIN) run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
+	go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
 
 .PHONY: update_keys
 update_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating firmware_keys.json"
-	CGO_ENABLED=0 $(GO_BIN) run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
+	CGO_ENABLED=0 go run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
 
 .PHONY: update_frida
 update_frida: ## Updates the frida-core-devkits used in the frida cmd
