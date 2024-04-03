@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	MacOSCacheFolder     = "System/Library/dyld/"
-	IPhoneCacheFolder    = "System/Library/Caches/com.apple.dyld/"
-	DriverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
+	MacOSCacheFolder      = "System/Library/dyld/"
+	IPhoneCacheFolder     = "System/Library/Caches/com.apple.dyld/"
+	DriverKitCacheFolder  = "System/DriverKit/System/Library/dyld/"
+	ExclavekitCacheFolder = "/System/ExclaveKit/System/Library/dyld/"
 
 	CacheRegex                           = `System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DriverKitCacheRegex                  = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
@@ -518,12 +519,14 @@ func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 
 type CacheSlideInfo5 struct {
 	Version         uint32 `json:"slide_version,omitempty"` // currently 5
-	PageSize        uint32 `json:"page_size,omitempty"`     // currently 16384
+	PageSize        uint32 `json:"page_size,omitempty"`     //  currently 4096 (may also be 16384)
 	PageStartsCount uint32 `json:"page_starts_count,omitempty"`
 	_               uint32 // padding for 64bit alignment
 	ValueAdd        uint64 `json:"value_add,omitempty"`
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
+
+const DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
 
 func (i CacheSlideInfo5) GetVersion() uint32 {
 	return i.Version
@@ -544,7 +547,44 @@ func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
 
 // CacheSlidePointer5 struct
 //
-// ???
+// The version 5 of the slide info uses a different compression scheme. Since
+// only interior pointers (pointers that point within the cache) are rebased
+// (slid), we know the possible range of the pointers and thus know there are
+// unused bits in each pointer.  We use those bits to form a linked list of
+// locations needing rebasing in each page.
+//
+// Definitions:
+//
+//	pageIndex = (pageAddress - startOfAllDataAddress)/info->page_size
+//	pageStarts[] = info + info->page_starts_offset
+//
+// There are two cases:
+//
+//  1. pageStarts[pageIndex] == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE
+//     The page contains no values that need rebasing.
+//
+//  2. otherwise...
+//     All rebase locations are in one linked list. The offset of the first
+//     rebase location in the page is pageStarts[pageIndex].
+//
+// A pointer is one of of the variants in dyld_cache_slide_pointer5
+//
+// The code for processing a linked list (chain) is:
+//
+//	uint32_t delta = pageStarts[pageIndex];
+//	dyld_cache_slide_pointer5* loc = pageStart;
+//	do {
+//	    loc += delta;
+//	    delta = loc->offsetToNextPointer;
+//	    newValue = loc->regular.target + value_add + results->slide;
+//	    if ( loc->auth.authenticated ) {
+//	        newValue = sign_using_the_various_bits(newValue);
+//	    }
+//	    else {
+//	        newValue = newValue | (loc->regular.high8 < 56);
+//	    }
+//	    loc->raw = newValue;
+//	} while (delta != 0);
 type CacheSlidePointer5 uint64
 
 // SignExtend51 returns a regular pointer which needs to fit in 51-bits of value.
@@ -563,7 +603,7 @@ func (p CacheSlidePointer5) Raw() uint64 {
 
 // Value returns the chained pointer's value
 func (p CacheSlidePointer5) Value() uint64 {
-	return types.ExtractBits(uint64(p), 0, 34)
+	return types.ExtractBits(uint64(p), 0, 34) // runtimeOffset - offset from the start of the shared cache
 }
 
 func (p CacheSlidePointer5) High8() uint64 {
