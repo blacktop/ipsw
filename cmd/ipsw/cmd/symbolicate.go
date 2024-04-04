@@ -66,7 +66,11 @@ var symbolicateCmd = &cobra.Command{
 
 		hdr, err := crashlog.ParseHeader(args[0])
 		if err != nil {
-			return err
+			log.WithError(err).Error("failed to parse crashlog header")
+			log.Warn("trying to parse as IPS crashlog (BugType=210)")
+			hdr = &crashlog.IpsMetadata{
+				BugType: "109",
+			}
 		}
 
 		switch hdr.BugType {
