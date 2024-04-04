@@ -426,6 +426,10 @@ func (i *Info) GetCPU(board string) string {
 
 // GetFolder returns a folder name for all the devices included in an IPSW
 func (i *Info) GetFolder(device ...string) (string, error) {
+	if i.Plists.BuildManifest == nil {
+		return "", fmt.Errorf("no BuildManifest.plist found")
+	}
+
 	var dev string
 	if len(device) > 0 && len(device[0]) > 0 {
 		dev = device[0]
