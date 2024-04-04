@@ -234,11 +234,13 @@ var wikiCmd = &cobra.Command{
 						log.Errorf("failed parsing remote IPSW URL: %v", err)
 						continue
 					}
-					log.WithFields(log.Fields{
-						"devices": i.Plists.Restore.SupportedProductTypes,
-						"build":   i.Plists.BuildManifest.ProductBuildVersion,
-						"version": i.Plists.BuildManifest.ProductVersion,
-					}).Infof("Parsing (%d/%d) IPSW", idx+1, len(filteredIPSW))
+					if i.Plists.BuildIdentities != nil && i.Plists.Restore != nil {
+						log.WithFields(log.Fields{
+							"devices": i.Plists.Restore.SupportedProductTypes,
+							"build":   i.Plists.BuildManifest.ProductBuildVersion,
+							"version": i.Plists.BuildManifest.ProductVersion,
+						}).Infof("Parsing (%d/%d) IPSW", idx+1, len(filteredIPSW))
+					}
 					db[ipsw.URL] = i
 				}
 				dat, err := json.Marshal(db)
@@ -442,11 +444,13 @@ var wikiCmd = &cobra.Command{
 							log.Errorf("failed parsing remote OTA URL: %v", err)
 							continue
 						}
-						log.WithFields(log.Fields{
-							"devices": i.Plists.MobileAssetProperties.SupportedDevices,
-							"build":   i.Plists.BuildManifest.ProductBuildVersion,
-							"version": i.Plists.BuildManifest.ProductVersion,
-						}).Infof("Parsing (%d/%d) OTA", idx+1, len(otas))
+						if i.Plists.BuildIdentities != nil {
+							log.WithFields(log.Fields{
+								"devices": i.Plists.MobileAssetProperties.SupportedDevices,
+								"build":   i.Plists.BuildManifest.ProductBuildVersion,
+								"version": i.Plists.BuildManifest.ProductVersion,
+							}).Infof("Parsing (%d/%d) OTA", idx+1, len(otas))
+						}
 						// dat, err := json.Marshal(i)
 						// if err != nil {
 						// 	return fmt.Errorf("failed to marshal OTA metadata: %v", err)
