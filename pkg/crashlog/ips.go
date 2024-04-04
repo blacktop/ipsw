@@ -502,7 +502,7 @@ func ParseHeader(in string) (hdr *IpsMetadata, err error) {
 	defer f.Close()
 
 	if err := json.NewDecoder(f).Decode(&hdr); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode JSON header (possibly unsupported .ips format): %w", err)
 	}
 
 	db, err := GetLogTypes()
