@@ -178,7 +178,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 				}
 			}
 
-			if i.Plists.Restore != nil {
+			if i.Plists.Restore != nil && i.Plists.BuildManifest != nil {
 				if dev := i.Plists.GetDeviceForBoardConfig(dt.BoardConfig); dev != nil {
 					proc, err := getProcessor(dev.Platform)
 					if err != nil {
@@ -201,7 +201,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 					}
 				}
 			} else {
-				return fmt.Errorf("no restore plist found for %s", dt.ProductType)
+				return fmt.Errorf("no restore/BuildManifest plist found for %s", dt.ProductType)
 			}
 		}
 	} else {

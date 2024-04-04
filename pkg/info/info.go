@@ -177,14 +177,16 @@ func (i *Info) String() string {
 	if i.Plists.OTAInfo != nil {
 		verextra = fmt.Sprintf(" %s", i.Plists.OTAInfo.MobileAssetProperties.ProductVersionExtra)
 	}
-	iStr += fmt.Sprintf(
-		"Version        = %s\n"+
-			"BuildVersion   = %s\n"+
-			"OS Type        = %s\n",
-		i.Plists.BuildManifest.ProductVersion+verextra,
-		i.Plists.BuildManifest.ProductBuildVersion,
-		i.Plists.GetOSType(),
-	)
+	if i.Plists.BuildManifest != nil {
+		iStr += fmt.Sprintf(
+			"Version        = %s\n"+
+				"BuildVersion   = %s\n"+
+				"OS Type        = %s\n",
+			i.Plists.BuildManifest.ProductVersion+verextra,
+			i.Plists.BuildManifest.ProductBuildVersion,
+			i.Plists.GetOSType(),
+		)
+	}
 	if i.Plists.Restore != nil {
 		foundFS := false
 		if fsDMG, err := i.GetFileSystemOsDmg(); err == nil {
@@ -257,10 +259,12 @@ func (i *Info) String() string {
 			}
 		}
 	} else {
-		iStr += "\nDevices\n"
-		iStr += "-------\n"
-		for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
-			iStr += fmt.Sprintf(" > %s_%s\n", dev, i.Plists.BuildManifest.ProductBuildVersion)
+		if i.Plists.BuildManifest != nil {
+			iStr += "\nDevices\n"
+			iStr += "-------\n"
+			for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
+				iStr += fmt.Sprintf(" > %s_%s\n", dev, i.Plists.BuildManifest.ProductBuildVersion)
+			}
 		}
 	}
 	return iStr
@@ -276,6 +280,9 @@ type InfoJSON struct {
 }
 
 func (i *Info) ToJSON() InfoJSON {
+	if i.Plists.BuildIdentities == nil {
+		return InfoJSON{Error: "no BuildManifest.plist found"}
+	}
 	return InfoJSON{
 		Type:    i.Plists.Type,
 		Version: i.Plists.BuildManifest.ProductVersion,
@@ -464,6 +471,9 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 
 // GetFolders returns a list of the IPSW name folders
 func (i *Info) GetFolders() ([]string, error) {
+	if i.Plists.BuildManifest == nil {
+		return nil, fmt.Errorf("no BuildManifest.plist found")
+	}
 	var folders []string
 	if len(i.DeviceTrees) > 0 {
 		for _, dtree := range i.DeviceTrees {
@@ -477,6 +487,9 @@ func (i *Info) GetFolders() ([]string, error) {
 
 // GetFolderForFile returns a list of the IPSW name folders for a given file
 func (i *Info) GetFolderForFile(fileName string) (string, error) {
+	if i.Plists.BuildManifest == nil {
+		return "", fmt.Errorf("no BuildManifest.plist found")
+	}
 	if len(i.DeviceTrees) > 0 {
 		files := i.getManifestPaths()
 		for _, dtree := range i.DeviceTrees {
@@ -512,6 +525,9 @@ type folder struct {
 }
 
 func (i *Info) getFolders() ([]folder, error) {
+	if i.Plists.BuildManifest == nil {
+		return nil, fmt.Errorf("no BuildManifest.plist found")
+	}
 	if len(i.DeviceTrees) > 0 {
 		var fs []folder
 		kcs := i.Plists.BuildManifest.GetKernelCaches()
