@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=jcroql
+version: 1
+
 before:
   hooks:
     - go mod tidy
@@ -11,6 +15,9 @@ snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
 report_sizes: true
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
 
 builds:
   # CLIs ###########################################################
@@ -375,7 +382,7 @@ brews:
       name: homebrew-tap
     ids:
       - extras_archive
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
     license: MIT
@@ -407,7 +414,7 @@ brews:
       name: homebrew-tap
     ids:
       - frida_archive
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
     license: MIT
@@ -435,7 +442,7 @@ brews:
       name: homebrew-tap
     ids:
       - daemon_archive
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "ipsw - Daemon"
     license: MIT
