@@ -81,7 +81,7 @@ var kerExtractCmd = &cobra.Command{
 
 		m, err := macho.Open(kernPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open kernelcache: %v", err)
 		}
 
 		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
@@ -103,7 +103,7 @@ var kerExtractCmd = &cobra.Command{
 			for _, fse := range m.FileSets() {
 				mfse, err := m.GetFileSetFileByName(fse.EntryID)
 				if err != nil {
-					return fmt.Errorf("failed to parse kext %s: %v", fse.EntryID, err)
+					return fmt.Errorf("failed to parse KEXT %s: %v", fse.EntryID, err)
 				}
 				if err := mfse.Export(filepath.Join(folder, fse.EntryID), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
 					return fmt.Errorf("failed to export KEXT %s; %v", fse.EntryID, err)
@@ -113,11 +113,11 @@ var kerExtractCmd = &cobra.Command{
 		} else {
 			m, err = m.GetFileSetFileByName(args[1])
 			if err != nil {
-				return fmt.Errorf("failed to parse kext %s: %v", args[0], err)
+				return fmt.Errorf("failed to parse KEXT %s: %v", args[1], err)
 			}
 
 			if err := m.Export(filepath.Join(folder, args[1]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
-				return fmt.Errorf("failed to export KEXT %s; %v", args[0], err)
+				return fmt.Errorf("failed to export KEXT %s; %v", args[1], err)
 			}
 			log.Infof("Created %s", filepath.Join(folder, args[1]))
 		}
