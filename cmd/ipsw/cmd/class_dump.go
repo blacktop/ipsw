@@ -203,12 +203,12 @@ var classDumpCmd = &cobra.Command{
 
 			img, err := f.Image(args[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to find dylib in DSC: %v", err)
 			}
 
 			m, err = img.GetMacho()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to parse MachO from dylib: %v", err)
 			}
 
 			conf.Name = filepath.Base(img.Name)
