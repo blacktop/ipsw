@@ -71,9 +71,6 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 
 // Equal checks if two Info structs are equal
 func (i DiffInfo) Equal(x DiffInfo) bool {
-	if i.Version == x.Version {
-		return true
-	}
 	if len(i.Imports) != len(x.Imports) {
 		return false
 	}
@@ -96,6 +93,9 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 	if i.Functions != x.Functions {
 		return false
 	}
+	// if i.Version != x.Version { (this could be a lie)
+	// 	return false
+	// }
 	return true
 }
 
