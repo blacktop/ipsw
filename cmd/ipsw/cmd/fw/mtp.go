@@ -22,28 +22,24 @@ THE SOFTWARE.
 package fw
 
 import (
-	"fmt"
-	"path/filepath"
-
 	"github.com/apex/log"
-	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	FwCmd.AddCommand(gpuCmd)
+	FwCmd.AddCommand(mtpCmd)
 
-	gpuCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
-	gpuCmd.MarkFlagDirname("output")
-	viper.BindPFlag("fw.gpu.output", gpuCmd.Flags().Lookup("output"))
+	mtpCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	mtpCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.mtp.output", mtpCmd.Flags().Lookup("output"))
 }
 
-// gpuCmd represents the gpu command
-var gpuCmd = &cobra.Command{
-	Use:     "gpu",
-	Aliases: []string{"agx"},
-	Short:   "Dump MachOs",
+// mtpCmd represents the mtp command
+var mtpCmd = &cobra.Command{
+	Use:     "mtp",
+	Aliases: []string{"m"},
+	Short:   "🚧 Dump MachOs",
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -51,9 +47,12 @@ var gpuCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := fwcmd.SplitGpuFW(filepath.Clean(args[0]), viper.GetString("fw.gpu.output")); err != nil {
-			return fmt.Errorf("failed to split GPU firmware: %v", err)
-		}
+		// Firmware/D84_MtpFirmware.im4p
+
+		// flags
+		// output := viper.GetString("fw.mtp.output")
+
+		panic("not implemented")
 
 		return nil
 	},

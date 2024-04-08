@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -146,11 +148,26 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 		if err := icmd.ExtractPayload(im4p, im4p, false); err != nil {
 			return fmt.Errorf("failed to extract im4p payload: %v", err)
 		}
-		if m, err := macho.Open(im4p); err == nil {
-			if err := handler(filepath.Base(im4p), m); err != nil {
-				return fmt.Errorf("failed to handle macho %s: %v", im4p, err)
+		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4p) {
+			out, err := fwcmd.SplitGpuFW(im4p, os.TempDir())
+			if err != nil {
+				return fmt.Errorf("failed to split GPU FW: %v", err)
 			}
-			m.Close()
+			for _, f := range out {
+				if m, err := macho.Open(f); err == nil {
+					if err := handler("agx_"+filepath.Base(f), m); err != nil {
+						return fmt.Errorf("failed to handle macho %s: %v", f, err)
+					}
+					m.Close()
+				}
+			}
+		} else {
+			if m, err := macho.Open(im4p); err == nil {
+				if err := handler(filepath.Base(im4p), m); err != nil {
+					return fmt.Errorf("failed to handle macho %s: %v", im4p, err)
+				}
+				m.Close()
+			}
 		}
 	}
 
