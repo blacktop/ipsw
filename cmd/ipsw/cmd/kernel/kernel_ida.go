@@ -112,8 +112,8 @@ var kernelIdaCmd = &cobra.Command{
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
 		} else if viper.IsSet("kernel.ida.diaphora-db") && !viper.IsSet("kernel.ida.script") {
 			return fmt.Errorf("must supply '--script /path/to/diaphora.py' with '--diaphora-db /path/to/diaphora.db'")
-		} else if viper.IsSet("kernel.ida.diaphora-db") && viper.GetBool("kernel.ida.enable-gui") {
-			return fmt.Errorf("cannot use '--diaphora-db' with '--enable-gui'")
+		} else if (viper.IsSet("kernel.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("kernel.ida.enable-gui") {
+			return fmt.Errorf("diaphora analysis should be done headless and NOT with '--enable-gui'")
 		}
 		// if viper.GetString("kernel.ida.slide") != "" { TODO: how to set kc slide?
 		// 	env = append(env, fmt.Sprintf("IDA_kernel_SHARED_CACHE_SLIDE=%s", viper.GetString("kernel.ida.slide")))
@@ -166,9 +166,13 @@ var kernelIdaCmd = &cobra.Command{
 			dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s.i64", device, m.SubCPU.String(m.CPU), args[1]))
 		}
 
-		if viper.IsSet("kernel.ida.diaphora-db") {
+		if viper.IsSet("kernel.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py") {
 			env = append(env, "DIAPHORA_AUTO=1")
-			env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
+			if viper.IsSet("kernel.ida.diaphora-db") {
+				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
+			} else {
+				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s_diaphora.db", device, m.SubCPU.String(m.CPU), args[1]))))
+			}
 		}
 
 		if len(logFile) > 0 {
