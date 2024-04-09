@@ -117,8 +117,8 @@ var idaCmd = &cobra.Command{
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
 		} else if viper.IsSet("dyld.ida.diaphora-db") && !viper.IsSet("dyld.ida.script") {
 			return fmt.Errorf("must supply '--script /path/to/diaphora.py' with '--diaphora-db /path/to/diaphora.db'")
-		} else if viper.IsSet("dyld.ida.diaphora-db") && viper.GetBool("dyld.ida.enable-gui") {
-			return fmt.Errorf("cannot use '--diaphora-db' with '--enable-gui'")
+		} else if (viper.IsSet("dyld.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("dyld.ida.enable-gui") {
+			return fmt.Errorf("diaphora analysis should be done headless and NOT with '--enable-gui'")
 		}
 
 		if viper.GetString("dyld.ida.slide") != "" {
@@ -264,9 +264,13 @@ var idaCmd = &cobra.Command{
 			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		}
 
-		if viper.IsSet("dyld.ida.diaphora-db") {
+		if viper.IsSet("dyld.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py") {
 			env = append(env, "DIAPHORA_AUTO=1")
-			env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("dyld.ida.diaphora-db")))
+			if viper.IsSet("dyld.ida.diaphora-db") {
+				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("dyld.ida.diaphora-db")))
+			} else {
+				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s_diaphora.db", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))))
+			}
 		}
 
 		if len(logFile) > 0 {
