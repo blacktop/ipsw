@@ -55,6 +55,7 @@ func init() {
 	kernelIdaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
 	kernelIdaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
 	kernelIdaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
+	kernelIdaCmd.Flags().String("diaphora-db", "", "Path to Diaphora database")
 	kernelIdaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	kernelIdaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
 	kernelIdaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
@@ -68,6 +69,7 @@ func init() {
 	viper.BindPFlag("kernel.ida.ida-path", kernelIdaCmd.Flags().Lookup("ida-path"))
 	viper.BindPFlag("kernel.ida.script", kernelIdaCmd.Flags().Lookup("script"))
 	viper.BindPFlag("kernel.ida.script-args", kernelIdaCmd.Flags().Lookup("script-args"))
+	viper.BindPFlag("kernel.ida.diaphora-db", kernelIdaCmd.Flags().Lookup("diaphora-db"))
 	viper.BindPFlag("kernel.ida.all", kernelIdaCmd.Flags().Lookup("all"))
 	viper.BindPFlag("kernel.ida.enable-gui", kernelIdaCmd.Flags().Lookup("enable-gui"))
 	viper.BindPFlag("kernel.ida.delete-db", kernelIdaCmd.Flags().Lookup("delete-db"))
@@ -82,7 +84,7 @@ func init() {
 
 // kernelIdaCmd represents the ida command
 var kernelIdaCmd = &cobra.Command{
-	Use:           "ida <KC> <KEXT> [KEXTS...]",
+	Use:           "ida <KC> [KEXT]",
 	Short:         "🚧 Analyze kernelcache in IDA Pro",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -92,7 +94,6 @@ var kernelIdaCmd = &cobra.Command{
 		var fileType string
 		var dbFile string
 		var env []string
-		var defaultframeworks []string
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -108,10 +109,11 @@ var kernelIdaCmd = &cobra.Command{
 			return fmt.Errorf("cannot use '--temp-db' without '--enable-gui'")
 		} else if viper.GetBool("kernel.ida.temp-db") && viper.GetBool("kernel.ida.delete-db") {
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
-		} else if len(args) > 2 && viper.GetBool("kernel.ida.dependancies") {
-			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
+		} else if viper.IsSet("kernel.ida.diaphora-db") && !viper.IsSet("kernel.ida.script") {
+			return fmt.Errorf("must supply '--script /path/to/diaphora.py' with '--diaphora-db /path/to/diaphora.db'")
+		} else if viper.IsSet("kernel.ida.diaphora-db") && viper.GetBool("kernel.ida.enable-gui") {
+			return fmt.Errorf("cannot use '--diaphora-db' with '--enable-gui'")
 		}
-
 		// if viper.GetString("kernel.ida.slide") != "" { TODO: how to set kc slide?
 		// 	env = append(env, fmt.Sprintf("IDA_kernel_SHARED_CACHE_SLIDE=%s", viper.GetString("kernel.ida.slide")))
 		// }
@@ -157,6 +159,17 @@ var kernelIdaCmd = &cobra.Command{
 		fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
 		dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s.i64", device, m.SubCPU.String(m.CPU)))
 
+		if len(args) > 1 {
+			fileType = fmt.Sprintf("Apple XNU kernelcache for %s (single kext)", m.SubCPU.String(m.CPU))
+			env = append(env, fmt.Sprintf("IDA_KCACHE_KEXT=%s", args[1]))
+			dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s.i64", device, m.SubCPU.String(m.CPU), args[1]))
+		}
+
+		if viper.IsSet("kernel.ida.diaphora-db") {
+			env = append(env, "DIAPHORA_AUTO=1")
+			env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
+		}
+
 		if len(logFile) > 0 {
 			logFile = filepath.Join(folder, viper.GetString("kernel.ida.log-file"))
 			if _, err := os.Stat(logFile); err == nil {
@@ -186,7 +199,6 @@ var kernelIdaCmd = &cobra.Command{
 		cli, err := ida.NewClient(ctx, &ida.Config{
 			IdaPath:      viper.GetString("kernel.ida.ida-path"),
 			InputFile:    kcPath,
-			Frameworks:   defaultframeworks,
 			LogFile:      logFile,
 			Output:       dbFile,
 			EnableGUI:    viper.GetBool("kernel.ida.enable-gui"),
@@ -197,7 +209,7 @@ var kernelIdaCmd = &cobra.Command{
 			AutoAnalyze:  true,
 			BatchMode:    true,
 			Env:          env,
-			// Options:      []string{"objc:+l"},
+			// Options:      []string{""},
 			ScriptFile: scriptFile,
 			ScriptArgs: viper.GetStringSlice("kernel.ida.script-args"),
 			ExtraArgs:  viper.GetStringSlice("kernel.ida.extra-args"),
