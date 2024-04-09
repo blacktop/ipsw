@@ -342,7 +342,8 @@ var idaCmd = &cobra.Command{
 		}
 
 		if !viper.GetBool("dyld.ida.temp-db") {
-			log.WithField("db", dbFile).Info("🎉 Done!")
+			cwd, _ := os.Getwd()
+			log.WithField("db", strings.TrimPrefix(dbFile, cwd)).Info("🎉 Done!")
 		}
 
 		return nil
