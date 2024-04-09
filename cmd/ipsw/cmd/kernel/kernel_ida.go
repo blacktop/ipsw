@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -243,7 +244,8 @@ var kernelIdaCmd = &cobra.Command{
 		}
 
 		if !viper.GetBool("kernel.ida.temp-db") {
-			log.WithField("db", dbFile).Info("🎉 Done!")
+			cwd, _ := os.Getwd()
+			log.WithField("db", strings.TrimPrefix(dbFile, cwd)).Info("🎉 Done!")
 		}
 
 		return nil
