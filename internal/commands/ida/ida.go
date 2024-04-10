@@ -32,6 +32,7 @@ type Config struct {
 	AutoAnalyze  bool
 	AutoAccept   bool
 	BatchMode    bool
+	LoadAddress  string
 	LogFile      string
 	Output       string
 	Env          []string
@@ -120,6 +121,9 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 	if !conf.EnableGUI || conf.AutoAccept {
 		args = append(args, "-A") // autonomous mode. IDA will not display dialog boxes.
 		// Designed to be used together with -S switch.
+	}
+	if conf.LoadAddress != "" {
+		args = append(args, fmt.Sprintf("-b%s", conf.LoadAddress)) // load address (hex)
 	}
 	if conf.BatchMode {
 		args = append(args, "-B") // batch mode. IDA will generate .IDB and .ASM files automatically
