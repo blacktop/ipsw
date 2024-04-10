@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/apex/log"
@@ -168,10 +169,16 @@ var kernelIdaCmd = &cobra.Command{
 
 		if viper.IsSet("kernel.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py") {
 			env = append(env, "DIAPHORA_AUTO=1")
+			env = append(env, "DIAPHORA_USE_DECOMPILER=1")
+			env = append(env, fmt.Sprintf("DIAPHORA_CPU_COUNT=%d", runtime.NumCPU()))
 			if viper.IsSet("kernel.ida.diaphora-db") {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
 			} else {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s_diaphora.db", device, m.SubCPU.String(m.CPU), args[1]))))
+			}
+			if viper.GetBool("verbose") {
+				env = append(env, "DIAPHORA_DEBUG=1")
+				env = append(env, "DIAPHORA_LOG_PRINT=1")
 			}
 		}
 
