@@ -591,12 +591,18 @@ func (o *ObjC) Headers() error {
 			if cat.Class != nil && cat.Class.Name != "" {
 				fname = filepath.Join(o.conf.Output, o.conf.Name, cat.Class.Name+"+"+cat.Name+".h")
 			}
+			var name string
+			if cat.Class != nil && cat.Class.Name != "" {
+				name = cat.Class.Name + "_" + cat.Name
+			} else {
+				name = cat.Name
+			}
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
 				BuildVersions: buildVersions,
 				SourceVersion: sourceVersion,
-				Name:          cat.Class.Name + "_" + cat.Name,
+				Name:          name,
 				Imports:       imps[cat.Name],
 				Object:        swift.DemangleBlob(cat.Verbose()),
 			}); err != nil {
