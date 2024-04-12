@@ -84,6 +84,8 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private bool) (*TBD, err
 
 	return &TBD{
 		Targets: []string{
+			"i386-macos",
+			"i386-maccatalyst",
 			"x86_64-macos",
 			"x86_64-maccatalyst",
 			"x86_64h-macos",
