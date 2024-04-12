@@ -17,4 +17,5 @@ exports:
 {{- if .ObjcIvars }}    
     objc-ivars:      [ {{ StringsJoin .ObjcIvars ",\n                       " }} ]
 {{- end }}
+...
 `
