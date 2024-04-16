@@ -59,6 +59,13 @@ func (i *Imports) uniq(foundation map[string][]string) {
 	i.Locals = slices.Compact(i.Locals)
 	i.Classes = slices.Compact(i.Classes)
 	i.Protos = slices.Compact(i.Protos)
+	i.Imports = slices.DeleteFunc(i.Imports, func(l string) bool {
+		l = strings.TrimSuffix(l, "-Protocol.h")
+		l = strings.TrimSuffix(l, ".h")
+		_, foundC := slices.BinarySearch(foundation["classes"], l)
+		_, foundP := slices.BinarySearch(foundation["protocols"], l)
+		return foundC || foundP
+	})
 	i.Locals = slices.DeleteFunc(i.Locals, func(l string) bool {
 		l = strings.TrimSuffix(l, "-Protocol.h")
 		l = strings.TrimSuffix(l, ".h")
@@ -884,9 +891,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 
 	for _, class := range classes {
 		imp := Imports{}
-		if class.SuperClass != "NSObject" { // skip NSObject since we'll import Foundation by default
-			imp.Imports = append(imp.Imports, class.SuperClass+".h")
-		}
+		imp.Imports = append(imp.Imports, class.SuperClass+".h")
 		for _, prot := range class.Protocols {
 			if slices.Contains(protoNames, prot.Name) {
 				imp.Locals = append(imp.Locals, prot.Name+"-Protocol.h")
