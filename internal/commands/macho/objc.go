@@ -917,7 +917,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				if rest, ok := strings.CutPrefix(typ, "@\""); ok {
 					typ = strings.TrimSuffix(rest, "\"")
 					if slices.Contains(classNames, typ) {
-						imp.Locals = append(imp.Locals, typ+".h")
+						if typ != class.Name {
+							imp.Locals = append(imp.Locals, typ+".h")
+						}
 					} else {
 						imp.Classes = append(imp.Classes, typ)
 					}
@@ -947,7 +949,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") {
 					typ = strings.Trim(typ, " *")
 					if slices.Contains(classNames, typ) {
-						imp.Locals = append(imp.Locals, typ+".h")
+						if typ != class.Name {
+							imp.Locals = append(imp.Locals, typ+".h")
+						}
 					} else {
 						imp.Classes = append(imp.Classes, typ)
 					}
@@ -959,7 +963,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				typ := method.ArgumentType(i)
 				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
 					if slices.Contains(classNames, typ) {
-						imp.Locals = append(imp.Locals, typ+".h")
+						if typ != class.Name {
+							imp.Locals = append(imp.Locals, typ+".h")
+						}
 					} else if slices.Contains(protoNames, strings.Trim(typ, "NSObject<>")) {
 						imp.Locals = append(imp.Locals, strings.Trim(typ, "NSObject<>")+"-Protocol.h")
 					} else {
@@ -976,7 +982,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				typ := method.ArgumentType(i)
 				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
 					if slices.Contains(classNames, typ) {
-						imp.Locals = append(imp.Locals, typ+".h")
+						if typ != class.Name {
+							imp.Locals = append(imp.Locals, typ+".h")
+						}
 					} else {
 						imp.Classes = append(imp.Classes, typ)
 					}
