@@ -1023,7 +1023,15 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 }
 
 func (o *ObjC) isBuiltInType(typ string) bool {
-	if typ == "" || strings.ContainsAny(typ, "#():?[]{}") {
+	if typ == "" {
+		return true
+	}
+
+	if strings.Contains(typ, "<") {
+		return false
+	}
+
+	if strings.ContainsAny(typ, "#(:?[{") {
 		return true
 	}
 
@@ -1037,7 +1045,10 @@ func (o *ObjC) isBuiltInType(typ string) bool {
 		return true
 	}
 
-	switch typ, _, _ := strings.Cut(typ, " "); typ {
+	switch before, after, _ := strings.Cut(typ, " "); before {
+	case "_Atomic", "const", "restrict", "volatile":
+		return o.isBuiltInType(after)
+
 	case "_Bool", "_Complex", "_Imaginary", "BOOL", "Class", "IMP", "Ivar", "Method", "SEL", "bool", "char", "class", "double", "enum", "float", "id", "int", "long", "short", "signed", "struct", "union", "unsigned", "void":
 		return true
 	}
