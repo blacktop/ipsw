@@ -984,7 +984,7 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 	}
 	typ = strings.Trim(typ, ` "*@^`)
 
-	if !strings.ContainsAny(typ, "<>") {
+	if !strings.Contains(typ, "<") {
 		if !slices.Contains(classNames, typ) {
 			imp.Classes = append(imp.Classes, typ)
 			return
@@ -998,17 +998,10 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 		return
 	}
 
-	if typ, ok := strings.CutPrefix(typ, "id <"); ok {
-		typ = strings.TrimSuffix(typ, ">")
-		for _, typ := range strings.Split(typ, ", ") {
-			if !slices.Contains(protoNames, typ) {
-				imp.Protos = append(imp.Protos, typ)
-				continue
-			}
-
-			imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-		}
-
+	if !strings.HasPrefix(typ, "<") {
+		before, after, _ := strings.Cut(typ, "<")
+		o.isBuiltInType(before)
+		o.isBuiltInType("<" + after)
 		return
 	}
 
@@ -1024,14 +1017,17 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 }
 
 func (o *ObjC) isBuiltInType(typ string) bool {
-	if typ == "" || strings.ContainsAny(typ, "#()*:?[]{}") {
+	if typ == "" || strings.ContainsAny(typ, "#():?[]{}") {
 		return true
 	}
 
 	switch typ[0] {
 	case '"', '@', '^':
 		return o.isBuiltInType(typ[1:])
-	case 'B', 'C', 'I', 'L', 'N', 'O', 'Q', 'R', 'S', 'V', 'b', 'c', 'd', 'f', 'i', 'l', 'n', 'o', 'q', 'r', 's', 'v':
+	}
+
+	switch typ {
+	case "*", "B", "C", "I", "L", "N", "O", "Q", "R", "S", "V", "b", "c", "d", "f", "i", "l", "n", "o", "q", "r", "s", "v":
 		return true
 	}
 
