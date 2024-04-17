@@ -982,6 +982,7 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 	if o.isBuiltInType(typ) {
 		return
 	}
+
 	typ = strings.Trim(typ, ` "*@^`)
 
 	if !strings.Contains(typ, "<") {
@@ -998,15 +999,20 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 		return
 	}
 
+	typ = strings.ReplaceAll(typ, "><", ", ")
+
 	if !strings.HasPrefix(typ, "<") {
 		before, after, _ := strings.Cut(typ, "<")
-		o.isBuiltInType(before)
-		o.isBuiltInType("<" + after)
+
+		o.fillImportsForType(before, className, classNames, protoNames, imp)
+		o.fillImportsForType("<"+after, className, classNames, protoNames, imp)
+
 		return
 	}
 
 	typ = strings.Trim(typ, "<>")
-	for _, typ := range strings.Split(typ, "><") {
+
+	for _, typ := range strings.Split(typ, ", ") {
 		if !slices.Contains(protoNames, typ) {
 			imp.Protos = append(imp.Protos, typ)
 			continue
