@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -905,82 +904,16 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		}
 		for _, ivar := range class.Ivars {
 			typ := ivar.Type
-			if strings.ContainsAny(typ, "<>") {
-				typ = strings.Trim(typ, "@\"")
-				if rest, ok := strings.CutPrefix(typ, "NSObject<"); ok {
-					typ = strings.TrimSuffix(rest, ">")
-					if slices.Contains(protoNames, typ) {
-						imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-					} else {
-						imp.Protos = append(imp.Protos, typ)
-					}
-				}
-				typ = strings.Trim(typ, "<>")
-				if slices.Contains(protoNames, typ) {
-					imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-				} else {
-					imp.Protos = append(imp.Protos, typ)
-				}
-
-			} else {
-				if rest, ok := strings.CutPrefix(typ, "@\""); ok {
-					typ = strings.TrimSuffix(rest, "\"")
-					if slices.Contains(classNames, typ) {
-						if typ != class.Name {
-							imp.Locals = append(imp.Locals, typ+".h")
-						}
-					} else {
-						imp.Classes = append(imp.Classes, typ)
-					}
-				}
-			}
+			o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
 		}
 		for _, prop := range class.Props {
 			typ := prop.Type()
-			if strings.ContainsAny(typ, "<>") {
-				typ = strings.Trim(typ, "@\"")
-				typ = strings.Trim(typ, " *")
-				if rest, ok := strings.CutPrefix(typ, "NSObject<"); ok {
-					typ = strings.TrimSuffix(rest, ">")
-					if slices.Contains(protoNames, typ) {
-						imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-					} else {
-						imp.Protos = append(imp.Protos, typ)
-					}
-				}
-				typ = strings.Trim(typ, "<>")
-				if slices.Contains(protoNames, typ) {
-					imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-				} else {
-					imp.Protos = append(imp.Protos, typ)
-				}
-			} else {
-				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") {
-					typ = strings.Trim(typ, " *")
-					if slices.Contains(classNames, typ) {
-						if typ != class.Name {
-							imp.Locals = append(imp.Locals, typ+".h")
-						}
-					} else {
-						imp.Classes = append(imp.Classes, typ)
-					}
-				}
-			}
+			o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
 		}
 		for _, method := range class.InstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
-					if slices.Contains(classNames, typ) {
-						if typ != class.Name {
-							imp.Locals = append(imp.Locals, typ+".h")
-						}
-					} else if slices.Contains(protoNames, strings.Trim(typ, "NSObject<>")) {
-						imp.Locals = append(imp.Locals, strings.Trim(typ, "NSObject<>")+"-Protocol.h")
-					} else {
-						imp.Classes = append(imp.Classes, typ)
-					}
-				}
+				o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
 				if i == 0 {
 					i += 2
 				}
@@ -989,15 +922,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range class.ClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
-					if slices.Contains(classNames, typ) {
-						if typ != class.Name {
-							imp.Locals = append(imp.Locals, typ+".h")
-						}
-					} else {
-						imp.Classes = append(imp.Classes, typ)
-					}
-				}
+				o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
 				if i == 0 {
 					i += 2
 				}
@@ -1014,7 +939,7 @@ func (o *ObjC) scanFoundation() error {
 	o.foundation["classes"] = []string{}
 	o.foundation["protocols"] = []string{}
 	if o.cache != nil {
-		for _, name := range []string{"Foundation", "CoreFoundation"} {
+		for _, name := range []string{"Foundation", "CoreFoundation", "libobjc.A.dylib"} {
 			img, err := o.cache.Image(name)
 			if err != nil {
 				return err
@@ -1054,4 +979,78 @@ func (o *ObjC) scanFoundation() error {
 		}
 	}
 	return nil
+}
+
+func (o *ObjC) fillImportsForType(typ string, className string, classNames []string, protoNames []string, imp *Imports) {
+	if o.isBuiltInType(typ) {
+		return
+	}
+
+	typ = strings.Trim(typ, ` "*@^`)
+
+	if !strings.Contains(typ, "<") {
+		if !slices.Contains(classNames, typ) {
+			imp.Classes = append(imp.Classes, typ)
+			return
+		}
+
+		if typ != className {
+			imp.Locals = append(imp.Locals, typ+".h")
+			return
+		}
+
+		return
+	}
+
+	typ = strings.ReplaceAll(typ, "><", ", ")
+
+	if !strings.HasPrefix(typ, "<") {
+		before, after, _ := strings.Cut(typ, "<")
+
+		o.fillImportsForType(before, className, classNames, protoNames, imp)
+		o.fillImportsForType("<"+after, className, classNames, protoNames, imp)
+
+		return
+	}
+
+	typ = strings.Trim(typ, "<>")
+
+	for _, typ := range strings.Split(typ, ", ") {
+		if !slices.Contains(protoNames, typ) {
+			imp.Protos = append(imp.Protos, typ)
+			continue
+		}
+
+		imp.Locals = append(imp.Locals, typ+"-Protocol.h")
+	}
+}
+
+func (o *ObjC) isBuiltInType(typ string) bool {
+	if typ == "" {
+		return true
+	}
+
+	if strings.ContainsAny(typ, "#(:?[{") {
+		return true
+	}
+
+	switch typ[0] {
+	case '"', '@', '^':
+		return o.isBuiltInType(typ[1:])
+	}
+
+	switch typ {
+	case "*", "B", "C", "I", "L", "N", "O", "Q", "R", "S", "V", "b", "c", "d", "f", "i", "l", "n", "o", "q", "r", "s", "v":
+		return true
+	}
+
+	switch before, after, _ := strings.Cut(typ, " "); before {
+	case "_Atomic", "const", "restrict", "volatile":
+		return o.isBuiltInType(after)
+
+	case "_Bool", "_Complex", "_Imaginary", "BOOL", "Class", "IMP", "Ivar", "Method", "SEL", "bool", "char", "class", "double", "enum", "float", "id", "int", "long", "short", "signed", "struct", "union", "unsigned", "void":
+		return true
+	}
+
+	return false
 }
