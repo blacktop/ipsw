@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
