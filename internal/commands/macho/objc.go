@@ -220,21 +220,23 @@ func (o *ObjC) DumpProtocol(pattern string) error {
 
 		for _, proto := range protos {
 			if re.MatchString(proto.Name) {
-				if o.conf.Color {
-					if o.conf.Addrs {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+				if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
+					if o.conf.Color {
+						if o.conf.Addrs {
+							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+						} else {
+							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
+						}
+						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
+						if o.conf.Addrs {
+							fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
+						} else {
+							fmt.Println(swift.DemangleBlob(proto.Verbose()))
+						}
 					}
-					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
-				} else {
-					if o.conf.Addrs {
-						fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
-					} else {
-						fmt.Println(swift.DemangleBlob(proto.Verbose()))
-					}
+					seen[proto.Ptr] = true
 				}
-				seen[proto.Ptr] = true
 			}
 		}
 	}
