@@ -1026,10 +1026,6 @@ func (o *ObjC) isBuiltInType(typ string) bool {
 		return true
 	}
 
-	if strings.Contains(typ, "<") {
-		return false
-	}
-
 	if strings.ContainsAny(typ, "#(:?[{") {
 		return true
 	}
