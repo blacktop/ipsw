@@ -935,7 +935,7 @@ func (o *ObjC) scanFoundation() error {
 	o.foundation["classes"] = []string{}
 	o.foundation["protocols"] = []string{}
 	if o.cache != nil {
-		for _, name := range []string{"Foundation", "CoreFoundation"} {
+		for _, name := range []string{"Foundation", "CoreFoundation", "libobjc.A.dylib"} {
 			img, err := o.cache.Image(name)
 			if err != nil {
 				return err
