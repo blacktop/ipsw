@@ -24,6 +24,8 @@ import (
 // ErrNoObjc is returned when a MachO does not contain objc info
 var ErrNoObjc = errors.New("macho does not contain objc info")
 
+var baseFrameworks = []string{"Foundation", "CoreFoundation", "libobjc.A.dylib"}
+
 // ObjcConfig for MachO ObjC parser
 type ObjcConfig struct {
 	Name     string
@@ -102,7 +104,7 @@ type ObjC struct {
 	cache *dyld.File
 	deps  []*macho.File
 
-	foundation map[string][]string
+	baseFWs map[string][]string
 }
 
 // NewObjC returns a new MachO ObjC parser instance
@@ -112,10 +114,10 @@ func NewObjC(file *macho.File, dsc *dyld.File, conf *ObjcConfig) (*ObjC, error) 
 	}
 
 	o := &ObjC{
-		conf:       conf,
-		file:       file,
-		cache:      dsc,
-		foundation: make(map[string][]string),
+		conf:    conf,
+		file:    file,
+		cache:   dsc,
+		baseFWs: make(map[string][]string),
 	}
 
 	if o.conf.Deps {
@@ -463,7 +465,7 @@ func (o *ObjC) Dump() error {
 func (o *ObjC) Headers() error {
 
 	// scan DSC for Foundation/CoreFoundation classes and protocols
-	if err := o.scanFoundation(); err != nil {
+	if err := o.scanBaseFrameworks(); err != nil {
 		return err
 	}
 
@@ -548,8 +550,10 @@ func (o *ObjC) Headers() error {
 		})
 		seen := make(map[uint64]bool)
 		for _, proto := range protos {
-			if _, found := slices.BinarySearch(o.foundation["protocols"], proto.Name); found {
-				continue // skip Foundation protocols
+			if !slices.Contains(baseFrameworks, o.conf.Name) {
+				if _, found := slices.BinarySearch(o.baseFWs["protocols"], proto.Name); found {
+					continue // skip Foundation protocols
+				}
 			}
 			if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
 				var props []string
@@ -930,18 +934,18 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				}
 			}
 		}
-		imp.uniq(o.foundation)
+		imp.uniq(o.baseFWs)
 		imps[class.Name] = imp
 	}
 
 	return imps, nil
 }
 
-func (o *ObjC) scanFoundation() error {
-	o.foundation["classes"] = []string{}
-	o.foundation["protocols"] = []string{}
+func (o *ObjC) scanBaseFrameworks() error {
+	o.baseFWs["classes"] = []string{}
+	o.baseFWs["protocols"] = []string{}
 	if o.cache != nil {
-		for _, name := range []string{"Foundation", "CoreFoundation", "libobjc.A.dylib"} {
+		for _, name := range baseFrameworks {
 			img, err := o.cache.Image(name)
 			if err != nil {
 				return err
@@ -961,7 +965,7 @@ func (o *ObjC) scanFoundation() error {
 				return cmp.Compare(a.Name, b.Name)
 			})
 			for _, class := range classes {
-				o.foundation["classes"] = append(o.foundation["classes"], class.Name)
+				o.baseFWs["classes"] = append(o.baseFWs["classes"], class.Name)
 			}
 
 			protos, err := m.GetObjCProtocols()
@@ -974,10 +978,10 @@ func (o *ObjC) scanFoundation() error {
 				return cmp.Compare(a.Name, b.Name)
 			})
 			for _, proto := range protos {
-				o.foundation["protocols"] = append(o.foundation["protocols"], proto.Name)
+				o.baseFWs["protocols"] = append(o.baseFWs["protocols"], proto.Name)
 			}
-			slices.Sort(o.foundation["classes"])
-			slices.Sort(o.foundation["protocols"])
+			slices.Sort(o.baseFWs["classes"])
+			slices.Sort(o.baseFWs["protocols"])
 		}
 	}
 	return nil
