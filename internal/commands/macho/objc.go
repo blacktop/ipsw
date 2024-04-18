@@ -890,8 +890,12 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 	}
 
 	for _, class := range classes {
-		imp := Imports{}
-		imp.Imports = append(imp.Imports, class.SuperClass+".h")
+		var imp Imports
+		if slices.Contains(classNames, class.SuperClass) {
+			imp.Locals = append(imp.Locals, class.SuperClass+".h")
+		} else {
+			imp.Classes = append(imp.Classes, class.SuperClass)
+		}
 		for _, prot := range class.Protocols {
 			if slices.Contains(protoNames, prot.Name) {
 				imp.Locals = append(imp.Locals, prot.Name+"-Protocol.h")
