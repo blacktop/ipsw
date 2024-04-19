@@ -21,26 +21,27 @@ import (
 )
 
 const (
-	iphoneWikiApiURL = "https://theapplewiki.com/api.php"
-	ipswPage         = "Firmware"
-	ipswKeysPage     = "Firmware Keys"
-	ipswBetaPage     = "Beta Firmware"
-	rsrPage          = "Rapid Security Responses"
-	rsrBetaPage      = "Beta Rapid Security Responses"
-	otaPage          = "OTA Updates"
-	otaBetaPage      = "Beta OTA Updates"
-	appleTV          = "Apple TV"
-	appleWatch       = "Apple Watch"
-	homePod          = "HomePod"
-	macOS            = "Mac"
-	macServer        = "Mac Server"
-	ibridge          = "iBridge"
-	ipad             = "iPad"
-	ipadAir          = "iPad Air"
-	ipadPro          = "iPad Pro"
-	ipadMini         = "iPad mini"
-	iphone           = "iPhone"
-	ipodTouch        = "iPod touch"
+	iphoneWikiApiURL  = "https://theapplewiki.com/api.php"
+	wikiKeysUrlFmtStr = "https://theapplewiki.com/wiki/Special:Ask/-5B-5B-2DHas-20subobject::%s-5D-5D/-3FHas-20filename=filename/-3FHas-20firmware-20device=device/-3FHas-20key=key/-3FHas-20key-20DevKBAG=devkbag/-3FHas-20key-20IV=iv/-3FHas-20key-20KBAG=kbag/mainlabel=filename/limit=100/offset=0/format=json/searchlabel=Keys/type=simple"
+	ipswPage          = "Firmware"
+	ipswKeysPage      = "Firmware Keys"
+	ipswBetaPage      = "Beta Firmware"
+	rsrPage           = "Rapid Security Responses"
+	rsrBetaPage       = "Beta Rapid Security Responses"
+	otaPage           = "OTA Updates"
+	otaBetaPage       = "Beta OTA Updates"
+	appleTV           = "Apple TV"
+	appleWatch        = "Apple Watch"
+	homePod           = "HomePod"
+	macOS             = "Mac"
+	macServer         = "Mac Server"
+	ibridge           = "iBridge"
+	ipad              = "iPad"
+	ipadAir           = "iPad Air"
+	ipadPro           = "iPad Pro"
+	ipadMini          = "iPad mini"
+	iphone            = "iPhone"
+	ipodTouch         = "iPod touch"
 )
 
 type Queue struct {
@@ -152,55 +153,36 @@ type wikiParseResults struct {
 	Parse wikiParseData `json:"parse"`
 }
 
-type wikiFWKeys struct {
-	Version            string
-	Build              string
-	Device             string
-	Codename           string
-	Baseband           string
-	DownloadURL        string
-	RootFS             string
-	RootFSKey          string
-	UpdateRamdisk      string
-	UpdateRamdiskIV    string
-	RestoreRamdisk     string
-	RestoreRamdiskIV   string
-	AppleLogo          string
-	AppleLogoIV        string
-	BatteryCharging0   string
-	BatteryCharging0IV string
-	BatteryCharging1   string
-	BatteryCharging1IV string
-	BatteryFull        string
-	BatteryFullIV      string
-	BatteryLow0        string
-	BatteryLow0IV      string
-	BatteryLow1        string
-	BatteryLow1IV      string
-	DeviceTree         string
-	DeviceTreeIV       string
-	GlyphPlugin        string
-	GlyphPluginIV      string
-	IBEC               string
-	IBECIV             string
-	IBECKey            string
-	IBoot              string
-	IBootIV            string
-	IBootKey           string
-	IBSS               string
-	IBSSIV             string
-	IBSSKey            string
-	Kernelcache        string
-	KernelcacheIV      string
-	LLB                string
-	LLBIV              string
-	LLBKey             string
-	RecoveryMode       string
-	RecoveryModeIV     string
-	SEPFirmware        string
-	SEPFirmwareIV      string
-	SEPFirmwareKey     string
-	SEPFirmwareKBAG    string
+type WikiFWKeys struct {
+	Filename []string `json:"filename,omitempty"`
+	Device   []string `json:"device,omitempty"`
+	Key      []string `json:"key,omitempty"`
+	Devkbag  []string `json:"devkbag,omitempty"`
+	Iv       []string `json:"iv,omitempty"`
+	Kbag     []string `json:"kbag,omitempty"`
+}
+
+func (k WikiFWKeys) String() string {
+	var out string
+	for i, fn := range k.Filename {
+		out += fmt.Sprintf("‣ %s\n", fn)
+		if len(k.Device) > 0 && len(k.Device[i]) > 0 {
+			out += fmt.Sprintf("  Device: %s\n", k.Device[i])
+		}
+		if len(k.Key) > 0 && len(k.Key[i]) > 0 {
+			out += fmt.Sprintf("  Key: %s\n", k.Key[i])
+		}
+		if len(k.Devkbag) > 0 && len(k.Devkbag[i]) > 0 {
+			out += fmt.Sprintf("  DevKBAG: %s\n", k.Devkbag[i])
+		}
+		if len(k.Iv) > 0 && len(k.Iv[i]) > 0 {
+			out += fmt.Sprintf("  IV:  %s\n", k.Iv[i])
+		}
+		if len(k.Kbag) > 0 && len(k.Kbag[i]) > 0 {
+			out += fmt.Sprintf("  KBAG: %s\n", k.Kbag[i])
+		}
+	}
+	return out
 }
 
 func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, error) {
@@ -707,12 +689,365 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 	return results, nil
 }
 
+func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
+	var deviceID, boardID, productName string
+	var results []WikiFirmware
+
+	fieldCount := 0
+	headerCount := 0
+	ipsw := WikiFirmware{}
+	index2Header := make(map[int]string)
+	header2Values := make(map[string]*Queue)
+
+	db, err := info.GetIpswDB()
+	if err != nil {
+		log.Fatalf("failed to get ipsw db: %v", err)
+	}
+
+	machine := sm.Machine{
+		ID:      "mediawiki",
+		Initial: "title",
+		States: sm.StateMap{
+			"title": sm.MachineState{
+				On: sm.TransitionMap{
+					"start": sm.MachineTransition{
+						To: "start_table",
+					},
+				},
+			},
+			"start_table": sm.MachineState{
+				On: sm.TransitionMap{
+					"read_header": sm.MachineTransition{
+						To: "header",
+					},
+				},
+			},
+			"header": sm.MachineState{
+				On: sm.TransitionMap{
+					"read_subheader": sm.MachineTransition{
+						To: "subheader",
+					},
+				},
+			},
+			"subheader": sm.MachineState{
+				On: sm.TransitionMap{
+					"process_item": sm.MachineTransition{
+						To: "process_item",
+					},
+				},
+			},
+			"process_item": sm.MachineState{
+				On: sm.TransitionMap{
+					// "item_done": sm.MachineTransition{
+					// 	To: "item_done",
+					// },
+					"stop": sm.MachineTransition{
+						To: "end_table",
+					},
+				},
+			},
+			// "item_done": sm.MachineState{
+			// 	On: sm.TransitionMap{
+			// 		"another": sm.MachineTransition{
+			// 			To: "start_item",
+			// 		},
+			// 		"stop": sm.MachineTransition{
+			// 			To: "end_table",
+			// 		},
+			// 	},
+			// },
+			"end_table": sm.MachineState{
+				On: sm.TransitionMap{
+					"done": sm.MachineTransition{
+						To: "title",
+					},
+				},
+			},
+		},
+	}
+
+	parseItem := func(i int) error {
+		switch v := index2Header[i]; v {
+		case "Product Version", "Version":
+			version := header2Values[v].Pop()
+			num, extra, err := getVersionParts(version)
+			if err == nil {
+				ipsw.Version = num
+				ipsw.VersionExtra = extra
+			}
+		case "Prerequisite Version":
+			ipsw.PrerequisiteVersion = strings.Replace(header2Values[v].Pop(), "{{n/a}}", "", -1)
+		case "Prerequisite Build":
+			ipsw.PrerequisiteBuild = strings.Replace(header2Values[v].Pop(), "{{n/a}}", "", -1)
+		case "Build":
+			build := header2Values[v].Pop()
+			build, _, _ = strings.Cut(build, "<")
+			ipsw.Build = build
+		case "Keys":
+			keys := header2Values[v].Pop()
+			if keys == "" {
+				if deviceID != "" {
+					ipsw.Devices = append(ipsw.Devices, deviceID)
+				}
+			} else {
+				var parts []string
+				if strings.Contains(keys, "<br/>") {
+					parts = strings.Split(keys, "<br/>")
+				} else {
+					parts = strings.Split(keys, "<br />")
+				}
+				for _, part := range parts {
+					part = strings.TrimSpace(part)
+					part = strings.Trim(part, "[]")
+					if _, dev, ok := strings.Cut(part, "|"); ok {
+						ipsw.Devices = utils.UniqueAppend(ipsw.Devices, dev)
+					}
+				}
+			}
+		case "Baseband":
+			ipsw.Baseband = header2Values[v].Pop()
+		case "Release Date":
+			// example: "{{date|2017|07|19}}"
+			dstr := header2Values[v].Pop()
+			if dstr != "Preinstalled" {
+				dstr = strings.TrimPrefix(dstr, "{{date|")
+				dstr = strings.TrimSuffix(dstr, "}}")
+				date, error := time.Parse("2006|01|02", dstr)
+				if error == nil {
+					ipsw.ReleaseDate = date
+				}
+			}
+		case "Download URL", "IPSW Download URL", "OTA Download URL":
+			url := header2Values[v].Pop()
+			url = strings.Trim(url, "[]")
+			parts := strings.Split(url, " ")
+			if len(parts) > 1 {
+				url = parts[0]
+			}
+			ipsw.URL = url
+		case "SHA1 Hash":
+			sha := header2Values[v].Pop()
+			sha = strings.TrimPrefix(sha, "<code>")
+			sha = strings.TrimSuffix(sha, "</code>")
+			ipsw.Sha1Hash = sha
+		case "File Size":
+			fstr := header2Values[v].Pop()
+			fs, err := strconv.Atoi(strings.Replace(fstr, ",", "", -1))
+			if err == nil {
+				ipsw.FileSize = fs
+			}
+		case "Release Notes":
+			fallthrough
+		case "Documentation":
+			doc := header2Values[v].Pop()
+			if strings.Contains(doc, "<br") {
+				doc = strings.ReplaceAll(doc, "]<br/>[", "\n")
+				doc = strings.ReplaceAll(doc, "]<br />[", "\n")
+				doc = strings.Trim(doc, "[]")
+				parts := strings.Split(doc, "\n")
+				ipsw.Documentation = append(ipsw.Documentation, parts...)
+			} else {
+				ipsw.Documentation = append(ipsw.Documentation, doc)
+			}
+		default:
+			header2Values[v].Pop() // pop into the ether
+		}
+		if len(ipsw.Product) == 0 && len(productName) > 0 {
+			ipsw.Product = productName
+		}
+		if len(ipsw.BoardID) == 0 && len(boardID) > 0 {
+			ipsw.BoardID = boardID
+		}
+		if len(ipsw.Devices) == 0 {
+			if len(deviceID) > 0 {
+				ipsw.Devices = append(ipsw.Devices, deviceID)
+			} else {
+				if len(productName) > 0 {
+					if prod, _, err := db.GetDeviceForName(productName); err == nil {
+						ipsw.Devices = utils.UniqueAppend(ipsw.Devices, prod)
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(text))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "===") { /* subtitle */
+			if machine.Current() != "title" && machine.Current() != "subtitle" {
+				return nil, fmt.Errorf("subtitle: invalid state '%s'", machine.Current())
+			}
+			deviceID = strings.Trim(strings.TrimSpace(line), "=[] ")
+			bID, dID, ok := strings.Cut(deviceID, "|")
+			if ok {
+				deviceID = dID
+				boardID = bID
+			}
+			// log.Info(deviceID)
+			continue
+		} else if strings.HasPrefix(line, "==") { /* title */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
+			}
+			productName = strings.Trim(strings.TrimSpace(line), "=[] ")
+			bID, dID, ok := strings.Cut(productName, "|")
+			if ok {
+				productName = dID
+				boardID = bID
+			}
+			// log.Info(productName)
+			continue
+		} else if strings.HasPrefix(line, "{|") { /* table start */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("table start: invalid state '%s'", machine.Current())
+			}
+			machine.Transition("start")
+			fieldCount = 0
+			headerCount = 0
+			index2Header = make(map[int]string)
+			header2Values = make(map[string]*Queue)
+			continue
+		} else if strings.HasPrefix(line, "|}") { /* table end */
+			if machine.Current() != "process_item" {
+				return nil, fmt.Errorf("table end: invalid state '%s'", machine.Current())
+			}
+			machine.Transition("stop")
+			for i := 0; i < headerCount; i++ {
+				parseItem(i)
+			}
+			if ipsw.URL != "" {
+				results = append(results, ipsw)
+			}
+			machine.Transition("done")
+			deviceID = ""
+			boardID = ""
+			productName = ""
+		} else if strings.HasPrefix(line, "|-") { /* table row delimiter */
+			switch machine.Current() {
+			case "start_table":
+				machine.Transition("read_header")
+			case "header":
+				machine.Transition("read_subheader")
+			case "subheader":
+				machine.Transition("process_item")
+			case "process_item":
+				for i := 0; i < headerCount; i++ {
+					parseItem(i)
+				}
+				if ipsw.URL != "" {
+					results = append(results, ipsw)
+				}
+				machine.Transition("item_done")
+				ipsw = WikiFirmware{}
+				fieldCount = 0
+			}
+			continue
+		} else if strings.HasPrefix(line, "!") { /* header values */
+			if machine.Current() != "header" && machine.Current() != "subheader" {
+				return nil, fmt.Errorf("parsing header: invalid state '%s'", machine.Current())
+			}
+			if machine.Current() == "header" {
+				line = strings.TrimPrefix(line, "! ")
+				if strings.Contains(line, "rowspan") {
+					_, _, field, err := getRowOrColInc(line)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
+					}
+					index2Header[headerCount] = field
+					header2Values[field] = NewQueue(100)
+					headerCount++
+				} else if strings.Contains(line, "colspan") {
+					_, colInc, field, err := getRowOrColInc(line)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
+					}
+					header2Values[field] = NewQueue(100)
+					for i := 0; i < colInc; i++ {
+						index2Header[headerCount] = field
+						headerCount++
+					}
+				} else {
+					index2Header[headerCount] = line
+					header2Values[line] = NewQueue(100)
+					headerCount++
+				}
+			} else if machine.Current() == "subheader" {
+				// FIXME: this replaces the 2nd colspan header (which works) but it's really supposed to be a sub-header value (and could be ignored?)
+				line = strings.TrimPrefix(line, "! ")
+				if strings.HasPrefix(line, "class=") {
+					_, line, _ = strings.Cut(line, " | ")
+					line = strings.TrimSpace(line)
+				}
+				var last string
+				for i := 0; i < headerCount; i++ {
+					if last == index2Header[i] {
+						index2Header[i] = line
+						header2Values[line] = NewQueue(100)
+						break
+					}
+					last = index2Header[i]
+				}
+			}
+		} else if strings.HasPrefix(line, "|") { /* field values */
+			if machine.Current() == "subheader" {
+				machine.Transition("process_item") // skip missing subheader
+			}
+			if machine.Current() != "process_item" {
+				return nil, fmt.Errorf("parsing items: invalid state '%s'", machine.Current())
+			}
+
+			for fieldCount < len(index2Header)-1 && header2Values[index2Header[fieldCount]].Len() > 0 {
+				fieldCount++
+			}
+
+			line = strings.TrimPrefix(line, "| ")
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "Nowrap") {
+				line = strings.Replace(line, "Nowrap", "", -1)
+			}
+
+			if strings.Contains(line, "colspan") || strings.Contains(line, "rowspan") {
+				rowInc, colInc, field, err := getRowOrColInc(line)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
+				}
+				if colInc > 0 && rowInc > 0 {
+					for i := 0; i < colInc; i++ {
+						for j := 0; j < rowInc; j++ {
+							header2Values[index2Header[fieldCount+i]].Push(field)
+						}
+					}
+				} else if colInc > 0 {
+					for i := 0; i < colInc; i++ {
+						if fieldCount+i < len(header2Values) {
+							header2Values[index2Header[fieldCount+i]].Push(field)
+						}
+					}
+				} else if rowInc > 0 {
+					for i := 0; i < rowInc; i++ {
+						header2Values[index2Header[fieldCount]].Push(field)
+					}
+				}
+			} else {
+				// log.Debugf("field: %s, value: %s", index2Header[fieldCount], line)
+				header2Values[index2Header[fieldCount]].Push(line)
+			}
+		}
+	}
+
+	return results, nil
+}
+
 type WikiConfig struct {
 	Device  string
 	Version string
 	Build   string
 	IPSW    bool
 	OTA     bool
+	Keys    bool
 	Beta    bool
 }
 
@@ -937,8 +1272,8 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, 
 	return otas, nil
 }
 
-func GetWikiFirmwareKeys(proxy string, insecure bool) ([]WikiFirmware, error) {
-	var otas []WikiFirmware
+func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[string]WikiFWKeys, error) {
+	var keys map[string]WikiFWKeys
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -955,7 +1290,7 @@ func GetWikiFirmwareKeys(proxy string, insecure bool) ([]WikiFirmware, error) {
 	q := req.URL.Query()
 	q.Add("format", "json")
 	q.Add("action", "parse")
-	q.Add("page", "OTA Updates")
+	q.Add("page", "Firmware_Keys")
 	q.Add("prop", "links")
 	q.Add("redirects", "true")
 	req.URL.RawQuery = q.Encode()
@@ -982,29 +1317,59 @@ func GetWikiFirmwareKeys(proxy string, insecure bool) ([]WikiFirmware, error) {
 	}
 
 	for _, link := range parseResp.Parse.Links {
-		// if strings.HasPrefix(link.Link, "OTA Updates/") {
-		if strings.HasPrefix(link.Link, "OTA Updates/iPhone/15") {
-
+		if strings.HasPrefix(link.Link, "Firmware Keys/16") {
 			wpage, err := getWikiPage(link.Link, proxy, insecure)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse page %s: %w", link.Link, err)
 			}
 
-			if utils.StrSliceContains(wpage.Parse.ExternalLinks, ".zip") {
-				wtable, err := getWikiTable(link.Link, proxy, insecure)
+			for _, llink := range wpage.Parse.Links {
+				regexStr := fmt.Sprintf("Keys:\\w+\\s%s\\s\\(%s\\)", cfg.Build, cfg.Device)
+				re, err := regexp.Compile(regexStr)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse wikitable for %s: %w", link.Link, err)
+					return nil, fmt.Errorf("failed to compile regexp '%s': %w", regexStr, err)
 				}
-				// parse the wikitable
-				tableIPSWs, err := parseWikiTable(wtable.Parse.WikiText.Text)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse wikitable: %w", err)
+				if re.MatchString(llink.Link) {
+					req, err = http.NewRequest("GET", fmt.Sprintf(wikiKeysUrlFmtStr, llink.Link), nil)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create request: %w", err)
+					}
+
+					resp, err = client.Do(req)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get response: %w", err)
+					}
+					defer resp.Body.Close()
+
+					if resp.StatusCode != http.StatusOK {
+						return nil, fmt.Errorf("failed to get response: %s", resp.Status)
+					}
+
+					data, err = io.ReadAll(resp.Body)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read response: %w", err)
+					}
+
+					if err := json.Unmarshal(data, &keys); err != nil {
+						return nil, fmt.Errorf("failed to parse response: %w", err)
+					}
+
+					return keys, nil
+					// wtable, err := getWikiTable(link.Link, proxy, insecure)
+					// if err != nil {
+					// 	return nil, fmt.Errorf("failed to parse wikitable for %s: %w", link.Link, err)
+					// }
+
+					// // parse the wikitable
+					// tableIPSWs, err := parseWikiTable(wtable.Parse.WikiText.Text)
+					// if err != nil {
+					// 	return nil, fmt.Errorf("failed to parse wikitable: %w", err)
+					// }
+					// keys = append(keys, tableIPSWs...)
 				}
-				fmt.Println(tableIPSWs)
-				// otas = append(otas, tableIPSWs...)
 			}
 		}
 	}
 
-	return otas, nil
+	return nil, fmt.Errorf("failed to find keys for %s %s", cfg.Device, cfg.Build)
 }
