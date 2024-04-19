@@ -403,7 +403,7 @@ var MachoCmd = &cobra.Command{
 							if doDemangle {
 								bind.Name, _ = swift.Demangle(bind.Name)
 							}
-							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 						}
 						w.Flush()
 					}

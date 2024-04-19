@@ -853,7 +853,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, bind := range binds {
-					fmt.Printf("%s:  %s\n", symAddrColor("%#09x", bind.Start+bind.Offset), symNameColor(bind))
+					fmt.Printf("%s:  %s\n", symAddrColor("%#09x", bind.Start+bind.SegOffset), symNameColor(bind))
 				}
 			}
 			if rebases, err := m.GetRebaseInfo(); err == nil {

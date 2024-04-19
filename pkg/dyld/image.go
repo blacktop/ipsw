@@ -974,12 +974,12 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 		if binds, err := m.GetBindInfo(); err == nil {
 			for _, bind := range binds {
 				if dump {
-					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 				} else {
-					i.cache.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
+					i.cache.AddressToSymbol[bind.Start+bind.SegOffset] = bind.Name
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    bind.Name,
-						Address: bind.Start + bind.Offset,
+						Address: bind.Start + bind.SegOffset,
 						Type:    fmt.Sprintf("%s|%s", bind.Kind, bind.Dylib),
 						Kind:    BIND,
 					})
