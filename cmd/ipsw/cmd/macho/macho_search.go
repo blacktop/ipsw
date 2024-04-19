@@ -241,7 +241,7 @@ var machoSearchCmd = &cobra.Command{
 				if binds, err := m.GetBindInfo(); err == nil {
 					for _, bind := range binds {
 						if symRE.MatchString(bind.Name) {
-							fmt.Printf("%#x: %s\t(%s)\n", bind.Start+bind.Offset, colorImage(path), bind.Name)
+							fmt.Printf("%#x: %s\t(%s)\n", bind.Start+bind.SegOffset, colorImage(path), bind.Name)
 							break
 						}
 					}
