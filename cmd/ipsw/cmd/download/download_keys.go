@@ -37,7 +37,8 @@ import (
 func init() {
 	DownloadCmd.AddCommand(downloadKeysCmd)
 
-	downloadKeysCmd.Flags().Bool("beta", false, "Download beta keys")
+	// downloadKeysCmd.Flags().Bool("beta", false, "Download beta keys")
+	downloadKeysCmd.Flags().Bool("json", false, "Output as JSON")
 	downloadKeysCmd.Flags().StringP("output", "o", "", "Folder to download keys to")
 	downloadKeysCmd.MarkFlagDirname("output")
 	downloadKeysCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
@@ -46,8 +47,9 @@ func init() {
 		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
 		c.Parent().HelpFunc()(c, s)
 	})
-	viper.BindPFlag("download.keys.beta", wikiCmd.Flags().Lookup("beta"))
-	viper.BindPFlag("download.keys.output", wikiCmd.Flags().Lookup("output"))
+	// viper.BindPFlag("download.keys.beta", downloadKeysCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.keys.json", downloadKeysCmd.Flags().Lookup("json"))
+	viper.BindPFlag("download.keys.output", downloadKeysCmd.Flags().Lookup("output"))
 }
 
 // downloadKeysCmd represents the keys command
@@ -56,8 +58,7 @@ var downloadKeysCmd = &cobra.Command{
 	Short:         "Download FW keys from The iPhone Wiki",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -66,11 +67,6 @@ var downloadKeysCmd = &cobra.Command{
 
 		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
 		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
 		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
 		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
@@ -83,30 +79,45 @@ var downloadKeysCmd = &cobra.Command{
 		version := viper.GetString("download.version")
 		build := viper.GetString("download.build")
 		// flags
+		asJSON := viper.GetBool("download.keys.json")
 		output := viper.GetString("download.keys.output")
 
 		// validate flags
-		if len(device) == 0 && len(version) == 0 && len(build) == 0 {
-			return fmt.Errorf("must specify at least one of --device, --version, or --build")
+		if len(device) == 0 {
+			return fmt.Errorf("please supply a --device")
+		}
+		if len(version) == 0 && len(build) == 0 {
+			return fmt.Errorf("please supply a --version OR --build")
+		}
+		if len(build) == 0 && len(version) > 0 {
+			build, err = download.GetBuildID(version, device)
+			if err != nil {
+				return fmt.Errorf("failed to query ipsw.me api for version %s (please supply '--build' as well): %v", version, err)
+			}
 		}
 
+		log.Info("Downloading Keys...")
 		keys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
 			Keys:    true,
 			Device:  device,
 			Version: version,
 			Build:   build,
-			Beta:    viper.GetBool("download.key.beta"),
+			// Beta:    viper.GetBool("download.key.beta"),
 		}, proxy, insecure)
 		if err != nil {
 			return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 		}
 
-		if len(output) > 0 {
+		if len(output) > 0 || asJSON {
 			dat, err := json.Marshal(keys)
 			if err != nil {
 				log.Errorf("failed to marshal keys metadata: %v", err)
 			}
-			name := fmt.Sprintf("keys_%s_%s_%s.json", device, version, build)
+			if asJSON {
+				fmt.Println(string(dat))
+				return nil
+			}
+			name := fmt.Sprintf("keys_%s_%s.json", device, build)
 			if err := os.MkdirAll(output, 0o750); err != nil {
 				log.Errorf("failed to create output folder: %v", err)
 			}
