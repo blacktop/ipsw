@@ -41,6 +41,7 @@ func init() {
 	DownloadCmd.AddCommand(gitCmd)
 
 	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
+	gitCmd.Flags().Bool("latest", false, "Get ONLY latest tag")
 	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
@@ -61,6 +62,7 @@ func init() {
 		c.Parent().HelpFunc()(c, s)
 	})
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
+	viper.BindPFlag("download.git.latest", gitCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.git.json", gitCmd.Flags().Lookup("json"))
@@ -74,7 +76,7 @@ var gitCmd = &cobra.Command{
 	Short:         "Download github.com/orgs/apple-oss-distributions tarballs",
 	SilenceUsage:  false,
 	SilenceErrors: false,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -89,6 +91,7 @@ var gitCmd = &cobra.Command{
 		insecure := viper.GetBool("download.insecure")
 		// flags
 		downloadProduct := viper.GetString("download.git.product")
+		latest := viper.GetBool("download.git.latest")
 		outputFolder := viper.GetString("download.git.output")
 		apiToken := viper.GetString("download.git.api")
 		asJSON := viper.GetBool("download.git.json")
@@ -103,55 +106,20 @@ var gitCmd = &cobra.Command{
 			}
 		}
 
-		var err error
-		tags := make(map[string]download.GithubTag)
-
-		if len(apiToken) == 0 {
-			log.Info("Querying github.com/blacktop/ipsw/apple_meta/github/tag_links.json for repositories...")
-			tags, err = download.GetPreprocessedAppleOssTags(proxy, insecure)
-			if err != nil {
-				return fmt.Errorf("failed to get tags from `ipsw` apple_meta: %w", err)
-			}
-		} else {
-			if viper.GetBool("download.git.webkit") { // only download WebKit tags JSON
-				log.Info("Querying github.com/WebKit/WebKit for tags...")
-				wkTags, err := download.WebKitGraphQLTags(proxy, insecure, apiToken)
-				if err != nil {
-					return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
-				}
-				if asJSON {
-					dat, err := json.Marshal(wkTags)
-					if err != nil {
-						return fmt.Errorf("failed to marshal JSON: %v", err)
-					}
-					if len(outputFolder) > 0 {
-						os.MkdirAll(outputFolder, 0750)
-						fpath := filepath.Join(outputFolder, "webkit_tags.json")
-						log.Infof("Creating %s", fpath)
-						if err := os.WriteFile(fpath, dat, 0660); err != nil {
-							return fmt.Errorf("failed to write file: %v", err)
-						}
-					} else {
-						fmt.Println(string(dat))
-					}
-				}
-				return nil
-			}
-
-			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
-			tags, err = download.AppleOssGraphQLTags(proxy, insecure, apiToken)
+		if viper.GetBool("download.git.webkit") { // only download WebKit tags JSON
+			log.Info("Querying github.com/WebKit/WebKit for tags...")
+			wkTags, err := download.WebKitGraphQLTags(proxy, insecure, apiToken)
 			if err != nil {
 				return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
 			}
-
 			if asJSON {
-				dat, err := json.Marshal(tags)
+				dat, err := json.Marshal(wkTags)
 				if err != nil {
 					return fmt.Errorf("failed to marshal JSON: %v", err)
 				}
 				if len(outputFolder) > 0 {
 					os.MkdirAll(outputFolder, 0750)
-					fpath := filepath.Join(outputFolder, "tag_links.json")
+					fpath := filepath.Join(outputFolder, "webkit_tags.json")
 					log.Infof("Creating %s", fpath)
 					if err := os.WriteFile(fpath, dat, 0660); err != nil {
 						return fmt.Errorf("failed to write file: %v", err)
@@ -159,65 +127,90 @@ var gitCmd = &cobra.Command{
 				} else {
 					fmt.Println(string(dat))
 				}
-				return nil
 			}
+			return nil
 		}
-
-		filteredTags := make(map[string]download.GithubTag)
-
-		if len(downloadProduct) > 0 {
-			if val, ok := tags[downloadProduct]; ok {
-				filteredTags[downloadProduct] = val
-			} else {
-				return fmt.Errorf("product %s not found", downloadProduct)
-			}
+		if downloadProduct == "" {
+			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
 		} else {
-			filteredTags = tags
+			log.Infof("Querying github.com/orgs/apple-oss-distributions for %s...", downloadProduct)
+		}
+		limit := 20
+		if latest {
+			limit = 1
+		}
+		tags, err := download.AppleOssGraphQLTags(downloadProduct, limit, proxy, insecure, apiToken)
+		if err != nil {
+			return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
 		}
 
-		for _, tag := range filteredTags {
-			destName := getDestName(tag.TarURL, false)
-			destName = filepath.Join(outputFolder, destName)
-
-			if _, err := os.Stat(destName); os.IsNotExist(err) {
-				log.WithFields(log.Fields{
-					"file": destName,
-				}).Info("Downloading")
-
-				req, err := http.NewRequest("GET", tag.TarURL, nil)
-				if err != nil {
-					return fmt.Errorf("cannot create http request: %v", err)
-				}
-
-				client := &http.Client{
-					Transport: &http.Transport{
-						Proxy:           download.GetProxy(proxy),
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-					},
-				}
-
-				resp, err := client.Do(req)
-				if err != nil {
-					return fmt.Errorf("client failed to perform request: %v", err)
-				}
-				defer resp.Body.Close()
-
-				if resp.StatusCode != 200 {
-					return fmt.Errorf("failed to connect to URL: %s", resp.Status)
-				}
-
-				document, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return fmt.Errorf("failed to read remote tarfile data: %v", err)
-				}
-
-				resp.Body.Close()
-
-				if err := os.WriteFile(destName, document, 0660); err != nil {
-					return fmt.Errorf("failed to write file %s: %v", destName, err)
+		if asJSON {
+			dat, err := json.Marshal(tags)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %v", err)
+			}
+			if len(outputFolder) > 0 {
+				os.MkdirAll(outputFolder, 0750)
+				fpath := filepath.Join(outputFolder, "tag_links.json")
+				log.Infof("Creating %s", fpath)
+				if err := os.WriteFile(fpath, dat, 0660); err != nil {
+					return fmt.Errorf("failed to write file: %v", err)
 				}
 			} else {
-				log.Warnf("file already exists: %s", destName)
+				fmt.Println(string(dat))
+			}
+			return nil
+		}
+
+		for repo, commits := range tags {
+			for _, tag := range commits {
+				destName := getDestName(tag.TarURL, false)
+				if len(outputFolder) > 0 {
+					os.MkdirAll(outputFolder, 0750)
+				}
+				destName = filepath.Join(outputFolder, destName)
+
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
+					log.WithFields(log.Fields{
+						"repo": repo,
+						"file": destName,
+					}).Info("Downloading")
+
+					req, err := http.NewRequest("GET", tag.TarURL, nil)
+					if err != nil {
+						return fmt.Errorf("cannot create http request: %v", err)
+					}
+
+					client := &http.Client{
+						Transport: &http.Transport{
+							Proxy:           download.GetProxy(proxy),
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+						},
+					}
+
+					resp, err := client.Do(req)
+					if err != nil {
+						return fmt.Errorf("client failed to perform request: %v", err)
+					}
+					defer resp.Body.Close()
+
+					if resp.StatusCode != 200 {
+						return fmt.Errorf("failed to connect to URL: %s", resp.Status)
+					}
+
+					document, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return fmt.Errorf("failed to read remote tarfile data: %v", err)
+					}
+
+					resp.Body.Close()
+
+					if err := os.WriteFile(destName, document, 0660); err != nil {
+						return fmt.Errorf("failed to write file %s: %v", destName, err)
+					}
+				} else {
+					log.Warnf("file already exists: %s", destName)
+				}
 			}
 		}
 
