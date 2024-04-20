@@ -1,0 +1,34 @@
+query ($owner: String!, $name: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    refs(refPrefix: "refs/tags/", first: 100, after: $endCursor) {
+      totalCount
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+      nodes {
+        name
+        target {
+          ... on Commit {
+            abbreviatedOid
+            committedDate
+          }
+          ... on Tag {
+            target {
+              ... on Commit {
+                abbreviatedOid
+                committedDate
+                zipballUrl
+                tarballUrl
+                author {
+                  name
+                  date
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

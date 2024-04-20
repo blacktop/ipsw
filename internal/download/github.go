@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )
@@ -21,40 +22,6 @@ const (
 	preprocTagsURL       = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
 	preprocWebKitTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/webkit_tags.json"
 	githubApiURL         = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
-	graphqlQuery         = `query ($endCursor: String) {
-						organization(login: "apple-oss-distributions") {
-							repositories(first: 100, after: $endCursor) {
-								nodes {
-									name
-									refs(refPrefix: "refs/tags/", last: 1) {
-										nodes {
-											name
-											target {
-												__typename
-												... on Tag {
-													commitUrl
-													target {
-														... on Commit {
-															zipballUrl
-															tarballUrl
-															author {
-																name
-																date
-															}
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-								pageInfo {
-									hasNextPage
-									endCursor
-								}
-							}
-						}
-					}`
 )
 
 type GithubRepos []githubRepo
@@ -539,23 +506,6 @@ type Commit struct {
 	TarballURL string `json:"tarballUrl"`
 }
 
-type Repo struct {
-	Name string
-	Ref  struct {
-		Nodes []struct {
-			Name   string
-			Target struct {
-				Tag struct {
-					CommitURL string `json:"commitUrl"`
-					Target    struct {
-						Commit `graphql:"... on Commit"`
-					}
-				} `graphql:"... on Tag"`
-			}
-		}
-	} `graphql:"refs(refPrefix: \"refs/tags/\", last: 1)"`
-}
-
 // GetGithubCommits returns a list of commits for a given pattern
 func GetGithubCommits(org, repo, branch, file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
 	var commits []Commit
@@ -632,9 +582,13 @@ func GetGithubCommits(org, repo, branch, file, pattern string, days int, proxy s
 	return commits, nil
 }
 
+type Repo struct {
+	Name string
+}
+
 // AppleOssGraphQLTags returns a list of apple-oss-distributions tags from the Github GraphQL API
-func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string]GithubTag, error) {
-	tags := make(map[string]GithubTag)
+func AppleOssGraphQLTags(repo string, limit int, proxy string, insecure bool, apikey string) (map[string][]GithubTag, error) {
+	tags := make(map[string][]GithubTag)
 
 	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: apikey},
@@ -642,45 +596,112 @@ func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string
 
 	client := githubv4.NewClient(httpClient)
 
-	var q struct {
-		Organization struct {
-			Repositories struct {
-				Nodes    []Repo
+	var repos []string
+	if len(repo) > 0 {
+		repos = append(repos, repo)
+	} else { // GET ALL THE REPO NAMES
+		var repoQuery struct {
+			Organization struct {
+				Repositories struct {
+					Nodes    []Repo
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage bool
+					}
+				} `graphql:"repositories(first: 100, after: $endCursor)"`
+			} `graphql:"organization(login: $login)"`
+		}
+		variables := map[string]interface{}{
+			"login":     githubv4.String("apple-oss-distributions"),
+			"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+		}
+		for {
+			err := client.Query(context.Background(), &repoQuery, variables)
+			if err != nil {
+				return nil, err
+			}
+			for _, repo := range repoQuery.Organization.Repositories.Nodes {
+				repos = append(repos, repo.Name)
+			}
+			if !repoQuery.Organization.Repositories.PageInfo.HasNextPage {
+				break
+			}
+			variables["endCursor"] = githubv4.String(repoQuery.Organization.Repositories.PageInfo.EndCursor)
+		}
+	}
+
+	var tagQuery struct {
+		Repository struct {
+			Refs struct {
+				Nodes []struct {
+					Name   string
+					Target struct {
+						Tag struct {
+							CommitURL string `json:"commitUrl"`
+							Target    struct {
+								Commit `graphql:"... on Commit"`
+							}
+						} `graphql:"... on Tag"`
+					}
+				}
 				PageInfo struct {
 					EndCursor   githubv4.String
 					HasNextPage bool
 				}
-			} `graphql:"repositories(first: 100, after: $endCursor)"`
-		} `graphql:"organization(login: \"apple-oss-distributions\")"`
+			} `graphql:"refs(refPrefix: \"refs/tags/\", first: $limit, after: $endCursor, orderBy: { field: TAG_COMMIT_DATE, direction: DESC})"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
-		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
-	}
-
-	for {
-		err := client.Query(context.Background(), &q, variables)
-		if err != nil {
-			return nil, err
-		}
-		for _, repo := range q.Organization.Repositories.Nodes {
-			for _, ref := range repo.Ref.Nodes {
-				tags[repo.Name] = GithubTag{
-					Name:   repo.Name,
-					TarURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo.Name, ref.Name),
-					ZipURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", repo.Name, ref.Name),
+	for _, repo := range repos {
+	loop:
+		for {
+			variables := map[string]interface{}{
+				"owner":     githubv4.String("apple-oss-distributions"),
+				"name":      githubv4.String(repo),
+				"limit":     githubv4.Int(limit),
+				"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+			}
+			err := client.Query(context.Background(), &tagQuery, variables)
+			if err != nil {
+				if strings.Contains(err.Error(), "API rate limit exceeded") ||
+					strings.Contains(err.Error(), "was submitted too quickly") {
+					// rate limit
+					var rateLimitQuery struct {
+						RateLimit struct {
+							ResetAt githubv4.DateTime
+						}
+					}
+					if err := client.Query(context.Background(), &rateLimitQuery, variables); err != nil {
+						return nil, fmt.Errorf("failed to query GraphQL API for rate limit: %w", err)
+					}
+					resetTime := rateLimitQuery.RateLimit.ResetAt.Time
+					log.Warnf("rate limit exceeded, waiting for %s", time.Until(resetTime))
+					time.Sleep(time.Until(resetTime) + 1*time.Second)
+					goto loop
+				} else {
+					return nil, fmt.Errorf("failed to query GraphQL API for %s tags: %w", repo, err)
+				}
+			}
+			for _, ref := range tagQuery.Repository.Refs.Nodes {
+				tags[repo] = append(tags[repo], GithubTag{
+					Name:   ref.Name,
+					TarURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo, ref.Name),
+					ZipURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", repo, ref.Name),
 					Commit: GithubCommit{
 						SHA:  string(ref.Target.Tag.Target.Commit.OID),
 						URL:  ref.Target.Tag.CommitURL,
 						Date: ref.Target.Tag.Target.Commit.Author.Date.Time,
 					},
+				})
+				if len(tags[repo]) == limit {
+					break loop
 				}
 			}
+			if !tagQuery.Repository.Refs.PageInfo.HasNextPage {
+				break
+			}
+			variables["endCursor"] = githubv4.String(tagQuery.Repository.Refs.PageInfo.EndCursor)
 		}
-		if !q.Organization.Repositories.PageInfo.HasNextPage {
-			break
-		}
-		variables["endCursor"] = githubv4.NewString(q.Organization.Repositories.PageInfo.EndCursor)
 	}
 
 	return tags, nil
