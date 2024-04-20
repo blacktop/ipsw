@@ -1317,7 +1317,7 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 	}
 
 	for _, link := range parseResp.Parse.Links {
-		if strings.HasPrefix(link.Link, "Firmware Keys/16") {
+		if strings.HasPrefix(link.Link, "Firmware Keys/") {
 			wpage, err := getWikiPage(link.Link, proxy, insecure)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse page %s: %w", link.Link, err)
