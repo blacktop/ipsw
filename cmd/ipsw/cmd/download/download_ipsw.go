@@ -22,6 +22,7 @@ THE SOFTWARE.
 package download
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	"github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -52,6 +54,7 @@ func init() {
 	ipswCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
+	ipswCmd.Flags().Bool("decrypt", false, "Attempt to decrypt the partial files if keys are available")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	ipswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
@@ -68,6 +71,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.dyld-arch", ipswCmd.Flags().Lookup("dyld-arch"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.ipsw.decrypt", ipswCmd.Flags().Lookup("decrypt"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ipsw.urls", ipswCmd.Flags().Lookup("urls"))
@@ -134,6 +138,7 @@ var ipswCmd = &cobra.Command{
 		dyldArches := viper.GetStringSlice("download.ipsw.dyld-arch")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		remotePattern := viper.GetString("download.ipsw.pattern")
+		decrypt := viper.GetBool("download.ipsw.decrypt")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
 
@@ -352,8 +357,50 @@ var ipswCmd = &cobra.Command{
 						if out, err := extract.Search(config); err != nil {
 							return err
 						} else {
+							cwd, _ := os.Getwd()
 							for _, f := range out {
-								utils.Indent(log.Info, 2)("Created " + f)
+								utils.Indent(log.Info, 2)("Created " + strings.TrimPrefix(f, cwd))
+							}
+							if decrypt {
+								log.Info("Searching for keys to decrypt files")
+								if keys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+									Keys:    true,
+									Device:  ipsw.Identifier,
+									Version: ipsw.Version,
+									Build:   ipsw.BuildID,
+								}, proxy, insecure); err == nil {
+									for _, key := range keys {
+										for idx, f := range key.Filename {
+											var in string
+											for _, o := range out {
+												if strings.HasSuffix(strings.ToLower(o), strings.ToLower(strings.ReplaceAll(f, " ", "_"))) {
+													in = o
+													break
+												}
+											}
+											if len(in) == 0 {
+												continue // not found
+											}
+											if len(key.Key) > 0 && len(key.Key[idx]) > 0 && key.Key[idx] != "Unknown" &&
+												len(key.Iv) > 0 && len(key.Iv[idx]) > 0 && key.Iv[idx] != "Unknown" {
+												iv, err := hex.DecodeString(key.Iv[idx])
+												if err != nil {
+													return fmt.Errorf("failed to decode --iv-key: %v", err)
+												}
+												k, err := hex.DecodeString(key.Key[idx])
+												if err != nil {
+													return fmt.Errorf("failed to decode --iv-key: %v", err)
+												}
+												utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
+												if err := img4.DecryptPayload(in, in+".dec", iv, k); err != nil {
+													return fmt.Errorf("failed to decrypt %s: %v", in, err)
+												}
+											}
+										}
+									}
+								} else {
+									return fmt.Errorf("failed to get decrypt files: %v", err)
+								}
 							}
 						}
 					}

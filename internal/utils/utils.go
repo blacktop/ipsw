@@ -257,6 +257,7 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 				artifacts = append(artifacts, fname)
 			} else {
 				Indent(log.Warn, 2)(fmt.Sprintf("%s already exists", fname))
+				artifacts = append(artifacts, fname)
 			}
 		}
 	}

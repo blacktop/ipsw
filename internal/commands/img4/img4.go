@@ -50,10 +50,6 @@ func DecryptPayload(path, output string, iv, key []byte) error {
 
 	mode.CryptBlocks(i.Data, i.Data)
 
-	if len(output) == 0 {
-		output = path + ".dec"
-	}
-
 	of, err := os.Create(output)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %v", output, err)
@@ -69,7 +65,6 @@ func DecryptPayload(path, output string, iv, key []byte) error {
 		r = bytes.NewReader(i.Data)
 	}
 
-	utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", output))
 	if _, err = io.Copy(of, r); err != nil {
 		return fmt.Errorf("failed to decompress to file %s: %v", output, err)
 	}

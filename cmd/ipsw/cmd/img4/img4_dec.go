@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -88,7 +89,7 @@ var decImg4Cmd = &cobra.Command{
 				return fmt.Errorf("failed to decode --iv-key: %v", err)
 			}
 		}
-
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", outputFile))
 		return icmd.DecryptPayload(args[0], outputFile, iv, key)
 	},
 }

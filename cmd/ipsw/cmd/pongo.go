@@ -207,7 +207,9 @@ var pongoCmd = &cobra.Command{
 
 		if viper.GetBool("pongo.decrypt") {
 			for _, kbag := range kbags.Files {
-				if err := icmd.DecryptPayload(filepath.Join(destPath, kbag.Name), "", kbag.Keybags[2].IV, kbag.Keybags[2].Key); err != nil {
+				fname := filepath.Join(destPath, kbag.Name)
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", fname+".dec"))
+				if err := icmd.DecryptPayload(fname, fname+".dec", kbag.Keybags[2].IV, kbag.Keybags[2].Key); err != nil {
 					return fmt.Errorf("failed to decrypt payload: %v", err)
 				}
 			}
