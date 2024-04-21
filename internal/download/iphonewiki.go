@@ -1359,17 +1359,6 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 					}
 
 					return keys, nil
-					// wtable, err := getWikiTable(link.Link, proxy, insecure)
-					// if err != nil {
-					// 	return nil, fmt.Errorf("failed to parse wikitable for %s: %w", link.Link, err)
-					// }
-
-					// // parse the wikitable
-					// tableIPSWs, err := parseWikiTable(wtable.Parse.WikiText.Text)
-					// if err != nil {
-					// 	return nil, fmt.Errorf("failed to parse wikitable: %w", err)
-					// }
-					// keys = append(keys, tableIPSWs...)
 				}
 			}
 		}
