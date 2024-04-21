@@ -44,7 +44,7 @@ func init() {
 	downloadKeysCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
+		DownloadCmd.PersistentFlags().MarkHidden("model")
 		c.Parent().HelpFunc()(c, s)
 	})
 	// viper.BindPFlag("download.keys.beta", downloadKeysCmd.Flags().Lookup("beta"))
@@ -92,7 +92,7 @@ var downloadKeysCmd = &cobra.Command{
 		if len(build) == 0 && len(version) > 0 {
 			build, err = download.GetBuildID(version, device)
 			if err != nil {
-				return fmt.Errorf("failed to query ipsw.me api for version %s (please supply '--build' as well): %v", version, err)
+				return fmt.Errorf("failed to query ipsw.me api for --version %s (please supply '--build' instead): %v", version, err)
 			}
 		}
 
@@ -105,7 +105,7 @@ var downloadKeysCmd = &cobra.Command{
 			// Beta:    viper.GetBool("download.key.beta"),
 		}, proxy, insecure)
 		if err != nil {
-			return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
+			return fmt.Errorf("failed querying theapplewiki.com: %v", err)
 		}
 
 		if len(output) > 0 || asJSON {

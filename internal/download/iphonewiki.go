@@ -1350,6 +1350,10 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 						return nil, fmt.Errorf("failed to read response: %w", err)
 					}
 
+					if len(data) == 0 {
+						return nil, fmt.Errorf("no keys on wiki for %s %s", cfg.Device, cfg.Build)
+					}
+
 					if err := json.Unmarshal(data, &keys); err != nil {
 						return nil, fmt.Errorf("failed to parse response: %w", err)
 					}
