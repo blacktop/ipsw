@@ -298,7 +298,7 @@ type Exception struct {
 
 type Register struct {
 	Value             uint64 `json:"value,omitempty"`
-	SymbolLocation    int    `json:"symbolLocation,omitempty"`
+	SymbolLocation    uint64 `json:"symbolLocation,omitempty"`
 	Symbol            string `json:"symbol,omitempty"`
 	Description       string `json:"description,omitempty"`
 	MatchesCrashFrame int    `json:"matchesCrashFrame,omitempty"`
