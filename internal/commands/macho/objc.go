@@ -988,13 +988,13 @@ func (o *ObjC) scanBaseFrameworks() error {
 }
 
 func (o *ObjC) fillImportsForType(typ string, className string, classNames []string, protoNames []string, imp *Imports) {
-	if o.isBuiltInType(typ) {
-		return
-	}
-
 	typ = strings.Trim(typ, ` "*@^`)
 
 	if !strings.Contains(typ, "<") {
+		if o.isBuiltInType(typ) {
+			return
+		}
+
 		if !slices.Contains(classNames, typ) {
 			imp.Classes = append(imp.Classes, typ)
 			return
