@@ -578,7 +578,7 @@ func (o *ObjC) Headers() error {
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
 					Name:          proto.Name + "_Protocol",
-					Imports:       imps[proto.Name],
+					Imports:       imps[proto.Name+"-Protocol"],
 					Object:        swift.DemangleBlob(proto.Verbose()),
 				}); err != nil {
 					return err
@@ -987,7 +987,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		imp.uniq(o.baseFWs)
-		imps[proto.Name] = imp
+		imps[proto.Name+"-Protocol"] = imp
 	}
 
 	return imps, nil
