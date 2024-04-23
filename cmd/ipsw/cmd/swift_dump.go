@@ -106,8 +106,8 @@ var swiftDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
 		}
 
-		if len(viper.GetString("class-dump.output")) > 0 {
-			if err := os.MkdirAll(viper.GetString("class-dump.output"), 0o750); err != nil {
+		if len(viper.GetString("swift-dump.output")) > 0 {
+			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {
 				return err
 			}
 		}
@@ -147,17 +147,17 @@ var swiftDumpCmd = &cobra.Command{
 					shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
 				}
 
-				if len(viper.GetString("class-dump.arch")) > 0 {
+				if len(viper.GetString("swift-dump.arch")) > 0 {
 					found := false
 					for i, opt := range shortOptions {
-						if strings.Contains(strings.ToLower(opt), strings.ToLower(viper.GetString("class-dump.arch"))) {
+						if strings.Contains(strings.ToLower(opt), strings.ToLower(viper.GetString("swift-dump.arch"))) {
 							m = fat.Arches[i].File
 							found = true
 							break
 						}
 					}
 					if !found {
-						return fmt.Errorf("--arch '%s' not found in: %s", viper.GetString("class-dump.arch"), strings.Join(shortOptions, ", "))
+						return fmt.Errorf("--arch '%s' not found in: %s", viper.GetString("swift-dump.arch"), strings.Join(shortOptions, ", "))
 					}
 				} else {
 					choice := 0
@@ -169,7 +169,7 @@ var swiftDumpCmd = &cobra.Command{
 					m = fat.Arches[choice].File
 				}
 			}
-			if viper.GetBool("class-dump.deps") {
+			if viper.GetBool("swift-dump.deps") {
 				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
 			}
 
@@ -233,7 +233,7 @@ var swiftDumpCmd = &cobra.Command{
 		}
 
 		if viper.GetString("swift-dump.type") != "" {
-			if err := s.DumpType(viper.GetString("class-dump.type")); err != nil {
+			if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
 				return err
 			}
 		}
