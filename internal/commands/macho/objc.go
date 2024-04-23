@@ -1057,7 +1057,7 @@ func (o *ObjC) isBuiltInType(typ string) bool {
 	}
 
 	switch typ {
-	case "*", "B", "C", "D", "I", "L", "Q", "S", "c", "d", "f", "i", "l", "q", "s", "v":
+	case "*", "B", "C", "D", "I", "L", "Q", "S", "T", "c", "d", "f", "i", "l", "q", "s", "t", "v":
 		return true
 	}
 
