@@ -578,7 +578,7 @@ func (o *ObjC) Headers() error {
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
 					Name:          proto.Name + "_Protocol",
-					Imports:       imps[proto.Name],
+					Imports:       imps[proto.Name+"-Protocol"],
 					Object:        swift.DemangleBlob(proto.Verbose()),
 				}); err != nil {
 					return err
@@ -891,7 +891,6 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 	})
 	for _, proto := range protos {
 		protoNames = append(protoNames, proto.Name)
-		//TODO: parse protocol properties and methods and add to imports etc
 	}
 
 	for _, class := range classes {
@@ -910,16 +909,16 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		}
 		for _, ivar := range class.Ivars {
 			typ := ivar.Type
-			o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
+			o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
 		}
 		for _, prop := range class.Props {
 			typ := prop.Type()
-			o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
+			o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
 		}
 		for _, method := range class.InstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
+				o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
 				if i == 0 {
 					i += 2
 				}
@@ -928,7 +927,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range class.ClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, class.Name, classNames, protoNames, &imp)
+				o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
 				if i == 0 {
 					i += 2
 				}
@@ -936,6 +935,59 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		}
 		imp.uniq(o.baseFWs)
 		imps[class.Name] = imp
+	}
+
+	for _, proto := range protos {
+		var imp Imports
+		for _, prot := range proto.Prots {
+			if slices.Contains(protoNames, prot.Name) {
+				imp.Locals = append(imp.Locals, prot.Name+"-Protocol.h")
+			} else {
+				imp.Protos = append(imp.Protos, prot.Name)
+			}
+		}
+		for _, prop := range proto.InstanceProperties {
+			typ := prop.Type()
+			o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+		}
+		for _, method := range proto.InstanceMethods {
+			for i := 0; i < method.NumberOfArguments(); i++ {
+				typ := method.ArgumentType(i)
+				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if i == 0 {
+					i += 2
+				}
+			}
+		}
+		for _, method := range proto.ClassMethods {
+			for i := 0; i < method.NumberOfArguments(); i++ {
+				typ := method.ArgumentType(i)
+				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if i == 0 {
+					i += 2
+				}
+			}
+		}
+		for _, method := range proto.OptionalInstanceMethods {
+			for i := 0; i < method.NumberOfArguments(); i++ {
+				typ := method.ArgumentType(i)
+				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if i == 0 {
+					i += 2
+				}
+			}
+		}
+		for _, method := range proto.OptionalClassMethods {
+			for i := 0; i < method.NumberOfArguments(); i++ {
+				typ := method.ArgumentType(i)
+				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if i == 0 {
+					i += 2
+				}
+			}
+		}
+		imp.uniq(o.baseFWs)
+		imps[proto.Name+"-Protocol"] = imp
 	}
 
 	return imps, nil
@@ -987,7 +1039,7 @@ func (o *ObjC) scanBaseFrameworks() error {
 	return nil
 }
 
-func (o *ObjC) fillImportsForType(typ string, className string, classNames []string, protoNames []string, imp *Imports) {
+func (o *ObjC) fillImportsForType(typ string, className string, protoName string, classNames []string, protoNames []string, imp *Imports) {
 	typ = strings.Trim(typ, ` "*@^`)
 
 	if !strings.Contains(typ, "<") {
@@ -1013,8 +1065,8 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 	if !strings.HasPrefix(typ, "<") {
 		before, after, _ := strings.Cut(typ, "<")
 
-		o.fillImportsForType(before, className, classNames, protoNames, imp)
-		o.fillImportsForType("<"+after, className, classNames, protoNames, imp)
+		o.fillImportsForType(before, className, protoName, classNames, protoNames, imp)
+		o.fillImportsForType("<"+after, className, protoName, classNames, protoNames, imp)
 
 		return
 	}
@@ -1036,7 +1088,9 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 			continue
 		}
 
-		imp.Locals = append(imp.Locals, typ+"-Protocol.h")
+		if typ != protoName {
+			imp.Locals = append(imp.Locals, typ+"-Protocol.h")
+		}
 	}
 }
 
