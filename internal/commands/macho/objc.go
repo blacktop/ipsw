@@ -1019,6 +1019,15 @@ func (o *ObjC) fillImportsForType(typ string, className string, classNames []str
 		return
 	}
 
+	if !strings.HasSuffix(typ, ">") {
+		before, after, _ := strings.Cut(typ, ">")
+
+		o.fillImportsForType(before+">", className, protoName, classNames, protoNames, imp)
+		o.fillImportsForType(after, className, protoName, classNames, protoNames, imp)
+
+		return
+	}
+
 	typ = strings.Trim(typ, "<>")
 
 	for _, typ := range strings.Split(typ, ", ") {
@@ -1036,17 +1045,19 @@ func (o *ObjC) isBuiltInType(typ string) bool {
 		return true
 	}
 
-	if strings.ContainsAny(typ, "#(:?[{") {
+	if strings.ContainsAny(typ, "!#(:?[{") {
 		return true
 	}
 
 	switch typ[0] {
-	case '"', '@', '^':
+	case '"', '@', 'A', 'N', 'O', 'R', 'V', '^', 'b', 'j', 'n', 'o', 'r':
 		return o.isBuiltInType(typ[1:])
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return true
 	}
 
 	switch typ {
-	case "*", "B", "C", "I", "L", "N", "O", "Q", "R", "S", "V", "b", "c", "d", "f", "i", "l", "n", "o", "q", "r", "s", "v":
+	case "*", "B", "C", "D", "I", "L", "Q", "S", "c", "d", "f", "i", "l", "q", "s", "v":
 		return true
 	}
 
