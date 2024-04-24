@@ -803,6 +803,10 @@ func (o *ObjC) XCFramework() error {
 	return o.Headers()
 }
 
+func (o *ObjC) SwiftPackage() error {
+	panic("not implemented yet")
+}
+
 /* utils */
 
 func writeHeader(hdr *headerInfo) error {
