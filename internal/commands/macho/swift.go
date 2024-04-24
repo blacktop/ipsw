@@ -624,7 +624,7 @@ func (s *Swift) Dump() error {
 
 // Interface outputs Swift swift-dump interface from a MachO
 func (s *Swift) Interface() error {
-	panic("not implemented")
+	panic("not implemented yet")
 }
 
 /* UTILS */
