@@ -57,10 +57,11 @@ func getImages(dscPath string) []string {
 func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
-	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
 	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
+	classDumpCmd.Flags().BoolP("spm", "s", false, "🚧 Generate a Swift Package for the dylib")
 	classDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names (same as verbose)")
+	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
 	classDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
 	classDumpCmd.MarkFlagDirname("output")
 	classDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
@@ -73,11 +74,13 @@ func init() {
 	classDumpCmd.Flags().Bool("refs", false, "Dump ObjC references too")
 	classDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
 	classDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
+	classDumpCmd.MarkFlagsMutuallyExclusive("headers", "xcfw", "spm")
 
-	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.xcfw", classDumpCmd.Flags().Lookup("xcfw"))
+	viper.BindPFlag("class-dump.spm", classDumpCmd.Flags().Lookup("spm"))
 	viper.BindPFlag("class-dump.demangle", classDumpCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("class-dump.class", classDumpCmd.Flags().Lookup("class"))
 	viper.BindPFlag("class-dump.proto", classDumpCmd.Flags().Lookup("proto"))
@@ -116,10 +119,12 @@ var classDumpCmd = &cobra.Command{
 				viper.GetString("class-dump.proto") != "" ||
 				viper.GetString("class-dump.cat") != "") {
 			return fmt.Errorf("cannot dump --headers and use --class, --protocol or --category flags")
-		} else if viper.GetBool("class-dump.headers") && viper.GetBool("class-dump.xcfw") {
-			return fmt.Errorf("cannot dump --headers and use --xcfw flag")
+		} else if viper.GetBool("class-dump.headers") && (viper.GetBool("class-dump.xcfw") || viper.GetBool("class-dump.spm")) {
+			return fmt.Errorf("cannot dump --headers and use --xcfw or --spm flags")
 		} else if viper.GetBool("class-dump.re") && !Verbose {
 			return fmt.Errorf("cannot use --re without --verbose")
+		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") || viper.GetBool("class-dump.xcfw") || viper.GetBool("class-dump.spm")) {
+			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
 		}
 
 		if len(viper.GetString("class-dump.output")) > 0 {
@@ -227,6 +232,10 @@ var classDumpCmd = &cobra.Command{
 
 		if viper.GetBool("class-dump.xcfw") {
 			return o.XCFramework()
+		}
+
+		if viper.GetBool("class-dump.spm") {
+			return o.SwiftPackage()
 		}
 
 		if viper.GetString("class-dump.class") != "" {
