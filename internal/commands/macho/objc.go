@@ -34,7 +34,6 @@ type ObjcConfig struct {
 	Headers  bool
 	ObjcRefs bool
 	Deps     bool
-	Demangle bool
 
 	IpswVersion string
 

@@ -60,6 +60,7 @@ func init() {
 	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
 	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
+	classDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names (same as verbose)")
 	classDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
 	classDumpCmd.MarkFlagDirname("output")
 	classDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
@@ -76,6 +77,7 @@ func init() {
 	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.xcfw", classDumpCmd.Flags().Lookup("xcfw"))
+	viper.BindPFlag("class-dump.demangle", classDumpCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("class-dump.class", classDumpCmd.Flags().Lookup("class"))
 	viper.BindPFlag("class-dump.proto", classDumpCmd.Flags().Lookup("proto"))
@@ -127,7 +129,7 @@ var classDumpCmd = &cobra.Command{
 		}
 
 		conf := mcmd.ObjcConfig{
-			Verbose:     Verbose,
+			Verbose:     Verbose || viper.GetBool("class-dump.demangle"),
 			Addrs:       viper.GetBool("class-dump.re"),
 			Headers:     viper.GetBool("class-dump.headers"),
 			ObjcRefs:    viper.GetBool("class-dump.refs"),
