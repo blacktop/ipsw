@@ -261,8 +261,8 @@ var swiftDumpCmd = &cobra.Command{
 
 		if viper.GetString("swift-dump.type") == "" &&
 			viper.GetString("swift-dump.proto") == "" &&
-			viper.GetString("cswiftlass-dump.ext") == "" &&
-			viper.GetString("cswiftlass-dump.ass") == "" {
+			viper.GetString("swift-dump.ext") == "" &&
+			viper.GetString("swift-dump.ass") == "" {
 			return s.Dump()
 		}
 
