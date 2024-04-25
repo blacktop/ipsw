@@ -102,8 +102,8 @@ var swiftDumpCmd = &cobra.Command{
 		if viper.GetBool("swift-dump.interface") &&
 			(viper.GetString("swift-dump.type") != "" ||
 				viper.GetString("swift-dump.proto") != "" ||
-				viper.GetString("swift-dump.ext") != "") ||
-			viper.GetString("swift-dump.ass") != "" {
+				viper.GetString("swift-dump.ext") != "" ||
+				viper.GetString("swift-dump.ass") != "") {
 			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
 		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") {
 			return fmt.Errorf("cannot set --output without setting --interface")
@@ -261,8 +261,8 @@ var swiftDumpCmd = &cobra.Command{
 
 		if viper.GetString("swift-dump.type") == "" &&
 			viper.GetString("swift-dump.proto") == "" &&
-			viper.GetString("cswiftlass-dump.ext") == "" &&
-			viper.GetString("cswiftlass-dump.ass") == "" {
+			viper.GetString("swift-dump.ext") == "" &&
+			viper.GetString("swift-dump.ass") == "" {
 			return s.Dump()
 		}
 
