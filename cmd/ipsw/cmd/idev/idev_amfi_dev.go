@@ -94,8 +94,12 @@ var idevAmfiDevModeCmd = &cobra.Command{
 
 			if postRestart {
 				awake := make(chan bool)
+				defer close(awake)
 				errs := make(chan error)
+				defer close(errs)
+
 				log.Warn("Waiting for device to reboot...")
+
 				go func() {
 					rebooting := false
 					for {
