@@ -105,8 +105,8 @@ var idevAmfiDevModeCmd = &cobra.Command{
 					for {
 						hb, err := heartbeat.NewClient(udid)
 						if err != nil {
+							log.Debugf("failed to connect to heartbeat: %v", err)
 							rebooting = true
-							// log.WithError(err).Error("failed to connect to heartbeat")
 							time.Sleep(1 * time.Second)
 							continue // ignore heartbeat connection errors (device may be rebooting)
 						}
