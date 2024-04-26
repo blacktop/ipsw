@@ -39,7 +39,7 @@ import (
 func init() {
 	AmfiCmd.AddCommand(idevAmfiDevModeCmd)
 
-	idevAmfiDevModeCmd.Flags().BoolP("post", "p", false, "Enable post restart")
+	idevAmfiDevModeCmd.Flags().BoolP("post", "p", false, "Enable post restart (acknowledges prompt after reboot)")
 }
 
 // idevAmfiDevModeCmd represents the push command
@@ -95,7 +95,7 @@ var idevAmfiDevModeCmd = &cobra.Command{
 			if postRestart {
 				awake := make(chan bool)
 				errs := make(chan error)
-
+				log.Warn("Waiting for device to reboot...")
 				go func() {
 					rebooting := false
 					for {
