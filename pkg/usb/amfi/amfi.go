@@ -9,6 +9,8 @@ import (
 
 const serviceName = "com.apple.amfi.lockdown"
 
+var ErrPasscodeSet = fmt.Errorf("Device has a passcode set")
+
 type AmfiAction struct {
 	Action int `plist:"action,omitempty"`
 }
@@ -34,36 +36,55 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) EnableDeveloperMode() error {
-	req := &AmfiAction{Action: 1}
 	var resp Response
-	if err := c.c.Request(req, &resp); err != nil {
+	if err := c.c.Request(&AmfiAction{Action: 1}, &resp); err != nil {
 		return err
 	}
 
 	if err, ok := resp["Error"]; ok {
-		return fmt.Errorf("failed to enable developer mode: %s", err)
+		if err == "Device has a passcode set" {
+			return ErrPasscodeSet
+		}
+		return fmt.Errorf("failed to enable Developer Mode: %s", err)
 	}
 
-	if success, ok := resp["success"]; ok && !success.(bool) {
-		return fmt.Errorf("failed to enable developer mode: success=%t", success)
+	if success, ok := resp["success"]; ok {
+		switch v := success.(type) {
+		case uint64:
+			if v != 1 {
+				return fmt.Errorf("failed to enable Developer Mode: success=%d", v)
+			}
+		case bool:
+			if !v {
+				return fmt.Errorf("failed to enable Developer Mode: success=%t", v)
+			}
+		}
 	}
 
 	return nil
 }
 
 func (c *Client) EnableDeveloperModePostRestart() error {
-	req := &AmfiAction{Action: 2}
 	var resp Response
-	if err := c.c.Request(req, &resp); err != nil {
+	if err := c.c.Request(&AmfiAction{Action: 2}, &resp); err != nil {
 		return err
 	}
 
 	if err, ok := resp["Error"]; ok {
-		return fmt.Errorf("failed to enable developer mode: %s", err)
+		return fmt.Errorf("failed to enable Developer Mode: %s", err)
 	}
 
-	if success, ok := resp["success"]; ok && !success.(bool) {
-		return fmt.Errorf("failed to enable developer mode: success=%t", success)
+	if success, ok := resp["success"]; ok {
+		switch v := success.(type) {
+		case uint64:
+			if v != 1 {
+				return fmt.Errorf("failed to enable Developer Mode: success=%d", v)
+			}
+		case bool:
+			if !v {
+				return fmt.Errorf("failed to enable Developer Mode: success=%t", v)
+			}
+		}
 	}
 
 	return nil
