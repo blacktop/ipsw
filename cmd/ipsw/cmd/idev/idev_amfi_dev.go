@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/amfi"
 	"github.com/blacktop/ipsw/pkg/usb/heartbeat"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -56,13 +55,12 @@ var idevAmfiDevModeCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
-
+		// flags
 		udid, _ := cmd.Flags().GetString("udid")
 		postRestart, _ := cmd.Flags().GetBool("post")
 
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
@@ -71,7 +69,7 @@ var idevAmfiDevModeCmd = &cobra.Command{
 
 		ok, err := utils.IsDeveloperModeEnabled(udid)
 		if err != nil {
-			return fmt.Errorf("failed to check if Developer Mode is enabled for device %s: %w", dev.UniqueDeviceID, err)
+			return fmt.Errorf("failed to check if Developer Mode is enabled for device %s: %w", udid, err)
 		}
 
 		if ok {
