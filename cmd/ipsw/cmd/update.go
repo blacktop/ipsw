@@ -59,6 +59,8 @@ var updateCmd = &cobra.Command{
 	Short:         "Download an ipsw update if one exists",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true, // NOTE: this is hidden because I believe it is no longer needed
+	// (but in case others are using it in automated scripts etc I'll leave it in for now)
 	Example: `# Grab an update for your platform
 ❯ ipsw update --detect
 # Grab an update for another platform
