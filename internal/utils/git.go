@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,29 +11,63 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/go-git/go-git/v5"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"golang.org/x/sys/execabs"
 	"golang.org/x/term"
 )
 
 // GitClone clones a git repo
 func GitClone(repo, dst string) (string, error) {
-	cmd := exec.Command("git", "clone", "--depth", "1", repo, dst)
-	dat, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to clone repo '%s' to %s: %v", repo, dst, err)
+	if _, err := execabs.LookPath("git"); err == nil {
+		cmd := exec.Command("git", "clone", "--depth", "1", repo, dst)
+		dat, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to clone repo '%s' to %s: %v", repo, dst, err)
+		}
+		return string(dat), nil
+	} else { // use pure Go version of git
+		if _, err := git.PlainClone(dst, false, &git.CloneOptions{
+			URL:      repo,
+			Depth:    1,
+			Progress: os.Stderr,
+		}); err != nil {
+			return "", fmt.Errorf("failed to create local copy of 'appledb' repo: %v", err)
+		}
+		return "", nil
 	}
-	return string(dat), nil
 }
 
 // GitRefresh refreshes a git repo
 func GitRefresh(repoPath string) (string, error) {
-	cmd := exec.Command("git", "pull", "--rebase")
-	cmd.Dir = repoPath
-	dat, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to refresh repo '%s': %v", repoPath, err)
+	if _, err := execabs.LookPath("git"); err == nil {
+		cmd := exec.Command("git", "pull", "--rebase")
+		cmd.Dir = repoPath
+		dat, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to refresh repo '%s': %v", repoPath, err)
+		}
+		return string(dat), nil
+	} else { // use pure Go version of git
+		r, err := git.PlainOpen(repoPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open local copy of 'appledb' repo: %v", err)
+		}
+		w, err := r.Worktree()
+		if err != nil {
+			return "", fmt.Errorf("failed to get worktree of local copy of 'appledb' repo: %v", err)
+		}
+		if err = w.Pull(&git.PullOptions{
+			RemoteName: "origin",
+			// Force:      true,
+			Progress: os.Stderr,
+		}); err != nil {
+			if !errors.Is(err, git.NoErrAlreadyUpToDate) {
+				return "", fmt.Errorf("failed to update local copy of 'appledb' repo: %v", err)
+			}
+		}
+		return "", nil
 	}
-	return string(dat), nil
 }
 
 type GitDiffConfig struct {
