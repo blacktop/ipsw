@@ -34,6 +34,7 @@ type ObjcConfig struct {
 	Headers  bool
 	ObjcRefs bool
 	Deps     bool
+	Generic  bool
 
 	IpswVersion string
 
@@ -744,7 +745,17 @@ func (o *ObjC) XCFramework() error {
 	if err != nil {
 		return err
 	}
-	t, err := tbd.NewTBD(image, nil, false)
+	m, err := image.GetMacho()
+	if err != nil {
+		return err
+	}
+	var reexports []string
+	if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
+		for _, rexp := range rexps {
+			reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
+		}
+	}
+	t, err := tbd.NewTBD(image, reexports, false, o.conf.Generic)
 	if err != nil {
 		return err
 	}
@@ -752,6 +763,7 @@ func (o *ObjC) XCFramework() error {
 	if err != nil {
 		return err
 	}
+	outTBD += "...\n"
 	tbdFile := filepath.Join(fwfolder, o.conf.Name+".tbd")
 	if err = os.WriteFile(tbdFile, []byte(outTBD), 0o660); err != nil {
 		return fmt.Errorf("failed to write tbd file %s: %v", tbdFile, err)
@@ -804,7 +816,7 @@ func (o *ObjC) XCFramework() error {
 }
 
 func (o *ObjC) SwiftPackage() error {
-	panic("not implemented yet")
+	return fmt.Errorf("not implemented yet (coming soon)")
 }
 
 /* utils */

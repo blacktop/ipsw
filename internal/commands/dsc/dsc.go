@@ -10,12 +10,14 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/tbd"
 )
 
 // ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib
@@ -747,4 +749,57 @@ func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
 	}
 
 	return ctx, f, nil
+}
+
+func GetTBD(f *dyld.File, dylib string, private, generic bool) (string, error) {
+	image, err := f.Image(dylib)
+	if err != nil {
+		return "", fmt.Errorf("image not in DSC: %v", err)
+	}
+
+	m, err := image.GetMacho()
+	if err != nil {
+		return "", fmt.Errorf("failed to get macho from image: %v", err)
+	}
+	defer m.Close()
+
+	var reexports []string
+	if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
+		for _, rexp := range rexps {
+			reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
+		}
+	}
+
+	t, err := tbd.NewTBD(image, reexports, private, generic)
+	if err != nil {
+		return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
+	}
+
+	outTBD, err := t.Generate()
+	if err != nil {
+		return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
+	}
+
+	if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
+		for _, rexp := range rexps {
+			image, err := f.Image(rexp.(*macho.ReExportDylib).Name)
+			if err != nil {
+				return "", fmt.Errorf("image not in DSC: %v", err)
+			}
+			t, err := tbd.NewTBD(image, nil, private, generic)
+			if err != nil {
+				return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
+			}
+
+			rexpOut, err := t.Generate()
+			if err != nil {
+				return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
+			}
+			outTBD += rexpOut
+		}
+	}
+
+	outTBD += "...\n"
+
+	return outTBD, nil
 }
