@@ -34,6 +34,7 @@ ipsw idev [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw idev afc](/docs/cli/ipsw/idev/afc)	 - FileSystem commands
+* [ipsw idev amfi](/docs/cli/ipsw/idev/amfi)	 - amfi commands
 * [ipsw idev apps](/docs/cli/ipsw/idev/apps)	 - Application commands
 * [ipsw idev comp](/docs/cli/ipsw/idev/comp)	 - List all paired companion devices
 * [ipsw idev crash](/docs/cli/ipsw/idev/crash)	 - Crashlog commands

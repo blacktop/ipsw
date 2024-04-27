@@ -11,13 +11,14 @@ description: 🚧 Analyze kernelcache in IDA Pro
 🚧 Analyze kernelcache in IDA Pro
 
 ```
-ipsw kernel ida <KC> <KEXT> [KEXTS...] [flags]
+ipsw kernel ida <KC> [KEXT] [flags]
 ```
 
 ### Options
 
 ```
   -c, --delete-db             Disassemble a new file (delete the old database)
+      --diaphora-db string    Path to Diaphora database
   -k, --docker                Run IDA Pro in a docker container
       --docker-image string   IDA Pro docker image (default "blacktop/idapro:8.2-pro")
   -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)

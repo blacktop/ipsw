@@ -20,6 +20,7 @@ ipsw download git [flags]
   -a, --api string       Github API Token
   -h, --help             help for git
       --json             Output downloadable tar.gz URLs as JSON
+      --latest           Get ONLY latest tag
   -o, --output string    Folder to download files to
   -p, --product string   macOS product to download (i.e. dyld)
       --webkit           Get WebKit tags
