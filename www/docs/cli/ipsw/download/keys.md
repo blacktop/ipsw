@@ -1,37 +1,25 @@
 ---
-id: ipsw
-title: ipsw
+id: keys
+title: keys
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ipsw
-description: Download and parse IPSW(s) from the internets
+sidebar_label: keys
+description: Download FW keys from The iPhone Wiki
 ---
-## ipsw download ipsw
+## ipsw download keys
 
-Download and parse IPSW(s) from the internets
+Download FW keys from The iPhone Wiki
 
 ```
-ipsw download ipsw [flags]
+ipsw download keys [flags]
 ```
 
 ### Options
 
 ```
-      --decrypt                 Attempt to decrypt the partial files if keys are available
-      --dyld                    Extract dyld_shared_cache(s) from remote IPSW
-  -a, --dyld-arch stringArray   dyld_shared_cache architecture(s) to remote extract
-  -f, --flat                    Do NOT perserve directory structure when downloading with --pattern
-  -h, --help                    help for ipsw
-      --ibridge                 Download iBridge IPSWs
-      --kernel                  Extract kernelcache from remote IPSW
-      --latest                  Download latest IPSWs
-      --macos                   Download macOS IPSWs
-  -o, --output string           Folder to download files to
-      --pattern string          Download remote files that match regex
-      --show-latest-build       Show latest iOS build
-      --show-latest-version     Show latest iOS version
-  -u, --urls                    Dump URLs only
-      --usb                     Download IPSWs for USB attached iDevices
+  -h, --help            help for keys
+      --json            Output as JSON
+  -o, --output string   Folder to download keys to
 ```
 
 ### Options inherited from parent commands

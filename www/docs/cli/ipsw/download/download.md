@@ -50,6 +50,7 @@ ipsw download [flags]
 * [ipsw download git](/docs/cli/ipsw/download/git)	 - Download github.com/orgs/apple-oss-distributions tarballs
 * [ipsw download ipa](/docs/cli/ipsw/download/ipa)	 - Download App Packages from the iOS App Store
 * [ipsw download ipsw](/docs/cli/ipsw/download/ipsw)	 - Download and parse IPSW(s) from the internets
+* [ipsw download keys](/docs/cli/ipsw/download/keys)	 - Download FW keys from The iPhone Wiki
 * [ipsw download macos](/docs/cli/ipsw/download/macos)	 - Download macOS installers
 * [ipsw download ota](/docs/cli/ipsw/download/ota)	 - Download OTAs
 * [ipsw download rss](/docs/cli/ipsw/download/rss)	 - Read Releases - Apple Developer RSS Feed

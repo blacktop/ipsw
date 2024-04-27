@@ -34,5 +34,6 @@ ipsw img4 [flags]
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw img4 dec](/docs/cli/ipsw/img4/dec)	 - Decrypt img4 payloads
 * [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract im4p payloads
+* [ipsw img4 img3](/docs/cli/ipsw/img4/img3)	 - Extract img3 payloads
 * [ipsw img4 kbag](/docs/cli/ipsw/img4/kbag)	 - Extract kbag from img4
 

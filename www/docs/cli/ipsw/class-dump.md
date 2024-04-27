@@ -20,6 +20,7 @@ ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
       --arch string     Which architecture to use for fat/universal MachO
   -a, --cat string      Dump category (regex)
   -c, --class string    Dump class (regex)
+      --demangle        Demangle symbol names (same as verbose)
       --deps            Dump imported private frameworks
       --headers         Dump ObjC headers
   -h, --help            help for class-dump
@@ -27,6 +28,7 @@ ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
   -p, --proto string    Dump protocol (regex)
       --re              RE verbosity (with addresses)
       --refs            Dump ObjC references too
+  -s, --spm             🚧 Generate a Swift Package for the dylib
       --theme string    Color theme (nord, github, etc) (default "nord")
   -x, --xcfw            🚧 Generate a XCFramework for the dylib
 ```

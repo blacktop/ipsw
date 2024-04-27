@@ -20,6 +20,7 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
   -a, --all                   Analyze whole cache (this will take a while)
   -c, --delete-db             Disassemble a new file (delete the old database)
   -d, --dependancies          Analyze module dependencies
+      --diaphora-db string    Path to Diaphora database
   -k, --docker                Run IDA Pro in a docker container
       --docker-image string   IDA Pro docker image (default "blacktop/idapro:8.2-pro")
   -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)
