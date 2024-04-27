@@ -59,6 +59,7 @@ func init() {
 
 	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
+	classDumpCmd.Flags().BoolP("generic", "g", false, "🚧 Generate a XCFramework for ALL targets")
 	classDumpCmd.Flags().BoolP("spm", "s", false, "🚧 Generate a Swift Package for the dylib")
 	classDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names (same as verbose)")
 	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
@@ -78,6 +79,7 @@ func init() {
 
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.xcfw", classDumpCmd.Flags().Lookup("xcfw"))
+	viper.BindPFlag("class-dump.generic", classDumpCmd.Flags().Lookup("generic"))
 	viper.BindPFlag("class-dump.spm", classDumpCmd.Flags().Lookup("spm"))
 	viper.BindPFlag("class-dump.demangle", classDumpCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
@@ -114,6 +116,7 @@ var classDumpCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		// flag validation
 		if viper.GetBool("class-dump.headers") &&
 			(viper.GetString("class-dump.class") != "" ||
 				viper.GetString("class-dump.proto") != "" ||
@@ -123,8 +126,14 @@ var classDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot dump --headers and use --xcfw or --spm flags")
 		} else if viper.GetBool("class-dump.re") && !Verbose {
 			return fmt.Errorf("cannot use --re without --verbose")
-		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") || viper.GetBool("class-dump.xcfw") || viper.GetBool("class-dump.spm")) {
+		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") && !viper.GetBool("class-dump.xcfw") && !viper.GetBool("class-dump.spm")) {
 			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
+		} else if viper.GetBool("class-dump.generic") && !viper.GetBool("class-dump.xcfw") {
+			return fmt.Errorf("cannot use --generic without --xcfw")
+		}
+
+		if viper.GetBool("class-dump.generic") {
+			log.Warn("Generating XCFramework for ALL targets (this might causes errors as some symbols are not available on all platforms)")
 		}
 
 		if len(viper.GetString("class-dump.output")) > 0 {
@@ -139,6 +148,7 @@ var classDumpCmd = &cobra.Command{
 			Headers:     viper.GetBool("class-dump.headers"),
 			ObjcRefs:    viper.GetBool("class-dump.refs"),
 			Deps:        viper.GetBool("class-dump.deps"),
+			Generic:     viper.GetBool("class-dump.generic"),
 			IpswVersion: fmt.Sprintf("Version: %s, BuildCommit: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildCommit)),
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("class-dump.theme"),
