@@ -124,8 +124,6 @@ var TbdCmd = &cobra.Command{
 			}
 		}
 
-		outTBD += "...\n"
-
 		tbdFile := filepath.Base(t.Path) + ".tbd"
 		if len(output) > 0 {
 			if err := os.MkdirAll(output, 0750); err != nil {
