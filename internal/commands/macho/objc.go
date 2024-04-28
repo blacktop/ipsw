@@ -14,6 +14,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/swift"
@@ -698,33 +699,89 @@ type XCFrameworkLibraryInfoPlist struct {
 	DTSDKName                     string   `plist:"DTSDKName"`
 	DTXcode                       string   `plist:"DTXcode"`
 	DTXcodeBuild                  string   `plist:"DTXcodeBuild"`
-	LSMinimumSystemVersion        string   `plist:"LSMinimumSystemVersion"`
+	LSMinimumSystemVersion        string   `plist:"LSMinimumSystemVersion,omitempty"`
+	MinimumOSVersion              string   `plist:"MinimumOSVersion,omitempty"`
+	UIDeviceFamily                []uint64 `plist:"UIDeviceFamily,omitempty"`
+}
+
+type XCFrameworkConfig struct {
+	LibraryIdentifier        string
+	SupportedArchitectures   []string
+	SupportedPlatform        string
+	SupportedPlatformVariant string
+	CFBundleVersion          string
+	DTPlatformVersion        string
+	LSMinimumSystemVersion   string
 }
 
 // XCFramework outputs and XCFramework for a DSC dylib
 func (o *ObjC) XCFramework() error {
+	var xcfw XCFrameworkConfig
+
 	xcfolder := filepath.Join(o.conf.Output, o.conf.Name+".xcframework")
 	if err := os.MkdirAll(xcfolder, 0o750); err != nil {
-		return err
+		return fmt.Errorf("failed to create XCFramework folder: %w", err)
 	}
-	supported := "ios-arm64_x86_64-simulator"
+
+	image, err := o.cache.Image(o.conf.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get image %s: %w", o.conf.Name, err)
+	}
+	m, err := image.GetMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get macho from image %s: %w", o.conf.Name, err)
+	}
+
+	if bvs := m.BuildVersions(); len(bvs) == 0 { // TODO: support universal MachOs (with multiple architectures)
+		return fmt.Errorf("no build versions found in %s", o.conf.Name)
+	} else {
+		for _, bv := range bvs {
+			switch bv.Platform {
+			case types.Platform_iOsSimulator, types.Platform_tvOsSimulator, types.Platform_watchOsSimulator, types.Platform_visionOsSimulator:
+				xcfw.LibraryIdentifier += "_simulator"
+				xcfw.SupportedPlatformVariant = "simulator"
+			default:
+				xcfw.LibraryIdentifier += strings.ToLower(bv.Platform.String())
+				xcfw.SupportedPlatform = strings.ToLower(bv.Platform.String())
+				xcfw.DTPlatformVersion = bv.Sdk.String()
+				xcfw.LSMinimumSystemVersion = bv.Minos.String()
+				switch m.CPU {
+				case types.CPUAmd64:
+					xcfw.LibraryIdentifier += "_x86_64"
+					xcfw.SupportedArchitectures = append(xcfw.SupportedArchitectures, "x86_64")
+				case types.CPUArm64:
+					if m.SubCPU.String(m.CPU) == "arm64e" {
+						xcfw.LibraryIdentifier += "_arm64e"
+					} else {
+						xcfw.LibraryIdentifier += "_arm64"
+					}
+				}
+			}
+		}
+	}
+
+	if id := m.DylibID(); id != nil {
+		xcfw.CFBundleVersion = id.CurrentVersion.String()
+	}
+
 	/* generate XCFramework Info.plist */
 	f, err := os.Create(filepath.Join(xcfolder, "Info.plist"))
 	if err != nil {
 		return fmt.Errorf("failed to create %s: %w", filepath.Join(xcfolder, "Info.plist"), err)
 	}
 	defer f.Close()
+
 	enc := plist.NewEncoder(f)
 	enc.Indent("    ")
 	if err := enc.Encode(XCFrameworkInfoPlist{
 		AvailableLibraries: []XCFrameworkAvailableLibrary{
 			{
 				BinaryPath:               o.conf.Name + ".framework/" + o.conf.Name + ".tbd",
-				LibraryIdentifier:        supported,
+				LibraryIdentifier:        xcfw.LibraryIdentifier,
 				LibraryPath:              o.conf.Name + ".framework",
-				SupportedArchitectures:   []string{"arm64", "x86_64"},
-				SupportedPlatform:        "ios",
-				SupportedPlatformVariant: "simulator",
+				SupportedArchitectures:   xcfw.SupportedArchitectures,
+				SupportedPlatform:        xcfw.SupportedPlatform,
+				SupportedPlatformVariant: xcfw.SupportedPlatformVariant,
 			},
 		},
 		CFBundlePackageType:      "XFWK",
@@ -732,42 +789,37 @@ func (o *ObjC) XCFramework() error {
 	}); err != nil {
 		return fmt.Errorf("failed to create XCFramework Info.plist")
 	}
+
 	/* create folder structure */
-	fwfolder := filepath.Join(xcfolder, supported, o.conf.Name+".framework")
+	fwfolder := filepath.Join(xcfolder, xcfw.LibraryIdentifier, o.conf.Name+".framework")
 	if err := os.MkdirAll(filepath.Join(fwfolder, "Headers"), 0o750); err != nil {
-		return err
+		return fmt.Errorf("failed to create Headers folder: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Join(fwfolder, "Modules"), 0o750); err != nil {
-		return err
+		return fmt.Errorf("failed to create Modules folder: %w", err)
 	}
-	/* generate framework stub */
-	image, err := o.cache.Image(o.conf.Name)
-	if err != nil {
-		return err
-	}
-	m, err := image.GetMacho()
-	if err != nil {
-		return err
-	}
+
+	/* generate framework tbd */
 	var reexports []string
 	if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
 		for _, rexp := range rexps {
 			reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
 		}
 	}
-	t, err := tbd.NewTBD(image, reexports, false, o.conf.Generic)
+	t, err := tbd.NewTBD(image, reexports, false, false)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create tbd: %w", err)
 	}
 	outTBD, err := t.Generate()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate tbd: %w", err)
 	}
 	outTBD += "...\n"
 	tbdFile := filepath.Join(fwfolder, o.conf.Name+".tbd")
 	if err = os.WriteFile(tbdFile, []byte(outTBD), 0o660); err != nil {
 		return fmt.Errorf("failed to write tbd file %s: %v", tbdFile, err)
 	}
+
 	/* generate modulemap */
 	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), []byte(fmt.Sprintf(
 		"module %s [system] {\n"+
@@ -777,6 +829,7 @@ func (o *ObjC) XCFramework() error {
 	)), 0o660); err != nil {
 		return fmt.Errorf("failed to write module.modulemap file: %v", err)
 	}
+
 	/* generate XCFramework Library Info.plist */
 	f2, err := os.Create(filepath.Join(fwfolder, "Info.plist"))
 	if err != nil {
@@ -786,29 +839,30 @@ func (o *ObjC) XCFramework() error {
 	enc = plist.NewEncoder(f2)
 	enc.Indent("    ")
 	if err := enc.Encode(XCFrameworkLibraryInfoPlist{
-		BuildMachineOSBuild:           "23C52",
-		CFBundleDevelopmentRegion:     "English",
+		BuildMachineOSBuild:           "23E224",
+		CFBundleDevelopmentRegion:     "en",
 		CFBundleExecutable:            o.conf.Name + ".tbd",
 		CFBundleIdentifier:            "com.apple." + strings.ToLower(o.conf.Name),
 		CFBundleInfoDictionaryVersion: "6.0",
-		CFBundleName:                  o.conf.Name + ".tbd",
+		CFBundleName:                  o.conf.Name,
 		CFBundlePackageType:           "FMWK",
-		CFBundleShortVersionString:    "2.1",
+		CFBundleShortVersionString:    "1.0",
 		CFBundleSignature:             "????",
-		CFBundleSupportedPlatforms:    []string{"MacOSX"},
-		CFBundleVersion:               "866.4",
+		CFBundleVersion:               xcfw.CFBundleVersion,
 		DTCompiler:                    "com.apple.compilers.llvm.clang.1_0",
+		CFBundleSupportedPlatforms:    []string{xcfw.SupportedPlatform}, // TODO: add variants (or universal dylib/macho support)
+		DTPlatformName:                xcfw.SupportedPlatform,
+		DTPlatformVersion:             xcfw.DTPlatformVersion,
 		DTPlatformBuild:               "",
-		DTPlatformName:                "macosx",
-		DTPlatformVersion:             "14.2",
-		DTSDKBuild:                    "23C52",
-		DTSDKName:                     "macosx14.2.internal",
+		DTSDKBuild:                    "23E224",
+		DTSDKName:                     fmt.Sprintf("%s%s.internal", xcfw.SupportedPlatform, xcfw.DTPlatformVersion),
 		DTXcode:                       "1500",
-		DTXcodeBuild:                  "15A6160m",
-		LSMinimumSystemVersion:        "14.2",
+		DTXcodeBuild:                  "15E6079e", // XCode 15.3
+		LSMinimumSystemVersion:        xcfw.LSMinimumSystemVersion,
 	}); err != nil {
 		return fmt.Errorf("failed to create XCFramework Info.plist")
 	}
+
 	/* generate Headers */
 	o.conf.Headers = true
 	o.conf.Output = filepath.Join(fwfolder, "Headers")
