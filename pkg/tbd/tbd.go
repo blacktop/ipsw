@@ -63,7 +63,7 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (
 		if bvs := m.BuildVersions(); len(bvs) > 0 {
 			for _, bv := range bvs {
 				switch bv.Platform {
-				case 1: // macOS
+				case types.Platform_macOS:
 					if m.FileHeader.Magic == types.Magic64 {
 						if m.CPU == types.CPUAmd64 {
 							targets = append(targets, macOs64bitIntelTargets...)
@@ -73,13 +73,13 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (
 					} else {
 						targets = append(targets, macOs32bitTargets...)
 					}
-				case 2: // iOS
+				case types.Platform_iOS:
 					if m.FileHeader.Magic == types.Magic64 {
 						targets = append(targets, iOS64bitTargets...)
 					} else {
 						targets = append(targets, iOS32bitTargets...)
 					}
-				case 6: // macOS Catalyst
+				case types.Platform_macCatalyst:
 					if m.FileHeader.Magic == types.Magic64 {
 						if m.CPU == types.CPUAmd64 {
 							targets = append(targets, macCatalyst64bitIntelTargets...)
