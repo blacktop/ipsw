@@ -14,7 +14,7 @@ description: Prep jailbroken device for remote debugging.
 ```
 
 ```bash
-❯ ipsw debugserver --force
+❯ ipsw ssh debugserver --force
 
    • Connecting to root@localhost:2222
 ? Select the DeveloperDiskImage you want to extract the debugserver from: 14.1/DeveloperDiskImage.dmg

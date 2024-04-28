@@ -172,7 +172,7 @@ Download **latest** `macOS` IPSWs
 To just output the latest iOS version
 
 ```bash
-❯ ipsw download ipsw --show-latest
+❯ ipsw download ipsw --show-latest-version
 
 15.1
 ```
@@ -446,7 +446,7 @@ Your Developer Portal credentials and session are stored securely in your Keycha
 :::
 
 :::caution note
-The `--vault-password` flag is the encryption password for the **file** based vaults that will be placed encrypted in the `~/.ipsw` directory. This is **NOT** for your Developer Portal credentials.  
+The `--vault-password` flag is the encryption password for the **file** based vaults that will be placed encrypted in the `~/.ipsw` directory. This is **NOT** for your Developer Portal credentials.
 
 This is when ran on an OS that does not have a native Keychain, Credential Manager or Keyring etc.
 :::

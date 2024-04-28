@@ -14,7 +14,7 @@ description: Dumping shsh blobs allows you to downgrade iOS later.
 ```
 
 ```bash
-❯ ipsw shsh
+❯ ipsw ssh shsh
 
    • Connecting to root@localhost:2222
       • Parsing shsh
