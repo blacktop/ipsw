@@ -60,14 +60,8 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (
 		targets = append(targets, iOS32bitTargets...)
 		targets = append(targets, iOS64bitTargets...)
 	} else {
-		var bvers []*macho.BuildVersion
-		for _, l := range m.Loads {
-			if s, ok := l.(*macho.BuildVersion); ok {
-				bvers = append(bvers, s)
-			}
-		}
-		if len(bvers) > 0 {
-			for _, bv := range bvers {
+		if bvs := m.BuildVersions(); len(bvs) > 0 {
+			for _, bv := range bvs {
 				switch bv.Platform {
 				case 1: // macOS
 					if m.FileHeader.Magic == types.Magic64 {
