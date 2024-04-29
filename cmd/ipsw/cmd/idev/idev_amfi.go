@@ -19,42 +19,22 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package img4
+package idev
 
 import (
-	"path/filepath"
-
-	"github.com/apex/log"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
-	Img4Cmd.AddCommand(img4Img3Cmd)
-
-	img4Img3Cmd.Flags().StringP("output", "o", "", "Output file")
-	img4Img3Cmd.MarkZshCompPositionalArgumentFile(1)
-	viper.BindPFlag("img4.img3.output", img4Img3Cmd.Flags().Lookup("output"))
+	IDevCmd.AddCommand(AmfiCmd)
 }
 
-// img4Img3Cmd represents the extract command
-var img4Img3Cmd = &cobra.Command{
-	Use:     "img3 <img3>",
-	Aliases: []string{"3"},
-	Short:   "Extract img3 payloads",
-	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		outFile := filepath.Join(viper.GetString("output"), filepath.Clean(args[0])+".payload")
-
-		log.Infof("Exracting payload to file %s", outFile)
-		return icmd.ParseImg3(filepath.Clean(args[0]), outFile)
+// AmfiCmd represents the afc command
+var AmfiCmd = &cobra.Command{
+	Use:   "amfi",
+	Short: "amfi commands",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }

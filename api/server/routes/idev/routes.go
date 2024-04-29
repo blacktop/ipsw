@@ -17,6 +17,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// ig.GET("/afc/rm", handler)    // TODO:
 	// ig.GET("/afc/tree", handler)  // TODO:
 
+	// ig.GET("/amfi", handler)    // TODO:
+	ig.GET("/amfi/dev", idevAmfiDev)
+
 	// ig.GET("/apps", handler)           // TODO: implement this
 	// ig.GET("/apps/install", handler)   // TODO: implement this
 	// ig.GET("/apps/ls", handler)        // TODO: implement this

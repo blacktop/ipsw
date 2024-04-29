@@ -28,9 +28,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/tbd"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,9 +37,11 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(TbdCmd)
+	TbdCmd.Flags().BoolP("generic", "g", false, "Generate for ALL targets")
 	TbdCmd.Flags().BoolP("private", "p", false, "Add private symbols")
 	TbdCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs (default: CWD)")
 	TbdCmd.MarkFlagDirname("output")
+	viper.BindPFlag("dyld.tbd.generic", TbdCmd.Flags().Lookup("generic"))
 	viper.BindPFlag("dyld.tbd.private", TbdCmd.Flags().Lookup("private"))
 	viper.BindPFlag("dyld.tbd.output", TbdCmd.Flags().Lookup("output"))
 }
@@ -66,8 +67,13 @@ var TbdCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
+		generic := viper.GetBool("dyld.tbd.generic")
 		private := viper.GetBool("dyld.tbd.private")
 		output := viper.GetString("dyld.tbd.output")
+
+		if generic {
+			log.Warn("Generating for ALL targets (this might causes errors as some symbols are not available on all platforms)")
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -77,58 +83,14 @@ var TbdCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		image, err := f.Image(args[1])
+		outTBD, err := dsc.GetTBD(f, args[1], private, generic)
 		if err != nil {
-			return fmt.Errorf("image not in %s: %v", dscPath, err)
+			return fmt.Errorf("failed to generate .tbd file for %s: %v", args[1], err)
 		}
 
-		m, err := image.GetMacho()
-		if err != nil {
-			return err
-		}
-		defer m.Close()
-
-		var reexports []string
-		if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
-			for _, rexp := range rexps {
-				reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
-			}
-		}
-
-		t, err := tbd.NewTBD(image, reexports, private)
-		if err != nil {
-			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-		}
-
-		outTBD, err := t.Generate()
-		if err != nil {
-			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-		}
-
-		if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
-			for _, rexp := range rexps {
-				image, err := f.Image(rexp.(*macho.ReExportDylib).Name)
-				if err != nil {
-					return fmt.Errorf("image not in %s: %v", dscPath, err)
-				}
-				t, err := tbd.NewTBD(image, nil, private)
-				if err != nil {
-					return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-				}
-
-				rexpOut, err := t.Generate()
-				if err != nil {
-					return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-				}
-				outTBD += "\n" + rexpOut
-			}
-		}
-
-		outTBD += "...\n"
-
-		tbdFile := filepath.Base(t.Path) + ".tbd"
+		tbdFile := filepath.Base(args[1]) + ".tbd"
 		if len(output) > 0 {
-			if err := os.MkdirAll(output, 0750); err != nil {
+			if err := os.MkdirAll(output, 0o750); err != nil {
 				return fmt.Errorf("failed to create output directory %s: %v", output, err)
 			}
 			tbdFile = filepath.Join(output, tbdFile)
@@ -140,7 +102,7 @@ var TbdCmd = &cobra.Command{
 		}
 
 		log.Info("Created " + strings.TrimPrefix(tbdFile, cwd))
-		if err = os.WriteFile(tbdFile, []byte(outTBD), 0660); err != nil {
+		if err = os.WriteFile(tbdFile, []byte(outTBD), 0o660); err != nil {
 			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile, err)
 		}
 

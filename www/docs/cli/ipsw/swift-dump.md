@@ -24,8 +24,8 @@ ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
       --deps            Dump imported private frameworks
   -e, --ext string      Dump extension (regex)
   -h, --help            help for swift-dump
-  -i, --interface       Dump Swift Interface
-  -o, --output string   Folder to write headers to
+  -i, --interface       🚧 Dump Swift Interface
+  -o, --output string   🚧 Folder to write interface to
   -p, --proto string    Dump protocol (regex)
       --theme string    Color theme (nord, github, etc) (default "nord")
   -y, --type string     Dump type (regex)
