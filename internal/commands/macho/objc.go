@@ -964,10 +964,12 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 
 	for _, class := range classes {
 		var imp Imports
-		if slices.Contains(classNames, class.SuperClass) {
-			imp.Locals = append(imp.Locals, class.SuperClass+".h")
-		} else {
-			imp.Classes = append(imp.Classes, class.SuperClass)
+		if superClass := class.SuperClass; superClass != "" {
+			if slices.Contains(classNames, superClass) {
+				imp.Locals = append(imp.Locals, superClass+".h")
+			} else {
+				imp.Classes = append(imp.Classes, superClass)
+			}
 		}
 		for _, prot := range class.Protocols {
 			if slices.Contains(protoNames, prot.Name) {
@@ -977,7 +979,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, ivar := range class.Ivars {
-			typ := ivar.Type
+			typ, _ := strings.CutSuffix(ivar.Verbose(), ivar.Name+";")
 			o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
 		}
 		for _, prop := range class.Props {
@@ -1109,10 +1111,11 @@ func (o *ObjC) scanBaseFrameworks() error {
 }
 
 func (o *ObjC) fillImportsForType(typ string, className string, protoName string, classNames []string, protoNames []string, imp *Imports) {
-	typ = strings.Trim(typ, ` "*@^`)
+	typ = strings.Trim(typ, ` *`)
 
-	if !strings.Contains(typ, "<") {
-		if o.isBuiltInType(typ) {
+	if !strings.ContainsAny(typ, "<>") {
+		typ := o.nonBuiltInType(typ)
+		if typ == "" {
 			return
 		}
 
@@ -1128,8 +1131,6 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 
 		return
 	}
-
-	typ = strings.ReplaceAll(typ, "><", ", ")
 
 	if !strings.HasPrefix(typ, "<") {
 		before, after, _ := strings.Cut(typ, "<")
@@ -1149,9 +1150,7 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 		return
 	}
 
-	typ = strings.Trim(typ, "<>")
-
-	for _, typ := range strings.Split(typ, ", ") {
+	for _, typ := range strings.Split(strings.Trim(typ, "<>"), ", ") {
 		if !slices.Contains(protoNames, typ) {
 			imp.Protos = append(imp.Protos, typ)
 			continue
@@ -1163,34 +1162,22 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 	}
 }
 
-func (o *ObjC) isBuiltInType(typ string) bool {
+func (o *ObjC) nonBuiltInType(typ string) string {
 	if typ == "" {
-		return true
+		return ""
 	}
 
-	if strings.ContainsAny(typ, "!#(:?[{") {
-		return true
-	}
-
-	switch typ[0] {
-	case '"', '@', 'A', 'N', 'O', 'R', 'V', '^', 'b', 'j', 'n', 'o', 'r':
-		return o.isBuiltInType(typ[1:])
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		return true
-	}
-
-	switch typ {
-	case "*", "B", "C", "D", "I", "L", "Q", "S", "T", "c", "d", "f", "i", "l", "q", "s", "t", "v":
-		return true
+	if strings.ContainsAny(typ, "()[]{};") {
+		return ""
 	}
 
 	switch before, after, _ := strings.Cut(typ, " "); before {
-	case "_Atomic", "const", "restrict", "volatile":
-		return o.isBuiltInType(after)
-
 	case "_Bool", "_Complex", "_Imaginary", "BOOL", "Class", "IMP", "Ivar", "Method", "SEL", "bool", "char", "class", "double", "enum", "float", "id", "int", "long", "short", "signed", "struct", "union", "unsigned", "void":
-		return true
+		return ""
+
+	case "_Atomic", "bycopy", "byref", "const", "in", "inout", "oneway", "out", "restrict", "volatile":
+		return o.nonBuiltInType(after)
 	}
 
-	return false
+	return typ
 }
