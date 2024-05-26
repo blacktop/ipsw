@@ -861,7 +861,7 @@ changelog:
   use: github
   groups:
     - title: Dependency updates
-      regexp: '^.*?(feat|fix|chore)\(deps\)!?:.+$'
+      regexp: '^.*?(.+)\(deps\)!?:.+$'
       order: 300
     - title: "New Features"
       regexp: '^.*?feat(\(.+\))??!?:.+$'
