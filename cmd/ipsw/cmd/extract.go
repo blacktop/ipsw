@@ -45,6 +45,7 @@ func init() {
 	extractCmd.Flags().Bool("iboot", false, "Extract iBoot")
 	extractCmd.Flags().Bool("sep", false, "Extract sep-firmware")
 	extractCmd.Flags().Bool("sptm", false, "Extract SPTM and TXM Firmwares")
+	extractCmd.Flags().BoolP("exclave", "x", false, "Extract Exclave Bundle")
 	extractCmd.Flags().Bool("kbag", false, "Extract Im4p Keybags")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
@@ -74,6 +75,7 @@ func init() {
 	viper.BindPFlag("extract.iboot", extractCmd.Flags().Lookup("iboot"))
 	viper.BindPFlag("extract.sep", extractCmd.Flags().Lookup("sep"))
 	viper.BindPFlag("extract.sptm", extractCmd.Flags().Lookup("sptm"))
+	viper.BindPFlag("extract.exclave", extractCmd.Flags().Lookup("exclave"))
 	viper.BindPFlag("extract.kbag", extractCmd.Flags().Lookup("kbag"))
 	viper.BindPFlag("extract.sys-ver", extractCmd.Flags().Lookup("sys-ver"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
@@ -106,7 +108,7 @@ var extractCmd = &cobra.Command{
 		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && !viper.IsSet("extract.dmg") &&
 			!viper.GetBool("extract.dtree") && !viper.GetBool("extract.iboot") && !viper.GetBool("extract.sep") &&
 			!viper.GetBool("extract.sptm") && !viper.GetBool("extract.kbag") && !viper.GetBool("extract.sys-ver") &&
-			len(viper.GetString("extract.pattern")) == 0 {
+			!viper.GetBool("extract.exclave") && len(viper.GetString("extract.pattern")) == 0 {
 			return fmt.Errorf("must specify at least one flag to specify what to extract")
 		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--dyld-arch or -a can only be used with --dyld or -d")
@@ -286,6 +288,25 @@ var extractCmd = &cobra.Command{
 		if viper.GetBool("extract.sptm") {
 			log.Info("Extracting SPTM firmware")
 			out, err := extract.SPTM(config)
+			if err != nil {
+				return err
+			}
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
+			}
+		}
+
+		if viper.GetBool("extract.exclave") {
+			log.Info("Extracting Exclave Bundle")
+			out, err := extract.Exclave(config)
 			if err != nil {
 				return err
 			}
