@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -194,7 +196,7 @@ func SPTM(c *Config) ([]string, error) {
 
 		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
 		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
-		if err := os.MkdirAll(folder, 0750); err != nil {
+		if err := os.MkdirAll(folder, 0o750); err != nil {
 			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
 		}
 
@@ -203,14 +205,115 @@ func SPTM(c *Config) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to decompress '%s': %v", f, err)
 			}
-			if err = os.WriteFile(fname, dat, 0660); err != nil {
+			if err = os.WriteFile(fname, dat, 0o666); err != nil {
 				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
 			}
 			outfiles = append(outfiles, fname)
 		} else {
-			if err = os.WriteFile(fname, im4p.Data, 0660); err != nil {
+			if err = os.WriteFile(fname, im4p.Data, 0o666); err != nil {
 				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
 			}
+			outfiles = append(outfiles, fname)
+		}
+	}
+
+	return outfiles, nil
+}
+
+func Exclave(c *Config) ([]string, error) {
+	var tmpOut []string
+	var outfiles []string
+
+	origOutput := c.Output
+
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_exclave")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store Exlave im4p: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+	c.Output = tmpDIR
+
+	c.Pattern = `.*exclavecore_bundle.*im4p$`
+	out, err := Search(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no Exclave bundles found")
+	}
+
+	tmpOut = append(tmpOut, out...)
+
+	c.Output = origOutput
+
+	for _, f := range tmpOut {
+		if strings.Contains(f, ".restore.") {
+			continue // TODO: skip restore bundles for now
+		}
+		dat, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
+		}
+
+		im4p, err := img4.ParseIm4p(bytes.NewReader(dat))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
+		}
+
+		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
+		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
+		if err := os.MkdirAll(folder, 0o750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
+		}
+
+		if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
+			dat, err = lzfse.NewDecoder(im4p.Data).DecodeBuffer()
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress '%s': %v", f, err)
+			}
+			if err = os.WriteFile(fname, dat, 0o666); err != nil {
+				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+		} else {
+			if err = os.WriteFile(fname, im4p.Data, 0o666); err != nil {
+				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+		}
+	}
+
+	for _, exc := range outfiles {
+		bn, err := bundle.Parse(exc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse exclave bundle: %v", err)
+		}
+
+		f, err := os.Open(exc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file %s: %v", exc, err)
+		}
+		defer f.Close()
+
+		for _, bf := range bn.Files {
+			fmt.Println(bf)
+
+			fname := filepath.Join(filepath.Dir(exc), bf.Type, bf.Name)
+			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+			}
+
+			of, err := os.Create(fname)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create file %s: %v", fname, err)
+			}
+			defer of.Close()
+
+			for _, seg := range bf.Segments {
+				f.Seek(int64(seg.Offset), io.SeekStart)
+				io.CopyN(of, f, int64(seg.Size))
+			}
+
 			outfiles = append(outfiles, fname)
 		}
 	}
@@ -370,10 +473,10 @@ func Keybags(c *Config) (fname string, err error) {
 	}
 
 	fname = filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json")
-	if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
 	}
-	if err := os.WriteFile(fname, out, 0660); err != nil {
+	if err := os.WriteFile(fname, out, 0o666); err != nil {
 		return "", fmt.Errorf("failed to write %s: %v", filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json"), err)
 	}
 
