@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -16,9 +15,9 @@ import (
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
+	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -284,38 +283,11 @@ func Exclave(c *Config) ([]string, error) {
 	}
 
 	for _, exc := range outfiles {
-		bn, err := bundle.Parse(exc)
+		out, err := fwcmd.Extract(exc, filepath.Dir(exc))
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse exclave bundle: %v", err)
+			return nil, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 		}
-
-		f, err := os.Open(exc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open file %s: %v", exc, err)
-		}
-		defer f.Close()
-
-		for _, bf := range bn.Files {
-			fmt.Println(bf)
-
-			fname := filepath.Join(filepath.Dir(exc), bf.Type, bf.Name)
-			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
-			}
-
-			of, err := os.Create(fname)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create file %s: %v", fname, err)
-			}
-			defer of.Close()
-
-			for _, seg := range bf.Segments {
-				f.Seek(int64(seg.Offset), io.SeekStart)
-				io.CopyN(of, f, int64(seg.Size))
-			}
-
-			outfiles = append(outfiles, fname)
-		}
+		outfiles = append(outfiles, out...)
 	}
 
 	return outfiles, nil
