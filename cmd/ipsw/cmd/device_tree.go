@@ -31,6 +31,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/pkg/errors"
@@ -84,21 +85,27 @@ var deviceTreeCmd = &cobra.Command{
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
 		} else {
+			var dtree *devicetree.DeviceTree
+
 			content, err := os.ReadFile(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to read DeviceTree")
 			}
 
-			var dtree *devicetree.DeviceTree
-			if bytes.Contains(content[:4], []byte("3gmI")) {
+			if ok, _ := magic.IsImg3(args[0]); ok {
 				dtree, err = devicetree.ParseImg3Data(content)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTree")
 				}
-			} else {
+			} else if ok, _ := magic.IsIm4p(args[0]); ok {
 				dtree, err = devicetree.ParseImg4Data(content)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTree")
+				}
+			} else {
+				dtree, err = devicetree.ParseData(bytes.NewReader(content))
+				if err != nil {
+					return fmt.Errorf("failed to parse DeviceTree: %v", err)
 				}
 			}
 

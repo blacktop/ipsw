@@ -74,6 +74,10 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 
 	children := (*dtree)["device-tree"]["children"]
 
+	if children == nil {
+		return nil, fmt.Errorf("failed to get device tree node children")
+	}
+
 	switch reflect.TypeOf(children).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(children)
