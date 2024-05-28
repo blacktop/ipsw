@@ -460,7 +460,7 @@ func parseNodeProperty(buffer io.Reader, propName string) (string, any, error) {
 		value = parseReg(dat)
 	case "uuid":
 		if len(dat) == 16 {
-			value = types.UUID(dat)
+			value = types.UUID(dat).String()
 		} else {
 			value = parseValue(dat)
 		}
