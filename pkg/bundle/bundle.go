@@ -110,15 +110,6 @@ func (f File) String() string {
 	return s
 }
 
-type OffSz struct {
-	Offset uint64
-	Size   uint64
-}
-
-func (os OffSz) String() string {
-	return fmt.Sprintf("  sz=0x%08x off=0x%08x-0x%08x", os.Size, os.Offset, os.Offset+os.Size)
-}
-
 type Type3 struct {
 	UUID             types.UUID
 	_                [4]uint64 // padding ?
