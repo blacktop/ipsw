@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -61,13 +63,21 @@ var dcpCmd = &cobra.Command{
 		showInfo := viper.GetBool("fw.dcp.info")
 		// output := viper.GetString("fw.dcp.output")
 
-		bn, err := bundle.Parse(filepath.Clean(args[0]))
-		if err != nil {
-			return err
-		}
-
 		if showInfo {
-			fmt.Println(bn)
+			if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
+				m, err := macho.Open(filepath.Clean(args[0]))
+				if err != nil {
+					return fmt.Errorf("failed to parse MachO file: %v", err)
+				}
+				defer m.Close()
+				fmt.Println(m.FileTOC.String())
+			} else {
+				bn, err := bundle.Parse(filepath.Clean(args[0]))
+				if err != nil {
+					return err
+				}
+				fmt.Println(bn)
+			}
 		} else {
 			panic("not implemented")
 		}

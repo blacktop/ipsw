@@ -23,11 +23,11 @@ package fw
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
+	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,8 +51,9 @@ var excCmd = &cobra.Command{
 	Use:     "exclave",
 	Aliases: []string{"exc"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -62,38 +63,25 @@ var excCmd = &cobra.Command{
 		showInfo := viper.GetBool("fw.exclave.info")
 		output := viper.GetString("fw.exclave.output")
 
-		bn, err := bundle.Parse(filepath.Clean(args[0]))
-		if err != nil {
-			return err
-		}
-
 		if showInfo {
+			bn, err := bundle.Parse(filepath.Clean(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to parse bundle: %v", err)
+			}
+
+			if bn.Type != 3 {
+				return fmt.Errorf("bundle is not an exclave bundle")
+			}
+
 			fmt.Println(bn)
 		} else {
-			f, err := os.Open(filepath.Clean(args[0]))
+			log.Info("Extracting Exclave Bundle")
+			out, err := fwcmd.Extract(filepath.Clean(args[0]), output)
 			if err != nil {
-				return fmt.Errorf("failed to open file %s: %v", filepath.Clean(args[0]), err)
+				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 			}
-			defer f.Close()
-
-			for _, bf := range bn.Files {
-				fmt.Println(bf)
-
-				fname := filepath.Join(output, bf.Type, bf.Name)
-				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-					return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
-				}
-
-				of, err := os.Create(fname)
-				if err != nil {
-					return fmt.Errorf("failed to create file %s: %v", fname, err)
-				}
-				defer of.Close()
-
-				for _, seg := range bf.Segments {
-					f.Seek(int64(seg.Offset), io.SeekStart)
-					io.CopyN(of, f, int64(seg.Size))
-				}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
