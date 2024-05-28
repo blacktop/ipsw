@@ -1,12 +1,17 @@
 package magic
 
 import (
+	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/blacktop/ipsw/pkg/bundle"
+	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
 )
 
@@ -72,4 +77,70 @@ func IsMachoOrImg4(filePath string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("not a macho file")
+}
+
+type Asn1Header struct {
+	Raw  asn1.RawContent
+	Name string
+}
+
+func IsIm4p(filePath string) (bool, error) {
+	if filepath.Ext(filePath) == ".im4p" {
+		return true, nil
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+
+	data := make([]byte, 10)
+
+	var hdr Asn1Header
+	if _, err := asn1.Unmarshal(data, &hdr); err != nil {
+		return false, fmt.Errorf("failed to ASN.1 parse header: %v", err)
+	}
+
+	if hdr.Name == "IM4P" {
+		return true, nil
+	}
+	return false, nil
+}
+
+func IsImg3(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	var hdr img3.Header
+	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
+		return false, fmt.Errorf("failed to read bundle header: %w", err)
+	}
+	if string(hdr.Magic[:]) == img3.Magic {
+		return true, nil
+	}
+	return false, nil
+}
+
+func IsBUND(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	var hdr bundle.Header
+	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
+		return false, fmt.Errorf("failed to read bundle header: %w", err)
+	}
+	if string(hdr.Magic[:]) == bundle.Magic {
+		return true, nil
+	}
+	slices.Reverse(hdr.Magic[:])
+
+	if string(hdr.Magic[:]) == bundle.Magic {
+		return true, nil
+	}
+	return false, nil
 }

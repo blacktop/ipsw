@@ -7,6 +7,8 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
+const Magic = "Img3"
+
 // Img3 object
 type Img3 struct {
 	Header
