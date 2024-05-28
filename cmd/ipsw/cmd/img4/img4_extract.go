@@ -59,7 +59,7 @@ var img4ExtractCmd = &cobra.Command{
 
 		outFile := filepath.Join(outputDir, filepath.Clean(args[0])+".payload")
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Exracting payload to file %s", outFile))
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting payload to file %s", outFile))
 		return icmd.ExtractPayload(filepath.Clean(args[0]), outFile, isImg4)
 	},
 }

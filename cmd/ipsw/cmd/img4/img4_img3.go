@@ -54,7 +54,7 @@ var img4Img3Cmd = &cobra.Command{
 
 		outFile := filepath.Join(viper.GetString("output"), filepath.Clean(args[0])+".payload")
 
-		log.Infof("Exracting payload to file %s", outFile)
+		log.Infof("Extracting payload to file %s", outFile)
 		return icmd.ParseImg3(filepath.Clean(args[0]), outFile)
 	},
 }
