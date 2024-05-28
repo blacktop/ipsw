@@ -22,16 +22,25 @@ THE SOFTWARE.
 package fw
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/AOP/aopfw-iphone16aop.RELEASE.im4p
+
 func init() {
 	FwCmd.AddCommand(aopCmd)
 
+	aopCmd.Flags().BoolP("info", "i", false, "Print info")
 	aopCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aopCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.aop.info", aopCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.aop.output", aopCmd.Flags().Lookup("output"))
 }
 
@@ -46,12 +55,24 @@ var aopCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// Firmware/AOP/aopfw-iphone16aop.RELEASE.im4p
+		if viper.GetBool("verbose") {
+			log.SetLevel(log.DebugLevel)
+		}
 
 		// flags
+		showInfo := viper.GetBool("fw.aop.info")
 		// output := viper.GetString("fw.aop.output")
 
-		panic("not implemented")
+		bn, err := bundle.Parse(filepath.Clean(args[0]))
+		if err != nil {
+			return err
+		}
+
+		if showInfo {
+			fmt.Println(bn)
+		} else {
+			panic("not implemented")
+		}
 
 		return nil
 	},
