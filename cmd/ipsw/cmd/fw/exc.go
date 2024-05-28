@@ -23,6 +23,8 @@ package fw
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
@@ -32,23 +34,22 @@ import (
 )
 
 // NOTE:
-//   Firmware/dcp/t8130dcp.im4p
-//   Firmware/dcp/t8130dcp_restore.im4p
+//   Firmware/image4/exclavecore_bundle.t8132.RELEASE.im4p
 
 func init() {
-	FwCmd.AddCommand(dcpCmd)
+	FwCmd.AddCommand(excCmd)
 
-	dcpCmd.Flags().BoolP("info", "i", false, "Print info")
-	dcpCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
-	dcpCmd.MarkFlagDirname("output")
-	viper.BindPFlag("fw.dcp.info", dcpCmd.Flags().Lookup("info"))
-	viper.BindPFlag("fw.dcp.output", dcpCmd.Flags().Lookup("output"))
+	excCmd.Flags().BoolP("info", "i", false, "Print info")
+	excCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	excCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.exclave.info", excCmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.exclave.output", excCmd.Flags().Lookup("output"))
 }
 
-// dcpCmd represents the dcp command
-var dcpCmd = &cobra.Command{
-	Use:     "dcp",
-	Aliases: []string{"d"},
+// excCmd represents the ane command
+var excCmd = &cobra.Command{
+	Use:     "exclave",
+	Aliases: []string{"exc"},
 	Short:   "🚧 Dump MachOs",
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,8 +59,8 @@ var dcpCmd = &cobra.Command{
 		}
 
 		// flags
-		showInfo := viper.GetBool("fw.dcp.info")
-		// output := viper.GetString("fw.dcp.output")
+		showInfo := viper.GetBool("fw.exclave.info")
+		output := viper.GetString("fw.exclave.output")
 
 		bn, err := bundle.Parse(filepath.Clean(args[0]))
 		if err != nil {
@@ -69,7 +70,31 @@ var dcpCmd = &cobra.Command{
 		if showInfo {
 			fmt.Println(bn)
 		} else {
-			panic("not implemented")
+			f, err := os.Open(filepath.Clean(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to open file %s: %v", filepath.Clean(args[0]), err)
+			}
+			defer f.Close()
+
+			for _, bf := range bn.Files {
+				fmt.Println(bf)
+
+				fname := filepath.Join(output, bf.Type, bf.Name)
+				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+					return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+				}
+
+				of, err := os.Create(fname)
+				if err != nil {
+					return fmt.Errorf("failed to create file %s: %v", fname, err)
+				}
+				defer of.Close()
+
+				for _, seg := range bf.Segments {
+					f.Seek(int64(seg.Offset), io.SeekStart)
+					io.CopyN(of, f, int64(seg.Size))
+				}
+			}
 		}
 
 		return nil

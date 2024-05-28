@@ -4,20 +4,65 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/apex/log"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/pkg/devicetree"
 )
 
-const Magic = "DNUB"
+const Magic = "BUND"
+
+type Header struct {
+	Unknown1 uint16  // 0x0200
+	Unknown2 uint16  // 0x1400
+	_        uint32  // padding ?
+	Magic    [4]byte // "BUND"
+	_        uint16  // padding ?
+	Type     uint16  // 3 (AOP/DCP), 4 (ExclaveCore)
+}
 
 type Bundle struct {
-	bundleHdr
-	Files  []File
-	Config Config
+	Header
+	TypeHeader any
+	Config     Config
+	Files      []File
+}
+
+func (b Bundle) String() string {
+	s := fmt.Sprintf("Bundle: %s\n", string(b.Magic[:]))
+	s += fmt.Sprintf("  Type: %d\n", b.Type)
+	switch b.Type {
+	case 3:
+		s += "  Config:\n"
+		s += fmt.Sprintf("    Unk1: %d\n", b.Config.Unk1)
+		s += fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2)
+		s += "    Header:\n"
+		for i, h := range b.Config.Header {
+			s += fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), h)
+		}
+		s += "    TOC:\n"
+		for _, t := range b.Config.TOC {
+			s += fmt.Sprintf("      %s\n", t)
+		}
+		s += "Files:\n"
+		for _, f := range b.Files {
+			s += fmt.Sprintf("%s\n", f)
+		}
+	case 4:
+		s += "  Ranges:\n"
+		for i, f := range b.TypeHeader.(Type4).Ranges {
+			s += fmt.Sprintf("    %3s) %s\n", fmt.Sprintf("%d", i+1), f)
+		}
+	}
+	return s
 }
 
 type Segment struct {
@@ -41,43 +86,152 @@ type File struct {
 }
 
 func (f File) String() string {
-	s := fmt.Sprintf("%s (%s)\n", f.Name, f.Type)
+	s := fmt.Sprintf("  %s (%s)\n", f.Name, f.Type)
 	for _, seg := range f.Segments {
 		if seg.Size == 0 {
 			continue
 		}
-		s += fmt.Sprintf("  sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name)
+		s += fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name)
 		for _, sec := range f.Sections {
 			if sec.Size == 0 {
 				continue
 			}
 			if strings.HasPrefix(sec.Name, seg.Name) && !strings.EqualFold(sec.Name, seg.Name) {
-				s += fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name)
+				s += fmt.Sprintf("      sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name)
 			}
 		}
 	}
 	if len(f.Endpoints) > 0 {
-		s += "  Endpoints:\n"
+		s += "    endpoints:\n"
 		for i, ep := range f.Endpoints {
-			s += fmt.Sprintf("    %3s) %s\n", fmt.Sprintf("%d", i+1), ep)
+			s += fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), ep)
 		}
 	}
 	return s
 }
 
-type bundleHdr struct {
-	Unknown1 uint16
-	Unknown2 uint16
-	_        uint32  // padding ?
-	Magic    [4]byte // "BUND"
+type OffSz struct {
+	Offset uint64
+	Size   uint64
+}
+
+func (os OffSz) String() string {
+	return fmt.Sprintf("  sz=0x%08x off=0x%08x-0x%08x", os.Size, os.Offset, os.Offset+os.Size)
+}
+
+type Type3 struct {
+	UUID             types.UUID
+	_                [4]uint64 // padding ?
+	SubType          uint64
+	_                uint64 // padding ?
+	FileSz           uint64
+	_                uint64 // padding ?
+	EndOff           uint64
+	DataOff          uint64 // roottask __DATA offset
+	_                uint64 // padding ?
+	KernelDataOffset uint64 // 2D0C000h
+	_                uint64 // padding ?
+	TextOff          uint64 // roottask __TEXT offset
+	UnkSz            uint64
+	TextOffAgain     uint64 // ???
+	TextSz           uint64 // is x14000 again
+	UnkSzMaybe       uint64 // 2CF8000h
+	_                uint64 // padding ?
+	UnkOffMaybe      uint64 // 5FC000h
+	UnkNumOfImgs     uint64 // C0000000h ? maybe just 0xC == 11 ?
+	What             uint64 // C0035404h
+	UnkSz2           uint64 // 5FC000h
+	Something        uint64 // 26FC000h
+	KernelDataOff    uint64 // 2D0C000h
+	SomeSize2        uint64 // 334000h
+	_                uint64 // padding ?
+	AnotherSz        uint64 // 30000h ?
+	_                uint64 // padding ?
+	_                uint64 // padding ?
+	YouAgain         uint64 // 30000h ?
+	UnkSize4         uint64 // 74000h ?
+	UnkSize5         uint64 // 40000h ?
+	HelpMe           uint64 // C05FC000h ?
+	UnkSize6         uint64 // 264000h ?
+	Nooooooo         uint64 // 14000h ???
+	SweetBaaaby      uint64 // C0670000h ??
+	ImDead           uint64 // 70000h ??
+	_                uint64 // padding ?
+	Aaaagain         uint64 // 70000h ??
+	UnkOffset6       uint64 // 2BC000h ???
+	UnkOffset7       uint64 // 2D0C000h ???
+	UnkOffset8       uint64 // 334000h ???
+	Aaaaaaaaaagin    uint64 // 70000h ???
+	_                uint64 // padding ?
+	Aaaaaaaaaagin2   uint64 // 70000h ???
+	UnkOffset9       uint64 // 2BC000h ???
+	UnkOffset10      uint64 // 32C000h ???
+	FooterOffset     uint64
+	FooterSz         uint64
+}
+
+type Type4 struct {
+	Unk0       uint32     // 1
+	Unk1       uint32     // 0xc == 11
+	_          uint64     // padding ?
+	Unk2       uint64     // F000h
+	_          [4]uint64  // padding ?
+	Unk3       uint64     // C000h
+	_          [2]uint64  // padding ?
+	Unk4       uint64     // 3 ?
+	_          uint64     // padding ?
+	Unk5       uint64     // 16000h ?
+	_          uint64     // padding ?
+	_          uint64     // padding ?
+	NumRanges  uint64     // 0xD == 12 ?
+	UUID       types.UUID // 636B62C3-4647-34F7-9089-A58256078A27
+	_          uint64     // padding ?
+	Unk7       uint64     // 14000h ?
+	Unk7again  uint64     // 14000h ?
+	Unk8       uint64     // 8000000h ?
+	Unk9       uint64     // 1 ?
+	_          uint64     // padding ?
+	Unk10      uint64     // C000h ?
+	Unk10again uint64     // C000h ?
+	Unk11      uint64     // 8014000h ?
+	Unk12      uint64     // 4 ?
+	_          [3]uint64  // padding ?
+	Unk13      uint64     // 8020000h ?
+	Unk14      uint64     // 6 ?
+	Unk15      uint64     // 8003E80h ?
+	_          [36]uint64 // padding ?
+	Unk17      uint64     // 0xa == 10 ?
+	_          uint64     // padding ?
+	Unk18      uint64     // 16000h ?
+	Unk19      uint64     // 1582Ch ?
+	_          uint64     // padding ?
+	Unk20      uint64     // 0xa == 10 ?
+	_          uint64     // padding ?
+	Unk21      uint64     // F000h ?
+	Ranges     [0xD]typ4Range
+}
+
+type typ4Range struct {
+	Type   uint32
+	Name   [4]byte
+	Offset uint64
+	Size   uint64
+}
+
+func (t4 typ4Range) String() string {
+	slices.Reverse(t4.Name[:])
+	if t4.Size == 0 {
+		return fmt.Sprintf("typ=%d sz=%-10s off=0x%08x-0x%08x %s", t4.Type, fmt.Sprintf("%d", t4.Size), t4.Offset, t4.Offset+t4.Size, t4.Name)
+	}
+	return fmt.Sprintf("typ=%d sz=0x%08x off=0x%08x-0x%08x %s", t4.Type, t4.Size, t4.Offset, t4.Offset+t4.Size, t4.Name)
 }
 
 type Config struct {
-	Num1   int
-	Num2   int
+	Unk1   int
+	Unk2   int
 	Header []hdrPart
 	TOC    []tocEntry
-	Files  []Asn1File
+	Files  []ConfigFile
 }
 
 type hdrPart struct {
@@ -88,15 +242,40 @@ type hdrPart struct {
 	Size   int
 }
 
+func (h hdrPart) String() string {
+	return fmt.Sprintf("%15s type=%d off=%#07x sz=%#x", h.Name.Bytes, h.Type, h.Offset, h.Size)
+}
+
 type tocEntry struct {
 	Index int
 	Entry asn1.RawValue `asn1:"optional"`
 }
 
-type Asn1File struct {
+type tocEntryType struct {
+	Name asn1.RawValue
+	Type int
+}
+
+func (t tocEntry) String() string {
+	if len(t.Entry.Bytes) > 0 {
+		var typ tocEntryType
+		if _, err := asn1.Unmarshal(t.Entry.Bytes, &typ); err == nil {
+			return fmt.Sprintf("%3d) %15s type=%d", t.Index, typ.Name.Bytes, typ.Type)
+		}
+	}
+	return fmt.Sprintf("%3d) %s", t.Index, "nil")
+}
+
+type ConfigFile struct {
 	Raw   asn1.RawContent
 	Index int
 	Info  []Info
+}
+
+type Info struct {
+	Raw   asn1.RawContent
+	Key   asn1.RawValue
+	Value asn1.RawValue
 }
 
 type Endpoint struct {
@@ -108,12 +287,6 @@ type Endpoint struct {
 
 func (e Endpoint) String() string {
 	return string(e.Name.Bytes)
-}
-
-type Info struct {
-	Raw   asn1.RawContent
-	Key   asn1.RawValue
-	Value asn1.RawValue
 }
 
 func (i Info) ParseValue() (any, error) {
@@ -239,29 +412,70 @@ func Parse(in string) (*Bundle, error) {
 	}
 	defer f.Close()
 
-	if err := binary.Read(f, binary.LittleEndian, &bn.bundleHdr); err != nil {
+	if err := binary.Read(f, binary.LittleEndian, &bn.Header); err != nil {
 		return nil, fmt.Errorf("failed to read bundle header: %v", err)
 	}
+	slices.Reverse(bn.Magic[:])
 
 	if string(bn.Magic[:]) != Magic {
-		return nil, fmt.Errorf("invalid magic: %s; expected 'DNUB'", string(bn.Magic[:]))
+		return nil, fmt.Errorf("invalid magic: %s; expected 'BUND'", string(bn.Magic[:]))
 	}
 
-	if _, err := f.Seek(-0x8000, io.SeekEnd); err != nil {
-		return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
-	}
+	switch bn.Type {
+	case 3: // ExclaveCore
+		var t3 Type3
+		if err := binary.Read(f, binary.LittleEndian, &t3); err != nil {
+			return nil, fmt.Errorf("failed to read bundle type 3: %v", err)
+		}
+		bn.TypeHeader = t3
+		// parse footer/config
+		if _, err := f.Seek(-int64(t3.FooterOffset), io.SeekEnd); err != nil {
+			return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
+		}
 
-	cdata := make([]byte, 0x8000)
-	if _, err := f.Read(cdata); err != nil {
-		return nil, fmt.Errorf("failed to read bundle data: %v", err)
-	}
+		fdata := make([]byte, t3.FooterSz)
+		if _, err := f.Read(fdata); err != nil {
+			return nil, fmt.Errorf("failed to read bundle data: %v", err)
+		}
 
-	if _, err = asn1.Unmarshal(cdata, &bn.Config); err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse bundle config: %v", err)
-	}
+		if _, err = asn1.Unmarshal(fdata, &bn.Config); err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse bundle config: %v", err)
+		}
 
-	if err := bn.ParseFiles(); err != nil {
-		return nil, fmt.Errorf("failed to parse bundle files: %v", err)
+		if err := bn.ParseFiles(); err != nil {
+			return nil, fmt.Errorf("failed to parse bundle files: %v", err)
+		}
+	case 4: // AOP/DCP
+		var t4 Type4
+		if err := binary.Read(f, binary.LittleEndian, &t4); err != nil {
+			return nil, fmt.Errorf("failed to read bundle type 4: %v", err)
+		}
+		for _, r := range t4.Ranges {
+			log.Debug(r.String())
+		}
+		bn.TypeHeader = t4
+		// parse device tree/config
+		dtreeRange := t4.Ranges[9]
+		if _, err := f.Seek(int64(dtreeRange.Offset), io.SeekStart); err != nil {
+			return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
+		}
+		dtdata := make([]byte, dtreeRange.Size)
+		if _, err := f.Read(dtdata); err != nil {
+			return nil, fmt.Errorf("failed to read bundle data: %v", err)
+		}
+		dt, err := devicetree.ParseData(bytes.NewReader(dtdata))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse device tree: %v", err)
+		}
+		j, err := json.MarshalIndent(dt, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		slices.Reverse(dtreeRange.Name[:])
+		log.WithField("name", string(dtreeRange.Name[:])).Debug("Device Tree")
+		log.Debug(string(j))
+	default:
+		return nil, fmt.Errorf("unknown bundle type: %d", bn.Type)
 	}
 
 	return &bn, nil

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
@@ -210,6 +211,36 @@ func isZero(bytes []byte) bool {
 	return b == 0
 }
 
+func parseInt(value []byte) any {
+	if len(value) == 0 {
+		return nil
+	}
+	switch len(value) {
+	case binary.Size(uint8(0)):
+		return uint8(value[0])
+	case binary.Size(uint16(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int16(binary.LittleEndian.Uint16(value))
+		} else {
+			return uint16(binary.LittleEndian.Uint16(value))
+		}
+	case binary.Size(uint32(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int32(binary.LittleEndian.Uint32(value))
+		} else {
+			return uint32(binary.LittleEndian.Uint32(value))
+		}
+	case binary.Size(uint64(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int64(binary.LittleEndian.Uint64(value))
+		} else {
+			return uint64(binary.LittleEndian.Uint64(value))
+		}
+	default:
+		return parseValue(value)
+	}
+}
+
 func parseValue(value []byte) any {
 	if len(value) == 0 {
 		return nil
@@ -227,6 +258,14 @@ func parseValue(value []byte) any {
 			}
 			return string(str)
 		}
+		if len(value) > 4 {
+			size := binary.LittleEndian.Uint32(value[:4])
+			if size <= uint32(len(value)-4) && !bytes.Contains(value[4:4+size], []byte("\x00")) {
+				if utils.IsASCII(string(value[4 : 4+size])) {
+					return string(value[4 : 4+size])
+				}
+			}
+		}
 		parts := bytes.Split(str, []byte("\x00"))
 		if len(parts) > 1 { // value is a string array
 			var values []string
@@ -239,7 +278,9 @@ func parseValue(value []byte) any {
 					// }
 				}
 			}
-			return values
+			if len(values) > 0 {
+				return values
+			}
 		}
 	}
 
@@ -249,27 +290,47 @@ func parseValue(value []byte) any {
 
 	switch len(value) {
 	case binary.Size(uint8(0)):
-		fallthrough
+		return uint8(value[0])
 	case binary.Size(uint16(0)):
 		if bytes.HasSuffix(value, []byte("\xff")) {
 			return int16(binary.LittleEndian.Uint16(value))
+		} else {
+			return uint16(binary.LittleEndian.Uint16(value))
 		}
-		fallthrough
 	case binary.Size(uint32(0)):
 		if bytes.HasSuffix(value, []byte("\xff")) {
 			return int32(binary.LittleEndian.Uint32(value))
+		} else {
+			return uint32(binary.LittleEndian.Uint32(value))
 		}
-		fallthrough
 	case binary.Size(uint64(0)):
 		if bytes.HasSuffix(value, []byte("\xff")) {
 			return int64(binary.LittleEndian.Uint64(value))
-		}
-		if i, err := binary.Uvarint(value); err > 0 {
-			return i
+		} else {
+			return uint64(binary.LittleEndian.Uint64(value))
 		}
 	}
 	// value is data
 	return base64.StdEncoding.EncodeToString(value)
+}
+
+func parseOffSz(value []byte) any {
+	switch {
+	case len(value) > 4:
+		kind := binary.LittleEndian.Uint32(value[:4])
+		_ = kind
+		switch len(value[4:]) {
+		case binary.Size(uint8(0)):
+			return uint8(value[4])
+		case binary.Size(uint16(0)):
+			return uint16(binary.LittleEndian.Uint16(value[4:]))
+		case binary.Size(uint32(0)):
+			return uint32(binary.LittleEndian.Uint32(value[4:]))
+		case binary.Size(uint64(0)):
+			return uint64(binary.LittleEndian.Uint64(value[4:]))
+		}
+	}
+	return parseValue(value)
 }
 
 func parseReg(value []byte) any {
@@ -357,7 +418,7 @@ func parseNode(buffer io.Reader) (Node, error) {
 	return node, nil
 }
 
-func parseNodeProperty(buffer io.Reader) (string, any, error) {
+func parseNodeProperty(buffer io.Reader, propName string) (string, any, error) {
 	var nProp NodeProperty
 	// Read a NodeProperty from the buffer
 	if err := binary.Read(buffer, binary.LittleEndian, &nProp); err != nil {
@@ -377,6 +438,8 @@ func parseNodeProperty(buffer io.Reader) (string, any, error) {
 	key := string(bytes.TrimRight(nProp.Name[:], "\x00"))
 	var value any
 	switch key {
+	case "AAPL,phandle":
+		value = parseInt(dat)
 	case "platform-name":
 		value = string(bytes.TrimRight(dat[:], "\x00"))
 	case "pmap-io-ranges":
@@ -387,12 +450,22 @@ func parseNodeProperty(buffer io.Reader) (string, any, error) {
 		value = parsePmgrDevices(dat)
 	case "reg-private":
 		value = parseAddr(dat)
-	default:
-		if key == "reg" {
-			value = parseReg(dat)
+	case "value":
+		if strings.HasPrefix(propName, "__MACHO") {
+			value = parseOffSz(dat)
 		} else {
 			value = parseValue(dat)
 		}
+	case "reg":
+		value = parseReg(dat)
+	case "uuid":
+		if len(dat) == 16 {
+			value = types.UUID(dat)
+		} else {
+			value = parseValue(dat)
+		}
+	default:
+		value = parseValue(dat)
 	}
 
 	return key, value, nil
@@ -404,7 +477,7 @@ func getProperties(buffer io.Reader, node Node) (string, DeviceTree, error) {
 	props := Properties{}
 
 	for index := 0; index < int(node.NumProperties); index++ {
-		key, value, err := parseNodeProperty(buffer)
+		key, value, err := parseNodeProperty(buffer, nodeName)
 		if err != nil {
 			return "", DeviceTree{}, err
 		}
@@ -462,6 +535,10 @@ func parseDeviceTree(r io.Reader) (*DeviceTree, error) {
 	}
 
 	return &dtree, nil
+}
+
+func ParseData(r io.Reader) (*DeviceTree, error) {
+	return parseDeviceTree(r)
 }
 
 // Parse parses plist files in a local ipsw file
