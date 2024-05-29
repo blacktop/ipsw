@@ -125,6 +125,12 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 			return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 		}
 	}
+	if excOS, err := i.GetExclaveOSDmg(); err == nil {
+		log.Info("Scanning ExclaveOS")
+		if err := scanDmg(ipswPath, excOS, "ExclaveOS", handler); err != nil {
+			return fmt.Errorf("failed to scan files in ExclaveOS %s: %v", excOS, err)
+		}
+	}
 
 	return nil
 }

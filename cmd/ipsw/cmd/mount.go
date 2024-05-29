@@ -34,7 +34,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var mountCmdSubCmds = []string{"fs", "sys", "app"}
+var mountCmdSubCmds = []string{"fs", "sys", "app", "exc"}
 
 func init() {
 	rootCmd.AddCommand(mountCmd)
@@ -42,7 +42,7 @@ func init() {
 
 // mountCmd represents the mount command
 var mountCmd = &cobra.Command{
-	Use:           "mount [fs|sys|app] IPSW",
+	Use:           "mount [fs|sys|app|exc] IPSW",
 	Aliases:       []string{"mo", "mnt"},
 	Short:         "Mount DMG from IPSW",
 	SilenceUsage:  true,

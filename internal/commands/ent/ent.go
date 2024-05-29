@@ -78,6 +78,16 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 					}
 				}
 			}
+			if excOS, err := i.GetExclaveOSDmg(); err == nil {
+				utils.Indent(log.Info, 3)("Scanning filesystem")
+				if ents, err := scanEnts(conf.IPSW, excOS, "ExclaveOS"); err != nil {
+					return nil, fmt.Errorf("failed to scan files in ExclaveOS %s: %v", excOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
+				}
+			}
 		}
 
 		if len(conf.Folder) > 0 {
