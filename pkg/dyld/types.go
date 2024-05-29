@@ -324,7 +324,7 @@ func (i CacheSlideInfo2) GetPageSize() uint32 {
 	return i.PageSize
 }
 func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
-	shift := uint64(64 - bits.LeadingZeros64(i.ValueAdd))
+	shift := uint64(bits.Len64(i.ValueAdd))
 	mask := uint64(1<<64-1) >> shift << shift
 	if ptr > i.ValueAdd && (ptr&mask) == 0 {
 		return ptr
