@@ -244,7 +244,7 @@ var dyldExtractCmd = &cobra.Command{
 				if m.HasFixups() {
 					dcf, err = m.DyldChainedFixups()
 					if err != nil {
-						return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+						log.Errorf("failed to parse fixups from in memory MachO for %s: %v", filepath.Base(image.Name), err)
 					}
 				}
 
