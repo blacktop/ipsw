@@ -232,10 +232,12 @@ var machoSearchCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("invalid regex '%s': %w", symReStr, err)
 				}
-				for _, sym := range m.Symtab.Syms {
-					if symRE.MatchString(sym.Name) {
-						fmt.Printf("%#x: %s\t(%s)\t%s\n", sym.Value, colorImage(path), sym.Type.String(""), sym.Name)
-						break
+				if m.Symtab != nil {
+					for _, sym := range m.Symtab.Syms {
+						if symRE.MatchString(sym.Name) {
+							fmt.Printf("%#x: %s\t(%s)\t%s\n", sym.Value, colorImage(path), sym.Type.String(""), sym.Name)
+							break
+						}
 					}
 				}
 				if binds, err := m.GetBindInfo(); err == nil {
