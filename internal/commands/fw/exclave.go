@@ -48,6 +48,31 @@ func Extract(input, output string) ([]string, error) {
 			continue
 		}
 
+		if entry := bn.Config.TOC[idx].GetEntry(); entry != nil && entry.Type == 1 { // roottask (APP)
+			fname := filepath.Join(output, bf.Type, string(entry.Name.Bytes))
+			attr, err := os.Create(fname)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create file %s: %v", fname, err)
+			}
+			defer attr.Close()
+			if _, err := f.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[idx].Offset, err)
+			}
+			adata := make([]byte, bn.Config.Assets[idx].Size) // brkr_artifact
+			if err := binary.Read(f, binary.LittleEndian, &adata); err != nil {
+				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
+			}
+			// var brkr dict
+			// _, err := asn1.Unmarshal(adata, &brkr)
+			// if err != nil {
+			// 	return nil, fmt.Errorf("failed to unmarshal data from file %s: %v", fname, err)
+			// }
+			if _, err := attr.Write(adata); err != nil {
+				return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+		}
+
 		// Get MachO header
 		if entry := bn.Config.TOC[idx].GetEntry(); entry != nil && entry.Type == 2 { // kernel (SYSTEM)
 			if _, err := f.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
