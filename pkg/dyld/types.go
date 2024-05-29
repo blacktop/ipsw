@@ -324,6 +324,9 @@ func (i CacheSlideInfo2) GetPageSize() uint32 {
 	return i.PageSize
 }
 func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
+	if ptr > i.ValueAdd {
+		return ptr
+	}
 	if (ptr & ^i.DeltaMask) != 0 {
 		return (ptr & ^i.DeltaMask) + i.ValueAdd
 	}
@@ -353,6 +356,11 @@ func (i CacheSlideInfo3) GetPageSize() uint32 {
 	return i.PageSize
 }
 func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
+	if ptr == 0 {
+		return 0
+	} else if (ptr & 0xFFF0_0000_0000_0000) == 0 {
+		return ptr
+	}
 	pointer := CacheSlidePointer3(ptr)
 	if pointer.Authenticated() {
 		return i.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
@@ -504,8 +512,10 @@ func (i CacheSlideInfo4) GetPageSize() uint32 {
 	return i.PageSize
 }
 func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
+	// if ptr > i.ValueAdd { FIXME: do I need to add this ?
+	// 	return ptr
+	// }
 	value := ptr & ^i.DeltaMask
-
 	if (value & 0xFFFF8000) == 0 {
 		// small positive non-pointer, use as-is
 	} else if (value & 0x3FFF8000) == 0x3FFF8000 {
