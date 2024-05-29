@@ -199,6 +199,9 @@ func (i *Info) String() string {
 		if fsDMG, err := i.GetAppOsDmg(); err == nil {
 			iStr += fmt.Sprintf("AppOS          = %s\n", fsDMG)
 		}
+		if fsDMG, err := i.GetExclaveOSDmg(); err == nil {
+			iStr += fmt.Sprintf("ExclaveOS      = %s\n", fsDMG)
+		}
 		if ramDisk, err := i.GetRestoreRamDiskDmgs(); err == nil {
 			iStr += fmt.Sprintf("RestoreRamDisk = %s\n", ramDisk)
 		}
@@ -402,6 +405,25 @@ func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
 		return dmgs, nil
 	}
 	return nil, fmt.Errorf("no RestoreRamDisk DMG found")
+}
+func (i *Info) GetExclaveOSDmg() (string, error) {
+	var dmgs []string
+	if i.Plists != nil && i.Plists.BuildManifest != nil {
+		for _, bi := range i.Plists.BuildIdentities {
+			if appOS, ok := bi.Manifest["Ap,ExclaveOS"]; ok {
+				dmgs = append(dmgs, appOS.Info["Path"].(string))
+			}
+		}
+		dmgs = utils.Unique(dmgs)
+		if len(dmgs) == 0 {
+			return "", fmt.Errorf("no ExclaveOS DMG found: %w", ErrorCryptexNotFound)
+		} else if len(dmgs) == 1 {
+			return dmgs[0], nil
+		} else {
+			return "", fmt.Errorf("multiple ExclaveOS DMGs found")
+		}
+	}
+	return "", fmt.Errorf("no BuildManifest.plist found")
 }
 
 // GetOsDmg returns the name of the OS dmg

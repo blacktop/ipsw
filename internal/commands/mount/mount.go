@@ -15,7 +15,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-var dmgTypes = []string{"fs", "sys", "app"}
+var dmgTypes = []string{"fs", "sys", "app", "exc"}
 
 // Context is the mount context
 type Context struct {
@@ -74,6 +74,11 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 		dmgPath, err = i.GetAppOsDmg()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get AppOS DMG: %v", err)
+		}
+	case "exc":
+		dmgPath, err = i.GetExclaveOSDmg()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ExclaveOS DMG: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(dmgTypes, "', '"))

@@ -391,6 +391,11 @@ func DMG(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
 		}
+	case "exc":
+		dmgPath, err = i.GetExclaveOSDmg()
+		if err != nil {
+			return nil, fmt.Errorf("failed to find exclaveOS DMG in IPSW: %v", err)
+		}
 	}
 
 	return utils.SearchZip(zr.File, regexp.MustCompile(dmgPath), filepath.Join(filepath.Clean(c.Output), folder), c.Flatten, c.Progress)
@@ -501,6 +506,13 @@ func Search(c *Config) ([]string, error) {
 				out, err := utils.ExtractFromDMG(c.IPSW, fsOS, destPath, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
+				}
+				artifacts = append(artifacts, out...)
+			}
+			if excOS, err := i.GetExclaveOSDmg(); err == nil {
+				out, err := utils.ExtractFromDMG(c.IPSW, excOS, destPath, re)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
