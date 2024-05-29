@@ -457,9 +457,6 @@ func Parse(in string) (*Bundle, error) {
 		if err := binary.Read(f, binary.LittleEndian, &t4); err != nil {
 			return nil, fmt.Errorf("failed to read bundle type 4: %v", err)
 		}
-		for _, r := range t4.Ranges {
-			log.Debug(r.String())
-		}
 		bn.TypeHeader = t4
 		// parse device tree/config
 		dtreeRange := t4.Ranges[9]
