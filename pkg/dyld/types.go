@@ -358,7 +358,7 @@ func (i CacheSlideInfo3) GetPageSize() uint32 {
 func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
 	if ptr == 0 {
 		return 0
-	} else if (ptr & 0xFFF0_0000_0000_0000) == 0 {
+	} else if (ptr & 0xFFF8_0000_0000_0000) == 0 {
 		return ptr
 	}
 	pointer := CacheSlidePointer3(ptr)
