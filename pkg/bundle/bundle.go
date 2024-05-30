@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -471,13 +470,9 @@ func Parse(in string) (*Bundle, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse device tree: %v", err)
 		}
-		j, err := json.MarshalIndent(dt, "", "  ")
-		if err != nil {
-			return nil, err
-		}
 		slices.Reverse(dtreeRange.Name[:])
 		log.WithField("name", string(dtreeRange.Name[:])).Debug("Device Tree")
-		log.Debug(string(j))
+		log.Debug(dt.String())
 	default:
 		return nil, fmt.Errorf("unknown bundle type: %d", bn.Type)
 	}
