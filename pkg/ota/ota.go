@@ -449,8 +449,8 @@ func Extract(otaZIP, extractPattern, folder string) error {
 }
 
 // RemoteExtract extracts and decompresses remote OTA payload files
-func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop func(string) bool) error {
-
+func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop func(string) bool) ([]string, error) {
+	var outfiles []string
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
 
 	// sortFileBySize(zr.File)
@@ -468,17 +468,18 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 				log.Error(err.Error())
 			}
 			if goteet {
+				outfiles = append(outfiles, path)
 				found = true
 				if shouldStop(path) {
-					return nil
+					return outfiles, nil
 				}
 			}
 		}
 	}
 	if found {
-		return nil
+		return outfiles, nil
 	}
-	return fmt.Errorf("%s not found", extractPattern)
+	return nil, fmt.Errorf("%s not found", extractPattern)
 }
 
 // ExtractFromCryptexes extracts files from patched OTA cryptexes
