@@ -162,6 +162,94 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 	return summary, nil
 }
 
+func printNode(out *strings.Builder, node Properties, depth int) {
+	for k, v := range node {
+		switch k {
+		case "children":
+			switch reflect.TypeOf(v).Kind() {
+			case reflect.Slice:
+				s := reflect.ValueOf(v)
+				for i := 0; i < s.Len(); i++ {
+					child := s.Index(i)
+					for kk, vv := range child.Interface().(DeviceTree) {
+						out.WriteString(fmt.Sprintf("%s%s:\n", strings.Repeat(" ", depth+2), kk))
+						printNode(out, vv, depth+4)
+					}
+				}
+			}
+		default:
+			switch vv := v.(type) {
+			case int:
+				if vv == 0 || vv < 1000 {
+					out.WriteString(fmt.Sprintf("%s%s: %d\n", strings.Repeat(" ", depth), k, vv))
+				} else {
+					out.WriteString(fmt.Sprintf("%s%s: %#x\n", strings.Repeat(" ", depth), k, vv))
+				}
+			case uint16:
+				if vv == 0 || vv < 1000 {
+					out.WriteString(fmt.Sprintf("%s%s: %d\n", strings.Repeat(" ", depth), k, vv))
+				} else {
+					out.WriteString(fmt.Sprintf("%s%s: %#x\n", strings.Repeat(" ", depth), k, vv))
+				}
+			case uint32:
+				if vv == 0 || vv < 1000 {
+					out.WriteString(fmt.Sprintf("%s%s: %d\n", strings.Repeat(" ", depth), k, vv))
+				} else {
+					out.WriteString(fmt.Sprintf("%s%s: %#x\n", strings.Repeat(" ", depth), k, vv))
+				}
+			case uint64:
+				if vv == 0 || vv < 1000 {
+					out.WriteString(fmt.Sprintf("%s%s: %d\n", strings.Repeat(" ", depth), k, vv))
+				} else {
+					out.WriteString(fmt.Sprintf("%s%s: %#x\n", strings.Repeat(" ", depth), k, vv))
+				}
+			case string:
+				out.WriteString(fmt.Sprintf("%s%s: \"%s\"\n", strings.Repeat(" ", depth), k, vv))
+			case []string:
+				for _, s := range vv {
+					out.WriteString(fmt.Sprintf("%s%s: \"%s\"\n", strings.Repeat(" ", depth+2), k, s))
+				}
+			case pmgr_dev:
+				out.WriteString(fmt.Sprintf("%s%s: \n%s\n", strings.Repeat(" ", depth), k, vv.String(depth+2)))
+			case []pmgr_dev:
+				for _, dev := range vv {
+					out.WriteString(fmt.Sprintf("%s%s: \n%s\n", strings.Repeat(" ", depth), k, dev.String(depth+2)))
+				}
+			case pmgr_map:
+				out.WriteString(fmt.Sprintf("%s%s: reg=%#x off=%#x unk=%#x\n", strings.Repeat(" ", depth), k, vv.Reg, vv.Off, vv.Unk))
+			case []pmgr_map:
+				for _, m := range vv {
+					out.WriteString(fmt.Sprintf("%s%s: reg=%#x off=%#x unk=%#x\n", strings.Repeat(" ", depth), k, m.Reg, m.Off, m.Unk))
+				}
+			case pmgr_reg:
+				out.WriteString(fmt.Sprintf("%s%s: addr=%#x sz=%#x\n", strings.Repeat(" ", depth), k, vv.Addr, vv.Size))
+			case []pmgr_reg:
+				for _, reg := range vv {
+					out.WriteString(fmt.Sprintf("%s%s: addr=%#x sz=%#x\n", strings.Repeat(" ", depth+2), k, reg.Addr, reg.Size))
+				}
+			case PmapIORange:
+				out.WriteString(fmt.Sprintf("%s%s: %#v\n", strings.Repeat(" ", depth), k, vv))
+			case []PmapIORange:
+				out.WriteString(fmt.Sprintf("%s%s:\n", strings.Repeat(" ", depth), k))
+				for _, pmap := range vv {
+					out.WriteString(fmt.Sprintf("%s\"%s\" start=%#x sz=%#x flags=%#x\n", strings.Repeat(" ", depth+2), pmap.Name[:], pmap.Start, pmap.Size, pmap.Flags))
+				}
+			default:
+				out.WriteString(fmt.Sprintf("%s%s: %v\n", strings.Repeat(" ", depth), k, vv))
+			}
+		}
+	}
+}
+
+func (dtree *DeviceTree) String() string {
+	var out strings.Builder
+	for k, v := range *dtree {
+		out.WriteString(fmt.Sprintf("%s:\n", k))
+		printNode(&out, v, 2)
+	}
+	return out.String()
+}
+
 // GetProductName returns the device-trees product names
 func (dtree *DeviceTree) GetProductName() (string, error) {
 	children := (*dtree)["device-tree"]["children"]
