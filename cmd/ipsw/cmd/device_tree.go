@@ -124,13 +124,12 @@ var deviceTreeCmd = &cobra.Command{
 				}
 				fmt.Println(string(j))
 			} else {
-				s, err := dtree.Summary()
-				if err != nil {
-					return errors.Wrap(err, "failed to parse device-tree")
+				if s, err := dtree.Summary(); err == nil {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+				fmt.Println(dtree.String())
 			}
 		}
 

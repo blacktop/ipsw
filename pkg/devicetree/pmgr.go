@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/blacktop/go-macho/types"
 )
@@ -65,6 +67,32 @@ func (p pmgr_dev) Map() uint8 {
 }
 func (p pmgr_dev) ID2() uint16 {
 	return uint16(types.ExtractBits(uint64(p.UnkAndID2), 16, 16))
+}
+func (p pmgr_dev) String(padding int) string {
+	return fmt.Sprintf(
+		"%sname: \"%s\"\n"+
+			"%sindex: %d\n"+
+			"%sflag: %d\n"+
+			"%sid1: %d\n"+
+			"%sid2: %d\n"+
+			"%salias: %d\n"+
+			"%smap: %d\n"+
+			"%sunk1: %d\n"+
+			"%sunk2: %d\n"+
+			"%sunk3: %d\n"+
+			"%sunk4: %d",
+		strings.Repeat(" ", padding), string(bytes.TrimRight(p.Name[:], "\x00")),
+		strings.Repeat(" ", padding), p.Index(),
+		strings.Repeat(" ", padding), p.Flag(),
+		strings.Repeat(" ", padding), p.ID1(),
+		strings.Repeat(" ", padding), p.ID2(),
+		strings.Repeat(" ", padding), p.Alias,
+		strings.Repeat(" ", padding), p.Map(),
+		strings.Repeat(" ", padding), p.Unk1,
+		strings.Repeat(" ", padding), p.Unk2,
+		strings.Repeat(" ", padding), p.Unk3,
+		strings.Repeat(" ", padding), p.Unk4,
+	)
 }
 
 func (p *pmgr_dev) MarshalJSON() ([]byte, error) {
