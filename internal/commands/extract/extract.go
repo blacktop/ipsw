@@ -5,12 +5,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/blacktop/go-macho"
@@ -23,6 +25,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/lzfse"
+	"github.com/blacktop/ipsw/pkg/ota"
 )
 
 // Config is the extract command configuration.
@@ -311,7 +314,38 @@ func DSC(c *Config) ([]string, error) {
 		}
 		if i.Plists.Type == "OTA" {
 			if runtime.GOOS == "darwin" {
-				return dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+				if err != nil {
+					if errors.Is(err, dyld.ErrNoCryptex) {
+						c.Pattern = `^` + dyld.CacheRegex
+						rfiles, err := ota.RemoteList(zr)
+						if err != nil {
+							return nil, fmt.Errorf("failed to list files in remote OTA: %v", err)
+						}
+						var dcaches []string
+						for _, f := range rfiles {
+							if regexp.MustCompile(c.Pattern).MatchString(f.Name()) {
+								dcaches = append(dcaches, f.Name())
+							}
+						}
+						out, err = ota.RemoteExtract(zr, c.Pattern, filepath.Join(filepath.Clean(c.Output), folder), func(s string) bool {
+							s = strings.TrimPrefix(s, folder+string(os.PathSeparator))
+							if slices.Contains(dcaches, s) {
+								dcaches = utils.RemoveStrFromSlice(dcaches, s)
+								if len(dcaches) == 0 {
+									return true
+								}
+							}
+							return false
+						})
+						if err != nil {
+							return nil, fmt.Errorf("failed to extract OTA: %v", err)
+						}
+					} else {
+						return nil, fmt.Errorf("failed to extract dyld_shared_cache from remote OTA: %v", err)
+					}
+				}
+				return out, nil
 			}
 			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
