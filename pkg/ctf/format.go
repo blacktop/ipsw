@@ -279,7 +279,7 @@ func (f *Function) Dump() string {
 	for _, a := range f.args {
 		sargs = append(sargs, strconv.Itoa(int(a)))
 	}
-	fdump = fmt.Sprintf("%s)", strings.Join(sargs, ","))
+	fdump += fmt.Sprintf("%s)", strings.Join(sargs, ","))
 	return fdump
 }
 func (f *Function) MarshalJSON() ([]byte, error) {
