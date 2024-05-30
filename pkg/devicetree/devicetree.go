@@ -234,6 +234,11 @@ func printNode(out *strings.Builder, node Properties, depth int) {
 				for _, pmap := range vv {
 					out.WriteString(fmt.Sprintf("%s\"%s\" start=%#x sz=%#x flags=%#x\n", strings.Repeat(" ", depth+2), pmap.Name[:], pmap.Start, pmap.Size, pmap.Flags))
 				}
+			case []region:
+				out.WriteString(fmt.Sprintf("%s%s:\n", strings.Repeat(" ", depth), k))
+				for _, reg := range vv {
+					out.WriteString(fmt.Sprintf("%sstart=%#06x end=%#06x\n", strings.Repeat(" ", depth+2), reg.Start, reg.End))
+				}
 			default:
 				out.WriteString(fmt.Sprintf("%s%s: %v\n", strings.Repeat(" ", depth), k, vv))
 			}
@@ -501,6 +506,28 @@ func parsePmapIORanges(value []byte) any {
 	return ranges
 }
 
+type region struct {
+	Start uint64
+	End   uint64
+}
+
+func parseRegions(value []byte) any {
+	var regions []region
+	r := bytes.NewReader(value)
+	for {
+		var reg region
+		err := binary.Read(r, binary.LittleEndian, &reg)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return parseValue(value)
+		}
+		regions = append(regions, reg)
+	}
+	return regions
+}
+
 func parseNode(buffer io.Reader) (Node, error) {
 	var node Node
 	// Read a Node from the buffer
@@ -540,6 +567,8 @@ func parseNodeProperty(buffer io.Reader, propName string) (string, any, error) {
 		value = parsePmgrMap(dat)
 	case "devices":
 		value = parsePmgrDevices(dat)
+	case "regions":
+		value = parseRegions(dat)
 	case "reg-private":
 		value = parseAddr(dat)
 	case "value":
