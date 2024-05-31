@@ -5,7 +5,7 @@
 // See: https://docusaurus.io/docs/api/docusaurus-config
 
 const path = require("path");
-import {themes as prismThemes} from "prism-react-renderer";
+import { themes as prismThemes } from "prism-react-renderer";
 const lightCodeTheme = prismThemes.vsDark;
 const darkCodeTheme = prismThemes.palenight;
 
@@ -114,11 +114,11 @@ const config = {
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
         additionalLanguages: ["armasm", "llvm", "bash"],
       },
-      // algolia: {
-      //   appId: "XN7OVST81R",
-      //   apiKey: "493729d49a9639b14fe433a033ef5992",
-      //   indexName: "ipsw",
-      // },
+      algolia: {
+        appId: "21CWMZIXI4",
+        apiKey: "75bcdb8074438def66676219c461ab86",
+        indexName: "ipsw",
+      },
       navbar: {
         hideOnScroll: true,
         title: "ipsw",
