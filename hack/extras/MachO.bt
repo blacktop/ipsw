@@ -299,56 +299,62 @@ string HeaderRead(Header &header) {
 #define REQ_DYLD (0x80000000)
 
 typedef enum <uint> {
-    SEGMENT                 = 0x1,
-    SYM_TAB                 = 0x2,
-    SYM_SEG                 = 0x3,
-    THREAD                  = 0x4,
-    UNIX_THREAD             = 0x5,
-    LOAD_FVM_LIB            = 0x6,
-    ID_FVM_LIB              = 0x7,
-    IDENT                   = 0x8,
-    FVM_FILE                = 0x9,
-    PREPAGE                 = 0xA,
-    DY_SYM_TAB              = 0xB,
-    LOAD_DYLIB              = 0xC,
-    ID_DYLIB                = 0xD,
-    LOAD_DYLINKER           = 0xE,
-    ID_DYLINKER             = 0xF,
-    PREBOUND_DYLIB          = 0x10,
-    ROUTINES                = 0x11,
-    SUB_FRAMEWORK           = 0x12,
-    SUB_UMBRELLA            = 0x13,
-    SUB_CLIENT              = 0x14,
-    SUB_LIBRARY             = 0x15,
-    TWOLEVEL_HINTS          = 0x16,
-    PREBIND_CKSUM        	= 0x17,
-    LOAD_WEAK_DYLIB         = 0x18 | REQ_DYLD,
-    SEGMENT_64              = 0x19,
-    ROUTINES_64             = 0x1A,
-    UUID                    = 0x1B,
-    RPATH                   = 0x1C | REQ_DYLD,
-    CODE_SIGNATURE          = 0x1D,
-    SEGMENT_SPLIT_INFO      = 0x1E,
-    REEXPORT_DYLIB          = 0x1F | REQ_DYLD,
-    LAZY_LOAD_DYLIB         = 0x20,
-    ENCRYPTION_INFO         = 0x21,
-    DYLD_INFO               = 0x22,
-    DYLD_INFO_ONLY          = 0x22 | REQ_DYLD,
-    LOAD_UPWARD_DYLIB       = 0x23 | REQ_DYLD,
-    VERSION_MIN_MAC_OSX     = 0x24,
-    VERSION_MIN_IPHONE_OS   = 0x25,
-    FUNCTION_STARTS         = 0x26,
-    DYLD_ENVIRONMENT        = 0x27,
-    MAIN                    = 0x28,
-    MAIN_DYLIB              = 0x28 | REQ_DYLD,     // Idk, ios app in arm64 uses
-    DATA_IN_CODE            = 0x29,
-    SOURCE_VERSION          = 0x2A,
-    DYLIB_CODE_SIGN_DRS     = 0x2B,
-    ENCRYPTION_INFO_64 		= 0x2c,
-    LC_BUILD_VERSION 		= 0x32,
-    LC_DYLD_EXPORTS_TRIE    = 0x33 | REQ_DYLD,
-    LC_DYLD_CHAINED_FIXUPS 	= 0x34 | REQ_DYLD,
-    LC_FILESET_ENTRY 	    = 0x35 | REQ_DYLD,
+    SEGMENT                     = 0x1,
+    SYM_TAB                     = 0x2,
+    SYM_SEG                     = 0x3,
+    THREAD                      = 0x4,
+    UNIX_THREAD                 = 0x5,
+    LOAD_FVM_LIB                = 0x6,
+    ID_FVM_LIB                  = 0x7,
+    IDENT                       = 0x8,
+    FVM_FILE                    = 0x9,
+    PREPAGE                     = 0xA,
+    DY_SYM_TAB                  = 0xB,
+    LOAD_DYLIB                  = 0xC,
+    ID_DYLIB                    = 0xD,
+    LOAD_DYLINKER               = 0xE,
+    ID_DYLINKER                 = 0xF,
+    PREBOUND_DYLIB              = 0x10,
+    ROUTINES                    = 0x11,
+    SUB_FRAMEWORK               = 0x12,
+    SUB_UMBRELLA                = 0x13,
+    SUB_CLIENT                  = 0x14,
+    SUB_LIBRARY                 = 0x15,
+    TWOLEVEL_HINTS              = 0x16,
+    PREBIND_CKSUM        	    = 0x17,
+    LOAD_WEAK_DYLIB             = 0x18 | REQ_DYLD,
+    SEGMENT_64                  = 0x19,
+    ROUTINES_64                 = 0x1A,
+    UUID                        = 0x1B,
+    RPATH                       = 0x1C | REQ_DYLD,
+    CODE_SIGNATURE              = 0x1D,
+    SEGMENT_SPLIT_INFO          = 0x1E,
+    REEXPORT_DYLIB              = 0x1F | REQ_DYLD,
+    LAZY_LOAD_DYLIB             = 0x20,
+    ENCRYPTION_INFO             = 0x21,
+    DYLD_INFO                   = 0x22,
+    DYLD_INFO_ONLY              = 0x22 | REQ_DYLD,
+    LOAD_UPWARD_DYLIB           = 0x23 | REQ_DYLD,
+    VERSION_MIN_MAC_OSX         = 0x24,
+    VERSION_MIN_IPHONE_OS       = 0x25,
+    FUNCTION_STARTS             = 0x26,
+    DYLD_ENVIRONMENT            = 0x27,
+    MAIN                        = 0x28,
+    MAIN_DYLIB                  = 0x28 | REQ_DYLD,     // Idk, ios app in arm64 uses
+    DATA_IN_CODE                = 0x29,
+    SOURCE_VERSION              = 0x2A,
+    DYLIB_CODE_SIGN_DRS         = 0x2B,
+    ENCRYPTION_INFO_64 		    = 0x2c,
+    LC_LINKER_OPTION            = 0x2d,
+    LC_LINKER_OPTIMIZATION_HINT = 0x2e,
+    LC_VERSION_MIN_TVOS         = 0x2f,
+    LC_VERSION_MIN_WATCHOS      = 0x30,
+    LC_NOTE                     = 0x31,
+    LC_BUILD_VERSION 		    = 0x32,
+    LC_DYLD_EXPORTS_TRIE        = 0x33 | REQ_DYLD,
+    LC_DYLD_CHAINED_FIXUPS 	    = 0x34 | REQ_DYLD,
+    LC_FILESET_ENTRY 	        = 0x35 | REQ_DYLD,
+    LC_ATOM_INFO                = 0x36,
 } LoadCommandType <read=LoadCommandTypeRead>;
 
 string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
@@ -445,6 +451,16 @@ string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
             return "DYLIB_CODE_SIGN_DRS";
         case ENCRYPTION_INFO_64:
             return "ENCRYPTION_INFO_64";
+        case LC_LINKER_OPTION:
+            return "LC_LINKER_OPTION";
+        case LC_LINKER_OPTIMIZATION_HINT:
+            return "LC_LINKER_OPTIMIZATION_HINT";
+        case LC_VERSION_MIN_TVOS:
+            return "LC_VERSION_MIN_TVOS";
+        case LC_VERSION_MIN_WATCHOS:
+            return "LC_VERSION_MIN_WATCHOS";
+        case LC_NOTE:
+            return "LC_NOTE";
         case LC_BUILD_VERSION:
             return "LC_BUILD_VERSION";
         case LC_DYLD_EXPORTS_TRIE:
@@ -453,6 +469,8 @@ string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
             return "LC_DYLD_CHAINED_FIXUPS";
         case LC_FILESET_ENTRY:
             return "LC_FILESET_ENTRY";
+        case LC_ATOM_INFO:
+            return "LC_ATOM_INFO";
         default :
             return "Error";
     }
@@ -681,7 +699,7 @@ typedef struct {
         CodeDirectoryType codeDirectory <comment="CodeDirectory">;
         // FSeek(cdPos + codeDirectory.identOffset);
         string ident;
-        // FSeek(cdPos + codeDirectory.hashOffset);  
+        // FSeek(cdPos + codeDirectory.hashOffset);
         Slot specialSlots[codeDirectory.nSpecialSlots]<optimize=false>;
         Slot codeSlots[codeDirectory.nCodeSlots]<optimize=false>;
     } else {
@@ -785,10 +803,10 @@ typedef struct {
         break;
     case CODE_SIGNATURE :
         CodeSignature codeSignature;
-        break;        
+        break;
     case LC_DYLD_EXPORTS_TRIE :
     case LC_DYLD_CHAINED_FIXUPS :
-    case FUNCTION_STARTS :   
+    case FUNCTION_STARTS :
     case SEGMENT_SPLIT_INFO:
     case DATA_IN_CODE:
         uint32 data_offset;
@@ -970,6 +988,11 @@ typedef struct {
         uint32	cryptsize <format=hex>; /* file size of encrypted range */
         uint32	cryptid;	/* which enryption system, 0 means not-encrypted yet */
         uint32	pad;		/* padding to make this struct's size a multiple of 8 */
+        break;
+    case LC_NOTE:
+        char data_owner[16];
+        uint64 offset;
+        uint64 size;
         break;
     case LC_BUILD_VERSION:
         uint32 platform;  // platform
