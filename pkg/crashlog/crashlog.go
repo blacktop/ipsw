@@ -370,7 +370,7 @@ func (c *CrashLog) getTriggeringThread() error {
 
 // getImages parses all the binary images in the crashlog
 func (c *CrashLog) getImages() error {
-	re := regexp.MustCompile(`(?:\s+)(?P<start>\w+)\s-\s+(?P<end>\w+)\s+(?P<name>.+)\s+(?P<arch>rmv[4-8][tfsk]?|arm64\S*|i386|x86_64\S)\s+\<?(?P<uuid>[[:xdigit:]]{32})?\>?\s* (?P<path>\/.*)\s*$`)
+	re := regexp.MustCompile(`(?P<start>\w+)\s-\s+(?P<end>\w+)\s+(?P<name>.+)\s+(?P<arch>rmv[4-8][tfsk]?|arm64\S*|i386|x86_64\S)\s+\<?(?P<uuid>[[:xdigit:]]{32})?\>?\s* (?P<path>\/.*)\s*$`)
 	found := false
 	for _, line := range c.lines {
 		if strings.HasPrefix(line, "Binary Images") {
