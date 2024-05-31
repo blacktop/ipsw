@@ -31,6 +31,7 @@ ipsw download appledb [flags]
   -a, --api                   Use Github API
       --api-token string      Github API Token
       --beta                  Download beta IPSWs
+      --dyld                  Extract dyld_shared_cache(s) from remote OTA
   -f, --flat                  Do NOT perserve directory structure when downloading with --pattern
   -h, --help                  help for appledb
   -j, --json                  Dump DB query results as JSON

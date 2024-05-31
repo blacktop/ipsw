@@ -17,16 +17,20 @@ ipsw ent [flags]
 ### Examples
 
 ```bash
-  # Search IPSW for entitlement key
-  ❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
-  # Search local folder for entitlement key
-  ❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
-  # Search IPSW for entitlement value (i.e. one of the <array> strings)
-  ❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
-  # Dump entitlements for MachO in IPSW
-  ❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
-  # Diff two IPSWs
-  ❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+# Search IPSW for entitlement key
+❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
+
+# Search local folder for entitlement key
+❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
+
+# Search IPSW for entitlement value (i.e. one of the <array> strings)
+❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
+
+# Dump entitlements for MachO in IPSW
+❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
+
+# Diff two IPSWs
+❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
 ```
 
 ### Options

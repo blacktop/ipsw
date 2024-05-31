@@ -11,7 +11,7 @@ description: Mount DMG from IPSW
 Mount DMG from IPSW
 
 ```
-ipsw mount [fs|sys|app] IPSW [flags]
+ipsw mount [fs|sys|app|exc] IPSW [flags]
 ```
 
 ### Options
