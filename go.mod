@@ -52,7 +52,7 @@ require (
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.23.0
-	golang.org/x/exp v0.0.0-20240530194437-404ba88c7ed0
+	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc
 	golang.org/x/net v0.25.0
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sync v0.7.0
