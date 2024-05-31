@@ -34,7 +34,10 @@ const config = {
   markdown: {
     mermaid: true,
   },
-  themes: ["@docusaurus/theme-mermaid"],
+  themes: [
+    "@docusaurus/theme-mermaid",
+    '@docusaurus/theme-search-algolia',
+  ],
   presets: [
     [
       "classic",
