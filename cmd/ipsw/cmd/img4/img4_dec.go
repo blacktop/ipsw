@@ -25,6 +25,7 @@ import (
 	"crypto/aes"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 
 	"github.com/apex/log"
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
@@ -68,6 +69,12 @@ var decImg4Cmd = &cobra.Command{
 			return fmt.Errorf("must specify either --iv-key OR --iv/--key")
 		}
 
+		infile := filepath.Clean(args[0])
+
+		if len(outputFile) == 0 {
+			outputFile = infile + ".dec"
+		}
+
 		var iv []byte
 		var key []byte
 
@@ -90,6 +97,6 @@ var decImg4Cmd = &cobra.Command{
 			}
 		}
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", outputFile))
-		return icmd.DecryptPayload(args[0], outputFile, iv, key)
+		return icmd.DecryptPayload(infile, outputFile, iv, key)
 	},
 }
