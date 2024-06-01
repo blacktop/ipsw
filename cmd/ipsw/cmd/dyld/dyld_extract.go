@@ -37,8 +37,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 func rebaseMachO(dsc *dyld.File, machoPath string) error {
@@ -204,7 +204,7 @@ var dyldExtractCmd = &cobra.Command{
 				// progress bar filler with customized style
 				mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
 				mpb.PrependDecorators(
-					decor.Name(name, decor.WC{W: len(name) + 1, C: decor.DidentRight}),
+					decor.Name(name, decor.WC{W: len(name), C: decor.DindentRight | decor.DextraSpace}),
 					// replace ETA decorator with "done" message, OnComplete event
 					decor.OnComplete(
 						decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",

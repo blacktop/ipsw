@@ -16,8 +16,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 var normalPadding = cli.Default.Padding
@@ -230,7 +230,7 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 						mpb.AppendDecorators(
 							decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 							decor.Name(" ] "),
-							decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+							decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
 						),
 					)
 					// create proxy reader

@@ -19,8 +19,8 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/pkg/errors"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 var ErrNoCryptex = errors.New("cryptex-system-arm64e NOT found in remote zip")
@@ -215,7 +215,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, 
 				mpb.AppendDecorators(
 					decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 					decor.Name(" ] "),
-					decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+					decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
 				),
 			)
 			// create proxy reader

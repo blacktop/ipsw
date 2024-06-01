@@ -21,8 +21,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 	"golang.org/x/net/http/httpproxy"
 )
 
@@ -298,34 +298,38 @@ func (d *Download) Do() error {
 		)
 
 		var bar *mpb.Bar
-
-		bar = p.Add(d.size,
-			mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+		bar = p.New(d.size,
+			mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
 			mpb.PrependDecorators(
 				decor.CountersKibiByte("\t% .2f / % .2f"),
 			),
 			mpb.AppendDecorators(
 				decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 				decor.Name(" ] "),
-				decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+				decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
 			),
 		)
 
 		if d.resume {
-			bar = p.Add(d.size,
-				mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+			bar = p.New(d.size,
+				mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
 				mpb.PrependDecorators(
 					decor.CountersKibiByte("\t% .2f / % .2f"),
 				),
 				mpb.AppendDecorators(
-					decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+					decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 					decor.Name(" ] "),
-					decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048)),
+					decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
 				),
+				// mpb.AppendDecorators(
+				// 	decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/1024), "✅ "),
+				// 	decor.Name(" ] "),
+				// 	decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", float64(d.size)/2048),
+				// ),
 			)
-			// bar.SetCurrent(d.bytesResumed)
-			bar.SetRefill(d.bytesResumed)
 			bar.IncrInt64(d.bytesResumed)
+			bar.SetRefill(d.bytesResumed)
+			// bar.IncrInt64(d.size - d.bytesResumed)
 		}
 
 		// create proxy reader
