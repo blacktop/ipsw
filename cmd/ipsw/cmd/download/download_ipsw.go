@@ -22,6 +22,7 @@ THE SOFTWARE.
 package download
 
 import (
+	"crypto/aes"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -385,14 +386,25 @@ var ipswCmd = &cobra.Command{
 												len(key.Iv) > 0 && len(key.Iv[idx]) > 0 && key.Iv[idx] != "Unknown" {
 												iv, err := hex.DecodeString(key.Iv[idx])
 												if err != nil {
-													return fmt.Errorf("failed to decode --iv-key: %v", err)
+													return fmt.Errorf("failed to decode iv: %v", err)
 												}
 												k, err := hex.DecodeString(key.Key[idx])
 												if err != nil {
-													return fmt.Errorf("failed to decode --iv-key: %v", err)
+													return fmt.Errorf("failed to decode key: %v", err)
 												}
 												utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
 												if err := img4.DecryptPayload(in, in+".dec", iv, k); err != nil {
+													return fmt.Errorf("failed to decrypt %s: %v", in, err)
+												}
+											} else if len(key.Kbag) > 0 && len(key.Kbag[idx]) > 0 && key.Kbag[idx] != "Unknown" {
+												kbag, err := hex.DecodeString(key.Kbag[idx])
+												if err != nil {
+													return fmt.Errorf("failed to decode kbag: %v", err)
+												}
+												iv := kbag[:aes.BlockSize]
+												key := kbag[aes.BlockSize:]
+												utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
+												if err := img4.DecryptPayload(in, in+".dec", iv, key); err != nil {
 													return fmt.Errorf("failed to decrypt %s: %v", in, err)
 												}
 											}
