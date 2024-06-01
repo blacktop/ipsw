@@ -1112,54 +1112,69 @@ func (o *ObjC) scanBaseFrameworks() error {
 
 func (o *ObjC) fillImportsForType(typ string, className string, protoName string, classNames []string, protoNames []string, imp *Imports) {
 	typ = strings.Trim(typ, ` *`)
+	if typ == "" {
+		return
+	}
 
-	if !strings.ContainsAny(typ, "<>") {
-		typ := o.nonBuiltInType(typ)
-		if typ == "" {
-			return
-		}
+	if strings.ContainsAny(typ, "{}") {
+		lTyp, mTyps, _ := o.contextualSplit(typ, "{", ";", "}")
 
-		if !slices.Contains(classNames, typ) {
-			imp.Classes = append(imp.Classes, typ)
-			return
-		}
+		o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp)
 
-		if typ != className {
-			imp.Locals = append(imp.Locals, typ+".h")
-			return
+		for _, mTyp := range mTyps {
+			o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp)
 		}
 
 		return
 	}
 
-	if !strings.HasPrefix(typ, "<") {
-		before, after, _ := strings.Cut(typ, "<")
+	if strings.ContainsAny(typ, "<>") {
+		lTyp, mTyps, _ := o.contextualSplit(typ, "<", ",", ">")
 
-		o.fillImportsForType(before, className, protoName, classNames, protoNames, imp)
-		o.fillImportsForType("<"+after, className, protoName, classNames, protoNames, imp)
+		o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp)
+
+		if strings.HasPrefix(lTyp, "struct ") || strings.Contains(lTyp, "::") {
+			// C++ Template
+
+			for _, mTyp := range mTyps {
+				o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp)
+			}
+		} else {
+			// Objective-C Qualifier
+
+			for _, mTyp := range mTyps {
+				mTyp := strings.Trim(mTyp, ` *`)
+
+				if !slices.Contains(protoNames, mTyp) {
+					imp.Protos = append(imp.Protos, mTyp)
+					continue
+				}
+
+				if mTyp != protoName {
+					imp.Locals = append(imp.Locals, mTyp+"-Protocol.h")
+				}
+			}
+		}
 
 		return
 	}
 
-	if !strings.HasSuffix(typ, ">") {
-		before, after, _ := strings.Cut(typ, ">")
-
-		o.fillImportsForType(before+">", className, protoName, classNames, protoNames, imp)
-		o.fillImportsForType(after, className, protoName, classNames, protoNames, imp)
-
+	typ = o.nonBuiltInType(typ)
+	if typ == "" {
 		return
 	}
 
-	for _, typ := range strings.Split(strings.Trim(typ, "<>"), ", ") {
-		if !slices.Contains(protoNames, typ) {
-			imp.Protos = append(imp.Protos, typ)
-			continue
-		}
-
-		if typ != protoName {
-			imp.Locals = append(imp.Locals, typ+"-Protocol.h")
-		}
+	if !slices.Contains(classNames, typ) {
+		imp.Classes = append(imp.Classes, typ)
+		return
 	}
+
+	if typ != className {
+		imp.Locals = append(imp.Locals, typ+".h")
+		return
+	}
+
+	return
 }
 
 func (o *ObjC) nonBuiltInType(typ string) string {
@@ -1167,7 +1182,7 @@ func (o *ObjC) nonBuiltInType(typ string) string {
 		return ""
 	}
 
-	if strings.ContainsAny(typ, "()[]{};") {
+	if strings.ContainsAny(typ, "()[]{}:;") {
 		return ""
 	}
 
@@ -1179,5 +1194,55 @@ func (o *ObjC) nonBuiltInType(typ string) string {
 		return o.nonBuiltInType(after)
 	}
 
-	return typ
+	if idx := strings.Index(typ, "*"); idx != -1 {
+		typ = typ[:idx]
+	}
+	return strings.TrimSpace(typ)
+}
+
+func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim string) (string, []string, string) {
+	lDelimIdx := strings.Index(typ, lDelim)
+	rDelimIdx := strings.Index(typ, rDelim)
+
+	lDelimIt := lDelimIdx + strings.Index(typ[lDelimIdx+1:], lDelim) + 1
+	for lDelimIt < rDelimIdx {
+		rDelimIdx += strings.Index(typ[rDelimIdx+1:], rDelim) + 1
+
+		lDelimNext := strings.Index(typ[lDelimIt+1:], lDelim)
+		if lDelimNext == -1 {
+			break
+		}
+
+		lDelimIt += lDelimNext + 1
+	}
+	rDelimIdx += 1
+
+	l := typ[:lDelimIdx]
+	m := typ[lDelimIdx+1 : rDelimIdx-1]
+	r := typ[rDelimIdx:]
+
+	var typs []string
+	{
+		level := 0
+		mDelimIdx := -1
+
+		for i, c := range m {
+			switch string(c) {
+			case lDelim:
+				level++
+			case rDelim:
+				level--
+			case mDelim:
+				if level == 0 {
+					typs = append(typs, m[mDelimIdx+1:i])
+
+					mDelimIdx = i
+				}
+			}
+		}
+
+		typs = append(typs, m[mDelimIdx+1:])
+	}
+
+	return l, typs, r
 }
