@@ -15,3 +15,5 @@ jobs:
       - name: Run ipsw watch WebKit/WebKit
         run: |
           /snap/bin/ipsw watch --pattern '(?i)Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
+          /snap/bin/ipsw watch --pattern '.*' --days 7 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/dyld
+          /snap/bin/ipsw watch --pattern '.*' --days 7 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/xnu
