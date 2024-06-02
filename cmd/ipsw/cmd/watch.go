@@ -60,6 +60,7 @@ func highlightHeader(re *regexp.Regexp, input string) string {
 func init() {
 	rootCmd.AddCommand(watchCmd)
 
+	// watchCmd.Flags().StringP("tags", "g", "main", "Watch for new tags")
 	watchCmd.Flags().StringP("branch", "b", "main", "Repo branch to watch")
 	watchCmd.Flags().StringP("file", "f", "", "Commit file path to watch")
 	watchCmd.Flags().StringP("pattern", "p", "", "Commit message pattern to match")
@@ -69,6 +70,8 @@ func init() {
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
 	watchCmd.Flags().String("discord-id", "", "Discord Webhook ID")
 	watchCmd.Flags().String("discord-token", "", "Discord Webhook Token")
+	watchCmd.Flags().String("discord-icon", "", "Discord Post Icon URL")
+	// viper.BindPFlag("watch.tags", watchCmd.Flags().Lookup("tags"))
 	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
@@ -78,6 +81,7 @@ func init() {
 	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
 	viper.BindPFlag("watch.discord-id", watchCmd.Flags().Lookup("discord-id"))
 	viper.BindPFlag("watch.discord-token", watchCmd.Flags().Lookup("discord-token"))
+	viper.BindPFlag("watch.discord-icon", watchCmd.Flags().Lookup("discord-icon"))
 }
 
 // TODO: add support for watching local repos so that we can leverage `git log -L :func:file` to watch a single function
@@ -142,13 +146,18 @@ var watchCmd = &cobra.Command{
 			}
 
 			if annouce {
+				iconURL := viper.GetString("watch.discord-icon")
+				if iconURL == "" {
+					iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
+				}
+
 				for _, commit := range commits {
 					if err := watch.DiscordAnnounce(string(commit.Message), &watch.Config{
 						DiscordWebhookID:    viper.GetString("watch.discord-id"),
 						DiscordWebhookToken: viper.GetString("watch.discord-token"),
 						DiscordColor:        "4535172",
 						DiscordAuthor:       string(commit.Author.Name),
-						DiscordIconURL:      "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png",
+						DiscordIconURL:      iconURL,
 					}); err != nil {
 						return fmt.Errorf("discord announce failed: %v", err)
 					}
