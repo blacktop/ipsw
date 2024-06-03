@@ -28,13 +28,13 @@ func (f *Field) String() string {
 	}
 	switch v := f.Value.(type) {
 	case string:
-		return fmt.Sprintf("%s %s\n", pad(colorField(f.Title)+":", 35), v)
+		return fmt.Sprintf("%s %s\n", pad(colorField(f.Title)+":", 36), v)
 	case uint64:
-		return fmt.Sprintf("%s %#x\n", pad(colorField(f.Title)+":", 35), v)
+		return fmt.Sprintf("%s %#x\n", pad(colorField(f.Title)+":", 36), v)
 	case bool:
-		return fmt.Sprintf("%s %t\n", pad(colorField(f.Title)+":", 35), v)
+		return fmt.Sprintf("%s %t\n", pad(colorField(f.Title)+":", 36), v)
 	default:
-		return fmt.Sprintf("%s %v\n", pad(colorField(f.Title)+":", 35), f.Value)
+		return fmt.Sprintf("%s %v\n", pad(colorField(f.Title)+":", 36), f.Value)
 	}
 }
 
@@ -731,7 +731,7 @@ func (p *Panic210) getLoadedKexts() (err error) {
 			continue
 		}
 		if found {
-			lkRE := regexp.MustCompile(`^(?P<name>[\w.]+)\s+(?P<version>[0-9.]+)`)
+			lkRE := regexp.MustCompile(`^(?P<name>[\w.]+)\s+(?P<version>[\w.]+)`)
 			matches := lkRE.FindStringSubmatch(line)
 			if len(matches) < 3 {
 				break
