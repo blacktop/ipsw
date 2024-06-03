@@ -223,7 +223,7 @@ var machoSearchCmd = &cobra.Command{
 				}
 			}
 			if uuidStr != "" {
-				if strings.EqualFold(m.UUID().UUID.String(), uuidStr) {
+				if m.UUID() != nil && strings.EqualFold(m.UUID().UUID.String(), uuidStr) {
 					fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("uuid"), uuidStr)
 				}
 			}
