@@ -37,7 +37,10 @@ func init() {
 	Img4Cmd.AddCommand(img4ExtractCmd)
 
 	img4ExtractCmd.Flags().Bool("img4", false, "Input file is an IMG4")
-	img4ExtractCmd.Flags().StringP("output", "o", "", "Output file")
+	img4ExtractCmd.Flags().StringP("output", "o", "", "Output folder")
+	img4ExtractCmd.MarkFlagDirname("output")
+	viper.BindPFlag("img4.extract.img4", img4DecCmd.Flags().Lookup("img4"))
+	viper.BindPFlag("img4.extract.output", img4DecCmd.Flags().Lookup("output"))
 	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -53,11 +56,14 @@ var img4ExtractCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
+		// flags
+		isImg4 := viper.GetBool("img4.extract.img4")
+		outputDir := viper.GetString("img4.extract.output")
 
-		isImg4, _ := cmd.Flags().GetBool("img4")
-		outputDir, _ := cmd.Flags().GetString("output")
-
-		outFile := filepath.Join(outputDir, filepath.Clean(args[0])+".payload")
+		outFile := filepath.Clean(args[0]) + ".payload"
+		if outputDir != "" {
+			outFile = filepath.Join(outputDir, outFile)
+		}
 
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting payload to file %s", outFile))
 		return icmd.ExtractPayload(filepath.Clean(args[0]), outFile, isImg4)
