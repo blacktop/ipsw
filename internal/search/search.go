@@ -101,7 +101,6 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 
 // ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
 func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
-
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
@@ -116,19 +115,19 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
 		log.Info("Scanning SystemOS")
 		if err := scanDmg(ipswPath, systemOS, "SystemOS", handler); err != nil {
-			return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
+			return fmt.Errorf("failed to scan files in SystemOS %s: %w", systemOS, err)
 		}
 	}
 	if appOS, err := i.GetAppOsDmg(); err == nil {
 		log.Info("Scanning AppOS")
 		if err := scanDmg(ipswPath, appOS, "AppOS", handler); err != nil {
-			return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+			return fmt.Errorf("failed to scan files in AppOS %s: %w", appOS, err)
 		}
 	}
 	if excOS, err := i.GetExclaveOSDmg(); err == nil {
 		log.Info("Scanning ExclaveOS")
 		if err := scanDmg(ipswPath, excOS, "ExclaveOS", handler); err != nil {
-			return fmt.Errorf("failed to scan files in ExclaveOS %s: %v", excOS, err)
+			return fmt.Errorf("failed to scan files in ExclaveOS %s: %w", excOS, err)
 		}
 	}
 
