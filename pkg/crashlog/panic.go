@@ -150,23 +150,72 @@ func (p PanickedThread) String() string {
 	return fmt.Sprintf(colorField("Panicked Thread")+": %#016x, "+colorField("backtrace")+": %#016x, "+colorField("tid")+": %d%s", p.Address, p.Backtrace, p.TID, callstack)
 }
 
+type LastStartedKext struct {
+	StartedAt uint64
+	Name      string
+	Version   string
+	Address   uint64
+	Size      uint64
+}
+
+func (l *LastStartedKext) String() string {
+	if l == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		colorField("last started kext at")+": %#016x: %s %s (%s %#016x, %s %#016x)\n",
+		l.StartedAt,
+		colorImage(l.Name),
+		l.Version,
+		colorField("addr"),
+		l.Address,
+		colorField("size"),
+		l.Size)
+}
+
+type LoadedKexts []LoadedKext
+
+func (l LoadedKexts) String() string {
+	if len(l) == 0 {
+		return ""
+	}
+	loadedKexts := ""
+	for _, kext := range l {
+		loadedKexts += fmt.Sprintf("    %s\n", kext)
+	}
+	return fmt.Sprintf(colorField("Loaded Kexts:")+"\n%s\n", loadedKexts)
+}
+
+type LoadedKext struct {
+	Name    string
+	Version string
+}
+
+func (l LoadedKext) String() string {
+	return fmt.Sprintf("%s %s", colorImage(l.Name), l.Version)
+}
+
 type Panic210 struct {
-	Panic            string
-	DebuggerMessage  string
-	MemoryID         uint64
-	OsReleaseType    string
-	OsVersion        string
-	KernelVersion    string
-	KernelCacheUUID  string
-	KernelUUID       string
-	BootSessionUUID  string
-	IBootVersion     string
-	SecureBoot       bool
-	RootsInstalled   bool
-	PaniclogVersion  string
-	KernelSlide      uint64
-	KernelTextBase   uint64
-	MachAbsoluteTime uint64
+	Panic               string
+	DebuggerMessage     string
+	MemoryID            uint64
+	OsReleaseType       string
+	OsVersion           string
+	KernelVersion       string
+	KernelCacheUUID     string
+	KernelUUID          string
+	BootSessionUUID     string
+	IBootVersion        string
+	SecureBoot          bool
+	RootsInstalled      bool
+	PaniclogVersion     string
+	KernelCacheSlide    uint64
+	KernelCacheBase     uint64
+	KernelSlide         uint64
+	KernelTextBase      uint64
+	KernelTextExecSlide uint64
+	KernelTextExecBase  uint64
+	MachAbsoluteTime    uint64
 
 	EpochTime EpochTime
 
@@ -179,6 +228,9 @@ type Panic210 struct {
 	CompressorInfo string
 	PanickedTask   PanickedTask
 	PanickedThread PanickedThread
+
+	LastStartedKext *LastStartedKext
+	LoadedKexts     LoadedKexts
 
 	lines []string
 }
@@ -220,7 +272,11 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.KernelCacheUUID, err = crash.getStrField("KernelCache UUID: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get kernel cache UUID")
+		log.WithError(err).Error("failed to get kernelcache UUID")
+	}
+	crash.KernelCacheUUID, err = crash.getStrField("Fileset KernelCache UUID: ")
+	if err != nil {
+		log.WithError(err).Error("failed to get fileset kernelcache UUID")
 	}
 	crash.KernelUUID, err = crash.getStrField("Kernel UUID: ")
 	if err != nil {
@@ -228,7 +284,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.BootSessionUUID, err = crash.getStrField("Boot session UUID: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get boot session UUID")
+		log.WithError(err).Debug("failed to get boot session UUID")
 	}
 	crash.IBootVersion, err = crash.getStrField("iBoot version: ")
 	if err != nil {
@@ -236,15 +292,23 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.SecureBoot, err = crash.getBoolField("secure boot?: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get secure boot")
+		log.WithError(err).Debug("failed to get secure boot")
 	}
 	crash.RootsInstalled, err = crash.getBoolField("roots installed: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get roots installed")
+		log.WithError(err).Debug("failed to get roots installed")
 	}
 	crash.PaniclogVersion, err = crash.getStrField("Paniclog version: ")
 	if err != nil {
 		log.WithError(err).Error("failed to get paniclog version")
+	}
+	crash.KernelCacheSlide, err = crash.getIntField("KernelCache slide:      ")
+	if err != nil {
+		log.WithError(err).Error("failed to get kernelcache slide")
+	}
+	crash.KernelCacheBase, err = crash.getIntField("KernelCache base:  ")
+	if err != nil {
+		log.WithError(err).Error("failed to get kernelcache base")
 	}
 	crash.KernelSlide, err = crash.getIntField("Kernel slide:      ")
 	if err != nil {
@@ -253,6 +317,14 @@ func parsePanicString210(in string) (*Panic210, error) {
 	crash.KernelTextBase, err = crash.getIntField("Kernel text base:  ")
 	if err != nil {
 		log.WithError(err).Error("failed to get kernel text base")
+	}
+	crash.KernelTextExecSlide, err = crash.getIntField("Kernel text exec slide:      ")
+	if err != nil {
+		log.WithError(err).Debug("failed to get kernel text exec slide")
+	}
+	crash.KernelTextExecBase, err = crash.getIntField("Kernel text exec base:  ")
+	if err != nil {
+		log.WithError(err).Debug("failed to get kernel text exec base")
 	}
 	crash.MachAbsoluteTime, err = crash.getIntField("mach_absolute_time: ")
 	if err != nil {
@@ -265,7 +337,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 		log.WithError(err).Error("failed to get zone info")
 	}
 	if err := crash.getTPIDRx_ELy(); err != nil {
-		log.WithError(err).Error("failed to get TPIDRx_ELy")
+		log.WithError(err).Debug("failed to get TPIDRx_ELy")
 	}
 	if err := crash.getCores(); err != nil {
 		log.WithError(err).Error("failed to get cores")
@@ -280,6 +352,13 @@ func parsePanicString210(in string) (*Panic210, error) {
 	if err := crash.getPanickedThread(); err != nil {
 		log.WithError(err).Error("failed to get panicked thread")
 	}
+	if err := crash.getLastStartedKext(); err != nil {
+		log.WithError(err).Debug(err.Error())
+	}
+	if err := crash.getLoadedKexts(); err != nil {
+		log.WithError(err).Debug(err.Error())
+	}
+
 	return crash, nil
 }
 
@@ -575,6 +654,57 @@ func (p *Panic210) getPanickedThread() (err error) {
 	}
 	return fmt.Errorf("failed to find panicked thread")
 }
+func (p *Panic210) getLastStartedKext() (err error) {
+	re := regexp.MustCompile(`^last started kext at`)
+	found := false
+	for _, line := range p.lines {
+		if re.MatchString(line) {
+			ptRE := regexp.MustCompile(`^last started kext at (?P<start>\w+): (?P<name>.*)\s+(?P<version>[0-9.]+) \(addr (?P<addr>\w+), size (?P<size>\w+)\)`)
+			matches := ptRE.FindStringSubmatch(line)
+			if len(matches) < 4 {
+				continue
+			}
+			p.LastStartedKext = &LastStartedKext{
+				StartedAt: cast.ToUint64(matches[1]),
+				Name:      matches[2],
+				Version:   matches[3],
+				Address:   cast.ToUint64(matches[4]),
+				Size:      cast.ToUint64(matches[5]),
+			}
+			found = true
+			continue
+		}
+	}
+	if found {
+		return nil
+	}
+	return fmt.Errorf("failed to find 'last started kext at'")
+}
+func (p *Panic210) getLoadedKexts() (err error) {
+	re := regexp.MustCompile(`^loaded kexts:`)
+	found := false
+	for _, line := range p.lines {
+		if re.MatchString(line) {
+			found = true
+			continue
+		}
+		if found {
+			csRE := regexp.MustCompile(`^(?P<name>.+) (?P<version>[0-9.]+)`)
+			matches := csRE.FindStringSubmatch(line)
+			if len(matches) < 3 {
+				continue
+			}
+			p.LoadedKexts = append(p.LoadedKexts, LoadedKext{
+				Name:    matches[1],
+				Version: matches[2],
+			})
+		}
+	}
+	if found {
+		return nil
+	}
+	return fmt.Errorf("failed to find 'loaded kexts:'")
+}
 func (p *Panic210) String() string {
 	panicParts := strings.Split(p.Panic, ": ")
 	var panic string
@@ -603,8 +733,12 @@ func (p *Panic210) String() string {
 			colorField("Secure Boot")+":        %t\n"+
 			colorField("Roots Installed")+":    %t\n"+
 			colorField("Paniclog Version")+":   %s\n"+
+			colorField("KernelCache Slide")+":       %#x\n"+
+			colorField("KernelCache Base")+":   %#x\n"+
 			colorField("Kernel Slide")+":       %#x\n"+
 			colorField("Kernel Text Base")+":   %#x\n"+
+			colorField("Kernel Text Exec Slide")+":   %#x\n"+
+			colorField("Kernel Text Exec Base")+":   %#x\n"+
 			colorField("Mach Absolute Time")+": %#x\n"+
 			"\n%s\n"+
 			"%s\n"+
@@ -612,6 +746,8 @@ func (p *Panic210) String() string {
 			"%s\n"+
 			colorField("Compressor Info: ")+"%s\n"+
 			"%s\n"+
+			"%s"+
+			"%s"+
 			"%s",
 		panic,
 		p.DebuggerMessage,
@@ -626,8 +762,12 @@ func (p *Panic210) String() string {
 		p.SecureBoot,
 		p.RootsInstalled,
 		p.PaniclogVersion,
+		p.KernelCacheSlide,
+		p.KernelCacheBase,
 		p.KernelSlide,
 		p.KernelTextBase,
+		p.KernelTextExecSlide,
+		p.KernelTextExecBase,
 		p.MachAbsoluteTime,
 		p.EpochTime,
 		p.ZoneInfo,
@@ -635,6 +775,9 @@ func (p *Panic210) String() string {
 		cores,
 		p.CompressorInfo,
 		p.PanickedTask,
-		p.PanickedThread)
+		p.PanickedThread,
+		p.LastStartedKext,
+		p.LoadedKexts,
+	)
 
 }
