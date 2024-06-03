@@ -336,11 +336,11 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.KernelCacheSlide, err = crash.getIntField("KernelCache Slide", "KernelCache slide:      ")
 	if err != nil {
-		log.WithError(err).Error("failed to get kernelcache slide")
+		log.WithError(err).Debug("failed to get kernelcache slide")
 	}
 	crash.KernelCacheBase, err = crash.getIntField("KernelCache Base", "KernelCache base:  ")
 	if err != nil {
-		log.WithError(err).Error("failed to get kernelcache base")
+		log.WithError(err).Debug("failed to get kernelcache base")
 	}
 	crash.KernelSlide, err = crash.getIntField("Kernel Slide", "Kernel slide:      ")
 	if err != nil {
