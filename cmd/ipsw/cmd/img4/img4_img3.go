@@ -34,9 +34,11 @@ import (
 func init() {
 	Img4Cmd.AddCommand(img4Img3Cmd)
 
-	img4Img3Cmd.Flags().StringP("output", "o", "", "Output file")
-	img4Img3Cmd.MarkZshCompPositionalArgumentFile(1)
+	img4Img3Cmd.Flags().StringP("output", "o", "", "Output folder")
+	img4Img3Cmd.MarkFlagDirname("output")
 	viper.BindPFlag("img4.img3.output", img4Img3Cmd.Flags().Lookup("output"))
+
+	img4Img3Cmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // img4Img3Cmd represents the extract command
@@ -52,7 +54,13 @@ var img4Img3Cmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		outFile := filepath.Join(viper.GetString("output"), filepath.Clean(args[0])+".payload")
+		// flags
+		outputDir := viper.GetString("img4.dec.output")
+
+		outFile := filepath.Clean(args[0]) + ".payload"
+		if outputDir != "" {
+			outFile = filepath.Join(outputDir, outFile)
+		}
 
 		log.Infof("Extracting payload to file %s", outFile)
 		return icmd.ParseImg3(filepath.Clean(args[0]), outFile)

@@ -47,7 +47,7 @@ var img4KbagCmd = &cobra.Command{
 	Use:           "kbag <IMG4>",
 	Aliases:       []string{"k"},
 	Short:         "Extract kbag from img4",
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
