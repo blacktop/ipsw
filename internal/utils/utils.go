@@ -22,10 +22,6 @@ import (
 
 var normalPadding = cli.Default.Padding
 
-func init() {
-	rand.Seed(time.Now().Unix())
-}
-
 // Retry will retry a function f a number of attempts with a sleep duration in between
 func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
 	for i := 0; i < attempts; i++ {
