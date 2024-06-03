@@ -569,6 +569,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		case "KernelCache":
 			i.Payload.BinaryImages[idx].Name = "kernelcache"
 			total--
+		case "KernelTextExec":
+			i.Payload.BinaryImages[idx].Name = "kernelcache (__TEXT_EXEC)"
+			total--
 		case "SharedCache":
 			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache"
 			total--
@@ -786,6 +789,12 @@ func (i *Ips) String(verbose bool) string {
 				}
 			}
 			out += "\n"
+		}
+		if len(i.Payload.Notes) > 0 {
+			out += colorField("NOTES") + ":\n"
+			for _, n := range i.Payload.Notes {
+				out += fmt.Sprintf("    - %s\n", n)
+			}
 		}
 	case "Crash", "309":
 		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
