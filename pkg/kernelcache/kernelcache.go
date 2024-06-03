@@ -240,6 +240,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 			return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
 		}
 
+		// check if kernelcache is fat/universal
 		fat, err := macho.NewFatFile(bytes.NewReader(dat))
 		if errors.Is(err, macho.ErrNotFat) {
 			return dat, nil
@@ -255,6 +256,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		}
 
 		// Essentially: lipo -thin arm64e
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting arch '%s, %s' from single slice fat MachO file", fat.Arches[0].CPU, fat.Arches[0].SubCPU.String(fat.Arches[0].CPU)))
 		return dat[fat.Arches[0].Offset:], nil
 
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
