@@ -582,7 +582,7 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		}
 		for idx, img := range i.Payload.BinaryImages {
 			var slide uint64
-			if strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
+			if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
 				i.Payload.BinaryImages[idx].Path = path
 				i.Payload.BinaryImages[idx].Name = path
 				slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
