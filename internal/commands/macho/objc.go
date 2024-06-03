@@ -1238,7 +1238,13 @@ func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim 
 	lDelimIdx := strings.Index(typ, lDelim)
 	rDelimIdx := strings.Index(typ, rDelim)
 
-	if rDelimIdx < lDelimIdx {
+	if lDelimIdx == -1 {
+		return "", nil, "", errors.New("contextualSplit failed: left delimiter not found")
+	}
+	if rDelimIdx == -1 {
+		return "", nil, "", errors.New("contextualSplit failed: right delimiter not found")
+	}
+	if lDelimIdx > rDelimIdx {
 		return "", nil, "", errors.New("contextualSplit failed: found right delimiter before first left delimiter")
 	}
 
@@ -1258,6 +1264,16 @@ func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim 
 		}
 	}
 	rDelimIdx += 1
+
+	if lDelimIdx > rDelimIdx {
+		return "", nil, "", errors.New("contextualSplit failed: left delimiter after right delimiter")
+	}
+	if lDelimIdx < 0 {
+		return "", nil, "", errors.New("contextualSplit failed: left delimiter out of bounds")
+	}
+	if rDelimIdx > len(typ) {
+		return "", nil, "", errors.New("contextualSplit failed: right delimiter out of bounds")
+	}
 
 	l := typ[:lDelimIdx]
 	m := typ[lDelimIdx+1 : rDelimIdx-1]
