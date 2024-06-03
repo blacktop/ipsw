@@ -15,6 +15,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
@@ -575,6 +576,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		case "SharedCache":
 			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache"
 			total--
+		case "SharedCacheLibrary":
+			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache (library)"
+			total--
 		}
 	}
 
@@ -634,6 +638,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
 				}
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "absolute" {
+					continue
+				}
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
 					// lookup symbol in DSC dylib
@@ -669,6 +676,13 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name + delta
 							}
 						}
+					} else {
+						log.WithFields(log.Fields{
+							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+							"thread": tid,
+							"frame":  idx,
+							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName,
+						}).Debugf("failed to find function for offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
 					}
 				}
 			}
