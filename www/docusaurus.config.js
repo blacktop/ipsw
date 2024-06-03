@@ -122,8 +122,8 @@ const config = {
         additionalLanguages: ["armasm", "llvm", "bash"],
       },
       algolia: {
-        appId: "21CWMZIXI4",
-        apiKey: "75bcdb8074438def66676219c461ab86",
+        appId: "KYIBYORJ9P",
+        apiKey: "1c1fbcef804f465f798caba08afc1f7c",
         indexName: "ipsw",
       },
       navbar: {
