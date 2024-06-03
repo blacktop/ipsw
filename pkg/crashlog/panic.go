@@ -248,7 +248,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 		return nil, fmt.Errorf("failed to scan panic string: %v", err)
 	}
 
-	crash.Panic = crash.lines[0]
+	crash.Panic = crash.getPanicString()
 
 	crash.DebuggerMessage, err = crash.getStrField("Debugger message: ")
 	if err != nil {
@@ -392,6 +392,16 @@ func (p *Panic210) getIntField(key string) (uint64, error) {
 		}
 	}
 	return 0, fmt.Errorf("failed to find %s", key)
+}
+func (p *Panic210) getPanicString() string {
+	var lines []string
+	for _, line := range p.lines {
+		if strings.HasPrefix(line, "Debugger message:") {
+			break
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 func (p *Panic210) getEpochTime() (err error) {
 	found := false
@@ -706,14 +716,10 @@ func (p *Panic210) getLoadedKexts() (err error) {
 	return fmt.Errorf("failed to find 'loaded kexts:'")
 }
 func (p *Panic210) String() string {
-	panicParts := strings.Split(p.Panic, ": ")
-	var panic string
-	for idx, part := range panicParts {
-		if idx < len(panicParts)-1 {
-			panic += fmt.Sprintf("%s%s\n", strings.Repeat("    ", idx), part+":")
-		} else {
-			panic += fmt.Sprintf("%s\n", part) // last part
-		}
+	panic := p.Panic
+	start, rest, ok := strings.Cut(p.Panic, ":")
+	if ok {
+		panic = colorField("Panic") + fmt.Sprintf("\n%s\n  %s\n", start, rest)
 	}
 	var cores string
 	for _, core := range p.Cores {
