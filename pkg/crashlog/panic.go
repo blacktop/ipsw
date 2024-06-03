@@ -701,7 +701,7 @@ func (p *Panic210) getLastStartedKext() (err error) {
 	found := false
 	for _, line := range p.lines {
 		if re.MatchString(line) {
-			ptRE := regexp.MustCompile(`^last started kext at (?P<start>\w+): (?P<name>.*)\s+(?P<version>[0-9.]+) \(addr (?P<addr>\w+), size (?P<size>\w+)\)`)
+			ptRE := regexp.MustCompile(`^last started kext at (?P<start>.+): (?P<name>.*)\s+(?P<version>[0-9.]+) \(addr (?P<addr>\w+), size (?P<size>\w+)\)`)
 			matches := ptRE.FindStringSubmatch(line)
 			if len(matches) < 4 {
 				continue
@@ -731,7 +731,7 @@ func (p *Panic210) getLoadedKexts() (err error) {
 			continue
 		}
 		if found {
-			lkRE := regexp.MustCompile(`^(?P<name>[\w.]+)\s+(?P<version>[\w.]+)`)
+			lkRE := regexp.MustCompile(`^(?P<name>\S+)\s+(?P<version>[0-9.]+)`)
 			matches := lkRE.FindStringSubmatch(line)
 			if len(matches) < 3 {
 				break
