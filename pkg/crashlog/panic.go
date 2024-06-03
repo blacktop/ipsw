@@ -163,7 +163,7 @@ func (l *LastStartedKext) String() string {
 		return ""
 	}
 	return fmt.Sprintf(
-		colorField("last started kext at")+": %#016x: %s %s (%s %#016x, %s %#016x)\n",
+		colorField("last started kext at")+": %#x: %s %s (%s %#x, %s %d)\n",
 		l.StartedAt,
 		colorImage(l.Name),
 		l.Version,
