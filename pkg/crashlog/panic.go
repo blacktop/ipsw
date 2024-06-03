@@ -731,7 +731,7 @@ func (p *Panic210) getLoadedKexts() (err error) {
 			continue
 		}
 		if found {
-			lkRE := regexp.MustCompile(`^(?P<name>.+) (?P<version>[0-9.]+)`)
+			lkRE := regexp.MustCompile(`^(?P<name>[\w.]+)\s+(?P<version>[0-9.]+)`)
 			matches := lkRE.FindStringSubmatch(line)
 			if len(matches) < 3 {
 				break
