@@ -980,16 +980,22 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		}
 		for _, ivar := range class.Ivars {
 			typ, _ := strings.CutSuffix(ivar.Verbose(), ivar.Name+";")
-			o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
+			if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
+				return nil, err
+			}
 		}
 		for _, prop := range class.Props {
 			typ := prop.Type()
-			o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
+			if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
+				return nil, err
+			}
 		}
 		for _, method := range class.InstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -998,7 +1004,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range class.ClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -1019,12 +1027,16 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		}
 		for _, prop := range proto.InstanceProperties {
 			typ := prop.Type()
-			o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+			if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
+				return nil, err
+			}
 		}
 		for _, method := range proto.InstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -1033,7 +1045,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range proto.ClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -1042,7 +1056,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range proto.OptionalInstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -1051,7 +1067,9 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range proto.OptionalClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp)
+				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
+					return nil, err
+				}
 				if i == 0 {
 					i += 2
 				}
@@ -1110,40 +1128,57 @@ func (o *ObjC) scanBaseFrameworks() error {
 	return nil
 }
 
-func (o *ObjC) fillImportsForType(typ string, className string, protoName string, classNames []string, protoNames []string, imp *Imports) {
+func (o *ObjC) fillImportsForType(typ string, className string, protoName string, classNames []string, protoNames []string, imp *Imports) error {
 	typ = strings.Trim(typ, ` *`)
 	if typ == "" {
-		return
+		return nil
 	}
 
 	if strings.ContainsAny(typ, "{}") {
-		lTyp, mTyps, _ := o.contextualSplit(typ, "{", ";", "}")
-
-		o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp)
-
-		for _, mTyp := range mTyps {
-			o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp)
+		lTyp, mTyps, _, err := o.contextualSplit(typ, "{", ";", "}")
+		if err != nil {
+			return err
 		}
 
-		return
+		if err := o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp); err != nil {
+			return err
+		}
+
+		for _, mTyp := range mTyps {
+			if err := o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	if strings.ContainsAny(typ, "<>") {
-		lTyp, mTyps, _ := o.contextualSplit(typ, "<", ",", ">")
+		lTyp, mTyps, _, err := o.contextualSplit(typ, "<", ",", ">")
+		if err != nil {
+			return err
+		}
 
-		o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp)
+		if err := o.fillImportsForType(lTyp, className, protoName, classNames, protoNames, imp); err != nil {
+			return err
+		}
 
 		if strings.HasPrefix(lTyp, "struct ") || strings.Contains(lTyp, "::") {
 			// C++ Template
 
 			for _, mTyp := range mTyps {
-				o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp)
+				if err := o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp); err != nil {
+					return err
+				}
 			}
 		} else {
 			// Objective-C Qualifier
 
 			for _, mTyp := range mTyps {
 				mTyp := strings.Trim(mTyp, ` *`)
+				if mTyp == "" {
+					continue
+				}
 
 				if !slices.Contains(protoNames, mTyp) {
 					imp.Protos = append(imp.Protos, mTyp)
@@ -1156,25 +1191,24 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 			}
 		}
 
-		return
+		return nil
 	}
 
 	typ = o.nonBuiltInType(typ)
 	if typ == "" {
-		return
+		return nil
 	}
 
 	if !slices.Contains(classNames, typ) {
 		imp.Classes = append(imp.Classes, typ)
-		return
+		return nil
 	}
 
 	if typ != className {
 		imp.Locals = append(imp.Locals, typ+".h")
-		return
 	}
 
-	return
+	return nil
 }
 
 func (o *ObjC) nonBuiltInType(typ string) string {
@@ -1200,20 +1234,28 @@ func (o *ObjC) nonBuiltInType(typ string) string {
 	return strings.TrimSpace(typ)
 }
 
-func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim string) (string, []string, string) {
+func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim string) (string, []string, string, error) {
 	lDelimIdx := strings.Index(typ, lDelim)
 	rDelimIdx := strings.Index(typ, rDelim)
 
+	if rDelimIdx < lDelimIdx {
+		return "", nil, "", errors.New("contextualSplit failed: found right delimiter before first left delimiter")
+	}
+
 	lDelimIt := lDelimIdx + strings.Index(typ[lDelimIdx+1:], lDelim) + 1
 	for lDelimIt < rDelimIdx {
-		rDelimIdx += strings.Index(typ[rDelimIdx+1:], rDelim) + 1
+		rDelimNext := strings.Index(typ[rDelimIdx+1:], rDelim)
+		rDelimIdx += rDelimNext + 1
 
 		lDelimNext := strings.Index(typ[lDelimIt+1:], lDelim)
 		if lDelimNext == -1 {
 			break
 		}
-
 		lDelimIt += lDelimNext + 1
+
+		if rDelimNext == -1 {
+			return "", nil, "", errors.New("contextualSplit failed: found no right delimiter after last left delimiter")
+		}
 	}
 	rDelimIdx += 1
 
@@ -1244,5 +1286,5 @@ func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim 
 		typs = append(typs, m[mDelimIdx+1:])
 	}
 
-	return l, typs, r
+	return l, typs, r, nil
 }
