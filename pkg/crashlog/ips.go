@@ -581,6 +581,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		case "Absolute":
 			i.Payload.BinaryImages[idx].Name = "absolute"
 			total--
+		case "Kernel":
+			i.Payload.BinaryImages[idx].Name = "kernel"
+			total--
 		case "KernelCache":
 			i.Payload.BinaryImages[idx].Name = "kernelcache"
 			total--
@@ -731,7 +734,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
 				} else {
-					fmt.Println("WHAT")
+					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName, "image_") {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (maybe a kext)"
+					}
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
 					// TODO: symbolicate kernelcache
