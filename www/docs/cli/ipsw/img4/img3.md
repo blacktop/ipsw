@@ -18,7 +18,7 @@ ipsw img4 img3 <img3> [flags]
 
 ```
   -h, --help            help for img3
-  -o, --output string   Output file
+  -o, --output string   Output folder
 ```
 
 ### Options inherited from parent commands

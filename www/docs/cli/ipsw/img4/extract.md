@@ -19,7 +19,7 @@ ipsw img4 extract <im4p> [flags]
 ```
   -h, --help            help for extract
       --img4            Input file is an IMG4
-  -o, --output string   Output file
+  -o, --output string   Output folder
 ```
 
 ### Options inherited from parent commands
