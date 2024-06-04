@@ -853,7 +853,7 @@ func (i *Ips) String() string {
 					for idx, f := range t.UserFrames {
 						slide := ""
 						if f.Slide > 0 {
-							slide = fmt.Sprintf(" (slide %#x) ", f.Slide)
+							slide = fmt.Sprintf(" (slide %#x)", f.Slide)
 						}
 						symloc := ""
 						if f.SymbolLocation > 0 {
@@ -871,10 +871,10 @@ func (i *Ips) String() string {
 					for idx, f := range t.KernelFrames {
 						slide := ""
 						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
-							slide = fmt.Sprintf(" (slide %#x) ", p210.KernelCacheSlide.Value.(uint64))
+							slide = fmt.Sprintf(" (slide %#x)", p210.KernelCacheSlide.Value.(uint64))
 						}
 						if p210.KernelSlide != nil && p210.KernelSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
-							slide = fmt.Sprintf(" (slide %#x) ", p210.KernelSlide.Value.(uint64))
+							slide = fmt.Sprintf(" (slide %#x)", p210.KernelSlide.Value.(uint64))
 						}
 						symloc := ""
 						if f.SymbolLocation > 0 {
