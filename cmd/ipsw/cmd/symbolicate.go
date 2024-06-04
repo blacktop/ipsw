@@ -39,10 +39,14 @@ import (
 func init() {
 	rootCmd.AddCommand(symbolicateCmd)
 
+	symbolicateCmd.Flags().BoolP("all", "a", false, "Show all threads in crashlog")
+	symbolicateCmd.Flags().BoolP("running", "r", false, "Show all running (TH_RUN) threads in crashlog")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
+	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
+	viper.BindPFlag("symbolicate.running", symbolicateCmd.Flags().Lookup("running"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
 }
@@ -62,6 +66,8 @@ var symbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		all := viper.GetBool("symbolicate.all")
+		running := viper.GetBool("symbolicate.running")
 		unslide := viper.GetBool("symbolicate.unslide")
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
@@ -77,7 +83,12 @@ var symbolicateCmd = &cobra.Command{
 
 		switch hdr.BugType {
 		case "210", "309": // NEW JSON STYLE CRASHLOG
-			ips, err := crashlog.OpenIPS(args[0])
+			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
+				All:      all || Verbose,
+				Running:  running,
+				Unslid:   unslide,
+				Demangle: demangleFlag,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to parse IPS file: %v", err)
 			}
@@ -86,19 +97,13 @@ var symbolicateCmd = &cobra.Command{
 				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 			} else {
 				if hdr.BugType == "210" {
-					if err := ips.Symbolicate210(
-						filepath.Clean(args[1]),
-						&crashlog.Config{
-							Unslid:   unslide,
-							Demangle: demangleFlag,
-						},
-					); err != nil {
+					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
 						return err
 					}
 				}
 			}
 
-			fmt.Println(ips.String(Verbose))
+			fmt.Println(ips)
 		case "109": // OLD STYLE CRASHLOG
 			crashLog, err := crashlog.Open(args[0])
 			if err != nil {

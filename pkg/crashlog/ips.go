@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -84,6 +85,8 @@ func GetLogTypes() (*LogTypes, error) {
 }
 
 type Config struct {
+	All      bool
+	Running  bool
 	Unslid   bool
 	Demangle bool
 }
@@ -91,6 +94,7 @@ type Config struct {
 type Ips struct {
 	Header  IpsMetadata
 	Payload IPSPayload
+	Config  *Config
 }
 
 type Platform int
@@ -239,6 +243,7 @@ type BinaryImage struct {
 	Size   uint64 `json:"size,omitempty"`
 	Source string `json:"source,omitempty"`
 	UUID   string `json:"uuid,omitempty"`
+	Slide  uint64 `json:"slide,omitempty"`
 }
 
 func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
@@ -375,6 +380,7 @@ type Frame struct {
 	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	SymbolLocation uint64 `json:"symbolLocation,omitempty"`
+	Slide          uint64 `json:"slide,omitempty"`
 }
 
 type PanicFrame struct {
@@ -383,6 +389,7 @@ type PanicFrame struct {
 	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	SymbolLocation uint64 `json:"symbolLocation,omitempty"`
+	Slide          uint64 `json:"slide,omitempty"`
 }
 
 func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
@@ -528,8 +535,8 @@ func ParseHeader(in string) (hdr *IpsMetadata, err error) {
 	return hdr, nil
 }
 
-func OpenIPS(in string) (*Ips, error) {
-	var ips Ips
+func OpenIPS(in string, conf *Config) (*Ips, error) {
+	ips := Ips{Config: conf}
 
 	f, err := os.Open(in)
 	if err != nil {
@@ -565,7 +572,7 @@ func OpenIPS(in string) (*Ips, error) {
 	return &ips, nil
 }
 
-func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
+func (i *Ips) Symbolicate210(ipswPath string) error {
 	total := len(i.Payload.BinaryImages)
 
 	// add default binary image names
@@ -595,23 +602,22 @@ func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
 			return ErrDone // break
 		}
 		for idx, img := range i.Payload.BinaryImages {
-			var slide uint64
 			if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
 				i.Payload.BinaryImages[idx].Path = path
 				i.Payload.BinaryImages[idx].Name = path
-				slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
 				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+				i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
 				for _, fn := range m.GetFunctions() {
 					if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
 						for _, sym := range syms {
 							fn.Name = sym.Name
 						}
-						fn.StartAddr += slide
-						fn.EndAddr += slide
+						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
 						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
 					} else {
-						fn.StartAddr += slide
-						fn.EndAddr += slide
+						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
 						fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
 						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
 					}
@@ -664,7 +670,7 @@ func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
 						}
 						if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 							if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-								if conf.Demangle {
+								if i.Config.Demangle {
 									if strings.HasPrefix(sym, "_$s") || strings.HasPrefix(sym, "$s") { // TODO: better detect swift symbols
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym)
 									} else if strings.HasPrefix(sym, "__Z") || strings.HasPrefix(sym, "_Z") {
@@ -688,7 +694,7 @@ func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
 					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName]; ok {
 						for _, fn := range funcs {
 							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset && i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset < fn.EndAddr {
-								if conf.Demangle {
+								if i.Config.Demangle {
 									if strings.HasPrefix(fn.Name, "_$s") || strings.HasPrefix(fn.Name, "$s") { // TODO: better detect swift symbols
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(fn.Name)
 									} else if strings.HasPrefix(fn.Name, "__Z") || strings.HasPrefix(fn.Name, "_Z") {
@@ -718,6 +724,9 @@ func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				}
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "kernelcache" {
+					// TODO: symbolicate kernelcache
 				}
 			}
 		}
@@ -751,7 +760,7 @@ func colorVMSummary(in string) string {
 	return in
 }
 
-func (i *Ips) String(verbose bool) string {
+func (i *Ips) String() string {
 	var out string
 
 	switch i.Header.BugType {
@@ -775,8 +784,23 @@ func (i *Ips) String(verbose bool) string {
 			if p.ID == p210.PanickedTask.PID {
 				paniced = colorError(" (Panicked)")
 			} else {
-				if !verbose {
-					continue
+				/* filter procs */
+				if !i.Config.All {
+					if i.Config.Running {
+						notRunning := true
+						// check if any thread is running
+						for _, t := range p.ThreadByID {
+							if slices.Contains(t.State, "TH_RUN") {
+								notRunning = false
+								break
+							}
+						}
+						if notRunning {
+							continue
+						}
+					} else {
+						continue
+					}
 				}
 			}
 			out += fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
@@ -785,8 +809,15 @@ func (i *Ips) String(verbose bool) string {
 				if t.ID == p210.PanickedThread.TID {
 					paniced = colorError("       (Panicked)")
 				} else {
-					if !verbose {
-						continue
+					/* filter threads */
+					if !i.Config.All {
+						if i.Config.Running {
+							if !slices.Contains(t.State, "TH_RUN") {
+								continue
+							}
+						} else {
+							continue
+						}
 					}
 				}
 				out += fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced)
