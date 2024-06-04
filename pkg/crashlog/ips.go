@@ -649,6 +649,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		for tid, thread := range proc.ThreadByID {
 			for idx, frame := range thread.UserFrames {
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+				if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
+				}
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
 				} else {
@@ -659,6 +662,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "absolute" {
 					continue // skip absolute
 				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
+					if f.Headers[f.UUID].SharedRegionStart != i.Payload.BinaryImages[frame.ImageIndex].Base {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Base - f.Headers[f.UUID].SharedRegionStart
+					}
 					// lookup symbol in DSC dylib
 					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
@@ -724,9 +730,12 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				} else {
+					fmt.Println("WHAT")
 				}
-				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "kernelcache" {
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
 					// TODO: symbolicate kernelcache
+					// i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide =
 				}
 			}
 		}
@@ -837,11 +846,15 @@ func (i *Ips) String() string {
 					buf := bytes.NewBufferString("")
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.UserFrames {
+						slide := ""
+						if f.Slide > 0 {
+							slide = fmt.Sprintf(" (slide %#x) ", f.Slide)
+						}
 						symloc := ""
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
+						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), colorBold(symloc))
 					}
 					w.Flush()
 					out += buf.String()
@@ -851,11 +864,18 @@ func (i *Ips) String() string {
 					buf := bytes.NewBufferString("")
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.KernelFrames {
+						slide := ""
+						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
+							slide = fmt.Sprintf(" (slide %#x) ", p210.KernelCacheSlide.Value.(uint64))
+						}
+						if p210.KernelSlide != nil && p210.KernelSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
+							slide = fmt.Sprintf(" (slide %#x) ", p210.KernelSlide.Value.(uint64))
+						}
 						symloc := ""
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
+						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), colorBold(symloc))
 					}
 					w.Flush()
 					out += buf.String()
