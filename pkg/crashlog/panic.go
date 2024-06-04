@@ -77,6 +77,7 @@ func (r Range) String() string {
 }
 
 type ZoneInfo struct {
+	found    bool
 	ZoneMap  Range
 	VM       Range
 	RO       Range
@@ -91,6 +92,9 @@ type ZoneInfo struct {
 }
 
 func (z ZoneInfo) String() string {
+	if !z.found {
+		return ""
+	}
 	return fmt.Sprintf(
 		colorField("Zone Info\n")+
 			colorImage("  Zone Map")+": %s\n"+
@@ -103,7 +107,7 @@ func (z ZoneInfo) String() string {
 			colorImage("  . DATA  ")+": %s\n"+
 			colorImage("  Metadata")+": %s\n"+
 			colorImage("  Bitmaps ")+": %s\n"+
-			colorImage("  Extra   ")+": %s\n",
+			colorImage("  Extra   ")+": %s\n\n",
 		z.ZoneMap,
 		z.VM,
 		z.RO,
@@ -376,7 +380,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.CompressorInfo, err = crash.getStrField("Compressor Info", "Compressor Info: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get compressor info")
+		log.WithError(err).Debug("failed to get compressor info")
 	}
 	if err := crash.getPanickedTask(); err != nil {
 		log.WithError(err).Error("failed to get panicked task")
@@ -491,8 +495,6 @@ func (p *Panic210) getEpochTime() (err error) {
 	return nil
 }
 func (p *Panic210) getZoneInfo() (err error) {
-	found := false
-
 	parse := func(line string) (uint64, uint64, error) {
 		timeRE := regexp.MustCompile(`: (?P<start>\w+) - (?P<end>\w+)`)
 		matches := timeRE.FindStringSubmatch(line)
@@ -504,10 +506,10 @@ func (p *Panic210) getZoneInfo() (err error) {
 
 	for _, line := range p.lines {
 		if strings.HasPrefix(line, "Zone info:") {
-			found = true
+			p.ZoneInfo.found = true
 			continue
 		}
-		if found {
+		if p.ZoneInfo.found {
 			if strings.HasPrefix(line, "  Zone map: ") {
 				p.ZoneInfo.ZoneMap.Start, p.ZoneInfo.ZoneMap.End, err = parse(line)
 				if err != nil {
@@ -588,8 +590,8 @@ func (p *Panic210) getZoneInfo() (err error) {
 		}
 	}
 
-	if !found {
-		return fmt.Errorf("failed to find Epoch Time")
+	if !p.ZoneInfo.found {
+		return fmt.Errorf("failed to find Zone info")
 	}
 
 	return nil
@@ -779,7 +781,7 @@ func (p *Panic210) String() string {
 			"%s"+
 			"%s"+
 			"\n%s\n"+ // EpochTime
-			"%s\n"+ // ZoneInfo
+			"%s"+ // ZoneInfo
 			"%s"+ // TPIDRx_ELy
 			"%s\n"+ // cores
 			"%s"+ // CompressorInfo
