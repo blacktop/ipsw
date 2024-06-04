@@ -8,6 +8,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func pointerAlign(sz uint32) uint32 {
@@ -176,15 +177,52 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for removing %s; must supply PATH string", loadCommand)
 		}
+		// TODO: add support for removing LC_DYLIB (by supporting removing them from imports as well)
+		utils.Indent(log.Warn, 2)(fmt.Sprintf("Removing %s will result in a malformed MachO (for now)", loadCommand))
 		lcs := m.GetLoadsByName(loadCommand)
 		if len(lcs) == 0 {
 			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if lc.(*macho.Dylib).Name == args[3] {
-				if err := m.RemoveLoad(lc); err != nil {
-					return fmt.Errorf("failed to remove load command: %v", err)
+			switch l := lc.(type) {
+			case *macho.LoadDylib:
+				if l.Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
 				}
+			case *macho.WeakDylib:
+				if l.Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case *macho.ReExportDylib:
+				if l.Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case *macho.LazyLoadDylib:
+				if l.Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case *macho.UpwardDylib:
+				if l.Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case *macho.Rpath:
+				if l.Path == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			default:
+				return fmt.Errorf("failed to modify load command %s in %s", loadCommand, machoPath)
 			}
 		}
 	case "LC_BUILD_VERSION":
