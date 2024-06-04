@@ -717,6 +717,7 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
 									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
 								}
+								break
 							}
 						}
 					} else {
@@ -734,8 +735,8 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
 				} else {
-					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName, "image_") {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (maybe a kext)"
+					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName, "image_") {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (maybe a kext)"
 					}
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
@@ -870,10 +871,10 @@ func (i *Ips) String() string {
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.KernelFrames {
 						slide := ""
-						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
+						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && (f.ImageName == "kernelcache" || f.ImageName == "kernel") {
 							slide = fmt.Sprintf(" (slide %#x)", p210.KernelCacheSlide.Value.(uint64))
 						}
-						if p210.KernelSlide != nil && p210.KernelSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
+						if p210.KernelSlide != nil && p210.KernelSlide.Value.(uint64) > 0 && (f.ImageName == "kernelcache" || f.ImageName == "kernel") {
 							slide = fmt.Sprintf(" (slide %#x)", p210.KernelSlide.Value.(uint64))
 						}
 						symloc := ""
