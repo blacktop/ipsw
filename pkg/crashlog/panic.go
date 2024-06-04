@@ -304,7 +304,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.KernelCacheUUID, err = crash.getStrField("KernelCache UUID", "KernelCache UUID: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get kernelcache UUID")
+		log.WithError(err).Debug("failed to get kernelcache UUID")
 	}
 	crash.FilesetKernelCacheUUID, err = crash.getStrField("Fileset KernelCache UUID", "Fileset KernelCache UUID: ")
 	if err != nil {
@@ -312,7 +312,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 	}
 	crash.KernelUUID, err = crash.getStrField("Kernel UUID", "Kernel UUID: ")
 	if err != nil {
-		log.WithError(err).Error("failed to get kernel UUID")
+		log.WithError(err).Debug("failed to get kernel UUID")
 	}
 	crash.BootSessionUUID, err = crash.getStrField("Boot Session UUID", "Boot session UUID: ")
 	if err != nil {
