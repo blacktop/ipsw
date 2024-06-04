@@ -19,7 +19,9 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
+	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/fatih/color"
 )
 
@@ -79,6 +81,11 @@ func GetLogTypes() (*LogTypes, error) {
 	}
 
 	return &db.LogTypes, nil
+}
+
+type Config struct {
+	Unslid   bool
+	Demangle bool
 }
 
 type Ips struct {
@@ -367,7 +374,7 @@ type Frame struct {
 	ImageIndex     uint64 `json:"imageIndex,omitempty"`
 	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
-	SymbolLocation int    `json:"symbolLocation,omitempty"`
+	SymbolLocation uint64 `json:"symbolLocation,omitempty"`
 }
 
 type PanicFrame struct {
@@ -375,7 +382,7 @@ type PanicFrame struct {
 	ImageName      string `json:"imageName,omitempty"`
 	ImageOffset    uint64 `json:"imageOffset,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
-	SymbolLocation int    `json:"symbolLocation,omitempty"`
+	SymbolLocation uint64 `json:"symbolLocation,omitempty"`
 }
 
 func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
@@ -558,7 +565,7 @@ func OpenIPS(in string) (*Ips, error) {
 	return &ips, nil
 }
 
-func (i *Ips) Symbolicate210(ipswPath string) error {
+func (i *Ips) Symbolicate210(ipswPath string, conf *Config) error {
 	total := len(i.Payload.BinaryImages)
 
 	// add default binary image names
@@ -635,14 +642,17 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
 			for idx, frame := range thread.UserFrames {
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				} else {
+					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName, "image_") {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += fmt.Sprintf(" (probably %s)", proc.Name)
+					}
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "absolute" {
-					continue
-				}
-				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
-				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
+					continue // skip absolute
+				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
 					// lookup symbol in DSC dylib
 					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
@@ -654,11 +664,20 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 						}
 						if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 							if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-								delta := ""
-								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
-									delta = fmt.Sprintf(" + %d", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr)
+								if conf.Demangle {
+									if strings.HasPrefix(sym, "_$s") || strings.HasPrefix(sym, "$s") { // TODO: better detect swift symbols
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym)
+									} else if strings.HasPrefix(sym, "__Z") || strings.HasPrefix(sym, "_Z") {
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym, false, false)
+									} else {
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
+									}
+								} else {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
 								}
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym + delta
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
+								}
 							} else {
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", fn.StartAddr)
 							}
@@ -669,11 +688,20 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName]; ok {
 						for _, fn := range funcs {
 							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset && i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset < fn.EndAddr {
-								delta := ""
-								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
-									delta = fmt.Sprintf(" + %d", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr)
+								if conf.Demangle {
+									if strings.HasPrefix(fn.Name, "_$s") || strings.HasPrefix(fn.Name, "$s") { // TODO: better detect swift symbols
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(fn.Name)
+									} else if strings.HasPrefix(fn.Name, "__Z") || strings.HasPrefix(fn.Name, "_Z") {
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(fn.Name, false, false)
+									} else {
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name
+									}
+								} else {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name
 								}
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name + delta
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
+								}
 							}
 						}
 					} else {
@@ -682,15 +710,15 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 							"thread": tid,
 							"frame":  idx,
 							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName,
-						}).Debugf("failed to find function for offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
+						}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
 					}
 				}
 			}
 			for idx, frame := range thread.KernelFrames {
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
 				}
-				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 			}
 		}
 	}
@@ -882,7 +910,11 @@ func (i *Ips) String(verbose bool) string {
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 			for idx, f := range i.Payload.LastExceptionBacktrace {
-				fmt.Fprintf(w, "  %02d: %s\t%s %s + %d\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), f.SymbolLocation)
+				symloc := ""
+				if f.SymbolLocation > 0 {
+					symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+				}
+				fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
 			}
 			w.Flush()
 			out += buf.String() + "\n"

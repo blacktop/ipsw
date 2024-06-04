@@ -43,6 +43,8 @@ func init() {
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
+	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
+	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -60,9 +62,9 @@ var symbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		unslide, _ := cmd.Flags().GetBool("unslide")
+		unslide := viper.GetBool("symbolicate.unslide")
 		// cacheFile, _ := cmd.Flags().GetString("cache")
-		demangleFlag, _ := cmd.Flags().GetBool("demangle")
+		demangleFlag := viper.GetBool("symbolicate.demangle")
 
 		hdr, err := crashlog.ParseHeader(args[0])
 		if err != nil {
@@ -84,7 +86,13 @@ var symbolicateCmd = &cobra.Command{
 				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 			} else {
 				if hdr.BugType == "210" {
-					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
+					if err := ips.Symbolicate210(
+						filepath.Clean(args[1]),
+						&crashlog.Config{
+							Unslid:   unslide,
+							Demangle: demangleFlag,
+						},
+					); err != nil {
 						return err
 					}
 				}
