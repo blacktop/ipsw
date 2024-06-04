@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,12 +18,14 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/fatih/color"
 )
 
@@ -37,7 +40,7 @@ var colorTime = color.New(color.Bold, color.FgHiGreen).SprintFunc()
 var colorError = color.New(color.Bold, color.FgHiRed).SprintFunc()
 var colorAddr = color.New(color.Faint).SprintfFunc()
 var colorBold = color.New(color.Bold).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintfFunc()
 var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 
 var ErrDone = errors.New("done")
@@ -197,6 +200,49 @@ type MemoryStatus struct {
 	PageSize int64 `json:"pageSize,omitempty"`
 }
 
+func (ms MemoryStatus) String() string {
+	return fmt.Sprintf(
+		"%s:\n"+
+			"  %s: %d\n"+
+			"  %s: %d\n"+
+			"  %s: %d\n"+
+			"  %s: %d\n"+
+			"  %s:\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"  %s: %t\n"+
+			"  %s:\n"+
+			"    %s: %d\n"+
+			"    %s: %d\n"+
+			"  %s: %d\n",
+		colorField("Memory Status"),
+		colorField("Busy Buffer Count"), ms.BusyBufferCount,
+		colorField("Compressions"), ms.Compressions,
+		colorField("Compressor Size"), ms.CompressorSize,
+		colorField("Decompressions"), ms.Decompressions,
+		colorField("Memory Pages"),
+		colorField("Active"), ms.MemoryPages.Active,
+		colorField("File Backed"), ms.MemoryPages.FileBacked,
+		colorField("Free"), ms.MemoryPages.Free,
+		colorField("Inactive"), ms.MemoryPages.Inactive,
+		colorField("Purgeable"), ms.MemoryPages.Purgeable,
+		colorField("Speculative"), ms.MemoryPages.Speculative,
+		colorField("Throttled"), ms.MemoryPages.Throttled,
+		colorField("Wired"), ms.MemoryPages.Wired,
+		colorField("Memory Pressure"), ms.MemoryPressure,
+		colorField("Memory Pressure Details"),
+		colorField("Pages Reclaimed"), ms.MemoryPressureDetails.PagesReclaimed,
+		colorField("Pages Wanted"), ms.MemoryPressureDetails.PagesWanted,
+		colorField("Page Size"), ms.PageSize,
+	)
+}
+
 type Process struct {
 	ID                  int            `json:"pid"`
 	Name                string         `json:"procname"`
@@ -292,12 +338,17 @@ type BundleInfo struct {
 	CFBundleIdentifier         string `json:"CFBundleIdentifier,omitempty"`
 	CFBundleShortVersionString string `json:"CFBundleShortVersionString,omitempty"`
 	CFBundleVersion            string `json:"CFBundleVersion,omitempty"`
+	DTAppStoreToolsBuild       string `json:"DTAppStoreToolsBuild,omitempty"`
 }
 
 type StoreInfo struct {
-	ApplicationVariant        string `json:"applicationVariant,omitempty"`
-	DeviceIdentifierForVendor string `json:"deviceIdentifierForVendor,omitempty"`
-	ItemID                    string `json:"itemID,omitempty"`
+	ItemID                            string `json:"itemID,omitempty"`
+	StoreCohortMetadata               string `json:"storeCohortMetadata,omitempty"`
+	DistributorID                     string `json:"distributorID,omitempty"`
+	ApplicationVariant                string `json:"applicationVariant,omitempty"`
+	DeviceIdentifierForVendor         string `json:"deviceIdentifierForVendor,omitempty"`
+	SoftwareVersionExternalIdentifier string `json:"softwareVersionExternalIdentifier,omitempty"`
+	ThirdParty                        bool   `json:"thirdParty,omitempty"`
 }
 
 type Exception struct {
@@ -435,42 +486,52 @@ type IPSPayload struct {
 	Asi map[string][]string `json:"asi,omitempty"` // Additional application-specific logging. The properties of this object include an array of log strings.
 	// For more information, see Diagnostic messages. This appears in a translated report under Application Specific Information.
 	// https://developer.apple.com/documentation/xcode/examining-the-fields-in-a-crash-report#Diagnostic-messages
-	IsCorpse               bool         `json:"isCorpse,omitempty"`
-	IsNonFatal             string       `json:"isNonFatal,omitempty"`
-	IsSimulated            string       `json:"isSimulated,omitempty"`
-	Uptime                 int          `json:"uptime,omitempty"`
-	Translated             bool         `json:"translated,omitempty"`
-	ProcName               string       `json:"procName,omitempty"`
-	ProcPath               string       `json:"procPath,omitempty"`
-	ProcRole               string       `json:"procRole,omitempty"`
-	UserID                 int          `json:"userID,omitempty"`
-	DeployVersion          int          `json:"deployVersion,omitempty"`
-	ModelCode              string       `json:"modelCode,omitempty"`
-	CoalitionID            int          `json:"coalitionID,omitempty"`
-	OsVersion              OsVersion    `json:"osVersion,omitempty"`
-	CaptureTime            string       `json:"captureTime,omitempty"`
-	PID                    int          `json:"pid,omitempty"`
-	CPUType                string       `json:"cpuType,omitempty"`
-	RootsInstalled         int          `json:"roots_installed,omitempty"`
-	BugType                string       `json:"bug_type,omitempty"`
-	ProcLaunch             string       `json:"procLaunch,omitempty"`
-	ProcStartAbsTime       int64        `json:"procStartAbsTime,omitempty"`
-	ProcExitAbsTime        int64        `json:"procExitAbsTime,omitempty"`
-	BundleInfo             BundleInfo   `json:"bundleInfo,omitempty"`
-	StoreInfo              StoreInfo    `json:"storeInfo,omitempty"`
-	ParentProc             string       `json:"parentProc,omitempty"`
-	ParentPid              int          `json:"parentPid,omitempty"`
-	CoalitionName          string       `json:"coalitionName,omitempty"`
-	LockdownMode           int          `json:"ldm,omitempty"`
-	WasUnlockedSinceBoot   int          `json:"wasUnlockedSinceBoot,omitempty"`
-	IsLocked               int          `json:"isLocked,omitempty"`
-	ThrottleTimeout        int64        `json:"throttleTimeout,omitempty"`
-	BasebandVersion        string       `json:"basebandVersion,omitempty"`
-	Exception              Exception    `json:"exception,omitempty"`
-	LastExceptionBacktrace []Frame      `json:"lastExceptionBacktrace,omitempty"`
-	FaultingThread         int          `json:"faultingThread,omitempty"`
-	Threads                []UserThread `json:"threads,omitempty"`
-	UsedImages             []struct {
+	IsCorpse              bool       `json:"isCorpse,omitempty"`
+	IsNonFatal            string     `json:"isNonFatal,omitempty"`
+	IsSimulated           string     `json:"isSimulated,omitempty"`
+	Uptime                int        `json:"uptime,omitempty"`
+	Translated            bool       `json:"translated,omitempty"`
+	ProcName              string     `json:"procName,omitempty"`
+	ProcPath              string     `json:"procPath,omitempty"`
+	ProcRole              string     `json:"procRole,omitempty"`
+	ProcLaunch            string     `json:"procLaunch,omitempty"`
+	ProcStartAbsTime      int64      `json:"procStartAbsTime,omitempty"`
+	ProcExitAbsTime       int64      `json:"procExitAbsTime,omitempty"`
+	UserID                int        `json:"userID,omitempty"`
+	DeployVersion         int        `json:"deployVersion,omitempty"`
+	ModelCode             string     `json:"modelCode,omitempty"`
+	CoalitionID           int        `json:"coalitionID,omitempty"`
+	OsVersion             OsVersion  `json:"osVersion,omitempty"`
+	CaptureTime           string     `json:"captureTime,omitempty"`
+	PID                   int        `json:"pid,omitempty"`
+	CPUType               string     `json:"cpuType,omitempty"`
+	RootsInstalled        int        `json:"roots_installed,omitempty"`
+	BugType               string     `json:"bug_type,omitempty"`
+	BundleInfo            BundleInfo `json:"bundleInfo,omitempty"`
+	StoreInfo             StoreInfo  `json:"storeInfo,omitempty"`
+	ParentProc            string     `json:"parentProc,omitempty"`
+	ParentPid             int        `json:"parentPid,omitempty"`
+	CoalitionName         string     `json:"coalitionName,omitempty"`
+	LockdownMode          int        `json:"ldm,omitempty"`
+	WasUnlockedSinceBoot  int        `json:"wasUnlockedSinceBoot,omitempty"`
+	IsLocked              int        `json:"isLocked,omitempty"`
+	InstructionByteStream struct {
+		BeforePC string `json:"beforePC,omitempty"`
+		AtPC     string `json:"atPC,omitempty"`
+	} `json:"instructionByteStream,omitempty"`
+	CodeSigningID                 string       `json:"codeSigningID,omitempty"`
+	CodeSigningTeamID             string       `json:"codeSigningTeamID,omitempty"`
+	CodeSigningFlags              int          `json:"codeSigningFlags,omitempty"`
+	CodeSigningValidationCategory int          `json:"codeSigningValidationCategory,omitempty"`
+	CodeSigningTrustLevel         int          `json:"codeSigningTrustLevel,omitempty"`
+	CodeSigningMonitor            int          `json:"codeSigningMonitor,omitempty"`
+	ThrottleTimeout               int64        `json:"throttleTimeout,omitempty"`
+	BasebandVersion               string       `json:"basebandVersion,omitempty"`
+	Exception                     Exception    `json:"exception,omitempty"`
+	LastExceptionBacktrace        []Frame      `json:"lastExceptionBacktrace,omitempty"`
+	FaultingThread                int          `json:"faultingThread,omitempty"`
+	Threads                       []UserThread `json:"threads,omitempty"`
+	UsedImages                    []struct {
 		Arch   string `json:"arch,omitempty"`
 		Base   uint64 `json:"base,omitempty"`
 		Name   string `json:"name,omitempty"`
@@ -741,7 +802,7 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
 					// TODO: symbolicate kernelcache
-					// i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide =
+					// i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide =
 				}
 			}
 		}
@@ -787,6 +848,8 @@ func (i *Ips) String() string {
 		} else {
 			out += p210.String()
 		}
+		out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
+		out += "\n" + i.Payload.MemoryStatus.String()
 		out += i.Payload.OtherString + "\n"
 		var pids []int
 		for pid := range i.Payload.ProcessByPid {
@@ -860,7 +923,7 @@ func (i *Ips) String() string {
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), colorBold(symloc))
+						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), symloc)
 					}
 					w.Flush()
 					out += buf.String()
@@ -871,7 +934,7 @@ func (i *Ips) String() string {
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.KernelFrames {
 						slide := ""
-						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && (f.ImageName == "kernelcache" || f.ImageName == "kernel") {
+						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
 							slide = fmt.Sprintf(" (slide %#x)", p210.KernelCacheSlide.Value.(uint64))
 						}
 						if p210.KernelSlide != nil && p210.KernelSlide.Value.(uint64) > 0 && (f.ImageName == "kernelcache" || f.ImageName == "kernel") {
@@ -881,7 +944,7 @@ func (i *Ips) String() string {
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 						}
-						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), colorBold(symloc))
+						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), symloc)
 					}
 					w.Flush()
 					out += buf.String()
@@ -898,16 +961,25 @@ func (i *Ips) String() string {
 	case "Crash", "309":
 		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
 		out += fmt.Sprintf(
-			colorField("Process")+":             %s [%d]\n"+
-				colorField("Hardware Model")+":      %s\n"+
-				colorField("OS Version")+":          %s\n"+
-				colorField("BuildID")+":             %s\n"+
-				colorField("LockdownMode")+":        %d\n",
+			colorField("Process")+":        %s [%d]\n"+
+				colorField("Path")+":           %s\n"+
+				colorField("Parent")+":         %s [%d]\n"+
+				colorField("Hardware Model")+": %s\n"+
+				colorField("OS Version")+":     %s\n"+
+				colorField("BuildID")+":        %s\n"+
+				colorField("LockdownMode")+":            %d\n"+
+				colorField("Was Unlocked Since Boot")+": %d\n"+
+				colorField("Is Locked")+":               %d\n",
 			i.Payload.ProcName, i.Payload.PID,
+			i.Payload.ProcPath,
+			i.Payload.ParentProc, i.Payload.ParentPid,
 			i.Payload.ModelCode,
 			i.Payload.OsVersion.Train,
 			i.Payload.OsVersion.Build,
-			i.Payload.LockdownMode)
+			i.Payload.LockdownMode,
+			i.Payload.WasUnlockedSinceBoot,
+			i.Payload.IsLocked,
+		)
 		if i.Payload.SharedCache.Size > 0 {
 			out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
 		}
@@ -952,13 +1024,65 @@ func (i *Ips) String() string {
 					if f.SymbolLocation > 0 {
 						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 					}
-					fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
+					fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), symloc)
 				}
 				w.Flush()
 				out += buf.String()
 			}
 			if t.Triggered {
 				out += colorField("Thread") + colorBold(" %d ", t.ID) + colorField(t.ThreadState.Flavor) + "\n" + t.ThreadState.String()
+				if len(i.Payload.InstructionByteStream.BeforePC) > 0 {
+					out += "\n"
+					b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.BeforePC)
+					if err != nil {
+						log.WithError(err).Errorf("failed to decode instruction byte stream")
+					}
+					instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value-(10*4), b64data)
+					if err != nil {
+						log.WithError(err).Errorf("failed to disassemble instructions")
+					}
+					pad := "    "
+					for _, block := range instructions.Blocks() {
+						for _, i := range block {
+							opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+							out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+								pad,
+								colorAddr("%#08x", i.Address),
+								disassemble.GetOpCodeByteString(i.Raw),
+								colorImage("%-7s", i.Operation),
+								disass.ColorOperands(opStr),
+							)
+						}
+						out += "\n"
+					}
+				}
+				if len(i.Payload.InstructionByteStream.AtPC) > 0 {
+					b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.AtPC)
+					if err != nil {
+						log.WithError(err).Errorf("failed to decode instruction byte stream")
+					}
+					instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value, b64data)
+					if err != nil {
+						log.WithError(err).Errorf("failed to disassemble instructions")
+					}
+					for idx, block := range instructions.Blocks() {
+						pad := "    "
+						if idx == 0 {
+							pad = colorError("PC=>")
+						}
+						for _, i := range block {
+							opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+							out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+								pad,
+								colorAddr("%#08x", i.Address),
+								disassemble.GetOpCodeByteString(i.Raw),
+								colorImage("%-7s", i.Operation),
+								disass.ColorOperands(opStr),
+							)
+						}
+						out += "\n"
+					}
+				}
 			}
 			out += "\n"
 		}
@@ -971,7 +1095,7 @@ func (i *Ips) String() string {
 				if f.SymbolLocation > 0 {
 					symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
 				}
-				fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), colorBold(symloc))
+				fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), symloc)
 			}
 			w.Flush()
 			out += buf.String() + "\n"

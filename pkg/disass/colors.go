@@ -16,7 +16,7 @@ var colorComment = color.New(color.Faint, color.FgWhite).SprintFunc()
 var colorLocation = color.New(color.FgHiYellow).SprintfFunc()
 var printCurLine = color.New(color.Bold, color.FgBlack, color.BgHiWhite).PrintfFunc()
 
-func colorOperands(operands string) string {
+func ColorOperands(operands string) string {
 	if len(operands) > 0 {
 		immMatch := regexp.MustCompile(`#?-?0x[0-9a-z]+`)
 		operands = immMatch.ReplaceAllStringFunc(operands, func(s string) string {

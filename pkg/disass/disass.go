@@ -226,7 +226,7 @@ func Disassemble(d Disass) {
 						colorAddr("%#08x", uint64(startAddr)),
 						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
 						colorOp("%-7s", op),
-						colorOperands(" "+oprs),
+						ColorOperands(" "+oprs),
 						colorComment(comment),
 					)
 				} else {
@@ -416,7 +416,7 @@ func Disassemble(d Disass) {
 						colorAddr("%#08x", uint64(startAddr)),
 						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
 						colorOp("%-7s", instruction.Operation),
-						colorOperands(" "+opStr),
+						ColorOperands(" "+opStr),
 						colorComment(comment),
 					)
 				} else {
