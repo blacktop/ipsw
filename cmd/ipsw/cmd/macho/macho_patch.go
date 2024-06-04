@@ -248,7 +248,7 @@ func patchMacho(m *macho.File, machoPath, action, loadCommand string, args []str
 				return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 			}
 			for _, lc := range lcs {
-				if lc.(*macho.Dylib).Name == args[3] {
+				if lc.(*macho.LoadDylib).Name == args[3] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
