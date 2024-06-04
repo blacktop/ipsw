@@ -11,25 +11,13 @@ description: Patch MachO Load Commands
 Patch MachO Load Commands
 
 ```
-ipsw macho patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...> [flags]
-```
-
-### Examples
-
-```bash
-  # Modify LC_BUILD_VERSION like vtool
-  ❯ ipsw macho patch mod MACHO LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
-  # Add an LC_RPATH like install_name_tool
-  ❯ ipsw macho patch add MACHO LC_RPATH @executable_path/Frameworks
+ipsw macho patch [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help            help for patch
-  -o, --output string   Output new file
-  -f, --overwrite       Overwrite file
-  -s, --re-sign         Adhoc sign file
+  -h, --help   help for patch
 ```
 
 ### Options inherited from parent commands
@@ -44,4 +32,7 @@ ipsw macho patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...> [flags]
 ### SEE ALSO
 
 * [ipsw macho](/docs/cli/ipsw/macho)	 - Parse MachO
+* [ipsw macho patch add](/docs/cli/ipsw/macho/patch/add)	 - Add a load command to a MachO file
+* [ipsw macho patch mod](/docs/cli/ipsw/macho/patch/mod)	 - Modify a load command to a MachO file
+* [ipsw macho patch rm](/docs/cli/ipsw/macho/patch/rm)	 - Remove a load command to a MachO file
 

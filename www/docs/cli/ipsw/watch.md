@@ -20,6 +20,7 @@ ipsw watch <ORG/REPO> [flags]
   -a, --api string             Github API Token
   -b, --branch string          Repo branch to watch (default "main")
   -d, --days int               Days back to search for commits (default 1)
+      --discord-icon string    Discord Post Icon URL
       --discord-id string      Discord Webhook ID
       --discord-token string   Discord Webhook Token
   -f, --file string            Commit file path to watch

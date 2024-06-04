@@ -21,7 +21,7 @@ ipsw img4 dec <img4> [flags]
   -i, --iv string       AES iv
       --iv-key string   AES iv+key
   -k, --key string      AES key
-  -o, --output string   Output file
+  -o, --output string   Output folder
 ```
 
 ### Options inherited from parent commands

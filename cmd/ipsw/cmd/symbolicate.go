@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/crashlog"
@@ -59,6 +60,14 @@ var symbolicateCmd = &cobra.Command{
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
 	Args:    cobra.MinimumNArgs(1),
+	Example: heredoc.Doc(`
+		# Symbolicate a panic crashlog (BugType=210) with an IPSW
+		  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+		# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
+		  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
+		# Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+		  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
+		    ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
