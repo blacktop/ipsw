@@ -58,7 +58,7 @@ jobs:
       #   run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
       - if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
@@ -82,7 +82,7 @@ jobs:
       # -
       #   if: matrix.platform == 'windows-latest'
       #   name: Run GoReleaser
-      #   uses: goreleaser/goreleaser-action@v5
+      #   uses: goreleaser/goreleaser-action@v6
       #   with:
       #     distribution: goreleaser
       #     version: latest
@@ -116,7 +116,7 @@ jobs:
       # -
       #   if: matrix.platform == 'macos-13'
       #   name: Run GoReleaser
-      #   uses: goreleaser/goreleaser-action@v5
+      #   uses: goreleaser/goreleaser-action@v6
       #   with:
       #     distribution: goreleaser
       #     version: latest
