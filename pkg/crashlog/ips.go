@@ -841,7 +841,9 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 							}
 						}
 						if !found {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (??? in memory macho)"
+							if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "/usr/lib/dyld" {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (??? in memory macho)"
+							}
 							log.WithFields(log.Fields{
 								"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
 								"thread": tid,
