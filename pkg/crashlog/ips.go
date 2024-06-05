@@ -360,6 +360,19 @@ type Exception struct {
 	Subtype  string `json:"subtype,omitempty"`
 }
 
+func fmtAddr(val uint64) string {
+	if val == 0 {
+		return colorAddr("%#016x", val)
+	}
+	return fmt.Sprintf("%#016x", val)
+}
+func fmtAddrSmol(val uint64) string {
+	if val == 0 {
+		return colorAddr("%#08x", val)
+	}
+	return fmt.Sprintf("%#08x", val)
+}
+
 type Register struct {
 	Value             uint64 `json:"value,omitempty"`
 	SymbolLocation    uint64 `json:"symbolLocation,omitempty"`
@@ -420,19 +433,6 @@ func (s ThreadState) HasSymbols() bool {
 		return true
 	}
 	return false
-}
-
-func fmtAddr(val uint64) string {
-	if val == 0 {
-		return colorAddr("%#016x", val)
-	}
-	return fmt.Sprintf("%#016x", val)
-}
-func fmtAddrSmol(val uint64) string {
-	if val == 0 {
-		return colorAddr("%#08x", val)
-	}
-	return fmt.Sprintf("%#08x", val)
 }
 
 func (s ThreadState) String() string {
@@ -816,11 +816,13 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 							}
 						}
 					}
-				} else {
+				} else { // "Process"
 					// lookup symbol in MachO symbol map
 					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName]; ok {
+						found := false
 						for _, fn := range funcs {
 							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset && i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset < fn.EndAddr {
+								found = true
 								if i.Config.Demangle {
 									if strings.HasPrefix(fn.Name, "_$s") || strings.HasPrefix(fn.Name, "$s") { // TODO: better detect swift symbols
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(fn.Name)
@@ -837,6 +839,15 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 								}
 								break
 							}
+						}
+						if !found {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (??? in memory macho)"
+							log.WithFields(log.Fields{
+								"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+								"thread": tid,
+								"frame":  idx,
+								"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName,
+							}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
 						}
 					} else {
 						log.WithFields(log.Fields{
