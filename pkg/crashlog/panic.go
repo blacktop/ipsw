@@ -129,7 +129,7 @@ func (t TPIDRx_ELy) String() string {
 	}
 	var tpidrx string
 	for key, val := range t {
-		tpidrx += fmt.Sprintf(colorImage("    %-3s")+": %#016x\n", key, val)
+		tpidrx += fmt.Sprintf(colorImage("    %-3s", key)+": %#016x\n", val)
 	}
 	return fmt.Sprintf(colorField("TPIDRx_ELy")+"\n%s\n", tpidrx)
 }
@@ -158,7 +158,7 @@ type PanickedTask struct {
 }
 
 func (p PanickedTask) String() string {
-	return fmt.Sprintf(colorField("Panicked Task")+":   %#016x, %d "+colorField("pages")+", %d "+colorField("threads")+", "+colorField("pid")+" %d: "+colorImage("%s"), p.Address, p.Pages, p.Threads, p.PID, p.Name)
+	return fmt.Sprintf("%s:   %#016x, %d %s, %d %s, %s %d: %s", colorField("Panicked Task"), p.Address, p.Pages, colorField("pages"), p.Threads, colorField("threads"), colorField("pid"), p.PID, colorImage(p.Name))
 }
 
 type State struct {

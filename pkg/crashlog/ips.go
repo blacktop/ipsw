@@ -368,6 +368,24 @@ type Register struct {
 	MatchesCrashFrame int    `json:"matchesCrashFrame,omitempty"`
 }
 
+func (r Register) String() string {
+	var out strings.Builder
+	out.WriteString(fmtAddr(r.Value))
+	if r.SymbolLocation != 0 {
+		out.WriteString(fmt.Sprintf(" %s", colorAddr("%#016x", r.SymbolLocation)))
+	}
+	if len(r.Symbol) > 0 {
+		out.WriteString(fmt.Sprintf(" %s", colorImage(r.Symbol)))
+	}
+	if len(r.Description) > 0 {
+		out.WriteString(" " + colorField(r.Description))
+	}
+	if r.MatchesCrashFrame != 0 {
+		out.WriteString(colorBold(" matches_crash_frame=%d", r.MatchesCrashFrame))
+	}
+	return out.String()
+}
+
 type ThreadState struct {
 	X      []Register `json:"x,omitempty"`
 	Flavor string     `json:"flavor,omitempty"`
@@ -378,6 +396,30 @@ type ThreadState struct {
 	ESR    Register   `json:"esr,omitempty"`
 	PC     Register   `json:"pc,omitempty"`
 	FAR    Register   `json:"far,omitempty"`
+}
+
+func (s ThreadState) HasSymbols() bool {
+	for _, reg := range s.X {
+		if len(reg.Symbol) > 0 {
+			return true
+		}
+	}
+	if len(s.LR.Symbol) > 0 {
+		return true
+	}
+	if len(s.FP.Symbol) > 0 {
+		return true
+	}
+	if len(s.SP.Symbol) > 0 {
+		return true
+	}
+	if len(s.PC.Symbol) > 0 {
+		return true
+	}
+	if len(s.ESR.Symbol) > 0 {
+		return true
+	}
+	return false
 }
 
 func fmtAddr(val uint64) string {
@@ -394,27 +436,42 @@ func fmtAddrSmol(val uint64) string {
 }
 
 func (s ThreadState) String() string {
-	return fmt.Sprintf(
-		"    x0: %s   x1: %s   x2: %s   x3: %s\n"+
-			"    x4: %s   x5: %s   x6: %s   x7: %s\n"+
-			"    x8: %s   x9: %s  x10: %s  x11: %s\n"+
-			"   x12: %s  x13: %s  x14: %s  x15: %s\n"+
-			"   x16: %s  x17: %s  x18: %s  x19: %s\n"+
-			"   x20: %s  x21: %s  x22: %s  x23: %s\n"+
-			"   x24: %s  x25: %s  x26: %s  x27: %s\n"+
-			"   x28: %s   fp: %s   lr: %s\n"+
-			"    sp: %s   pc: %s cpsr: %s\n"+
-			"   esr: %s %s\n",
-		fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
-		fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
-		fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
-		fmtAddr(s.X[12].Value), fmtAddr(s.X[13].Value), fmtAddr(s.X[14].Value), fmtAddr(s.X[15].Value),
-		fmtAddr(s.X[16].Value), fmtAddr(s.X[17].Value), fmtAddr(s.X[18].Value), fmtAddr(s.X[19].Value),
-		fmtAddr(s.X[20].Value), fmtAddr(s.X[21].Value), fmtAddr(s.X[22].Value), fmtAddr(s.X[23].Value),
-		fmtAddr(s.X[24].Value), fmtAddr(s.X[25].Value), fmtAddr(s.X[26].Value), fmtAddr(s.X[27].Value),
-		fmtAddr(s.X[28].Value), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
-		fmtAddr(s.SP.Value), fmtAddr(s.PC.Value), fmtAddrSmol(s.CPSR.Value),
-		fmtAddrSmol(s.ESR.Value), colorError(s.ESR.Description))
+	if s.HasSymbols() {
+		var out strings.Builder
+		for i, reg := range s.X {
+			out.WriteString(fmt.Sprintf("  %3s: %s\n", fmt.Sprintf("x%d", i), reg))
+		}
+		out.WriteString(fmt.Sprintf("   fp: %s\n", s.FP))
+		out.WriteString(fmt.Sprintf("   lr: %s\n", s.LR))
+		out.WriteString(fmt.Sprintf("   sp: %s\n", s.SP))
+		out.WriteString(fmt.Sprintf("   pc: %s\n", s.PC))
+		out.WriteString(fmt.Sprintf("  far: %s\n", s.FAR))
+		out.WriteString(fmt.Sprintf(" cpsr: %s\n", s.CPSR))
+		out.WriteString(fmt.Sprintf("  esr: %s\n", s.ESR))
+		return out.String()
+	} else {
+		return fmt.Sprintf(
+			"    x0: %s   x1: %s   x2: %s   x3: %s\n"+
+				"    x4: %s   x5: %s   x6: %s   x7: %s\n"+
+				"    x8: %s   x9: %s  x10: %s  x11: %s\n"+
+				"   x12: %s  x13: %s  x14: %s  x15: %s\n"+
+				"   x16: %s  x17: %s  x18: %s  x19: %s\n"+
+				"   x20: %s  x21: %s  x22: %s  x23: %s\n"+
+				"   x24: %s  x25: %s  x26: %s  x27: %s\n"+
+				"   x28: %s   fp: %s   lr: %s\n"+
+				"    sp: %s   pc: %s cpsr: %s\n"+
+				"   esr: %s %s\n",
+			fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
+			fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
+			fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
+			fmtAddr(s.X[12].Value), fmtAddr(s.X[13].Value), fmtAddr(s.X[14].Value), fmtAddr(s.X[15].Value),
+			fmtAddr(s.X[16].Value), fmtAddr(s.X[17].Value), fmtAddr(s.X[18].Value), fmtAddr(s.X[19].Value),
+			fmtAddr(s.X[20].Value), fmtAddr(s.X[21].Value), fmtAddr(s.X[22].Value), fmtAddr(s.X[23].Value),
+			fmtAddr(s.X[24].Value), fmtAddr(s.X[25].Value), fmtAddr(s.X[26].Value), fmtAddr(s.X[27].Value),
+			fmtAddr(s.X[28].Value), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
+			fmtAddr(s.SP.Value), fmtAddr(s.PC.Value), fmtAddrSmol(s.CPSR.Value),
+			fmtAddrSmol(s.ESR.Value), colorField(s.ESR.Description))
+	}
 }
 
 type UserThread struct {
@@ -983,7 +1040,7 @@ func (i *Ips) String() string {
 		if i.Payload.SharedCache.Size > 0 {
 			out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
 		}
-		out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), i.Payload.Exception.Type, i.Payload.Exception.Signal, i.Payload.Exception.Message)
+		out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), colorBold(i.Payload.Exception.Type), i.Payload.Exception.Signal, i.Payload.Exception.Message)
 		if len(i.Payload.Exception.Subtype) > 0 {
 			out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", i.Payload.Exception.Subtype)
 		}
@@ -1029,58 +1086,61 @@ func (i *Ips) String() string {
 				w.Flush()
 				out += buf.String()
 			}
-			if t.Triggered {
+			if t.Triggered || i.Config.All {
 				out += colorField("Thread") + colorBold(" %d ", t.ID) + colorField(t.ThreadState.Flavor) + "\n" + t.ThreadState.String()
-				if len(i.Payload.InstructionByteStream.BeforePC) > 0 {
-					out += "\n"
-					b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.BeforePC)
-					if err != nil {
-						log.WithError(err).Errorf("failed to decode instruction byte stream")
-					}
-					instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value-(10*4), b64data)
-					if err != nil {
-						log.WithError(err).Errorf("failed to disassemble instructions")
-					}
-					pad := "    "
-					for _, block := range instructions.Blocks() {
-						for _, i := range block {
-							opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
-							out += fmt.Sprintf("%s%s:  %s   %s %s\n",
-								pad,
-								colorAddr("%#08x", i.Address),
-								disassemble.GetOpCodeByteString(i.Raw),
-								colorImage("%-7s", i.Operation),
-								disass.ColorOperands(opStr),
-							)
+				if t.Triggered {
+					if len(i.Payload.InstructionByteStream.BeforePC) > 0 {
+						out += colorField("Instructions") + "\n"
+						if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.BeforePC); err != nil {
+							log.WithError(err).Errorf("failed to decode BeforePC instruction byte stream")
+						} else {
+							if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value-(10*4), b64data); err != nil {
+								log.WithError(err).Errorf("failed to disassemble BeforePC instructions")
+							} else {
+								pad := "    "
+								for _, block := range instructions.Blocks() {
+									for _, i := range block {
+										opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+										out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+											pad,
+											colorAddr("%#08x", i.Address),
+											disassemble.GetOpCodeByteString(i.Raw),
+											colorImage("%-7s", i.Operation),
+											disass.ColorOperands(opStr),
+										)
+									}
+									out += "\n"
+								}
+							}
 						}
-						out += "\n"
 					}
-				}
-				if len(i.Payload.InstructionByteStream.AtPC) > 0 {
-					b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.AtPC)
-					if err != nil {
-						log.WithError(err).Errorf("failed to decode instruction byte stream")
-					}
-					instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value, b64data)
-					if err != nil {
-						log.WithError(err).Errorf("failed to disassemble instructions")
-					}
-					for idx, block := range instructions.Blocks() {
-						pad := "    "
-						if idx == 0 {
-							pad = colorError("PC=>")
+					if len(i.Payload.InstructionByteStream.AtPC) > 0 {
+						out = strings.TrimSuffix(out, "\n")
+						if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.AtPC); err != nil {
+							log.WithError(err).Errorf("failed to decode AtPC instruction byte stream")
+						} else {
+							if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value, b64data); err != nil {
+								log.WithError(err).Errorf("failed to disassemble AtPC instructions")
+							} else {
+								for idx, block := range instructions.Blocks() {
+									for jdx, i := range block {
+										pad := "    "
+										if idx == 0 && jdx == 0 {
+											pad = colorError("PC=>")
+										}
+										opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+										out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+											pad,
+											colorAddr("%#08x", i.Address),
+											disassemble.GetOpCodeByteString(i.Raw),
+											colorImage("%-7s", i.Operation),
+											disass.ColorOperands(opStr),
+										)
+									}
+									out += "\n"
+								}
+							}
 						}
-						for _, i := range block {
-							opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
-							out += fmt.Sprintf("%s%s:  %s   %s %s\n",
-								pad,
-								colorAddr("%#08x", i.Address),
-								disassemble.GetOpCodeByteString(i.Raw),
-								colorImage("%-7s", i.Operation),
-								disass.ColorOperands(opStr),
-							)
-						}
-						out += "\n"
 					}
 				}
 			}
