@@ -841,6 +841,7 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 							}
 						}
 						if !found {
+							// sometimes a frame will report using `dyld` but the offset is not in any function or in the binary image (e.g. in memory macho)
 							if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "/usr/lib/dyld" {
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (??? in memory macho)"
 							}
