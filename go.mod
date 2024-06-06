@@ -193,4 +193,5 @@ require (
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.30.0 // indirect
+	rsc.io/gitfs v1.0.0 // indirect
 )

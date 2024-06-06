@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"rsc.io/gitfs"
 )
 
 const (
@@ -225,6 +227,23 @@ type ADBQuery struct {
 
 func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 	var osfiles OsFiles
+
+	repo, err := gitfs.NewRepo(AppleDBGitURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git repo: %v", err)
+	}
+	h, f, err := repo.Clone("HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone git repo: %v", err)
+	}
+	fmt.Println(h)
+	fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		fmt.Println(path)
+		return nil
+	})
 
 	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Git cloning local 'appledb' to %s", filepath.Join(q.ConfigDir, "appledb")))
