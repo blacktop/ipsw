@@ -31,7 +31,7 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 		 */
 		fallthrough
 	case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
-		if len(args) < 6 {
+		if len(args) < 5 {
 			return fmt.Errorf("not enough arguments for adding %s; must supply PATH, CURRENT_VERSION and COMPAT_VERSION strings", loadCommand)
 		}
 		var lc types.LoadCmd
@@ -50,59 +50,59 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			lc = types.LC_LOAD_UPWARD_DYLIB
 		}
 		var currVer types.Version
-		if err := currVer.Set(args[4]); err != nil {
+		if err := currVer.Set(args[3]); err != nil {
 			return fmt.Errorf("failed to parse current version: %v", err)
 		}
 		var compatVer types.Version
-		if err := compatVer.Set(args[5]); err != nil {
+		if err := compatVer.Set(args[4]); err != nil {
 			return fmt.Errorf("failed to parse compatibility version: %v", err)
 		}
 		m.AddLoad(&macho.Dylib{
 			DylibCmd: types.DylibCmd{
 				LoadCmd:        lc,
-				Len:            pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1)),
+				Len:            pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[2]) + 1)),
 				NameOffset:     0x18,
 				Timestamp:      2, // TODO: I've only seen this value be 2
 				CurrentVersion: currVer,
 				CompatVersion:  compatVer,
 			},
-			Name: args[3],
+			Name: args[2],
 		})
 	case "LC_RPATH":
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for adding %s; must supply PATH string", loadCommand)
 		}
 		m.AddLoad(&macho.Rpath{
 			RpathCmd: types.RpathCmd{
 				LoadCmd:    types.LC_RPATH,
-				Len:        pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[3]) + 1)),
+				Len:        pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[2]) + 1)),
 				PathOffset: 0xC,
 			},
-			Path: args[3],
+			Path: args[2],
 		})
 	case "LC_BUILD_VERSION":
-		if len(args) < 6 {
+		if len(args) < 5 {
 			return fmt.Errorf("not enough arguments for modding %s; must supply at least PLATFORM, MINOS and SDK strings", loadCommand)
-		} else if len(args) > 6 {
-			if ((len(args) - 6) % 2) != 0 {
+		} else if len(args) > 5 {
+			if ((len(args) - 5) % 2) != 0 {
 				return fmt.Errorf("when adding tools to %s; ensure you supply both TOOL and TOOL_VERSION strings", loadCommand)
 			}
 		}
-		platform, err := types.GetPlatformByName(args[3])
+		platform, err := types.GetPlatformByName(args[2])
 		if err != nil {
-			return fmt.Errorf("failed to parse platform name %s: %v", args[3], err)
+			return fmt.Errorf("failed to parse platform name %s: %v", args[2], err)
 		}
 		var minos types.Version
-		if err := minos.Set(args[4]); err != nil {
+		if err := minos.Set(args[3]); err != nil {
 			return fmt.Errorf("failed to parse min OS version: %v", err)
 		}
 		var sdk types.Version
-		if err := sdk.Set(args[5]); err != nil {
+		if err := sdk.Set(args[4]); err != nil {
 			return fmt.Errorf("failed to parse SDK version: %v", err)
 		}
 		var tools []types.BuildVersionTool
-		if len(args) > 6 {
-			for i := 6; i < len(args); i += 2 {
+		if len(args) > 5 {
+			for i := 5; i < len(args); i += 2 {
 				tool, err := types.GetToolByName(args[i])
 				if err != nil {
 					return fmt.Errorf("failed to parse tool name %s: %v", args[i], err)
@@ -126,15 +126,15 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			Tools: tools,
 		})
 	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for modding %s; must supply VERSION and SDK strings", loadCommand)
 		}
 		var version types.Version
-		if err := version.Set(args[3]); err != nil {
+		if err := version.Set(args[2]); err != nil {
 			return fmt.Errorf("failed to parse version: %v", err)
 		}
 		var sdk types.Version
-		if err := sdk.Set(args[4]); err != nil {
+		if err := sdk.Set(args[3]); err != nil {
 			return fmt.Errorf("failed to parse SDK version: %v", err)
 		}
 		switch loadCommand {
@@ -180,26 +180,26 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 		var name string
 		switch loadCommand {
 		case "LC_ID_DYLINKER":
-			if len(args) < 4 {
+			if len(args) < 3 {
 				return fmt.Errorf("not enough arguments for setting %s; must supply ID name", loadCommand)
 			}
 			lc = types.LC_ID_DYLINKER
-			name = args[3]
+			name = args[2]
 		case "LC_LOAD_DYLINKER":
-			if len(args) < 4 {
+			if len(args) < 3 {
 				return fmt.Errorf("not enough arguments for setting %s; must supply PATH string", loadCommand)
 			}
 			lc = types.LC_LOAD_DYLINKER
-			name = args[3]
+			name = args[2]
 		case "LC_DYLD_ENVIRONMENT":
 			if m.FileHeader.Type != types.MH_EXECUTE {
 				return fmt.Errorf("you can only modify LC_DYLD_ENVIRONMENT in a main binary")
 			}
-			if len(args) < 5 {
+			if len(args) < 4 {
 				return fmt.Errorf("not enough arguments for setting %s; must supply ENV_VAR name, and VALUE strings", loadCommand)
 			}
 			lc = types.LC_DYLD_ENVIRONMENT
-			name = args[3] + "=" + args[4]
+			name = args[2] + "=" + args[3]
 		}
 		m.AddLoad(&macho.Dylinker{
 			DylinkerCmd: types.DylinkerCmd{
@@ -224,7 +224,7 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 		}
 		fallthrough
 	case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB", "LC_RPATH":
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for removing %s; must supply PATH string", loadCommand)
 		}
 		// TODO: add support for removing LC_DYLIB (by supporting removing them from imports as well)
@@ -236,37 +236,37 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 		for _, lc := range lcs {
 			switch l := lc.(type) {
 			case *macho.LoadDylib:
-				if l.Name == args[3] {
+				if l.Name == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
 				}
 			case *macho.WeakDylib:
-				if l.Name == args[3] {
+				if l.Name == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
 				}
 			case *macho.ReExportDylib:
-				if l.Name == args[3] {
+				if l.Name == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
 				}
 			case *macho.LazyLoadDylib:
-				if l.Name == args[3] {
+				if l.Name == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
 				}
 			case *macho.UpwardDylib:
-				if l.Name == args[3] {
+				if l.Name == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
 				}
 			case *macho.Rpath:
-				if l.Path == args[3] {
+				if l.Path == args[2] {
 					if err := m.RemoveLoad(lc); err != nil {
 						return fmt.Errorf("failed to remove load command: %v", err)
 					}
@@ -301,7 +301,7 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 			}
 		}
 	case "LC_LOAD_DYLINKER":
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for removing %s; must supply PATH string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -309,14 +309,14 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if lc.(*macho.LoadDylinker).Name == args[3] {
+			if lc.(*macho.LoadDylinker).Name == args[2] {
 				if err := m.RemoveLoad(lc); err != nil {
 					return fmt.Errorf("failed to remove load command: %v", err)
 				}
 			}
 		}
 	case "LC_DYLD_ENVIRONMENT":
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for removing %s; must supply ENV_VAR string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -324,7 +324,7 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if strings.Split(lc.(*macho.DyldEnvironment).Name, "=")[0] == args[3] {
+			if strings.Split(lc.(*macho.DyldEnvironment).Name, "=")[0] == args[2] {
 				if err := m.RemoveLoad(lc); err != nil {
 					return fmt.Errorf("failed to remove load command: %v", err)
 				}
@@ -353,7 +353,7 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		if m.FileHeader.Type != types.MH_DYLIB {
 			return fmt.Errorf("you can only modify %s in a dylib", loadCommand)
 		}
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for setting %s; must supply ID string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -364,12 +364,12 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		}
 		for _, lc := range lcs {
 			prevLen := int32(lc.(*macho.IDDylib).Len)
-			lc.(*macho.IDDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
-			lc.(*macho.IDDylib).Name = args[3]
+			lc.(*macho.IDDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[2]) + 1))
+			lc.(*macho.IDDylib).Name = args[2]
 			m.ModifySizeCommands(prevLen, int32(lc.(*macho.IDDylib).Len))
 		}
 	case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -379,72 +379,72 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		for _, lc := range lcs {
 			switch c := lc.(type) {
 			case *macho.LoadDylib:
-				if c.Name != args[3] {
+				if c.Name != args[2] {
 					continue
 				}
 				prevLen := int32(c.Len)
-				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-				c.Name = args[4]
+				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+				c.Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(c.Len))
 			case *macho.WeakDylib:
-				if c.Name != args[3] {
+				if c.Name != args[2] {
 					continue
 				}
 				prevLen := int32(c.Len)
-				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-				c.Name = args[4]
+				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+				c.Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(c.Len))
 			case *macho.ReExportDylib:
-				if c.Name != args[3] {
+				if c.Name != args[2] {
 					continue
 				}
 				prevLen := int32(c.Len)
-				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-				c.Name = args[4]
+				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+				c.Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(c.Len))
 			case *macho.LazyLoadDylib:
-				if c.Name != args[3] {
+				if c.Name != args[2] {
 					continue
 				}
 				prevLen := int32(c.Len)
-				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-				c.Name = args[4]
+				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+				c.Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(c.Len))
 			case *macho.UpwardDylib:
-				if c.Name != args[3] {
+				if c.Name != args[2] {
 					continue
 				}
 				prevLen := int32(c.Len)
-				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-				c.Name = args[4]
+				c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+				c.Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(c.Len))
 			default:
 				return fmt.Errorf("failed to modify load command %s in %s", loadCommand, machoPath)
 			}
 		}
 	case "LC_BUILD_VERSION":
-		if len(args) < 6 {
+		if len(args) < 5 {
 			return fmt.Errorf("not enough arguments for modding %s; must supply at least PLATFORM, MINOS and SDK strings", loadCommand)
-		} else if len(args) > 6 {
-			if ((len(args) - 6) % 2) != 0 {
+		} else if len(args) > 5 {
+			if ((len(args) - 5) % 2) != 0 {
 				return fmt.Errorf("when adding tools to %s; ensure you supply both TOOL and TOOL_VERSION strings", loadCommand)
 			}
 		}
-		platform, err := types.GetPlatformByName(args[3])
+		platform, err := types.GetPlatformByName(args[2])
 		if err != nil {
-			return fmt.Errorf("failed to parse platform name %s: %v", args[3], err)
+			return fmt.Errorf("failed to parse platform name %s: %v", args[2], err)
 		}
 		var minos types.Version
-		if err := minos.Set(args[4]); err != nil {
-			return fmt.Errorf("failed to parse min OS version: %v", err)
+		if err := minos.Set(args[3]); err != nil {
+			return fmt.Errorf("failed to parse min OS versionc: %v", args[3], err)
 		}
 		var sdk types.Version
-		if err := sdk.Set(args[5]); err != nil {
-			return fmt.Errorf("failed to parse SDK version: %v", err)
+		if err := sdk.Set(args[4]); err != nil {
+			return fmt.Errorf("failed to parse SDK version: %v", args[4], err)
 		}
 		var tools []types.BuildVersionTool
-		if len(args) > 6 {
-			for i := 6; i < len(args); i += 2 {
+		if len(args) > 5 {
+			for i := 5; i < len(args); i += 2 {
 				tool, err := types.GetToolByName(args[i])
 				if err != nil {
 					return fmt.Errorf("failed to parse tool name %s: %v", args[i], err)
@@ -472,15 +472,15 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("found more than one load command %s in %s", loadCommand, machoPath)
 		}
 	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for modding %s; must supply VERSION and SDK strings", loadCommand)
 		}
 		var version types.Version
-		if err := version.Set(args[3]); err != nil {
+		if err := version.Set(args[2]); err != nil {
 			return fmt.Errorf("failed to parse version: %v", err)
 		}
 		var sdk types.Version
-		if err := sdk.Set(args[4]); err != nil {
+		if err := sdk.Set(args[3]); err != nil {
 			return fmt.Errorf("failed to parse SDK version: %v", err)
 		}
 		lcmvs := m.GetLoadsByName(loadCommand)
@@ -517,7 +517,7 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("found more than one load command %s in %s", loadCommand, machoPath)
 		}
 	case "LC_RPATH":
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for adding %s; must supply OLD_PATH NEW_PATH string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -525,15 +525,15 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if lc.(*macho.Rpath).Path == args[3] {
+			if lc.(*macho.Rpath).Path == args[2] {
 				prevLen := int32(lc.(*macho.Rpath).Len)
-				lc.(*macho.Rpath).Len = pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[4]) + 1))
-				lc.(*macho.Rpath).Path = args[4]
+				lc.(*macho.Rpath).Len = pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[3]) + 1))
+				lc.(*macho.Rpath).Path = args[3]
 				m.ModifySizeCommands(prevLen, int32(lc.(*macho.Rpath).Len))
 			}
 		}
 	case "LC_ID_DYLINKER":
-		if len(args) < 4 {
+		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for setting %s; must supply PATH string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -544,12 +544,12 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		}
 		for _, lc := range lcs {
 			prevLen := int32(lc.(*macho.DylinkerID).Len)
-			lc.(*macho.DylinkerID).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1))
-			lc.(*macho.DylinkerID).Name = args[3]
+			lc.(*macho.DylinkerID).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[2]) + 1))
+			lc.(*macho.DylinkerID).Name = args[2]
 			m.ModifySizeCommands(prevLen, int32(lc.(*macho.DylinkerID).Len))
 		}
 	case "LC_LOAD_DYLINKER":
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for setting %s; must supply OLD_PATH and NEW_PATH string", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -557,10 +557,10 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if lc.(*macho.LoadDylinker).Name == args[3] {
+			if lc.(*macho.LoadDylinker).Name == args[2] {
 				prevLen := int32(lc.(*macho.LoadDylinker).Len)
-				lc.(*macho.LoadDylinker).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[4]) + 1))
-				lc.(*macho.LoadDylinker).Name = args[4]
+				lc.(*macho.LoadDylinker).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1))
+				lc.(*macho.LoadDylinker).Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(lc.(*macho.LoadDylinker).Len))
 			}
 		}
@@ -568,7 +568,7 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		if m.FileHeader.Type != types.MH_EXECUTE {
 			return fmt.Errorf("you can only modify %s in a main binary", loadCommand)
 		}
-		if len(args) < 5 {
+		if len(args) < 4 {
 			return fmt.Errorf("not enough arguments for setting %s; must supply ENV_VAR and NEW_VALUE strings", loadCommand)
 		}
 		lcs := m.GetLoadsByName(loadCommand)
@@ -576,10 +576,10 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("failed to %s in %s", loadCommand, machoPath)
 		}
 		for _, lc := range lcs {
-			if strings.Split(lc.(*macho.DyldEnvironment).Name, "=")[0] == args[3] {
+			if strings.Split(lc.(*macho.DyldEnvironment).Name, "=")[0] == args[2] {
 				prevLen := int32(lc.(*macho.DyldEnvironment).Len)
-				lc.(*macho.DyldEnvironment).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[4]) + 1))
-				lc.(*macho.DyldEnvironment).Name = args[4]
+				lc.(*macho.DyldEnvironment).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1))
+				lc.(*macho.DyldEnvironment).Name = args[3]
 				m.ModifySizeCommands(prevLen, int32(lc.(*macho.DyldEnvironment).Len))
 			}
 		}
