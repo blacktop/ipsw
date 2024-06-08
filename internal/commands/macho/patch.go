@@ -125,6 +125,56 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			},
 			Tools: tools,
 		})
+	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
+		if len(args) < 5 {
+			return fmt.Errorf("not enough arguments for modding %s; must supply VERSION and SDK strings", loadCommand)
+		}
+		var version types.Version
+		if err := version.Set(args[3]); err != nil {
+			return fmt.Errorf("failed to parse version: %v", err)
+		}
+		var sdk types.Version
+		if err := sdk.Set(args[4]); err != nil {
+			return fmt.Errorf("failed to parse SDK version: %v", err)
+		}
+		switch loadCommand {
+		case "LC_VERSION_MIN_MACOSX":
+			m.AddLoad(&macho.VersionMin{
+				VersionMinCmd: types.VersionMinCmd{
+					LoadCmd: types.LC_VERSION_MIN_MACOSX,
+					Len:     uint32(binary.Size(types.VersionMinMacOSCmd{})),
+					Version: version,
+					Sdk:     sdk,
+				},
+			})
+		case "LC_VERSION_MIN_IPHONEOS":
+			m.AddLoad(&macho.VersionMin{
+				VersionMinCmd: types.VersionMinCmd{
+					LoadCmd: types.LC_VERSION_MIN_IPHONEOS,
+					Len:     uint32(binary.Size(types.VersionMinIPhoneOSCmd{})),
+					Version: version,
+					Sdk:     sdk,
+				},
+			})
+		case "LC_VERSION_MIN_TVOS":
+			m.AddLoad(&macho.VersionMin{
+				VersionMinCmd: types.VersionMinCmd{
+					LoadCmd: types.LC_VERSION_MIN_TVOS,
+					Len:     uint32(binary.Size(types.VersionMinTvOSCmd{})),
+					Version: version,
+					Sdk:     sdk,
+				},
+			})
+		case "LC_VERSION_MIN_WATCHOS":
+			m.AddLoad(&macho.VersionMin{
+				VersionMinCmd: types.VersionMinCmd{
+					LoadCmd: types.LC_VERSION_MIN_WATCHOS,
+					Len:     uint32(binary.Size(types.VersionMinWatchOSCmd{})),
+					Version: version,
+					Sdk:     sdk,
+				},
+			})
+		}
 	case "LC_ID_DYLINKER", "LC_LOAD_DYLINKER", "LC_DYLD_ENVIRONMENT":
 		var lc types.LoadCmd
 		var name string
@@ -280,6 +330,16 @@ func PatchMachoRm(m *macho.File, machoPath, loadCommand string, args []string) e
 				}
 			}
 		}
+	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
+		lcs := m.GetLoadsByName(loadCommand)
+		if len(lcs) == 0 {
+			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
+		}
+		for _, lc := range lcs {
+			if err := m.RemoveLoad(lc); err != nil {
+				return fmt.Errorf("failed to remove load command: %v", err)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported load command: %s", loadCommand)
 	}
@@ -408,6 +468,51 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 			lcbvs[0].(*macho.BuildVersion).NumTools = uint32(len(tools))
 			lcbvs[0].(*macho.BuildVersion).Tools = tools
 			m.ModifySizeCommands(prevLen, int32(lcbvs[0].(*macho.BuildVersion).Len)) // should be 0
+		} else {
+			return fmt.Errorf("found more than one load command %s in %s", loadCommand, machoPath)
+		}
+	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
+		if len(args) < 5 {
+			return fmt.Errorf("not enough arguments for modding %s; must supply VERSION and SDK strings", loadCommand)
+		}
+		var version types.Version
+		if err := version.Set(args[3]); err != nil {
+			return fmt.Errorf("failed to parse version: %v", err)
+		}
+		var sdk types.Version
+		if err := sdk.Set(args[4]); err != nil {
+			return fmt.Errorf("failed to parse SDK version: %v", err)
+		}
+		lcmvs := m.GetLoadsByName(loadCommand)
+		if len(lcmvs) == 0 {
+			return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
+		} else if len(lcmvs) == 1 {
+			switch loadCommand {
+			case "LC_VERSION_MIN_MACOSX":
+				prevLen := int32(lcmvs[0].(*macho.VersionMinMacOSX).Len)
+				lcmvs[0].(*macho.VersionMinMacOSX).Len = uint32(binary.Size(types.VersionMinMacOSCmd{}))
+				lcmvs[0].(*macho.VersionMinMacOSX).Version = version
+				lcmvs[0].(*macho.VersionMinMacOSX).Sdk = sdk
+				m.ModifySizeCommands(prevLen, int32(lcmvs[0].(*macho.VersionMinMacOSX).Len)) // should be 0
+			case "LC_VERSION_MIN_IPHONEOS":
+				prevLen := int32(lcmvs[0].(*macho.VersionMiniPhoneOS).Len)
+				lcmvs[0].(*macho.VersionMiniPhoneOS).Len = uint32(binary.Size(types.VersionMinIPhoneOSCmd{}))
+				lcmvs[0].(*macho.VersionMiniPhoneOS).Version = version
+				lcmvs[0].(*macho.VersionMiniPhoneOS).Sdk = sdk
+				m.ModifySizeCommands(prevLen, int32(lcmvs[0].(*macho.VersionMiniPhoneOS).Len)) // should be 0
+			case "LC_VERSION_MIN_TVOS":
+				prevLen := int32(lcmvs[0].(*macho.VersionMinTvOS).Len)
+				lcmvs[0].(*macho.VersionMinTvOS).Len = uint32(binary.Size(types.VersionMinTvOSCmd{}))
+				lcmvs[0].(*macho.VersionMinTvOS).Version = version
+				lcmvs[0].(*macho.VersionMinTvOS).Sdk = sdk
+				m.ModifySizeCommands(prevLen, int32(lcmvs[0].(*macho.VersionMinTvOS).Len)) // should be 0
+			case "LC_VERSION_MIN_WATCHOS":
+				prevLen := int32(lcmvs[0].(*macho.VersionMinWatchOS).Len)
+				lcmvs[0].(*macho.VersionMinWatchOS).Len = uint32(binary.Size(types.VersionMinWatchOSCmd{}))
+				lcmvs[0].(*macho.VersionMinWatchOS).Version = version
+				lcmvs[0].(*macho.VersionMinWatchOS).Sdk = sdk
+				m.ModifySizeCommands(prevLen, int32(lcmvs[0].(*macho.VersionMinWatchOS).Len)) // should be 0
+			}
 		} else {
 			return fmt.Errorf("found more than one load command %s in %s", loadCommand, machoPath)
 		}
