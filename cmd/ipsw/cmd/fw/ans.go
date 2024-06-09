@@ -39,6 +39,7 @@ func init() {
 var ansCmd = &cobra.Command{
 	Use:    "ans",
 	Short:  "🚧 Dump MachOs",
+	Args:   cobra.ExactArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

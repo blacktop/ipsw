@@ -1,3 +1,5 @@
+//go:build cgo
+
 package sep
 
 import (
@@ -23,38 +25,35 @@ import (
 
 const (
 	legionStr                   = "Built by legion2"
-	legionStrLen                = 16
 	appListOffsetFromSEPOS32bit = 0xec8
 	hdr32Offset                 = 0x408
 	hdr64v1Offset               = 0x1004
 	hdr64v2Offset               = 0x103c
 )
 
-type Header32 struct {
+type LegionHeader32 struct {
 	Subversion uint32 //0x1
 	Offset     uint32 //0x800
 	Legion     [16]byte
 }
 
-type Header64v1 struct {
+type LegionHeader64v1 struct {
 	Subversion uint32 //0x3
 	Legion     [16]byte
 	Offset     uint16
 	Reserved   [2]uint8
 }
 
-type Header64v2 struct {
-	Unknown    uint64
-	TextUUID   types.UUID
-	Unknown1   uint64
-	Unknown2   uint32
-	UUID       types.UUID
-	Unknown3   uint64
-	Unknown4   uint64
-	Subversion uint32 //0x4
-	Legion     [16]byte
-	Offset     uint16
-	Reserved   [2]uint8
+type LegionHeader64v2 struct {
+	Magic         uint64
+	UUIDLabel     [4]byte
+	UnknownOffset uint64
+	_             uint32
+	UUID          types.UUID
+	_             [4]uint32
+	Subversion    uint32 //0x4
+	Legion        [16]byte
+	Offset        uint32
 }
 
 type Header64 struct {
@@ -69,83 +68,40 @@ type Header64 struct {
 	Unknown2         uint64
 	Unknown3         uint64
 	Unknown4         uint64
-	IsZero1          uint64
-	IsZero2          uint64
-	InitTextOffset   uint64
-	InitTextVaddr    uint64
-	InitVMSize       uint64
-	InitEntry        uint64
-	IsZero3          uint64
-	IsZero4          uint64
-	Unknown5         uint64
-	Unknown6         uint64
-	IsZero5          uint64
-	IsZero6          uint64
-	InitName         [16]byte
-	InitUUID         types.UUID
-	SourceVersion    types.SrcVersion
-	Unknown7         uint64
-	NumApps          uint64
+	_                uint64
+	_                uint64
+}
+
+type RootHeader struct {
+	TextOffset    uint64
+	TextVaddr     uint64
+	VMSize        uint64
+	Entry         uint64
+	IsZero3       uint64
+	IsZero4       uint64
+	Unknown5      uint64
+	Unknown6      uint64
+	_             uint64
+	_             uint64
+	_             uint64
+	_             uint64
+	Unknown7      uint64
+	Unknown8      uint64
+	Name          [16]byte // SEPOS
+	UUID          types.UUID
+	SourceVersion types.SrcVersion
+	CRC32         uint32
+	Unknown9      uint32
+	Pad           [256]byte
+	AppCount      uint32
+	LibCount      uint32
+	// AppInfoOffset uint64
 }
 
 func (h Header64) String() string {
 	return fmt.Sprintf(
-		"KernelUUID       : %s\n"+
-			"Unknown0         : %#x\n"+
-			"KernelTextOffset : %#x\n"+
-			"KernelDataOffset   : %#x\n"+
-			"StartOfText      : %#x\n"+
-			"StartOfData      : %#x\n"+
-			"SepFwSize        : %#x\n"+
-			"Unknown1         : %#x\n"+
-			"Unknown2         : %#x\n"+
-			"Unknown3         : %#x\n"+
-			"Unknown4         : %#x\n"+
-			"IsZero1          : %#x\n"+
-			"IsZero2          : %#x\n"+
-			"InitTextOffset   : %#x\n"+
-			"InitTextVaddr    : %#x\n"+
-			"InitVMSize       : %#x\n"+
-			"InitEntry        : %#x\n"+
-			"IsZero3          : %#x\n"+
-			"IsZero4          : %#x\n"+
-			"Unknown5         : %#x\n"+
-			"Unknown6         : %#x\n"+
-			"IsZero5          : %#x\n"+
-			"IsZero6          : %#x\n"+
-			"InitName         : %s\n"+
-			"InitUUID         : %s\n"+
-			"SourceVersion    : %s\n"+
-			"Unknown7         : %#x\n"+
-			"NumApps          : %d",
+		"KernelUUID:       %s\n",
 		h.KernelUUID,
-		h.Unknown0,
-		h.KernelTextOffset,
-		h.KernelDataOffset,
-		h.StartOfText,
-		h.StartOfData,
-		h.SepFwSize,
-		h.Unknown1,
-		h.Unknown2,
-		h.Unknown3,
-		h.Unknown4,
-		h.IsZero1,
-		h.IsZero2,
-		h.InitTextOffset,
-		h.InitTextVaddr,
-		h.InitVMSize,
-		h.InitEntry,
-		h.IsZero3,
-		h.IsZero4,
-		h.Unknown5,
-		h.Unknown6,
-		h.IsZero5,
-		h.IsZero6,
-		strings.TrimSpace(string(h.InitName[:])),
-		h.InitUUID,
-		h.SourceVersion,
-		h.Unknown7,
-		h.NumApps,
 	)
 }
 
@@ -213,28 +169,6 @@ type application64 struct {
 	SourceVersion        types.SrcVersion
 }
 
-type application64v2 struct {
-	TextOffset           uint64
-	TextSize             uint64
-	DataOffset           uint64
-	DataSize             uint64
-	VMBase               uint64
-	Entry                uint64
-	PageSize             uint64
-	MemSize              uint64
-	NonAntireplayMemSize uint64
-	HeapMemSize          uint64
-	// Unknown1             uint64
-	// Unknown2             uint64
-	// Unknown3             uint64
-	// Unknown4             uint64
-	Magic         uint64
-	Name          [16]byte
-	UUID          types.UUID
-	SourceVersion types.SrcVersion
-	_             uint32
-}
-
 func (a application64) String() string {
 	return fmt.Sprintf(
 		"Name:          %s\n"+
@@ -257,6 +191,29 @@ func (a application64) String() string {
 		a.MemSize,
 	)
 }
+
+type application64v2 struct {
+	TextOffset           uint64
+	TextSize             uint64
+	DataOffset           uint64
+	DataSize             uint64
+	VMBase               uint64
+	Entry                uint64
+	PageSize             uint64
+	MemSize              uint64
+	NonAntireplayMemSize uint64
+	HeapMemSize          uint64
+	Unknown1             uint64
+	Unknown2             uint64
+	Unknown3             uint64
+	Unknown4             uint64
+	Magic                uint64
+	Name                 [16]byte
+	UUID                 types.UUID
+	SourceVersion        types.SrcVersion
+	_                    uint32
+}
+
 func (a application64v2) String() string {
 	return fmt.Sprintf(
 		"Name:          %s\n"+
@@ -267,7 +224,11 @@ func (a application64v2) String() string {
 			"TextAddr:      %#x -> %#x\n"+
 			"Entry:         %#x\n"+
 			"PageSize:      %#x\n"+
-			"MemSize:       %#x",
+			"MemSize:       %#x\n"+
+			"Unknown1:      %#x\n"+
+			"Unknown2:      %#x\n"+
+			"Unknown3:      %#x\n"+
+			"Unknown4:      %#x\n",
 		strings.TrimSpace(string(a.Name[:])),
 		a.UUID,
 		a.SourceVersion,
@@ -277,6 +238,10 @@ func (a application64v2) String() string {
 		a.Entry,
 		a.PageSize,
 		a.MemSize,
+		a.Unknown1,
+		a.Unknown2,
+		a.Unknown3,
+		a.Unknown4,
 	)
 }
 func (a application64v2) GetOffset(addr uint64) (uint64, error) {
@@ -292,46 +257,94 @@ func (a application64v2) GetVMAddress(off uint64) (uint64, error) {
 	return 0, fmt.Errorf("invalid offset %#x", off)
 }
 
-// TODO: finish this
-func Parse(data []byte) error {
+type Sep struct {
+	Legion LegionHeader64v2
+	Hdr    Header64
+	SepOS  RootHeader
+	Apps   []application64v2
+	Libs   []application64v2
 
-	if string(data[8:16]) == "eGirBwRD" {
-		out := make([]byte, len(data)*4)
-		if n := lzfse.DecodeLZVNBuffer(data[0x10000:], out); n == 0 {
-			return fmt.Errorf("failed to decompress")
+	data []byte
+}
+
+func (s Sep) String() string {
+	var out string
+	out += fmt.Sprintf(
+		"Legion: %s uuid=%s\n"+
+			"Kernel:    start=%#x end=%#x\n"+
+			"%s:        uuid=%s\n",
+		s.Legion.Legion[:], s.Legion.UUID,
+		s.Hdr.KernelTextOffset, s.Hdr.KernelTextOffset+s.Hdr.KernelDataOffset,
+		s.SepOS.Name[:], s.SepOS.UUID,
+	)
+	if len(s.Apps) > 0 {
+		out += "\n\nAPPS"
+		for _, app := range s.Apps {
+			out += fmt.Sprintf("\n\n%s\n", app)
+			if m, err := macho.NewFile(bytes.NewReader(s.data[app.TextOffset:])); err == nil {
+				out += fmt.Sprintf("\n%s\n", m.FileTOC.String())
+			}
+		}
+	}
+	if len(s.Libs) > 0 {
+		out += "\n\nLIBS"
+		for _, lib := range s.Libs {
+			out += fmt.Sprintf("\n\n%s\n", lib)
+			if m, err := macho.NewFile(bytes.NewReader(s.data[lib.TextOffset:])); err == nil {
+				out += fmt.Sprintf("\n%s\n", m.FileTOC.String())
+			}
+		}
+	}
+	return out
+}
+
+// Parse parses a SEP firmware image
+func Parse(in string) (*Sep, error) {
+	var s Sep
+	var err error
+
+	s.data, err = os.ReadFile(in)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(s.data[8:16]) == "eGirBwRD" {
+		out := make([]byte, len(s.data)*4)
+		if n := lzfse.DecodeLZVNBuffer(s.data[0x10000:], out); n == 0 {
+			return nil, fmt.Errorf("failed to decompress")
 		} else {
-			data = out[:n]
-			os.WriteFile("decompressed", data, 0644)
+			s.data = out[:n]
+			os.WriteFile("decompressed", s.data, 0644)
 		}
 	}
 
-	legion := bytes.Index(data, []byte(legionStr))
+	legion := bytes.Index(s.data, []byte(legionStr))
 	if legion < 0 {
-		return fmt.Errorf("failed to find " + legionStr)
+		return nil, fmt.Errorf("failed to find sep firmware magic: " + legionStr)
 	}
 
-	r := bytes.NewReader(data)
+	r := bytes.NewReader(s.data)
 
 	switch legion {
 	case hdr32Offset:
 		r.Seek(0x400, io.SeekStart)
-		var hdr Header32
+		var hdr LegionHeader32
 		if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-			return err
+			return nil, err
 		}
 		r.Seek(int64(hdr.Offset), io.SeekStart)
 		var monitorArgs MonitorBootArgs
 		if err := binary.Read(r, binary.LittleEndian, &monitorArgs); err != nil {
-			return err
+			return nil, err
 		}
 		r.Seek(int64(monitorArgs.KernBootArgsOffset), io.SeekStart)
 		var kernArgs KernBootArgs
 		if err := binary.Read(r, binary.LittleEndian, &kernArgs); err != nil {
-			return err
+			return nil, err
 		}
 		appList := make([]application64v2, kernArgs.NumApps)
 		if err := binary.Read(r, binary.LittleEndian, &appList); err != nil {
-			return fmt.Errorf("failed to read app list: %w", err)
+			return nil, fmt.Errorf("failed to read app list: %w", err)
 		}
 		for _, app := range appList {
 			log.Debugf("App:\n\n%s\n", app)
@@ -376,9 +389,9 @@ func Parse(data []byte) error {
 				app.TextOffset += 0x1000
 				app.TextSize -= 0x1000
 			}
-			m, err := macho.NewFile(bytes.NewReader(append(data[app.TextOffset:app.TextOffset+app.TextSize], data[app.DataOffset:]...)))
+			m, err := macho.NewFile(bytes.NewReader(append(s.data[app.TextOffset:app.TextOffset+app.TextSize], s.data[app.DataOffset:]...)))
 			if err != nil {
-				return fmt.Errorf("failed to create MachO from embedded app file data: %w", err)
+				return nil, fmt.Errorf("failed to create MachO from embedded app file data: %w", err)
 			}
 			fmt.Println(m.FileTOC.String())
 
@@ -413,7 +426,7 @@ func Parse(data []byte) error {
 				"offset": fmt.Sprintf("%#x-%#x", app.TextOffset, app.TextOffset+app.TextSize),
 			}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(app.Name[:]))))
 			if err := m.Export(fname, nil, app.Entry, nil); err != nil {
-				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
+				return nil, fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			// fmt.Println(m.FileTOC)
 			// for _, sym := range m.Symtab.Syms {
@@ -423,19 +436,32 @@ func Parse(data []byte) error {
 		}
 	case hdr64v1Offset:
 		r.Seek(0x1000, io.SeekStart)
-		var hdr Header64v1
+		var hdr LegionHeader64v1
 		if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-			return err
+			return nil, err
 		}
 		fmt.Println(hdr)
 	case hdr64v2Offset:
 		r.Seek(0x1000, io.SeekStart)
-		var hdr Header64
-		if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-			return err
+		if err := binary.Read(r, binary.LittleEndian, &s.Legion); err != nil {
+			return nil, err
 		}
-		fmt.Println(hdr)
+		r.Seek(int64(s.Legion.Offset), io.SeekStart)
+		if err := binary.Read(r, binary.LittleEndian, &s.Hdr); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(r, binary.LittleEndian, &s.SepOS); err != nil {
+			return nil, err
+		}
+		s.Apps = make([]application64v2, s.SepOS.AppCount)
+		if err := binary.Read(r, binary.LittleEndian, &s.Apps); err != nil {
+			return nil, fmt.Errorf("failed to read app list: %w", err)
+		}
+		s.Libs = make([]application64v2, s.SepOS.LibCount)
+		if err := binary.Read(r, binary.LittleEndian, &s.Libs); err != nil {
+			return nil, fmt.Errorf("failed to read app list: %w", err)
+		}
 	}
 
-	return nil
+	return &s, nil
 }

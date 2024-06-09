@@ -297,6 +297,7 @@ string HeaderRead(Header &header) {
 }
 
 #define REQ_DYLD (0x80000000)
+#define REQ_SEP (0x8000000)
 
 typedef enum <uint> {
     SEGMENT                     = 0x1,
@@ -355,6 +356,9 @@ typedef enum <uint> {
     LC_DYLD_CHAINED_FIXUPS 	    = 0x34 | REQ_DYLD,
     LC_FILESET_ENTRY 	        = 0x35 | REQ_DYLD,
     LC_ATOM_INFO                = 0x36,
+    LC_SEP_CACHE_SLIDE          = 0x1 | REQ_SEP,
+    LC_SEP_UNKNOWN2             = 0x2 | REQ_SEP,
+    LC_SEP_UNKNOWN3             = 0x3 | REQ_SEP,
 } LoadCommandType <read=LoadCommandTypeRead>;
 
 string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
@@ -471,6 +475,12 @@ string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
             return "LC_FILESET_ENTRY";
         case LC_ATOM_INFO:
             return "LC_ATOM_INFO";
+        case LC_SEP_CACHE_SLIDE:    
+            return "LC_SEP_CACHE_SLIDE";
+        case LC_SEP_UNKNOWN2:
+            return "LC_SEP_UNKNOWN2";
+        case LC_SEP_UNKNOWN3:
+            return "LC_SEP_UNKNOWN3";            
         default :
             return "Error";
     }
@@ -1009,7 +1019,12 @@ typedef struct {
         uint64 entryoff <format=hex>;
         uint64 stacksize <format=hex>;
         break;
-
+    case LC_SEP_CACHE_SLIDE:
+    case LC_SEP_UNKNOWN2:
+    case LC_SEP_UNKNOWN3:
+        uint32 data_offset;
+        uint32 data_size;
+        break;       
     default :
         Warning("Hit an unknown or unsupported load command : [%d]", command);
         break;  //Exit(-1);

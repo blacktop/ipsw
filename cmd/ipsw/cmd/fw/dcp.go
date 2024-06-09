@@ -52,6 +52,7 @@ var dcpCmd = &cobra.Command{
 	Use:     "dcp",
 	Aliases: []string{"d"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

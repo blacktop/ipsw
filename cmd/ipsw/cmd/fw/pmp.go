@@ -40,6 +40,7 @@ var pmpCmd = &cobra.Command{
 	Use:     "pmp",
 	Aliases: []string{"p"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
