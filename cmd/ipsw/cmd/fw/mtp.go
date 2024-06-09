@@ -40,6 +40,7 @@ var mtpCmd = &cobra.Command{
 	Use:     "mtp",
 	Aliases: []string{"m"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

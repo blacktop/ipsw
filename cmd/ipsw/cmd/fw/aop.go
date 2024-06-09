@@ -50,6 +50,7 @@ func init() {
 var aopCmd = &cobra.Command{
 	Use:    "aop",
 	Short:  "🚧 Dump MachOs",
+	Args:   cobra.ExactArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

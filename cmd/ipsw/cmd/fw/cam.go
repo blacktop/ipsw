@@ -40,6 +40,7 @@ var camCmd = &cobra.Command{
 	Use:     "cam",
 	Aliases: []string{"c"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

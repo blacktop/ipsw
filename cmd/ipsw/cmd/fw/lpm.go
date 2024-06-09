@@ -40,6 +40,7 @@ var lpmCmd = &cobra.Command{
 	Use:     "lpm",
 	Aliases: []string{"l"},
 	Short:   "🚧 Dump MachOs",
+	Args:    cobra.ExactArgs(1),
 	Hidden:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
