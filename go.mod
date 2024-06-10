@@ -64,7 +64,7 @@ require (
 )
 
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
-replace github.com/spf13/cast => github.com/blacktop/cast v1.5.1
+replace github.com/spf13/cast => github.com/blacktop/cast v1.5.2
 
 // replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/go-dwarf => ../go-dwarf
