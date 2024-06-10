@@ -635,8 +635,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
 		f.SubCacheInfo = make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 		// TODO: gross hack to read the subcache info for pre iOS 16.
-		endOfSubCacheInfoArray := f.Headers[f.UUID].SubCacheArrayOffset + uint32(binary.Size(subcacheEntry{})*int(f.Headers[f.UUID].SubCacheArrayCount))
-		if endOfSubCacheInfoArray == f.Images[0].PathOffset {
+		if f.Headers[f.UUID].MappingOffset >= 0x200 {
 			subCacheInfo := make([]subcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
 				return err
