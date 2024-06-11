@@ -76,7 +76,7 @@ var aeaCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA: %v", err)
 		}
-		log.Infof("Extracted AEA to  %s", out)
+		log.Infof("Extracted AEA to %s", out)
 
 		return nil
 	},
