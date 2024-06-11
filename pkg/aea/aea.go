@@ -43,43 +43,55 @@ func aea(in, out, key string) (string, error) {
 	return "", fmt.Errorf("only supported on macOS")
 }
 
-func Parse(in, out string, privKey []byte) (string, error) {
-	metadata := make(map[string][]byte)
-
-	data, err := os.ReadFile(in)
+func Info(in string) (map[string][]byte, error) {
+	f, err := os.Open(in)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	r := bytes.NewReader(data)
+	defer f.Close()
 
 	var hdr Header
-	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return "", err
+	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
+		return nil, err
 	}
+
+	if string(hdr.Magic[:]) != "AEA1" {
+		return nil, fmt.Errorf("invalid AEA header: found '%s' expected 'AEA1'", string(hdr.Magic[:]))
+	}
+
+	metadata := make(map[string][]byte)
+	mdr := io.NewSectionReader(f, int64(binary.Size(hdr)), int64(hdr.Length))
 
 	// parse key-value pairs
 	for {
 		var length uint32
-		err := binary.Read(r, binary.LittleEndian, &length)
+		err := binary.Read(mdr, binary.LittleEndian, &length)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			return "", err
+			return nil, err
 		}
 
 		keyval := make([]byte, length-uint32(binary.Size(length)))
-		_, err = r.Read(keyval)
-		if err != nil {
+		if _, err = mdr.Read(keyval); err != nil {
 			if err == io.EOF {
 				break
 			}
-			return "", err
+			return nil, err
 		}
 
 		k, v, _ := bytes.Cut(keyval, []byte{0x00})
-		metadata[string(k)] = v // FIXME: don't parse DATA (past metadata)
+		metadata[string(k)] = v
+	}
+
+	return metadata, nil
+}
+
+func Decrypt(in, out string, privKey []byte) (string, error) {
+	metadata, err := Info(in)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse AEA: %v", err)
 	}
 
 	if privKey == nil {
