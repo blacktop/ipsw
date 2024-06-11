@@ -34,6 +34,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
 )
@@ -97,6 +98,13 @@ var mdevsCmd = &cobra.Command{
 			defer os.Remove(dmgs[0])
 		} else {
 			log.Debugf("Found extracted %s", dmgPath)
+		}
+		if filepath.Ext(dmgPath) == ".aea" {
+			dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+			}
+			defer os.Remove(dmgPath)
 		}
 		// mount filesystem DMG
 		log.Debugf("Mounting %s", dmgPath)

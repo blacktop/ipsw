@@ -16,6 +16,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/pkg/errors"
@@ -182,6 +183,13 @@ func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, 
 			return nil, fmt.Errorf("File System %s NOT found in IPSW", dmgPath)
 		}
 		defer os.Remove(dmgs[0])
+	}
+
+	if filepath.Ext(dmgPath) == ".aea" {
+		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
 	}
 
 	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit)

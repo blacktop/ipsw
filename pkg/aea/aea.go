@@ -12,10 +12,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/cloudflare/circl/hpke"
 )
 
@@ -28,6 +29,18 @@ type Header struct {
 type fcsResponse struct {
 	EncRequest string `json:"enc-request,omitempty"`
 	WrappedKey string `json:"wrapped-key,omitempty"`
+}
+
+func aea(in, out, key string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
+		cout, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, cout)
+		}
+		return out, nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
 }
 
 func Parse(in, out string, privKey []byte) (string, error) {
@@ -135,5 +148,5 @@ func Parse(in, out string, privKey []byte) (string, error) {
 		return "", err
 	}
 
-	return utils.Aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), base64.StdEncoding.EncodeToString(wkey))
+	return aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), base64.StdEncoding.EncodeToString(wkey))
 }
