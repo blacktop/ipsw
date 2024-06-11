@@ -7,8 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -550,6 +549,8 @@ func FcsKeys(c *Config) ([]string, error) {
 	}
 	dmgPaths = append(dmgPaths, dmgPath)
 
+	kmap := make(map[string]aea.PrivateKey)
+
 	for _, dmgPath := range dmgPaths {
 		if filepath.Ext(dmgPath) != ".aea" {
 			return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmgPath))
@@ -570,35 +571,51 @@ func FcsKeys(c *Config) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
 			}
-			privKeyURL, ok := metadata["com.apple.wkms.fcs-key-url"]
-			if !ok {
-				return nil, fmt.Errorf("no private key URL found")
-			}
-
-			// TODO: make a client w/ proxy support etc
-			resp, err := http.Get(string(privKeyURL))
-			if err != nil {
-				return nil, err
-			}
-			defer resp.Body.Close()
-
-			privKey, err := io.ReadAll(resp.Body)
+			pkmap, err := metadata.GetPrivateKey(nil)
 			if err != nil {
 				return nil, err
 			}
 
-			fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
+			if c.JSON {
+				// check if json file exists
+				if _, err := os.Stat(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")); !os.IsNotExist(err) {
+					data, err := os.ReadFile(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json"))
+					if err != nil {
+						return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
+					}
+					if err := json.Unmarshal(data, &kmap); err != nil {
+						return nil, fmt.Errorf("failed to unmarshal fcs-keys: %v", err)
+					}
+				}
+				maps.Copy(kmap, pkmap)
+			} else {
+				for _, pk := range pkmap {
+					fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
 
-			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+						return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+					}
+
+					if err := os.WriteFile(fname, pk, 0o644); err != nil {
+						return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
+					}
+
+					artifacts = append(artifacts, fname)
+				}
 			}
-
-			if err := os.WriteFile(fname, privKey, 0o644); err != nil {
-				return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
-			}
-
-			artifacts = append(artifacts, fname)
 		}
+	}
+
+	if c.JSON {
+		out, err := json.Marshal(kmap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal fcs-keys: %v", err)
+		}
+		fname := filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")
+		if err := os.WriteFile(fname, out, 0o644); err != nil {
+			return nil, fmt.Errorf("failed to write fcs-keys.json: %v", err)
+		}
+		artifacts = append(artifacts, fname)
 	}
 
 	return artifacts, nil

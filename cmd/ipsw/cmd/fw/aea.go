@@ -112,7 +112,7 @@ var aeaCmd = &cobra.Command{
 			if err := os.MkdirAll(output, 0o750); err != nil {
 				return fmt.Errorf("failed to create output directory: %v", err)
 			}
-			fname := filepath.Join(output, "private_key.json")
+			fname := filepath.Join(output, "fcs-keys.json")
 			log.Infof("Created %s", fname)
 			if err := os.WriteFile(fname, data, 0o644); err != nil {
 				return fmt.Errorf("failed to write private key to file: %v", err)

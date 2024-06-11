@@ -53,6 +53,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
+	downloadAppledbCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
@@ -70,6 +71,7 @@ func init() {
 	viper.BindPFlag("download.appledb.dyld", downloadAppledbCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.fcs-keys", downloadAppledbCmd.Flags().Lookup("fcs-keys"))
+	viper.BindPFlag("download.appledb.fcs-keys-json", downloadAppledbCmd.Flags().Lookup("fcs-keys-json"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.appledb.prereq-build", downloadAppledbCmd.Flags().Lookup("prereq-build"))
@@ -150,6 +152,7 @@ var downloadAppledbCmd = &cobra.Command{
 		dyld := viper.GetBool("download.appledb.dyld")
 		pattern := viper.GetString("download.appledb.pattern")
 		fcsKeys := viper.GetBool("download.appledb.fcs-keys")
+		fcsKeysJson := viper.GetBool("download.appledb.fcs-keys-json")
 		isBeta := viper.GetBool("download.appledb.beta")
 		latest := viper.GetBool("download.appledb.latest")
 		prereqBuild := viper.GetString("download.appledb.prereq-build")
@@ -306,7 +309,7 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		if cont {
-			if kernel || dyld || len(pattern) > 0 || fcsKeys {
+			if kernel || dyld || len(pattern) > 0 || fcsKeys || fcsKeysJson {
 				for _, result := range results {
 					var url string
 					for _, link := range result.Links {
@@ -370,7 +373,10 @@ var downloadAppledbCmd = &cobra.Command{
 						}
 					}
 					// REMOTE AEA1 DMG fcs-key MODE
-					if fcsKeys {
+					if fcsKeys || fcsKeysJson {
+						if fcsKeysJson {
+							config.JSON = true
+						}
 						log.Info("Extracting remote AEA1 DMG fcs-keys")
 						if out, err := extract.FcsKeys(config); err != nil {
 							return err

@@ -55,6 +55,8 @@ func init() {
 	ipswCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
+	ipswCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
+	ipswCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	ipswCmd.Flags().Bool("decrypt", false, "Attempt to decrypt the partial files if keys are available")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
@@ -72,6 +74,8 @@ func init() {
 	viper.BindPFlag("download.ipsw.dyld-arch", ipswCmd.Flags().Lookup("dyld-arch"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.ipsw.fcs-keys", ipswCmd.Flags().Lookup("fcs-keys"))
+	viper.BindPFlag("download.ipsw.fcs-keys-json", ipswCmd.Flags().Lookup("fcs-keys-json"))
 	viper.BindPFlag("download.ipsw.decrypt", ipswCmd.Flags().Lookup("decrypt"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
@@ -139,6 +143,8 @@ var ipswCmd = &cobra.Command{
 		dyldArches := viper.GetStringSlice("download.ipsw.dyld-arch")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		remotePattern := viper.GetString("download.ipsw.pattern")
+		fcsKeys := viper.GetBool("download.ipsw.fcs-keys")
+		fcsKeysJson := viper.GetBool("download.ipsw.fcs-keys-json")
 		decrypt := viper.GetBool("download.ipsw.decrypt")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
@@ -345,6 +351,20 @@ var ipswCmd = &cobra.Command{
 					if remoteDSC {
 						log.Info("Extracting remote dyld_shared_cache(s)")
 						if out, err := extract.DSC(config); err != nil {
+							return err
+						} else {
+							for _, f := range out {
+								utils.Indent(log.Info, 2)("Created " + f)
+							}
+						}
+					}
+					// REMOTE AEA1 DMG fcs-key MODE
+					if fcsKeys || fcsKeysJson {
+						if fcsKeysJson {
+							config.JSON = true
+						}
+						log.Info("Extracting remote AEA1 DMG fcs-keys")
+						if out, err := extract.FcsKeys(config); err != nil {
 							return err
 						} else {
 							for _, f := range out {
