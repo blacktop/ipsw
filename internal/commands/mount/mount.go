@@ -12,6 +12,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
@@ -95,6 +96,13 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 		}
 		if len(dmgs) == 0 {
 			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+	}
+
+	if filepath.Ext(extractedDMG) == ".aea" {
+		extractedDMG, err = aea.Parse(extractedDMG, filepath.Dir(extractedDMG), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
 	}
 

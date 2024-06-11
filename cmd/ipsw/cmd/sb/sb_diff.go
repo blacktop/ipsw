@@ -35,6 +35,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -111,6 +112,14 @@ var sbDiffCmd = &cobra.Command{
 					defer os.Remove(dmgs[0])
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+				}
+
+				if filepath.Ext(dmgPath) == ".aea" {
+					dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+					if err != nil {
+						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+					}
+					defer os.Remove(dmgPath)
 				}
 
 				utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting FS %s", dmgPath))

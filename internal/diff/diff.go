@@ -20,6 +20,7 @@ import (
 	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -258,6 +259,12 @@ func mountDMG(ctx *Context) (err error) {
 		}
 	} else {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
+	}
+	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
+		ctx.SystemOsDmgPath, err = aea.Parse(ctx.SystemOsDmgPath, filepath.Dir(ctx.SystemOsDmgPath), nil)
+		if err != nil {
+			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ctx.SystemOsDmgPath))
 	ctx.MountPath, ctx.IsMounted, err = utils.MountDMG(ctx.SystemOsDmgPath)

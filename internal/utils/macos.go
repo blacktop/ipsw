@@ -18,6 +18,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils/lsof"
+	"github.com/blacktop/ipsw/pkg/aea"
 	semver "github.com/hashicorp/go-version"
 )
 
@@ -601,6 +602,15 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 		defer os.Remove(filepath.Clean(dmgs[0]))
 	}
 
+	if filepath.Ext(dmgPath) == ".aea" {
+		var err error
+		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
+		defer os.Remove(dmgPath)
+	}
+
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	mountPoint, alreadyMounted, err := MountDMG(dmgPath)
 	if err != nil {
@@ -659,18 +669,6 @@ func PkgUtilExpand(src, dst string) (string, error) {
 			return "", fmt.Errorf("%v: %s", err, out)
 		}
 		return outDir, nil
-	}
-	return "", fmt.Errorf("only supported on macOS")
-}
-
-func Aea(in, out, key string) (string, error) {
-	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
-		cout, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, cout)
-		}
-		return out, nil
 	}
 	return "", fmt.Errorf("only supported on macOS")
 }

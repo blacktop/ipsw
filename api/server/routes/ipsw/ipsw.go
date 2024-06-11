@@ -18,6 +18,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/gin-gonic/gin"
 )
@@ -67,6 +68,13 @@ func getFsFiles(c *gin.Context) {
 		defer os.Remove(filepath.Clean(dmgs[0]))
 	} else {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+	}
+
+	if filepath.Ext(dmgPath) == ".aea" {
+		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
+		}
 	}
 
 	// mount filesystem DMG

@@ -16,6 +16,7 @@ import (
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
@@ -34,6 +35,13 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 		defer os.Remove(dmgs[0])
 	} else {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+	}
+	if filepath.Ext(dmgPath) == ".aea" {
+		var err error
+		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		if err != nil {
+			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
 	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
