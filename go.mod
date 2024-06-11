@@ -20,6 +20,7 @@ require (
 	github.com/boombuler/barcode v1.0.1
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
+	github.com/cloudflare/circl v1.3.8
 	github.com/docker/docker v26.1.4+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
@@ -87,7 +88,6 @@ require (
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic v1.11.8 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
-	github.com/cloudflare/circl v1.3.8 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect

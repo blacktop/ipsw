@@ -663,6 +663,18 @@ func PkgUtilExpand(src, dst string) (string, error) {
 	return "", fmt.Errorf("only supported on macOS")
 }
 
+func Aea(in, out, key string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
+		cout, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, cout)
+		}
+		return out, nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
 func InstallXCodeSimRuntime(path string) error {
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("xcrun", "simctl", "runtime", "add", path)
