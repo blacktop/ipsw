@@ -112,6 +112,7 @@ type pallasRequest struct {
 
 type ota struct {
 	AssetSetID      string          `plist:"AssetSetId,omitempty" json:"AssetSetId,omitempty"`
+	AssetAudience   string          `plist:"AssetAudience,omitempty" json:"AssetAudience,omitempty"`
 	Assets          []types.Asset   `plist:"Assets,omitempty" json:"Assets,omitempty"`
 	Certificate     []byte          `plist:"Certificate,omitempty"`
 	Signature       []byte          `plist:"Signature,omitempty"`

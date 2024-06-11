@@ -34,6 +34,11 @@ type assetReceipt struct {
 	AssetSignature string `json:"AssetSignature"`
 }
 
+type cryptexSize struct {
+	CryptexSize int    `json:"CryptexSize,omitempty"`
+	CryptexTag  string `json:"CryptexTag,omitempty"`
+}
+
 // Asset is an OTA asset object
 type Asset struct {
 	ActualMinimumSystemPartition          int                `json:"ActualMinimumSystemPartition" plist:"ActualMinimumSystemPartition,omitempty"`
@@ -42,6 +47,7 @@ type Asset struct {
 	BridgeVersionInfo                     bridgeVersionInfo  `json:"BridgeVersionInfo,omitempty" plist:"BridgeVersionInfo,omitempty"`
 	Build                                 string             `json:"Build" plist:"Build,omitempty"`
 	DataTemplateSize                      int                `json:"DataTemplateSize" plist:"DataTemplateSize,omitempty"`
+	EAPFSEnabled                          bool               `json:"EAPFSEnabled,omitempty" plist:"EAPFSEnabled,omitempty"`
 	InstallationSize                      string             `json:"InstallationSize" plist:"InstallationSize,omitempty"`
 	InstallationSizeSnapshot              string             `json:"InstallationSize-Snapshot" plist:"InstallationSize-Snapshot,omitempty"`
 	MinimumSystemPartition                int                `json:"MinimumSystemPartition" plist:"MinimumSystemPartition,omitempty"`
@@ -86,12 +92,19 @@ type Asset struct {
 	QueuingServiceURL                     string             `json:"__QueuingServiceURL" plist:"__QueuingServiceURL,omitempty"`
 	RelativePath                          string             `json:"__RelativePath" plist:"__RelativePath,omitempty"`
 	// extras
-	DeviceName             string `plist:"DeviceName,omitempty"`
-	FirmwareBundle         string `plist:"FirmwareBundle,omitempty"`
-	FirmwareVersionMajor   int    `plist:"FirmwareVersionMajor,omitempty"`
-	FirmwareVersionMinor   int    `plist:"FirmwareVersionMinor,omitempty"`
-	FirmwareVersionRelease int    `plist:"FirmwareVersionRelease,omitempty"`
-	Devices                []string
+	DeviceName                           string `json:"DeviceName,omitempty" plist:"DeviceName,omitempty"`
+	FirmwareBundle                       string `json:"FirmwareBundle,omitempty" plist:"FirmwareBundle,omitempty"`
+	FirmwareVersionMajor                 int    `json:"FirmwareVersionMajor,omitempty" plist:"FirmwareVersionMajor,omitempty"`
+	FirmwareVersionMinor                 int    `json:"FirmwareVersionMinor,omitempty" plist:"FirmwareVersionMinor,omitempty"`
+	FirmwareVersionRelease               int    `json:"FirmwareVersionRelease,omitempty" plist:"FirmwareVersionRelease,omitempty"`
+	Devices                              []string
+	DisablePreSoftwareUpdateAssetStaging bool          `json:"DisablePreSoftwareUpdateAssetStaging,omitempty" plist:"DisablePreSoftwareUpdateAssetStaging,omitempty"`
+	TrainName                            string        `json:"TrainName,omitempty" plist:"TrainName,omitempty"`
+	ArchiveID                            string        `json:"ArchiveID,omitempty" plist:"ArchiveID,omitempty"`
+	AssetFormat                          string        `json:"AssetFormat,omitempty" plist:"AssetFormat,omitempty"`
+	IsEncrypted                          bool          `json:"_IsEncrypted,omitempty" plist:"_IsEncrypted,omitempty"`
+	ArchiveDecryptionKey                 string        `json:"ArchiveDecryptionKey,omitempty" plist:"ArchiveDecryptionKey,omitempty"`
+	CryptexSizeInfo                      []cryptexSize `json:"CryptexSizeInfo,omitempty" plist:"CryptexSizeInfo,omitempty"`
 }
 
 func (a Asset) Version() string {
@@ -110,7 +123,11 @@ func (a Asset) String() string {
 	if len(a.RestoreVersion) > 0 {
 		version = fmt.Sprintf(", version: %s", a.RestoreVersion)
 	}
-	return fmt.Sprintf("name: %s%s, build: %s, os: %s, asset_type: %s%s, devices: %d, models: %d, size: %s, zip: %s",
+	var key string
+	if a.IsEncrypted {
+		key = fmt.Sprintf(", encrypted: %t key: 'base64:%s'", a.IsEncrypted, a.ArchiveDecryptionKey)
+	}
+	return fmt.Sprintf("name: %s%s, build: %s, os: %s, asset_type: %s%s, devices: %d, models: %d, size: %s, zip: %s%s",
 		a.DocumentationID,
 		version,
 		a.Build,
@@ -121,6 +138,7 @@ func (a Asset) String() string {
 		len(a.SupportedDeviceModels),
 		humanize.Bytes(uint64(a.UnarchivedSize)),
 		filepath.Base(a.RelativePath),
+		key,
 	)
 }
 

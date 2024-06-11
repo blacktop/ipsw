@@ -343,12 +343,17 @@ var otaDLCmd = &cobra.Command{
 		if cont {
 			if remoteDyld || remoteKernel || len(remotePattern) > 0 {
 				for _, o := range otas {
-					log.WithFields(log.Fields{
+					fields := log.Fields{
 						"version": o.OSVersion,
 						"build":   o.Build,
 						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices, " "), len(o.SupportedDevices)),
 						"model":   strings.Join(o.SupportedDeviceModels, " "),
-					}).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
+					}
+					if o.IsEncrypted {
+						fields["encrypted"] = true
+						fields["key"] = o.ArchiveDecryptionKey
+					}
+					log.WithFields(fields).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
 
 					config := &extract.Config{
 						URL:          o.BaseURL + o.RelativePath,
@@ -421,12 +426,17 @@ var otaDLCmd = &cobra.Command{
 					}
 					destName := filepath.Join(folder, fmt.Sprintf("%s%s_%s", isRSR, devices, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
-						log.WithFields(log.Fields{
+						fields := log.Fields{
 							"device": strings.Join(o.SupportedDevices, " "),
 							"model":  strings.Join(o.SupportedDeviceModels, " "),
 							"build":  o.Build,
 							"type":   o.DocumentationID,
-						}).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
+						}
+						if o.IsEncrypted {
+							fields["encrypted"] = true
+							fields["key"] = o.ArchiveDecryptionKey
+						}
+						log.WithFields(fields).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
 						// download file
 						downloader.URL = url
 						downloader.DestName = destName
