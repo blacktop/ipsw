@@ -112,11 +112,11 @@ func Parse(in, out string, privKey []byte) (string, error) {
 	block, _ := pem.Decode(privKey)
 	parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return fmt.Errorf("createToken: failed to parse p8 key: %v", err)
+		return "", fmt.Errorf("createToken: failed to parse p8 key: %v", err)
 	}
 	pkey, ok := parsedKey.(*ecdsa.PrivateKey)
 	if !ok {
-		return fmt.Errorf("createToken: AuthKey must be of type ecdsa.PrivateKey")
+		return "", fmt.Errorf("createToken: AuthKey must be of type ecdsa.PrivateKey")
 	}
 	privateKey, err := kemID.Scheme().UnmarshalBinaryPrivateKey(pkey.D.Bytes())
 	if err != nil {
