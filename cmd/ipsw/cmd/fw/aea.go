@@ -30,6 +30,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTES: key-val is 32 bytes or 64 char hex string
+
 func init() {
 	FwCmd.AddCommand(aeaCmd)
 
