@@ -2,11 +2,10 @@ package aea
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/ecdsa"
 	"crypto/x509"
-	"path"
-
-	// _ "embed"
+	_ "embed"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -17,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -24,8 +24,8 @@ import (
 	"github.com/cloudflare/circl/hpke"
 )
 
-// //go:embed data/keys.gz
-// var keyData []byte
+//go:embed data/fcs-keys.gz
+var keyData []byte
 
 type Header struct {
 	Magic   [4]byte // AEA1
@@ -38,23 +38,23 @@ type fcsResponse struct {
 	WrappedKey string `json:"wrapped-key,omitempty"`
 }
 
-// type Keys map[string][]byte
+type Keys map[string][]byte
 
-// func getKeys() (*Keys, error) {
-// 	var keys Keys
+func getKeys() (Keys, error) {
+	var keys Keys
 
-// 	zr, err := gzip.NewReader(bytes.NewReader(keyData))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer zr.Close()
+	zr, err := gzip.NewReader(bytes.NewReader(keyData))
+	if err != nil {
+		return nil, err
+	}
+	defer zr.Close()
 
-// 	if err := json.NewDecoder(zr).Decode(&keys); err != nil {
-// 		return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
-// 	}
+	if err := json.NewDecoder(zr).Decode(&keys); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
+	}
 
-// 	return &keys, nil
-// }
+	return keys, nil
+}
 
 type PrivateKey []byte
 
@@ -84,6 +84,20 @@ func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
 	privKeyURL, ok := md["com.apple.wkms.fcs-key-url"]
 	if !ok {
 		return nil, fmt.Errorf("fcs-key-url key NOT found")
+	}
+
+	// check if keys are already loaded
+	if keys, err := getKeys(); err == nil {
+		u, err := url.Parse(string(privKeyURL))
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range keys {
+			if strings.EqualFold(k, path.Base(u.Path)) {
+				out[k] = PrivateKey(v)
+				return out, nil
+			}
+		}
 	}
 
 	resp, err := http.Get(string(privKeyURL))
