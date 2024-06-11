@@ -100,7 +100,7 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
-		extractedDMG, err = aea.Parse(extractedDMG, filepath.Dir(extractedDMG), nil)
+		extractedDMG, err = aea.Decrypt(extractedDMG, filepath.Dir(extractedDMG), nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

@@ -115,7 +115,7 @@ var sbDiffCmd = &cobra.Command{
 				}
 
 				if filepath.Ext(dmgPath) == ".aea" {
-					dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+					dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
 					if err != nil {
 						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 					}

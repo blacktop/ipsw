@@ -38,7 +38,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 	}
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
