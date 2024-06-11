@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -492,6 +495,113 @@ func Keybags(c *Config) (fname string, err error) {
 	}
 
 	return
+}
+
+// FcsKeys extracts the AEA1 DMG fsc-keys from an IPSW
+func FcsKeys(c *Config) ([]string, error) {
+	if len(c.IPSW) == 0 && len(c.URL) == 0 {
+		return nil, fmt.Errorf("no IPSW or URL provided")
+	}
+
+	var artifacts []string
+
+	var err error
+	var i *info.Info
+	var folder string
+	var zr *zip.Reader
+
+	if len(c.IPSW) > 0 {
+		i, folder, err = getFolder(c)
+		if err != nil {
+			return nil, err
+		}
+		f, err := os.Open(filepath.Clean(c.IPSW))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IPSW: %v", err)
+		}
+		defer f.Close()
+		finfo, err := f.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat IPSW: %v", err)
+		}
+		zr, err = zip.NewReader(f, finfo.Size())
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IPSW: %v", err)
+		}
+	} else if len(c.URL) > 0 {
+		if !isURL(c.URL) {
+			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
+		}
+		i, zr, folder, err = getRemoteFolder(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var dmgPaths []string
+	dmgPath, err := i.GetSystemOsDmg()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %v", err)
+	}
+	dmgPaths = append(dmgPaths, dmgPath)
+	dmgPath, err = i.GetFileSystemOsDmg()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
+	}
+	dmgPaths = append(dmgPaths, dmgPath)
+
+	for _, dmgPath := range dmgPaths {
+		if filepath.Ext(dmgPath) != ".aea" {
+			return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmgPath))
+		}
+
+		out, err := utils.SearchPartialZip(zr.File, regexp.MustCompile(dmgPath+`$`), os.TempDir(), 0x1000, false, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract fcs-keys from DMG: %v", err)
+		}
+		defer func() {
+			for _, f := range out {
+				os.Remove(f)
+			}
+		}()
+
+		for _, f := range out {
+			metadata, err := aea.Info(filepath.Clean(f))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
+			}
+			privKeyURL, ok := metadata["com.apple.wkms.fcs-key-url"]
+			if !ok {
+				return nil, fmt.Errorf("no private key URL found")
+			}
+
+			// TODO: make a client w/ proxy support etc
+			resp, err := http.Get(string(privKeyURL))
+			if err != nil {
+				return nil, err
+			}
+			defer resp.Body.Close()
+
+			privKey, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+
+			fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
+
+			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+			}
+
+			if err := os.WriteFile(fname, privKey, 0o644); err != nil {
+				return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
+			}
+
+			artifacts = append(artifacts, fname)
+		}
+	}
+
+	return artifacts, nil
 }
 
 // Search searches for files matching a pattern in an IPSW

@@ -604,7 +604,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Parse(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

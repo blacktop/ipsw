@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/x509"
+
+	// _ "embed"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -19,6 +21,9 @@ import (
 
 	"github.com/cloudflare/circl/hpke"
 )
+
+// //go:embed data/keys.gz
+// var keyData []byte
 
 type Header struct {
 	Magic   [4]byte // AEA1
@@ -42,6 +47,24 @@ func aea(in, out, key string) (string, error) {
 	}
 	return "", fmt.Errorf("only supported on macOS")
 }
+
+// type Keys map[string][]byte
+
+// func getKeys() (*Keys, error) {
+// 	var keys Keys
+
+// 	zr, err := gzip.NewReader(bytes.NewReader(keyData))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer zr.Close()
+
+// 	if err := json.NewDecoder(zr).Decode(&keys); err != nil {
+// 		return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
+// 	}
+
+// 	return &keys, nil
+// }
 
 func Info(in string) (map[string][]byte, error) {
 	f, err := os.Open(in)

@@ -47,6 +47,7 @@ func init() {
 	extractCmd.Flags().Bool("sptm", false, "Extract SPTM and TXM Firmwares")
 	extractCmd.Flags().BoolP("exclave", "x", false, "Extract Exclave Bundle")
 	extractCmd.Flags().Bool("kbag", false, "Extract Im4p Keybags")
+	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 DMG fcs-key pem files")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
@@ -77,6 +78,7 @@ func init() {
 	viper.BindPFlag("extract.sptm", extractCmd.Flags().Lookup("sptm"))
 	viper.BindPFlag("extract.exclave", extractCmd.Flags().Lookup("exclave"))
 	viper.BindPFlag("extract.kbag", extractCmd.Flags().Lookup("kbag"))
+	viper.BindPFlag("extract.fcs-key", extractCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("extract.sys-ver", extractCmd.Flags().Lookup("sys-ver"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
@@ -108,7 +110,7 @@ var extractCmd = &cobra.Command{
 		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && !viper.IsSet("extract.dmg") &&
 			!viper.GetBool("extract.dtree") && !viper.GetBool("extract.iboot") && !viper.GetBool("extract.sep") &&
 			!viper.GetBool("extract.sptm") && !viper.GetBool("extract.kbag") && !viper.GetBool("extract.sys-ver") &&
-			!viper.GetBool("extract.exclave") && len(viper.GetString("extract.pattern")) == 0 {
+			!viper.GetBool("extract.exclave") && len(viper.GetString("extract.pattern")) == 0 && !viper.GetBool("extract.fcs-key") {
 			return fmt.Errorf("must specify at least one flag to specify what to extract")
 		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--dyld-arch or -a can only be used with --dyld or -d")
@@ -334,6 +336,21 @@ var extractCmd = &cobra.Command{
 			} else {
 				if len(out) > 0 {
 					utils.Indent(log.Info, 2)("Created " + out)
+				}
+			}
+		}
+
+		if viper.GetBool("extract.fcs-key") {
+			log.Info("Extracting AEA1 DMG fcs-keys")
+			out, err := extract.FcsKeys(config)
+			if err != nil {
+				return err
+			}
+			if viper.GetBool("extract.json") {
+				fmt.Println(out)
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
 				}
 			}
 		}

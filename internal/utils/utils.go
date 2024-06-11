@@ -265,6 +265,96 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 	return artifacts, nil
 }
 
+// SearchPartialZip searches for files in a zip.Reader and returns a byte slice of the file
+func SearchPartialZip(files []*zip.File, pattern *regexp.Regexp, folder string, size int64, flat, progress bool) ([]string, error) {
+	var fname string
+	var artifacts []string
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %v", err)
+	}
+
+	found := false
+	for _, f := range files {
+		if pattern.MatchString(f.Name) {
+			if f.FileInfo().IsDir() {
+				continue
+			}
+			found = true
+			if flat {
+				fname = filepath.Join(folder, filepath.Base(f.Name))
+			} else {
+				fname = filepath.Join(folder, filepath.Clean(f.Name))
+			}
+
+			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+			}
+
+			var r io.ReadCloser
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				rc, err := f.Open()
+				if err != nil {
+					return nil, fmt.Errorf("error opening remote zipped file %s: %v", f.Name, err)
+				}
+				defer rc.Close()
+
+				var p *mpb.Progress
+				if progress {
+					// setup progress bar
+					var total = int64(size)
+					p = mpb.New(
+						mpb.WithWidth(60),
+						mpb.WithRefreshRate(180*time.Millisecond),
+					)
+					bar := p.New(total,
+						mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
+						mpb.PrependDecorators(
+							decor.CountersKibiByte("\t% .2f / % .2f"),
+						),
+						mpb.AppendDecorators(
+							decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+							decor.Name(" ] "),
+							decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
+						),
+					)
+					// create proxy reader
+					r = bar.ProxyReader(io.LimitReader(rc, total))
+					defer r.Close()
+				} else {
+					r = rc
+				}
+
+				Indent(log.Debug, 2)(fmt.Sprintf("Extracting %#x bytes of %s", size, strings.TrimPrefix(fname, cwd)))
+				out, err := os.Create(fname)
+				if err != nil {
+					return nil, fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)
+				}
+				defer out.Close()
+
+				io.CopyN(out, r, size)
+
+				if progress {
+					// wait for our bar to complete and flush and close remote zip and temp file
+					p.Wait()
+				}
+
+				artifacts = append(artifacts, fname)
+			} else {
+				Indent(log.Warn, 2)(fmt.Sprintf("%s already exists", fname))
+				artifacts = append(artifacts, fname)
+			}
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("no files found matching %s", pattern.String())
+	}
+
+	return artifacts, nil
+}
+
 // Unzip - https://stackoverflow.com/a/24792688
 func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
