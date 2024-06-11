@@ -23,8 +23,10 @@ package fw
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -43,11 +45,13 @@ func init() {
 	FwCmd.AddCommand(aeaCmd)
 
 	aeaCmd.Flags().BoolP("info", "i", false, "Print info")
-	aeaCmd.Flags().StringP("key", "k", "", "AEA private_key.pem file")
+	aeaCmd.Flags().BoolP("key", "k", false, "Get private key JSON")
+	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
-	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("output"))
+	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
+	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
 }
 
@@ -65,8 +69,9 @@ var aeaCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
+		keyJSON := viper.GetBool("fw.aea.key")
 		showInfo := viper.GetBool("fw.aea.info")
-		privateKey := viper.GetString("fw.aea.key")
+		pemFile := viper.GetString("fw.aea.pem")
 		output := viper.GetString("fw.aea.output")
 
 		var bold = color.New(color.Bold).SprintFunc()
@@ -91,18 +96,42 @@ var aeaCmd = &cobra.Command{
 					}
 				}
 			}
-		} else {
-			if privateKey == "" {
-				key, err = os.ReadFile(privateKey)
-				if err != nil {
-					return err
+		} else if keyJSON {
+			metadata, err := aea.Info(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA: %v", err)
+			}
+			pkmap, err := metadata.GetPrivateKey(nil)
+			if err != nil {
+				return fmt.Errorf("failed to get private key: %v", err)
+			}
+			data, err := json.Marshal(pkmap)
+			if err != nil {
+				return fmt.Errorf("failed to marshal private key: %v", err)
+			}
+			if err := os.MkdirAll(output, 0o750); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
+			fname := filepath.Join(output, "private_key.json")
+			log.Infof("Created %s", fname)
+			if err := os.WriteFile(fname, data, 0o644); err != nil {
+				return fmt.Errorf("failed to write private key to file: %v", err)
+			}
+			if viper.GetBool("color") && !viper.GetBool("no-color") {
+				if err := quick.Highlight(os.Stdout, string(data)+"\n\n", "json", "terminal256", "nord"); err != nil {
+					return fmt.Errorf("failed to highlight json: %v", err)
 				}
 			}
-
-			if err := os.MkdirAll(output, 0o750); err != nil {
-				return err
+		} else {
+			if pemFile == "" {
+				key, err = os.ReadFile(pemFile)
+				if err != nil {
+					return fmt.Errorf("failed to read pem file: %v", err)
+				}
 			}
-
+			if err := os.MkdirAll(output, 0o750); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
 			out, err := aea.Decrypt(args[0], output, key)
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
