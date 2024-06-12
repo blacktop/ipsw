@@ -64,6 +64,9 @@ const (
 	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
+	// XCode Simulator
+	iOsSimulatorUpdate     assetType = "com.apple.MobileAsset.iOSSimulatorRuntime"
+	watchOsSimulatorUpdate assetType = "com.apple.MobileAsset.watchOSSimulatorRuntime"
 )
 
 // Ota is an OTA object
