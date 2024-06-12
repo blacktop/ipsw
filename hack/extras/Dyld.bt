@@ -166,8 +166,8 @@ typedef struct
     uint64 cacheAtlasSize;       // size of embedded cache atlas
     uint64 dynamicDataOffset;    // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
     uint64 dynamicDataMaxSize;   // maximum size of space reserved from dynamic dataz
-    uint32 imageNamesOffset;     // offset to start of image names
-    uint32 unknown_1;            // new field added in iOS 18 beta1 (I've only seen this be 1 on iOS)
+    uint32 tProMappingOffset;    // file offset to TPRO mappings  NEW in iOS 18.0 beta1 (hi mrmacete :P)
+    uint32 tProMappingCount;     // TPRO mappings count           NEW in iOS 18.0 beta1 (is 1 for now)
 } dyld_cache_header;
 
 typedef struct
@@ -472,7 +472,7 @@ typedef struct
 
 if (header.subCacheArrayOffset > 0 && header.subCacheArrayCount > 0)
 {
-    if (header.cacheType == 2)
+    if (header.mappingOffset >= 0x200)
     {
         FSeek(header.subCacheArrayOffset);
         dyld_subcache_entry_pagein_link info[header.subCacheArrayCount];
@@ -484,6 +484,17 @@ if (header.subCacheArrayOffset > 0 && header.subCacheArrayCount > 0)
     }
 }
 
+typedef struct
+{
+    uint64 address;
+    uint64 size;
+} tpro_mapping<bgcolor = cLtBlue>;
+
+if (header.mappingOffset >= 0x208)
+{
+    FSeek(header.tProMappingOffset);
+    tpro_mapping tproMappings[header.tProMappingCount];
+}
 // FSeek(header.codeSignatureOffset);
 // if (header.codeSignatureSize > 0)
 // {

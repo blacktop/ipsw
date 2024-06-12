@@ -82,6 +82,7 @@ type File struct {
 	IsDyld4         bool
 	symCacheLoaded  bool
 	SubCacheInfo    []SubcacheEntry
+	TPROMappings    []TPROMapping
 	symUUID         mtypes.UUID
 	dyldImageAddr   uint64
 	dyldStartFnAddr uint64
@@ -391,6 +392,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			} else if cxmInfo.MaxProt.Write() {
 				if cm.Flags.IsAuthData() {
 					cm.Name = "__AUTH"
+				} else if cm.Flags.IsTPRO() {
+					cm.Name = "__TPRO"
 				} else {
 					cm.Name = "__DATA"
 				}
@@ -654,6 +657,15 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 				f.SubCacheInfo[idx].UUID = scinfo.UUID
 				f.SubCacheInfo[idx].CacheVMOffset = scinfo.CacheVMOffset
 			}
+		}
+	}
+
+	if f.Headers[uuid].MappingOffset >= 0x208 {
+		// read TPRO mapping info
+		sr.Seek(int64(f.Headers[uuid].TPROMappingOffset), io.SeekStart)
+		f.TPROMappings = make([]TPROMapping, f.Headers[uuid].TPROMappingCount)
+		if err := binary.Read(sr, f.ByteOrder, f.TPROMappings); err != nil {
+			return fmt.Errorf("failed to read DSC TPRO mappings (new in iOS18.0beta1): %v", err)
 		}
 	}
 
