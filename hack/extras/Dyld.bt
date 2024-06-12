@@ -166,6 +166,8 @@ typedef struct
     uint64 cacheAtlasSize;       // size of embedded cache atlas
     uint64 dynamicDataOffset;    // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
     uint64 dynamicDataMaxSize;   // maximum size of space reserved from dynamic dataz
+    uint32 imageNamesOffset;     // offset to start of image names
+    uint32 unknown_1;            // new field added in iOS 18 beta1 (I've only seen this be 1 on iOS)
 } dyld_cache_header;
 
 typedef struct
