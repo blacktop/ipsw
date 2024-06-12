@@ -191,7 +191,8 @@ type CacheHeader struct {
 	CacheAtlasSize                uint64         // size of embedded cache atlas
 	DynamicDataOffset             uint64         // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
 	DynamicDataMaxSize            uint64         // maximum size of space reserved from dynamic data
-	Unknown                       uint64         // NEW in iOS 18.0 beta1
+	ImageNamesOffset              uint32         // offset to start of image names (right about sub cache info entries) NEW in iOS 18.0 beta1
+	Unknown                       uint32         // NEW in iOS 18.0 beta1 (is 1)
 }
 
 type CacheMappingInfo struct {
