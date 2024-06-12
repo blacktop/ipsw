@@ -123,7 +123,7 @@ var aeaCmd = &cobra.Command{
 				}
 			}
 		} else {
-			if pemFile == "" {
+			if pemFile != "" {
 				key, err = os.ReadFile(pemFile)
 				if err != nil {
 					return fmt.Errorf("failed to read pem file: %v", err)
