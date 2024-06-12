@@ -120,6 +120,62 @@ func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
 	return out, nil
 }
 
+func (md Metadata) DecryptFCS(pemData []byte) (string, error) {
+	ddata, ok := md["com.apple.wkms.fcs-response"]
+	if !ok {
+		return "", fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
+	}
+	var fcsResp fcsResponse
+	if err := json.Unmarshal(ddata, &fcsResp); err != nil {
+		return "", err
+	}
+	encRequestData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.EncRequest)
+	if err != nil {
+		return "", err
+	}
+	wrappedKeyData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.WrappedKey)
+	if err != nil {
+		return "", err
+	}
+
+	pkmap, err := md.GetPrivateKey(pemData)
+	if err != nil {
+		return "", err
+	}
+	var privKey []byte
+	for _, pk := range pkmap {
+		privKey, err = pk.UnmarshalBinaryPrivateKey()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	kemID := hpke.KEM_P256_HKDF_SHA256
+	kdfID := hpke.KDF_HKDF_SHA256
+	aeadID := hpke.AEAD_AES256GCM
+
+	suite := hpke.NewSuite(kemID, kdfID, aeadID)
+
+	privateKey, err := kemID.Scheme().UnmarshalBinaryPrivateKey(privKey)
+	if err != nil {
+		return "", err
+	}
+	recv, err := suite.NewReceiver(privateKey, nil)
+	if err != nil {
+		return "", err
+	}
+	opener, err := recv.Setup(encRequestData)
+	if err != nil {
+		return "", err
+	}
+	wkey, err := opener.Open(wrappedKeyData, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(wkey), nil
+}
+
 func Info(in string) (Metadata, error) {
 	var metadata Metadata
 	f, err := os.Open(in)
@@ -172,59 +228,12 @@ func Decrypt(in, out string, privKeyData []byte) (string, error) {
 		return "", fmt.Errorf("failed to parse AEA: %v", err)
 	}
 
-	ddata, ok := metadata["com.apple.wkms.fcs-response"]
-	if !ok {
-		return "", fmt.Errorf("no fcs response found")
-	}
-	var fcsResp fcsResponse
-	if err := json.Unmarshal(ddata, &fcsResp); err != nil {
-		return "", err
-	}
-	encRequestData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.EncRequest)
+	wkey, err := metadata.DecryptFCS(privKeyData)
 	if err != nil {
-		return "", err
-	}
-	wrappedKeyData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.WrappedKey)
-	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 	}
 
-	pkmap, err := metadata.GetPrivateKey(privKeyData)
-	if err != nil {
-		return "", err
-	}
-	var privKey []byte
-	for _, pk := range pkmap {
-		privKey, err = pk.UnmarshalBinaryPrivateKey()
-		if err != nil {
-			return "", err
-		}
-	}
-
-	kemID := hpke.KEM_P256_HKDF_SHA256
-	kdfID := hpke.KDF_HKDF_SHA256
-	aeadID := hpke.AEAD_AES256GCM
-
-	suite := hpke.NewSuite(kemID, kdfID, aeadID)
-
-	privateKey, err := kemID.Scheme().UnmarshalBinaryPrivateKey(privKey)
-	if err != nil {
-		return "", err
-	}
-	recv, err := suite.NewReceiver(privateKey, nil)
-	if err != nil {
-		return "", err
-	}
-	opener, err := recv.Setup(encRequestData)
-	if err != nil {
-		return "", err
-	}
-	wkey, err := opener.Open(wrappedKeyData, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), base64.StdEncoding.EncodeToString(wkey))
+	return aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), wkey)
 }
 
 func aea(in, out, key string) (string, error) {
@@ -236,5 +245,5 @@ func aea(in, out, key string) (string, error) {
 		}
 		return out, nil
 	}
-	return "", fmt.Errorf("only supported on macOS")
+	return "", fmt.Errorf("only supported on macOS (due to `aea` binary requirement)")
 }

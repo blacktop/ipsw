@@ -45,7 +45,8 @@ func init() {
 	FwCmd.AddCommand(aeaCmd)
 
 	aeaCmd.Flags().BoolP("info", "i", false, "Print info")
-	aeaCmd.Flags().BoolP("key", "k", false, "Get private key JSON")
+	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
+	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
@@ -61,7 +62,7 @@ var aeaCmd = &cobra.Command{
 	Short: "Parse ANE1 DMGs",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		var key []byte
+		var pemData []byte
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -69,7 +70,8 @@ var aeaCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
-		keyJSON := viper.GetBool("fw.aea.key")
+		fcsKey := viper.GetBool("fw.aea.fcs-key")
+		adKey := viper.GetBool("fw.aea.key")
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
 		output := viper.GetString("fw.aea.output")
@@ -96,7 +98,7 @@ var aeaCmd = &cobra.Command{
 					}
 				}
 			}
-		} else if keyJSON {
+		} else if fcsKey {
 			metadata, err := aea.Info(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
@@ -122,9 +124,25 @@ var aeaCmd = &cobra.Command{
 					return fmt.Errorf("failed to highlight json: %v", err)
 				}
 			}
+		} else if adKey {
+			if pemFile != "" {
+				pemData, err = os.ReadFile(pemFile)
+				if err != nil {
+					return fmt.Errorf("failed to read pem file: %v", err)
+				}
+			}
+			metadata, err := aea.Info(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA: %v", err)
+			}
+			wkey, err := metadata.DecryptFCS(pemData)
+			if err != nil {
+				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
+			}
+			fmt.Printf("base64:%s\n", wkey)
 		} else {
 			if pemFile != "" {
-				key, err = os.ReadFile(pemFile)
+				pemData, err = os.ReadFile(pemFile)
 				if err != nil {
 					return fmt.Errorf("failed to read pem file: %v", err)
 				}
@@ -132,7 +150,7 @@ var aeaCmd = &cobra.Command{
 			if err := os.MkdirAll(output, 0o750); err != nil {
 				return fmt.Errorf("failed to create output directory: %v", err)
 			}
-			out, err := aea.Decrypt(args[0], output, key)
+			out, err := aea.Decrypt(args[0], output, pemData)
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
