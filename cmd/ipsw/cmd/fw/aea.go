@@ -50,7 +50,9 @@ func init() {
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
+	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.aea.fcs-key", aeaCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
@@ -75,8 +77,18 @@ var aeaCmd = &cobra.Command{
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
 		output := viper.GetString("fw.aea.output")
+		// validate flags
+		if (adKey || showInfo) && output != "" {
+			return fmt.Errorf("--output flag is not valid with --info or --key flags")
+		}
 
 		var bold = color.New(color.Bold).SprintFunc()
+
+		if output != "" {
+			if err := os.MkdirAll(output, 0o750); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
+		}
 
 		if showInfo {
 			metadata, err := aea.Info(args[0])
@@ -111,9 +123,6 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to marshal private key: %v", err)
 			}
-			if err := os.MkdirAll(output, 0o750); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
-			}
 			fname := filepath.Join(output, "fcs-keys.json")
 			log.Infof("Created %s", fname)
 			if err := os.WriteFile(fname, data, 0o644); err != nil {
@@ -146,9 +155,6 @@ var aeaCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to read pem file: %v", err)
 				}
-			}
-			if err := os.MkdirAll(output, 0o750); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
 			}
 			out, err := aea.Decrypt(args[0], output, pemData)
 			if err != nil {
