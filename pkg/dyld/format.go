@@ -159,9 +159,15 @@ func (mappings cacheMappingsWithSlideInfo) String(slideVersion uint32, verbose b
 	for _, mapping := range mappings {
 		mappingAddr := fmt.Sprintf("%#08x", mapping.Address)
 		mappingOff := fmt.Sprintf("%#08x", mapping.FileOffset)
+		mappingInitProt := mapping.InitProt.String()
+		mappingMaxProt := mapping.MaxProt.String()
+		mappingFlags := mapping.Flags.String()
 		if verbose {
 			mappingAddr = fmt.Sprintf("%#08x -> %#08x", mapping.Address, mapping.Address+mapping.Size)
 			mappingOff = fmt.Sprintf("%#08x -> %#08x", mapping.FileOffset, mapping.FileOffset+mapping.Size)
+			mappingInitProt += fmt.Sprintf(" (%d)", mapping.InitProt)
+			mappingMaxProt += fmt.Sprintf(" (%d)", mapping.MaxProt)
+			mappingFlags += fmt.Sprintf(" (%d)", mapping.Flags)
 		}
 		var slideInfoSize string
 		if mapping.SlideInfoSize > 0 {
@@ -169,13 +175,13 @@ func (mappings cacheMappingsWithSlideInfo) String(slideVersion uint32, verbose b
 		}
 		mdata = append(mdata, []string{
 			mapping.Name,
-			mapping.InitProt.String(),
-			mapping.MaxProt.String(),
+			mappingInitProt,
+			mappingMaxProt,
 			fmt.Sprintf("%#08x (%s)", mapping.Size, humanize.Bytes(mapping.Size)),
 			mappingAddr,
 			mappingOff,
 			slideInfoSize,
-			fmt.Sprintf("%d", mapping.Flags),
+			mappingFlags,
 		})
 	}
 	table := tablewriter.NewWriter(tableString)
