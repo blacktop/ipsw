@@ -212,8 +212,8 @@ const (
 	DYLD_CACHE_MAPPING_CONST_DATA  CacheMappingFlag = 1 << 2
 	DYLD_CACHE_MAPPING_TEXT_STUBS  CacheMappingFlag = 1 << 3
 	DYLD_CACHE_DYNAMIC_CONFIG_DATA CacheMappingFlag = 1 << 4
-	DYLD_CACHE_DYNAMIC_UNKNOWN     CacheMappingFlag = 1 << 5
-	DYLD_CACHE_DYNAMIC_TPRO        CacheMappingFlag = 1 << 6
+	DYLD_CACHE_MAPPING_UNKNOWN     CacheMappingFlag = 1 << 5
+	DYLD_CACHE_MAPPING_TPRO        CacheMappingFlag = 1 << 6
 )
 
 func (f CacheMappingFlag) IsNone() bool {
@@ -235,10 +235,10 @@ func (f CacheMappingFlag) IsConfigData() bool {
 	return (f & DYLD_CACHE_DYNAMIC_CONFIG_DATA) != 0
 }
 func (f CacheMappingFlag) IsUnknown() bool {
-	return (f & DYLD_CACHE_DYNAMIC_UNKNOWN) != 0
+	return (f & DYLD_CACHE_MAPPING_UNKNOWN) != 0
 }
 func (f CacheMappingFlag) IsTPRO() bool {
-	return (f & DYLD_CACHE_DYNAMIC_TPRO) != 0
+	return (f & DYLD_CACHE_MAPPING_TPRO) != 0
 }
 func (f CacheMappingFlag) String() string {
 	var fStr []string
