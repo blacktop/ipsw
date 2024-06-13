@@ -238,7 +238,7 @@ func Decrypt(in, out string, privKeyData []byte) (string, error) {
 
 func aea(in, out, key string) (string, error) {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
+		cmd := exec.Command("/usr/bin/aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
 		cout, err := cmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("%v: %s", err, cout)
