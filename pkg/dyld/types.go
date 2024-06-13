@@ -587,8 +587,6 @@ func (i CacheSlideInfo5) GetPageSize() uint32 {
 func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
 	if ptr == 0 {
 		return 0
-	} else if (ptr & 0xFFF0_0000_0000_0000) == 0 {
-		return ptr
 	}
 	pointer := CacheSlidePointer5(ptr)
 	if pointer.Authenticated() {
