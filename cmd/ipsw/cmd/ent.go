@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -43,7 +44,6 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 )
 
 var colorBin = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
@@ -56,11 +56,12 @@ func init() {
 	entCmd.Flags().StringArray("ipsw", []string{}, "IPSWs to analyze")
 	entCmd.Flags().StringArray("input", []string{}, "Folders of MachOs to analyze")
 	entCmd.MarkFlagDirname("input")
-	entCmd.Flags().StringP("key", "k", "", "Entitlement KEY to search for")
-	entCmd.Flags().StringP("val", "v", "", "Entitlement VALUE to search for (i.e. <array> strings)")
+	entCmd.Flags().StringP("key", "k", "", "Entitlement KEY regex to search for")
+	entCmd.Flags().StringP("val", "v", "", "Entitlement VALUE regex to search for (i.e. <array> strings)")
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO as plist")
 	entCmd.Flags().String("db", "", "Folder to r/w entitlement databases")
 	entCmd.MarkFlagDirname("db")
+	entCmd.Flags().Bool("file-only", false, "Only output the file path of matches")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
 	entCmd.Flags().Bool("ui", false, "Show entitlements UI")
@@ -70,6 +71,7 @@ func init() {
 	viper.BindPFlag("ent.val", entCmd.Flags().Lookup("val"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
 	viper.BindPFlag("ent.db", entCmd.Flags().Lookup("db"))
+	viper.BindPFlag("ent.file-only", entCmd.Flags().Lookup("file-only"))
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("ent.md", entCmd.Flags().Lookup("md"))
 	viper.BindPFlag("ent.ui", entCmd.Flags().Lookup("ui"))
@@ -105,7 +107,6 @@ var entCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		ipsws := viper.GetStringSlice("ent.ipsw")
@@ -114,6 +115,7 @@ var entCmd = &cobra.Command{
 		entitlementKey := viper.GetString("ent.key")
 		entitlementValue := viper.GetString("ent.val")
 		searchFile := viper.GetString("ent.file")
+		onlyFiles := viper.GetBool("ent.file-only")
 		doDiff := viper.GetBool("ent.diff")
 		markdown := viper.GetBool("ent.md")
 		showUI := viper.GetBool("ent.ui")
@@ -121,6 +123,7 @@ var entCmd = &cobra.Command{
 		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
 		}
+		color.NoColor = viper.GetBool("no-color") || onlyFiles
 
 		if len(dbFolder) > 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			// search preprocessed entitlement databases
@@ -222,37 +225,63 @@ var entCmd = &cobra.Command{
 			}
 			return nil
 		} else if len(entitlementKey) > 0 { // FIND ALL FILES WITH ENTITLEMENT KEY
-			log.Infof("Files containing entitlement: %s", entitlementKey)
-			fmt.Println()
+			re, err := regexp.Compile(entitlementKey)
+			if err != nil {
+				return fmt.Errorf("failed to compile regex '%s': %v", entitlementKey, err)
+			}
+			if !onlyFiles {
+				log.Infof("Files matching entitlement: %s", entitlementKey)
+				fmt.Println()
+			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, entDB := range entDBs {
 				for f, ent := range entDB {
-					if strings.Contains(ent, entitlementKey) {
+					if re.MatchString(ent) {
 						ents := make(map[string]any)
 						if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
 							return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
 						}
 						for k, v := range ents {
-							if strings.Contains(k, entitlementKey) {
+							if re.MatchString(k) {
 								switch v := v.(type) {
 								case bool:
 									if v {
-										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										if onlyFiles {
+											fmt.Fprintf(w, "%s\n", colorBin(f))
+										} else {
+											fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										}
 									}
 								case uint64:
-									fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
+									if onlyFiles {
+										fmt.Fprintf(w, "%s\n", colorBin(f))
+									} else {
+										fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
+									}
 								case string:
-									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-									fmt.Fprintf(w, " - %s\n", colorValue(v))
+									if onlyFiles {
+										fmt.Fprintf(w, "%s\n", colorBin(f))
+									} else {
+										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										fmt.Fprintf(w, " - %s\n", colorValue(v))
+									}
 								case []any:
-									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-									for _, i := range v {
-										fmt.Fprintf(w, " - %v\n", colorValue(i))
+									if onlyFiles {
+										fmt.Fprintf(w, "%s\n", colorBin(f))
+									} else {
+										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										for _, i := range v {
+											fmt.Fprintf(w, " - %v\n", colorValue(i))
+										}
 									}
 								case map[string]any:
-									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-									for kk, vv := range v {
-										fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+									if onlyFiles {
+										fmt.Fprintf(w, "%s\n", colorBin(f))
+									} else {
+										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										for kk, vv := range v {
+											fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+										}
 									}
 								default:
 									log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
@@ -264,8 +293,14 @@ var entCmd = &cobra.Command{
 			}
 			w.Flush()
 		} else if len(entitlementValue) > 0 { // FIND ALL FILES WITH ENTITLEMENT VALUE
-			log.Infof("Files containing entitlement value: %s", entitlementValue)
-			fmt.Println()
+			re, err := regexp.Compile(entitlementValue)
+			if err != nil {
+				return fmt.Errorf("failed to compile regex '%s': %v", entitlementValue, err)
+			}
+			if !onlyFiles {
+				log.Infof("Files matching entitlement value: %s", entitlementValue)
+				fmt.Println()
+			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, entDB := range entDBs {
 				for f, ent := range entDB {
@@ -280,22 +315,48 @@ var entCmd = &cobra.Command{
 						case uint64:
 							continue // skip uint64 (prob too noisy)
 						case string:
-							if strings.Contains(v, entitlementValue) {
-								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-								fmt.Fprintf(w, " - %s\n", colorValue(v))
+							if re.MatchString(v) {
+								if onlyFiles {
+									fmt.Fprintf(w, "%s\n", colorBin(f))
+								} else {
+									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									fmt.Fprintf(w, " - %s\n", colorValue(v))
+								}
 							}
 						case []any:
-							if slices.Contains(v, any(entitlementValue)) {
-								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-								for _, i := range v {
-									fmt.Fprintf(w, " - %v\n", colorValue(i))
+							for _, i := range v {
+								if iStr, ok := i.(string); ok {
+									if re.MatchString(iStr) {
+										if onlyFiles {
+											fmt.Fprintf(w, "%s\n", colorBin(f))
+										} else {
+											fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+											for _, i := range v {
+												fmt.Fprintf(w, " - %v\n", colorValue(i))
+											}
+										}
+									}
 								}
 							}
 						case map[string]any:
 							for kk, vv := range v {
-								if strings.Contains(kk, entitlementValue) {
-									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-									fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+								if re.MatchString(kk) {
+									if onlyFiles {
+										fmt.Fprintf(w, "%s\n", colorBin(f))
+									} else {
+										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+										fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+									}
+								}
+								if vvStr, ok := vv.(string); ok {
+									if re.MatchString(vvStr) {
+										if onlyFiles {
+											fmt.Fprintf(w, "%s\n", colorBin(f))
+										} else {
+											fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+											fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+										}
+									}
 								}
 							}
 						default:
