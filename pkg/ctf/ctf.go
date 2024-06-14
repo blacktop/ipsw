@@ -12,6 +12,8 @@ import (
 	"github.com/blacktop/go-macho"
 )
 
+const CTF_MAGIC = 0xcff1
+
 // CTF is the Compact ANSI-C Type Format object
 type CTF struct {
 	Header    header       `json:"header,omitempty"`
@@ -44,6 +46,10 @@ func Parse(m *macho.File) (*CTF, error) {
 
 	if err := binary.Read(c.sr, binary.LittleEndian, &c.Header.header_t); err != nil {
 		return nil, fmt.Errorf("failed to read ctf_header_t: %v", err)
+	}
+
+	if c.Header.Preamble.Magic != CTF_MAGIC {
+		return nil, fmt.Errorf("CTF magic %#x is invalid; expected %#x", c.Header.Preamble.Magic, CTF_MAGIC)
 	}
 
 	if c.Header.Preamble.Version < 2 || c.Header.Preamble.Version > 4 {
