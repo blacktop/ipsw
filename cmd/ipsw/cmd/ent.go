@@ -256,7 +256,7 @@ var entCmd = &cobra.Command{
 									if onlyFiles {
 										fmt.Fprintf(w, "%s\n", colorBin(f))
 									} else {
-										fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
+										fmt.Fprintf(w, "%s=%s\t%s\n", colorKey(k), colorValue(fmt.Sprintf("%d", v)), colorBin(f))
 									}
 								case string:
 									if onlyFiles {
