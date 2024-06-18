@@ -631,11 +631,7 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 					}
 				}
 			}
-			strstart := match
-			if strstart > 0 && strstart >= uint64(len(pattern)-1) {
-				strstart -= uint64(len(pattern) - 1)
-			}
-			if str, err := f.GetCStringAtOffsetForUUID(uuid, strstart); err == nil {
+			if str, err := f.GetCStringAtOffsetForUUID(uuid, match); err == nil {
 				s.String = strings.TrimSuffix(strings.TrimSpace(str), "\n")
 			}
 			if addr, err := f.GetVMAddressForUUID(uuid, match); err == nil {

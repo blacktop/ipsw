@@ -1783,7 +1783,11 @@ func (f *File) Search(search []byte) (map[mtypes.UUID][]uint64, error) {
 				// scan backwards to find the start of the line
 				nullIdx := bytes.LastIndexByte(chunk[:uint64(idx)+tailLen], 0x00)
 				if nullIdx >= 0 {
-					matches[uuid] = append(matches[uuid], uint64(offset+uint64(nullIdx+1)))
+					if uint64(offset+uint64(nullIdx+1)) > 0 && uint64(offset+uint64(nullIdx+1)) >= uint64(len(search)-1) {
+						matches[uuid] = append(matches[uuid], uint64(offset+uint64(nullIdx+1))-uint64(len(search)-1))
+					} else {
+						matches[uuid] = append(matches[uuid], uint64(offset+uint64(nullIdx+1)))
+					}
 				} else {
 					matches[uuid] = append(matches[uuid], uint64(offset+uint64(idx)))
 				}
