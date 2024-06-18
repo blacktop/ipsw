@@ -1,0 +1,35 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: AEA.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: 
+//  Category: Operating System
+// File Mask: *.aea
+//  ID Bytes: 41 45 41 31 01 00 00 00
+//   History: 
+//------------------------------------------------
+
+typedef struct 
+{
+  char magic[4]<bgcolor = cLtBlue>; // "AEA1"
+  uint version;  // Always 1
+  uint length;   // Length of metadata
+} AEAHeader;
+
+typedef struct 
+{
+  uint address;
+  uint length;
+} ClusterHeader;
+
+LittleEndian();
+
+AEAHeader header;
+char metadata[header.length]<bgcolor = cLtGreen>;
+char salt[32]<bgcolor = cLtPurple>;
+char unknown[70h]<bgcolor = cLtRed>;
+char clusterHeader[2800h]<bgcolor = cDkAqua>;
+char unknown2[20h]<bgcolor = cLtRed>;
+char segAuthTags[2000h]<bgcolor = cDkAqua>;
