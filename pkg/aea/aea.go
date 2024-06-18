@@ -15,14 +15,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/cloudflare/circl/hpke"
 )
+
+const aeaBinPath = "/usr/bin/aea"
 
 //go:embed data/fcs-keys.gz
 var keyData []byte
@@ -120,33 +119,33 @@ func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
 	return out, nil
 }
 
-func (md Metadata) DecryptFCS(pemData []byte) (string, error) {
+func (md Metadata) DecryptFCS(pemData []byte) ([]byte, error) {
 	ddata, ok := md["com.apple.wkms.fcs-response"]
 	if !ok {
-		return "", fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
+		return nil, fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
 	}
 	var fcsResp fcsResponse
 	if err := json.Unmarshal(ddata, &fcsResp); err != nil {
-		return "", err
+		return nil, err
 	}
 	encRequestData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.EncRequest)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	wrappedKeyData, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(fcsResp.WrappedKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	pkmap, err := md.GetPrivateKey(pemData)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var privKey []byte
 	for _, pk := range pkmap {
 		privKey, err = pk.UnmarshalBinaryPrivateKey()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -158,22 +157,17 @@ func (md Metadata) DecryptFCS(pemData []byte) (string, error) {
 
 	privateKey, err := kemID.Scheme().UnmarshalBinaryPrivateKey(privKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	recv, err := suite.NewReceiver(privateKey, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	opener, err := recv.Setup(encRequestData)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	wkey, err := opener.Open(wrappedKeyData, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.StdEncoding.EncodeToString(wkey), nil
+	return opener.Open(wrappedKeyData, nil)
 }
 
 func Info(in string) (Metadata, error) {
@@ -220,30 +214,4 @@ func Info(in string) (Metadata, error) {
 	}
 
 	return metadata, nil
-}
-
-func Decrypt(in, out string, privKeyData []byte) (string, error) {
-	metadata, err := Info(in)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse AEA: %v", err)
-	}
-
-	wkey, err := metadata.DecryptFCS(privKeyData)
-	if err != nil {
-		return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
-	}
-
-	return aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), wkey)
-}
-
-func aea(in, out, key string) (string, error) {
-	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("/usr/bin/aea", "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
-		cout, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, cout)
-		}
-		return out, nil
-	}
-	return "", fmt.Errorf("only supported on macOS (due to `aea` binary requirement)")
 }

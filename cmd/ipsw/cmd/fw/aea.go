@@ -148,7 +148,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 			}
-			fmt.Printf("base64:%s\n", wkey)
+			fmt.Printf("base64:%s\n", base64.StdEncoding.EncodeToString(wkey))
 		} else {
 			if pemFile != "" {
 				pemData, err = os.ReadFile(pemFile)
