@@ -32,6 +32,6 @@ ipsw fw [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw fw aea](/docs/cli/ipsw/fw/aea)	 - Parse ANE1 DMGs
 * [ipsw fw iboot](/docs/cli/ipsw/fw/iboot)	 - Dump firmwares
-* [ipsw fw sepfw](/docs/cli/ipsw/fw/sepfw)	 - Dump MachOs
 
