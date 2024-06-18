@@ -20,6 +20,8 @@ ipsw download ipsw [flags]
       --decrypt                 Attempt to decrypt the partial files if keys are available
       --dyld                    Extract dyld_shared_cache(s) from remote IPSW
   -a, --dyld-arch stringArray   dyld_shared_cache architecture(s) to remote extract
+      --fcs-keys                Download AEA1 DMG fcs-key pem files
+      --fcs-keys-json           Download AEA1 DMG fcs-keys as JSON
   -f, --flat                    Do NOT perserve directory structure when downloading with --pattern
   -h, --help                    help for ipsw
       --ibridge                 Download iBridge IPSWs

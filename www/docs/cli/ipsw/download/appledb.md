@@ -32,6 +32,8 @@ ipsw download appledb [flags]
       --api-token string      Github API Token
       --beta                  Download beta IPSWs
       --dyld                  Extract dyld_shared_cache(s) from remote OTA
+      --fcs-keys              Download AEA1 DMG fcs-key pem files
+      --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
   -f, --flat                  Do NOT perserve directory structure when downloading with --pattern
   -h, --help                  help for appledb
   -j, --json                  Dump DB query results as JSON

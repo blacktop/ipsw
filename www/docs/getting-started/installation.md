@@ -104,9 +104,12 @@ sudo snap install ipsw
 
 ## Via `deb`/`rpm`/`apk` debian packages in the [releases](https://github.com/blacktop/ipsw/releases) page
 
+To install, after downloading the files, run:
+
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_linux_x86_64.deb
-sudo dpkg -i ipsw_3.1.199_linux_x86_64.deb
+dpkg -i ipsw*.deb
+rpm -ivh ipsw*.rpm
+apk add --allow-untrusted ipsw*.apk
 ```
 
 ## Install [archlinux](https://aur.archlinux.org/packages/ipsw-bin/) package from AUR

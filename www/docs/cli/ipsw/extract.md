@@ -24,6 +24,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
   -d, --dyld                    Extract dyld_shared_cache
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
   -x, --exclave                 Extract Exclave Bundle
+      --fcs-key                 Extract AEA1 DMG fcs-key pem files
   -f, --files                   Extract File System files
       --flat                    Do NOT perserve directory structure when extracting
   -h, --help                    help for extract
