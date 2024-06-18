@@ -688,7 +688,7 @@ func (f *File) GetSubCacheInfo(uuid mtypes.UUID) *SubcacheEntry {
 		return &SubcacheEntry{
 			UUID:          uuid,
 			CacheVMOffset: 0,
-			Extention:     "",
+			Extention:     "primary",
 		}
 	}
 	if f.symUUID == uuid {
