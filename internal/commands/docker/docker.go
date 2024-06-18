@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -49,7 +49,7 @@ func (c *Client) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
 
-	images, err := cli.ImageList(ctx, types.ImageListOptions{})
+	images, err := cli.ImageList(ctx, image.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -61,7 +61,7 @@ func (c *Client) Run(ctx context.Context) error {
 		}
 	}
 	if !found {
-		reader, err := cli.ImagePull(ctx, c.Image, types.ImagePullOptions{
+		reader, err := cli.ImagePull(ctx, c.Image, image.PullOptions{
 			// Platform: "linux/amd64",
 		})
 		if err != nil {
