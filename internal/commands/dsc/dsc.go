@@ -632,7 +632,7 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 				}
 			}
 			strstart := match
-			if strstart > 0 && strstart > uint64(len(pattern)) {
+			if strstart > 0 && strstart >= uint64(len(pattern)-1) {
 				strstart -= uint64(len(pattern) - 1)
 			}
 			if str, err := f.GetCStringAtOffsetForUUID(uuid, strstart); err == nil {
