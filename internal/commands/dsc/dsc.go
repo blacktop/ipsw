@@ -614,21 +614,11 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 			if mapping, err := f.GetMappingForOffsetForUUID(uuid, match); err == nil {
 				s.Mapping = mapping.Name
 				if sc := f.GetSubCacheInfo(uuid); sc != nil {
-					s.Mapping += ", sub_cache"
-					if sc.Extention != "" {
-						s.Mapping += fmt.Sprintf(" (%s)", sc.Extention)
-					} else {
-						s.Mapping += " (primary)"
-					}
+					s.Mapping += fmt.Sprintf(", sub_cache (%s)", sc.Extention)
 				}
 			} else {
 				if sc := f.GetSubCacheInfo(uuid); sc != nil {
-					s.Mapping += "sub_cache"
-					if sc.Extention != "" {
-						s.Mapping += fmt.Sprintf(" (%s)", sc.Extention)
-					} else {
-						s.Mapping += " (primary)"
-					}
+					s.Mapping += fmt.Sprintf("sub_cache (%s)", sc.Extention)
 				}
 			}
 			if str, err := f.GetCStringAtOffsetForUUID(uuid, match); err == nil {
