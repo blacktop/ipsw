@@ -491,12 +491,7 @@ func (f *File) GetCString(strVMAdr uint64) (string, error) {
 
 // GetCStringAtOffsetForUUID returns a c-string at a given offset
 func (f *File) GetCStringAtOffsetForUUID(uuid types.UUID, offset uint64) (string, error) {
-
-	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-
-	if _, err := sr.Seek(int64(offset), io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to Seek to offset %#x: %v", offset, err)
-	}
+	sr := io.NewSectionReader(f.r[uuid], int64(offset), 1<<63-1)
 
 	s, err := bufio.NewReader(sr).ReadString('\x00')
 	if err != nil {

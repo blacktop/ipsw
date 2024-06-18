@@ -96,7 +96,9 @@ type SymbolLookup struct {
 // String is a struct that contains information about a dyld_shared_cache string
 // swagger:model
 type String struct {
+	Offset  uint64 `json:"address,omitempty"`
 	Address uint64 `json:"address,omitempty"`
+	Mapping string `json:"mapping,omitempty"`
 	Image   string `json:"image,omitempty"`
 	String  string `json:"string,omitempty"`
 }
@@ -600,6 +602,53 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 	strRE, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("invalid regex: %w", err)
+	}
+
+	matches, err := f.Search([]byte(pattern))
+	if err != nil {
+		return nil, fmt.Errorf("failed to search for pattern: %v", err)
+	}
+	for uuid, ms := range matches {
+		for _, match := range ms {
+			s := String{Offset: match}
+			if mapping, err := f.GetMappingForOffsetForUUID(uuid, match); err == nil {
+				s.Mapping = mapping.Name
+				if sc := f.GetSubCacheInfo(uuid); sc != nil {
+					s.Mapping += ", sub_cache"
+					if sc.Extention != "" {
+						s.Mapping += fmt.Sprintf(" (%s)", sc.Extention)
+					} else {
+						s.Mapping += " (primary)"
+					}
+				}
+			} else {
+				if sc := f.GetSubCacheInfo(uuid); sc != nil {
+					s.Mapping += "sub_cache"
+					if sc.Extention != "" {
+						s.Mapping += fmt.Sprintf(" (%s)", sc.Extention)
+					} else {
+						s.Mapping += " (primary)"
+					}
+				}
+			}
+			strstart := match
+			if strstart > 0 && strstart > uint64(len(pattern)) {
+				strstart -= uint64(len(pattern) - 1)
+			}
+			if str, err := f.GetCStringAtOffsetForUUID(uuid, strstart); err == nil {
+				s.String = strings.TrimSuffix(strings.TrimSpace(str), "\n")
+			}
+			if addr, err := f.GetVMAddressForUUID(uuid, match); err == nil {
+				s.Address = addr
+				if image, err := f.GetImageContainingVMAddr(addr); err == nil {
+					s.Image = filepath.Base(image.Name)
+				}
+			}
+			strs = append(strs, s)
+		}
+	}
+	if len(matches) > 0 {
+		return strs, nil
 	}
 
 	for _, i := range f.Images {

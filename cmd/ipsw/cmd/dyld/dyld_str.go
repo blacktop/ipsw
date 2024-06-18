@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
+	"strings"
 
 	"github.com/apex/log"
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
@@ -92,11 +92,22 @@ var StrSearchCmd = &cobra.Command{
 			return err
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		var out strings.Builder
 		for _, str := range strs {
-			fmt.Fprintf(w, "%s: %s\t%s\n", colorAddr("%#x", str.Address), str.String, symImageColor(str.Image))
+			out.Reset()
+			out.WriteString(fmt.Sprintf("%s: \"%s\"", colorAddr("%#x", str.Address), str.String))
+			if str.Address == 0 {
+				out.WriteString(fmt.Sprintf("\t%s=%s", colorField("offset"), colorAddr("%#x", str.Offset)))
+			}
+			if str.Image != "" {
+				out.WriteString(fmt.Sprintf("\t%s=%s", colorField("image"), symImageColor(str.Image)))
+			} else {
+				if str.Mapping != "" {
+					out.WriteString(fmt.Sprintf("\t%s=%s", colorField("mapping"), symLibColor(str.Mapping)))
+				}
+			}
+			fmt.Println(out.String())
 		}
-		w.Flush()
 
 		return nil
 	},
