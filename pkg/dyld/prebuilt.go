@@ -438,14 +438,15 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	if err := binary.Read(sr, binary.LittleEndian, &ldr); err != nil {
 		return nil, fmt.Errorf("failed to read prebuilt loader: %v", err)
 	}
+	sr.Seek(-int64(binary.Size(ldr)), io.SeekCurrent)
 	if ldr.IsVersion2() {
 		var hdr prebuiltLoaderHeaderV2
 		if err := binary.Read(sr, binary.LittleEndian, &hdr); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader header: %v", err)
 		}
 	} else {
-		var hdr prebuiltLoaderHeader
-		if err := binary.Read(sr, binary.LittleEndian, &hdr); err != nil {
+		// var hdr prebuiltLoaderHeader
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.prebuiltLoaderHeader); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader header: %v", err)
 		}
 	}
@@ -487,11 +488,14 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		pbl.FileValidation = &fv
 	}
 	if pbl.RegionsCount() > 0 {
-		// sr.Seek(int64(pbl.RegionsOffset), io.SeekStart)
-		// pbl.Regions = make([]Region, pbl.RegionsCount())
-		// if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
-		// 	return nil, fmt.Errorf("failed to read prebuilt loader regions: %v", err)
-		// }
+		sr.Seek(int64(pbl.RegionsOffset), io.SeekStart)
+		pbl.Regions = make([]Region, pbl.RegionsCount())
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader regions: %v", err)
+		}
+		for i, r := range pbl.Regions {
+			fmt.Printf("Region %d) %s\n", i, r)
+		}
 	}
 	if pbl.DependentLoaderRefsArrayOffset > 0 {
 		sr.Seek(int64(pbl.DependentLoaderRefsArrayOffset), io.SeekStart)
