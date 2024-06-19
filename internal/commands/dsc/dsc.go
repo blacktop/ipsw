@@ -389,7 +389,7 @@ func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
 		for _, img := range f.Images {
 			pbl, err := f.GetDylibPrebuiltLoader(img.Name)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get prebuilt loader for %s: %v", filepath.Base(img.Name), err)
 			}
 			for _, dep := range pbl.Dependents {
 				if strings.EqualFold(dep.Name, image.Name) {
@@ -401,7 +401,7 @@ func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
 		for _, img := range f.Images {
 			m, err := img.GetPartialMacho()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to create partial MachO for image %s: %v", filepath.Base(img.Name), err)
 			}
 			for _, imp := range m.ImportedLibraries() {
 				if strings.EqualFold(imp, image.Name) {
@@ -426,7 +426,7 @@ func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
 				}
 			}
 		}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get prebuilt loader set: %v", err)
 		}
 	}
 
