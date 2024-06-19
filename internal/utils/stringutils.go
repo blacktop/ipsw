@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -254,4 +255,16 @@ func Slugify(s string) string {
 		}
 	}
 	return strings.ToLower(string(out[a : b+1]))
+}
+
+func Bits(in uint64) string {
+	var out strings.Builder
+	out.WriteString("|63  |59  |55  |51  |47  |43  |39  |35  |31  |27  |23  |19  |15  |11  |7   |3   |\n")
+	for i, b := range fmt.Sprintf("%064b", in) {
+		if i%4 == 0 && i != 0 {
+			out.WriteRune(' ')
+		}
+		out.WriteRune(b)
+	}
+	return out.String()
 }
