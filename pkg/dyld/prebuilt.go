@@ -9,8 +9,10 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func (f *File) SupportsPrebuiltLoaderSet() bool {
@@ -174,12 +176,19 @@ func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, e
 	if err != nil {
 		return nil, err
 	}
+	if sc := f.GetSubCacheInfo(uuid); sc != nil {
+		log.Debug(sc.Extention)
+	}
 
 	sr := io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)
 
 	var pset PrebuiltLoaderSet
 	if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
 		return nil, err
+	}
+
+	if pset.Magic != PrebuiltLoaderSetMagic {
+		return nil, fmt.Errorf("invalid magic for PrebuiltLoaderSet: expected %x got %x", PrebuiltLoaderSetMagic, pset.Magic)
 	}
 
 	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
@@ -197,6 +206,8 @@ func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, e
 	}
 
 	sr.Seek(int64(loaderOffsets[imgIdx]), io.SeekStart)
+
+	fmt.Println(executablePath)
 
 	return f.parsePrebuiltLoader(io.NewSectionReader(f.r[uuid], int64(off)+int64(loaderOffsets[imgIdx]), 1<<63-1))
 }
@@ -422,29 +433,48 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 // parsePrebuiltLoader parses a prebuilt loader from a section reader.
 func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error) {
 	var pbl PrebuiltLoader
-	if err := binary.Read(sr, binary.LittleEndian, &pbl.prebuiltLoaderHeader); err != nil {
-		return nil, err
+
+	var ldr Loader
+	if err := binary.Read(sr, binary.LittleEndian, &ldr); err != nil {
+		return nil, fmt.Errorf("failed to read prebuilt loader: %v", err)
+	}
+	if ldr.IsVersion2() {
+		var hdr prebuiltLoaderHeaderV2
+		if err := binary.Read(sr, binary.LittleEndian, &hdr); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader header: %v", err)
+		}
+	} else {
+		var hdr prebuiltLoaderHeader
+		if err := binary.Read(sr, binary.LittleEndian, &hdr); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader header: %v", err)
+		}
 	}
 
 	if pbl.Magic != LoaderMagic {
 		return nil, fmt.Errorf("invalid magic for prebuilt loader: expected %x got %x", LoaderMagic, pbl.Magic)
 	}
 
+	log.Debug(pbl.Loader.String())
+	log.Debug(pbl.GetInfo())
+
+	fmt.Println("Loader Info:")
+	fmt.Println(utils.Bits(uint64(pbl.Loader.Info)))
+	fmt.Println("Info:")
+	fmt.Println(utils.Bits(uint64(pbl.Info)))
+
 	if pbl.PathOffset > 0 {
 		sr.Seek(int64(pbl.PathOffset), io.SeekStart)
-		br := bufio.NewReader(sr)
-		path, err := br.ReadString('\x00')
+		path, err := bufio.NewReader(sr).ReadString('\x00')
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader path: %v", err)
 		}
 		pbl.Path = strings.TrimSuffix(path, "\x00")
 	}
 	if pbl.AltPathOffset > 0 {
 		sr.Seek(int64(pbl.AltPathOffset), io.SeekStart)
-		br := bufio.NewReader(sr)
-		path, err := br.ReadString('\x00')
+		path, err := bufio.NewReader(sr).ReadString('\x00')
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader alt path: %v", err)
 		}
 		pbl.AltPath = strings.TrimSuffix(path, "\x00")
 	}
@@ -452,28 +482,28 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		sr.Seek(int64(pbl.FileValidationOffset), io.SeekStart)
 		var fv fileValidation
 		if err := binary.Read(sr, binary.LittleEndian, &fv); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader file validation: %v", err)
 		}
 		pbl.FileValidation = &fv
 	}
 	if pbl.RegionsCount() > 0 {
-		sr.Seek(int64(pbl.RegionsOffset), io.SeekStart)
-		pbl.Regions = make([]Region, pbl.RegionsCount())
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
-			return nil, err
-		}
+		// sr.Seek(int64(pbl.RegionsOffset), io.SeekStart)
+		// pbl.Regions = make([]Region, pbl.RegionsCount())
+		// if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
+		// 	return nil, fmt.Errorf("failed to read prebuilt loader regions: %v", err)
+		// }
 	}
 	if pbl.DependentLoaderRefsArrayOffset > 0 {
 		sr.Seek(int64(pbl.DependentLoaderRefsArrayOffset), io.SeekStart)
 		depsArray := make([]LoaderRef, pbl.DepCount)
 		if err := binary.Read(sr, binary.LittleEndian, &depsArray); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader dependent loader refs: %v", err)
 		}
 		kindsArray := make([]DependentKind, pbl.DepCount)
 		if pbl.DependentKindArrayOffset > 0 {
 			sr.Seek(int64(pbl.DependentKindArrayOffset), io.SeekStart)
 			if err := binary.Read(sr, binary.LittleEndian, &kindsArray); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to read prebuilt loader dependent kinds: %v", err)
 			}
 		}
 		for idx, dep := range depsArray {
@@ -491,32 +521,32 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		sr.Seek(int64(pbl.BindTargetRefsOffset), io.SeekStart)
 		pbl.BindTargets = make([]BindTargetRef, pbl.BindTargetRefsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.BindTargets); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader bind target refs: %v", err)
 		}
 	}
 	if pbl.OverrideBindTargetRefsCount > 0 {
 		sr.Seek(int64(pbl.OverrideBindTargetRefsOffset), io.SeekStart)
 		pbl.OverrideBindTargets = make([]BindTargetRef, pbl.OverrideBindTargetRefsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.OverrideBindTargets); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader override bind target refs: %v", err)
 		}
 	}
 	if pbl.ObjcBinaryInfoOffset > 0 {
 		sr.Seek(int64(pbl.ObjcBinaryInfoOffset), io.SeekStart)
 		var ofi ObjCBinaryInfo
 		if err := binary.Read(sr, binary.LittleEndian, &ofi); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader objc binary info: %v", err)
 		}
 		pbl.ObjcFixupInfo = &ofi
 		sr.Seek(int64(pbl.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.ProtocolFixupsOffset), io.SeekStart)
 		pbl.ObjcCanonicalProtocolFixups = make([]bool, pbl.ObjcFixupInfo.ProtocolListCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcCanonicalProtocolFixups); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader objc canonical protocol fixups: %v", err)
 		}
 		sr.Seek(int64(pbl.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.SelectorReferencesFixupsOffset), io.SeekStart)
 		pbl.ObjcSelectorFixups = make([]BindTargetRef, pbl.ObjcFixupInfo.SelectorReferencesFixupsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcSelectorFixups); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read prebuilt loader objc selector fixups: %v", err)
 		}
 	}
 	if pbl.IndexOfTwin != NoUnzipperedTwin {
@@ -527,7 +557,7 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		for {
 			var patch DylibPatch
 			if err := binary.Read(sr, binary.LittleEndian, &patch); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to read prebuilt loader dylib patch: %v", err)
 			}
 			pbl.DylibPatches = append(pbl.DylibPatches, patch)
 			if patch.Kind == endOfPatchTable {

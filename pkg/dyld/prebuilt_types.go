@@ -59,8 +59,10 @@ type Loader struct {
 	// hasReadOnlyObjC    :  1,  // Has __DATA_CONST,__objc_selrefs section
 	// pre2022Binary      :  1,
 	// isPremapped        :  1,  // mapped by exclave core
+	// isVersion2         :  1,  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
 	// padding            :  6;
 	Ref LoaderRef
+	// Unk [12]uint16
 }
 
 func (l Loader) IsPrebuilt() bool {
@@ -92,6 +94,9 @@ func (l Loader) Pre2022Binary() bool {
 }
 func (l Loader) IsPremapped() bool {
 	return types.ExtractBits(uint64(l.Info), 9, 1) != 0
+}
+func (l Loader) IsVersion2() bool {
+	return types.ExtractBits(uint64(l.Info), 10, 1) != 0
 }
 
 func (l Loader) String() string {
@@ -127,6 +132,9 @@ func (l Loader) String() string {
 	}
 	if l.IsPremapped() {
 		out = append(out, "premapped")
+	}
+	if l.IsVersion2() {
+		out = append(out, "v2")
 	}
 	return fmt.Sprintf("%s, ref: %s", strings.Join(out, "|"), l.Ref)
 }
@@ -362,6 +370,53 @@ type prebuiltLoaderHeader struct {
 	//  bind targets
 }
 
+type prebuiltLoaderHeaderV2 struct {
+	Loader
+	Unknown                        [12]uint16
+	PathOffset                     uint16
+	DependentLoaderRefsArrayOffset uint16 // offset to array of LoaderRef
+	DependentKindArrayOffset       uint16 // zero if all deps normal
+	FixupsLoadCommandOffset        uint16
+
+	AltPathOffset        uint16 // if install_name does not match real path
+	FileValidationOffset uint16 // zero or offset to FileValidationInfo
+
+	Info uint16
+	// hasInitializers      :  1,
+	// isOverridable        :  1,      // if in dyld cache, can roots override it
+	// supportsCatalyst     :  1,      // if false, this cannot be used in catalyst process
+	// isCatalystOverride   :  1,      // catalyst side of unzippered twin
+	// regionsCount         : 12
+	RegionsOffset uint16 // offset to Region array
+
+	DepCount             uint16
+	BindTargetRefsOffset uint16
+	BindTargetRefsCount  uint32 // bind targets can be large, so it is last
+	// After this point, all offsets in to the PrebuiltLoader need to be 32-bits as the bind targets can be large
+
+	ObjcBinaryInfoOffset uint32 // zero or offset to ObjCBinaryInfo
+	IndexOfTwin          uint16 // if in dyld cache and part of unzippered twin, then index of the other twin
+	_                    uint16
+
+	ExportsTrieLoaderOffset uint64
+	ExportsTrieLoaderSize   uint32
+	VmSize                  uint32
+
+	CodeSignature CodeSignatureInFile
+
+	PatchTableOffset uint32
+
+	OverrideBindTargetRefsOffset uint32
+	OverrideBindTargetRefsCount  uint32
+
+	// followed by:
+	//  path chars
+	//  dep kind array
+	//  file validation info
+	//  segments
+	//  bind targets
+}
+
 // ObjCBinaryInfo stores information about the layout of the objc sections in a binary,
 // as well as other properties relating to the objc information in there.
 type ObjCBinaryInfo struct {
@@ -492,6 +547,9 @@ func (pl PrebuiltLoader) GetInfo() string {
 	}
 	if pl.IsCatalystOverride() {
 		out = append(out, "catalyst_override")
+	}
+	if pl.RegionsCount() > 0 {
+		out = append(out, fmt.Sprintf("regions=%d", pl.RegionsCount()))
 	}
 	return strings.Join(out, "|")
 }
