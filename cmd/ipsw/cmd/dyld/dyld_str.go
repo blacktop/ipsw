@@ -100,7 +100,7 @@ var StrSearchCmd = &cobra.Command{
 				out.WriteString(fmt.Sprintf("\t%s=%s", colorField("offset"), colorAddr("%#x", str.Offset)))
 			}
 			if str.Image != "" {
-				out.WriteString(fmt.Sprintf("\t%s=%s", colorField("image"), symImageColor(str.Image)))
+				out.WriteString(fmt.Sprintf("\t%s=%s", colorField("image"), colorImage(str.Image)))
 			} else {
 				if str.Mapping != "" {
 					out.WriteString(fmt.Sprintf("\t%s=%s", colorField("mapping"), symLibColor(str.Mapping)))
