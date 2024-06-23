@@ -110,6 +110,14 @@ var swiftDumpCmd = &cobra.Command{
 		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") {
 			return fmt.Errorf("cannot set --output without setting --interface")
 		}
+		doDump := false
+		if !viper.IsSet("swift-dump.interface") &&
+			!viper.IsSet("swift-dump.type") &&
+			!viper.IsSet("swift-dump.proto") &&
+			!viper.GetBool("swift-dump.ext") &&
+			!viper.GetBool("swift-dump.ass") {
+			doDump = true
+		}
 
 		if len(viper.GetString("swift-dump.output")) > 0 {
 			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {
@@ -213,10 +221,7 @@ var swiftDumpCmd = &cobra.Command{
 				}
 			}
 
-			if viper.GetString("swift-dump.type") == "" &&
-				viper.GetString("swift-dump.proto") == "" &&
-				viper.GetString("swift-dump.ext") == "" &&
-				viper.GetString("swift-dump.ass") == "" {
+			if doDump {
 				return s.Dump()
 			}
 		} else { /* DSC file */
@@ -305,10 +310,7 @@ var swiftDumpCmd = &cobra.Command{
 					}
 				}
 
-				if viper.GetString("swift-dump.type") == "" &&
-					viper.GetString("swift-dump.proto") == "" &&
-					viper.GetString("swift-dump.ext") == "" &&
-					viper.GetString("swift-dump.ass") == "" {
+				if doDump {
 					if err := s.Dump(); err != nil {
 						return fmt.Errorf("failed to dump Swift info for dylib '%s': %v", filepath.Base(image.Name), err)
 					}
