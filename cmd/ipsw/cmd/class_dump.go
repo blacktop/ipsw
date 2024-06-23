@@ -132,6 +132,15 @@ var classDumpCmd = &cobra.Command{
 		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") && !viper.GetBool("class-dump.xcfw") && !viper.GetBool("class-dump.spm")) {
 			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
 		}
+		doDump := false
+		if !viper.IsSet("class-dump.class") &&
+			!viper.IsSet("class-dump.proto") &&
+			!viper.IsSet("class-dump.cat") &&
+			!viper.GetBool("class-dump.headers") &&
+			!viper.GetBool("class-dump.xcfw") &&
+			!viper.GetBool("class-dump.spm") {
+			doDump = true
+		}
 		// } else if viper.GetBool("class-dump.generic") && !viper.GetBool("class-dump.xcfw") {
 		// 	return fmt.Errorf("cannot use --generic without --xcfw")
 		// }
@@ -242,9 +251,7 @@ var classDumpCmd = &cobra.Command{
 				}
 			}
 
-			if viper.GetString("class-dump.class") == "" &&
-				viper.GetString("class-dump.proto") == "" &&
-				viper.GetString("class-dump.cat") == "" {
+			if doDump {
 				return o.Dump()
 			}
 		} else { /* DSC file */
@@ -289,9 +296,11 @@ var classDumpCmd = &cobra.Command{
 				}
 
 				if viper.GetBool("class-dump.headers") {
+					log.WithField("dylib", filepath.Base(img.Name)).Info("Dumping ObjC headers")
 					if err := o.Headers(); err != nil {
 						return fmt.Errorf("failed to dump headers for dylib '%s': %v", filepath.Base(img.Name), err)
 					}
+					continue
 				}
 
 				if viper.GetBool("class-dump.xcfw") {
@@ -324,9 +333,7 @@ var classDumpCmd = &cobra.Command{
 					}
 				}
 
-				if viper.GetString("class-dump.class") == "" &&
-					viper.GetString("class-dump.proto") == "" &&
-					viper.GetString("class-dump.cat") == "" {
+				if doDump {
 					if err := o.Dump(); err != nil {
 						return fmt.Errorf("failed to dump dylib '%s': %v", filepath.Base(img.Name), err)
 					}
