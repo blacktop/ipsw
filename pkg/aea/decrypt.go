@@ -86,7 +86,11 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 		}
 		// read clusterHeader
 		var chkey clusterHeaderKey
-		if err := binary.Read(hkdf.New(sha256.New, clusterKey, []byte{}, []byte(clusterKeyMaterialInfo)), binary.LittleEndian, &chkey); err != nil {
+		if err := binary.Read(
+			hkdf.New(sha256.New, clusterKey, []byte{}, []byte(clusterKeyMaterialInfo)),
+			binary.LittleEndian,
+			&chkey,
+		); err != nil {
 			return err
 		}
 
@@ -135,7 +139,11 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 						return err
 					}
 					var segmentKey clusterHeaderKey
-					if err := binary.Read(hkdf.New(sha256.New, clusterKey, []byte{}, info.Bytes()), binary.LittleEndian, &segmentKey); err != nil {
+					if err := binary.Read(
+						hkdf.New(sha256.New, clusterKey, []byte{}, info.Bytes()),
+						binary.LittleEndian,
+						&segmentKey,
+					); err != nil {
 						return err
 					}
 					decryptedData, err := decryptCTR(data, segmentKey.Key[:], segmentKey.IV[:])
@@ -262,7 +270,11 @@ func Decrypt(in, out string, privKeyData []byte) (string, error) {
 		return aeaDecrypt(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), wkey)
 	}
 	// use 'aea' binary (as is the fastest way to decrypt AEA on macOS)
-	return aea(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), base64.StdEncoding.EncodeToString(wkey))
+	return aea(
+		in,
+		filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))),
+		base64.StdEncoding.EncodeToString(wkey),
+	)
 }
 
 func aea(in, out, key string) (string, error) {
