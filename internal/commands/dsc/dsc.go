@@ -637,6 +637,8 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 		return strs, nil
 	}
 
+	log.Warn("No strings found in dyld_shared_cache using FAST byte search, falling back to slow MachO parsing/regex search...")
+
 	for _, i := range f.Images {
 		m, err := i.GetMacho()
 		if err != nil {
