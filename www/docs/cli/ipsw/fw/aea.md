@@ -4,11 +4,11 @@ title: aea
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: aea
-description: Parse ANE1 DMGs
+description: Parse AEA1 DMGs
 ---
 ## ipsw fw aea
 
-Parse ANE1 DMGs
+Parse AEA1 DMGs
 
 ```
 ipsw fw aea [flags]
