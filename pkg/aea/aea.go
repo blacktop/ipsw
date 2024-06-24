@@ -149,6 +149,15 @@ func (md Metadata) DecryptFCS(pemData []byte) ([]byte, error) {
 		}
 	}
 
+	// TODO: write my own HPKE implementation
+	if len(privKey) > 32 {
+		return nil, fmt.Errorf("private key must be 32 bytes")
+	} else if len(privKey) < 32 {
+		delta := 32 - len(privKey)
+		// prepend zeros to make 32 bytes
+		privKey = append(bytes.Repeat([]byte{0}, delta), privKey...)
+	}
+
 	kemID := hpke.KEM_P256_HKDF_SHA256
 	kdfID := hpke.KDF_HKDF_SHA256
 	aeadID := hpke.AEAD_AES256GCM
