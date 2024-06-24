@@ -17,11 +17,12 @@ ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ### Options
 
 ```
+      --all             Dump ALL dylbs from DSC
       --arch string     Which architecture to use for fat/universal MachO
   -a, --cat string      Dump category (regex)
   -c, --class string    Dump class (regex)
       --demangle        Demangle symbol names (same as verbose)
-      --deps            Dump imported private frameworks
+      --deps            Dump imported private frameworks as well
       --headers         Dump ObjC headers
   -h, --help            help for class-dump
   -o, --output string   Folder to write headers to
