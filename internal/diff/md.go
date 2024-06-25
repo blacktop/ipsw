@@ -153,7 +153,7 @@ func (d *Diff) Markdown() error {
 					fmt.Fprintf(f, "> `%s`\n\n", k)
 					fmt.Fprintf(f, d.Machos.Updated[k])
 					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_"))))
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
 			}
 			out.WriteString("\n</details>\n\n")
@@ -224,7 +224,7 @@ func (d *Diff) Markdown() error {
 					fmt.Fprintf(f, "> `%s`\n\n", k)
 					fmt.Fprintf(f, d.Firmwares.Updated[k])
 					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FIRMWARE", filepath.Base(k))))
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FIRMWARE", filepath.Base(k)+".md")))
 				}
 			}
 			out.WriteString("\n</details>\n\n")
@@ -302,7 +302,7 @@ func (d *Diff) Markdown() error {
 					fmt.Fprintf(f, "> `%s`\n\n", k)
 					fmt.Fprintf(f, d.Dylibs.Updated[k])
 					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("DYLIBS", strings.ReplaceAll(filepath.Base(k), " ", "_"))))
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("DYLIBS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
 			}
 			out.WriteString("\n</details>\n\n")
