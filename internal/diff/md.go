@@ -108,15 +108,29 @@ func (d *Diff) Markdown() error {
 		out.WriteString("## MachO\n\n")
 		if len(d.Machos.New) > 0 {
 			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Machos.New)))
+			if len(d.Machos.New) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View NEW</i></summary>\n\n")
+			}
 			for _, k := range d.Machos.New {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Machos.New) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
 		if len(d.Machos.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Machos.Removed)))
+			if len(d.Machos.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
 			for _, k := range d.Machos.Removed {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Machos.Removed) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
@@ -179,15 +193,29 @@ func (d *Diff) Markdown() error {
 		out.WriteString("## Firmware\n\n")
 		if len(d.Firmwares.New) > 0 {
 			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Firmwares.New)))
+			if len(d.Firmwares.New) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View NEW</i></summary>\n\n")
+			}
 			for _, k := range d.Firmwares.New {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Firmwares.New) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
 		if len(d.Firmwares.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Firmwares.Removed)))
+			if len(d.Firmwares.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
 			for _, k := range d.Firmwares.Removed {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Firmwares.Removed) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
@@ -257,15 +285,29 @@ func (d *Diff) Markdown() error {
 		out.WriteString("### Dylibs\n\n")
 		if len(d.Dylibs.New) > 0 {
 			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Dylibs.New)))
+			if len(d.Dylibs.New) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View NEW</i></summary>\n\n")
+			}
 			for _, k := range d.Dylibs.New {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Dylibs.New) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
 		if len(d.Dylibs.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Dylibs.Removed)))
+			if len(d.Dylibs.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
 			for _, k := range d.Dylibs.Removed {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Dylibs.Removed) > 30 {
+				out.WriteString("\n</details>\n")
 			}
 			out.WriteString("\n")
 		}
