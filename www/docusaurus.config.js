@@ -155,6 +155,12 @@ const config = {
             position: "left",
             sidebarId: "api",
           },
+          // {
+          //   label: "DIFF",
+          //   to: "/diff",
+          //   position: "left",
+          //   sidebarId: "diff",
+          // },
           // Right
           {
             href: "https://github.com/blacktop/ipsw",
