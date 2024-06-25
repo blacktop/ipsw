@@ -3,6 +3,8 @@ package diff
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"os"
@@ -119,23 +121,50 @@ func New(conf *Config) *Diff {
 	}
 }
 
+func (d *Diff) SetOutput(output string) {
+	if d.conf == nil {
+		d.conf = &Config{Output: output}
+	} else {
+		d.conf.Output = output
+	}
+}
+
+func (d *Diff) TitleToFilename() string {
+	out := strings.ReplaceAll(d.Title, " ", "_")
+	out = strings.ReplaceAll(out, ".", "_")
+	out = strings.ReplaceAll(out, "(", "")
+	return strings.ReplaceAll(out, ")", "")
+}
+
 // Save saves the diff
 func (d *Diff) Save() error {
 	if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 		return err
 	}
 
-	fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.md", d.Title))
-	log.Infof("Creating diff file: %s", fname)
-	f, err := os.Create(fname)
+	idiff, err := os.Create(filepath.Join(d.conf.Output, d.TitleToFilename()+".idiff"))
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer idiff.Close()
 
-	_, err = f.WriteString(d.String())
+	d.Old.Info = nil
+	d.New.Info = nil
 
-	return err
+	gob.Register([]any{})
+	gob.Register(map[string]any{})
+
+	buff := new(bytes.Buffer)
+	if err := gob.NewEncoder(buff).Encode(&d); err != nil {
+		return fmt.Errorf("failed to encode diff: %v", err)
+	}
+
+	log.Infof("Saving pickled IPSW diff: %s", idiff.Name())
+	if _, err = buff.WriteTo(idiff); err != nil {
+		return fmt.Errorf("failed to write diff to file: %v", err)
+	}
+
+	return nil
 }
 
 func (d *Diff) getInfo() (err error) {
