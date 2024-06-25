@@ -1033,7 +1033,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						CacheFileOffset: rebaseLocation,
 						CacheVMAddress:  rebaseAddr,
 						Target:          targetValue,
-						Pointer:         pointer,
+						Pointer:         uint64(pointer),
 						Symbol:          symName,
 					})
 				}
@@ -1125,7 +1125,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 							CacheFileOffset: pageContent + uint64(pageOffset),
 							CacheVMAddress:  pageContent + uint64(pageAddress),
 							Target:          targetValue,
-							Pointer:         pointer,
+							Pointer:         uint64(pointer),
 							Symbol:          symName,
 						})
 					}
@@ -1234,7 +1234,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						CacheFileOffset: rebaseLocation,
 						CacheVMAddress:  rebaseAddr,
 						Target:          targetValue,
-						Pointer:         pointer,
+						Pointer:         pointer.Raw(),
 						Symbol:          symName,
 					})
 				}

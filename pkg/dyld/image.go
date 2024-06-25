@@ -402,6 +402,18 @@ func (i *CacheImage) GetVMAddress(offset uint64) (uint64, error) {
 	return i.cache.GetVMAddressForUUID(i.cuuid, offset)
 }
 
+func (i *CacheImage) SlidePointer(addr uint64) uint64 {
+	if addr == 0 {
+		return addr
+	}
+	// check if addr is in the cache (not slid)
+	if _, _, err := i.cache.GetMappingForVMAddress(addr); err == nil {
+		return addr
+	}
+	// try and slide the encoded pointer
+	return i.cache.SlideInfo.SlidePointer(addr)
+}
+
 // GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
 	if i.m != nil {
@@ -429,7 +441,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 	vma := types.VMAddrConverter{
 		Converter: func(addr uint64) uint64 {
-			return i.cache.SlideInfo.SlidePointer(addr)
+			return i.SlidePointer(addr)
 		},
 		VMAddr2Offet: func(address uint64) (uint64, error) {
 			return i.GetOffset(address)
@@ -655,7 +667,7 @@ func (i *CacheImage) ParseSlideInfo() error {
 		}
 
 		for _, r := range rs {
-			i.sinfo[r.CacheVMAddress] = r.Target
+			i.sinfo[r.Pointer] = r.Target
 		}
 	}
 
