@@ -14,6 +14,9 @@ import (
 // Markdown saves the diff as Markdown files.
 func (d *Diff) Markdown() error {
 	d.conf.Output = filepath.Join(d.conf.Output, d.TitleToFilename())
+	if err := os.MkdirAll(d.conf.Output, 0o750); err != nil {
+		return err
+	}
 
 	var out strings.Builder
 	/* TOC */
