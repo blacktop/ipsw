@@ -34,6 +34,11 @@ type Config struct {
 	Markdown bool
 	Color    bool
 	DiffTool string
+
+	// UI Config
+	Version string
+	Host    string
+	Port    int
 }
 
 // GetDatabase returns the entitlement database for the given IPSW
