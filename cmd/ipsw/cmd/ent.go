@@ -26,6 +26,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,6 +66,8 @@ func init() {
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
 	entCmd.Flags().Bool("ui", false, "Show entitlements UI")
+	entCmd.Flags().String("ui-host", "localhost", "UI host to server on")
+	entCmd.Flags().Int("ui-port", 3993, "UI port to server on")
 	viper.BindPFlag("ent.ipsw", entCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
 	viper.BindPFlag("ent.key", entCmd.Flags().Lookup("key"))
@@ -75,6 +78,8 @@ func init() {
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("ent.md", entCmd.Flags().Lookup("md"))
 	viper.BindPFlag("ent.ui", entCmd.Flags().Lookup("ui"))
+	viper.BindPFlag("ent.ui-host", entCmd.Flags().Lookup("ui"))
+	viper.BindPFlag("ent.ui-port", entCmd.Flags().Lookup("ui"))
 	entCmd.MarkFlagsMutuallyExclusive("key", "val", "ui")
 	entCmd.Flags().MarkHidden("ui")
 }
@@ -185,7 +190,15 @@ var entCmd = &cobra.Command{
 		}
 
 		if showUI {
-			panic("not implemented")
+			db := make(map[string]string)
+			for f, e := range entDBs[0] {
+				db[f] = html.EscapeString(e)
+			}
+			return ent.UI(db, &ent.Config{
+				Version: "18.0 beta2 (18A5319i)",
+				Host:    viper.GetString("ent.host"),
+				Port:    viper.GetInt("ent.port"),
+			})
 		} else if doDiff { // DIFF ENTITLEMENTS
 			if len(searchFile) > 0 { // DIFF MACHO'S ENTITLEMENTS
 				dmp := diffmatchpatch.New()
