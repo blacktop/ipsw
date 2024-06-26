@@ -57,7 +57,7 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 	slices.Sort(nextFiles)
 
 	/* DIFF KERNEL */
-
+	diff.New = utils.Difference(nextFiles, prevFiles)
 	diff.Removed = utils.Difference(prevFiles, nextFiles)
 	// gc
 	prevFiles = []string{}
