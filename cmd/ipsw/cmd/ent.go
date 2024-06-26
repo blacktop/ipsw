@@ -26,7 +26,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -192,7 +191,10 @@ var entCmd = &cobra.Command{
 		if showUI {
 			db := make(map[string]string)
 			for f, e := range entDBs[0] {
-				db[f] = html.EscapeString(e)
+				if len(e) == 0 {
+					continue
+				}
+				db[f] = e
 			}
 			return ent.UI(db, &ent.Config{
 				Version: "18.0 beta2 (18A5319i)",
