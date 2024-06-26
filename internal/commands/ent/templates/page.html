@@ -83,6 +83,13 @@
             border-radius: 0.5rem;
             overflow-x: auto;
         }
+
+        .highlight {
+            background-color: #d08770;
+            /* Aurora highlight */
+            color: #2e3440;
+            /* Polar Night text */
+        }
     </style>
 </head>
 
@@ -112,31 +119,45 @@
         const searchInput = document.getElementById('search');
         const entitlementList = document.getElementById('entitlement-list');
 
-        const renderEntitlements = (filteredEntitlements) => {
+            const debounce = (func, delay) => {
+                let timeout;
+                return function (...args) {
+                    const context = this;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(context, args), delay);
+                };
+            };
+
+            const highlightMatches = (text, searchTerm) => {
+                if (!searchTerm) return text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                return text.replace(regex, '<span class="highlight">$1</span>');
+            };
+
+            const renderEntitlements = (filteredEntitlements, searchTerm) => {
             entitlementList.innerHTML = '';
             for (const [key, value] of Object.entries(filteredEntitlements)) {
                 const entitlementItem = document.createElement('div');
                 entitlementItem.className = 'bg-nord-light rounded shadow-md';
 
+                    const highlightedKey = highlightMatches(key, searchTerm);
+
                 const entitlementButton = document.createElement('button');
                 entitlementButton.className = 'p-4 w-full text-left hover-bg-nord-light';
-                entitlementButton.textContent = key;
-                entitlementButton.addEventListener('click', () => toggleDetails(entitlementItem));
+                    entitlementButton.innerHTML = highlightedKey;
+                    entitlementButton.addEventListener('click', () => toggleDetails(entitlementItem, value, searchTerm));
                 entitlementItem.appendChild(entitlementButton);
 
                 const entitlementDetails = document.createElement('div');
                 entitlementDetails.className = 'accordion-content bg-nord';
-                entitlementDetails.innerHTML = `<div class="accordion-inner"><pre><code class="language-xml">${value}</code></pre></div>`;
+                    entitlementDetails.innerHTML = `<div class="accordion-inner"><pre><code class="language-xml"></code></pre></div>`;
                 entitlementItem.appendChild(entitlementDetails);
 
                 entitlementList.appendChild(entitlementItem);
             }
-            document.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightBlock(block);
-            });
         };
 
-        const toggleDetails = (entitlementItem) => {
+            const toggleDetails = (entitlementItem, value, searchTerm) => {
             const details = entitlementItem.querySelector('.accordion-content');
             if (details.classList.contains('show')) {
                 details.style.maxHeight = null;
@@ -147,13 +168,16 @@
                     content.classList.remove('show');
                 });
                 details.classList.add('show');
+                    details.querySelector('code').textContent = value;
+                    hljs.highlightBlock(details.querySelector('code'));
+                    details.querySelector('code').innerHTML = highlightMatches(details.querySelector('code').innerHTML, searchTerm);
                 details.style.maxHeight = "none";  // Allow the content to expand fully
                 const scrollHeight = details.scrollHeight;  // Get the full height of the content
                 details.style.maxHeight = `${scrollHeight}px`;  // Set max-height to the full height of the content
             }
         };
 
-        searchInput.addEventListener('input', () => {
+            const performSearch = () => {
             const searchTerm = searchInput.value.toLowerCase();
             const filteredEntitlements = Object.fromEntries(
                 Object.entries(entitlements).filter(([key, value]) =>
@@ -164,11 +188,15 @@
             if (Object.keys(filteredEntitlements).length === 0) {
                 entitlementList.innerHTML = '<p class="text-center w-full text-nord-aurora">No entitlements found.</p>';
             } else {
-                renderEntitlements(filteredEntitlements);
+                    renderEntitlements(filteredEntitlements, searchTerm);
             }
-        });
+            };
 
-        renderEntitlements(entitlements);
+            const debouncedSearch = debounce(performSearch, 300);
+
+            searchInput.addEventListener('input', debouncedSearch);
+
+            renderEntitlements(entitlements, '');
         });
     </script>
 </body>
