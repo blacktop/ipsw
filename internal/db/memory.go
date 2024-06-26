@@ -44,7 +44,7 @@ func (m Memory) Create(i *models.IPSW) error {
 func (m Memory) Get(id uint) (*models.IPSW, error) {
 	pet, exists := m.IPSWs[id]
 	if !exists {
-		return nil, errors.Errorf("no pet found with id: %s", id)
+		return nil, errors.Errorf("no IPSW found with id: %d", id)
 	}
 	return pet, nil
 }
