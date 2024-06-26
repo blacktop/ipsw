@@ -17,6 +17,7 @@ import (
 
 const port = 3993
 
+// TODO: gzip static files
 var (
 	//go:embed templates
 	templatesFs embed.FS
