@@ -40,6 +40,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
@@ -126,6 +127,8 @@ var entCmd = &cobra.Command{
 		// check flags
 		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
+		} else if showUI && doDiff || len(ipsws) > 1 {
+			return fmt.Errorf("cannot use --ui with --diff OR multiple IPSWs")
 		}
 		color.NoColor = viper.GetBool("no-color") || onlyFiles
 
@@ -189,6 +192,14 @@ var entCmd = &cobra.Command{
 		}
 
 		if showUI {
+			var version string
+			if len(ipsws) == 1 {
+				if i, err := info.Parse(ipsws[0]); err == nil {
+					version = fmt.Sprintf("for %s (%s)",
+						i.Plists.BuildManifest.ProductVersion,
+						i.Plists.BuildManifest.ProductBuildVersion)
+				}
+			}
 			db := make(map[string]string)
 			for f, e := range entDBs[0] {
 				if len(e) == 0 {
@@ -197,7 +208,7 @@ var entCmd = &cobra.Command{
 				db[f] = e
 			}
 			return ent.UI(db, &ent.Config{
-				Version: "18.0 beta2 (18A5319i)",
+				Version: version,
 				Host:    viper.GetString("ent.host"),
 				Port:    viper.GetInt("ent.port"),
 			})
