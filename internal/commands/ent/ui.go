@@ -15,8 +15,6 @@ import (
 	"github.com/apex/log"
 )
 
-const port = 3993
-
 // TODO: gzip static files
 var (
 	//go:embed templates
@@ -59,9 +57,9 @@ func UI(db map[string]string, c *Config) error {
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFs))))
 
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", c.Port)
 	if c.Host != "localhost" {
-		addr = fmt.Sprintf("%s:%d", c.Host, port)
+		addr = fmt.Sprintf("%s:%d", c.Host, c.Port)
 	}
 
 	server := &http.Server{
@@ -69,12 +67,15 @@ func UI(db map[string]string, c *Config) error {
 		Handler: mux,
 	}
 
-	log.WithField("port", port).Info("Starting server")
+	log.WithFields(log.Fields{
+		"host": c.Host,
+		"port": c.Port,
+	}).Info("Starting Server")
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server: failed to listen and serve: %v\n", err)
 		}
-		log.Warn("Shutting down server...")
+		log.Warn("shutting down server...")
 	}()
 
 	sigChan := make(chan os.Signal, 1)
@@ -87,7 +88,7 @@ func UI(db map[string]string, c *Config) error {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("server: failed to shutdown: %v", err)
 	}
-	log.Info("Shutdown complete")
+	log.Info("Shutdown Complete")
 
 	return nil
 }
