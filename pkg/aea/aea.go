@@ -59,6 +59,9 @@ type PrivateKey []byte
 
 func (k PrivateKey) UnmarshalBinaryPrivateKey() ([]byte, error) {
 	block, _ := pem.Decode(k)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode p8 key")
+	}
 	parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse p8 key: %v", err)
@@ -72,7 +75,7 @@ func (k PrivateKey) UnmarshalBinaryPrivateKey() ([]byte, error) {
 
 type Metadata map[string][]byte
 
-func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
+func (md Metadata) GetPrivateKey(data []byte, skipEmbedded bool) (map[string]PrivateKey, error) {
 	out := make(map[string]PrivateKey)
 
 	if len(data) > 0 {
@@ -86,15 +89,17 @@ func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
 	}
 
 	// check if keys are already loaded
-	if keys, err := getKeys(); err == nil {
-		u, err := url.Parse(string(privKeyURL))
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range keys {
-			if strings.EqualFold(k, path.Base(u.Path)) {
-				out[k] = PrivateKey(v)
-				return out, nil
+	if !skipEmbedded {
+		if keys, err := getKeys(); err == nil {
+			u, err := url.Parse(string(privKeyURL))
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range keys {
+				if strings.EqualFold(k, path.Base(u.Path)) {
+					out[k] = PrivateKey(v)
+					return out, nil
+				}
 			}
 		}
 	}
@@ -104,6 +109,10 @@ func (md Metadata) GetPrivateKey(data []byte) (map[string]PrivateKey, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to fcs-key URL: %s", resp.Status)
+	}
 
 	privKey, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -137,7 +146,7 @@ func (md Metadata) DecryptFCS(pemData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	pkmap, err := md.GetPrivateKey(pemData)
+	pkmap, err := md.GetPrivateKey(pemData, false)
 	if err != nil {
 		return nil, err
 	}

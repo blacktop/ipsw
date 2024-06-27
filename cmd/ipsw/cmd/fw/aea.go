@@ -115,7 +115,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil)
+			pkmap, err := metadata.GetPrivateKey(nil, false)
 			if err != nil {
 				return fmt.Errorf("failed to get private key: %v", err)
 			}

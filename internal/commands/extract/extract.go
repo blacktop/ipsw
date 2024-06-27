@@ -571,7 +571,7 @@ func FcsKeys(c *Config) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil)
+			pkmap, err := metadata.GetPrivateKey(nil, true)
 			if err != nil {
 				return nil, err
 			}
