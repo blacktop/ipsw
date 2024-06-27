@@ -484,11 +484,11 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 			}
 		}
 
-		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
+		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevListFolder(devs)), nil
 	}
 
 	sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
-	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
+	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevListFolder(i.Plists.BuildManifest.SupportedProductTypes)), nil
 }
 
 // GetFolders returns a list of the IPSW name folders
@@ -610,6 +610,32 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 }
 
 func getAbbreviatedDevList(devices []string) string {
+	var devList string
+
+	if len(devices) == 0 {
+		return ""
+	} else if len(devices) == 1 {
+		return devices[0]
+	}
+
+	currentDev := devices[0]
+	devPrefix := strings.Split(currentDev, ",")[0]
+	devList += currentDev
+
+	for _, dev := range devices[1:] {
+		if strings.HasPrefix(dev, devPrefix) {
+			devList += fmt.Sprintf("_%s", strings.Split(dev, ",")[1])
+		} else {
+			currentDev = dev
+			devPrefix = strings.Split(currentDev, ",")[0]
+			devList += "_" + currentDev
+		}
+	}
+
+	return devList
+}
+
+func getAbbreviatedDevListFolder(devices []string) string {
 	var devList string
 
 	if len(devices) == 0 {
