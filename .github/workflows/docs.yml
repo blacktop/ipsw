@@ -24,13 +24,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: www/package-lock.json
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install
       - name: Build website
-        run: yarn build
+        run: pnpm build --locale en
 
       - name: Upload Build Artifact
         uses: actions/upload-pages-artifact@v3
