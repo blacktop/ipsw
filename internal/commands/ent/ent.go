@@ -160,7 +160,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 		}
 	} else {
-		log.WithField("database", filepath.Base(conf.Database)).Info("Loading entitlement DB")
+		log.WithField("database", filepath.Base(conf.Database)).Info("Loading Entitlement DB")
 
 		edbFile, err := os.Open(conf.Database)
 		if err != nil {
