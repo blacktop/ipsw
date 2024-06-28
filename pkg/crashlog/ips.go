@@ -90,6 +90,7 @@ func GetLogTypes() (*LogTypes, error) {
 type Config struct {
 	All      bool
 	Running  bool
+	Process  string
 	Unslid   bool
 	Demangle bool
 }
@@ -964,6 +965,10 @@ func (i *Ips) String() string {
 						if notRunning {
 							continue
 						}
+					} else if len(i.Config.Process) > 0 {
+						if p.Name != i.Config.Process {
+							continue
+						}
 					} else {
 						continue
 					}
@@ -979,6 +984,10 @@ func (i *Ips) String() string {
 					if !i.Config.All {
 						if i.Config.Running {
 							if !slices.Contains(t.State, "TH_RUN") {
+								continue
+							}
+						} else if len(i.Config.Process) > 0 {
+							if p.Name != i.Config.Process {
 								continue
 							}
 						} else {
