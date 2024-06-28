@@ -186,8 +186,6 @@ type SwiftHashTable struct {
 }
 
 func (s *SwiftHashTable) Read(r *io.SectionReader) error {
-	r.Seek(int64(s.CacheOffset), io.SeekStart)
-
 	if err := binary.Read(r, binary.LittleEndian, &s.swiftHashTable); err != nil {
 		return fmt.Errorf("failed to read %T: %v", s.swiftHashTable, err)
 	}
@@ -236,7 +234,7 @@ func (f *File) getSwiftTypeHashTable() (*SwiftHashTable, error) {
 
 		shash := SwiftHashTable{CacheOffset: off, UUID: uuid, Type: TypeConformance}
 
-		if err := shash.Read(io.NewSectionReader(f.r[uuid], 0, 1<<63-1)); err != nil {
+		if err := shash.Read(io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)); err != nil {
 			return nil, fmt.Errorf("failed to read %T: %v", shash, err)
 		}
 
@@ -272,7 +270,7 @@ func (f *File) getSwiftMetadataTable() (*SwiftHashTable, error) {
 
 		shash := SwiftHashTable{CacheOffset: off, UUID: uuid, Type: MetadataConformance}
 
-		if err := shash.Read(io.NewSectionReader(f.r[uuid], 0, 1<<63-1)); err != nil {
+		if err := shash.Read(io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)); err != nil {
 			return nil, fmt.Errorf("failed to read %T: %v", shash, err)
 		}
 
@@ -308,7 +306,7 @@ func (f *File) getSwiftForeignTypeHashTable() (*SwiftHashTable, error) {
 
 		shash := SwiftHashTable{CacheOffset: off, UUID: uuid, Type: ForeignTypeConformance}
 
-		if err := shash.Read(io.NewSectionReader(f.r[uuid], 0, 1<<63-1)); err != nil {
+		if err := shash.Read(io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)); err != nil {
 			return nil, fmt.Errorf("failed to read %T: %v", shash, err)
 		}
 

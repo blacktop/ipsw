@@ -128,9 +128,6 @@ func (s *StringHash) Scramble() [256]uint32 {
 }
 
 func (s *StringHash) Read(r io.ReadSeeker) error {
-
-	r.Seek(int64(s.FileOffset), io.SeekStart)
-
 	if s.opt.GetVersion() >= 16 {
 		var sh stringHashV16
 		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {

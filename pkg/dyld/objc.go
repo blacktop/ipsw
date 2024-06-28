@@ -230,11 +230,8 @@ func (f *File) GetOptimizations() (Optimization, error) {
 					f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].ObjcOptsOffset, err)
 			}
 
-			sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-			sr.Seek(int64(off), io.SeekStart)
-
 			var o ObjCOptimizationHeader
-			if err := binary.Read(sr, f.ByteOrder, &o); err != nil {
+			if err := binary.Read(io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1), f.ByteOrder, &o); err != nil {
 				return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", err)
 			}
 
@@ -260,12 +257,11 @@ func (f *File) getHeaderInfoRO() (*objc_headeropt_ro_t, error) {
 	switch o := opt.(type) {
 	case *ObjCOptimizationHeader:
 		hdr.offset = o.GetHeaderInfoRoCacheOffset()
-		u, off, err = f.GetCacheOffset(o.GetHeaderInfoRoCacheOffset())
+		u, off, err = f.GetOffset(f.Headers[f.UUID].SharedRegionStart + o.GetHeaderInfoRoCacheOffset())
 		if err != nil {
 			return nil, err
 		}
-		sr := io.NewSectionReader(f.r[u], 0, 1<<63-1)
-		sr.Seek(int64(off), io.SeekStart)
+		sr := io.NewSectionReader(f.r[u], int64(off), 1<<63-1)
 		if err := binary.Read(sr, f.ByteOrder, &hdr.Count); err != nil {
 			return nil, err
 		}
@@ -277,7 +273,7 @@ func (f *File) getHeaderInfoRO() (*objc_headeropt_ro_t, error) {
 			return nil, err
 		}
 	case *ObjcOptT:
-		u, off, err = f.GetOffset(f.objcOptRoAddr + uint64(o.HeaderOptRoOffset))
+		u, off, err = f.GetOffset(f.Headers[f.UUID].SharedRegionStart + f.Headers[f.UUID].ObjcOptsOffset + uint64(o.HeaderOptRoOffset))
 		if err != nil {
 			return nil, err
 		}
@@ -317,21 +313,17 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 
 	switch o := opt.(type) {
 	case *ObjCOptimizationHeader:
-		u, off, err = f.GetCacheOffset(o.SelectorHashTableOffset(0))
+		u, off, err = f.GetOffset(f.Headers[f.UUID].SharedRegionStart + o.SelectorHashTableOffset(0))
 		if err != nil {
 			return nil, nil, err
 		}
 		shash = StringHash{Type: selopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(off), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	case *ObjcOptT:
-		u, off, err = f.GetOffset(f.objcOptRoAddr)
-		if err != nil {
-			return nil, nil, err
-		}
-		shash = StringHash{Type: selopt, FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		shash = StringHash{Type: selopt, FileOffset: int64(opt.SelectorHashTableOffset(0)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(opt.SelectorHashTableOffset(0)), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -357,21 +349,17 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 
 	switch o := opt.(type) {
 	case *ObjCOptimizationHeader:
-		u, off, err = f.GetCacheOffset(o.ClassHashTableOffset(0))
+		u, off, err = f.GetOffset(f.Headers[f.UUID].SharedRegionStart + o.ClassHashTableOffset(0))
 		if err != nil {
 			return nil, nil, err
 		}
 		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(off), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	case *ObjcOptT:
-		u, off, err = f.GetOffset(f.objcOptRoAddr)
-		if err != nil {
-			return nil, nil, err
-		}
-		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ClassHashTableOffset(0)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(opt.ClassHashTableOffset(0)), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -397,21 +385,17 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 
 	switch o := opt.(type) {
 	case *ObjCOptimizationHeader:
-		u, off, err = f.GetCacheOffset(o.ProtocolHashTableOffset(0))
+		u, off, err = f.GetOffset(f.Headers[f.UUID].SharedRegionStart + o.ProtocolHashTableOffset(0))
 		if err != nil {
 			return nil, nil, err
 		}
 		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(off), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	case *ObjcOptT:
-		u, off, err = f.GetOffset(f.objcOptRoAddr)
-		if err != nil {
-			return nil, nil, err
-		}
-		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ProtocolHashTableOffset(0)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], int64(opt.ProtocolHashTableOffset(0)), 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	}
