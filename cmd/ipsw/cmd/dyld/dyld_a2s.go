@@ -136,10 +136,14 @@ var AddrToSymCmd = &cobra.Command{
 			fmt.Println("-----")
 			fmt.Printf(" > %s (%s.%s)\n\n", sym.Image, sym.Segment, sym.Section)
 		} else {
-			log.WithFields(log.Fields{
-				"dylib":   sym.Image,
-				"section": fmt.Sprintf("%s.%s", sym.Segment, sym.Section),
-			}).Info("Address location")
+			if len(sym.Section) > 0 {
+				log.WithFields(log.Fields{
+					"dylib":   sym.Image,
+					"section": fmt.Sprintf("%s.%s", sym.Segment, sym.Section),
+				}).Info("Address location")
+			} else {
+				log.WithFields(log.Fields{"dylib": sym.Image, "segment": sym.Segment}).Info("Address location")
+			}
 		}
 
 		fmt.Printf("%#x: %s\n", unslidAddr, sym.Symbol)
