@@ -15,8 +15,8 @@ dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
 	@go install golang.org/x/tools/...@latest
 	@go install github.com/spf13/cobra-cli@latest
-	@go get -d golang.org/x/tools/cmd/cover
-	@go get -d golang.org/x/tools/cmd/stringer
+	@go install golang.org/x/tools/cmd/cover@latest
+	@go ginstall golang.org/x/tools/cmd/stringer@latest
 	@go install github.com/caarlos0/svu@v1.4.1
 
 .PHONY: x86-brew
