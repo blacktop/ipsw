@@ -88,8 +88,8 @@ func (md Metadata) GetPrivateKey(data []byte, skipEmbedded bool) (map[string]Pri
 		return nil, fmt.Errorf("fcs-key-url key NOT found")
 	}
 
-	// check if keys are already loaded
 	if !skipEmbedded {
+		// check if keys are already loaded
 		if keys, err := getKeys(); err == nil {
 			u, err := url.Parse(string(privKeyURL))
 			if err != nil {
