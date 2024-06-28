@@ -177,6 +177,23 @@ type IpsMetadata struct {
 	RootsInstalled   int       `json:"roots_installed,omitempty"`
 }
 
+func (m IpsMetadata) Version() string {
+	re := regexp.MustCompile(`(?P<version>[0-9.]+) \((?P<build>\w+)\)$`)
+	matches := re.FindStringSubmatch(m.OsVersion)
+	if len(matches) != 3 {
+		return m.OsVersion
+	}
+	return matches[1]
+}
+func (m IpsMetadata) Build() string {
+	re := regexp.MustCompile(`(?P<version>[0-9.]+) \((?P<build>\w+)\)$`)
+	matches := re.FindStringSubmatch(m.OsVersion)
+	if len(matches) != 3 {
+		return m.OsVersion
+	}
+	return matches[2]
+}
+
 type MemoryStatus struct {
 	BusyBufferCount int64 `json:"busyBufferCount,omitempty"`
 	Compressions    int64 `json:"compressions,omitempty"`
