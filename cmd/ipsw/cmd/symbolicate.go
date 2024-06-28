@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -32,6 +34,7 @@ import (
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -59,15 +62,17 @@ var symbolicateCmd = &cobra.Command{
 	Use:     "symbolicate <CRASHLOG> [IPSW|DSC]",
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
-	Args:    cobra.MinimumNArgs(1),
 	Example: heredoc.Doc(`
-		# Symbolicate a panic crashlog (BugType=210) with an IPSW
-		  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
-		# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
+	# Symbolicate a panic crashlog (BugType=210) with an IPSW
+	❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+	# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
 		  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
-		# Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+		  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
 		  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
-		    ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
+		  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -106,12 +111,25 @@ var symbolicateCmd = &cobra.Command{
 				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 			} else {
 				if hdr.BugType == "210" {
+					/* validate IPSW */
+					i, err := info.Parse(args[1])
+					if err != nil {
+						return err
+					}
+					if i.Plists.BuildManifest.ProductVersion != ips.Header.OsVersion ||
+						!slices.Contains(i.Plists.Restore.SupportedProductTypes, ips.Payload.Product) {
+						return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s)",
+							filepath.Base(args[1]),
+							ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
+							strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
+							i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
+						)
+					}
 					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
 						return err
 					}
 				}
 			}
-
 			fmt.Println(ips)
 		case "109": // OLD STYLE CRASHLOG
 			crashLog, err := crashlog.Open(args[0])
