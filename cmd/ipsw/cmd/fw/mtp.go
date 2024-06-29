@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/D84_MtpFirmware.im4p
+
 func init() {
 	FwCmd.AddCommand(mtpCmd)
 
@@ -47,8 +50,6 @@ var mtpCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/D84_MtpFirmware.im4p
 
 		// flags
 		// output := viper.GetString("fw.mtp.output")

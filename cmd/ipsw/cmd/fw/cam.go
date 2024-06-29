@@ -22,16 +22,31 @@ THE SOFTWARE.
 package fw
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/isp_bni/adc-aceso-d8x.im4p
+
 func init() {
 	FwCmd.AddCommand(camCmd)
 
+	camCmd.Flags().BoolP("info", "i", false, "Print info")
 	camCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	camCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.cam.info", camCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.cam.output", camCmd.Flags().Lookup("output"))
 }
 
@@ -48,13 +63,33 @@ var camCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// Firmware/isp_bni/adc-aceso-d8x.im4p
-
 		// flags
-		// output := viper.GetString("fw.cam.output")
+		showInfo := viper.GetBool("fw.cam.info")
+		output := viper.GetString("fw.cam.output")
 
-		panic("not implemented")
+		if ok, _ := magic.IsIm4p(args[0]); ok {
+			log.Info("Processing IM4P file")
+			im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+			if err != nil {
+				return err
+			}
+			if showInfo {
+				m, err := macho.NewFile(bytes.NewReader(im4p.Data))
+				if err != nil {
+					return err
+				}
+				fmt.Println(m.FileTOC.String())
+				return nil
+			} else {
+				fname := strings.TrimSuffix(filepath.Clean(args[0]), filepath.Ext(filepath.Clean(args[0])))
+				if output != "" {
+					fname = filepath.Join(output, filepath.Base(fname))
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
+				return os.WriteFile(fname, im4p.Data, 0o644)
+			}
+		}
 
-		return nil
+		return fmt.Errorf("unsupported file type")
 	},
 }

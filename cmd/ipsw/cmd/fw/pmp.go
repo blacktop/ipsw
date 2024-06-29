@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/pmp/t8130pmp.im4p
+
 func init() {
 	FwCmd.AddCommand(pmpCmd)
 
@@ -47,8 +50,6 @@ var pmpCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/pmp/t8130pmp.im4p
 
 		// flags
 		// output := viper.GetString("fw.pmp.output")

@@ -22,13 +22,18 @@ THE SOFTWARE.
 package fw
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -58,33 +63,42 @@ var aopCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		// flags
 		showInfo := viper.GetBool("fw.aop.info")
-		// output := viper.GetString("fw.aop.output")
+		output := viper.GetString("fw.aop.output")
 
-		if showInfo {
-			if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
-				m, err := macho.Open(filepath.Clean(args[0]))
+		if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
+			log.Info("Processing IM4P file")
+			im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+			if err != nil {
+				return err
+			}
+			if showInfo {
+				m, err := macho.NewFile(bytes.NewReader(im4p.Data))
 				if err != nil {
-					return fmt.Errorf("failed to parse MachO file: %v", err)
+					return err
 				}
-				defer m.Close()
 				fmt.Println(m.FileTOC.String())
+				return nil
 			} else {
+				fname := strings.TrimSuffix(filepath.Clean(args[0]), filepath.Ext(filepath.Clean(args[0])))
+				if output != "" {
+					fname = filepath.Join(output, filepath.Base(fname))
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
+				return os.WriteFile(fname, im4p.Data, 0o644)
+			}
+		} else {
+			if showInfo {
 				bn, err := bundle.Parse(filepath.Clean(args[0]))
 				if err != nil {
 					return err
 				}
 				fmt.Println(bn)
+			} else {
+				return fmt.Errorf("extraction not yet supported for this file type")
 			}
-		} else {
-			panic("not implemented")
 		}
 
-		return nil
+		return fmt.Errorf("unsupported file type")
 	},
 }

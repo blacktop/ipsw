@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/AppleLPM/AppleLPM.d84.release.im4p
+
 func init() {
 	FwCmd.AddCommand(lpmCmd)
 
@@ -47,8 +50,6 @@ var lpmCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/AppleLPM/AppleLPM.d84.release.im4p
 
 		// flags
 		// output := viper.GetString("fw.ane.output")
