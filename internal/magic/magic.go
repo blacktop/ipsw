@@ -1,6 +1,7 @@
 package magic
 
 import (
+	"bytes"
 	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
@@ -30,12 +31,18 @@ func IsMachO(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 	defer f.Close()
-
-	var magic [4]byte
-	if _, err = f.Read(magic[:]); err != nil {
+	data := make([]byte, 4)
+	if _, err := f.Read(data); err != nil {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
+	return IsMachOData(data)
+}
 
+func IsMachOData(dat []byte) (bool, error) {
+	var magic [4]byte
+	if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
 	switch Magic(binary.LittleEndian.Uint32(magic[:])) {
 	case Magic32, Magic64, MagicFatBE, MagicFatLE:
 		return true, nil

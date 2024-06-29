@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/ave/AppleAVE2FW_H16.im4p
+
 func init() {
 	FwCmd.AddCommand(aveCmd)
 
@@ -46,8 +49,6 @@ var aveCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/ave/AppleAVE2FW_H16.im4p
 
 		// flags
 		// output := viper.GetString("fw.ave.output")

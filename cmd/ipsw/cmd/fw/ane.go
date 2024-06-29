@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/ane/h16x_ane_fw_iaso_d8x.im4p
+
 func init() {
 	FwCmd.AddCommand(aneCmd)
 
@@ -46,8 +49,6 @@ var aneCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/ane/h16x_ane_fw_iaso_d8x.im4p
 
 		// flags
 		// output := viper.GetString("fw.ane.output")

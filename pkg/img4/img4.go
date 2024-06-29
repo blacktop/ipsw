@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -399,6 +400,15 @@ func Parse(r io.Reader) (*Img4, error) {
 			img4RestoreInfo: i.RestoreInfo,
 		},
 	}, nil
+}
+
+func OpenIm4p(path string) (*Im4p, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ParseIm4p(f)
 }
 
 func ParseIm4p(r io.Reader) (*Im4p, error) {
