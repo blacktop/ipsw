@@ -1,0 +1,22 @@
+name: Go Proxy
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+
+      - name: Proxy
+        run: |
+          GOPROXY=${{ secrets.GOPROXY }} go mod download all
+          GOPROXY=${{ secrets.GOPROXY }} go mod tidy
