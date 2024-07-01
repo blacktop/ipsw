@@ -3,7 +3,7 @@ package db
 import (
 	"fmt"
 
-	"github.com/blacktop/ipsw/internal/models"
+	"github.com/blacktop/ipsw/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -21,14 +21,17 @@ type Postgres struct {
 }
 
 // NewPostgres creates a new Postgres database.
-func NewPostgres(host, port, user, password, database string) Database {
+func NewPostgres(host, port, user, password, database string) (Database, error) {
+	if host == "" || port == "" || user == "" || password == "" || database == "" {
+		return nil, fmt.Errorf("'host', 'port', 'user', 'password and 'database' are required")
+	}
 	return Postgres{
 		Host:     host,
 		Port:     port,
 		User:     user,
 		Password: password,
 		Database: database,
-	}
+	}, nil
 }
 
 // Connect connects to the database.
@@ -40,27 +43,27 @@ func (p Postgres) Connect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
 	}
-	return p.db.AutoMigrate(&models.IPSW{})
+	return p.db.AutoMigrate(&model.IPSW{})
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
-func (p Postgres) Create(i *models.IPSW) error {
+func (p Postgres) Create(i *model.IPSW) error {
 	p.db.Create(i)
 	return nil
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
-func (p Postgres) Get(key uint) (*models.IPSW, error) {
-	i := &models.IPSW{}
+func (p Postgres) Get(key uint) (*model.IPSW, error) {
+	i := &model.IPSW{}
 	p.db.First(&i, key)
 	return i, nil
 }
 
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
-func (p Postgres) Set(key uint, value *models.IPSW) error {
+func (p Postgres) Set(key uint, value *model.IPSW) error {
 	p.db.Save(value)
 	return nil
 }
@@ -68,7 +71,7 @@ func (p Postgres) Set(key uint, value *models.IPSW) error {
 // Delete removes the given key.
 // It returns ErrNotFound if the key does not exist.
 func (p Postgres) Delete(key uint) error {
-	p.db.Delete(&models.IPSW{}, key)
+	p.db.Delete(&model.IPSW{}, key)
 	return nil
 }
 
