@@ -22,6 +22,7 @@ type daemon struct {
 type database struct {
 	Driver   string `json:"driver" env:"DB_DRIVER"`
 	Name     string `json:"database" env:"DB_NAME"`
+	Path     string `json:"path" env:"DB_PATH"`
 	Host     string `json:"host" env:"DB_HOST"`
 	Port     string `json:"port" env:"DB_PORT"`
 	User     string `json:"user" env:"DB_USER"`
