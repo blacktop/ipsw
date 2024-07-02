@@ -40,10 +40,10 @@ func init() {
 
 // imageCmd represents the image command
 var ImageCmd = &cobra.Command{
-	Use:     "image <DSC> <DYLIB>",
+	Use:     "image <DSC> [DYLIB]",
 	Aliases: []string{"img"},
 	Short:   "Dump image array info",
-	Args:    cobra.MaximumNArgs(2),
+	Args:    cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
 			return getImages(args[0]), cobra.ShellCompDirectiveDefault

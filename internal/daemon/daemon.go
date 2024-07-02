@@ -85,7 +85,7 @@ func (d *daemon) Start() (err error) {
 	if err := d.setupDB(); err != nil {
 		return err
 	}
-	return d.server.Start()
+	return d.server.Start(d.db)
 }
 
 func (d *daemon) Stop() error {
