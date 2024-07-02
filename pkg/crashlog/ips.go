@@ -807,8 +807,8 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 					// lookup symbol in DSC dylib
 					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
-						img.ParseLocalSymbols(false)
 						img.ParsePublicSymbols(false)
+						img.ParseLocalSymbols(false)
 						m, err := img.GetMacho()
 						if err != nil {
 							return fmt.Errorf("failed to get macho from image: %w", err)

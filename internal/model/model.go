@@ -23,7 +23,7 @@ type IPSW struct {
 	Date       time.Time         `json:"date,omitempty"`
 	Kernels    []Kernelcache     `gorm:"many2many:ipsw_kernels;" json:"kernels,omitempty"`
 	DSCs       []DyldSharedCache `gorm:"many2many:ipsw_dscs;" json:"dscs,omitempty"`
-	FileSystem FileSystem        `json:"files"`
+	FileSystem []MachO           `gorm:"many2many:ipsw_files;" json:"file_system,omitempty"`
 }
 
 type Device struct {
@@ -54,14 +54,6 @@ type DyldSharedCache struct {
 	Images  []MachO `gorm:"many2many:dsc_images;" json:"images,omitempty"`
 }
 
-type FileSystem struct {
-	gorm.Model
-	AppOS    []MachO `gorm:"many2many:appos_files;" json:"app_os,omitempty"`
-	SystemOS []MachO `gorm:"many2many:systemos_files;" json:"system_os,omitempty"`
-	FS       []MachO `gorm:"many2many:fs_files;" json:"fs,omitempty"`
-	IPSWID   uint
-}
-
 type MachO struct {
 	UUID      string `gorm:"primaryKey" json:"uuid"`
 	CreatedAt time.Time
@@ -74,7 +66,7 @@ type MachO struct {
 
 type Symbol struct {
 	gorm.Model
-	Symbol *string `json:"symbol"`
-	Start  uint64  `json:"start"`
-	End    uint64  `json:"end"`
+	Symbol string `json:"symbol"`
+	Start  string `json:"start"`
+	End    string `json:"end"`
 }
