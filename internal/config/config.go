@@ -20,14 +20,15 @@ type daemon struct {
 }
 
 type database struct {
-	Driver   string `json:"driver" env:"DB_DRIVER"`
-	Name     string `json:"database" env:"DB_NAME"`
-	Path     string `json:"path" env:"DB_PATH"`
-	Host     string `json:"host" env:"DB_HOST"`
-	Port     string `json:"port" env:"DB_PORT"`
-	User     string `json:"user" env:"DB_USER"`
-	Password string `json:"password" env:"DB_PASSWORD"`
-	SSLMode  string `json:"sslmode" env:"DB_SSLMODE"`
+	Driver    string `json:"driver" env:"DB_DRIVER"`
+	Name      string `json:"database" env:"DB_NAME"`
+	Path      string `json:"path" env:"DB_PATH"`
+	Host      string `json:"host" env:"DB_HOST"`
+	Port      string `json:"port" env:"DB_PORT"`
+	User      string `json:"user" env:"DB_USER"`
+	Password  string `json:"password" env:"DB_PASSWORD"`
+	SSLMode   string `json:"sslmode" env:"DB_SSLMODE"`
+	BatchSize int    `json:"batchsize" env:"DB_BATCHSIZE" envDefault:"1000"`
 }
 
 // Config is the configuration struct
@@ -56,6 +57,8 @@ func (c *Config) verify() error {
 		c.Daemon.Host = "localhost"
 	} else if strings.HasPrefix(c.Daemon.Socket, "~/") {
 		c.Daemon.Socket = filepath.Join(home, c.Daemon.Socket[2:]) // TODO: is this bad practice?
+	} else if c.Database.BatchSize == 0 {
+		c.Database.BatchSize = 1000
 	}
 
 	return nil

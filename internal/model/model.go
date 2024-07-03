@@ -28,7 +28,6 @@ type Ipsw struct {
 }
 
 type Device struct {
-	gorm.Model
 	Name string `gorm:"primaryKey" json:"name"`
 }
 

@@ -211,7 +211,7 @@ func Scan(ipswPath string, db db.Database) (err error) {
 		if m.UUID() != nil {
 			mm := &model.Macho{
 				UUID: m.UUID().String(),
-				Name: filepath.Base(path),
+				Name: path,
 			}
 			for _, fn := range m.GetFunctions() {
 				var msym *model.Symbol

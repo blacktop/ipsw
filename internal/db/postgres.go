@@ -6,6 +6,7 @@ import (
 	"github.com/blacktop/ipsw/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Postgres is a database that stores data in a Postgres database.
@@ -16,21 +17,24 @@ type Postgres struct {
 	User     string
 	Password string
 	Database string
+	// Config
+	BatchSize int
 
 	db *gorm.DB
 }
 
 // NewPostgres creates a new Postgres database.
-func NewPostgres(host, port, user, password, database string) (Database, error) {
-	if host == "" || port == "" || user == "" || password == "" || database == "" {
-		return nil, fmt.Errorf("'host', 'port', 'user', 'password and 'database' are required")
+func NewPostgres(host, port, user, password, database string, batchSize int) (Database, error) {
+	if host == "" || port == "" || user == "" || database == "" {
+		return nil, fmt.Errorf("'host', 'port', 'user' and 'database' are required")
 	}
 	return &Postgres{
-		Host:     host,
-		Port:     port,
-		User:     user,
-		Password: password,
-		Database: database,
+		Host:      host,
+		Port:      port,
+		User:      user,
+		Password:  password,
+		Database:  database,
+		BatchSize: batchSize,
 	}, nil
 }
 
@@ -39,17 +43,28 @@ func (p *Postgres) Connect() (err error) {
 	p.db, err = gorm.Open(postgres.Open(fmt.Sprintf(
 		"host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
 		p.Host, p.Port, p.User, p.Database, p.Password,
-	)), &gorm.Config{})
+	)), &gorm.Config{
+		CreateBatchSize:        p.BatchSize,
+		SkipDefaultTransaction: true,
+		Logger:                 logger.Default.LogMode(logger.Error),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
 	}
-	return p.db.AutoMigrate(&model.Ipsw{})
+	return p.db.AutoMigrate(
+		&model.Ipsw{},
+		&model.Device{},
+		&model.Kernelcache{},
+		&model.DyldSharedCache{},
+		&model.Macho{},
+		&model.Symbol{},
+	)
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {
-	if result := p.db.Create(value); result.Error != nil {
+	if result := p.db.FirstOrCreate(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
