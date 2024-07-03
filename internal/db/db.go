@@ -18,12 +18,14 @@ type Database interface {
 	// It returns ErrNotFound if the key does not exist.
 	Get(key string) (*model.Ipsw, error)
 
-	// Get returns the value for the given key.
-	// It returns ErrNotFound if the key does not exist.
+	// GetByName returns the value for the given name.
+	// It returns ErrNotFound if the name does not exist.
 	GetByName(name string) (*model.Ipsw, error)
 
+	// GetSymbol returns the symbol for the given UUID and address.
 	GetSymbol(uuid string, addr uint64) (*model.Symbol, error)
 
+	// GetSymbols returns all symbols for the given UUID.
 	GetSymbols(uuid string) ([]*model.Symbol, error)
 
 	// Save updates the IPSW.

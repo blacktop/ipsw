@@ -58,7 +58,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 	//
 	// Symbol
 	//
-	// Get symbols for a given uuid.
+	// Get symbol for a given uuid and address.
 	//
 	//     Produces:
 	//     - application/json
