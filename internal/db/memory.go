@@ -6,7 +6,6 @@ import (
 
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/pkg/errors"
-	"gorm.io/gorm"
 )
 
 // Memory is a database that stores data in memory.
@@ -34,10 +33,6 @@ func (m *Memory) Connect() error {
 	}
 	defer f.Close()
 	return gob.NewDecoder(f).Decode(&m.IPSWs)
-}
-
-func (m *Memory) DB() *gorm.DB {
-	return nil
 }
 
 // Create creates a new entry in the database.

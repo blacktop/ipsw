@@ -3,7 +3,6 @@ package db
 
 import (
 	"github.com/blacktop/ipsw/internal/model"
-	"gorm.io/gorm"
 )
 
 // Database is the interface that wraps the basic database operations.
@@ -14,8 +13,6 @@ type Database interface {
 	// Create creates a new entry in the database.
 	// It returns ErrAlreadyExists if the key already exists.
 	Create(value any) error
-
-	DB() *gorm.DB
 
 	// Get returns the value for the given key.
 	// It returns ErrNotFound if the key does not exist.
