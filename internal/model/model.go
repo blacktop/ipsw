@@ -68,7 +68,9 @@ type Macho struct {
 	Symbols []*Symbol `gorm:"many2many:macho_syms;"`
 }
 
+// swagger:model
 type Symbol struct {
+	// swagger:ignore
 	gorm.Model
 	Symbol string `json:"symbol"`
 	Start  uint64 `gorm:"type:bigint" json:"start"`
