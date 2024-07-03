@@ -33,7 +33,7 @@ func NewDaemon() Daemon {
 func (d *daemon) setupDB() (err error) {
 	switch d.conf.Database.Driver {
 	case "sqlite":
-		d.db, err = db.NewSqlite(d.conf.Database.Path)
+		d.db, err = db.NewSqlite(d.conf.Database.Path, d.conf.Database.BatchSize)
 		if err != nil {
 			return fmt.Errorf("failed to create sqlite database: %w", err)
 		}
@@ -45,6 +45,7 @@ func (d *daemon) setupDB() (err error) {
 			d.conf.Database.User,
 			d.conf.Database.Password,
 			d.conf.Database.Name,
+			d.conf.Database.BatchSize,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create postgres database: %w", err)

@@ -13,24 +13,27 @@ import (
 // Sqlite is a database that stores data in a sqlite database.
 type Sqlite struct {
 	URL string
+	// Config
+	BatchSize int
 
 	db *gorm.DB
 }
 
 // NewSqlite creates a new Sqlite database.
-func NewSqlite(path string) (Database, error) {
+func NewSqlite(path string, batchSize int) (Database, error) {
 	if path == "" {
 		return nil, fmt.Errorf("'path' is required")
 	}
 	return &Sqlite{
-		URL: path,
+		URL:       path,
+		BatchSize: batchSize,
 	}, nil
 }
 
 // Connect connects to the database.
 func (s *Sqlite) Connect() (err error) {
 	s.db, err = gorm.Open(sqlite.Open(s.URL), &gorm.Config{
-		CreateBatchSize:        1000,
+		CreateBatchSize:        s.BatchSize,
 		SkipDefaultTransaction: true,
 		Logger:                 logger.Default.LogMode(logger.Error),
 		// Logger:                 logger.Default.LogMode(logger.Silent),
