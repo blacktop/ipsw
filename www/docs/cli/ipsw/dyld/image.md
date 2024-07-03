@@ -11,7 +11,7 @@ description: Dump image array info
 Dump image array info
 
 ```
-ipsw dyld image <DSC> <DYLIB> [flags]
+ipsw dyld image <DSC> [DYLIB] [flags]
 ```
 
 ### Examples
