@@ -54,38 +54,6 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 		}
 		c.JSON(http.StatusOK, successResponse{Success: true})
 	})
-	// swagger:route GET /syms/{uuid} Syms getSymbols
-	//
-	// Symbols
-	//
-	// Get symbols for a given uuid.
-	//
-	//     Produces:
-	//     - application/json
-	//
-	//     Parameters:
-	//       + name: uuid
-	//         in: path
-	//         description: file UUID
-	//         required: true
-	//         type: string
-	//
-	//     Responses:
-	//       200: symsResponse
-	//       500: genericError
-	rg.GET("/syms/:uuid", func(c *gin.Context) {
-		uuid := c.Param("uuid")
-		syms, err := syms.Get(uuid, db)
-		if err != nil {
-			if errors.Is(err, model.ErrNotFound) {
-				c.AbortWithStatusJSON(http.StatusNotFound, types.GenericError{Error: err.Error()})
-				return
-			}
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, symsResponse(syms))
-	})
 	// swagger:route GET /syms/{uuid}/{addr} Syms getSymbol
 	//
 	// Symbol
@@ -123,5 +91,37 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 			return
 		}
 		c.JSON(http.StatusOK, symResponse(sym))
+	})
+	// swagger:route GET /syms/{uuid} Syms getSymbols
+	//
+	// Symbols
+	//
+	// Get symbols for a given uuid.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: uuid
+	//         in: path
+	//         description: file UUID
+	//         required: true
+	//         type: string
+	//
+	//     Responses:
+	//       200: symsResponse
+	//       500: genericError
+	rg.GET("/syms/:uuid", func(c *gin.Context) {
+		uuid := c.Param("uuid")
+		syms, err := syms.Get(uuid, db)
+		if err != nil {
+			if errors.Is(err, model.ErrNotFound) {
+				c.AbortWithStatusJSON(http.StatusNotFound, types.GenericError{Error: err.Error()})
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, symsResponse(syms))
 	})
 }
