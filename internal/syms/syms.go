@@ -19,23 +19,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
-const batchSize = 300
-
-func batchInsert(db db.Database, model any, assoc string, values []*any) error {
-	for i := 0; i < len(values); i++ {
-		end := i + batchSize
-		if end > len(values) {
-			end = len(values)
-		}
-		batch := values[i:end]
-		if err := db.DB().Model(model).Association(assoc).Append(batch); err != nil {
-			return fmt.Errorf("failed to batch insert: %w", err)
-		}
-	}
-	return nil
-
-}
-
 func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 	var kcs []*model.Kernelcache
 
