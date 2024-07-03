@@ -23,6 +23,7 @@ type Plists struct {
 	*Restore       `json:"restore,omitempty"`
 	*AssetDataInfo `json:"asset_data_info,omitempty"`
 	*OTAInfo       `json:"ota_info,omitempty"`
+	*SystemVersion `json:"system_version,omitempty"`
 }
 
 // AssetDataInfo AssetData/Info.plist object found in OTAs
@@ -203,6 +204,15 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 					return nil, fmt.Errorf("failed to read plist file: %s", err)
 				}
 				ipsw.OTAInfo, err = ParseOTAInfo(dat)
+				if err != nil {
+					return nil, err
+				}
+			case strings.HasSuffix(f.Name, "SystemVersion.plist"):
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.SystemVersion, err = ParseSystemVersion(dat)
 				if err != nil {
 					return nil, err
 				}

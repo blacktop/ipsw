@@ -13,13 +13,31 @@ import (
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/search"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
-func scanKernels(ipswPath string) ([]model.Kernelcache, error) {
-	var kcs []model.Kernelcache
+const batchSize = 300
+
+func batchInsert(db db.Database, model any, assoc string, values []*any) error {
+	for i := 0; i < len(values); i++ {
+		end := i + batchSize
+		if end > len(values) {
+			end = len(values)
+		}
+		batch := values[i:end]
+		if err := db.DB().Model(model).Association(assoc).Append(batch); err != nil {
+			return fmt.Errorf("failed to batch insert: %w", err)
+		}
+	}
+	return nil
+
+}
+
+func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
+	var kcs []*model.Kernelcache
 
 	out, err := extract.Kernelcache(&extract.Config{
 		IPSW:   ipswPath,
@@ -43,7 +61,7 @@ func scanKernels(ipswPath string) ([]model.Kernelcache, error) {
 		if err != nil {
 			return nil, err
 		}
-		kc := model.Kernelcache{
+		kc := &model.Kernelcache{
 			UUID:    m.UUID().String(),
 			Version: kv.String(),
 		}
@@ -57,27 +75,29 @@ func scanKernels(ipswPath string) ([]model.Kernelcache, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 				}
-				kext := model.MachO{
+				kext := &model.Macho{
 					Name: fe.EntryID,
 					UUID: mfe.UUID().String(),
 				}
 				for _, fn := range mfe.GetFunctions() {
+					var msym model.Symbol
 					if syms, err := mfe.FindAddressSymbols(fn.StartAddr); err == nil {
 						for _, sym := range syms {
 							fn.Name = sym.Name
 						}
-						kext.Symbols = append(kext.Symbols, model.Symbol{
+						msym = model.Symbol{
 							Symbol: fn.Name,
 							Start:  strconv.FormatUint(fn.StartAddr, 16),
 							End:    strconv.FormatUint(fn.EndAddr, 16),
-						})
+						}
 					} else {
-						kext.Symbols = append(kext.Symbols, model.Symbol{
+						msym = model.Symbol{
 							Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
 							Start:  strconv.FormatUint(fn.StartAddr, 16),
 							End:    strconv.FormatUint(fn.EndAddr, 16),
-						})
+						}
 					}
+					kext.Symbols = append(kext.Symbols, &msym)
 				}
 				kc.Kexts = append(kc.Kexts, kext)
 			}
@@ -88,8 +108,8 @@ func scanKernels(ipswPath string) ([]model.Kernelcache, error) {
 	return kcs, nil
 }
 
-func scanDSCs(ipswPath string) ([]model.DyldSharedCache, error) {
-	var dscs []model.DyldSharedCache
+func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
+	var dscs []*model.DyldSharedCache
 
 	out, err := extract.DSC(&extract.Config{
 		IPSW:   ipswPath,
@@ -103,18 +123,22 @@ func scanDSCs(ipswPath string) ([]model.DyldSharedCache, error) {
 			os.Remove(dsc)
 		}
 	}()
+
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no dyld_shared_cache found in IPSW")
 	}
+
 	f, err := dyld.Open(out[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse dyld_shared_cache: %w", err)
 	}
 	defer f.Close()
-	dsc := model.DyldSharedCache{
+
+	dsc := &model.DyldSharedCache{
 		UUID:    f.UUID.String(),
 		Version: f.Headers[f.UUID].OsVersion.String(),
 	}
+
 	for idx, img := range f.Images {
 		log.WithFields(log.Fields{
 			"index": idx,
@@ -127,80 +151,104 @@ func scanDSCs(ipswPath string) ([]model.DyldSharedCache, error) {
 			return nil, fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
 		}
 		defer m.Close()
-		dylib := model.MachO{
+		dylib := &model.Macho{
 			UUID: m.UUID().String(),
 			Name: img.Name,
 		}
 		for _, fn := range m.GetFunctions() {
+			var msym *model.Symbol
 			if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-				dylib.Symbols = append(dylib.Symbols, model.Symbol{
+				msym = &model.Symbol{
 					Symbol: sym,
 					Start:  strconv.FormatUint(fn.StartAddr, 16),
 					End:    strconv.FormatUint(fn.EndAddr, 16),
-				})
+				}
 			} else {
-				dylib.Symbols = append(dylib.Symbols, model.Symbol{
+				msym = &model.Symbol{
 					Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
 					Start:  strconv.FormatUint(fn.StartAddr, 16),
 					End:    strconv.FormatUint(fn.EndAddr, 16),
-				})
+				}
 			}
+			dylib.Symbols = append(dylib.Symbols, msym)
 		}
 		dsc.Images = append(dsc.Images, dylib)
 	}
+
+	dscs = append(dscs, dsc)
+
 	return dscs, nil
 }
 
 func Scan(ipswPath string, db db.Database) (err error) {
 	/* IPSW */
+	sha1, err := utils.Sha1(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to calculate sha1: %w", err)
+	}
 	inf, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW info: %w", err)
 	}
-	ipsw := &model.IPSW{
+	ipsw := &model.Ipsw{
+		ID:      sha1,
 		Name:    filepath.Base(ipswPath),
 		BuildID: inf.Plists.BuildManifest.ProductBuildVersion,
 		Version: inf.Plists.BuildManifest.ProductVersion,
 	}
+	if err := db.Create(ipsw); err != nil {
+		return fmt.Errorf("failed to create IPSW in database: %w", err)
+	}
 	for _, dev := range inf.Plists.BuildManifest.SupportedProductTypes {
-		ipsw.Devices = append(ipsw.Devices, model.Device{
+		ipsw.Devices = append(ipsw.Devices, &model.Device{
 			Name: dev,
 		})
+		if err := db.Save(ipsw); err != nil {
+			return fmt.Errorf("failed to save IPSW to database: %w", err)
+		}
 	}
+
 	/* KERNEL */
-	ipsw.Kernels, err = scanKernels(ipswPath)
-	if err != nil {
+	if ipsw.Kernels, err = scanKernels(ipswPath); err != nil {
 		return fmt.Errorf("failed to scan kernels: %w", err)
 	}
+	log.Debug("Saving IPSW with Kernels")
+	db.Save(ipsw)
+
 	/* DSC */
 	ipsw.DSCs, err = scanDSCs(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to scan DSCs: %w", err)
 	}
+	log.Debug("Saving IPSW with DSCs")
+	db.Save(ipsw)
+
 	/* FileSystem */
 	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
 		if m.UUID() != nil {
-			mm := model.MachO{
+			mm := &model.Macho{
 				UUID: m.UUID().String(),
 				Name: filepath.Base(path),
 			}
 			for _, fn := range m.GetFunctions() {
+				var msym *model.Symbol
 				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
 					for _, sym := range syms {
 						fn.Name = sym.Name
 					}
-					mm.Symbols = append(mm.Symbols, model.Symbol{
+					msym = &model.Symbol{
 						Symbol: fn.Name,
 						Start:  strconv.FormatUint(fn.StartAddr, 16),
 						End:    strconv.FormatUint(fn.EndAddr, 16),
-					})
+					}
 				} else {
-					mm.Symbols = append(mm.Symbols, model.Symbol{
+					msym = &model.Symbol{
 						Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
 						Start:  strconv.FormatUint(fn.StartAddr, 16),
 						End:    strconv.FormatUint(fn.EndAddr, 16),
-					})
+					}
 				}
+				mm.Symbols = append(mm.Symbols, msym)
 			}
 			ipsw.FileSystem = append(ipsw.FileSystem, mm)
 		}
@@ -208,6 +256,8 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	}); err != nil {
 		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
 	}
+	log.Debug("Saving IPSW with FileSystem")
+	db.Save(ipsw)
 
-	return db.Create(ipsw)
+	return nil
 }

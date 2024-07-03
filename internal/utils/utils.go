@@ -470,3 +470,16 @@ func UnTarGz(tarfile, destPath string) error {
 	}
 	return nil
 }
+
+func Sha1(in string) (string, error) {
+	f, err := os.Open(in)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha1.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}

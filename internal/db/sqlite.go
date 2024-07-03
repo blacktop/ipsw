@@ -1,11 +1,13 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Sqlite is a database that stores data in a sqlite database.
@@ -27,39 +29,73 @@ func NewSqlite(path string) (Database, error) {
 
 // Connect connects to the database.
 func (s *Sqlite) Connect() (err error) {
-	s.db, err = gorm.Open(sqlite.Open(s.URL), &gorm.Config{})
+	s.db, err = gorm.Open(sqlite.Open(s.URL), &gorm.Config{
+		CreateBatchSize:        1000,
+		SkipDefaultTransaction: true,
+		Logger:                 logger.Default.LogMode(logger.Error),
+		// Logger:                 logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to connect sqlite database: %w", err)
 	}
-	return s.db.AutoMigrate(&model.IPSW{})
+	return s.db.AutoMigrate(
+		&model.Ipsw{},
+		&model.Device{},
+		&model.Kernelcache{},
+		&model.DyldSharedCache{},
+		&model.Macho{},
+		&model.Symbol{},
+	)
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
-func (s *Sqlite) Create(i *model.IPSW) error {
-	s.db.Create(i)
+func (s *Sqlite) Create(value any) error {
+	// if result := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(value); result.Error != nil {
+	if result := s.db.FirstOrCreate(value); result.Error != nil {
+		return result.Error
+	}
 	return nil
+}
+
+func (s *Sqlite) DB() *gorm.DB {
+	return s.db
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
-func (s *Sqlite) Get(key uint) (*model.IPSW, error) {
-	i := &model.IPSW{}
+func (s *Sqlite) Get(key string) (*model.Ipsw, error) {
+	i := &model.Ipsw{}
 	s.db.First(&i, key)
+	return i, nil
+}
+
+// GetByName returns the IPSW for the given name.
+// It returns ErrNotFound if the key does not exist.
+func (s *Sqlite) GetByName(name string) (*model.Ipsw, error) {
+	i := &model.Ipsw{Name: name}
+	if result := s.db.First(&i); result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, result.Error
+	}
 	return i, nil
 }
 
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
-func (s *Sqlite) Set(key uint, value *model.IPSW) error {
-	s.db.Save(value)
+func (s *Sqlite) Save(value any) error {
+	if result := s.db.Save(value); result.Error != nil {
+		return result.Error
+	}
 	return nil
 }
 
 // Delete removes the given key.
 // It returns ErrNotFound if the key does not exist.
-func (s *Sqlite) Delete(key uint) error {
-	s.db.Delete(&model.IPSW{}, key)
+func (s *Sqlite) Delete(key string) error {
+	s.db.Delete(&model.Ipsw{}, key)
 	return nil
 }
 
