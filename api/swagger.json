@@ -1425,7 +1425,7 @@
     },
     "/syms/{uuid}/{addr}": {
       "get": {
-        "description": "Get symbols for a given uuid.",
+        "description": "Get symbol for a given uuid and address.",
         "produces": [
           "application/json"
         ],
