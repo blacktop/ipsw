@@ -29,7 +29,7 @@ type Ipsw struct {
 
 type Device struct {
 	gorm.Model
-	Name string `orm:"primaryKey" json:"name"`
+	Name string `gorm:"primaryKey" json:"name"`
 }
 
 // Kernelcache is the model for a kernelcache.
