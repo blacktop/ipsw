@@ -43,35 +43,56 @@ func (p *Postgres) Connect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
 	}
-	return p.db.AutoMigrate(&model.IPSW{})
+	return p.db.AutoMigrate(&model.Ipsw{})
+}
+
+func (p *Postgres) DB() *gorm.DB {
+	return p.db
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
-func (p *Postgres) Create(i *model.IPSW) error {
-	p.db.Create(i)
+func (p *Postgres) Create(value any) error {
+	if result := p.db.Create(value); result.Error != nil {
+		return result.Error
+	}
 	return nil
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
-func (p *Postgres) Get(key uint) (*model.IPSW, error) {
-	i := &model.IPSW{}
+func (p *Postgres) Get(key string) (*model.Ipsw, error) {
+	i := &model.Ipsw{}
 	p.db.First(&i, key)
+	return i, nil
+}
+
+// Get returns the value for the given key.
+// It returns ErrNotFound if the key does not exist.
+func (p *Postgres) GetByName(name string) (*model.Ipsw, error) {
+	i := &model.Ipsw{Name: name}
+	if result := p.db.First(&i); result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, model.ErrNotFound
+		}
+		return nil, result.Error
+	}
 	return i, nil
 }
 
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
-func (p *Postgres) Set(key uint, value *model.IPSW) error {
-	p.db.Save(value)
+func (p *Postgres) Save(value any) error {
+	if result := p.db.Save(value); result.Error != nil {
+		return result.Error
+	}
 	return nil
 }
 
 // Delete removes the given key.
 // It returns ErrNotFound if the key does not exist.
-func (p *Postgres) Delete(key uint) error {
-	p.db.Delete(&model.IPSW{}, key)
+func (p *Postgres) Delete(key string) error {
+	p.db.Delete(&model.Ipsw{}, key)
 	return nil
 }
 

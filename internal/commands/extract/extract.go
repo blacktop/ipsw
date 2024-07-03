@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-plist"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -28,6 +27,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/blacktop/ipsw/pkg/plist"
 )
 
 // Config is the extract command configuration.
@@ -746,19 +746,8 @@ func LaunchdConfig(path string) (string, error) {
 	return string(data), nil
 }
 
-// SystemVersionPlist is the SystemVersion.plist struct
-type SystemVersionPlist struct {
-	BuildID             string `json:"build_id,omitempty"`
-	ProductBuildVersion string `json:"product_build_version,omitempty"`
-	ProductCopyright    string `json:"product_copyright,omitempty"`
-	ProductName         string `json:"product_name,omitempty"`
-	ProductVersion      string `json:"product_version,omitempty"`
-	ReleaseType         string `json:"release_type,omitempty"`
-	SystemImageID       string `json:"system_image_id,omitempty"`
-}
-
 // SystemVersion extracts the system version info from an IPSW
-func SystemVersion(path string) (*SystemVersionPlist, error) {
+func SystemVersion(path string) (*plist.SystemVersion, error) {
 	ipswPath := filepath.Clean(path)
 
 	i, err := info.Parse(ipswPath)
@@ -787,10 +776,5 @@ func SystemVersion(path string) (*SystemVersionPlist, error) {
 		return nil, fmt.Errorf("failed to read SystemVersion.plist: %v", err)
 	}
 
-	var sysVer SystemVersionPlist
-	if err := plist.NewDecoder(bytes.NewReader(dat)).Decode(&sysVer); err != nil {
-		return nil, fmt.Errorf("failed to decode SystemVersion.plist: %v", err)
-	}
-
-	return &sysVer, nil
+	return plist.ParseSystemVersion(dat)
 }

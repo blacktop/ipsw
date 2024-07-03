@@ -12,11 +12,11 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign"
-	"github.com/blacktop/ipsw/internal/commands/extract"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/tbd"
 )
 
@@ -741,7 +741,7 @@ func GetWebkitVersion(f *dyld.File) (string, error) {
 	return m.SourceVersion().Version.String(), nil
 }
 
-func GetUserAgent(f *dyld.File, sysVer *extract.SystemVersionPlist) (string, error) {
+func GetUserAgent(f *dyld.File, sysVer *plist.SystemVersion) (string, error) {
 	// NOTES:
 	// This calls WebCore::standardUserAgentWithApplicationName (which has iOS and Maco variants)
 	//    - which reads the SystemVersion.plist to get the OS version and replaces `.` with `_`

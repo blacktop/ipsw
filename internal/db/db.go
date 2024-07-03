@@ -1,7 +1,10 @@
 // Package db provides a database interface and implementations.
 package db
 
-import "github.com/blacktop/ipsw/internal/model"
+import (
+	"github.com/blacktop/ipsw/internal/model"
+	"gorm.io/gorm"
+)
 
 // Database is the interface that wraps the basic database operations.
 type Database interface {
@@ -10,19 +13,25 @@ type Database interface {
 
 	// Create creates a new entry in the database.
 	// It returns ErrAlreadyExists if the key already exists.
-	Create(i *model.IPSW) error
+	Create(value any) error
+
+	DB() *gorm.DB
 
 	// Get returns the value for the given key.
 	// It returns ErrNotFound if the key does not exist.
-	Get(key uint) (*model.IPSW, error)
+	Get(key string) (*model.Ipsw, error)
 
-	// Set sets the value for the given key.
-	// It overwrites any previous value for that key.
-	Set(key uint, value *model.IPSW) error
+	// Get returns the value for the given key.
+	// It returns ErrNotFound if the key does not exist.
+	GetByName(name string) (*model.Ipsw, error)
+
+	// Save updates the IPSW.
+	// It overwrites any previous value for that IPSW.
+	Save(value any) error
 
 	// Delete removes the given key.
 	// It returns ErrNotFound if the key does not exist.
-	Delete(key uint) error
+	Delete(key string) error
 
 	// Close closes the database.
 	// It returns ErrClosed if the database is already closed.
