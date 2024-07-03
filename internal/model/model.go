@@ -2,6 +2,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -70,6 +71,18 @@ type Macho struct {
 type Symbol struct {
 	gorm.Model
 	Symbol string `json:"symbol"`
-	Start  string `json:"start"`
-	End    string `json:"end"`
+	Start  uint64 `gorm:"type:bigint" json:"start"`
+	End    uint64 `gorm:"type:bigint" json:"end"`
+}
+
+func (s Symbol) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Symbol string `json:"symbol"`
+		Start  uint64 `json:"start"`
+		End    uint64 `json:"end"`
+	}{
+		Symbol: s.Symbol,
+		Start:  s.Start,
+		End:    s.End,
+	})
 }

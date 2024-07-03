@@ -1393,6 +1393,73 @@
         }
       }
     },
+    "/syms/{uuid}": {
+      "get": {
+        "description": "Get symbols for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Symbols",
+        "operationId": "getSymbols",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "file UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/{uuid}/{addr}": {
+      "get": {
+        "description": "Get symbols for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Symbol",
+        "operationId": "getSymbol",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "file UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "symbol address",
+            "name": "addr",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/unmount": {
       "post": {
         "description": "Unmount a previously mounted DMG.",
@@ -3820,6 +3887,21 @@
       "headers": {
         "success": {
           "type": "boolean"
+        }
+      }
+    },
+    "symResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Symbol"
+      }
+    },
+    "symsResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/Symbol"
         }
       }
     },

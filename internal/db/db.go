@@ -22,6 +22,10 @@ type Database interface {
 	// It returns ErrNotFound if the key does not exist.
 	GetByName(name string) (*model.Ipsw, error)
 
+	GetSymbol(uuid string, addr uint64) (*model.Symbol, error)
+
+	GetSymbols(uuid string) ([]*model.Symbol, error)
+
 	// Save updates the IPSW.
 	// It overwrites any previous value for that IPSW.
 	Save(value any) error
