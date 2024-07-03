@@ -3577,7 +3577,6 @@
       },
       "headers": {
         "artifacts": {
-          "minItems": 0,
           "description": "The list of extracted kernels and what devices they are for"
         }
       }
@@ -3586,7 +3585,6 @@
       "description": "The extract response message",
       "headers": {
         "artifacts": {
-          "minItems": 0,
           "type": "array",
           "items": {
             "type": "string"
