@@ -186,9 +186,9 @@ func Scan(ipswPath string, db db.Database) (err error) {
 		ipsw.Devices = append(ipsw.Devices, &model.Device{
 			Name: dev,
 		})
-		if err := db.Save(ipsw); err != nil {
-			return fmt.Errorf("failed to save IPSW to database: %w", err)
-		}
+	}
+	if err := db.Save(ipsw); err != nil {
+		return fmt.Errorf("failed to save IPSW to database: %w", err)
 	}
 
 	/* KERNEL */
@@ -196,7 +196,9 @@ func Scan(ipswPath string, db db.Database) (err error) {
 		return fmt.Errorf("failed to scan kernels: %w", err)
 	}
 	log.Debug("Saving IPSW with Kernels")
-	db.Save(ipsw)
+	if err := db.Save(ipsw); err != nil {
+		return fmt.Errorf("failed to save IPSW to database: %w", err)
+	}
 
 	/* DSC */
 	ipsw.DSCs, err = scanDSCs(ipswPath)
@@ -204,7 +206,9 @@ func Scan(ipswPath string, db db.Database) (err error) {
 		return fmt.Errorf("failed to scan DSCs: %w", err)
 	}
 	log.Debug("Saving IPSW with DSCs")
-	db.Save(ipsw)
+	if err := db.Save(ipsw); err != nil {
+		return fmt.Errorf("failed to save IPSW to database: %w", err)
+	}
 
 	/* FileSystem */
 	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
@@ -239,8 +243,7 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	}); err != nil {
 		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
 	}
-	log.Debug("Saving IPSW with FileSystem")
-	db.Save(ipsw)
 
-	return nil
+	log.Debug("Saving IPSW with FileSystem")
+	return db.Save(ipsw)
 }
