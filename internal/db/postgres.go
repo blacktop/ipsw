@@ -46,10 +46,6 @@ func (p *Postgres) Connect() (err error) {
 	return p.db.AutoMigrate(&model.Ipsw{})
 }
 
-func (p *Postgres) DB() *gorm.DB {
-	return p.db
-}
-
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {

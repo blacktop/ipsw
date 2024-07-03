@@ -58,10 +58,6 @@ func (s *Sqlite) Create(value any) error {
 	return nil
 }
 
-func (s *Sqlite) DB() *gorm.DB {
-	return s.db
-}
-
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
 func (s *Sqlite) Get(key string) (*model.Ipsw, error) {
