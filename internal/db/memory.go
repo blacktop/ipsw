@@ -99,5 +99,7 @@ func (m *Memory) Close() error {
 		return err
 	}
 	defer f.Close()
+	gob.Register([]any{})
+	gob.Register(map[string]any{})
 	return gob.NewEncoder(f).Encode(m.IPSWs)
 }
