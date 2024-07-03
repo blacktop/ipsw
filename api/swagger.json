@@ -1363,6 +1363,36 @@
         }
       }
     },
+    "/syms/scan": {
+      "post": {
+        "description": "Scan symbols for a given IPSW.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Scan",
+        "operationId": "postScan",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/successResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/unmount": {
       "post": {
         "description": "Unmount a previously mounted DMG.",
@@ -2948,6 +2978,8 @@
           "x-go-name": "CacheVMAddress"
         },
         "pointer": {
+          "type": "integer",
+          "format": "uint64",
           "x-go-name": "Pointer"
         },
         "symbol": {
@@ -3091,6 +3123,10 @@
         "image": {
           "type": "string",
           "x-go-name": "Image"
+        },
+        "mapping": {
+          "type": "string",
+          "x-go-name": "Mapping"
         },
         "string": {
           "type": "string",
