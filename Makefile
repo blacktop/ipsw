@@ -8,16 +8,17 @@ NEXT_VERSION=$(shell svu patch)
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install go goreleaser zig unicorn libusb go-swagger/go-swagger/go-swagger
+	brew install gh go git goreleaser zig unicorn libusb
 
+.PHONY: build-deps
+download:
+	@echo " > Download go.mod dependencies"
+	@go mod download
+ 
 .PHONY: dev-deps
-dev-deps: ## Install the dev dependencies
-	@echo " > Installing dev deps"
-	@go install golang.org/x/tools/...@latest
-	@go install github.com/spf13/cobra-cli@latest
-	@go install golang.org/x/tools/cmd/cover@latest
-	@go ginstall golang.org/x/tools/cmd/stringer@latest
-	@go install github.com/caarlos0/svu@v1.4.1
+dev-deps: download
+	@echo " > Installing tools from tools.go"
+	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -tI % go install %
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
