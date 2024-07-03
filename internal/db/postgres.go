@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/blacktop/ipsw/internal/model"
@@ -89,6 +90,35 @@ func (p *Postgres) GetByName(name string) (*model.Ipsw, error) {
 		return nil, result.Error
 	}
 	return i, nil
+}
+
+func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {
+	var symbol model.Symbol
+	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
+		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Where("machos.uuid = ? AND symbols.start <= ? AND ? < symbols.end", uuid, address, address).
+		First(&symbol).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &symbol, nil
+}
+
+func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
+	var syms []*model.Symbol
+	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
+		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Where("machos.uuid = ?", uuid).
+		Select("symbol", "start", "end").
+		Find(&syms).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return syms, nil
 }
 
 // Set sets the value for the given key.

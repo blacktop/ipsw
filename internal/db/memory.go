@@ -65,6 +65,68 @@ func (m *Memory) GetByName(name string) (*model.Ipsw, error) {
 	return nil, model.ErrNotFound
 }
 
+func (m *Memory) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
+	for _, ipsw := range m.IPSWs {
+		for _, dyld := range ipsw.DSCs {
+			for _, img := range dyld.Images {
+				if img.UUID == uuid {
+					for _, sym := range img.Symbols {
+						if addr >= sym.Start && addr < sym.End {
+							return sym, nil
+						}
+					}
+				}
+			}
+		}
+		for _, fs := range ipsw.FileSystem {
+			if fs.UUID == uuid {
+				for _, sym := range fs.Symbols {
+					if addr >= sym.Start && addr < sym.End {
+						return sym, nil
+					}
+				}
+			}
+		}
+		for _, fs := range ipsw.Kernels {
+			for _, kext := range fs.Kexts {
+				if fs.UUID == uuid {
+					for _, sym := range kext.Symbols {
+						if addr >= sym.Start && addr < sym.End {
+							return sym, nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
+func (m *Memory) GetSymbols(uuid string) ([]*model.Symbol, error) {
+	for _, ipsw := range m.IPSWs {
+		for _, dyld := range ipsw.DSCs {
+			for _, img := range dyld.Images {
+				if img.UUID == uuid {
+					return img.Symbols, nil
+				}
+			}
+		}
+		for _, fs := range ipsw.FileSystem {
+			if fs.UUID == uuid {
+				return fs.Symbols, nil
+			}
+		}
+		for _, fs := range ipsw.Kernels {
+			for _, kext := range fs.Kexts {
+				if fs.UUID == uuid {
+					return kext.Symbols, nil
+				}
+			}
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
 func (m *Memory) Save(value any) error {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -18,6 +17,8 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
+
+const highestBitMask uint64 = ^uint64(1 << 63)
 
 func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 	var kcs []*model.Kernelcache
@@ -70,14 +71,14 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 						}
 						msym = model.Symbol{
 							Symbol: fn.Name,
-							Start:  strconv.FormatUint(fn.StartAddr, 16),
-							End:    strconv.FormatUint(fn.EndAddr, 16),
+							Start:  fn.StartAddr & highestBitMask,
+							End:    fn.EndAddr & highestBitMask,
 						}
 					} else {
 						msym = model.Symbol{
 							Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-							Start:  strconv.FormatUint(fn.StartAddr, 16),
-							End:    strconv.FormatUint(fn.EndAddr, 16),
+							Start:  fn.StartAddr & highestBitMask,
+							End:    fn.EndAddr & highestBitMask,
 						}
 					}
 					kext.Symbols = append(kext.Symbols, &msym)
@@ -143,14 +144,14 @@ func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
 			if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 				msym = &model.Symbol{
 					Symbol: sym,
-					Start:  strconv.FormatUint(fn.StartAddr, 16),
-					End:    strconv.FormatUint(fn.EndAddr, 16),
+					Start:  fn.StartAddr,
+					End:    fn.EndAddr,
 				}
 			} else {
 				msym = &model.Symbol{
 					Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-					Start:  strconv.FormatUint(fn.StartAddr, 16),
-					End:    strconv.FormatUint(fn.EndAddr, 16),
+					Start:  fn.StartAddr,
+					End:    fn.EndAddr,
 				}
 			}
 			dylib.Symbols = append(dylib.Symbols, msym)
@@ -225,14 +226,14 @@ func Scan(ipswPath string, db db.Database) (err error) {
 					}
 					msym = &model.Symbol{
 						Symbol: fn.Name,
-						Start:  strconv.FormatUint(fn.StartAddr, 16),
-						End:    strconv.FormatUint(fn.EndAddr, 16),
+						Start:  fn.StartAddr,
+						End:    fn.EndAddr,
 					}
 				} else {
 					msym = &model.Symbol{
 						Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-						Start:  strconv.FormatUint(fn.StartAddr, 16),
-						End:    strconv.FormatUint(fn.EndAddr, 16),
+						Start:  fn.StartAddr,
+						End:    fn.EndAddr,
 					}
 				}
 				mm.Symbols = append(mm.Symbols, msym)
@@ -246,4 +247,12 @@ func Scan(ipswPath string, db db.Database) (err error) {
 
 	log.Debug("Saving IPSW with FileSystem")
 	return db.Save(ipsw)
+}
+
+func Get(uuid string, db db.Database) ([]*model.Symbol, error) {
+	return db.GetSymbols(uuid)
+}
+
+func GetForAddr(uuid string, addr uint64, db db.Database) (*model.Symbol, error) {
+	return db.GetSymbol(uuid, addr)
 }

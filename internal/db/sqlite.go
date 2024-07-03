@@ -82,6 +82,34 @@ func (s *Sqlite) GetByName(name string) (*model.Ipsw, error) {
 	return i, nil
 }
 
+func (s *Sqlite) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {
+	var symbol model.Symbol
+	if err := s.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
+		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Where("machos.uuid = ? AND symbols.start <= ? AND ? < symbols.end", uuid, address, address).
+		First(&symbol).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &symbol, nil
+}
+
+func (s *Sqlite) GetSymbols(uuid string) ([]*model.Symbol, error) {
+	var syms []*model.Symbol
+	if err := s.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
+		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Where("machos.uuid = ?", uuid).
+		Find(syms).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return syms, nil
+}
+
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
 func (s *Sqlite) Save(value any) error {

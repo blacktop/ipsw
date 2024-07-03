@@ -42,6 +42,7 @@ func (c *Config) verify() error {
 	if err != nil {
 		return fmt.Errorf("config: failed to get user home directory: %v", err)
 	}
+	// verify daemon
 	if c.Daemon.Host == "" && c.Daemon.Port == 0 && c.Daemon.Socket == "" {
 		if os.Getenv("IPSW_IN_SNAP") == "1" {
 			c.Daemon.Socket = "/var/snap/ipswd/common/ipsw.sock"
@@ -57,7 +58,9 @@ func (c *Config) verify() error {
 		c.Daemon.Host = "localhost"
 	} else if strings.HasPrefix(c.Daemon.Socket, "~/") {
 		c.Daemon.Socket = filepath.Join(home, c.Daemon.Socket[2:]) // TODO: is this bad practice?
-	} else if c.Database.BatchSize == 0 {
+	}
+	// verify database
+	if c.Database.BatchSize == 0 {
 		c.Database.BatchSize = 1000
 	}
 
