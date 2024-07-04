@@ -3730,6 +3730,11 @@
           "type": "string",
           "x-go-name": "Mapping"
         },
+        "offset": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "Offset"
+        },
         "string": {
           "type": "string",
           "x-go-name": "String"
