@@ -105,6 +105,7 @@ test-docs: ## Start local server hosting docusaurus docs
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
 	rm go.sum || true
+	go list -f '{{if not (or .Main .Indirect)}}{{.Path}}{{end}}' -m all | xargs --no-run-if-empty go get
 	go mod download
 	go mod tidy
 
