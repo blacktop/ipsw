@@ -20,7 +20,7 @@ require (
 	github.com/boombuler/barcode v1.0.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/caarlos0/svu v1.4.1
+	github.com/caarlos0/svu v1.12.0
 	github.com/cloudflare/circl v1.3.9
 	github.com/docker/docker v27.0.3+incompatible
 	github.com/dominikbraun/graph v0.23.0
