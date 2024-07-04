@@ -47,7 +47,7 @@ func (p *Postgres) Connect() (err error) {
 	)), &gorm.Config{
 		CreateBatchSize:        p.BatchSize,
 		SkipDefaultTransaction: true,
-		Logger:                 logger.Default.LogMode(logger.Error),
+		Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
@@ -81,7 +81,7 @@ func (p *Postgres) Get(key string) (*model.Ipsw, error) {
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
-func (p *Postgres) GetByName(name string) (*model.Ipsw, error) {
+func (p *Postgres) GetIpswByName(name string) (*model.Ipsw, error) {
 	i := &model.Ipsw{Name: name}
 	if result := p.db.First(&i); result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
@@ -90,6 +90,42 @@ func (p *Postgres) GetByName(name string) (*model.Ipsw, error) {
 		return nil, result.Error
 	}
 	return i, nil
+}
+
+func (p *Postgres) GetDSC(uuid string) (*model.DyldSharedCache, error) {
+	var dsc model.DyldSharedCache
+	if err := p.db.Where("uuid = ?", uuid).First(&dsc).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &dsc, nil
+}
+
+func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error) {
+	var macho model.Macho
+	if err := p.db.Joins("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
+		Joins("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
+		Where("dyld_shared_caches.uuid = ? AND machos.text_start <= ? AND ? < machos.text_end", uuid, address, address).
+		First(&macho).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &macho, nil
+}
+
+func (p *Postgres) GetMachO(uuid string) (*model.Macho, error) {
+	var macho model.Macho
+	if err := p.db.Where("uuid = ?", uuid).First(&macho).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &macho, nil
 }
 
 func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {

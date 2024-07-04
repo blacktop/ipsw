@@ -440,7 +440,7 @@ func (d *Diff) parseKDKs() (err error) {
 
 func (d *Diff) parseDSC() error {
 	/* OLD DSC */
-	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false)
+	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
 	}
@@ -456,7 +456,7 @@ func (d *Diff) parseDSC() error {
 
 	/* NEW DSC */
 
-	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false)
+	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
 	}

@@ -96,7 +96,7 @@ type SymbolLookup struct {
 // String is a struct that contains information about a dyld_shared_cache string
 // swagger:model
 type String struct {
-	Offset  uint64 `json:"address,omitempty"`
+	Offset  uint64 `json:"offset,omitempty"`
 	Address uint64 `json:"address,omitempty"`
 	Mapping string `json:"mapping,omitempty"`
 	Image   string `json:"image,omitempty"`
@@ -766,13 +766,13 @@ func GetUserAgent(f *dyld.File, sysVer *plist.SystemVersion) (string, error) {
 	return "", nil
 }
 
-func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
+func OpenFromIPSW(ipswPath string, driverKit, all bool) (*mount.Context, []*dyld.File, error) {
 	ctx, err := mount.DmgInIPSW(ipswPath, "sys")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to mount IPSW: %v", err)
 	}
 
-	dscs, err := dyld.GetDscPathsInMount(ctx.MountPoint, false)
+	dscs, err := dyld.GetDscPathsInMount(ctx.MountPoint, driverKit, all)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get DSC paths in %s: %v", ctx.MountPoint, err)
 	}
@@ -780,12 +780,18 @@ func OpenFromIPSW(ipswPath string) (*mount.Context, *dyld.File, error) {
 		return nil, nil, fmt.Errorf("no DSCs found in IPSW mount %s", ctx.MountPoint)
 	}
 
-	f, err := dyld.Open(dscs[0])
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open DSC: %v", err)
+	var fs []*dyld.File
+	for _, dsc := range dscs {
+		if len(filepath.Ext(dsc)) == 0 {
+			f, err := dyld.Open(dsc)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to open DSC: %v", err)
+			}
+			fs = append(fs, f)
+		}
 	}
 
-	return ctx, f, nil
+	return ctx, fs, nil
 }
 
 func GetTBD(f *dyld.File, dylib string, private, generic bool) (string, error) {

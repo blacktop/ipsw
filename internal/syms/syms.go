@@ -8,12 +8,12 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
@@ -63,6 +63,10 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 					Name: fe.EntryID,
 					UUID: mfe.UUID().String(),
 				}
+				if text := mfe.Segment("__TEXT"); text != nil {
+					kext.TextStart = text.Addr
+					kext.TextEnd = text.Addr + text.Filesz
+				}
 				for _, fn := range mfe.GetFunctions() {
 					var msym model.Symbol
 					if syms, err := mfe.FindAddressSymbols(fn.StartAddr); err == nil {
@@ -93,74 +97,67 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 }
 
 func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
-	var dscs []*model.DyldSharedCache
-
-	out, err := extract.DSC(&extract.Config{
-		IPSW:   ipswPath,
-		Output: os.TempDir(),
-	})
+	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, false, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract dyld_shared_cache: %w", err)
+		return nil, fmt.Errorf("failed to open DSC from IPSW: %w", err)
 	}
 	defer func() {
-		for _, dsc := range out {
-			os.Remove(dsc)
+		for _, f := range fs {
+			f.Close()
 		}
+		ctx.Unmount()
 	}()
 
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no dyld_shared_cache found in IPSW")
-	}
+	var dscs []*model.DyldSharedCache
 
-	f, err := dyld.Open(out[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse dyld_shared_cache: %w", err)
-	}
-	defer f.Close()
-
-	dsc := &model.DyldSharedCache{
-		UUID:    f.UUID.String(),
-		Version: f.Headers[f.UUID].OsVersion.String(),
-	}
-
-	for idx, img := range f.Images {
-		log.WithFields(log.Fields{
-			"index": idx,
-			"name":  img.Name,
-		}).Debug("Parsing DSC Image")
-		img.ParsePublicSymbols(false)
-		img.ParseLocalSymbols(false)
-		m, err := img.GetMacho()
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
+	for _, f := range fs {
+		dsc := &model.DyldSharedCache{
+			UUID:              f.UUID.String(),
+			SharedRegionStart: f.Headers[f.UUID].SharedRegionStart,
 		}
-		defer m.Close()
-		dylib := &model.Macho{
-			UUID: m.UUID().String(),
-			Name: img.Name,
-		}
-		for _, fn := range m.GetFunctions() {
-			var msym *model.Symbol
-			if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-				msym = &model.Symbol{
-					Symbol: sym,
-					Start:  fn.StartAddr,
-					End:    fn.EndAddr,
-				}
-			} else {
-				msym = &model.Symbol{
-					Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-					Start:  fn.StartAddr,
-					End:    fn.EndAddr,
-				}
+
+		for idx, img := range f.Images {
+			log.WithFields(log.Fields{
+				"index": idx,
+				"name":  img.Name,
+			}).Debug("Parsing DSC Image")
+			img.ParsePublicSymbols(false)
+			img.ParseLocalSymbols(false)
+			m, err := img.GetMacho()
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
 			}
-			dylib.Symbols = append(dylib.Symbols, msym)
+			defer m.Close()
+			dylib := &model.Macho{
+				UUID: m.UUID().String(),
+				Name: img.Name,
+			}
+			if text := m.Segment("__TEXT"); text != nil {
+				dylib.TextStart = text.Addr
+				dylib.TextEnd = text.Addr + text.Filesz
+			}
+			for _, fn := range m.GetFunctions() {
+				var msym *model.Symbol
+				if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+					msym = &model.Symbol{
+						Symbol: sym,
+						Start:  fn.StartAddr,
+						End:    fn.EndAddr,
+					}
+				} else {
+					msym = &model.Symbol{
+						Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
+						Start:  fn.StartAddr,
+						End:    fn.EndAddr,
+					}
+				}
+				dylib.Symbols = append(dylib.Symbols, msym)
+			}
+			dsc.Images = append(dsc.Images, dylib)
 		}
-		dsc.Images = append(dsc.Images, dylib)
+
+		dscs = append(dscs, dsc)
 	}
-
-	dscs = append(dscs, dsc)
-
 	return dscs, nil
 }
 
@@ -217,6 +214,10 @@ func Scan(ipswPath string, db db.Database) (err error) {
 			mm := &model.Macho{
 				UUID: m.UUID().String(),
 				Name: path,
+			}
+			if text := m.Segment("__TEXT"); text != nil {
+				mm.TextStart = text.Addr
+				mm.TextEnd = text.Addr + text.Filesz
 			}
 			for _, fn := range m.GetFunctions() {
 				var msym *model.Symbol

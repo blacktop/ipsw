@@ -22,6 +22,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/swift"
@@ -771,18 +772,23 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		}
 	}
 
-	// // print any binary images that are missing names
+	// print any binary images that are missing names
 	// for idx, img := range i.Payload.BinaryImages {
 	// 	if len(img.Name) == 0 {
 	// 		fmt.Printf("idx: %d - %v\n", idx, img)
 	// 	}
 	// }
 
-	ctx, f, err := dsc.OpenFromIPSW(ipswPath)
+	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, false, true)
 	if err != nil {
 		return fmt.Errorf("failed to open DSC from IPSW: %w", err)
 	}
-	defer ctx.Unmount()
+	defer func() {
+		for _, f := range fs {
+			f.Close()
+		}
+		ctx.Unmount()
+	}()
 
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
@@ -801,36 +807,41 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "absolute" {
 					continue // skip absolute
 				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
-					if f.Headers[f.UUID].SharedRegionStart != i.Payload.BinaryImages[frame.ImageIndex].Base {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Base - f.Headers[f.UUID].SharedRegionStart
-					}
-					// lookup symbol in DSC dylib
-					if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
-						img.ParsePublicSymbols(false)
-						img.ParseLocalSymbols(false)
-						m, err := img.GetMacho()
-						if err != nil {
-							return fmt.Errorf("failed to get macho from image: %w", err)
+					for _, f := range fs {
+						if !strings.EqualFold(i.Payload.BinaryImages[frame.ImageIndex].UUID, f.UUID.String()) {
+							continue // skip to next DSC
 						}
-						if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-							if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-								if i.Config.Demangle {
-									if strings.HasPrefix(sym, "_$s") || strings.HasPrefix(sym, "$s") { // TODO: better detect swift symbols
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym)
-									} else if strings.HasPrefix(sym, "__Z") || strings.HasPrefix(sym, "_Z") {
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym, false, false)
+						if f.Headers[f.UUID].SharedRegionStart != i.Payload.BinaryImages[frame.ImageIndex].Base {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Base - f.Headers[f.UUID].SharedRegionStart
+						}
+						// lookup symbol in DSC dylib
+						if img, err := f.GetImageContainingVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
+							img.ParsePublicSymbols(false)
+							img.ParseLocalSymbols(false)
+							m, err := img.GetMacho()
+							if err != nil {
+								return fmt.Errorf("failed to get macho from image: %w", err)
+							}
+							if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+								if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+									if i.Config.Demangle {
+										if strings.HasPrefix(sym, "_$s") || strings.HasPrefix(sym, "$s") { // TODO: better detect swift symbols
+											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym)
+										} else if strings.HasPrefix(sym, "__Z") || strings.HasPrefix(sym, "_Z") {
+											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym, false, false)
+										} else {
+											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
+										}
 									} else {
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
 									}
+									if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
+										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
+									}
 								} else {
-									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", fn.StartAddr)
 								}
-								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
-									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
-								}
-							} else {
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", fn.StartAddr)
 							}
 						}
 					}
@@ -897,7 +908,155 @@ func (i *Ips) Symbolicate210(ipswPath string) error {
 		}
 	}
 
-	f.Close()
+	return nil
+}
+
+func (i *Ips) Symbolicate210WithDatabase(db db.Database) error {
+	total := len(i.Payload.BinaryImages)
+
+	// add default binary image names
+	for idx, img := range i.Payload.BinaryImages {
+		switch img.Source {
+		case "Absolute":
+			i.Payload.BinaryImages[idx].Name = "absolute"
+			total--
+		case "Kernel":
+			i.Payload.BinaryImages[idx].Name = "kernel"
+			total--
+		case "KernelCache":
+			i.Payload.BinaryImages[idx].Name = "kernelcache"
+			total--
+		case "KernelTextExec":
+			i.Payload.BinaryImages[idx].Name = "kernelcache (__TEXT_EXEC)"
+			total--
+		case "SharedCache":
+			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache"
+			total--
+		case "SharedCacheLibrary":
+			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache (library)"
+			total--
+		}
+	}
+
+	for idx, img := range i.Payload.BinaryImages {
+		if m, err := db.GetMachO(strings.ToUpper(img.UUID)); err == nil {
+			i.Payload.BinaryImages[idx].Path = m.Name
+			i.Payload.BinaryImages[idx].Name = m.Name
+			i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.TextStart
+		} else {
+			log.WithFields(log.Fields{
+				"uuid": img.UUID,
+				"name": img.Name,
+			}).Debug("failed to find macho for uuid")
+		}
+	}
+
+	for pid, proc := range i.Payload.ProcessByPid {
+		for tid, thread := range proc.ThreadByID {
+			for idx, frame := range thread.UserFrames {
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+				if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
+				}
+				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				} else {
+					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName, "image_") {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += fmt.Sprintf(" (probably %s)", proc.Name)
+					}
+				}
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "absolute" {
+					continue // skip absolute
+				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "dyld_shared_cache" {
+					dsc, err := db.GetDSC(strings.ToUpper(i.Payload.BinaryImages[frame.ImageIndex].UUID))
+					if err != nil {
+						return fmt.Errorf("failed to get DSC for uuid: %w", err)
+					}
+					if dsc.SharedRegionStart != i.Payload.BinaryImages[frame.ImageIndex].Base {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Base - dsc.SharedRegionStart
+					}
+					// lookup symbol in DSC dylib
+					if img, err := db.GetDSCImage(dsc.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
+						if sym, err := db.GetSymbol(img.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+							if i.Config.Demangle {
+								if strings.HasPrefix(sym.Symbol, "_$s") || strings.HasPrefix(sym.Symbol, "$s") {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym.Symbol)
+								} else if strings.HasPrefix(sym.Symbol, "__Z") || strings.HasPrefix(sym.Symbol, "_Z") {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym.Symbol, false, false)
+								} else {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+								}
+							} else {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+							}
+							if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-sym.Start != 0 {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - sym.Start
+							}
+						} else {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
+						}
+					} else {
+						log.WithFields(log.Fields{
+							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+							"thread": tid,
+							"frame":  idx,
+							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName,
+						}).Debugf("failed to find DSC image containing offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
+					}
+				} else { // "Process"
+					if sym, err := db.GetSymbol(
+						strings.ToUpper(i.Payload.BinaryImages[frame.ImageIndex].UUID),
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide,
+					); err == nil {
+						if i.Config.Demangle {
+							if strings.HasPrefix(sym.Symbol, "_$s") || strings.HasPrefix(sym.Symbol, "$s") {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym.Symbol)
+							} else if strings.HasPrefix(sym.Symbol, "__Z") || strings.HasPrefix(sym.Symbol, "_Z") {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym.Symbol, false, false)
+							} else {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+							}
+						} else {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym.Symbol
+						}
+						if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-sym.Start != 0 {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation =
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset -
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide -
+									sym.Start
+						}
+					} else {
+						// sometimes a frame will report using `dyld` but the offset is not in any function or in the binary image (e.g. in memory macho)
+						if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName == "/usr/lib/dyld" {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName += " (??? in memory macho)"
+						}
+						log.WithFields(log.Fields{
+							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+							"thread": tid,
+							"frame":  idx,
+							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName,
+						}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset)
+					}
+				}
+			}
+			for idx, frame := range thread.KernelFrames {
+				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+				} else {
+					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName, "image_") {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (maybe a kext)"
+					}
+				}
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
+					// TODO: symbolicate kernelcache
+					// i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide =
+				}
+			}
+		}
+	}
 
 	return nil
 }
@@ -1012,6 +1171,9 @@ func (i *Ips) String() string {
 					buf := bytes.NewBufferString("")
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.UserFrames {
+						if f.ImageName == "absolute" {
+							continue
+						}
 						slide := ""
 						if f.Slide > 0 {
 							slide = fmt.Sprintf(" (slide %#x)", f.Slide)
@@ -1030,6 +1192,9 @@ func (i *Ips) String() string {
 					buf := bytes.NewBufferString("")
 					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					for idx, f := range t.KernelFrames {
+						if f.ImageName == "absolute" {
+							continue
+						}
 						slide := ""
 						if p210.KernelCacheSlide != nil && p210.KernelCacheSlide.Value.(uint64) > 0 && f.ImageName == "kernelcache" {
 							slide = fmt.Sprintf(" (slide %#x)", p210.KernelCacheSlide.Value.(uint64))
