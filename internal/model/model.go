@@ -53,9 +53,8 @@ type DyldSharedCache struct {
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 
-	Version string   `json:"version,omitempty"`
-	Header  string   `json:"header,omitempty"`
-	Images  []*Macho `gorm:"many2many:dsc_images;" json:"images,omitempty"`
+	SharedRegionStart uint64   `json:"shared_region_start,omitempty"`
+	Images            []*Macho `gorm:"many2many:dsc_images;" json:"images,omitempty"`
 }
 
 type Macho struct {
@@ -64,8 +63,10 @@ type Macho struct {
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 
-	Name    string    `json:"name,omitempty"`
-	Symbols []*Symbol `gorm:"many2many:macho_syms;"`
+	Name      string    `json:"name,omitempty"`
+	TextStart uint64    `gorm:"type:bigint" json:"text_start,omitempty"`
+	TextEnd   uint64    `gorm:"type:bigint" json:"text_end,omitempty"`
+	Symbols   []*Symbol `gorm:"many2many:macho_syms;"`
 }
 
 // swagger:model

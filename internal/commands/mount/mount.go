@@ -62,7 +62,7 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 		dmgPath, err = i.GetSystemOsDmg()
 		if err != nil {
 			if errors.Is(err, info.ErrorCryptexNotFound) {
-				log.Warn("failed to get SystemOS DMG; trying filesystem DMG")
+				log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
 				dmgPath, err = i.GetFileSystemOsDmg()
 				if err != nil {
 					return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)

@@ -18,9 +18,18 @@ type Database interface {
 	// It returns ErrNotFound if the key does not exist.
 	Get(key string) (*model.Ipsw, error)
 
-	// GetByName returns the value for the given name.
+	// GetIpswByName returns the IPSW for the given name.
 	// It returns ErrNotFound if the name does not exist.
-	GetByName(name string) (*model.Ipsw, error)
+	GetIpswByName(name string) (*model.Ipsw, error)
+
+	// GetDSC returns the DyldSharedCache for the given UUID.
+	GetDSC(uuid string) (*model.DyldSharedCache, error)
+
+	// GetDSCImage returns the DyldSharedCache Image for the given UUID and address.
+	GetDSCImage(uuid string, addr uint64) (*model.Macho, error)
+
+	// GetMachO returns the MachO for the given UUID.
+	GetMachO(uuid string) (*model.Macho, error)
 
 	// GetSymbol returns the symbol for the given UUID and address.
 	GetSymbol(uuid string, addr uint64) (*model.Symbol, error)

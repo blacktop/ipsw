@@ -35,8 +35,7 @@ func (s *Sqlite) Connect() (err error) {
 	s.db, err = gorm.Open(sqlite.Open(s.URL), &gorm.Config{
 		CreateBatchSize:        s.BatchSize,
 		SkipDefaultTransaction: true,
-		Logger:                 logger.Default.LogMode(logger.Error),
-		// Logger:                 logger.Default.LogMode(logger.Silent),
+		Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect sqlite database: %w", err)
@@ -69,9 +68,9 @@ func (s *Sqlite) Get(key string) (*model.Ipsw, error) {
 	return i, nil
 }
 
-// GetByName returns the IPSW for the given name.
+// GetIpswByName returns the IPSW for the given name.
 // It returns ErrNotFound if the key does not exist.
-func (s *Sqlite) GetByName(name string) (*model.Ipsw, error) {
+func (s *Sqlite) GetIpswByName(name string) (*model.Ipsw, error) {
 	i := &model.Ipsw{Name: name}
 	if result := s.db.First(&i); result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -80,6 +79,42 @@ func (s *Sqlite) GetByName(name string) (*model.Ipsw, error) {
 		return nil, result.Error
 	}
 	return i, nil
+}
+
+func (s *Sqlite) GetDSC(uuid string) (*model.DyldSharedCache, error) {
+	var dsc model.DyldSharedCache
+	if err := s.db.Where("uuid = ?", uuid).First(&dsc).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &dsc, nil
+}
+
+func (s *Sqlite) GetDSCImage(uuid string, address uint64) (*model.Macho, error) {
+	var macho model.Macho
+	if err := s.db.Joins("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
+		Joins("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
+		Where("dyld_shared_caches.uuid = ? AND machos.text_start <= ? AND ? < machos.text_end", uuid, address, address).
+		First(&macho).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &macho, nil
+}
+
+func (s *Sqlite) GetMachO(uuid string) (*model.Macho, error) {
+	var macho model.Macho
+	if err := s.db.Where("uuid = ?", uuid).First(&macho).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &macho, nil
 }
 
 func (s *Sqlite) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {

@@ -20,7 +20,7 @@ const (
 	CacheRegex                           = `System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DriverKitCacheRegex                  = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
 	CacheRegexEnding                     = `(\..*)?$`
-	CacheUberRegex                       = `(System/DriverKit/)?System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_(arm64e|x86_64)(\..*)?$`
+	CacheUberRegex                       = `(System/DriverKit/)?System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DYLD_SHARED_CACHE_DYNAMIC_DATA_MAGIC = "dyld_data    v0"
 )
 

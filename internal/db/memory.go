@@ -54,12 +54,63 @@ func (m *Memory) Get(id string) (*model.Ipsw, error) {
 	return ipsw, nil
 }
 
-// GetByName returns the IPSW for the given name.
+// GetIpswByName returns the IPSW for the given name.
 // It returns ErrNotFound if the key does not exist.
-func (m *Memory) GetByName(name string) (*model.Ipsw, error) {
+func (m *Memory) GetIpswByName(name string) (*model.Ipsw, error) {
 	for _, ipsw := range m.IPSWs {
 		if ipsw.Name == name {
 			return ipsw, nil
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
+func (m *Memory) GetDSC(uuid string) (*model.DyldSharedCache, error) {
+	for _, ipsw := range m.IPSWs {
+		for _, dyld := range ipsw.DSCs {
+			if dyld.UUID == uuid {
+				return dyld, nil
+			}
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
+func (m *Memory) GetDSCImage(uuid string, addr uint64) (*model.Macho, error) {
+	for _, ipsw := range m.IPSWs {
+		for _, dyld := range ipsw.DSCs {
+			if dyld.UUID == uuid {
+				for _, img := range dyld.Images {
+					if addr >= img.TextStart && addr < img.TextEnd {
+						return img, nil
+					}
+				}
+			}
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
+func (m *Memory) GetMachO(uuid string) (*model.Macho, error) {
+	for _, ipsw := range m.IPSWs {
+		for _, dyld := range ipsw.DSCs {
+			for _, img := range dyld.Images {
+				if img.UUID == uuid {
+					return img, nil
+				}
+			}
+		}
+		for _, fs := range ipsw.FileSystem {
+			if fs.UUID == uuid {
+				return fs, nil
+			}
+		}
+		for _, fs := range ipsw.Kernels {
+			for _, kext := range fs.Kexts {
+				if kext.UUID == uuid {
+					return kext, nil
+				}
+			}
 		}
 	}
 	return nil, model.ErrNotFound
