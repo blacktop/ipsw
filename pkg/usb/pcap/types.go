@@ -1,6 +1,6 @@
 package pcap
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=iface,protocolFamily -output types_string.go
+//go:generate stringer -type=iface,protocolFamily -output types_string.go
 
 type protocolFamily uint32 // for darwin
 

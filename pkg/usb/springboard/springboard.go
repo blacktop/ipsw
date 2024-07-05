@@ -1,6 +1,6 @@
 package springboard
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=Orientation -output springboard_string.go
+//go:generate stringer -type=Orientation -output springboard_string.go
 
 import (
 	"github.com/blacktop/ipsw/pkg/usb"

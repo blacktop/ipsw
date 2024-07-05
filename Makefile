@@ -9,16 +9,17 @@ NEXT_VERSION=$(shell svu patch)
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
 	brew install gh go git goreleaser zig unicorn libusb
-
-.PHONY: build-deps
-download:
-	@echo " > Download go.mod dependencies"
-	@go mod download
  
 .PHONY: dev-deps
 dev-deps: download
-	@echo " > Installing tools from tools.go"
-	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -tI % go install %
+	@echo " > Installing Go dev tools"
+	@go mod download	
+	@go install github.com/caarlos0/svu@v1.4.1
+	@go install github.com/go-swagger/go-swagger/cmd/swagger@latest
+	@go install github.com/goreleaser/goreleaser@latest
+	@go install github.com/spf13/cobra-cli@latest
+	@go install golang.org/x/perf/cmd/benchstat@latest
+	@go install golang.org/x/tools/cmd/stringer@latest
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
@@ -105,7 +106,7 @@ test-docs: ## Start local server hosting docusaurus docs
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
 	rm go.sum || true
-	go list -f '{{if not (or .Main .Indirect)}}{{.Path}}{{end}}' -m all | xargs --no-run-if-empty go get
+	# go list -f '{{if not (or .Main .Indirect)}}{{.Path}}{{end}}' -m all | xargs --no-run-if-empty go get
 	go mod download
 	go mod tidy
 
