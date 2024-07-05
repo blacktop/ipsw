@@ -136,6 +136,7 @@ var symbolicateCmd = &cobra.Command{
 					log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 				}
 			} else {
+				// TODO: use IPSW to populate symbol server if both are supplied
 				if hdr.BugType == "210" {
 					/* validate IPSW */
 					i, err := info.Parse(args[1])
