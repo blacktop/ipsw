@@ -7,7 +7,6 @@ import (
 	"github.com/blacktop/ipsw/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 // Postgres is a database that stores data in a Postgres database.
@@ -47,7 +46,7 @@ func (p *Postgres) Connect() (err error) {
 	)), &gorm.Config{
 		CreateBatchSize:        p.BatchSize,
 		SkipDefaultTransaction: true,
-		Logger:                 logger.Default.LogMode(logger.Silent),
+		// Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
@@ -90,6 +89,20 @@ func (p *Postgres) GetIpswByName(name string) (*model.Ipsw, error) {
 		return nil, result.Error
 	}
 	return i, nil
+}
+
+func (p *Postgres) GetIPSW(version, build, device string) (*model.Ipsw, error) {
+	var ipsw model.Ipsw
+	if err := p.db.Joins("JOIN ipsw_devices ON ipsw_devices.ipsw_id = ipsws.id").
+		Joins("JOIN devices ON devices.name = ipsw_devices.device_name").
+		Where("ipsws.version = ? AND ipsws.build_id = ? AND devices.name = ?", version, build, device).
+		First(&ipsw).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &ipsw, nil
 }
 
 func (p *Postgres) GetDSC(uuid string) (*model.DyldSharedCache, error) {

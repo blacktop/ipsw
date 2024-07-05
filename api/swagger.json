@@ -1430,6 +1430,50 @@
         }
       }
     },
+    "/syms/ipsw": {
+      "get": {
+        "description": "Get IPSW for a given version OR build AND device.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "IPSW",
+        "operationId": "getIPSW",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "version of IPSW",
+            "name": "version",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "build of IPSW",
+            "name": "build",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "device of IPSW",
+            "name": "device",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symIpswResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/syms/macho/{uuid}": {
       "get": {
         "description": "Get MachO for a given uuid.",
@@ -3345,6 +3389,108 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/info"
     },
+    "Ipsw": {
+      "type": "object",
+      "title": "Ipsw is the model for an Ipsw file.",
+      "properties": {
+        "CreatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "UpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "buildid": {
+          "type": "string",
+          "x-go-name": "BuildID"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "Date"
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Device"
+          },
+          "x-go-name": "Devices"
+        },
+        "dscs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DyldSharedCache"
+          },
+          "x-go-name": "DSCs"
+        },
+        "file_system": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "FileSystem"
+        },
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "kernels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Kernelcache"
+          },
+          "x-go-name": "Kernels"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "version": {
+          "type": "string",
+          "x-go-name": "Version"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
+    "Kernelcache": {
+      "type": "object",
+      "title": "Kernelcache is the model for a kernelcache.",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "CreatedAt"
+        },
+        "deleted_at": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "kexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "Kexts"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "UpdatedAt"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        },
+        "version": {
+          "type": "string",
+          "x-go-name": "Version"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "LLVMVersion": {
       "type": "object",
       "title": "LLVMVersion represents the LLVM version used to compile the kernel.",
@@ -4916,6 +5062,12 @@
       "description": "",
       "schema": {
         "$ref": "#/definitions/DyldSharedCache"
+      }
+    },
+    "symIpswResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Ipsw"
       }
     },
     "symMachoResponse": {

@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/gob"
 	"os"
+	"slices"
 
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/pkg/errors"
@@ -60,6 +61,23 @@ func (m *Memory) GetIpswByName(name string) (*model.Ipsw, error) {
 	for _, ipsw := range m.IPSWs {
 		if ipsw.Name == name {
 			return ipsw, nil
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
+// GetIPSW returns the IPSW for the given version, build, and device.
+// It returns ErrNotFound if the IPSW does not exist.
+func (m *Memory) GetIPSW(version, build, device string) (*model.Ipsw, error) {
+	for _, ipsw := range m.IPSWs {
+		if ipsw.Version == version && ipsw.BuildID == build {
+			var devs []string
+			for _, dev := range ipsw.Devices {
+				devs = append(devs, dev.Name)
+			}
+			if slices.Contains(devs, device) {
+				return ipsw, nil
+			}
 		}
 	}
 	return nil, model.ErrNotFound

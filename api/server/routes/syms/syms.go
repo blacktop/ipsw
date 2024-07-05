@@ -20,6 +20,9 @@ type successResponse struct {
 }
 
 // swagger:response
+type symIpswResponse *model.Ipsw
+
+// swagger:response
 type symMachoResponse *model.Macho
 
 // swagger:response
@@ -30,6 +33,12 @@ type symResponse *model.Symbol
 
 // swagger:response
 type symsResponse []*model.Symbol
+
+type IpswParams struct {
+	Version string `form:"version" json:"version" binding:"required"`
+	Build   string `form:"build" json:"build" binding:"required"`
+	Device  string `form:"device" json:"device" binding:"required"`
+}
 
 // AddRoutes adds the syms routes to the router
 func AddRoutes(rg *gin.RouterGroup, db db.Database) {
@@ -59,6 +68,52 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 			return
 		}
 		c.JSON(http.StatusOK, successResponse{Success: true})
+	})
+	// swagger:route GET /syms/ipsw Syms getIPSW
+	//
+	// IPSW
+	//
+	// Get IPSW for a given version OR build AND device.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: version
+	//         in: query
+	//         description: version of IPSW
+	//         required: true
+	//         type: string
+	//	    + name: build
+	//         in: query
+	//         description: build of IPSW
+	//         required: true
+	//         type: string
+	//	    + name: device
+	//         in: query
+	//         description: device of IPSW
+	//         required: true
+	//         type: string
+	//
+	//     Responses:
+	//       200: symIpswResponse
+	//       500: genericError
+	rg.GET("/syms/ipsw", func(c *gin.Context) {
+		var params IpswParams
+		if err := c.BindQuery(&params); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+			return
+		}
+		ipsw, err := syms.GetIPSW(params.Version, params.Build, params.Device, db)
+		if err != nil {
+			if errors.Is(err, model.ErrNotFound) {
+				c.AbortWithStatusJSON(http.StatusNotFound, types.GenericError{Error: err.Error()})
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, symIpswResponse(ipsw))
 	})
 	// swagger:route GET /syms/macho/{uuid} Syms getMachO
 	//

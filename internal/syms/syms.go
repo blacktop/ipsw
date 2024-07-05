@@ -284,6 +284,10 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	return db.Save(ipsw)
 }
 
+func GetIPSW(version, build, device string, db db.Database) (*model.Ipsw, error) {
+	return db.GetIPSW(version, build, device)
+}
+
 // GetMachO retrieves the Mach-O file with the given UUID from the database.
 func GetMachO(uuid string, db db.Database) (*model.Macho, error) {
 	return db.GetMachO(uuid)

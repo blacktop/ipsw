@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/blacktop/ipsw/internal/model"
 )
@@ -41,6 +42,30 @@ func (s Server) Ping() error {
 		return fmt.Errorf("failed to ping symbol server: got response %s", resp.Status)
 	}
 	return nil
+}
+
+func (s Server) HasIPSW(version, build, device string) (bool, error) {
+	// Parse the base URL
+	u, err := url.Parse(s.URL + "/v1/syms/ipsw")
+	if err != nil {
+		return false, fmt.Errorf("failed to parse URL: %w", err)
+	}
+	// Add query parameters
+	q := url.Values{}
+	q.Add("version", version)
+	q.Add("build", build)
+	q.Add("device", device)
+	u.RawQuery = q.Encode()
+	// Create the GET request
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (s Server) GetMachO(uuid string) (*model.Macho, error) {

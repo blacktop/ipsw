@@ -920,6 +920,15 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 		return fmt.Errorf("failed symbolicate panic 210: %w", err)
 	}
 
+	if ok, err := db.HasIPSW(i.Header.Version(), i.Header.Build(), i.Payload.Product); err != nil {
+		return fmt.Errorf("failed symbolicate panic 210: %w", err)
+	} else {
+		if !ok {
+			need := fmt.Sprintf("%s (%s) for %s", i.Header.Version(), i.Header.Build(), i.Payload.Product)
+			return fmt.Errorf("failed symbolicate panic 210: required IPSW not found in symbol server database; need %s", need)
+		}
+	}
+
 	i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
 	if err != nil {
 		return fmt.Errorf("failed to parse panic string: %w", err)
