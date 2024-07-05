@@ -4,6 +4,7 @@ package model
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -76,6 +77,10 @@ type Symbol struct {
 	Symbol string `json:"symbol"`
 	Start  uint64 `gorm:"type:bigint" json:"start"`
 	End    uint64 `gorm:"type:bigint" json:"end"`
+}
+
+func (s Symbol) String() string {
+	return fmt.Sprintf("%#x: %s", s.Start, s.Symbol)
 }
 
 func (s Symbol) MarshalJSON() ([]byte, error) {
