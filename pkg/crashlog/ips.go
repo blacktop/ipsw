@@ -1130,6 +1130,13 @@ func (i *Ips) String() string {
 	switch i.Header.BugType {
 	case "Panic", "210":
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
+		if i.Payload.panic210 == nil {
+			var err error
+			i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
+			if err != nil {
+				log.Errorf("failed to parse panic string: %w", err)
+			}
+		}
 		if i.Config.Verbose {
 			out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
 		} else {
