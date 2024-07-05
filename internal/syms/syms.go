@@ -18,7 +18,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
-const highestBitMask uint64 = ^uint64(1 << 63)
+const (
+	highestBitMask uint64 = ^uint64(1 << 63)
+	isKernelMask   uint64 = 1 << 62
+)
 
 func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 	var kcs []*model.Kernelcache
@@ -64,8 +67,8 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 					UUID: mfe.UUID().String(),
 				}
 				if text := mfe.Segment("__TEXT"); text != nil {
-					kext.TextStart = text.Addr
-					kext.TextEnd = text.Addr + text.Filesz
+					kext.TextStart = text.Addr & highestBitMask
+					kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 				}
 				for _, fn := range mfe.GetFunctions() {
 					var msym model.Symbol
@@ -89,6 +92,36 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 				}
 				kc.Kexts = append(kc.Kexts, kext)
 			}
+		} else {
+			kext := &model.Macho{
+				Name: filepath.Base(k),
+				UUID: m.UUID().String(),
+			}
+			if text := m.Segment("__TEXT"); text != nil {
+				kext.TextStart = text.Addr & highestBitMask
+				kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
+			}
+			for _, fn := range m.GetFunctions() {
+				var msym model.Symbol
+				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+					for _, sym := range syms {
+						fn.Name = sym.Name
+					}
+					msym = model.Symbol{
+						Symbol: fn.Name,
+						Start:  fn.StartAddr & highestBitMask,
+						End:    fn.EndAddr & highestBitMask,
+					}
+				} else {
+					msym = model.Symbol{
+						Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
+						Start:  fn.StartAddr & highestBitMask,
+						End:    fn.EndAddr & highestBitMask,
+					}
+				}
+				kext.Symbols = append(kext.Symbols, &msym)
+			}
+			kc.Kexts = append(kc.Kexts, kext)
 		}
 		kcs = append(kcs, kc)
 	}
