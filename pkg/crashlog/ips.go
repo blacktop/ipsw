@@ -563,7 +563,7 @@ type IPSPayload struct {
 	Asi map[string][]string `json:"asi,omitempty"` // Additional application-specific logging. The properties of this object include an array of log strings.
 	// For more information, see Diagnostic messages. This appears in a translated report under Application Specific Information.
 	// https://developer.apple.com/documentation/xcode/examining-the-fields-in-a-crash-report#Diagnostic-messages
-	IsCorpse              bool       `json:"isCorpse,omitempty"`
+	IsCorpse              any        `json:"isCorpse,omitempty"`
 	IsNonFatal            string     `json:"isNonFatal,omitempty"`
 	IsSimulated           string     `json:"isSimulated,omitempty"`
 	Uptime                int        `json:"uptime,omitempty"`
