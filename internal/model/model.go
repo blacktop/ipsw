@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrNotFound  = errors.New("no ipsw found")
+	ErrNotFound  = errors.New("not found")
 	ErrSymExists = errors.New("symbol exists")
 )
 
