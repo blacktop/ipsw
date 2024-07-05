@@ -1363,6 +1363,103 @@
         }
       }
     },
+    "/syms/dsc/{uuid}": {
+      "get": {
+        "description": "Get dyld_shared_cache for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "DSC",
+        "operationId": "getDSC",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "dsc UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symDscResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/dsc/{uuid}/{addr}": {
+      "get": {
+        "description": "Get image from a DSC for a given uuid and address.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Dylib",
+        "operationId": "getDylib",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "dsc UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "pointer address",
+            "name": "addr",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/macho/{uuid}": {
+      "get": {
+        "description": "Get MachO for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "MachO",
+        "operationId": "getMachO",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "machO UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/syms/scan": {
       "post": {
         "description": "Scan symbols for a given IPSW.",
@@ -2334,6 +2431,9 @@
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
     },
+    "DeletedAt": {
+      "$ref": "#/definitions/NullTime"
+    },
     "Device": {
       "description": "Device object",
       "type": "object",
@@ -2887,6 +2987,40 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/usb/lockdownd"
     },
+    "DyldSharedCache": {
+      "type": "object",
+      "title": "DyldSharedCache is the model for a dyld_shared_cache.",
+      "properties": {
+        "CreatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "UpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "Images"
+        },
+        "shared_region_start": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "SharedRegionStart"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "Dylib": {
       "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
       "type": "object",
@@ -3266,10 +3400,66 @@
       "title": "A LoadCmd is a Mach-O load command.",
       "x-go-package": "github.com/blacktop/go-macho/types"
     },
+    "Macho": {
+      "type": "object",
+      "properties": {
+        "CreatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "Symbols": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Symbol"
+          }
+        },
+        "UpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "text_end": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "TextEnd"
+        },
+        "text_start": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "TextStart"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "Magic": {
       "type": "integer",
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "NullTime": {
+      "description": "NullTime implements the [Scanner] interface so\nit can be used as a scan destination, similar to [NullString].",
+      "type": "object",
+      "title": "NullTime represents a [time.Time] that may be null.",
+      "properties": {
+        "Time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "Valid": {
+          "type": "boolean"
+        }
+      },
+      "x-go-package": "database/sql"
     },
     "Plists": {
       "description": "Plists IPSW/OTA plists object",
@@ -4720,6 +4910,18 @@
         "success": {
           "type": "boolean"
         }
+      }
+    },
+    "symDscResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/DyldSharedCache"
+      }
+    },
+    "symMachoResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Macho"
       }
     },
     "symResponse": {

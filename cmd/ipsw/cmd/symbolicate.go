@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,7 +48,8 @@ func init() {
 	symbolicateCmd.Flags().BoolP("running", "r", false, "Show all running (TH_RUN) threads in crashlog")
 	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
-	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().Bool("demangle", false, "Demangle symbol names")
+	symbolicateCmd.Flags().StringP("database", "d", "", "Symbol Server DB URL")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -55,6 +57,7 @@ func init() {
 	viper.BindPFlag("symbolicate.proc", symbolicateCmd.Flags().Lookup("proc"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("symbolicate.database", symbolicateCmd.Flags().Lookup("database"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -118,7 +121,20 @@ var symbolicateCmd = &cobra.Command{
 			}
 
 			if len(args) < 2 && hdr.BugType == "210" {
-				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
+				if viper.IsSet("symbolicate.database") {
+					u, err := url.ParseRequestURI(viper.GetString("symbolicate.database"))
+					if err != nil {
+						return fmt.Errorf("failed to parse symbol server URL: %v", err)
+					}
+					if u.Scheme == "" || u.Host == "" {
+						return fmt.Errorf("invalid symbol server URL: %s (needs a valid schema AND host)", u.String())
+					}
+					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
+						return err
+					}
+				} else {
+					log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
+				}
 			} else {
 				if hdr.BugType == "210" {
 					/* validate IPSW */
