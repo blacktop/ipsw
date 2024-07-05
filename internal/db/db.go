@@ -22,6 +22,10 @@ type Database interface {
 	// It returns ErrNotFound if the name does not exist.
 	GetIpswByName(name string) (*model.Ipsw, error)
 
+	// GetIPSW returns the IPSW for the given version, build, and device.
+	// It returns ErrNotFound if the IPSW does not exist.
+	GetIPSW(version, build, device string) (*model.Ipsw, error)
+
 	// GetDSC returns the DyldSharedCache for the given UUID.
 	GetDSC(uuid string) (*model.DyldSharedCache, error)
 

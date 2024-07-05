@@ -17,7 +17,6 @@ var (
 
 // Ipsw is the model for an Ipsw file.
 type Ipsw struct {
-	gorm.Model                    // adds ID, created_at etc.
 	ID         string             `gorm:"primaryKey" json:"id"`
 	Name       string             `json:"name,omitempty"`
 	Version    string             `json:"version,omitempty"`
@@ -27,10 +26,15 @@ type Ipsw struct {
 	Kernels    []*Kernelcache     `gorm:"many2many:ipsw_kernels;" json:"kernels,omitempty"`
 	DSCs       []*DyldSharedCache `gorm:"many2many:ipsw_dscs;" json:"dscs,omitempty"`
 	FileSystem []*Macho           `gorm:"many2many:ipsw_files;" json:"file_system,omitempty"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 type Device struct {
-	Name      string `gorm:"primaryKey" json:"name"`
+	Name string `gorm:"primaryKey" json:"name"`
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
