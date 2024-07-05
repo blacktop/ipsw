@@ -111,6 +111,7 @@ var symbolicateCmd = &cobra.Command{
 				Process:  proc,
 				Unslid:   unslide,
 				Demangle: demangleFlag,
+				Verbose:  Verbose,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to parse IPS file: %v", err)
