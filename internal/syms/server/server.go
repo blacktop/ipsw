@@ -8,12 +8,27 @@ import (
 	"github.com/blacktop/ipsw/internal/model"
 )
 
+type cache struct {
+	MachOs  map[string]*model.Macho
+	DSCs    map[string]*model.DyldSharedCache
+	Dylibs  map[string]map[uint64]*model.Macho
+	Symbols map[string]map[uint64]*model.Symbol
+}
+
 type Server struct {
 	URL string
+
+	cache *cache
 }
 
 func NewServer(url string) *Server {
-	return &Server{URL: url}
+	cache := &cache{
+		MachOs:  make(map[string]*model.Macho),
+		DSCs:    make(map[string]*model.DyldSharedCache),
+		Dylibs:  make(map[string]map[uint64]*model.Macho),
+		Symbols: make(map[string]map[uint64]*model.Symbol),
+	}
+	return &Server{URL: url, cache: cache}
 }
 
 func (s Server) Ping() error {
@@ -29,6 +44,10 @@ func (s Server) Ping() error {
 }
 
 func (s Server) GetMachO(uuid string) (*model.Macho, error) {
+	// check cache first
+	if macho, ok := s.cache.MachOs[uuid]; ok {
+		return macho, nil
+	}
 	resp, err := http.Get(s.URL + "/v1/syms/macho/" + uuid)
 	if err != nil {
 		return nil, err
@@ -41,10 +60,16 @@ func (s Server) GetMachO(uuid string) (*model.Macho, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&macho); err != nil {
 		return nil, err
 	}
+	// add to cache
+	s.cache.MachOs[uuid] = &macho
 	return &macho, nil
 }
 
 func (s Server) GetDSC(uuid string) (*model.DyldSharedCache, error) {
+	// check cache first
+	if dsc, ok := s.cache.DSCs[uuid]; ok {
+		return dsc, nil
+	}
 	resp, err := http.Get(s.URL + "/v1/syms/dsc/" + uuid)
 	if err != nil {
 		return nil, err
@@ -57,10 +82,18 @@ func (s Server) GetDSC(uuid string) (*model.DyldSharedCache, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&dsc); err != nil {
 		return nil, err
 	}
+	// add to cache
+	s.cache.DSCs[uuid] = &dsc
 	return &dsc, nil
 }
 
 func (s Server) GetDSCImage(uuid string, addr uint64) (*model.Macho, error) {
+	// check cache first
+	if dsc, ok := s.cache.Dylibs[uuid]; ok {
+		if dylib, ok := dsc[addr]; ok {
+			return dylib, nil
+		}
+	}
 	resp, err := http.Get(s.URL + fmt.Sprintf("/v1/syms/dsc/%s/%d", uuid, addr))
 	if err != nil {
 		return nil, err
@@ -73,10 +106,21 @@ func (s Server) GetDSCImage(uuid string, addr uint64) (*model.Macho, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&dylib); err != nil {
 		return nil, err
 	}
+	// add to cache
+	if _, ok := s.cache.Dylibs[uuid]; !ok {
+		s.cache.Dylibs[uuid] = make(map[uint64]*model.Macho)
+	}
+	s.cache.Dylibs[uuid][addr] = &dylib
 	return &dylib, nil
 }
 
 func (s Server) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
+	// check cache first
+	if dsc, ok := s.cache.Symbols[uuid]; ok {
+		if sym, ok := dsc[addr]; ok {
+			return sym, nil
+		}
+	}
 	resp, err := http.Get(s.URL + fmt.Sprintf("/v1/syms/%s/%d", uuid, addr))
 	if err != nil {
 		return nil, err
@@ -89,5 +133,10 @@ func (s Server) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&sym); err != nil {
 		return nil, err
 	}
+	// add to cache
+	if _, ok := s.cache.Symbols[uuid]; !ok {
+		s.cache.Symbols[uuid] = make(map[uint64]*model.Symbol)
+	}
+	s.cache.Symbols[uuid][addr] = &sym
 	return &sym, nil
 }
