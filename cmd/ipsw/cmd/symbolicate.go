@@ -48,8 +48,8 @@ func init() {
 	symbolicateCmd.Flags().BoolP("running", "r", false, "Show all running (TH_RUN) threads in crashlog")
 	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
-	symbolicateCmd.Flags().Bool("demangle", false, "Demangle symbol names")
-	symbolicateCmd.Flags().StringP("database", "d", "", "Symbol Server DB URL")
+	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -57,7 +57,7 @@ func init() {
 	viper.BindPFlag("symbolicate.proc", symbolicateCmd.Flags().Lookup("proc"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
-	viper.BindPFlag("symbolicate.database", symbolicateCmd.Flags().Lookup("database"))
+	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -121,14 +121,15 @@ var symbolicateCmd = &cobra.Command{
 			}
 
 			if len(args) < 2 && hdr.BugType == "210" {
-				if viper.IsSet("symbolicate.database") {
-					u, err := url.ParseRequestURI(viper.GetString("symbolicate.database"))
+				if viper.IsSet("symbolicate.server") {
+					u, err := url.ParseRequestURI(viper.GetString("symbolicate.server"))
 					if err != nil {
 						return fmt.Errorf("failed to parse symbol server URL: %v", err)
 					}
 					if u.Scheme == "" || u.Host == "" {
 						return fmt.Errorf("invalid symbol server URL: %s (needs a valid schema AND host)", u.String())
 					}
+					log.WithField("server", u.String()).Info("Symbolicating 210 Panic with Symbol Server")
 					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
 						return err
 					}
