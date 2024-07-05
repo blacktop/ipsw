@@ -1,6 +1,6 @@
 package car
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=renditionAttributeType,renditionLayoutType,resourceID,csiBitmapEncoding -output car_string.go
+//go:generate stringer -type=renditionAttributeType,renditionLayoutType,resourceID,csiBitmapEncoding -output car_string.go
 
 import (
 	"bytes"

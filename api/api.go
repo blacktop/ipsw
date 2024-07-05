@@ -1,7 +1,7 @@
 // Package api contains common constants for daemon and client.
 package api
 
-//go:generate go run github.com/go-swagger/go-swagger/cmd/swagger generate spec -o swagger.json
+//go:generate swagger generate spec -o swagger.json
 
 // Common constants for daemon and client.
 const (
