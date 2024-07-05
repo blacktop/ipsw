@@ -22,10 +22,10 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
-	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/fatih/color"
 )
@@ -846,17 +846,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 							}
 							if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 								if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-									if i.Config.Demangle {
-										if strings.HasPrefix(sym, "_$s") || strings.HasPrefix(sym, "$s") { // TODO: better detect swift symbols
-											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(sym)
-										} else if strings.HasPrefix(sym, "__Z") || strings.HasPrefix(sym, "_Z") {
-											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(sym, false, false)
-										} else {
-											i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
-										}
-									} else {
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = sym
-									}
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym)
 									if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
 									}
@@ -873,17 +863,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 						for _, fn := range funcs {
 							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset && i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset < fn.EndAddr {
 								found = true
-								if i.Config.Demangle {
-									if strings.HasPrefix(fn.Name, "_$s") || strings.HasPrefix(fn.Name, "$s") { // TODO: better detect swift symbols
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol, _ = swift.Demangle(fn.Name)
-									} else if strings.HasPrefix(fn.Name, "__Z") || strings.HasPrefix(fn.Name, "_Z") {
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangle.Do(fn.Name, false, false)
-									} else {
-										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name
-									}
-								} else {
-									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fn.Name
-								}
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
 								if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
 									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr
 								}
@@ -932,7 +912,13 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	return nil
 }
 
-func (i *Ips) Symbolicate210WithDatabase(db db.Database) (err error) {
+func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
+
+	db := server.NewServer(dbURL)
+
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed symbolicate panic 210: %w", err)
+	}
 
 	i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
 	if err != nil {

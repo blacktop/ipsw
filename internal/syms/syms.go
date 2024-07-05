@@ -194,6 +194,7 @@ func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
 	return dscs, nil
 }
 
+// Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
 func Scan(ipswPath string, db db.Database) (err error) {
 	/* IPSW */
 	sha1, err := utils.Sha1(ipswPath)
@@ -283,10 +284,29 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	return db.Save(ipsw)
 }
 
+// GetMachO retrieves the Mach-O file with the given UUID from the database.
+func GetMachO(uuid string, db db.Database) (*model.Macho, error) {
+	return db.GetMachO(uuid)
+}
+
+// GetDSC retrieves the Dyld Shared Cache (DSC) with the given UUID from the database.
+func GetDSC(uuid string, db db.Database) (*model.DyldSharedCache, error) {
+	return db.GetDSC(uuid)
+}
+
+// GetDSCImage retrieves the Mach-O image with the given UUID and address from the
+// Dyld Shared Cache (DSC) in the database.
+func GetDSCImage(uuid string, addr uint64, db db.Database) (*model.Macho, error) {
+	return db.GetDSCImage(uuid, addr)
+}
+
+// Get retrieves the symbols associated with the given UUID from the database.
 func Get(uuid string, db db.Database) ([]*model.Symbol, error) {
 	return db.GetSymbols(uuid)
 }
 
+// GetForAddr retrieves the symbol associated with the given UUID and address from the database.
+// It returns the symbol and an error if any.
 func GetForAddr(uuid string, addr uint64, db db.Database) (*model.Symbol, error) {
 	return db.GetSymbol(uuid, addr)
 }

@@ -29,12 +29,13 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 ### Options
 
 ```
-  -a, --all           Show all threads in crashlog
-  -d, --demangle      Demangle symbol names
-  -h, --help          help for symbolicate
-  -p, --proc string   Filter crashlog by process name
-  -r, --running       Show all running (TH_RUN) threads in crashlog
-  -u, --unslide       Unslide the crashlog for easier static analysis
+  -a, --all               Show all threads in crashlog
+  -d, --database string   Symbol Server DB URL
+      --demangle          Demangle symbol names
+  -h, --help              help for symbolicate
+  -p, --proc string       Filter crashlog by process name
+  -r, --running           Show all running (TH_RUN) threads in crashlog
+  -u, --unslide           Unslide the crashlog for easier static analysis
 ```
 
 ### Options inherited from parent commands
