@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -40,6 +42,12 @@ type mount struct {
 	IsMounted bool
 }
 
+type PlistDiff struct {
+	New     []string          `json:"new,omitempty"`
+	Removed []string          `json:"removed,omitempty"`
+	Updated map[string]string `json:"changed,omitempty"`
+}
+
 type Config struct {
 	Title    string
 	IpswOld  string
@@ -47,6 +55,7 @@ type Config struct {
 	KDKs     []string
 	LaunchD  bool
 	Firmware bool
+	Features bool
 	Filter   []string
 	Output   string
 }
@@ -84,6 +93,7 @@ type Diff struct {
 	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
 	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
 	Launchd   string          `json:"launchd,omitempty"`
+	Features  *PlistDiff      `json:"features,omitempty"`
 
 	tmpDir string `json:"-"`
 	conf   *Config
@@ -250,6 +260,13 @@ func (d *Diff) Diff() (err error) {
 	if d.conf.Firmware {
 		log.Info("Diffing Firmware")
 		if err := d.parseFirmwares(); err != nil {
+			return err
+		}
+	}
+
+	if d.conf.Features {
+		log.Info("Diffing Feature Flags")
+		if err := d.parseFeatureFlags(); err != nil {
 			return err
 		}
 	}
@@ -554,4 +571,80 @@ func (d *Diff) parseFirmwares() (err error) {
 		Filter:   d.conf.Filter,
 	})
 	return
+}
+
+func (d *Diff) parseFeatureFlags() (err error) {
+	d.Features = &PlistDiff{
+		Updated: make(map[string]string),
+	}
+	conf := &mcmd.DiffConfig{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+	}
+
+	oldPlists := make(map[string]string)
+	if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", func(path string, content string) error {
+		oldPlists[path] = content
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	var prevFiles []string
+	for f := range oldPlists {
+		prevFiles = append(prevFiles, f)
+	}
+	slices.Sort(prevFiles)
+
+	newPlists := make(map[string]string)
+	if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", func(path string, content string) error {
+		newPlists[path] = content
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	var nextFiles []string
+	for f := range newPlists {
+		nextFiles = append(nextFiles, f)
+	}
+	slices.Sort(nextFiles)
+
+	/* DIFF IPSW */
+	d.Features.New = utils.Difference(nextFiles, prevFiles)
+	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
+	// gc
+	prevFiles = []string{}
+
+	for _, f2 := range nextFiles {
+		dat2 := newPlists[f2]
+		if dat1, ok := oldPlists[f2]; ok {
+			if strings.EqualFold(dat2, dat1) {
+				continue
+			}
+			var out string
+			if conf.Markdown {
+				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			} else {
+				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			}
+			if len(out) == 0 { // no diff
+				continue
+			}
+			if conf.Markdown {
+				d.Features.Updated[f2] = "```diff\n" + out + "\n```\n"
+			} else {
+				d.Features.Updated[f2] = out
+			}
+		}
+	}
+
+	return nil
 }
