@@ -35,22 +35,24 @@ func (d *Diff) Markdown() error {
 	)
 
 	// SECTION: Kernel
-	out.WriteString(
-		fmt.Sprintf(
-			"## Kernel\n\n"+
-				"### Version\n\n"+
-				"| iOS | Version | Build | Date |\n"+
-				"| :-- | :------ | :---- | :--- |\n"+
-				"| %s *(%s)* | %s | %s | %s |\n"+
-				"| %s *(%s)* | %s | %s | %s |\n\n",
-			d.Old.Version, d.Old.Build,
-			d.Old.Kernel.Version.KernelVersion.Darwin, d.Old.Kernel.Version.KernelVersion.XNU,
-			d.Old.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
-			d.New.Version, d.New.Build,
-			d.New.Kernel.Version.KernelVersion.Darwin, d.New.Kernel.Version.KernelVersion.XNU,
-			d.New.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
-		),
-	)
+	if d.Old.Kernel.Version != nil && d.New.Kernel.Version != nil {
+		out.WriteString(
+			fmt.Sprintf(
+				"## Kernel\n\n"+
+					"### Version\n\n"+
+					"| iOS | Version | Build | Date |\n"+
+					"| :-- | :------ | :---- | :--- |\n"+
+					"| %s *(%s)* | %s | %s | %s |\n"+
+					"| %s *(%s)* | %s | %s | %s |\n\n",
+				d.Old.Version, d.Old.Build,
+				d.Old.Kernel.Version.KernelVersion.Darwin, d.Old.Kernel.Version.KernelVersion.XNU,
+				d.Old.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
+				d.New.Version, d.New.Build,
+				d.New.Kernel.Version.KernelVersion.Darwin, d.New.Kernel.Version.KernelVersion.XNU,
+				d.New.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
+			),
+		)
+	}
 
 	// SUB-SECTION: Kexts
 	if d.Kexts != nil && (len(d.Kexts.New) > 0 || len(d.Kexts.Removed) > 0 || len(d.Kexts.Updated) > 0) {
@@ -345,6 +347,77 @@ func (d *Diff) Markdown() error {
 					fmt.Fprintf(f, d.Dylibs.Updated[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("DYLIBS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
+				}
+			}
+			out.WriteString("\n</details>\n\n")
+		}
+	}
+
+	// SUB-SECTION: Feature Flags
+	if d.Features != nil && (len(d.Features.New) > 0 || len(d.Features.Removed) > 0 || len(d.Features.Updated) > 0) {
+		out.WriteString("### Feature Flags\n\n")
+		if len(d.Features.New) > 0 {
+			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Features.New)))
+			if len(d.Features.New) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View NEW</i></summary>\n\n")
+			}
+			for _, k := range d.Features.New {
+				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Features.New) > 30 {
+				out.WriteString("\n</details>\n")
+			}
+			out.WriteString("\n")
+		}
+		if len(d.Features.Removed) > 0 {
+			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Features.Removed)))
+			if len(d.Features.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
+			for _, k := range d.Features.Removed {
+				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Features.Removed) > 30 {
+				out.WriteString("\n</details>\n")
+			}
+			out.WriteString("\n")
+		}
+		if len(d.Features.Updated) > 0 {
+			out.WriteString(fmt.Sprintf("#### ⬆️ Updated (%d)\n\n", len(d.Features.Updated)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View Updated</i></summary>\n\n")
+			if len(d.Features.Updated) < 20 {
+				for k, v := range d.Features.Updated {
+					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
+					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
+					out.WriteString(fmt.Sprintf("%s\n", v))
+				}
+			} else {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "Features"), 0o750); err != nil {
+					return err
+				}
+				keys := make([]string, 0, len(d.Features.Updated))
+				for k := range d.Features.Updated {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					fname := filepath.Join(d.conf.Output, "Features", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+					if _, err := os.Stat(fname); os.IsExist(err) {
+						fname = filepath.Join(d.conf.Output, "Features", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+					}
+					log.Debugf("Creating diff dylib Markdown file: %s", fname)
+					f, err := os.Create(fname)
+					if err != nil {
+						return fmt.Errorf("failed to create diff file: %w", err)
+					}
+					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
+					fmt.Fprintf(f, "> `%s`\n\n", k)
+					fmt.Fprintf(f, d.Features.Updated[k])
+					f.Close()
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
 			}
 			out.WriteString("\n</details>\n\n")

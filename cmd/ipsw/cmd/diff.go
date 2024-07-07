@@ -44,6 +44,7 @@ func init() {
 	diffCmd.Flags().StringArrayP("kdk", "k", []string{}, "Path to KDKs to diff")
 	diffCmd.Flags().Bool("launchd", false, "Diff launchd configs")
 	diffCmd.Flags().Bool("fw", false, "Diff other firmwares")
+	diffCmd.Flags().Bool("feat", false, "Diff feature flags")
 	diffCmd.Flags().StringSliceP("filter", "f", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	diffCmd.MarkFlagDirname("output")
@@ -56,6 +57,7 @@ func init() {
 	viper.BindPFlag("diff.kdk", diffCmd.Flags().Lookup("kdk"))
 	viper.BindPFlag("diff.launchd", diffCmd.Flags().Lookup("launchd"))
 	viper.BindPFlag("diff.fw", diffCmd.Flags().Lookup("fw"))
+	viper.BindPFlag("diff.feat", diffCmd.Flags().Lookup("feat"))
 	viper.BindPFlag("diff.filter", diffCmd.Flags().Lookup("filter"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 }
@@ -115,6 +117,7 @@ var diffCmd = &cobra.Command{
 				KDKs:     viper.GetStringSlice("diff.kdk"),
 				LaunchD:  viper.GetBool("diff.launchd"),
 				Firmware: viper.GetBool("diff.fw"),
+				Features: viper.GetBool("diff.feat"),
 				Filter:   viper.GetStringSlice("diff.filter"),
 				Output:   viper.GetString("diff.output"),
 			})
