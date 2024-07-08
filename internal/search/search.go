@@ -85,7 +85,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, string) err
 						if subErr != nil {
 							return subErr
 						}
-						files = append(files, subPath)
+						files = append(files, strings.TrimPrefix(subPath, "/private"))
 						return nil
 					})
 				}
