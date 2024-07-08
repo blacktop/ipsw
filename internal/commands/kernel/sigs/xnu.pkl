@@ -1,0 +1,4 @@
+args = 0
+pattern = "vm_compressor_init: Failed"
+symbol = "_vm_compressor_init"
+caller = "_panic"
