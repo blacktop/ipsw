@@ -395,7 +395,7 @@ func (d *Diff) Markdown() error {
 					out.WriteString(fmt.Sprintf("%s\n", v))
 				}
 			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "Features"), 0o750); err != nil {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
 					return err
 				}
 				keys := make([]string, 0, len(d.Features.Updated))
@@ -404,9 +404,9 @@ func (d *Diff) Markdown() error {
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "Features", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
 					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "Features", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
 					}
 					log.Debugf("Creating diff dylib Markdown file: %s", fname)
 					f, err := os.Create(fname)
