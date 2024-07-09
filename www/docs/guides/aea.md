@@ -74,23 +74,6 @@ Decrypt with `/usr/bin/aea`
       -o TEST.dmg -key-value 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
-You can also dump the PEM in the JSON database form
-
-```bash
-❯ ipsw fw aea --fcs-key iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea
-   • Created fcs-keys.json    
-```   
-```json   
-{
-  "C76OEoiX5Lfc0nRQtn1cLkOEwDtC8HGIM_M_1rJgQ9g=": "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZ21qWDBwYmU2WWErMDJUek4KY0laWHZ6L1VId1lMN1JwUVFka01QV1pmT2UraFJBTkNBQVRzeUsxZEJzUFJVZU15b2hWM2VJUG5JNGw2SzhjUApWeGZGRXBEd01DdXNlTUVrV0UzV0w5QXcvTTMyRk5Ta2lYZUNpQXoxMXBOdUJVWGVmTkFPSXlkSQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg=="
-}
-```
-
-:::info note
-This "Database" is a key-value pair JSON file where the `key` is the unique part of the `fcs-key-url` as can been seen above in the `--info` dump from a `.dmg.aea` file AND the `value` of the key-value is the base64 encoded PEM bytes.
-:::
-
-
 ### Download AEA PEMs as JSON "Database"
 
 Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
@@ -110,6 +93,22 @@ To get the `macOS` PEM JSON "Database"
    • Extracting remote AEA1 DMG fcs-keys
       • Created '/tmp/fcs-keys.json'
 ```      
+
+You can also dump the PEM in the JSON database from a local file
+
+```bash
+❯ ipsw fw aea --fcs-key iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea
+   • Created fcs-keys.json    
+```   
+```json   
+{
+  "C76OEoiX5Lfc0nRQtn1cLkOEwDtC8HGIM_M_1rJgQ9g=": "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZ21qWDBwYmU2WWErMDJUek4KY0laWHZ6L1VId1lMN1JwUVFka01QV1pmT2UraFJBTkNBQVRzeUsxZEJzUFJVZU15b2hWM2VJUG5JNGw2SzhjUApWeGZGRXBEd01DdXNlTUVrV0UzV0w5QXcvTTMyRk5Ta2lYZUNpQXoxMXBOdUJVWGVmTkFPSXlkSQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg=="
+}
+```
+
+:::info note
+This "Database" is a key-value pair JSON file where the `key` is the unique part of the `fcs-key-url` as can been seen above in the `--info` dump from a `.dmg.aea` file AND the `value` of the key-value is the base64 encoded PEM bytes.
+:::
 
 ### Use AEA PEM Database
 
