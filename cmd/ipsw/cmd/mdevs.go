@@ -53,7 +53,7 @@ type MobileDevice struct {
 func init() {
 	rootCmd.AddCommand(mdevsCmd)
 
-	mdevsCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	mdevsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 }
 
 // mdevsCmd represents the mdevs command

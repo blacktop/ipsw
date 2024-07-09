@@ -41,7 +41,7 @@ import (
 func init() {
 	DyldCmd.AddCommand(dyldImportsCmd)
 	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
-	dyldImportsCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	dyldImportsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})

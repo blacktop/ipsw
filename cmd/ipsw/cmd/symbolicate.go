@@ -50,7 +50,7 @@ func init() {
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
-	symbolicateCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))

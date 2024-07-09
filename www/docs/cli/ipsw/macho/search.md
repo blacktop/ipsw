@@ -24,6 +24,7 @@ ipsw macho search <IPSW> [flags]
   -r, --ivar string           Search for specific ObjC instance variable regex
   -t, --launch-const string   Search for launch constraint regex
   -l, --load-command string   Search for specific load command regex
+      --pem-db string         AEA pem DB JSON file
   -p, --protocol string       Search for specific ObjC protocol regex
   -x, --section string        Search for specific section regex
   -s, --sel string            Search for specific ObjC selector regex

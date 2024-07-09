@@ -70,7 +70,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	machoSearchCmd.Flags().StringP("ivar", "r", "", "Search for specific ObjC instance variable regex")
-	machoSearchCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	machoSearchCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	})
