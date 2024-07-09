@@ -14,6 +14,7 @@ type DiffConfig struct {
 	Color    bool
 	DiffTool string
 	Filter   []string
+	PemDB    string
 }
 
 type MachoDiff struct {
@@ -123,7 +124,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 
 	prev := make(map[string]*DiffInfo)
 
-	if err := search.ForEachMachoInIPSW(oldIPSW, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSW(oldIPSW, conf.PemDB, func(path string, m *macho.File) error {
 		prev[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
@@ -140,7 +141,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 
 	next := make(map[string]*DiffInfo)
 
-	if err := search.ForEachMachoInIPSW(newIPSW, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSW(newIPSW, conf.PemDB, func(path string, m *macho.File) error {
 		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {

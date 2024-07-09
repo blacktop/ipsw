@@ -766,8 +766,8 @@ func GetUserAgent(f *dyld.File, sysVer *plist.SystemVersion) (string, error) {
 	return "", nil
 }
 
-func OpenFromIPSW(ipswPath string, driverKit, all bool) (*mount.Context, []*dyld.File, error) {
-	ctx, err := mount.DmgInIPSW(ipswPath, "sys")
+func OpenFromIPSW(ipswPath, pemDB string, driverKit, all bool) (*mount.Context, []*dyld.File, error) {
+	ctx, err := mount.DmgInIPSW(ipswPath, "sys", pemDB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to mount IPSW: %v", err)
 	}

@@ -95,6 +95,7 @@ type Config struct {
 	Unslid   bool
 	Demangle bool
 	Verbose  bool
+	PemDB    string
 }
 
 type Ips struct {
@@ -758,7 +759,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	}
 
 	machoFuncMap := make(map[string][]types.Function)
-	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
 		if total == 0 {
 			return ErrDone // break
 		}
@@ -800,7 +801,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	// 	}
 	// }
 
-	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, false, true)
+	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, i.Config.PemDB, false, true)
 	if err != nil {
 		return fmt.Errorf("failed to open DSC from IPSW: %w", err)
 	}

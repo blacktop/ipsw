@@ -154,7 +154,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, dri
 }
 
 // Extract extracts dyld_shared_cache from IPSW
-func Extract(ipsw, destPath string, arches []string, driverkit, all bool) ([]string, error) {
+func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
 
 	if runtime.GOOS == "windows" {
 		return nil, fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
@@ -188,7 +188,7 @@ func Extract(ipsw, destPath string, arches []string, driverkit, all bool) ([]str
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

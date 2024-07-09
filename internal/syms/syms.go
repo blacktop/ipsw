@@ -129,8 +129,8 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 	return kcs, nil
 }
 
-func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
-	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, false, true)
+func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
+	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, pemDB, false, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DSC from IPSW: %w", err)
 	}
@@ -195,7 +195,7 @@ func scanDSCs(ipswPath string) ([]*model.DyldSharedCache, error) {
 }
 
 // Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
-func Scan(ipswPath string, db db.Database) (err error) {
+func Scan(ipswPath, pemDB string, db db.Database) (err error) {
 	/* IPSW */
 	sha1, err := utils.Sha1(ipswPath)
 	if err != nil {
@@ -233,7 +233,7 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	}
 
 	/* DSC */
-	ipsw.DSCs, err = scanDSCs(ipswPath)
+	ipsw.DSCs, err = scanDSCs(ipswPath, pemDB)
 	if err != nil {
 		return fmt.Errorf("failed to scan DSCs: %w", err)
 	}
@@ -243,7 +243,7 @@ func Scan(ipswPath string, db db.Database) (err error) {
 	}
 
 	/* FileSystem */
-	if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
 		if m.UUID() != nil {
 			mm := &model.Macho{
 				UUID: m.UUID().String(),
