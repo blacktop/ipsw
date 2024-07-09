@@ -438,8 +438,8 @@ func Mount(image, mountPoint string) error {
 	} else {
 		out, err := exec.Command("apfs-fuse", image, mountPoint).CombinedOutput()
 		if err != nil {
-			if _, lperr := exec.LookPath("apfs-fuse"); err != nil {
-				return fmt.Errorf("utils.Mount: 'apfs-fuse' not found (required on non-darwin systems): %v: %v: %s", lperr, err, out)
+			if _, perr := exec.LookPath("apfs-fuse"); perr != nil {
+				return fmt.Errorf("utils.Mount: 'apfs-fuse' not found (required on non-darwin systems): %v: %v: %s", perr, err, out)
 			}
 			return fmt.Errorf("%v: %s", err, out)
 		}
@@ -587,7 +587,7 @@ func MountInfo() (*HdiUtilInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
-func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) ([]string, error) {
+func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -604,7 +604,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

@@ -57,13 +57,18 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
-	//
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       200: successResponse
 	//       500: genericError
 	rg.POST("/syms/scan", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
-		if err := syms.Scan(ipswPath, db); err != nil {
+		pemDBPath := filepath.Clean(c.Query("pem_db"))
+		if err := syms.Scan(ipswPath, pemDBPath, db); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}

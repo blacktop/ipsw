@@ -41,8 +41,8 @@ type getFsFilesResponse struct {
 }
 
 func getFsFiles(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
+	ipswPath := filepath.Clean(c.Query("path"))
+	pemDbPath := filepath.Clean(c.Query("pem_db"))
 
 	i, err := info.Parse(ipswPath)
 	if err != nil {
@@ -71,7 +71,7 @@ func getFsFiles(c *gin.Context) {
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDbPath)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
 		}
@@ -133,10 +133,10 @@ type getFsEntitlementsResponse struct {
 }
 
 func getFsEntitlements(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
+	ipswPath := filepath.Clean(c.Query("path"))
+	pemDbPath := filepath.Clean(c.Query("pem_db"))
 
-	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath})
+	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath})
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
@@ -162,9 +162,10 @@ type getFsLaunchdConfigResponse struct {
 }
 
 func getFsLaunchdConfig(c *gin.Context) {
-	ipswPath := c.Query("path")
+	ipswPath := filepath.Clean(c.Query("path"))
+	pemDBPath := filepath.Clean(c.Query("pem_db"))
 
-	ldconf, err := extract.LaunchdConfig(ipswPath)
+	ldconf, err := extract.LaunchdConfig(ipswPath, pemDBPath)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return

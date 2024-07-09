@@ -44,17 +44,23 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       500: genericError
 	//       200: mountReponse
 	rg.POST("/mount/:type", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
+		pemDBPath := filepath.Clean(c.Query("pem_db"))
 		dmgType := c.Param("type")
 		if !utils.StrSliceContains([]string{"app", "sys", "fs"}, dmgType) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
 			return
 		}
-		ctx, err := mount.DmgInIPSW(ipswPath, dmgType)
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDBPath)
 		if err != nil {
 			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
 				c.AbortWithError(http.StatusNotFound, err)

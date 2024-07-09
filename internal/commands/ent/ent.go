@@ -31,6 +31,7 @@ type Config struct {
 	IPSW     string
 	Folder   string
 	Database string
+	PemDB    string
 	Markdown bool
 	Color    bool
 	DiffTool string
@@ -56,7 +57,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 
 			if appOS, err := i.GetAppOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning AppOS")
-				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS"); err != nil {
+				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS", conf.PemDB); err != nil {
 					return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 				} else {
 					for k, v := range ents {
@@ -66,7 +67,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning SystemOS")
-				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS"); err != nil {
+				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS", conf.PemDB); err != nil {
 					return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
 				} else {
 					for k, v := range ents {
@@ -76,7 +77,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning filesystem")
-				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem"); err != nil {
+				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem", conf.PemDB); err != nil {
 					return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
 				} else {
 					for k, v := range ents {
@@ -86,7 +87,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning filesystem")
-				if ents, err := scanEnts(conf.IPSW, excOS, "ExclaveOS"); err != nil {
+				if ents, err := scanEnts(conf.IPSW, excOS, "ExclaveOS", conf.PemDB); err != nil {
 					return nil, fmt.Errorf("failed to scan files in ExclaveOS %s: %v", excOS, err)
 				} else {
 					for k, v := range ents {
@@ -258,7 +259,7 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 	return dat.String(), nil
 }
 
-func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
+func scanEnts(ipswPath, dmgPath, dmgType, pemDB string) (map[string]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -277,7 +278,7 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

@@ -253,13 +253,13 @@ func aeaDecrypt(in, out string, akey []byte) (string, error) {
 	return out, nil
 }
 
-func Decrypt(in, out string, privKeyData []byte) (string, error) {
+func Decrypt(in, out string, privKeyData []byte, pemDB string) (string, error) {
 	metadata, err := Info(in)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse AEA: %v", err)
 	}
 
-	wkey, err := metadata.DecryptFCS(privKeyData)
+	wkey, err := metadata.DecryptFCS(privKeyData, pemDB)
 	if err != nil {
 		return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 	}

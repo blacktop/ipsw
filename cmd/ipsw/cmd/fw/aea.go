@@ -48,6 +48,7 @@ func init() {
 	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
 	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
+	aeaCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
@@ -55,6 +56,7 @@ func init() {
 	viper.BindPFlag("fw.aea.fcs-key", aeaCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
+	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
 }
 
@@ -76,6 +78,7 @@ var aeaCmd = &cobra.Command{
 		adKey := viper.GetBool("fw.aea.key")
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
+		pemDB := viper.GetString("fw.aea.pem-db")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
 		if (adKey || showInfo) && output != "" {
@@ -115,7 +118,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil, false)
+			pkmap, err := metadata.GetPrivateKey(nil, pemDB, false)
 			if err != nil {
 				return fmt.Errorf("failed to get private key: %v", err)
 			}
@@ -144,7 +147,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			wkey, err := metadata.DecryptFCS(pemData)
+			wkey, err := metadata.DecryptFCS(pemData, pemDB)
 			if err != nil {
 				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 			}
@@ -156,7 +159,7 @@ var aeaCmd = &cobra.Command{
 					return fmt.Errorf("failed to read pem file: %v", err)
 				}
 			}
-			out, err := aea.Decrypt(args[0], output, pemData)
+			out, err := aea.Decrypt(args[0], output, pemData, pemDB)
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}

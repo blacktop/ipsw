@@ -22,6 +22,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsFilesResponse
@@ -42,6 +47,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsEntitlementsResponse
@@ -61,6 +71,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         in: query
 	//         description: path to IPSW
 	//         required: true
+	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
 	//         type: string
 	//
 	//     Responses:

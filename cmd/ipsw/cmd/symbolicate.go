@@ -50,6 +50,7 @@ func init() {
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
+	symbolicateCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -58,6 +59,7 @@ func init() {
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
+	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -92,6 +94,7 @@ var symbolicateCmd = &cobra.Command{
 		unslide := viper.GetBool("symbolicate.unslide")
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
+		pemDB := viper.GetString("symbolicate.pem-db")
 		/* validate flags */
 		if (Verbose || all) && len(proc) > 0 {
 			return fmt.Errorf("cannot use --verbose OR --all WITH --proc")
@@ -114,6 +117,7 @@ var symbolicateCmd = &cobra.Command{
 				Process:  proc,
 				Unslid:   unslide,
 				Demangle: demangleFlag,
+				PemDB:    pemDB,
 				Verbose:  Verbose,
 			})
 			if err != nil {
