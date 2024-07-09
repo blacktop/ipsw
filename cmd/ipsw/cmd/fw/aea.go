@@ -48,7 +48,7 @@ func init() {
 	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
 	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
-	aeaCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")

@@ -45,7 +45,7 @@ import (
 func init() {
 	SbCmd.AddCommand(sbDiffCmd)
 
-	sbDiffCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	sbDiffCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(2, "*.ipsw", "*.zip")
 	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

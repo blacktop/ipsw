@@ -50,7 +50,7 @@ func init() {
 	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 DMG fcs-key pem files")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
-	extractCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	extractCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.MarkFlagDirname("output")

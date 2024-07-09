@@ -17,8 +17,9 @@ ipsw dyld imports <DSC> <DYLIB> [flags]
 ### Options
 
 ```
-  -h, --help          help for imports
-  -i, --ipsw string   Path to IPSW to scan for MachO files that import dylib
+  -h, --help            help for imports
+  -i, --ipsw string     Path to IPSW to scan for MachO files that import dylib
+      --pem-db string   AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands

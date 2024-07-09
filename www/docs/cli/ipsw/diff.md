@@ -30,6 +30,7 @@ ipsw diff <IPSW> <IPSW> [flags]
 ### Options
 
 ```
+      --feat              Diff feature flags
   -f, --filter strings    Filter MachO sections to diff (e.g. __TEXT.__text)
       --fw                Diff other firmwares
   -h, --help              help for diff

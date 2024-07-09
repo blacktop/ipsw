@@ -39,7 +39,7 @@ var mountCmdSubCmds = []string{"fs", "sys", "app", "exc"}
 func init() {
 	rootCmd.AddCommand(mountCmd)
 
-	mountCmd.Flags().StringP("pem-db", "d", "", "AEA pem DB JSON file")
+	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 }
 
 // mountCmd represents the mount command
