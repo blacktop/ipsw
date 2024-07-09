@@ -13,7 +13,7 @@ description: Working with Apple's NEW AEA format.
 
 ### Download AEA PEMs from remote IPSWs
 
-![image](https://private-user-images.githubusercontent.com/6118188/338740008-3159e2ab-c0cb-47a1-ba85-d28fa9ef9007.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MjA0OTkzNzEsIm5iZiI6MTcyMDQ5OTA3MSwicGF0aCI6Ii82MTE4MTg4LzMzODc0MDAwOC0zMTU5ZTJhYi1jMGNiLTQ3YTEtYmE4NS1kMjhmYTllZjkwMDcucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI0MDcwOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNDA3MDlUMDQyNDMxWiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9NDc0MTBjNGI3NWMxZjIyOTgxZTVkYjk4MzZhODg2M2MxMzFiNzFjZDUxZGQxYjYwYjhjNDVkYjM1ODA4ZmI3OSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmYWN0b3JfaWQ9MCZrZXlfaWQ9MCZyZXBvX2lkPTAifQ.iiRGr_yWJVVrft-ma2JMzDh22nRSBd9RunYwkhTPIY8)
+![aea-dl-pem](../../static/img/guilds/aea-dl-pem.png)
 
 You can also pull them out of local/remote IPSWs
 
@@ -50,8 +50,7 @@ Now extract one of these pesky `.dmg.aea` files
 
 This parses the AEA header and metadata and presents it for you in `--color`
 
-![image](https://private-user-images.githubusercontent.com/6118188/338740737-920287ff-033a-4fdc-beee-63068b0b6a43.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MjA0OTkzNzEsIm5iZiI6MTcyMDQ5OTA3MSwicGF0aCI6Ii82MTE4MTg4LzMzODc0MDczNy05MjAyODdmZi0wMzNhLTRmZGMtYmVlZS02MzA2OGIwYjZhNDMucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI0MDcwOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNDA3MDlUMDQyNDMxWiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9MTI0OGVhMGZlY2NjOWU1ZGNlNjkxMWQ2NzViOTViODFlZGRmOTA0ZDgyNTUyYTNiMTY1MTgyMjk1YzVhMjBlYiZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmYWN0b3JfaWQ9MCZrZXlfaWQ9MCZyZXBvX2lkPTAifQ.WNRvohKxiEXP1fCxKeKR6ONzF3qjIXwePQzIZm8PIf0)
-
+![aea-info](../../static/img/guilds/aea-info.png)
 
 ### Extract the AEA private key that you can use with the `aea` binary to decrypt the `*.dmg.aea`
 
@@ -79,7 +78,7 @@ You can also dump the key in the JSON database form
 
 ### Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
 
-![image](https://private-user-images.githubusercontent.com/6118188/338740222-76981c6f-0881-4c8c-88e3-e2ff75cbfa9a.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MjA0OTkzNzEsIm5iZiI6MTcyMDQ5OTA3MSwicGF0aCI6Ii82MTE4MTg4LzMzODc0MDIyMi03Njk4MWM2Zi0wODgxLTRjOGMtODhlMy1lMmZmNzVjYmZhOWEucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI0MDcwOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNDA3MDlUMDQyNDMxWiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9MDUxNGZjYzMxMDQxZTRkZThhNjU2MDZkNGM0MzcyYTE0NTY0NWI0NmZmZjljMGRjMmZmZDM3MmI1ZWUwZjY4ZSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmYWN0b3JfaWQ9MCZrZXlfaWQ9MCZyZXBvX2lkPTAifQ.z569RaLs_ubVyZ8p-A-WeAite0JpxgKbPxsbDalQDtU)
+![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
 
 > [!NOTE]
 > It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  
@@ -91,5 +90,3 @@ You can also dump the key in the JSON database form
    • Mounted fs DMG 090-27454-036.dmg
       • Press Ctrl+C to unmount '/tmp/090-27454-036.dmg.mount' ...
 ```
-
-
