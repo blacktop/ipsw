@@ -86,7 +86,7 @@ You can also dump the key in the JSON database form
 }
 ```
 
-### Download AEA PEMs as JSON
+### Download AEA PEMs as JSON "Database"
 
 Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
 
