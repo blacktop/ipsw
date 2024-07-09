@@ -81,7 +81,7 @@ Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **pa
 ![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
 
 :::info note
-It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  There ALSO appears to only be `unique` PEMs per release for iOS and macOS.
+It appears that these AEA PEM keys are `unique` per release for iOS and macOS. *(So only 2 🆕 keys per release; **1** `iOS` and **1** `macOS`)*
 :::
 
 To get the `macOS` PEM JSON "Database"
