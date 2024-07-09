@@ -11,15 +11,16 @@ description: Working with Apple's NEW AEA format.
 
 ## What if I **want** to mess with them?
 
-### Download AEA PEMs from remote IPSWs
+### Download AEA PEMs
+
+Download AEA PEMs from remote IPSWs
 
 ![aea-dl-pem](../../static/img/guilds/aea-dl-pem.png)
 
 You can also pull them out of local/remote IPSWs
 
 ```bash
-❯ 
-ipsw extract --fcs-key iPhone16,2_18.0_22A5307f_Restore.ipsw
+❯ ipsw extract --fcs-key iPhone16,2_18.0_22A5307f_Restore.ipsw
    • Extracting AEA1 DMG fcs-keys
       • Created 22A5307f__iPhone16,2/090-29713-065.dmg.aea.pem
       • Created 22A5307f__iPhone16,2/090-27454-052.dmg.aea.pem
@@ -38,7 +39,9 @@ Now extract one of these pesky `.dmg.aea` files
       • Created 22A5307f__iPhone16,2/Firmware/090-29713-065.dmg.aea.trustcache
 ```
 
-### Use an extracted PEM file to decrypt a `*.dmg.aea` file
+### Use an extracted PEM
+
+Use an extracted PEM file to decrypt a `*.dmg.aea` file
 
 ```bash
 ❯ ipsw fw aea --pem '22A5307f__iPhone16,2/090-29713-065.dmg.aea.pem' 
@@ -46,18 +49,22 @@ Now extract one of these pesky `.dmg.aea` files
    • Extracted AEA to /tmp/090-29713-065.dmg
 ```
 
-### Dump all the AEA metadata from a local AEA file
+### Dump all the AEA metadata
 
-This parses the AEA header and metadata and presents it for you in `--color`
+Dump all the AEA metadata from a local AEA file
+
+> This parses the AEA header and metadata and presents it for you in `--color`
 
 ![aea-info](../../static/img/guilds/aea-info.png)
 
-### Extract the AEA private key that you can use with the `aea` binary to decrypt the `*.dmg.aea`
+### Extract the AEA Private Key
+
+Extract the AEA private key that you can use with the `aea` binary to decrypt the `*.dmg.aea`
 
 ```bash
 ❯ ipsw fw aea --key iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea
 
-base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ=
+'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
 ```bash
@@ -76,17 +83,22 @@ You can also dump the key in the JSON database form
 }
 ```
 
-### Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
+### Download AEA PEMs as JSON
+
+Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
 
 ![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
 
 > [!NOTE]
 > It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  
 
-### This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used offline via the `--pem-db` flag on several `ipsw` commands.
+### Use AEA PEM Database
 
 ```bash
 ❯ ipsw mount fs --pem-db 'fcs-keys.json' iPhone16,2_18.0_22A5282m_Restore.ipsw
    • Mounted fs DMG 090-27454-036.dmg
       • Press Ctrl+C to unmount '/tmp/090-27454-036.dmg.mount' ...
 ```
+
+> [!NOTE]
+> This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used offline via the `--pem-db` flag on several `ipsw` commands.
