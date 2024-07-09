@@ -4,7 +4,7 @@ description: Working with Apple's NEW AEA format.
 
 # AEA
 
-## How to extract/mount these NEW `.dmg.aea` files
+## How to extract from/mount these NEW `.dmg.aea` files
 
 - It all works seemlessly in the background so you don't have to worry about it at all. 
 - It will also work offline as the `latest` version of `ipsw` will always have the AEA private keys embedded.
