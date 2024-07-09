@@ -31,9 +31,9 @@ Now extract one of these pesky `.dmg.aea` files
 ```bash
 ❯ ipsw extract --dmg sys iPhone16,2_18.0_22A5307f_Restore.ipsw
    • Extracting DMG           
-        1.50 GiB / 1.50 GiB [==========================================================| ✅  ] 1.50 GiB/s
-        229.00 b / 229.00 b [==========================================================| ✅  ] 
-        2.04 KiB / 2.04 KiB [==========================================================| ✅  ] 
+        1.50 GiB / 1.50 GiB [====================================| ✅  ] 1.50 GiB/s
+        229.00 b / 229.00 b [====================================| ✅  ] 
+        2.04 KiB / 2.04 KiB [====================================| ✅  ] 
       • Created 22A5307f__iPhone16,2/090-29713-065.dmg.aea
       • Created 22A5307f__iPhone16,2/Firmware/090-29713-065.dmg.aea.root_hash
       • Created 22A5307f__iPhone16,2/Firmware/090-29713-065.dmg.aea.trustcache
@@ -67,8 +67,11 @@ Extract the AEA private key that you can use with the `aea` binary to decrypt th
 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
+Decrypt with `/usr/bin/aea`
+
 ```bash
-❯ aea decrypt -i iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea -o TEST.dmg -key-value 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
+❯ aea decrypt -i iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea 
+              -o TEST.dmg -key-value 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
 You can also dump the key in the JSON database form
@@ -89,8 +92,9 @@ Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **pa
 
 ![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
 
-> [!NOTE]
-> It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  
+:::info note
+It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  
+:::
 
 ### Use AEA PEM Database
 
@@ -100,5 +104,6 @@ Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **pa
       • Press Ctrl+C to unmount '/tmp/090-27454-036.dmg.mount' ...
 ```
 
-> [!NOTE]
-> This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used offline via the `--pem-db` flag on several `ipsw` commands.
+:::info note
+This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used offline via the `--pem-db` flag on several `ipsw` commands.
+:::
