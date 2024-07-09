@@ -9,11 +9,11 @@ NEXT_VERSION=$(shell svu patch)
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
 	brew install gh go git goreleaser zig unicorn libusb
- 
+
 .PHONY: dev-deps
 dev-deps: download
 	@echo " > Installing Go dev tools"
-	@go mod download	
+	@go mod download
 	@go install github.com/caarlos0/svu@v1.4.1
 	@go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	@go install github.com/goreleaser/goreleaser@latest
@@ -86,6 +86,9 @@ docs: ## Build the cli docs
 	@echo " > Updating CLI Docs"
 	go generate ./...
 	hack/make/docs
+	@echo " > 🕸️ Crawling Docs 🕸️"
+	@http -a ${CRAWLER_USER_ID}:${CRAWLER_API_KEY} POST "https://crawler.algolia.com/api/1/crawlers/${CRAWLER_ID}/reindex"
+
 
 .PHONY: docs-search
 docs-search: ## Build/Update the docs search index
