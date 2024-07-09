@@ -74,7 +74,7 @@ Decrypt with `/usr/bin/aea`
       -o TEST.dmg -key-value 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
-You can also dump the key in the JSON database form
+You can also dump the PEM in the JSON database form
 
 ```bash
 ❯ ipsw fw aea --fcs-key iPhone16,2_18.0_22A5282m_Restore/090-27454-036.dmg.aea
@@ -86,6 +86,11 @@ You can also dump the key in the JSON database form
 }
 ```
 
+:::info note
+This "Database" is a key-value pair JSON file where the `key` is the unique part of the `fcs-key-url` as can been seen above in the `--info` dump from a `.dmg.aea` file AND the `value` of the key-value is the base64 encoded PEM bytes.
+:::
+
+
 ### Download AEA PEMs as JSON "Database"
 
 Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)* 
@@ -93,8 +98,18 @@ Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **pa
 ![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
 
 :::info note
-It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  
+It appears AAPL is only using 1 private key per mobile per version? Thx AAPL ❤️  There ALSO appears to only be `unique` PEMs per release for iOS and macOS.
 :::
+
+To get the `macOS` PEM JSON "Database"
+
+```bash
+❯ ipsw dl appledb --os macOS --version '15.0 beta 2' --fcs-keys-json --output /tmp --confirm
+   • Querying AppleDB...      
+   • Parsing remote IPSW       build=24A5279h devices=UniversalMac version=15.0
+   • Extracting remote AEA1 DMG fcs-keys
+      • Created '/tmp/fcs-keys.json'
+```      
 
 ### Use AEA PEM Database
 
