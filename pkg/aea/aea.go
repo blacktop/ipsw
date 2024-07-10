@@ -88,7 +88,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (
 		return nil, fmt.Errorf("fcs-key-url key NOT found")
 	}
 
-	if pemDB != "" {
+	if pemDB != "" && pemDB != "." {
 		pemData, err := os.ReadFile(pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read pem DB JSON '%s': %w", pemDB, err)
