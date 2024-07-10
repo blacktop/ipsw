@@ -163,3 +163,7 @@ http POST 'localhost:3993/v1/syms/scan' path==./IPSWs/iPad_Pro_HFR_17.4_21E219_R
 ![syms-panic](../../static/img/guides/syms-panic.webp)
 
 > From [here](https://discord.com/channels/779134930265309195/782323285294841896/1137089549324005416)
+
+### Symbol Server RESTful API
+
+Swagger Docs are here [Syms API](https://blacktop.github.io/ipsw/api#tag/Syms)
