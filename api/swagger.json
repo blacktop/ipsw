@@ -49,7 +49,7 @@
       "get": {
         "description": "Get fsc-keys PEM bytes for a given key.",
         "produces": [
-          "application/json"
+          "application/octet-stream"
         ],
         "tags": [
           "AEA"
