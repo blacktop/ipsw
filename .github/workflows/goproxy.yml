@@ -2,8 +2,8 @@ name: Go Proxy
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - "v*.*.*"
 
 jobs:
   build:
@@ -27,7 +27,7 @@ jobs:
         with:
           webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}
           status: ${{ job.status }}
-          content: "🥃 <@cryodeus>"
+          content: "🥃 @cryodeus"
           title: "GOPROXY"
           description: "`ipsw` GOPROXY Github Action"
           url: "https://github.com/blacktop/ipsw/actions/workflows/goproxy.yml"
