@@ -83,7 +83,8 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							return subErr
+							log.WithError(subErr).Error("failed to walk symlinked path")
+							return nil
 						}
 						files = append(files, strings.TrimPrefix(subPath, "/private"))
 						return nil
