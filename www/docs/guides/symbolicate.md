@@ -198,6 +198,10 @@ Examples:
 	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
 ```
 
+:::info  
+Swagger Docs for the symbol server API are here [Syms API](https://blacktop.github.io/ipsw/api#tag/Syms)  
+:::
+
 Symbolicate a 210 panic using the symbol server
 
 ```bash
@@ -208,8 +212,4 @@ Symbolicate a 210 panic using the symbol server
 
 ![syms-panic](../../static/img/guides/syms-panic.webp)
 
-> From [here](https://discord.com/channels/779134930265309195/782323285294841896/1137089549324005416)
-
-### Symbol Server RESTful API
-
-Swagger Docs are here [Syms API](https://blacktop.github.io/ipsw/api#tag/Syms)
+> NOTE: panic is from [here](https://discord.com/channels/779134930265309195/782323285294841896/1137089549324005416)
