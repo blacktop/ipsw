@@ -158,6 +158,48 @@ http POST 'localhost:3993/v1/syms/scan' path==./IPSWs/iPad_Pro_HFR_17.4_21E219_R
 
 ### Symbolicate a `panic`
 
+The `symbolicate` command now supports the NEW panic/crash JSON format
+
+```bash
+❯ ipsw symbolicate --help
+```
+```bash
+Symbolicate ARM 64-bit crash logs (similar to Apples symbolicatecrash)
+
+Usage:
+  ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
+
+Aliases:
+  symbolicate, sym
+
+Flags:
+  -a, --all             Show all threads in crashlog
+  -d, --demangle        Demangle symbol names
+  -h, --help            help for symbolicate
+      --pem-db string   AEA pem DB JSON file
+  -p, --proc string     Filter crashlog by process name
+  -r, --running         Show all running (TH_RUN) threads in crashlog
+  -s, --server string   Symbol Server DB URL
+  -u, --unslide         Unslide the crashlog for easier static analysis
+
+Global Flags:
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
+
+Examples:
+  # Symbolicate a panic crashlog (BugType=210) with an IPSW
+  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+  # Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
+  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
+  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
+	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
+```
+
+Symbolicate a 210 panic using the symbol server
+
 ```bash
 ❯ ipsw symbolicate --server 'http://localhost:3993' panic-full-2023-08-04-191003.000.ips
 
