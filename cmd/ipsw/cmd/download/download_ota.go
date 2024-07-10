@@ -193,6 +193,9 @@ var otaDLCmd = &cobra.Command{
 		if getRSR && len(build) == 0 {
 			return fmt.Errorf("for now you will need to supply a --build number when using --rsr")
 		}
+		if viper.GetBool("download.ota.delta") && len(build) == 0 || len(version) == 0 {
+			return fmt.Errorf("for now you will need to supply a --version AND --build number when using --delta")
+		}
 		if len(build) == 0 {
 			build = "0"
 		}
