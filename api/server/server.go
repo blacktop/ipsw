@@ -34,6 +34,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/api/server/routes"
+	"github.com/blacktop/ipsw/api/server/routes/aea"
 	"github.com/blacktop/ipsw/api/server/routes/syms"
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/db"
@@ -47,6 +48,7 @@ type Config struct {
 	Socket  string
 	Debug   bool
 	LogFile string
+	PemDB   string
 }
 
 // Server is the main server struct
@@ -95,6 +97,10 @@ func (s *Server) Start(db db.Database) error {
 
 	if db != nil {
 		syms.AddRoutes(rg, db)
+	}
+
+	if s.conf.PemDB != "" {
+		aea.AddRoutes(rg, s.conf.PemDB)
 	}
 
 	s.server = &http.Server{
