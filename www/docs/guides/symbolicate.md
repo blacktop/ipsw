@@ -95,7 +95,7 @@ Thread 45 State:
 You can use the `--unslide` flag to unslide the crashlog for easier static analysis
 :::
 
-## Symbol Server
+## 🆕 Symbol Server
 
 ### Setup Server
 
