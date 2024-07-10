@@ -124,7 +124,7 @@ This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and i
 
 ### Sinkhole/Proxy Apple PEM Server
 
-You can use `ipswd` to also serve the fcs-keys.json DB by adding the following to the `~/.config/ipsw/config.yml`
+You can use [ipswd](https://blacktop.github.io/ipsw/api) to also serve the fcs-keys.json DB by adding the following to the `~/.config/ipsw/config.yml`
 
 ```yaml
 daemon:
@@ -134,7 +134,7 @@ daemon:
 Start the *daemon*
 
 ```bash
-ipsw start
+ipswd start
 ```
 
 The *daemon* is now hosting the route `GET /v1/aea/fcs-keys/:key`
