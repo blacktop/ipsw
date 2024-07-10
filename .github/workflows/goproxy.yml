@@ -27,7 +27,7 @@ jobs:
         with:
           webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}
           status: ${{ job.status }}
-          content: "🥃 @cryodeus"
+          content: "🥃 <@193791870285905920>"
           title: "GOPROXY"
           description: "`ipsw` GOPROXY Github Action"
           url: "https://github.com/blacktop/ipsw/actions/workflows/goproxy.yml"
