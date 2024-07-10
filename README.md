@@ -112,6 +112,10 @@ D --> E[Search]
 E --> F[Symbolicate]
 ```
 
+## `ipsw` Diffs
+
+A collection of `ipsw` diffs can be found here: <https://github.com/blacktop/ipsw-diffs>
+
 ## Community
 
 You have questions, need support and or just want to talk about `ipsw`?
