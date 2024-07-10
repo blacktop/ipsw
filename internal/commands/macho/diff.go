@@ -14,6 +14,7 @@ type DiffConfig struct {
 	Color    bool
 	DiffTool string
 	Filter   []string
+	CStrings bool
 	PemDB    string
 }
 
@@ -32,8 +33,9 @@ type DiffInfo struct {
 	Version   string
 	Imports   []string
 	Sections  []section
-	Symbols   int
 	Functions int
+	Symbols   []string
+	CStrings  []string
 }
 
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
@@ -57,16 +59,27 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	if m.SourceVersion() != nil {
 		sourceVersion = m.SourceVersion().Version.String()
 	}
-	var symCount int
+	var syms []string
+	// TODO: handle private symbols from DSC images
 	if m.Symtab != nil {
-		symCount = len(m.Symtab.Syms)
+		for _, sym := range m.Symtab.Syms {
+			syms = append(syms, sym.Name)
+		}
+		slices.Sort(syms)
+	}
+	var strs []string
+	if conf.CStrings {
+		if cs, err := m.GetCStrings(); err == nil {
+			strs = cs
+		}
 	}
 	return &DiffInfo{
 		Version:   sourceVersion,
 		Imports:   m.ImportedLibraries(),
 		Sections:  secs,
-		Symbols:   symCount,
 		Functions: funcCount,
+		Symbols:   syms,
+		CStrings:  strs,
 	}
 }
 
@@ -88,10 +101,10 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 			return false
 		}
 	}
-	if i.Symbols != x.Symbols {
+	if i.Functions != x.Functions {
 		return false
 	}
-	if i.Functions != x.Functions {
+	if len(i.Symbols) != len(x.Symbols) {
 		return false
 	}
 	// if i.Version != x.Version { (this could be a lie)
@@ -109,9 +122,93 @@ func (i *DiffInfo) String() string {
 	for _, i := range i.Imports {
 		out += fmt.Sprintf("  - %s\n", i)
 	}
-	out += fmt.Sprintf("  Symbols:   %d\n", i.Symbols)
 	out += fmt.Sprintf("  Functions: %d\n", i.Functions)
+	out += fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols))
+	out += fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings))
 	return out
+}
+
+func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfig) error {
+
+	var prevFiles []string
+	for f := range prev {
+		prevFiles = append(prevFiles, f)
+	}
+	slices.Sort(prevFiles)
+
+	var nextFiles []string
+	for f := range next {
+		nextFiles = append(nextFiles, f)
+	}
+	slices.Sort(nextFiles)
+
+	/* DIFF IPSW */
+	diff.New = utils.Difference(nextFiles, prevFiles)
+	diff.Removed = utils.Difference(prevFiles, nextFiles)
+
+	var err error
+	for _, f2 := range nextFiles {
+		dat2 := next[f2]
+		if dat1, ok := prev[f2]; ok {
+			if dat2.Equal(*dat1) {
+				continue
+			}
+			var out string
+			if conf.Markdown {
+				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			} else {
+				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			}
+			if len(out) == 0 { // no diff
+				continue
+			}
+			if conf.Markdown {
+				diff.Updated[f2] = "```diff\n" + out
+			} else {
+				diff.Updated[f2] = out
+			}
+
+			/* DIFF Symbols */
+			newSyms := utils.Difference(dat2.Symbols, dat1.Symbols)
+			rmSyms := utils.Difference(dat1.Symbols, dat2.Symbols)
+			if len(newSyms) > 0 || len(rmSyms) > 0 {
+				diff.Updated[f2] += "Symbols:\n"
+				for _, s := range newSyms {
+					diff.Updated[f2] += fmt.Sprintf("+ %s\n", s)
+				}
+				for _, s := range rmSyms {
+					diff.Updated[f2] += fmt.Sprintf("- %s\n", s)
+				}
+			}
+
+			/* DIFF CStrings */
+			if conf.CStrings {
+				newStrs := utils.Difference(dat2.CStrings, dat1.CStrings)
+				rmStrs := utils.Difference(dat1.CStrings, dat2.CStrings)
+				if len(newStrs) > 0 || len(rmStrs) > 0 {
+					diff.Updated[f2] += "CStrings:\n"
+					for _, s := range newStrs {
+						diff.Updated[f2] += fmt.Sprintf("+ %#v\n", s)
+					}
+					for _, s := range rmStrs {
+						diff.Updated[f2] += fmt.Sprintf("- %#v\n", s)
+					}
+				}
+			}
+
+			if conf.Markdown {
+				diff.Updated[f2] += "\n```\n"
+			}
+		}
+	}
+
+	return nil
 }
 
 // DiffIPSW diffs two IPSW's MachOs
@@ -131,12 +228,6 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
 	/* NEXT IPSW */
 
 	next := make(map[string]*DiffInfo)
@@ -148,46 +239,8 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
-	/* DIFF IPSW */
-	diff.New = utils.Difference(nextFiles, prevFiles)
-	diff.Removed = utils.Difference(prevFiles, nextFiles)
-	// gc
-	prevFiles = []string{}
-
-	var err error
-	for _, f2 := range nextFiles {
-		dat2 := next[f2]
-		if dat1, ok := prev[f2]; ok {
-			if dat2.Equal(*dat1) {
-				continue
-			}
-			var out string
-			if conf.Markdown {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			}
-			if len(out) == 0 { // no diff
-				continue
-			}
-			if conf.Markdown {
-				diff.Updated[f2] = "```diff\n" + out + "\n```\n"
-			} else {
-				diff.Updated[f2] = out
-			}
-		}
+	if err := diff.Generate(prev, next, conf); err != nil {
+		return nil, err
 	}
 
 	return diff, nil
@@ -210,12 +263,6 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
 	/* NEXT IPSW */
 
 	next := make(map[string]*DiffInfo)
@@ -227,46 +274,8 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
-	/* DIFF IPSW */
-	diff.New = utils.Difference(nextFiles, prevFiles)
-	diff.Removed = utils.Difference(prevFiles, nextFiles)
-	// gc
-	prevFiles = []string{}
-
-	var err error
-	for _, f2 := range nextFiles {
-		dat2 := next[f2]
-		if dat1, ok := prev[f2]; ok {
-			if dat2.Equal(*dat1) {
-				continue
-			}
-			var out string
-			if conf.Markdown {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			}
-			if len(out) == 0 { // no diff
-				continue
-			}
-			if conf.Markdown {
-				diff.Updated[f2] = "```diff\n" + out + "\n```\n"
-			} else {
-				diff.Updated[f2] = out
-			}
-		}
+	if err := diff.Generate(prev, next, conf); err != nil {
+		return nil, err
 	}
 
 	return diff, nil

@@ -56,6 +56,7 @@ type Config struct {
 	LaunchD  bool
 	Firmware bool
 	Features bool
+	CStrings bool
 	Filter   []string
 	PemDB    string
 	Output   string
@@ -410,6 +411,7 @@ func (d *Diff) parseKernelcache() error {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -506,6 +508,7 @@ func (d *Diff) parseDSC() error {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -538,6 +541,7 @@ func (d *Diff) parseMachos() (err error) {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	return
 }
@@ -571,6 +575,7 @@ func (d *Diff) parseFirmwares() (err error) {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	return
 }
