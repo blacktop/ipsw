@@ -121,3 +121,48 @@ This "Database" is a key-value pair JSON file where the `key` is the unique part
 :::info note
 This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used **offline** via the `--pem-db` flag on several `ipsw` commands.  This allows you to just *update* the JSON Database instead of having to contantly download a 🆕 version of `ipsw` to use **offline** on latest `*.dmg.aea` files.
 :::
+
+### Sinkhole/Proxy Apple PEM Server
+
+You can use `ipswd` to also serve the fcs-keys.json DB by adding the following to the `~/.config/ipsw/config.yml`
+
+```yaml
+daemon:
+  pemdb: /path/to/fcs-keys.json
+```
+
+Start the *daemon*
+
+```bash
+ipsw start
+```
+
+The *daemon* is now hosting the route `GET /v1/aea/fcs-keys/:key`
+
+```bash
+❯ http localhost:3993/v1/aea/fcs-keys/zhYs0f2L4kS-0oTUtvLn1JZdp4YGOoLbKFBad8ui7Vo=
+```
+```
+HTTP/1.1 200 OK
+Content-Length: 241
+Content-Type: application/octet-stream
+Date: Wed, 10 Jul 2024 23:33:15 GMT
+
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgeHM016M8mfitwIag
+gsNwsYLUrNgifqq5VRdR8USWAdGhRANCAATl3LnJS5y4HbGj72pGcKpka8WbocXi
+2cVY4NlhgpH5VRFwPcWtHZnoWj0hxDqB5V+b14UkPXsyelZIP91MEO8T
+-----END PRIVATE KEY-----
+```
+
+You can use the above `ipsw dl appleb` command periodically to update the `fcs-keys.json` *(which appends)* and transer that file over to your offline system running `ipswd` to prevent needing to constantly update `ipsw` to latest etc.
+
+Now you just need to proxy `https://wkms-public.apple.com/fcs-keys` to `http://localhost:3993/v1/aea/fcs-keys`
+
+This works because `ipsw` will:
+
+1) Try it's embedded PEM keys
+2) Try the `--pem-db` you provided
+3) Try and reach out to Apple's server to get the PEM
+ 
+Which `ipswd` will happily serve to it 😎
