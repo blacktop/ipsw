@@ -41,6 +41,7 @@ ipsw diff <IPSW> <IPSW> [flags]
       --launchd           Diff launchd configs
   -m, --markdown          Save diff as Markdown file
   -o, --output string     Folder to save diff output
+      --strs              Diff MachO cstrings
   -t, --title string      Title of the diff
 ```
 
