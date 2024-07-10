@@ -41,8 +41,17 @@ type getFsFilesResponse struct {
 }
 
 func getFsFiles(c *gin.Context) {
-	ipswPath := filepath.Clean(c.Query("path"))
-	pemDbPath := filepath.Clean(c.Query("pem_db"))
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
 	i, err := info.Parse(ipswPath)
 	if err != nil {
@@ -133,8 +142,17 @@ type getFsEntitlementsResponse struct {
 }
 
 func getFsEntitlements(c *gin.Context) {
-	ipswPath := filepath.Clean(c.Query("path"))
-	pemDbPath := filepath.Clean(c.Query("pem_db"))
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
 	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath})
 	if err != nil {
@@ -162,10 +180,19 @@ type getFsLaunchdConfigResponse struct {
 }
 
 func getFsLaunchdConfig(c *gin.Context) {
-	ipswPath := filepath.Clean(c.Query("path"))
-	pemDBPath := filepath.Clean(c.Query("pem_db"))
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
-	ldconf, err := extract.LaunchdConfig(ipswPath, pemDBPath)
+	ldconf, err := extract.LaunchdConfig(ipswPath, pemDbPath)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
