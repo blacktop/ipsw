@@ -114,7 +114,8 @@ E --> F[Symbolicate]
 
 ## `ipsw` Diffs
 
-A collection of `ipsw` diffs can be found here: <https://github.com/blacktop/ipsw-diffs>
+A collection of `ipsw` diffs can be found here: 
+- <https://github.com/blacktop/ipsw-diffs>
 
 ## Community
 
