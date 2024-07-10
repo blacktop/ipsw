@@ -119,5 +119,5 @@ This "Database" is a key-value pair JSON file where the `key` is the unique part
 ```
 
 :::info note
-This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used offline via the `--pem-db` flag on several `ipsw` commands.
+This `fcs-keys.json` is what I'm refering to as an *AEA PEM JSON Database* and it can be used **offline** via the `--pem-db` flag on several `ipsw` commands.  This allows you to just *update* the JSON Database instead of having to contantly download a 🆕 version of `ipsw` to use **offline** on latest `*.dmg.aea` files.
 :::
