@@ -23,7 +23,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDbPath string) {
 	// Get fsc-keys PEM bytes for a given key.
 	//
 	//     Produces:
-	//     - application/json
+	//     - application/octet-stream
 	//     Parameters:
 	//       + name: key
 	//         in: path
