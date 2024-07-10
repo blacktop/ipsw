@@ -45,7 +45,7 @@
         }
       }
     },
-    "/aea/fcs-keys/:key": {
+    "/aea/fcs-keys/{key}": {
       "get": {
         "description": "Get fsc-keys PEM bytes for a given key.",
         "produces": [

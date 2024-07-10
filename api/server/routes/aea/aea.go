@@ -16,7 +16,7 @@ type aeaPemResponse []byte
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup, pemDbPath string) {
-	// swagger:route GET /aea/fcs-keys/:key AEA getFcsKeys
+	// swagger:route GET /aea/fcs-keys/{key} AEA getFcsKeys
 	//
 	// FcsKeys
 	//
