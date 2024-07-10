@@ -94,3 +94,65 @@ Thread 45 State:
 :::info 
 You can use the `--unslide` flag to unslide the crashlog for easier static analysis
 :::
+
+## Symbol Server
+
+### Setup Server
+
+Databases supported:
+
+- in-mem
+- sqlite
+- postgres
+
+:::info 
+Want another database driver supported? Make a [feature request](https://github.com/blacktop/ipsw/issues/new?assignees=blacktop&labels=enhancement%2Ctriage&projects=&template=feature.yaml)
+:::
+
+#### Install `postgres`
+
+```bash
+brew install postgresql@16
+```
+
+Start `postgres` either as service:
+
+```bash
+brew services start postgresql@16
+```
+
+Or manually:
+
+```bash
+LC_ALL="C" /opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var/postgresql@16
+```
+
+### Create a `~/.config/ipsw/config.yml` with the following database info
+
+```yaml
+database:
+  driver: postgres
+  name: postgres
+  host: localhost
+  port: 5432
+  user: blacktop
+```  
+
+### Start `ipswd`
+
+```bash
+ipswd start
+```
+
+### Scan an IPSW
+
+Using [httpie](https://httpie.io)
+
+```bash
+http POST 'localhost:3993/v1/syms/scan' path==./IPSWs/iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+```
+
+### Symbolicate a `panic`
+
+![syms-panic](../../static/img/guides/syms-panic.webp)
+

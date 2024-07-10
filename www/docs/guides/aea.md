@@ -15,7 +15,7 @@ description: Working with Apple's NEW AEA format.
 
 Download AEA PEMs from remote IPSWs
 
-![aea-dl-pem](../../static/img/guilds/aea-dl-pem.png)
+![aea-dl-pem](../../static/img/guides/aea-dl-pem.webp)
 
 You can also pull them out of local/remote IPSWs
 
@@ -55,7 +55,7 @@ Dump all the AEA metadata from a local AEA file
 
 > This parses the AEA header and metadata and presents it for you in `--color`
 
-![aea-info](../../static/img/guilds/aea-info.png)
+![aea-info](../../static/img/guides/aea-info.webp)
 
 ### Extract the AEA Private Key
 
@@ -78,7 +78,7 @@ Decrypt with `/usr/bin/aea`
 
 Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)*
 
-![aea-dl-jsondb](../../static/img/guilds/aea-dl-jsondb.png)
+![aea-dl-jsondb](../../static/img/guides/aea-dl-jsondb.webp)
 
 :::info note
 It appears that these AEA PEM keys are `unique` per release for iOS and macOS. *(So only 2 🆕 keys per release; **1** `iOS` and **1** `macOS`)*
