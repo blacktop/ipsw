@@ -140,9 +140,13 @@ database:
 
 ### Start `ipswd`
 
+> `ipswd` is a *daemon* that exposes a subset of `ipsw`'s functionality as a RESTful API to allow for easier automation and use in large scale pipelines.
+
 ```bash
 ipswd start
 ```
+
+Here are the `ipswd` [API Docs](https://blacktop.github.io/ipsw/api)
 
 ### Scan an IPSW
 
