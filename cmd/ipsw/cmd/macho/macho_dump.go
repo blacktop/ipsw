@@ -33,6 +33,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -48,6 +49,7 @@ func init() {
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
 	machoDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	machoDumpCmd.Flags().StringP("entry", "e", "", "Dump from fileset entry (requires --section)")
 	machoDumpCmd.Flags().StringP("section", "x", "", "Dump a specific segment/section (i.e. __TEXT.__text)")
 
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
@@ -56,6 +58,7 @@ func init() {
 	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("macho.dump.bytes", machoDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("macho.dump.entry", machoDumpCmd.Flags().Lookup("entry"))
 	viper.BindPFlag("macho.dump.section", machoDumpCmd.Flags().Lookup("section"))
 
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
@@ -83,6 +86,7 @@ var machoDumpCmd = &cobra.Command{
 		asAddrs := viper.GetBool("macho.dump.addr")
 		asBytes := viper.GetBool("macho.dump.bytes")
 		outFile := viper.GetString("macho.dump.output")
+		filesetEntry := viper.GetString("macho.dump.entry")
 		segmentSection := viper.GetString("macho.dump.section")
 
 		color.NoColor = viper.GetBool("no-color")
@@ -97,6 +101,10 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --bytes with --size")
 		} else if len(segmentSection) > 0 && len(args) != 1 {
 			return fmt.Errorf("you can only use <address> OR --section")
+		} else if len(filesetEntry) > 0 && len(segmentSection) == 0 {
+			return fmt.Errorf("you must specify a --section when using --entry")
+		} else if len(segmentSection) > 0 && len(filesetEntry) == 0 {
+			return fmt.Errorf("you must specify an --entry when using --section")
 		}
 
 		machoPath := filepath.Clean(args[0])
@@ -142,13 +150,23 @@ var machoDumpCmd = &cobra.Command{
 			}
 		}
 
+		if len(filesetEntry) > 0 && m.FileTOC.FileHeader.Type != types.MH_FILESET {
+			return fmt.Errorf("macho is not a MH_FILESET")
+		}
+
 		var addr uint64
 		if len(segmentSection) != 0 {
-			parts := strings.Split(segmentSection, ".")
-			if len(parts) != 2 {
+			seg, sec, ok := strings.Cut(segmentSection, ".")
+			if !ok {
 				return fmt.Errorf("invalid section")
 			}
-			if sec := m.Section(parts[0], parts[1]); sec != nil {
+			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+				m, err = m.GetFileSetFileByName(filesetEntry)
+				if err != nil {
+					return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
+				}
+			}
+			if sec := m.Section(seg, sec); sec != nil {
 				addr = sec.Addr
 				if size == 0 && count == 0 {
 					size = sec.Size
