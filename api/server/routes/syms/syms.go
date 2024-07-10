@@ -66,9 +66,18 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 	//       200: successResponse
 	//       500: genericError
 	rg.POST("/syms/scan", func(c *gin.Context) {
-		ipswPath := filepath.Clean(c.Query("path"))
-		pemDBPath := filepath.Clean(c.Query("pem_db"))
-		if err := syms.Scan(ipswPath, pemDBPath, db); err != nil {
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
+		}
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		}
+		if err := syms.Scan(ipswPath, pemDbPath, db); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}

@@ -88,7 +88,23 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (
 		return nil, fmt.Errorf("fcs-key-url key NOT found")
 	}
 
-	if pemDB != "" && pemDB != "." {
+	if !skipEmbedded {
+		// check if keys are already loaded
+		if keys, err := getKeys(); err == nil {
+			u, err := url.Parse(string(privKeyURL))
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range keys {
+				if strings.EqualFold(k, path.Base(u.Path)) {
+					out[k] = PrivateKey(v)
+					return out, nil
+				}
+			}
+		}
+	}
+
+	if pemDB != "" {
 		pemData, err := os.ReadFile(pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read pem DB JSON '%s': %w", pemDB, err)
@@ -105,22 +121,6 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (
 			if strings.EqualFold(k, path.Base(u.Path)) {
 				out[k] = PrivateKey(v)
 				return out, nil
-			}
-		}
-	}
-
-	if !skipEmbedded {
-		// check if keys are already loaded
-		if keys, err := getKeys(); err == nil {
-			u, err := url.Parse(string(privKeyURL))
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range keys {
-				if strings.EqualFold(k, path.Base(u.Path)) {
-					out[k] = PrivateKey(v)
-					return out, nil
-				}
 			}
 		}
 	}
