@@ -2,12 +2,10 @@ package kernel
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // Diff compares two MH_FILESET kernelcache files
@@ -30,12 +28,6 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 		}
 	}
 
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
 	/* NEXT KERNEL */
 
 	next := make(map[string]*mcmd.DiffInfo)
@@ -50,46 +42,8 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 		}
 	}
 
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
-	/* DIFF KERNEL */
-	diff.New = utils.Difference(nextFiles, prevFiles)
-	diff.Removed = utils.Difference(prevFiles, nextFiles)
-	// gc
-	prevFiles = []string{}
-
-	var err error
-	for _, f2 := range nextFiles {
-		dat2 := next[f2]
-		if dat1, ok := prev[f2]; ok {
-			if dat2.Equal(*dat1) {
-				continue
-			}
-			var out string
-			if conf.Markdown {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return nil, err
-				}
-			}
-			if len(out) == 0 { // no diff
-				continue
-			}
-			if conf.Markdown {
-				diff.Updated[f2] = "```diff\n" + out + "\n```\n"
-			} else {
-				diff.Updated[f2] = out
-			}
-		}
+	if err := diff.Generate(prev, next, conf); err != nil {
+		return nil, err
 	}
 
 	return diff, nil

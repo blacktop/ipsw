@@ -20,3 +20,16 @@ jobs:
         run: |
           GOPROXY=${{ secrets.GOPROXY }} go mod download all
           GOPROXY=${{ secrets.GOPROXY }} go mod tidy
+
+      - name: Actions Status Discord
+        uses: sarisia/actions-status-discord@v1.14.5
+        if: always()
+        with:
+          webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          content: "🥃 <@193791870285905920>"
+          title: "GOPROXY"
+          description: "`ipsw` GOPROXY Github Action"
+          url: "https://github.com/blacktop/ipsw/actions/workflows/goproxy.yml"
+          username: GitHub Actions
+          avatar_url: ${{ secrets.GOPROXY_AVATAR_URL }}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -44,17 +45,32 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       500: genericError
 	//       200: mountReponse
 	rg.POST("/mount/:type", func(c *gin.Context) {
-		ipswPath := filepath.Clean(c.Query("path"))
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
+		}
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		}
 		dmgType := c.Param("type")
 		if !utils.StrSliceContains([]string{"app", "sys", "fs"}, dmgType) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
 			return
 		}
-		ctx, err := mount.DmgInIPSW(ipswPath, dmgType)
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath)
 		if err != nil {
 			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
 				c.AbortWithError(http.StatusNotFound, err)

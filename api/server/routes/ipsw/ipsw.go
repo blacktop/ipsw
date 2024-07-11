@@ -41,8 +41,17 @@ type getFsFilesResponse struct {
 }
 
 func getFsFiles(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
 	i, err := info.Parse(ipswPath)
 	if err != nil {
@@ -71,7 +80,7 @@ func getFsFiles(c *gin.Context) {
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDbPath)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
 		}
@@ -133,10 +142,19 @@ type getFsEntitlementsResponse struct {
 }
 
 func getFsEntitlements(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
-	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath})
+	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath})
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
@@ -162,9 +180,19 @@ type getFsLaunchdConfigResponse struct {
 }
 
 func getFsLaunchdConfig(c *gin.Context) {
-	ipswPath := c.Query("path")
+	ipswPath, ok := c.GetQuery("path")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+		return
+	} else {
+		ipswPath = filepath.Clean(ipswPath)
+	}
+	pemDbPath, ok := c.GetQuery("pem_db")
+	if ok {
+		pemDbPath = filepath.Clean(pemDbPath)
+	}
 
-	ldconf, err := extract.LaunchdConfig(ipswPath)
+	ldconf, err := extract.LaunchdConfig(ipswPath, pemDbPath)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return

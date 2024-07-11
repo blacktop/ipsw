@@ -75,7 +75,7 @@ func (k PrivateKey) UnmarshalBinaryPrivateKey() ([]byte, error) {
 
 type Metadata map[string][]byte
 
-func (md Metadata) GetPrivateKey(data []byte, skipEmbedded bool) (map[string]PrivateKey, error) {
+func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (map[string]PrivateKey, error) {
 	out := make(map[string]PrivateKey)
 
 	if len(data) > 0 {
@@ -104,6 +104,27 @@ func (md Metadata) GetPrivateKey(data []byte, skipEmbedded bool) (map[string]Pri
 		}
 	}
 
+	if pemDB != "" {
+		pemData, err := os.ReadFile(pemDB)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read pem DB JSON '%s': %w", pemDB, err)
+		}
+		var keys Keys
+		if err := json.NewDecoder(bytes.NewReader(pemData)).Decode(&keys); err != nil {
+			return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
+		}
+		u, err := url.Parse(string(privKeyURL))
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range keys {
+			if strings.EqualFold(k, path.Base(u.Path)) {
+				out[k] = PrivateKey(v)
+				return out, nil
+			}
+		}
+	}
+
 	resp, err := http.Get(string(privKeyURL))
 	if err != nil {
 		return nil, err
@@ -128,7 +149,7 @@ func (md Metadata) GetPrivateKey(data []byte, skipEmbedded bool) (map[string]Pri
 	return out, nil
 }
 
-func (md Metadata) DecryptFCS(pemData []byte) ([]byte, error) {
+func (md Metadata) DecryptFCS(pemData []byte, pemDB string) ([]byte, error) {
 	ddata, ok := md["com.apple.wkms.fcs-response"]
 	if !ok {
 		return nil, fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
@@ -146,7 +167,7 @@ func (md Metadata) DecryptFCS(pemData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	pkmap, err := md.GetPrivateKey(pemData, false)
+	pkmap, err := md.GetPrivateKey(pemData, pemDB, false)
 	if err != nil {
 		return nil, err
 	}

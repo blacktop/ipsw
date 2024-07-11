@@ -174,7 +174,11 @@ var kernelIdaCmd = &cobra.Command{
 			if viper.IsSet("kernel.ida.diaphora-db") {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
 			} else {
-				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s_diaphora.db", device, m.SubCPU.String(m.CPU), args[1]))))
+				if len(args) > 1 {
+					env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s_diaphora.db", device, m.SubCPU.String(m.CPU), args[1]))))
+				} else {
+					env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("KC_%s_%s_diaphora.db", device, m.SubCPU.String(m.CPU)))))
+				}
 			}
 			if viper.GetBool("verbose") {
 				env = append(env, "DIAPHORA_DEBUG=1")

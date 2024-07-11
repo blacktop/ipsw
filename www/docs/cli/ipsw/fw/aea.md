@@ -23,6 +23,7 @@ ipsw fw aea [flags]
   -k, --key             Get archive decryption key
   -o, --output string   Folder to extract files to
   -p, --pem string      AEA private_key.pem file
+      --pem-db string   AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands

@@ -42,7 +42,7 @@ func (c Context) Unmount() error {
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
-func DmgInIPSW(path, typ string) (*Context, error) {
+func DmgInIPSW(path, typ, pemDB string) (*Context, error) {
 	ipswPath := filepath.Clean(path)
 
 	i, err := info.Parse(ipswPath)
@@ -100,7 +100,7 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
-		extractedDMG, err = aea.Decrypt(extractedDMG, filepath.Dir(extractedDMG), nil)
+		extractedDMG, err = aea.Decrypt(extractedDMG, filepath.Dir(extractedDMG), nil, pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

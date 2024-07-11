@@ -82,6 +82,7 @@ func (d *daemon) Start() (err error) {
 		Socket:  d.conf.Daemon.Socket,
 		Debug:   d.conf.Daemon.Debug,
 		LogFile: d.conf.Daemon.LogFile,
+		PemDB:   d.conf.Daemon.PemDB,
 	})
 	if err := d.setupDB(); err != nil {
 		return err

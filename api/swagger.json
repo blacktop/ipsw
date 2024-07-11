@@ -45,6 +45,36 @@
         }
       }
     },
+    "/aea/fcs-keys/{key}": {
+      "get": {
+        "description": "Get fsc-keys PEM bytes for a given key.",
+        "produces": [
+          "application/octet-stream"
+        ],
+        "tags": [
+          "AEA"
+        ],
+        "summary": "FcsKeys",
+        "operationId": "getFcsKeys",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "fcs-keys.json PEM lookup key",
+            "name": "key",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/aeaPemResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/device_list": {
       "get": {
         "description": "This will return JSON of all XCode devices.",
@@ -1125,6 +1155,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1155,6 +1191,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1185,6 +1227,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1351,6 +1399,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1522,6 +1576,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -4632,6 +4692,16 @@
     }
   },
   "responses": {
+    "aeaPemResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "uint8"
+        }
+      }
+    },
     "deviceListResponse": {
       "description": "",
       "headers": {

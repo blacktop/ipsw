@@ -94,3 +94,122 @@ Thread 45 State:
 :::info 
 You can use the `--unslide` flag to unslide the crashlog for easier static analysis
 :::
+
+## 🆕 Symbol Server
+
+### Setup Server
+
+Databases supported:
+
+- in-mem
+- sqlite
+- postgres
+
+:::info 
+Want another database driver supported? Make a [feature request](https://github.com/blacktop/ipsw/issues/new?assignees=blacktop&labels=enhancement%2Ctriage&projects=&template=feature.yaml)
+:::
+
+#### Install `postgres`
+
+```bash
+brew install postgresql@16
+```
+
+Start `postgres` either as service:
+
+```bash
+brew services start postgresql@16
+```
+
+Or manually:
+
+```bash
+LC_ALL="C" /opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var/postgresql@16
+```
+
+### Create a `~/.config/ipsw/config.yml` with the following database info
+
+```yaml
+database:
+  driver: postgres
+  name: postgres
+  host: localhost
+  port: 5432
+  user: blacktop
+```  
+
+### Start `ipswd`
+
+> `ipswd` is a *daemon* that exposes a subset of `ipsw`'s functionality as a RESTful API to allow for easier automation and use in large scale pipelines.
+
+```bash
+ipswd start
+```
+
+Here are the `ipswd` [API Docs](https://blacktop.github.io/ipsw/api)
+
+### Scan an IPSW
+
+Using [httpie](https://httpie.io)
+
+```bash
+http POST 'localhost:3993/v1/syms/scan' path==./IPSWs/iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+```
+
+### Symbolicate a `panic`
+
+The `symbolicate` command now supports the NEW panic/crash JSON format
+
+```bash
+❯ ipsw symbolicate --help
+```
+```bash
+Symbolicate ARM 64-bit crash logs (similar to Apples symbolicatecrash)
+
+Usage:
+  ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
+
+Aliases:
+  symbolicate, sym
+
+Flags:
+  -a, --all             Show all threads in crashlog
+  -d, --demangle        Demangle symbol names
+  -h, --help            help for symbolicate
+      --pem-db string   AEA pem DB JSON file
+  -p, --proc string     Filter crashlog by process name
+  -r, --running         Show all running (TH_RUN) threads in crashlog
+  -s, --server string   Symbol Server DB URL
+  -u, --unslide         Unslide the crashlog for easier static analysis
+
+Global Flags:
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
+
+Examples:
+  # Symbolicate a panic crashlog (BugType=210) with an IPSW
+  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+  # Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
+  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
+  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
+	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
+```
+
+:::info  
+Swagger Docs for the symbol server API are here [Syms API](https://blacktop.github.io/ipsw/api#tag/Syms)  
+:::
+
+Symbolicate a 210 panic using the symbol server
+
+```bash
+❯ ipsw symbolicate --server 'http://localhost:3993' panic-full-2023-08-04-191003.000.ips
+
+   • Symbolicating 210 Panic with Symbol Server server=http://localhost:3993
+```
+
+![syms-panic](../../static/img/guides/syms-panic.webp)
+
+> NOTE: panic is from [here](https://discord.com/channels/779134930265309195/782323285294841896/1137089549324005416)

@@ -17,6 +17,7 @@ type daemon struct {
 	Socket  string `json:"socket" env:"DAEMON_SOCKET"`
 	Debug   bool   `json:"debug" env:"DAEMON_DEBUG"`
 	LogFile string `json:"logfile" env:"DAEMON_LOGFILE"`
+	PemDB   string `json:"pemdb" env:"DAEMON_PEM_DB"`
 }
 
 type database struct {

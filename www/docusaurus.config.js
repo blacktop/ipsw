@@ -119,7 +119,7 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
-        additionalLanguages: ["armasm", "llvm", "bash"],
+        additionalLanguages: ["armasm", "llvm", "bash", "json", "yaml", "toml"],
       },
       algolia: {
         appId: "KYIBYORJ9P",

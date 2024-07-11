@@ -35,6 +35,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
   -k, --kernel                  Extract kernelcache
   -o, --output string           Folder to extract files to
   -p, --pattern string          Extract files that match regex
+      --pem-db string           AEA pem DB JSON file
       --proxy string            HTTP/HTTPS proxy
   -r, --remote                  Extract from URL
       --sep                     Extract sep-firmware

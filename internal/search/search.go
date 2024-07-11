@@ -21,7 +21,7 @@ import (
 )
 
 // TODO: make this an array of handlers to perform multiple actions on each file
-func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, string) error) error {
+func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, string) error) error {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -39,7 +39,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, string) err
 	}
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
@@ -83,7 +83,8 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, string) err
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							return subErr
+							log.WithError(subErr).Error("failed to walk symlinked path")
+							return nil
 						}
 						files = append(files, subPath)
 						return nil
@@ -115,7 +116,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, string) err
 }
 
 // ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
-func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
+func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
 	scanMacho := func(mountPoint, machoPath string) error {
 		if ok, _ := magic.IsMachO(machoPath); ok {
 			var m *macho.File
@@ -134,7 +135,10 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 					return nil
 				}
 			}
-			if err := handler(strings.TrimPrefix(machoPath, mountPoint), m); err != nil {
+			if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
+				machoPath = rest
+			}
+			if err := handler(machoPath, m); err != nil {
 				return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
 			}
 		}
@@ -148,25 +152,25 @@ func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error
 
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning filesystem")
-		if err := scanDmg(ipswPath, fsOS, "filesystem", scanMacho); err != nil {
+		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDbPath, scanMacho); err != nil {
 			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
 		log.Info("Scanning SystemOS")
-		if err := scanDmg(ipswPath, systemOS, "SystemOS", scanMacho); err != nil {
+		if err := scanDmg(ipswPath, systemOS, "SystemOS", pemDbPath, scanMacho); err != nil {
 			return fmt.Errorf("failed to scan files in SystemOS %s: %w", systemOS, err)
 		}
 	}
 	if appOS, err := i.GetAppOsDmg(); err == nil {
 		log.Info("Scanning AppOS")
-		if err := scanDmg(ipswPath, appOS, "AppOS", scanMacho); err != nil {
+		if err := scanDmg(ipswPath, appOS, "AppOS", pemDbPath, scanMacho); err != nil {
 			return fmt.Errorf("failed to scan files in AppOS %s: %w", appOS, err)
 		}
 	}
 	if excOS, err := i.GetExclaveOSDmg(); err == nil {
 		log.Info("Scanning ExclaveOS")
-		if err := scanDmg(ipswPath, excOS, "ExclaveOS", scanMacho); err != nil {
+		if err := scanDmg(ipswPath, excOS, "ExclaveOS", pemDbPath, scanMacho); err != nil {
 			return fmt.Errorf("failed to scan files in ExclaveOS %s: %w", excOS, err)
 		}
 	}
@@ -219,7 +223,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 	return nil
 }
 
-func ForEachPlistInIPSW(ipswPath string, directory string, handler func(string, string) error) error {
+func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, string) error) error {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
@@ -248,12 +252,14 @@ func ForEachPlistInIPSW(ipswPath string, directory string, handler func(string, 
 			// if err != nil {
 			// 	return fmt.Errorf("failed to marshal plist %s: %v", plistPath, err)
 			// }
-			plistPath = strings.TrimPrefix(plistPath, mountPoint)
+			if _, rest, ok := strings.Cut(plistPath, mountPoint); ok {
+				plistPath = rest
+			}
 			plistPath, err = filepath.Rel(directory, plistPath)
 			if err != nil {
 				return fmt.Errorf("failed to get relative path for %s: %v", plistPath, err)
 			}
-			if err := handler(strings.TrimPrefix(plistPath, mountPoint), string(data)); err != nil {
+			if err := handler(plistPath, string(data)); err != nil {
 				return fmt.Errorf("failed to handle plist %s: %v", plistPath, err)
 			}
 		}
@@ -262,25 +268,25 @@ func ForEachPlistInIPSW(ipswPath string, directory string, handler func(string, 
 
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning filesystem")
-		if err := scanDmg(ipswPath, fsOS, "filesystem", scanPlist); err != nil {
+		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDB, scanPlist); err != nil {
 			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
 		log.Info("Scanning SystemOS")
-		if err := scanDmg(ipswPath, systemOS, "SystemOS", scanPlist); err != nil {
+		if err := scanDmg(ipswPath, systemOS, "SystemOS", pemDB, scanPlist); err != nil {
 			return fmt.Errorf("failed to scan files in SystemOS %s: %w", systemOS, err)
 		}
 	}
 	if appOS, err := i.GetAppOsDmg(); err == nil {
 		log.Info("Scanning AppOS")
-		if err := scanDmg(ipswPath, appOS, "AppOS", scanPlist); err != nil {
+		if err := scanDmg(ipswPath, appOS, "AppOS", pemDB, scanPlist); err != nil {
 			return fmt.Errorf("failed to scan files in AppOS %s: %w", appOS, err)
 		}
 	}
 	if excOS, err := i.GetExclaveOSDmg(); err == nil {
 		log.Info("Scanning ExclaveOS")
-		if err := scanDmg(ipswPath, excOS, "ExclaveOS", scanPlist); err != nil {
+		if err := scanDmg(ipswPath, excOS, "ExclaveOS", pemDB, scanPlist); err != nil {
 			return fmt.Errorf("failed to scan files in ExclaveOS %s: %w", excOS, err)
 		}
 	}

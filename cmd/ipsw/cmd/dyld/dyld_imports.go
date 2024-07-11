@@ -41,6 +41,7 @@ import (
 func init() {
 	DyldCmd.AddCommand(dyldImportsCmd)
 	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
+	dyldImportsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -67,6 +68,7 @@ var dyldImportsCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 		// flags
 		ipswPath, _ := cmd.Flags().GetString("ipsw")
+		pemDB, _ := cmd.Flags().GetString("pem-db")
 		// validate args
 		if ipswPath != "" && len(args) != 1 {
 			return errors.New("you must specify a DYLIB to search for")
@@ -76,7 +78,7 @@ var dyldImportsCmd = &cobra.Command{
 
 		if ipswPath != "" {
 			found := false
-			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), func(path string, m *macho.File) error {
+			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), pemDB, func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
 					if strings.EqualFold(imp, args[0]) {
 						fmt.Printf("%s\n", path)

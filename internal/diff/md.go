@@ -267,8 +267,11 @@ func (d *Diff) Markdown() error {
 	}
 
 	// SECTION: DSC
-	out.WriteString("## DSC\n\n")
-	if len(d.Old.Webkit) > 0 {
+	if len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0 &&
+		d.Dylibs != nil && (len(d.Dylibs.New) > 0 || len(d.Dylibs.Removed) > 0 || len(d.Dylibs.Updated) > 0) {
+		out.WriteString("## DSC\n\n")
+	}
+	if len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0 {
 		out.WriteString(
 			fmt.Sprintf(
 				"### WebKit\n\n"+
@@ -395,7 +398,7 @@ func (d *Diff) Markdown() error {
 					out.WriteString(fmt.Sprintf("%s\n", v))
 				}
 			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "Features"), 0o750); err != nil {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
 					return err
 				}
 				keys := make([]string, 0, len(d.Features.Updated))
@@ -404,9 +407,9 @@ func (d *Diff) Markdown() error {
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "Features", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
 					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "Features", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
 					}
 					log.Debugf("Creating diff dylib Markdown file: %s", fname)
 					f, err := os.Create(fname)

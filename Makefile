@@ -9,11 +9,11 @@ NEXT_VERSION=$(shell svu patch)
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
 	brew install gh go git goreleaser zig unicorn libusb
- 
+
 .PHONY: dev-deps
 dev-deps: download
 	@echo " > Installing Go dev tools"
-	@go mod download	
+	@go mod download
 	@go install github.com/caarlos0/svu@v1.4.1
 	@go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	@go install github.com/goreleaser/goreleaser@latest
@@ -67,19 +67,20 @@ build: ## Build ipsw
 	@go mod download
 	@CGO_ENABLED=1 go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 
+.PHONY: build-ios
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
 	@go mod download
 	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$(CUR_COMMIT)" ./cmd/ipsw
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
+.PHONY: build-linux
 build-linux: ## Build ipsw (linux)
 	@echo " > Building ipsw (linux)"
 	@go mod download
 	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 	@echo " > Building ipswd (linux)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
-
 
 .PHONY: docs
 docs: ## Build the cli docs
@@ -89,18 +90,13 @@ docs: ## Build the cli docs
 
 .PHONY: docs-search
 docs-search: ## Build/Update the docs search index
-	@echo " > Updating Docs Search Index"
-	@docker run -t --rm \
-                  -e MEILISEARCH_HOST_URL=$(MEILISEARCH_HOST_URL) \
-                  -e MEILISEARCH_API_KEY=$(MEILISEARCH_API_KEY) \
-                  -v $(PWD)/hack/scripts/scraper.json:/docs-scraper/scraper.json \
-                  getmeili/docs-scraper:v0.12.8 pipenv run ./docs_scraper ./scraper.json
-	# @curl -X POST "$(MEILISEARCH_HOST_URL)/swap-indexes" -H "Authorization: Bearer $(MEILISEARCH_API_KEY)" -H "Content-Type: application/json" --data-binary '[ { "indexes": ["docs-v1", "docs-v1-staging"] } ]'
+	@echo " > 🕸️ Crawling Docs 🕸️"
+	@http -a ${CRAWLER_USER_ID}:${CRAWLER_API_KEY} POST "https://crawler.algolia.com/api/1/crawlers/${CRAWLER_ID}/reindex"
 
 .PHONY: test-docs
 test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
-	cd www; npm start
+	cd www; pnpm start
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file

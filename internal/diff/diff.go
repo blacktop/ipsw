@@ -56,7 +56,9 @@ type Config struct {
 	LaunchD  bool
 	Firmware bool
 	Features bool
+	CStrings bool
 	Filter   []string
+	PemDB    string
 	Output   string
 }
 
@@ -75,6 +77,7 @@ type Context struct {
 	DSC             string
 	Webkit          string
 	KDK             string
+	PemDB           string
 
 	mu *sync.Mutex
 }
@@ -307,7 +310,7 @@ func mountDMG(ctx *Context) (err error) {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
 	}
 	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
-		ctx.SystemOsDmgPath, err = aea.Decrypt(ctx.SystemOsDmgPath, filepath.Dir(ctx.SystemOsDmgPath), nil)
+		ctx.SystemOsDmgPath, err = aea.Decrypt(ctx.SystemOsDmgPath, filepath.Dir(ctx.SystemOsDmgPath), nil, ctx.PemDB)
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
@@ -408,6 +411,7 @@ func (d *Diff) parseKernelcache() error {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -504,6 +508,7 @@ func (d *Diff) parseDSC() error {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -536,16 +541,17 @@ func (d *Diff) parseMachos() (err error) {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	return
 }
 
 func (d *Diff) parseLaunchdPlists() error {
-	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath)
+	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath, d.conf.PemDB)
 	if err != nil {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
 	}
-	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath)
+	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath, d.conf.PemDB)
 	if err != nil {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
 	}
@@ -569,6 +575,7 @@ func (d *Diff) parseFirmwares() (err error) {
 		Color:    false,
 		DiffTool: "git",
 		Filter:   d.conf.Filter,
+		CStrings: d.conf.CStrings,
 	})
 	return
 }
@@ -584,7 +591,7 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	}
 
 	oldPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", func(path string, content string) error {
+	if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
 		oldPlists[path] = content
 		return nil
 	}); err != nil {
@@ -598,7 +605,7 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	slices.Sort(prevFiles)
 
 	newPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", func(path string, content string) error {
+	if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
 		newPlists[path] = content
 		return nil
 	}); err != nil {
@@ -614,8 +621,6 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	/* DIFF IPSW */
 	d.Features.New = utils.Difference(nextFiles, prevFiles)
 	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
-	// gc
-	prevFiles = []string{}
 
 	for _, f2 := range nextFiles {
 		dat2 := newPlists[f2]

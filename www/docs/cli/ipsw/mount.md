@@ -17,7 +17,8 @@ ipsw mount [fs|sys|app|exc] IPSW [flags]
 ### Options
 
 ```
-  -h, --help   help for mount
+  -h, --help            help for mount
+      --pem-db string   AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands
