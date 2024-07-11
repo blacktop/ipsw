@@ -86,7 +86,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 							log.WithError(subErr).Error("failed to walk symlinked path")
 							return nil
 						}
-						files = append(files, strings.TrimPrefix(subPath, "/private"))
+						files = append(files, subPath)
 						return nil
 					})
 				}
@@ -135,7 +135,10 @@ func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.
 					return nil
 				}
 			}
-			if err := handler(strings.TrimPrefix(machoPath, mountPoint), m); err != nil {
+			if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
+				machoPath = rest
+			}
+			if err := handler(machoPath, m); err != nil {
 				return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
 			}
 		}
@@ -249,12 +252,14 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 			// if err != nil {
 			// 	return fmt.Errorf("failed to marshal plist %s: %v", plistPath, err)
 			// }
-			plistPath = strings.TrimPrefix(plistPath, mountPoint)
+			if _, rest, ok := strings.Cut(plistPath, mountPoint); ok {
+				plistPath = rest
+			}
 			plistPath, err = filepath.Rel(directory, plistPath)
 			if err != nil {
 				return fmt.Errorf("failed to get relative path for %s: %v", plistPath, err)
 			}
-			if err := handler(strings.TrimPrefix(plistPath, mountPoint), string(data)); err != nil {
+			if err := handler(plistPath, string(data)); err != nil {
 				return fmt.Errorf("failed to handle plist %s: %v", plistPath, err)
 			}
 		}
