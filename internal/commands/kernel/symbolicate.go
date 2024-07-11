@@ -80,12 +80,12 @@ func xrefs(m *macho.File, addr uint64) error {
 }
 
 func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error {
-	strs, err := m.GetCStrings()
+	cstrs, err := m.GetCStrings()
 	if err != nil {
 		return err
 	}
 	for _, sig := range sigs.Signatures {
-		for addr, s := range strs {
+		for addr, s := range cstrs {
 			if strings.Contains(s, sig.Pattern) {
 				log.WithFields(log.Fields{
 					"pattern": s,
