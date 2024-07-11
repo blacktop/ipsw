@@ -17,16 +17,20 @@ import (
 	"github.com/blacktop/ipsw/pkg/signature"
 )
 
-func ParseSignatures(dir string) (sigs *signature.Symbolicator, err error) {
+func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			sigs, err = signature.LoadFromPath(context.Background(), path)
+			if filepath.Ext(path) != ".pkl" {
+				return nil
+			}
+			sig, err := signature.LoadFromPath(context.Background(), path)
 			if err != nil {
 				return err
 			}
+			sigs = append(sigs, sig)
 		}
 		return nil
 	}); err != nil {

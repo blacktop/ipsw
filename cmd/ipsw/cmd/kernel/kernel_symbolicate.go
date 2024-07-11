@@ -55,7 +55,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		var sigs *signature.Symbolicator
+		var sigs []*signature.Symbolicator
 		if viper.IsSet("kernel.symbolicate.signatures") {
 			sigs, err = kcmd.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
 			if err != nil {
@@ -64,6 +64,12 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 
 		// symbolicate kernelcache
-		return kcmd.Symbolicate(args[0], sigs)
+		for _, sig := range sigs {
+			if err := kcmd.Symbolicate(args[0], sig); err != nil {
+				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+			}
+		}
+
+		return nil
 	},
 }
