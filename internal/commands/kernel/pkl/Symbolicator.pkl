@@ -1,0 +1,20 @@
+@go.Package { name = "github.com/blacktop/ipsw/pkg/signature" }
+module io.blacktop.Symbolicator
+
+import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.7.0#/go.pkl" 
+
+class Signature {
+    /// The number of args.
+    args: UInt16
+
+    /// The string in function.
+    pattern: String
+
+    /// The name of the function this signature matches.
+    symbol: String
+
+    /// The name of the function that calls this function.
+    caller: String
+}
+
+signatures: Listing<Signature>(isDistinct)

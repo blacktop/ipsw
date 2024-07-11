@@ -55,7 +55,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		var sigs []*signature.Signature
+		var sigs *signature.Symbolicator
 		if viper.IsSet("kernel.symbolicate.signatures") {
 			sigs, err = kcmd.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
 			if err != nil {

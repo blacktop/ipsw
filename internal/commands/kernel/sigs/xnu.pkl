@@ -1,4 +1,14 @@
-args = 0
-pattern = "vm_compressor_init: Failed"
-symbol = "_vm_compressor_init"
-caller = "_panic"
+signatures { 
+    new {
+        args = 0
+        pattern = "policy's OPs field is NULL"
+        symbol = "_mac_policy_register"
+        caller = "_panic"
+    }
+    new {
+        args = 1
+        pattern = "vm_mem_bootstrap"
+        symbol = "_kernel_bootstrap"
+        caller = "_strncpy"
+    }
+}
