@@ -1,7 +1,7 @@
 @go.Package { name = "github.com/blacktop/ipsw/pkg/signature" }
 module io.blacktop.Symbolicator
 
-import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.7.0#/go.pkl" 
+import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl" 
 
 class Signature {
     /// The number of args.

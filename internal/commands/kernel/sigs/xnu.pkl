@@ -1,4 +1,6 @@
-signatures { 
+amends "../pkl/Symbolicator.pkl"
+
+signatures {
     new {
         args = 0
         pattern = "policy's OPs field is NULL"
