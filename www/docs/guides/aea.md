@@ -155,7 +155,7 @@ gsNwsYLUrNgifqq5VRdR8USWAdGhRANCAATl3LnJS5y4HbGj72pGcKpka8WbocXi
 -----END PRIVATE KEY-----
 ```
 
-You can use the above [`ipsw dl appleb`](#download-aea-pems-as-json-database) command periodically to update the `fcs-keys.json` *(which appends)* and transer that file over to your offline system running `ipswd` to prevent needing to constantly update `ipsw` to latest etc.
+You can use the above [`ipsw dl appledb`](#download-aea-pems-as-json-database) command periodically to update the `fcs-keys.json` *(which appends)* and transfer that file over to your offline system running `ipswd` to prevent needing to constantly update `ipsw` to latest etc.
 
 Now you just need to proxy `https://wkms-public.apple.com/fcs-keys` to `http://localhost:3993/v1/aea/fcs-keys`
 
