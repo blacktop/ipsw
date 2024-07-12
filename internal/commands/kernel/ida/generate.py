@@ -26,7 +26,7 @@ def get_segment_ea(segment_name: str) -> Optional[int]:
 
 
 def get_cstrings():
-    seg_start = get_segment_ea('__cstring')
+    seg_start = get_segment_ea("__cstring")
     seg_end = idc.get_segm_end(seg_start)
     for string in idautils.Strings():
         # filter out strings that are not in the __cstring section
@@ -53,7 +53,7 @@ def find_single_refs() -> None:
     seg_start = get_segment_ea("__text")
     seg_end = idc.get_segm_end(seg_start)
     unique_function_names = set()
-    # FIXME: If a string is NOT unique we can't use it as an anchor 
+    # FIXME: If a string is NOT unique we can't use it as an anchor
     # (also should I look for non-cstring strings; maybe __const strings?)
     unique_anchor_strings = set()
 
