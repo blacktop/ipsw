@@ -7,6 +7,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
+	"golang.org/x/exp/maps"
 )
 
 type DiffConfig struct {
@@ -70,7 +71,8 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	var strs []string
 	if conf.CStrings {
 		if cs, err := m.GetCStrings(); err == nil {
-			strs = cs
+			strs = maps.Values(cs)
+			slices.Sort(strs)
 		}
 	}
 	return &DiffInfo{
