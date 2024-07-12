@@ -11,6 +11,9 @@ type Symbolicator struct {
 	// The target for the signatures.
 	Target string `pkl:"target"`
 
+	// The version of the signatures.
+	Version *Version `pkl:"version"`
+
 	Signatures []*Signature `pkl:"signatures"`
 }
 

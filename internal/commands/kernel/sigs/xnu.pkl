@@ -2,6 +2,11 @@ amends "../pkl/Symbolicator.pkl"
 
 target = "com.apple.kernel"
 
+version {
+    max = "24.0.0"
+    min = "24.0.0"
+}
+
 signatures {
     new {
         args = 1

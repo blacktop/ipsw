@@ -3,12 +3,23 @@ module io.blacktop.Symbolicator
 
 import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl" 
 
-// TODO: add darwin version range
-// TODO: add MH_FILESET entry
 // TODO: byte pattern matching
+// TODO: use arg count to match functions with same anchor strings
+// TODO: use caller to get more symbols
 
 /// The target for the signatures.
 target: String
+
+class Version {
+    /// The maximum version supported.
+    max: String
+
+    /// The minimum version supported.
+    min: String
+}
+
+/// The version of the signatures.
+version: Version
 
 class Signature {
     /// The number of args.
