@@ -124,7 +124,10 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 		}
 	}
 
-	log.Infof("STATS: %.4f%% signatures matched", float64(len(sigs.Signatures)-notFound)*100/float64(len(sigs.Signatures)))
+	log.WithFields(log.Fields{
+		"total":   len(sigs.Signatures),
+		"matched": fmt.Sprintf("%.4f%%", float64(len(sigs.Signatures)-notFound)*100/float64(len(sigs.Signatures))),
+	}).Info("STATS")
 
 	return nil
 }
