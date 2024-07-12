@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import namedtuple
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 import ida_funcs
 import ida_idaapi
@@ -25,9 +25,13 @@ def get_segment_ea(segment_name: str) -> Optional[int]:
     return None
 
 
-def get_strings():
+def get_cstrings():
+    seg_start = get_segment_ea('__cstring')
+    seg_end = idc.get_segm_end(seg_start)
     for string in idautils.Strings():
-        yield StringInfo(string.ea, str(string))
+        # filter out strings that are not in the __cstring section
+        if seg_start <= string.ea < seg_end:
+            yield StringInfo(string.ea, str(string))
 
 
 def get_xrefs(ea: ea_t) -> Optional[Iterable[ea_t]]:
@@ -49,18 +53,21 @@ def find_single_refs() -> None:
     seg_start = get_segment_ea("__text")
     seg_end = idc.get_segm_end(seg_start)
     unique_function_names = set()
+    # FIXME: If a string is NOT unique we can't use it as an anchor 
+    # (also should I look for non-cstring strings; maybe __const strings?)
     unique_anchor_strings = set()
 
     sigs = {}
 
     print("🔍 Looking for single references to strings")
-    for s in get_strings():
+    for cstr in get_cstrings():
         # print(f'👀 for XREFs to 0x{s.address:x}: "{repr(s.content)}"')
-        xrefs = get_xrefs(s.address)
+        xrefs = get_xrefs(cstr.address)
         if xrefs is not None and len(xrefs) == 1:
-            if repr(s.content) in unique_anchor_strings:
+            if repr(cstr.content) in unique_anchor_strings:
+                print(f"Skipping duplicate string: {cstr.content}")
                 continue
-            unique_anchor_strings.add(repr(s.content))
+            unique_anchor_strings.add(repr(cstr.content))
             if xrefs[0] < seg_start or xrefs[0] > seg_end:
                 continue
             func_name = idc.get_func_name(xrefs[0])
@@ -71,7 +78,7 @@ def find_single_refs() -> None:
                 unique_function_names.add(func_name)
             if func_name not in sigs:
                 sigs[func_name] = {"args": args, "anchors": []}
-            sigs[func_name]["anchors"].append(repr(s.content))
+            sigs[func_name]["anchors"].append(repr(cstr.content))
             # print(f'0x{xrefs[0]:x}: {func_name}(args: {args}) -> "{repr(s.content)}"')
     print("✅ Done looking for single references to strings")
 

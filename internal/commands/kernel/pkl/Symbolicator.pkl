@@ -3,11 +3,15 @@ module io.blacktop.Symbolicator
 
 import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl" 
 
+// TODO: add darwin version range
+// TODO: add MH_FILESET entry
+// TODO: byte pattern matching
+
 class Signature {
     /// The number of args.
     args: UInt16
 
-    /// The string in function.
+    /// The unique strings in function.
     anchors: Listing<String>
 
     /// The name of the function this signature matches.

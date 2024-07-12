@@ -66,16 +66,17 @@ func xrefs(m *macho.File, addr uint64, expected string) (bool, error) {
 				if len(syms) > 0 {
 					symbolMap[loc] = syms[0].Name
 				}
-				if syms[0].Name == expected {
-					println("🎉")
-				} else {
-					println("💩")
-				}
+				// if strings.Contains(syms[0].Name, expected) {
+				// 	println("🎉")
+				// } else {
+				// 	println("💩")
+				// }
 				xrefs[loc] = fmt.Sprintf("%s + %d", syms[0].Name, loc-fn.StartAddr)
 			} else {
 				xrefs[loc] = fmt.Sprintf("%s + %d", expected, loc-fn.StartAddr)
 				// xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
 			}
+			break // break out of functions loop
 		}
 	}
 
@@ -107,7 +108,8 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 						"symbol":  sig.Symbol,
 					}).Info("Found Signature")
 					if found, err = xrefs(m, addr, sig.Symbol); err != nil {
-						return fmt.Errorf("failed to find xrefs to addr %#x: %v", addr, err)
+						log.Errorf("failed to find xrefs to addr %#x for symbol lookup '%s': %v", addr, sig.Symbol, err)
+						break
 					} else {
 						if found {
 							break // break out of sig.Anchors loop
