@@ -8,6 +8,9 @@ import (
 )
 
 type Symbolicator struct {
+	// The target for the signatures.
+	Target string `pkl:"target"`
+
 	Signatures []*Signature `pkl:"signatures"`
 }
 

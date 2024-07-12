@@ -7,6 +7,9 @@ import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl"
 // TODO: add MH_FILESET entry
 // TODO: byte pattern matching
 
+/// The target for the signatures.
+target: String
+
 class Signature {
     /// The number of args.
     args: UInt16

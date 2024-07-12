@@ -1,5 +1,7 @@
 amends "../pkl/Symbolicator.pkl"
 
+target = "com.apple.kernel"
+
 signatures {
     new {
         args = 1

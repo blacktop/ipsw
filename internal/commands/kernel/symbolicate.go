@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"strconv"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -39,83 +39,72 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	return sigs, nil
 }
 
-func xrefs(m *macho.File, addr uint64, expected string) (bool, error) {
-	xrefs := make(map[uint64]string)
-	symbolMap := make(map[uint64]string)
-
-	utils.Indent(log.Debug, 2)(fmt.Sprintf("Searching for xrefs to: %#x", addr))
-
-	for _, fn := range m.GetFunctions() {
-		data, err := m.GetFunctionData(fn)
-		if err != nil {
-			log.Errorf("failed to get data for function: %v", err)
-			continue
-		}
-
-		engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
-			Data:         data,
-			StartAddress: fn.StartAddr,
-		})
-
-		if err := engine.Triage(); err != nil {
-			return false, fmt.Errorf("first pass triage failed: %v", err)
-		}
-
-		if ok, loc := engine.Contains(addr); ok {
-			if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
-				if len(syms) > 0 {
-					symbolMap[loc] = syms[0].Name
-				}
-				// if strings.Contains(syms[0].Name, expected) {
-				// 	println("🎉")
-				// } else {
-				// 	println("💩")
-				// }
-				xrefs[loc] = fmt.Sprintf("%s + %d", syms[0].Name, loc-fn.StartAddr)
-			} else {
-				xrefs[loc] = fmt.Sprintf("%s + %d", expected, loc-fn.StartAddr)
-				// xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
-			}
-			break // break out of functions loop
-		}
+func truncate(in string, length int) string {
+	if len(in) > length {
+		return in[:length] + "..."
 	}
-
-	for loc, sym := range xrefs {
-		utils.Indent(log.WithFields(log.Fields{
-			"address": fmt.Sprintf("%#09x", loc),
-			"symbol":  sym,
-		}).Info, 2)("XREF")
-	}
-
-	return true, nil
+	return in
 }
 
 func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error {
+	symbolMap := make(map[uint64]string)
+
+	text := m.Section("__TEXT_EXEC", "__text")
+	if text == nil {
+		return fmt.Errorf("failed to find __TEXT_EXEC.__text section")
+	}
+	data, err := text.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
+	}
+
+	engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+		Data:         data,
+		StartAddress: text.Addr,
+	})
+
+	log.WithField("name", name).Info("Analyzing MachO...")
+	if err := engine.Triage(); err != nil {
+		return fmt.Errorf("first pass triage failed: %v", err)
+	}
+
 	cstrs, err := m.GetCStrings()
 	if err != nil {
 		return err
 	}
+
 	for _, sig := range sigs.Signatures {
 		found := false
 		for addr, s := range cstrs {
 			for _, anchor := range sig.Anchors {
-				re := regexp.MustCompile(anchor)
-				if re.MatchString(s) {
+				if s == anchor {
 					log.WithFields(log.Fields{
-						"pattern": s,
+						"pattern": truncate(strconv.Quote(s), 40),
 						"address": fmt.Sprintf("%#09x", addr),
 						"file":    name,
 						"symbol":  sig.Symbol,
-					}).Info("Found Signature")
-					if found, err = xrefs(m, addr, sig.Symbol); err != nil {
-						log.Errorf("failed to find xrefs to addr %#x for symbol lookup '%s': %v", addr, sig.Symbol, err)
-						break
-					} else {
-						if found {
-							break // break out of sig.Anchors loop
-						} else {
-							log.Warnf("No xrefs found for: %s", anchor)
+					}).Debug("Found Signature")
+					if ok, loc := engine.Contains(addr); ok {
+						fn, err := m.GetFunctionForVMAddr(loc)
+						if err != nil {
+							log.Errorf("failed to get function for address: %v", err)
+							break
 						}
+						utils.Indent(log.WithFields(log.Fields{
+							"file":    name,
+							"address": fmt.Sprintf("%#09x", fn.StartAddr),
+							"symbol":  sig.Symbol,
+						}).Info, 2)("Symbolicated")
+						found = true
+					}
+					if found {
+						break // break out of sig.Anchors loop
+					} else {
+						utils.Indent(log.WithFields(log.Fields{
+							"macho":  name,
+							"anchor": truncate(strconv.Quote(anchor), 40),
+							"symbol": sig.Symbol,
+						}).Warn, 2)("No xrefs found")
 					}
 				}
 			}
@@ -135,19 +124,14 @@ func Symbolicate(in string, sigs *signature.Symbolicator) error {
 	defer m.Close()
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-		for _, fs := range m.FileSets() {
-			entry, err := m.GetFileSetFileByName(fs.EntryID)
-			if err != nil {
-				return err
-			}
-			if err := symbolicate(entry, fs.EntryID, sigs); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := symbolicate(m, filepath.Base(in), sigs); err != nil {
+		m, err = m.GetFileSetFileByName(sigs.Target)
+		if err != nil {
 			return err
 		}
+	}
+
+	if err := symbolicate(m, sigs.Target, sigs); err != nil {
+		return err
 	}
 
 	return nil
