@@ -73,6 +73,8 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 		return err
 	}
 
+	var notFound int
+
 	for _, sig := range sigs.Signatures {
 		found := false
 		for addr, s := range cstrs {
@@ -104,7 +106,7 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 							"macho":  name,
 							"anchor": truncate(strconv.Quote(anchor), 40),
 							"symbol": sig.Symbol,
-						}).Warn, 2)("No xrefs found")
+						}).Warn, 2)("No XREFs found")
 					}
 				}
 			}
@@ -112,7 +114,18 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 				break // break out of cstr loop
 			}
 		}
+		if !found {
+			utils.Indent(log.WithFields(log.Fields{
+				"macho":  name,
+				"symbol": sig.Symbol,
+				"anchor": truncate(strconv.Quote(sig.Anchors[0]), 40),
+			}).Warn, 2)("Signature Not Matched")
+			notFound++
+		}
 	}
+
+	log.Infof("STATS: %.4f%% signatures matched", float64(len(sigs.Signatures)-notFound)*100/float64(len(sigs.Signatures)))
+
 	return nil
 }
 
