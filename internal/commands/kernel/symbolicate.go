@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -39,7 +39,7 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	return sigs, nil
 }
 
-func xrefs(m *macho.File, addr uint64) error {
+func xrefs(m *macho.File, addr uint64) (bool, error) {
 	xrefs := make(map[uint64]string)
 	symbolMap := make(map[uint64]string)
 
@@ -58,7 +58,7 @@ func xrefs(m *macho.File, addr uint64) error {
 		})
 
 		if err := engine.Triage(); err != nil {
-			return fmt.Errorf("first pass triage failed: %v", err)
+			return false, fmt.Errorf("first pass triage failed: %v", err)
 		}
 
 		if ok, loc := engine.Contains(addr); ok {
@@ -80,7 +80,7 @@ func xrefs(m *macho.File, addr uint64) error {
 		}).Info, 2)("XREF")
 	}
 
-	return nil
+	return true, nil
 }
 
 func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error {
@@ -89,16 +89,29 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 		return err
 	}
 	for _, sig := range sigs.Signatures {
+		found := false
 		for addr, s := range cstrs {
-			if strings.Contains(s, sig.Pattern) {
-				log.WithFields(log.Fields{
-					"pattern": s,
-					"address": fmt.Sprintf("%#09x", addr),
-					"file":    name,
-				}).Info("Found Signature")
-				if err := xrefs(m, addr); err != nil {
-					return err
+			for _, anchor := range sig.Anchors {
+				re := regexp.MustCompile(anchor)
+				if re.MatchString(s) {
+					log.WithFields(log.Fields{
+						"pattern": s,
+						"address": fmt.Sprintf("%#09x", addr),
+						"file":    name,
+					}).Info("Found Signature")
+					if found, err = xrefs(m, addr); err != nil {
+						return fmt.Errorf("failed to find xrefs to addr %#x: %v", addr, err)
+					} else {
+						if found {
+							break // break out of sig.Anchors loop
+						} else {
+							log.Warnf("No xrefs found for: %s", anchor)
+						}
+					}
 				}
+			}
+			if found {
+				break // break out of cstr loop
 			}
 		}
 	}

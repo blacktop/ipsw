@@ -8,7 +8,7 @@ class Signature {
     args: UInt16
 
     /// The string in function.
-    pattern: String
+    anchors: Listing<String>
 
     /// The name of the function this signature matches.
     symbol: String

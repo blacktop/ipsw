@@ -6,7 +6,7 @@ type Signature struct {
 	Args uint16 `pkl:"args"`
 
 	// The string in function.
-	Pattern string `pkl:"pattern"`
+	Anchors []string `pkl:"anchors"`
 
 	// The name of the function this signature matches.
 	Symbol string `pkl:"symbol"`
