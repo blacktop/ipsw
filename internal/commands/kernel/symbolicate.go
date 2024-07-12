@@ -116,8 +116,8 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 	return nil
 }
 
-func Symbolicate(in string, sigs *signature.Symbolicator) error {
-	m, err := macho.Open(in)
+func Symbolicate(infile string, sigs *signature.Symbolicator) error {
+	m, err := macho.Open(infile)
 	if err != nil {
 		return err
 	}
