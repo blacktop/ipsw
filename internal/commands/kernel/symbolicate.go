@@ -39,7 +39,7 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	return sigs, nil
 }
 
-func xrefs(m *macho.File, addr uint64) (bool, error) {
+func xrefs(m *macho.File, addr uint64, expected string) (bool, error) {
 	xrefs := make(map[uint64]string)
 	symbolMap := make(map[uint64]string)
 
@@ -66,9 +66,15 @@ func xrefs(m *macho.File, addr uint64) (bool, error) {
 				if len(syms) > 0 {
 					symbolMap[loc] = syms[0].Name
 				}
+				if syms[0].Name == expected {
+					println("🎉")
+				} else {
+					println("💩")
+				}
 				xrefs[loc] = fmt.Sprintf("%s + %d", syms[0].Name, loc-fn.StartAddr)
 			} else {
-				xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
+				xrefs[loc] = fmt.Sprintf("%s + %d", expected, loc-fn.StartAddr)
+				// xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
 			}
 		}
 	}
@@ -98,8 +104,9 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 						"pattern": s,
 						"address": fmt.Sprintf("%#09x", addr),
 						"file":    name,
+						"symbol":  sig.Symbol,
 					}).Info("Found Signature")
-					if found, err = xrefs(m, addr); err != nil {
+					if found, err = xrefs(m, addr, sig.Symbol); err != nil {
 						return fmt.Errorf("failed to find xrefs to addr %#x: %v", addr, err)
 					} else {
 						if found {
