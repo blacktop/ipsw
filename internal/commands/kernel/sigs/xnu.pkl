@@ -1152,7 +1152,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "couldn't find stack %p in library %p @%s:%d"
+            "couldn\\'t find stack %p in library %p @%s:%d"
         }
         symbol = "__btlib_remove_notfound_panic"
         caller = "?"
@@ -1179,10 +1179,10 @@ signatures {
         args = 0
         anchors {
             "Per-coalition ledgers"
-            "couldn't create coalition ledger template @%s:%d"
-            "couldn't create entries for coaliton ledger template @%s:%d"
+            "couldn\\'t create coalition ledger template @%s:%d"
+            "couldn\\'t create entries for coaliton ledger template @%s:%d"
             "Coalition task ledgers"
-            "couldn't create coalition task ledger template @%s:%d"
+            "couldn\\'t create coalition task ledger template @%s:%d"
         }
         symbol = "init_coalition_ledgers"
         caller = "?"
@@ -1401,7 +1401,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "Couldn't obtain preoslog region: result = %d, preoslog_pa = %p, preoslog_size = %d\n"
+            "Couldn\\'t obtain preoslog region: result = %d, preoslog_pa = %p, preoslog_size = %d\n"
         }
         symbol = "sysctl_debug_get_preoslog"
         caller = "?"
@@ -1679,7 +1679,7 @@ signatures {
         args = 1
         anchors {
             "__text"
-            "kalloc_type_view_parse: couldn't find kext @ offset:%lx @%s:%d"
+            "kalloc_type_view_parse: couldn\\'t find kext @ offset:%lx @%s:%d"
             "kalloc_type_view_parse: No support for non-split seg KCs @%s:%d"
         }
         symbol = "kalloc_type_view_parse"
@@ -2666,7 +2666,7 @@ signatures {
         args = 0
         anchors {
             "Per-task ledger"
-            "couldn't create task ledger template @%s:%d"
+            "couldn\\'t create task ledger template @%s:%d"
             "tkm_private"
             "tkm_shared"
             "phys_mem"
@@ -2709,7 +2709,7 @@ signatures {
             "neural_nofootprint_total"
             "platform_idle_wakeups"
             "interrupt_wakeups"
-            "couldn't create entries for task ledger template for SFI class 0x%x @%s:%d"
+            "couldn\\'t create entries for task ledger template for SFI class 0x%x @%s:%d"
             "cpu_time_billed_to_me"
             "cpu_time_billed_to_others"
             "physical_writes"
@@ -2719,7 +2719,7 @@ signatures {
             "energy_billed_to_others"
             "memorystatus_dirty_time"
             "swapins"
-            "couldn't create entries for task ledger template @%s:%d"
+            "couldn\\'t create entries for task ledger template @%s:%d"
         }
         symbol = "init_task_ledgers"
         caller = "?"
@@ -2759,7 +2759,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "couldn't take coredump of %s[%d]: %d\n"
+            "couldn\\'t take coredump of %s[%d]: %d\n"
             "coredump of %s[%d] taken in %d secs %d microsecs\n"
             "process %s[%d] crossed memory high watermark (%d MB); EXC_RESOURCE suppressed by a boot-arg.\n"
             "process %s [%d] crossed memory %s (%d MB); EXC_RESOURCE \n"
@@ -2947,8 +2947,8 @@ signatures {
         args = 0
         anchors {
             "Per-thread ledger"
-            "couldn't create thread ledger template @%s:%d"
-            "couldn't create cpu_time entry for thread ledger template @%s:%d"
+            "couldn\\'t create thread ledger template @%s:%d"
+            "couldn\\'t create cpu_time entry for thread ledger template @%s:%d"
         }
         symbol = "thread_init"
         caller = "?"
@@ -3181,7 +3181,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "Couldn't allocate send right for ux_handler_port! @%s:%d"
+            "Couldn\\'t allocate send right for ux_handler_port! @%s:%d"
             "host_set_exception_ports failed to set ux_handler! %d @%s:%d"
         }
         symbol = "ux_handler_setup"
@@ -3662,10 +3662,10 @@ signatures {
         anchors {
             "BANK subsystem is initialized\n"
             "Bank ledger"
-            "couldn't create bank ledger template @%s:%d"
-            "couldn't create cpu_time entry for bank ledger template @%s:%d"
+            "couldn\\'t create bank ledger template @%s:%d"
+            "couldn\\'t create cpu_time entry for bank ledger template @%s:%d"
             "energy"
-            "couldn't create energy entry for bank ledger template @%s:%d"
+            "couldn\\'t create energy entry for bank ledger template @%s:%d"
         }
         symbol = "bank_init"
         caller = "?"
@@ -4049,9 +4049,9 @@ signatures {
     new {
         args = 0
         anchors {
-            "Ignoring "vm_compressor" boot arg %d\n"
+            "Ignoring \"vm_compressor\" boot arg %d\n"
             "kern.vm_compressor"
-            ""vm_compressor_mode" is %d\n"
+            "\"vm_compressor_mode\" is %d\n"
             "vm_protect_privileged_from_untrusted"
         }
         symbol = "vm_fault_init"
@@ -4104,14 +4104,14 @@ signatures {
             "%s: pmap %p vaddr 0x%llx prot 0x%x options 0x%x !cs_bypass @%s:%d"
             "page marked to be NX, not letting it be mapped EXEC\n"
             "vm_fault: signed: %s validate: %s tainted: %s wpmapped: %s prot: 0x%x\n"
-            "CODE SIGNING: process %d[%s]: rejecting invalid page at address 0x%llx from offset 0x%llx in file "%s%s%s" (cs_mtime:%lu.%ld %s mtime:%lu.%ld) (signed:%d validated:%d tainted:%d nx:%d wpmapped:%d dirty:%d depth:%d)\n"
+            "CODE SIGNING: process %d[%s]: rejecting invalid page at address 0x%llx from offset 0x%llx in file \"%s%s%s\" (cs_mtime:%lu.%ld %s mtime:%lu.%ld) (signed:%d validated:%d tainted:%d nx:%d wpmapped:%d dirty:%d depth:%d)\n"
             "<nil>"
             "/.../"
             "vm_fault_enter: failed to allocate codesigning exit reason\n"
             "vm_fault_enter: failed to allocate buffer for codesigning exit reason\n"
             "vm_fault_enter: failed to allocate kcdata for codesigning exit reason\n"
             "CODE SIGNING: tainted page %p phys 0x%x phystokv 0x%llx copied to %p\n"
-            "CODE SIGNING: process %d[%s]: rejecting invalid page (phys#0x%x) at address 0x%llx from offset 0x%llx in file "%s%s%s" (cs_mtime:%lu.%ld %s mtime:%lu.%ld) (signed:%d validated:%d tainted:%d nx:%dwpmapped:%d dirty:%d depth:%d)\n @%s:%d"
+            "CODE SIGNING: process %d[%s]: rejecting invalid page (phys#0x%x) at address 0x%llx from offset 0x%llx in file \"%s%s%s\" (cs_mtime:%lu.%ld %s mtime:%lu.%ld) (signed:%d validated:%d tainted:%d nx:%dwpmapped:%d dirty:%d depth:%d)\n @%s:%d"
             "CODESIGNING: vm_fault_enter(0x%llx): *** INVALID PAGE ***\n"
             "CODESIGNING: panicking on invalid page @%s:%d"
         }
@@ -5337,7 +5337,7 @@ signatures {
             "shared_region: vm_shared_region_lastid wrapped @%s:%d"
             "shared_region: lookup(root=%p,cpu=<%d,%d>,64bit=%d,pgshift=%d,reslide=%d,driverkit=%d) <- %p\n"
             "shared_region: -> create(root=%p,cpu=<%d,%d>,64bit=%d,pgshift=%d,reslide=%d,driverkit=%d)\n"
-            "shared_region: create: couldn't allocate map\n"
+            "shared_region: create: couldn\\'t allocate map\n"
             "shared_region: create(root=%p,cpu=<%d,%d>,64bit=%d,reslide=%d,driverkit=%d,base=0x%llx,size=0x%llx) <- %p mem=(%p,%p) map=%p pmap=%p\n"
             "shared_region: create(root=%p,cpu=<%d,%d>,64bit=%d,driverkit=%d,base=0x%llx,size=0x%llx) <- NULL"
         }
@@ -8147,7 +8147,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "dtrace_open: couldn't acquire minor number %d. This usually means that too many DTrace clients are in use at the moment"
+            "dtrace_open: couldn\\'t acquire minor number %d. This usually means that too many DTrace clients are in use at the moment"
             "dtrace_aggid_%d"
         }
         symbol = "dtrace_state_create"
@@ -8314,7 +8314,7 @@ signatures {
         args = 0
         anchors {
             "sdt_init: failed to allocate a major number!\n"
-            "/dev/sdt couldn't create minor node"
+            "/dev/sdt couldn\\'t create minor node"
             "failed to register sdt provider %s"
         }
         symbol = "sdt_init"
@@ -8515,7 +8515,7 @@ signatures {
         args = 0
         anchors {
             "using %d buffer headers and %d cluster IO buffer headers\n"
-            "Couldn't register buffer cache callout for vm pressure! @%s:%d"
+            "Couldn\\'t register buffer cache callout for vm pressure! @%s:%d"
         }
         symbol = "bufinit"
         caller = "?"
@@ -9741,9 +9741,9 @@ signatures {
     new {
         args = 0
         anchors {
-            "Couldn't make stdin, err %d.\n"
-            "Couldn't make stdout, err %d.\n"
-            "Couldn't make stderr, err %d.\n"
+            "Couldn\\'t make stdin, err %d.\n"
+            "Couldn\\'t make stdout, err %d.\n"
+            "Couldn\\'t make stderr, err %d.\n"
         }
         symbol = "devfs_fdesc_makelinks"
         caller = "?"
@@ -11051,13 +11051,13 @@ signatures {
             "dl_inp->dlth_affinity_tag == 0"
             "dl_inp->dlth_pkts_cnt == 0"
             "thfunc == NULL"
-            "%s: ifp=%p couldn't get an input thread; err=%d"
+            "%s: ifp=%p couldn\\'t get an input thread; err=%d"
             "ifp->if_start_thread == THREAD_NULL"
             "ifp->if_start != NULL"
-            "%s: ifp=%p couldn't get a start thread; err=%d"
+            "%s: ifp=%p couldn\\'t get a start thread; err=%d"
             "ifp->if_input_poll != NULL"
             "ifp->if_input_ctl != NULL"
-            "%s: ifp=%p couldn't get a poll thread; err=%d"
+            "%s: ifp=%p couldn\\'t get a poll thread; err=%d"
             "ifp->if_desc.ifd_len == 0"
             "%s: attached with %d suspended link-layer multicast membership(s)\n"
             "ifp->if_agentids == NULL"
@@ -11279,8 +11279,8 @@ signatures {
             "%s_input_poll"
             "%s_input"
             "inp->dlth_thread == THREAD_NULL"
-            "%s: couldn't create main input thread"
-            "%s: couldn't create %s input thread"
+            "%s: couldn\\'t create main input thread"
+            "%s: couldn\\'t create %s input thread"
         }
         symbol = "dlil_create_input_thread"
         caller = "?"
@@ -11571,8 +11571,8 @@ signatures {
         args = 0
         anchors {
             "lo_txstart"
-            "%s: couldn't allocate loopback ifnet (%d) @%s:%d"
-            "%s: couldn't attach loopback ifnet (%d) @%s:%d"
+            "%s: couldn\\'t allocate loopback ifnet (%d) @%s:%d"
+            "%s: couldn\\'t attach loopback ifnet (%d) @%s:%d"
         }
         symbol = "loopattach"
         caller = "?"
@@ -11822,7 +11822,7 @@ signatures {
             "%s: %s sent expiry notification on nexus port %u notif code %u"
             "%s: %s err=%d, nx_port_id: 0x%x"
             "%s: Packet has %llu usec until expiration"
-            "%s: Unrecognized value %d for "net.link.fake.tx_exp_policy""
+            "%s: Unrecognized value %d for \"net.link.fake.tx_exp_policy\""
         }
         symbol = "feth_tx_expired_error"
         caller = "?"
@@ -12416,8 +12416,8 @@ signatures {
     new {
         args = 1
         anchors {
-            "rn_delete: couldn't find our annotation\n"
-            "rn_delete: couldn't find us\n"
+            "rn_delete: couldn\\'t find our annotation\n"
+            "rn_delete: couldn\\'t find us\n"
             "rn_delete: Orphaned Mask 0x%llx at 0x%llx\n"
         }
         symbol = "rn_delete"
@@ -12588,7 +12588,7 @@ signatures {
         anchors {
             "evtag != NULL"
             "eventhandler_deregister event_type=route_event"
-            "eventhandler_invoke("route_event")"
+            "eventhandler_invoke(\"route_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "route_event_callback"
@@ -13925,7 +13925,7 @@ signatures {
         args = 0
         anchors {
             "necp_client_assert_bb_radio_manager"
-            "Couldn't find client"
+            "Couldn\\'t find client"
             "BB radio manager agent not found"
             "netagent_client_message failed"
             "%s: %s\n"
@@ -16013,7 +16013,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: couldn't create flow event advisory thread @%s:%d"
+            "%s: couldn\\'t create flow event advisory thread @%s:%d"
             "flowadv_init"
             "flowadv.c"
         }
@@ -16597,7 +16597,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: couldn't create network work queue thread"
+            "%s: couldn\\'t create network work queue thread"
             "nwk_wq_init"
         }
         symbol = "nwk_wq_init"
@@ -18020,7 +18020,7 @@ signatures {
         args = 0
         anchors {
             "dummynet_event"
-            "eventhandler_invoke("dummynet_event")"
+            "eventhandler_invoke(\"dummynet_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "dummynet_event_callback"
@@ -19181,7 +19181,7 @@ signatures {
         anchors {
             "(mpts->mpts_flags & (MPTSF_CONNECTING | MPTSF_CONNECTED)) == MPTSF_CONNECTING"
             "%s - %lx: ifindex %u dst %s:%d pended %u\n"
-            "%s - %lx: Couldn't find proc for pid %u\n"
+            "%s - %lx: Couldn\\'t find proc for pid %u\n"
             "%s - %lx: connectx failed with error %d ifscope %u\n"
         }
         symbol = "mptcp_subflow_soconnectx"
@@ -19659,7 +19659,7 @@ signatures {
             "sum length mismatch in IPv4 AH input (%d should be %u): %s\n"
             "IPv4 AH input: can't pullup\n"
             "replay packet in IPv4 AH input: %s %s\n"
-            "IPv4 AH input: couldn't alloc temporary region for cksum\n"
+            "IPv4 AH input: couldn\\'t alloc temporary region for cksum\n"
             "IPv4 AH input: bad length ip header len %u, total len %u\n"
             "checksum mismatch in IPv4 AH input: %s %s\n"
             "ipsec tunnel protocol mismatch in IPv4 AH input: %s\n"
@@ -22712,7 +22712,7 @@ signatures {
         args = 0
         anchors {
             "&audit_drain_cv"
-            "audit_rotate_vnode: Couldn't close audit file.\n"
+            "audit_rotate_vnode: Couldn\\'t close audit file.\n"
         }
         symbol = "audit_rotate_vnode"
         caller = "?"
@@ -22720,7 +22720,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "audit_worker_init: Couldn't create audit_worker thread @%s:%d"
+            "audit_worker_init: Couldn\\'t create audit_worker thread @%s:%d"
         }
         symbol = "audit_worker_init"
         caller = "?"
@@ -23549,12 +23549,12 @@ signatures {
         anchors {
             "%s: disallowing arm64e binary with invalid RO range\n"
             "%s: disallowing arm64e binary with invalid dynlinker RO range\n"
-            "%s: allowing binary "%s" built against preview arm64e ABI\n"
+            "%s: allowing binary \"%s\" built against preview arm64e ABI\n"
             "%s: (customer builds will need custom boot-args to run this binary!)\n"
-            "%s: not running binary "%s" built against preview arm64e ABI\n"
-            "%s: (to allow this, add "-arm64e_preview_abi" to boot-args)\n"
-            "%s: disallowing arm64 platform driverkit binary "%s", should be arm64e\n"
-            "%s: disallowing emulated x86 driverkit binary "%s", should be arm64\n"
+            "%s: not running binary \"%s\" built against preview arm64e ABI\n"
+            "%s: (to allow this, add \"-arm64e_preview_abi\" to boot-args)\n"
+            "%s: disallowing arm64 platform driverkit binary \"%s\", should be arm64e\n"
+            "%s: disallowing emulated x86 driverkit binary \"%s\", should be arm64\n"
             "com.apple.developer.web-browser-engine.host"
             "com.apple.developer.web-browser-engine.rendering"
             "com.apple.pac.shared_region_id"
@@ -26264,9 +26264,9 @@ signatures {
             "com.apple.bash"
             "com.apple.zsh"
             "com.apple.ksh"
-            "%s: running binary "%s" in keys-off mode due to posix_spawnattr_disable_ptr_auth_a_keys_np"
-            "%s: running binary "%s" in keys-off mode due to entitlement: %s"
-            "%s: running binary "%s" in keys-off mode due to identity: %s"
+            "%s: running binary \"%s\" in keys-off mode due to posix_spawnattr_disable_ptr_auth_a_keys_np"
+            "%s: running binary \"%s\" in keys-off mode due to entitlement: %s"
+            "%s: running binary \"%s\" in keys-off mode due to identity: %s"
         }
         symbol = "load_machfile"
         caller = "?"
@@ -26277,10 +26277,10 @@ signatures {
             "pagezero boundary at 0x%llx; adjust slide from 0x%llx to 0x%llx%s\n"
             "page-unaligned X-W boundary at 0x%llx; adjust slide from 0x%llx to 0x%llx%s\n"
             "PAGEZERO"
-            "proc %d: load code signature error %d for file "%s"\n"
+            "proc %d: load code signature error %d for file \"%s\"\n"
             "validating initial pages of %s\n"
             "CODE SIGNING: %s[%d]: invalid initial page at offset %lld validated:%d tainted:%d csflags:0x%x\n"
-            "proc %d: set_code_unprotect() error %d for file "%s"\n"
+            "proc %d: set_code_unprotect() error %d for file \"%s\"\n"
         }
         symbol = "parse_machfile"
         caller = "?"
@@ -26492,10 +26492,10 @@ signatures {
         args = 1
         anchors {
             "evhrm"
-            "%s: removing item %p from "%s""
-            "%s: marking item %p from "%s" as dead"
-            "%s: removing all items from "%s""
-            "%s: marking all items from "%s" as dead"
+            "%s: removing item %p from \"%s\""
+            "%s: marking item %p from \"%s\" as dead"
+            "%s: removing all items from \"%s\""
+            "%s: marking all items from \"%s\" as dead"
         }
         symbol = "eventhandler_deregister"
         caller = "?"
@@ -26504,7 +26504,7 @@ signatures {
         args = 0
         anchors {
             "eventhandler_prune_list"
-            "%s: pruning list "%s""
+            "%s: pruning list \"%s\""
         }
         symbol = "eventhandler_prune_list"
         caller = "?"
@@ -26523,8 +26523,8 @@ signatures {
             "strlen(name) <= (sizeof(new_list->el_name) - 1)"
             "evthdlr_lists_ctxt->eventhandler_lists_initted"
             "%s: registering event_type=%s\n"
-            "%s: creating list "%s""
-            "%s: adding item %p (function %p to "%s""
+            "%s: creating list \"%s\""
+            "%s: adding item %p (function %p to \"%s\""
         }
         symbol = "eventhandler_register"
         caller = "?"
@@ -26953,7 +26953,7 @@ signatures {
         args = 0
         anchors {
             "not supported @%s:%d"
-            "%s: image file not found or couldn't be read: %d\n"
+            "%s: image file not found or couldn\\'t be read: %d\n"
             "%s: attached disk image %s as %s\n"
             "/dev/"
             "%s: attempting to mount as hfs...\n"
@@ -27331,7 +27331,7 @@ signatures {
         args = 0
         anchors {
             "/AppleInternal/Library/BuildRoots/d3a62b52-2ef5-11ef-9ecd-e2437461156c/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/lib/net_filter_event.c"
-            "eventhandler_invoke("net_filter_event")"
+            "eventhandler_invoke(\"net_filter_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "net_filter_event_enqueue_callback"
@@ -27342,9 +27342,7 @@ signatures {
         anchors {
             "skmem_dump_buf != NULL"
             "Region %p\n  | Mode         : 0x%b\n  | Memory       : [%llu in use [%llu wired]] / [%llu total]\n  | Transactions : [%llu segment allocs, %llu frees]\n\n"
-            "\x10\x01NOREDIRECT\x02MMAPOK\x03KREADONLY\x04UREADONLY\x05PERSISTENT\x06MONOLITHIC\x07NOMAGAZINES\x08NOCACHE\tSEGPHYSCONTIG\nSHAREOK\x0bIODIR_IN\x0cIODIR_OUT\rGUARD\x0ePUREDATA\x0fPSEUDO\x10THREADSAFE\x11MEMTAG\x1fSLAB MIRRORED"
             "Cache %p\n  | Mode         : 0x%b\n  | Memory       : [%llu in use] / [%llu total]\n  | Transactions : [%llu alloc failures]\n  |                [%llu slab creates, %llu destroys]\n  |                [%llu slab allocs,  %llu frees]\n\n"
-            "\x10\x01NOMAGAZINES\x02AUDIT\x03NOREDIRECT\x04BATCH\x05DYNAMIC\x06CLEARONFREE\x07PSEUDO\x08RECLAIM"
             "VM Pages\n  | Free         : %u [%u speculative]\n  | Active       : %u\n  | Inactive     : %u\n  | Wired        : %u [%u throttled, %u lopage_free]\n  | Purgeable    : %u [%u purged]\n"
         }
         symbol = "skmem_dump"
@@ -27514,10 +27512,10 @@ signatures {
         args = 2
         anchors {
             "(skmflag & (SKMEM_NOSLEEP | SKMEM_FAILOK)) != (SKMEM_NOSLEEP | SKMEM_FAILOK)"
-            ""%s": failed to allocate segment (sleeping mode) after %u retries\n\n%s"
+            "\"%s\": failed to allocate segment (sleeping mode) after %u retries\n\n%s"
             "skmflag & (SKMEM_NOSLEEP | SKMEM_FAILOK)"
             "(skmflag & (SKMEM_NOSLEEP | SKMEM_FAILOK)) == SKMEM_NOSLEEP"
-            ""%s": skr 0x%p unable to satisfy mandatory allocation\n"
+            "\"%s\": skr 0x%p unable to satisfy mandatory allocation\n"
             "sg != NULL"
             "sg->sg_index == sg0->sg_index"
         }
@@ -27556,7 +27554,7 @@ signatures {
     new {
         args = 1
         anchors {
-            ""%s": skr 0x%p sg 0x%p (idx %u) unable to satisfy mandatory allocation\n"
+            "\"%s\": skr 0x%p sg 0x%p (idx %u) unable to satisfy mandatory allocation\n"
             "Fail to reclaim md %p, err %d @%s:%d"
             "Fail to wire md %p, err %d @%s:%d"
             "Fail to set md %p, err %d @%s:%d"
@@ -27567,8 +27565,8 @@ signatures {
     new {
         args = 1
         anchors {
-            ""%s": boff_total counter overflows\n"
-            ""%s": failed to allocate slab (sleeping mode) after %llu msec, %u retries\n\n%s"
+            "\"%s\": boff_total counter overflows\n"
+            "\"%s\": failed to allocate slab (sleeping mode) after %llu msec, %u retries\n\n%s"
             "boff > 0 && ((uint32_t)boff <= (SKMEM_SLAB_BACKOFF_THRES * 2))"
         }
         symbol = "skmem_slab_alloc_locked"
@@ -28218,7 +28216,7 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s: ifp=%p couldn't get a poll  thread; err=%d"
+            "%s: ifp=%p couldn\\'t get a poll  thread; err=%d"
             "nx_netif_compat_na_activate"
             "ifp->if_poll_thread != NULL"
             "netif_poll_thread_exit"
@@ -29138,7 +29136,7 @@ signatures {
         args = 0
         anchors {
             "Driver-"
-            ""%s" not a kext"
+            "\"%s\" not a kext"
         }
         symbol = "__ZN6OSKext31createExcludeListFromBooterDataEP12OSDictionaryP20OSCollectionIterator"
         caller = "?"
@@ -29830,7 +29828,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "Couldn't allocate kext panic log buffer."
+            "Couldn\\'t allocate kext panic log buffer."
         }
         symbol = "__ZN6OSKext23saveLoadedKextPanicListEv"
         caller = "?"
@@ -29879,7 +29877,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "integer size="%d""
+            "integer size=\"%d\""
             "0x%lx%08lx"
             "0x%lx"
         }
@@ -29921,7 +29919,7 @@ signatures {
     new {
         args = 2
         anchors {
-            "<reference IDREF=""
+            "<reference IDREF=\""
         }
         symbol = "__ZN11OSSerialize20previouslySerializedEPK15OSMetaClassBase"
         caller = "?"
@@ -29930,7 +29928,7 @@ signatures {
         args = 0
         anchors {
             "class %s: xml serialize\n"
-            " ID=""
+            " ID=\""
         }
         symbol = "__ZN11OSSerialize14addXMLStartTagEPK15OSMetaClassBasePKc"
         caller = "?"
@@ -30442,7 +30440,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "couldn't find sectHIBTEXTB in segInfo @%s:%d"
+            "couldn\\'t find sectHIBTEXTB in segInfo @%s:%d"
         }
         symbol = "hibernate_write_image"
         caller = "?"
@@ -30901,7 +30899,6 @@ signatures {
         anchors {
             "%s: match category %s exists\n"
             "%s: stalling for module\n"
-            "Couldn\'t alloc class "%s"\n"
             "%s::init fails\n"
             "%s::probe(%s)\n"
             "%s::probe fails\n"
@@ -31546,7 +31543,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "Missing or bad "%s" key\n"
+            "Missing or bad \"%s\" key\n"
         }
         symbol = "__ZN11IOCatalogue4initEP7OSArray"
         caller = "?"
@@ -31928,7 +31925,7 @@ signatures {
         args = 0
         anchors {
             "(unknown platform name)"
-            "Unable to find driver for this platform: "%s". @%s:%d"
+            "Unable to find driver for this platform: \"%s\". @%s:%d"
         }
         symbol = "__ZN15IOPanicPlatform5startEP9IOService"
         caller = "?"
@@ -32307,8 +32304,6 @@ signatures {
         anchors {
             "Count %d\n"
             "Empty\n"
-            "%*s\x1b[33m%s"
-            "\x1b[0m <class %s"
             ", busy %ld"
         }
         symbol = "IOPrintPlane"
@@ -32664,7 +32659,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "DK:  fClasses["%s"] => %p\n"
+            "DK:  fClasses[\"%s\"] => %p\n"
         }
         symbol = "___ZN12IOUserServer17objectInstantiateEP8OSObject5IORPCP12IORPCMessage_block_invoke"
         caller = "?"
@@ -32914,7 +32909,7 @@ signatures {
         anchors {
             "Driver %s has crashed %zu time(s)\n"
             "DK: Could not find OSKext for %s\n"
-            "IOUserServerName "%s" not correct organization for bundleID "%s"\n"
+            "IOUserServerName \"%s\" not correct organization for bundleID \"%s\"\n"
             "Could not initialize token\n"
         }
         symbol = "__ZN12IOUserServer16launchUserServerEP8OSStringPK8OSSymbolP8OSNumberbPP24IOUserServerCheckInTokenP6OSData"
@@ -32950,7 +32945,7 @@ signatures {
     new {
         args = 1
         anchors {
-            "DK: Attempted to create action object with type "%s" which does not inherit from OSAction\n"
+            "DK: Attempted to create action object with type \"%s\" which does not inherit from OSAction\n"
         }
         symbol = "__ZL34OSActionCreateWithTypeNameInternalP8OSObjectyymP8OSStringbPP8OSAction"
         caller = "?"
@@ -33091,7 +33086,7 @@ signatures {
             "corefile_size_mb"
             "Boot-args specify %d MB kernel corefile\n"
             "Volume is low on space. Not allocating kernel corefile.\n"
-            "Couldn't retrieve volume status. Error %d\n"
+            "Couldn\\'t retrieve volume status. Error %d\n"
         }
         symbol = "__ZL20IOOpenPolledCoreFilePvS_"
         caller = "?"
@@ -33462,7 +33457,7 @@ signatures {
         args = 0
         anchors {
             "HibernationService"
-            "Couldn't allocate service dict @%s:%d"
+            "Couldn\\'t allocate service dict @%s:%d"
             "Wrong type for IOService @%s:%d"
         }
         symbol = "__ZN13SEPHibernator13sepHibernatorEv"
@@ -35095,7 +35090,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""Unable to recycle a chunk" @%s:%d"
+            "\"Unable to recycle a chunk\" @%s:%d"
             "firehose_buffer.c"
         }
         symbol = "__ZN17AppleSmartBattery18setChargeRateLimitEP8OSObject.cold.1"
@@ -35104,7 +35099,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "msg_buf->position >= msg_buf->reserved" @%s:%d"
+            "\"TB_ASSERT: \" \"msg_buf->position >= msg_buf->reserved\" @%s:%d"
         }
         symbol = "__ZN18IODARTMapperClient5startEP9IOService.cold.2_0"
         caller = "?"
@@ -35112,7 +35107,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "end <= msg_buf->size" @%s:%d"
+            "\"TB_ASSERT: \" \"end <= msg_buf->size\" @%s:%d"
         }
         symbol = "delete_buffers_triage"
         caller = "?"
@@ -35120,7 +35115,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "original_buffer->connection_owned" @%s:%d"
+            "\"TB_ASSERT: \" \"original_buffer->connection_owned\" @%s:%d"
         }
         symbol = "sched_clutch_thread_remove.cold.2"
         caller = "?"
@@ -35128,7 +35123,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "success" @%s:%d"
+            "\"TB_ASSERT: \" \"success\" @%s:%d"
         }
         symbol = "__add_accumulator.cold.1"
         caller = "?"
@@ -35136,7 +35131,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "overflow detected when multiplying" @%s:%d"
+            "\"TB_FATAL: \" \"overflow detected when multiplying\" @%s:%d"
         }
         symbol = "_tb_message_accumulator_accumulate.cold.2"
         caller = "?"
@@ -35144,7 +35139,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "accumulator->total_size >= total" @%s:%d"
+            "\"TB_ASSERT: \" \"accumulator->total_size >= total\" @%s:%d"
         }
         symbol = "key_output.cold.2"
         caller = "?"
@@ -35152,7 +35147,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "!init_err" @%s:%d"
+            "\"TB_ASSERT: \" \"!init_err\" @%s:%d"
         }
         symbol = "__ZN12IODARTMapper5startEP9IOService.cold.2"
         caller = "?"
@@ -35160,7 +35155,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "tb_message_get_state(message) == TB_MESSAGE_STATE_RECEIVED" @%s:%d"
+            "\"TB_ASSERT: \" \"tb_message_get_state(message) == TB_MESSAGE_STATE_RECEIVED\" @%s:%d"
         }
         symbol = "buf_brelse.cold.1"
         caller = "?"
@@ -35168,7 +35163,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "tb_message_get_disposition(message) == TB_MESSAGE_DISPOSITION_QUERY" @%s:%d"
+            "\"TB_ASSERT: \" \"tb_message_get_disposition(message) == TB_MESSAGE_DISPOSITION_QUERY\" @%s:%d"
         }
         symbol = "os_reason_set_description_data.cold.2"
         caller = "?"
@@ -35176,7 +35171,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "buffer" @%s:%d"
+            "\"TB_ASSERT: \" \"buffer\" @%s:%d"
         }
         symbol = "compressor_memory_object_last_unmap"
         caller = "?"
@@ -35184,7 +35179,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "buffer->payload != NULL" @%s:%d"
+            "\"TB_ASSERT: \" \"buffer->payload != NULL\" @%s:%d"
         }
         symbol = "___tb_service_connection_create_block_invoke.cold.3_0"
         caller = "?"
@@ -35192,7 +35187,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "query->state == TB_MESSAGE_STATE_READY" @%s:%d"
+            "\"TB_ASSERT: \" \"query->state == TB_MESSAGE_STATE_READY\" @%s:%d"
         }
         symbol = "device_pager_data_initialize"
         caller = "?"
@@ -35200,7 +35195,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "query->disposition == TB_MESSAGE_DISPOSITION_QUERY" @%s:%d"
+            "\"TB_ASSERT: \" \"query->disposition == TB_MESSAGE_DISPOSITION_QUERY\" @%s:%d"
         }
         symbol = "_tb_connection_send_query.cold.3"
         caller = "?"
@@ -35208,7 +35203,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "transport_buffer->connection_owned" @%s:%d"
+            "\"TB_ASSERT: \" \"transport_buffer->connection_owned\" @%s:%d"
         }
         symbol = "__ZN25IOSkywalkNetworkBSDClient21adjustInterfaceEnableEv.cold.1_0"
         caller = "?"
@@ -35216,7 +35211,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "0 && \\"invalid transport type for static initialisation\\"" @%s:%d"
+            "\"TB_ASSERT: \" \"0 && \\\"invalid transport type for static initialisation\\\"\" @%s:%d"
         }
         symbol = "__ZN26IOUnifiedAddressTranslator20mapHardwareResourcesEv.cold.10"
         caller = "?"
@@ -35224,7 +35219,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "transport_buffer->wrapping == false" @%s:%d"
+            "\"TB_ASSERT: \" \"transport_buffer->wrapping == false\" @%s:%d"
         }
         symbol = "__ZN14OSEntitlements10getXMLBlobEv.cold.2_1"
         caller = "?"
@@ -35232,7 +35227,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "tpt_buf->wrapping == false" @%s:%d"
+            "\"TB_ASSERT: \" \"tpt_buf->wrapping == false\" @%s:%d"
         }
         symbol = "proc_apply_resource_actions.cold.1"
         caller = "?"
@@ -35240,7 +35235,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "self->state == TB_MESSAGE_STATE_UNINITIALIZED" @%s:%d"
+            "\"TB_ASSERT: \" \"self->state == TB_MESSAGE_STATE_UNINITIALIZED\" @%s:%d"
         }
         symbol = "__ZN22AppleMCA2Cluster_T803025initClusterPreflightGatedEv.cold.3"
         caller = "?"
@@ -35248,7 +35243,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "(disposition == TB_MESSAGE_DISPOSITION_REPLY || disposition == TB_MESSAGE_DISPOSITION_QUERY)" @%s:%d"
+            "\"TB_ASSERT: \" \"(disposition == TB_MESSAGE_DISPOSITION_REPLY || disposition == TB_MESSAGE_DISPOSITION_QUERY)\" @%s:%d"
         }
         symbol = "__ZN17AppleUSBIORequest4freeEv.cold.1_0"
         caller = "?"
@@ -35256,7 +35251,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "overflow detected when subtracting" @%s:%d"
+            "\"TB_FATAL: \" \"overflow detected when subtracting\" @%s:%d"
         }
         symbol = "bank_init.cold.4"
         caller = "?"
@@ -35264,7 +35259,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "start <= msg->transport_buffer->size" @%s:%d"
+            "\"TB_ASSERT: \" \"start <= msg->transport_buffer->size\" @%s:%d"
         }
         symbol = "__ZN19IOPCIHostBridgeData4initEv.cold.4_0"
         caller = "?"
@@ -35272,7 +35267,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "end <= msg->transport_buffer->size" @%s:%d"
+            "\"TB_ASSERT: \" \"end <= msg->transport_buffer->size\" @%s:%d"
         }
         symbol = "__ZN16AppleT8006GPIOIC15claimWakeEventsEv.cold.1_0_0"
         caller = "?"
@@ -35280,7 +35275,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "tb_message_encode_f32_v2" ": %d" @%s:%d"
+            "\"TB_FATAL: \" \"tb_message_encode_f32_v2\" \": %d\" @%s:%d"
         }
         symbol = "_tb_message_encode_f32"
         caller = "?"
@@ -35288,7 +35283,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "tb_message_encode_f64_v2" ": %d" @%s:%d"
+            "\"TB_FATAL: \" \"tb_message_encode_f64_v2\" \": %d\" @%s:%d"
         }
         symbol = "_tb_message_encode_f64"
         caller = "?"
@@ -35296,7 +35291,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "end <= tpt_buf->size" @%s:%d"
+            "\"TB_ASSERT: \" \"end <= tpt_buf->size\" @%s:%d"
         }
         symbol = "_tb_message_encode_buffer.cold.2"
         caller = "?"
@@ -35304,7 +35299,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "tb_message_decode_f32_v2" ": %d" @%s:%d"
+            "\"TB_FATAL: \" \"tb_message_decode_f32_v2\" \": %d\" @%s:%d"
         }
         symbol = "_tb_message_decode_f32"
         caller = "?"
@@ -35312,7 +35307,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_FATAL: " "tb_message_decode_f64_v2" ": %d" @%s:%d"
+            "\"TB_FATAL: \" \"tb_message_decode_f64_v2\" \": %d\" @%s:%d"
         }
         symbol = "_tb_message_decode_f64"
         caller = "?"
@@ -35320,7 +35315,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "kr == KERN_SUCCESS" @%s:%d"
+            "\"TB_ASSERT: \" \"kr == KERN_SUCCESS\" @%s:%d"
         }
         symbol = "ip6_ecn_egress.cold.1"
         caller = "?"
@@ -35328,7 +35323,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "blocks->connection_message_handler" @%s:%d"
+            "\"TB_ASSERT: \" \"blocks->connection_message_handler\" @%s:%d"
         }
         symbol = "__ZN16EndpointInstance28initWithControllerAndOptionsEP21IOUSBDeviceControlleriiijjiP8IOMapper.cold.1"
         caller = "?"
@@ -35336,7 +35331,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "response->state == TB_MESSAGE_STATE_READY" @%s:%d"
+            "\"TB_ASSERT: \" \"response->state == TB_MESSAGE_STATE_READY\" @%s:%d"
         }
         symbol = "__ZN29AppleConvergedIPCRTIInterface5startEP9IOService.cold.1_0"
         caller = "?"
@@ -35344,7 +35339,7 @@ signatures {
     new {
         args = 0
         anchors {
-            ""TB_ASSERT: " "response" @%s:%d"
+            "\"TB_ASSERT: \" \"response\" @%s:%d"
         }
         symbol = "__ZN15IODMAController13getControllerEP9IOServicej.cold.1"
         caller = "?"
@@ -35867,7 +35862,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "eventhandler_invoke("ifnet_event")"
+            "eventhandler_invoke(\"ifnet_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "intf_event_callback"
@@ -36973,7 +36968,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "eventhandler_invoke("in6_clat46_event")"
+            "eventhandler_invoke(\"in6_clat46_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "in6_clat46_event_callback"
@@ -37873,8 +37868,8 @@ signatures {
         args = 0
         anchors {
             "%s - %lx: skt_unit is still 0\n"
-            "%s - %lx: Couldn't find proc for uuid %s\n"
-            "%s - %lx: Couldn't find proc for pid %u\n"
+            "%s - %lx: Couldn\\'t find proc for uuid %s\n"
+            "%s - %lx: Couldn\\'t find proc for pid %u\n"
             "%s - %lx: asked symptoms about pid %u, taskprio %u, prio %u, err %d\n"
         }
         symbol = "mptcp_ask_symptoms"
@@ -37883,7 +37878,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s - %lx: Couldn't find proc for pid %u\n"
+            "%s - %lx: Couldn\\'t find proc for pid %u\n"
             "%s - %lx: unable to create subflow socket error %d\n"
             "%s - %lx: necp_client_register_socket_flow failed with error %d\n"
             "%s - %lx: state changed during unlock: %u flags %#x\n"
@@ -37987,7 +37982,7 @@ signatures {
             "sum length too short in IPv6 AH input (%u, should be at least %u): %s\n"
             "sum length mismatch in IPv6 AH input (%d should be %u): %s\n"
             "replay packet in IPv6 AH input: %s %s\n"
-            "IPv6 AH input: couldn't alloc temporary region for cksum\n"
+            "IPv6 AH input: couldn\\'t alloc temporary region for cksum\n"
             "checksum mismatch in IPv6 AH input: %s %s\n"
             "authentication failed in IPv6 AH input: %s %s\n"
             "ipsec tunnel protocol mismatch in IPv6 AH input: %s\n"
@@ -38363,7 +38358,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "eventhandler_invoke("in6_event")"
+            "eventhandler_invoke(\"in6_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "in6_event_callback"
@@ -39053,7 +39048,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "eventhandler_invoke("protoctl_event")"
+            "eventhandler_invoke(\"protoctl_event\")"
             "eventhandler_invoke: executing %p"
         }
         symbol = "protoctl_event_callback"
@@ -39218,14 +39213,6 @@ signatures {
             "Thread state corruption detected (PE mode == 0)"
         }
         symbol = "_ml_auth_thread_state_invalid_cpsr"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "Sysreg JOP hash mismatch detected (guest state corruption): expected 0x%llx, actual 0x%llx, state %p"
-        }
-        symbol = "sub_FFFFFE00072C70DC"
         caller = "?"
     }
     new {
