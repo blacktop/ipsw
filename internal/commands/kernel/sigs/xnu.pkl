@@ -66,14 +66,6 @@ signatures {
         caller = "?"
     }
     new {
-        args = 0
-        anchors {
-            "0123456789ABCDEF"
-        }
-        symbol = "sysctl_bootobjectspath"
-        caller = "?"
-    }
-    new {
         args = 1
         anchors {
             "common"
@@ -10244,7 +10236,6 @@ signatures {
             "is_promisc == list_is_promisc"
             "%s: (%s): count %u"
             "%s: (%s): sublist %u pkts %u"
-            "%s: (%s): sublist %u pkts %u"
         }
         symbol = "bridge_early_input"
         caller = "?"
@@ -10297,11 +10288,9 @@ signatures {
             "%s: m_pullup failed hlen %d"
             "%s: bad IP version"
             "%s: bad IP header length %d < %d"
-            "%s: m_pullup failed hlen %d"
             "%s: IP total len %d < header len %d"
             "%s: invalid IP payload length %d > %d"
             "%s: short IPv6 packet %d < %d"
-            "%s: m_pullup failed hlen %d"
             "%s: bad IPv6 version"
             "%s: ip6_lasthdr() returned %d"
             "%s: invalid IPv6 payload length %d > %d"
@@ -10390,16 +10379,7 @@ signatures {
             "%s: %s mcast for us"
             "%s: %s.%dbrhf_bad_ether_srchw_addr"
             "%s: %s.%dbrhf_ip_too_small"
-            "%s: %s.%dbrhf_ip_too_small"
-            "%s: %s.%dbrhf_ip_too_small"
             "%s: %s.%dbrhf_ip_bad_srcaddr"
-            "%s: %s.%dbrhf_ip_too_small"
-            "%s: %s.%dbrhf_ip_too_small"
-            "%s: %s.%dbrhf_ip_bad_srcaddr"
-            "%s: %s.%dbrhf_ip_bad_srcaddr"
-            "%s: %s.%dbrhf_ip_bad_proto"
-            "%s: %s.%dbrhf_ip_too_small"
-            "%s: %s.%dbrhf_ip_too_small"
             "%s: %s.%dbrhf_ip_bad_proto"
             "%s: %s.%dbrhf_bad_ether_type"
         }
@@ -10452,9 +10432,6 @@ signatures {
             "%s: %s event_code %u - %s"
             "%s: ifnet_set_promiscuous (%s) failed %d"
             "%s: if_allmulti (%s) failed %d"
-            "%s: %s"
-            "%s: %s"
-            "%s: %s input broadcast %s"
         }
         symbol = "bridge_iff_event"
         caller = "?"
@@ -10471,7 +10448,6 @@ signatures {
         args = 1
         anchors {
             "bridge_iff_detached"
-            "%s: %s"
         }
         symbol = "bridge_iff_detached"
         caller = "?"
@@ -10480,7 +10456,6 @@ signatures {
         args = 1
         anchors {
             "bridge_attach_protocol"
-            "%s: %s"
             "%s: ifnet_attach_protocol(%s) failed, %d"
         }
         symbol = "bridge_attach_protocol"
@@ -10499,7 +10474,6 @@ signatures {
         args = 0
         anchors {
             "bridge_link_event"
-            "%s: %s event_code %u - %s"
         }
         symbol = "bridge_link_event"
         caller = "?"
@@ -10509,9 +10483,6 @@ signatures {
         anchors {
             "bridge_detach_protocol"
             "ifnet_detach_flowswitch_nexus"
-            "%s: bridge_set_tso failed %d"
-            "%s: ifnet_set_lladdr failed %d"
-            "%s: %s"
             "%s: ifnet_detach_protocol(%s) failed, %d"
         }
         symbol = "bridge_delete_member"
@@ -10538,7 +10509,6 @@ signatures {
         args = 0
         anchors {
             "%s (%d): ifnet_detach(%p) failed %d @%s:%d"
-            "%s: ifnet_set_flags failed %d"
         }
         symbol = "bridge_clone_destroy"
         caller = "?"
@@ -10559,13 +10529,6 @@ signatures {
         anchors {
             "etypef == ETHER_TYPE_FLAG_ARP"
             "%s: %s from %s count %d head 0x%llx.0x%llx tail 0x%llx.0x%llx"
-            "%s: %s not running passing along"
-            "%s: %s bridge_lookup_member_if failed"
-            "%s: %s.%dbrhf_bad_ether_type"
-            "%s: %s.%dbrhf_bad_ether_srchw_addr"
-            "%s:  multicast: %02x:%02x:%02x:%02x:%02x:%02x"
-            "%s: gso_tcp returned no packets"
-            "%s: %s packets %d bytes %d"
         }
         symbol = "bridge_input_list"
         caller = "?"
@@ -10574,9 +10537,6 @@ signatures {
         args = 0
         anchors {
             "bridge_filter_checksum"
-            "%s: %s(%s) bridge_get_ip_proto failed %d"
-            "%s: %s.%dbrhf_ip_bad_proto"
-            "%s: %s(%s) bridge_offload_checksum failed %d"
         }
         symbol = "bridge_filter_checksum_list"
         caller = "?"
@@ -10594,7 +10554,6 @@ signatures {
         args = 2
         anchors {
             "dst_if != NULL"
-            "%s: large non IP packet"
             "%s: %s (%s) append gso #segs %u bytes %u"
             "%s: %s (%s) append %d bytes op %d"
             "%s: %s (%s) bridge_transmit packets %u bytes %u error %d"
@@ -11418,7 +11377,6 @@ signatures {
         args = 0
         anchors {
             "dlil_attach_protocol"
-            "%s: %s is no longer attached"
         }
         symbol = "dlil_attach_protocol"
         caller = "?"
@@ -11623,7 +11581,6 @@ signatures {
             "ifvlan_release: bad signature @%s:%d"
             "ifvlan_release: retain count is 0 @%s:%d"
             "ifvlan_release"
-            "%s: %s"
         }
         symbol = "ifvlan_release"
         caller = "?"
@@ -11634,7 +11591,6 @@ signatures {
             "vlan_parent_release: signature is bad @%s:%d"
             "vlan_parent_release: retain count is 0 @%s:%d"
             "vlan_parent_release"
-            "%s: %s"
         }
         symbol = "vlan_parent_release"
         caller = "?"
@@ -11723,7 +11679,6 @@ signatures {
             "fakeif->iff_rx_pp == S_pp"
             "fakeif->iff_tx_pp == S_pp"
             "feth_free"
-            "%s: %s"
         }
         symbol = "feth_release"
         caller = "?"
@@ -11747,8 +11702,6 @@ signatures {
             "%s: multi-buflet not supported for split rx & tx pool"
             "%s: rx pp create failed %d"
             "%s: tx pp create failed %d"
-            "%s: register provider failed, error %d"
-            "%s: alloc_net_provider_instance failed, %d"
             "%s: register provider failed, error %d"
             "%s: alloc_net_provider_instance failed, %d"
             "%s: create_non_default_llinks failed, %d"
@@ -11818,7 +11771,6 @@ signatures {
             "clock_timebase.denom != 0"
             "feth_packet_has_expired"
             "feth_get_effective_expn_action"
-            "%s: %s"
             "%s: %s sent expiry notification on nexus port %u notif code %u"
             "%s: %s err=%d, nx_port_id: 0x%x"
             "%s: Packet has %llu usec until expiration"
@@ -11831,7 +11783,6 @@ signatures {
         args = 2
         anchors {
             "feth_tx_complete_error"
-            "%s: %s err=%d, nx_port_id: 0x%x"
         }
         symbol = "feth_tx_complete_error"
         caller = "?"
@@ -11858,7 +11809,6 @@ signatures {
         args = 0
         anchors {
             "feth_nx_sync_rx"
-            "%s: %s"
         }
         symbol = "feth_nx_sync_rx"
         caller = "?"
@@ -11867,7 +11817,6 @@ signatures {
         args = 1
         anchors {
             "feth_nx_tx_doorbell"
-            "%s: %s"
             "%s: %s: TX refill (sync) %d"
             "%s: %s: TX refilled (sync)"
             "%s: %s: schedule async refill"
@@ -11889,7 +11838,6 @@ signatures {
         args = 0
         anchors {
             "feth_nx_capab_config"
-            "%s: %s"
         }
         symbol = "feth_nx_capab_config"
         caller = "?"
@@ -11940,10 +11888,6 @@ signatures {
         anchors {
             "feth_nx_queue_tx_push"
             "%s: %s queue %p"
-            "%s: %s: detaching %s, channel connected %s"
-            "%s: peer %s: detaching %s, channel connected %s"
-            "%s: peer_fakeif is NULL"
-            "%s: peer_ifp is NULL"
         }
         symbol = "feth_nx_queue_tx_push"
         caller = "?"
@@ -11972,7 +11916,6 @@ signatures {
         args = 0
         anchors {
             "redirect_max_mtu"
-            "%s: rd is NULL\n"
         }
         symbol = "redirect_max_mtu"
         caller = "?"
@@ -11981,7 +11924,6 @@ signatures {
         args = 0
         anchors {
             "redirect_clear_delegate_locked"
-            "%s: failed to set mac addr for %s, error %d\n"
         }
         symbol = "redirect_clear_delegate_locked"
         caller = "?"
@@ -11991,7 +11933,6 @@ signatures {
         anchors {
             "rd->rd_doorbell_tcall == NULL"
             "%s: ifp is NULL\n"
-            "%s: rd is NULL\n"
         }
         symbol = "redirect_if_free"
         caller = "?"
@@ -12095,7 +12036,6 @@ signatures {
         args = 0
         anchors {
             "ifbond_release"
-            "%s: %s"
             "%s: %s: removing multicast"
         }
         symbol = "ifbond_release"
@@ -12123,8 +12063,6 @@ signatures {
         args = 0
         anchors {
             "ifbond_wait"
-            "%s: %s: %s msleep"
-            "%s: %s: %s woke up"
         }
         symbol = "ifbond_wait"
         caller = "?"
@@ -12151,7 +12089,6 @@ signatures {
         args = 0
         anchors {
             "bond_attach_protocol"
-            "%s: %s: ifnet_attach_protocol failed, %d"
         }
         symbol = "bond_attach_protocol"
         caller = "?"
@@ -12173,11 +12110,9 @@ signatures {
             "%s: dropping short LACP frame %d < %d"
             "%s: m_pullup LACPDU failed"
             "%s: m_pullup LA_MARKER failed"
-            "%s: %s"
             "%s: %s: (receive) generating LINK event"
             "%s: simulating link status changed event"
             "%s: System %x:%x:%x:%x:%x:%x Port 0x%x moved from %s to %s"
-            "%s: %s"
         }
         symbol = "bond_input"
         caller = "?"
@@ -12589,7 +12524,6 @@ signatures {
             "evtag != NULL"
             "eventhandler_deregister event_type=route_event"
             "eventhandler_invoke(\"route_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "route_event_callback"
         caller = "?"
@@ -12705,7 +12639,6 @@ signatures {
         args = 0
         anchors {
             "nstat_generic_provider_add_watcher"
-            "%s - nstat_client_source_add returned %d for provider type: %d"
         }
         symbol = "nstat_generic_provider_add_watcher"
         caller = "?"
@@ -12732,7 +12665,6 @@ signatures {
         args = 1
         anchors {
             "nstat_client_handle_query_request"
-            "%s - nstat_client_send_description() %d"
         }
         symbol = "nstat_client_send"
         caller = "?"
@@ -12750,7 +12682,6 @@ signatures {
         args = 0
         anchors {
             "nstat_client_cleanup_source"
-            "%s - nstat_client_send_removed() %d"
         }
         symbol = "nstat_client_cleanup_source"
         caller = "?"
@@ -12856,8 +12787,6 @@ signatures {
             "%s: unexpected IPv4 protocol %u from %s"
             "%s: mbuf_copydata(ip6_hdr) error %d"
             "%s: mbuf_copydata(ip6_frag) error %d"
-            "%s: mbuf_copydata(tcphdr) error %d"
-            "%s: mbuf_copydata(udphdr) error %d"
             "%s: unexpected IPv6 protocol %u from %s"
             "%s: unexpected protocol family %d from %s"
         }
@@ -13028,7 +12957,6 @@ signatures {
             "utun_register_control - ctl_register failed: %d\n"
             "utun_register_control - proto_register_plumber(PF_INET, IFNET_FAMILY_UTUN) failed: %d\n"
             "utun_register_control - proto_register_plumber(PF_INET6, IFNET_FAMILY_UTUN) failed: %d\n"
-            "%s: failed to register domain provider\n"
         }
         symbol = "utun_register_control"
         caller = "?"
@@ -13050,9 +12978,6 @@ signatures {
             "%s kern_nexus_ifattach ms device %d\n"
             "utun_flowswitch_attach - flowswitch is NULL\n"
             "utun_flowswitch_attach - unable to find flowswitch nexus\n"
-            "%s can't get %s provider, error %d\n"
-            "%s register %s provider failed, error %d\n"
-            "%s alloc_provider_instance %s failed, %d\n"
         }
         symbol = "utun_ctl_connect"
         caller = "?"
@@ -13091,7 +13016,6 @@ signatures {
         anchors {
             "utun_netif_sync_tx"
             "tx_offset >= UTUN_HEADER_SIZE(pcb)"
-            "%s: data path stopped for %s\n"
             "utun_netif_sync_tx %s: unknown ip version %u vhl %u tx_offset %u len %u header_size %zu\n"
             "utun_netif_sync_tx %s - mbuf_copyback(%zu) error %d\n"
             "utun_netif_sync_tx %s - mbuf_gethdr error %d\n"
@@ -13104,7 +13028,6 @@ signatures {
         args = 0
         anchors {
             "utun_netif_sync_rx"
-            "%s: data path stopped for %s\n"
             "utun_netif_sync_rx %s: legacy packet length too short for header %zu < %zu\n"
             "utun_netif_sync_rx %s: legacy packet length %zu > %u\n"
             "utun_netif_sync_rx %s: packet length too short for header %u < %zu\n"
@@ -13135,7 +13058,6 @@ signatures {
         anchors {
             "utun_ctl_send"
             "%s - unexpected short mbuf pkt len %d\n"
-            "%s: data path stopped for %s\n"
             "%s - ifnet_input failed: %d\n"
         }
         symbol = "utun_ctl_send"
@@ -13147,7 +13069,6 @@ signatures {
             "utun_ncd"
             "utun_enable_channel"
             "uuid_is_null(pcb->utun_kpipe_uuid)"
-            "%s pbufbool create failed, error %d\n"
             "%s: kern_nexus_controller_create failed: %d\n"
             "%s: kern_nexus_get_default_domain_provider failed: %d\n"
             "%s: kern_nexus_controller_register_provider failed: %d\n"
@@ -13168,7 +13089,6 @@ signatures {
         args = 0
         anchors {
             "utun_kpipe_sync_tx"
-            "%s: data path stopped for %s\n"
         }
         symbol = "utun_kpipe_sync_tx"
         caller = "?"
@@ -13180,12 +13100,10 @@ signatures {
             "tx_baddr != NULL"
             "mb_cnt <= avail"
             "mb_cnt == 0"
-            "%s: data path stopped for %s\n"
             "utun_kpipe_sync_rx %s: failed to allocate packet\n"
             "utun_kpipe_sync_rx %s: invalid length %zu header_size %zu\n"
             "utun_kpipe_sync_rx %s: unknown ip version %u vhl %u header_size %zu\n"
             "utun_kpipe_sync_rx: ifnet_enable_output returned error %d\n"
-            "utun_kpipe_sync_rx %s: failed to allocate packet\n"
         }
         symbol = "utun_kpipe_sync_rx"
         caller = "?"
@@ -13206,7 +13124,6 @@ signatures {
             "ipsec_register_control - ctl_register failed: %d\n"
             "ipsec_register_control - proto_register_plumber(PF_INET, IFNET_FAMILY_IPSEC) failed: %d\n"
             "ipsec_register_control - proto_register_plumber(PF_INET6, IFNET_FAMILY_IPSEC) failed: %d\n"
-            "%s: failed to register domain provider\n"
         }
         symbol = "ipsec_register_control"
         caller = "?"
@@ -13215,7 +13132,6 @@ signatures {
         args = 1
         anchors {
             "ipsec_inject_inbound_packet"
-            "%s: data path stopped for %s\n"
         }
         symbol = "ipsec_inject_inbound_packet"
         caller = "?"
@@ -13239,20 +13155,9 @@ signatures {
             "ipsec_ctl_connect - ifnet_attach failed: %d\n"
             "%s: %s failed to register kernel pipe nexus\n"
             "%s: %s pbufbool create failed, error %d\n"
-            "%s: kern_nexus_controller_create failed: %d\n"
-            "%s: kern_nexus_get_default_domain_provider failed: %d\n"
-            "%s: kern_nexus_controller_register_provider failed: %d\n"
             "%s: %s enabling wmm mode\n"
-            "%s pbufbool create failed, error %d\n"
-            "%s register provider failed, error %d\n"
-            "%s alloc_net_provider_instance failed, %d\n"
-            "%s: failed to create bridge provider and instance\n"
-            "%s kern_nexus_ifattach ms device %d\n"
             "ipsec_flowswitch_attach - flowswitch is NULL\n"
             "ipsec_flowswitch_attach - unable to find flowswitch nexus\n"
-            "%s can't get %s provider, error %d\n"
-            "%s register %s provider failed, error %d\n"
-            "%s alloc_provider_instance %s failed, %d\n"
         }
         symbol = "ipsec_ctl_connect"
         caller = "?"
@@ -13289,7 +13194,6 @@ signatures {
         args = 0
         anchors {
             "ipsec_kpipe_sync_tx"
-            "%s: data path stopped for %s\n"
         }
         symbol = "ipsec_kpipe_sync_tx"
         caller = "?"
@@ -13300,7 +13204,6 @@ signatures {
             "ring_idx <= pcb->ipsec_kpipe_count"
             "interface != NULL"
             "dph != 0"
-            "%s: data path stopped for %s\n"
             "%s: %s ring %s index %d no room in rx_ring\n"
             "%s: %s ring %s index %d bad netif_txring 1\n"
             "%s: %s ring %s index %d bad netif_txring 2\n"
@@ -13338,7 +13241,6 @@ signatures {
         anchors {
             "ipsec_netif_sync_tx"
             "ring_idx < IPSEC_IF_MAX_RING_COUNT"
-            "%s: data path stopped for %s\n"
             "ipsec_netif_sync_tx %s - failed policy check\n"
             "ipsec_netif_sync_tx %s - ipsec_output error %d\n"
             "ipsec_netif_sync_tx %s - mbuf_copyback(%zu) error %d\n"
@@ -13357,7 +13259,6 @@ signatures {
             "netif_ph != 0"
             "kpipe_buf != NULL"
             "netif_buf != NULL"
-            "%s: data path stopped for %s\n"
             "ipsec_netif_sync_rx %s: legacy decrypted packet length cannot hold IP %zu < %zu\n"
             "ipsec_netif_sync_rx %s: legacy unknown ip version %u\n"
             "ipsec_netif_sync_rx %s: failed to fragment IPv4 packet of length %zu (%d)\n"
@@ -13367,7 +13268,6 @@ signatures {
             "ipsec_transform_kpipe_pkt_to_netif_pkt %s: kpipe buffer length %u > pcb ipsec slot size %u"
             "ipsec_transform_kpipe_pkt_to_netif_pkt %s - bad packet length %u\n"
             "ipsec_transform_kpipe_pkt_to_netif_pkt %s - bad ip version %u\n"
-            "ipsec_transform_kpipe_pkt_to_netif_pkt %s - bad packet length %u\n"
             "ipsec_transform_kpipe_pkt_to_netif_pkt %s - netif buffer length %u too short\n"
             "ipsec_transform_kpipe_pkt_to_netif_pkt %s: wake packet flag is set\n"
         }
@@ -13378,7 +13278,6 @@ signatures {
         args = 2
         anchors {
             "ipsec_netif_tx_doorbell"
-            "%s: data path stopped for %s\n"
         }
         symbol = "ipsec_netif_tx_doorbell"
         caller = "?"
@@ -13398,7 +13297,6 @@ signatures {
         args = 0
         anchors {
             "ipsec_nexus_detach"
-            "%s: kern_nexus_ifdetach ms device failed %d\n"
         }
         symbol = "ipsec_nexus_detach"
         caller = "?"
@@ -13448,8 +13346,6 @@ signatures {
             "Only platform-signed binaries can open NECP sessions"
             "Process does not hold necessary entitlement to open NECP session"
             "necp_create_session"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Created NECP session, control unit %d\n"
         }
         symbol = "necp_session_open"
@@ -13472,13 +13368,6 @@ signatures {
             "RESULT - DROP <NO CLIENT / MULTICAST>"
             "%s: Invalid TLV length (%u)\n"
             "%s: %s(%d) does not hold the necessary entitlement to delegate network traffic for other processes by %s\n"
-            "%s: %s(%d) does not hold the necessary entitlement to delegate network traffic for other processes by %s\n"
-            "%s: %s(%d) does not hold the necessary entitlement to delegate network traffic for other processes by %s\n"
-            "%s: %s(%d) does not hold the necessary entitlement to delegate network traffic for other processes by %s\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d>\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d>\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d>\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d>\n"
             "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d>\n"
         }
         symbol = "necp_application_find_policy_match_internal"
@@ -13495,18 +13384,9 @@ signatures {
             "RESULT - DROP <MISSING CLIENT>"
             "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
             "%s: DATA-TRACE: Socket Policy - INP UPDATE - RESULT - CACHED <MATCHED>: %p (BoundInterface %d Proto %d) Policy %d Result %d Parameter %d\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
             "%s: DATA-TRACE: Socket Policy: <so %llx> (BoundInterface %d Proto %d) Dropping packet because agent is not active\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
             "%s: Marking socket in state %d as defunct\n"
             "%s: DATA-TRACE: Socket Policy: <so %llx> (BoundInterface %d Proto %d) Policy %d Skip %d Result %d Parameter %d Filter %d\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d>\n"
         }
         symbol = "necp_socket_find_policy_match"
         caller = "?"
@@ -13517,7 +13397,6 @@ signatures {
             "necp_mark_packet_from_socket"
             "START - MARK PACKET"
             "RESULT - MARK PACKET"
-            "%s: DATA-TRACE <%s %llx>: %s - <policy_id %d skip_policy_id %d> <cached policy_id %d skip_policy_id %d>\n"
             "%s: DATA-TRACE <%s %llx>: %s - <policy_id %d skip_policy_id %d> <cached policy_id %d skip_policy_id %d>\n"
         }
         symbol = "necp_mark_packet_from_socket"
@@ -13534,22 +13413,10 @@ signatures {
             "NECP Socket Policies:\n"
             "necp_kernel_ip_output_policies_dump_all"
             "NECP IP Output Policies:\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: \t%3d. Policy ID: %5d\tProcess: %10.10s\tOrder: %04d.%04d\tMask: %llx\tResult: %s\n\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: \tApp Bucket: %d\n\n"
-            "%s: \t%3d. Policy ID: %5d\tProcess: %10.10s\tOrder: %04d.%04d\tMask: %llx\tResult: %s\n\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s:  ID Bucket: %d\n\n"
             "%s: \t%3d. Policy ID: %5d\tProcess: %10.10s\tOrder: %04d.%04d.%d\tMask: %llx\tResult: %s\n\n"
-            "%s: %s\n"
         }
         symbol = "necp_policy_apply_all"
         caller = "?"
@@ -13563,16 +13430,7 @@ signatures {
             "Allocate route rule ID failed.\n"
             "necp_kernel_socket_policy_add"
             "Failed to find a free socket kernel policy ID.\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Added kernel policy: socket, id=%d, mask=%llx\n\n"
-            "%s: %s\n"
         }
         symbol = "necp_policy_apply"
         caller = "?"
@@ -13582,9 +13440,6 @@ signatures {
         anchors {
             "Failed to find a free service UUID.\n"
             "Allocate uuid ID failed.\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "necp_get_new_uuid_id"
         caller = "?"
@@ -13593,7 +13448,6 @@ signatures {
         args = 0
         anchors {
             "Failed to find a free aggregate route rule id.\n"
-            "%s: %s\n"
         }
         symbol = "necp_create_aggregate_route_rule"
         caller = "?"
@@ -13603,7 +13457,6 @@ signatures {
         anchors {
             "Failed to find a free IP kernel policy ID.\n"
             "necp_kernel_ip_output_policy_add"
-            "%s: %s\n"
             "%s: Added kernel policy: ip output, id=%d, mask=%llx\n\n"
         }
         symbol = "necp_kernel_ip_output_policy_add"
@@ -13646,7 +13499,6 @@ signatures {
         anchors {
             "necp_delete_session"
             "Deleted NECP session"
-            "%s: %s\n"
         }
         symbol = "necp_session_op_close"
         caller = "?"
@@ -13676,21 +13528,10 @@ signatures {
             "%s: Policy result length too large: %u\n"
             "%s: Failed to allocate a policy result buffer (size %d)\n"
             "%s: Failed to get policy result: %d\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Route rules length too large: %u\n"
             "%s: Failed to allocate a policy route rules array (size %d)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Conditions length too large: %u\n"
             "%s: Failed to allocate a policy conditions array (size %d)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "necp_session_add_policy"
         caller = "?"
@@ -13700,11 +13541,9 @@ signatures {
         anchors {
             "necp_get_tlv_at_offset buffer is NULL"
             "necp_get_tlv_at_offset tlv_value is NULL"
-            "%s: %s\n"
             "%s: necp_get_tlv_at_offset buffer_length is too small for TLV (%u < %lu)\n"
             "%s: necp_get_tlv_at_offset buffer_length is too small for TLV of length %u (%u < %lu)\n"
             "%s: necp_get_tlv_at_offset out_buffer_length is too small for TLV value (%u < %u)\n"
-            "%s: %s\n"
         }
         symbol = "necp_get_tlv_at_offset"
         caller = "?"
@@ -13752,8 +13591,6 @@ signatures {
             "Session does not hold the necessary entitlement to get Network Extension Policy information"
             "Gathering policies"
             "%s: necp_session_dump_all invalid output buffer (%zu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Failed to allocate tlv_buffer_pointers (%lu bytes)\n"
             "%s: Failed to allocate tlv_buffer_lengths (%lu bytes)\n"
             "%s: Policy: process: %s, result: %s\n"
@@ -13771,7 +13608,6 @@ signatures {
         anchors {
             "necp_get_new_domain_filter_id"
             "Failed to find a free filter ID.\n"
-            "%s: %s\n"
         }
         symbol = "necp_create_domain_filter"
         caller = "?"
@@ -13822,56 +13658,14 @@ signatures {
             "NECP_KERNEL_CONDITION_DELEGATE_IS_PLATFORM_BINARY"
             "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
             "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: (Application %d Real Application %d BoundInterface %d Proto %d) Filter %d\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: (Application %d Real Application %d BoundInterface %d Proto %d) Route Rule %d\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: (Application %d Real Application %d BoundInterface %d Proto %d) %s Netagent %d\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: (Application %d Real Application %d BoundInterface %d Proto %d) Remove Netagent %d\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: (Application %d Real Application %d BoundInterface %d Proto %d) flow divert %u\n"
-            "%s: DATA-TRACE <%s %llx>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
             "%s: DATA-TRACE: Socket Policy <so %llx>: MATCHED SKIP POLICY (Application %d Real Application %d BoundInterface %d Proto %d) set skip_policy_id %d\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
             "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
             "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value %s %s %s input %s %s %s>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s %llx>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
         }
         symbol = "necp_socket_find_policy_match_with_info_locked"
         caller = "?"
@@ -13905,18 +13699,8 @@ signatures {
             "RESULT - DROP - NO MATCH"
             "RESULT - DROP - MULTICAST"
             "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
             "%s: DATA-TRACE: Socket Policy - Send/Recv - RESULT - CACHED <MATCHED>: %p (BoundInterface %d Proto %d) Policy %d Skip %d Result %d Parameter %d\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE: Socket Policy: <so %llx> (BoundInterface %d Proto %d) Dropping packet because agent is not active\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
             "%s: DATA-TRACE: Socket Policy - Send/Recv: %p (BoundInterface %d Proto %d) Policy %d Result %d Parameter %d Allowed %d <filter_control_unit %d flow_divert_aggregate_unit %d>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
-            "%s: DATA-TRACE <%s %llx>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <pid=%d Application %d Real Application %d BoundInterface %d> <policy_id %d skip_policy_id %d result %d> <input ifindex %d> <allowed_to_receive %d><pf_tag %X pass_flags %X>\n"
         }
         symbol = "necp_socket_is_allowed_to_send_recv_internal"
         caller = "?"
@@ -13928,9 +13712,6 @@ signatures {
             "Couldn\\'t find client"
             "BB radio manager agent not found"
             "netagent_client_message failed"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "necp_client_assert_bb_radio_manager"
         caller = "?"
@@ -13951,10 +13732,6 @@ signatures {
             "NULL fp"
             "Could not find client structure for backgrounded client"
             "Not a client fd, ignore"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "necp_set_client_as_background"
         caller = "?"
@@ -13963,7 +13740,6 @@ signatures {
         args = 1
         anchors {
             "Client does not hold necessary entitlement to observe other NECP clients"
-            "%s: %s\n"
         }
         symbol = "necp_open"
         caller = "?"
@@ -13983,7 +13759,6 @@ signatures {
         anchors {
             "necp_client_remove_assertion"
             "Netagent uuid not previously asserted"
-            "%s: %s\n"
         }
         symbol = "necp_client_remove_assertion"
         caller = "?"
@@ -13999,22 +13774,8 @@ signatures {
             "Resolver tag address does not match"
             "Failed to validate resolve answer"
             "necp_client_trace_parsed_parameters"
-            "%s: Invalid TLV length (%u)\n"
-            "%s: %s\n"
             "%s: Resolver tag length too short: %u\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Resolver tag unknown sign type: %u\n"
-            "%s: %s\n"
             "%s: NECP_CLIENT_PARAMS_LOG <pid %d %s>: Parsing param - type %d length %d value <%llu (%llX)> %s\n\n"
             "%s: NECP_CLIENT_PARAMS_LOG <pid %d %s>: Parsing param - type %d length %d\n\n"
             "%s: NECP_CLIENT_PARAMS_LOG <pid %d %s>: Parsed params - valid_fields %X flags %X delegated_upid %llu local_addr %s remote_addr %s required_interface_index %u required_interface_type %d local_address_preference %d ip_protocol %d transport_protocol %d ethertype %d effective_pid %d effective_uuid %s uid %d persona_id %d traffic_class %d\n\n"
@@ -14045,7 +13806,6 @@ signatures {
         anchors {
             "necp_process_defunct_list"
             "%s: necp_update_client abort nexus error (%d) for pid %d %s\n"
-            "%s: necp_update_client abort nexus error (%d) for pid %d %s\n"
         }
         symbol = "necp_process_defunct_list"
         caller = "?"
@@ -14063,7 +13823,6 @@ signatures {
         args = 0
         anchors {
             "necp_destroy_client"
-            "%s: necp_client_remove unassert agent error (%d)\n"
             "%s: necp_client_remove unassert agent error (%d)\n"
         }
         symbol = "necp_destroy_client"
@@ -14083,7 +13842,6 @@ signatures {
         anchors {
             "No channel for kqfilter"
             "%s: bad filter request %d\n"
-            "%s: %s\n"
         }
         symbol = "necpop_kqfilter"
         caller = "?"
@@ -14103,7 +13861,6 @@ signatures {
             "necp_client_add, parent/child remote address mismatch"
             "necp_client_add, parent/child local port mismatch"
             "necp_client_add, parent/child remote port mismatch"
-            "%s: %s\n"
             "%s: necp_client_add parameters copyin error (%d)\n"
             "%s: NECP_CLIENT_LOG <pid %d %s>: Adding client\n\n"
             "%s: necp_client_add client_id copyout error (%d)\n"
@@ -14114,19 +13871,8 @@ signatures {
             "%s: necp_client_add listener invalid address family (%d)\n"
             "%s: necp_client_add netns_reserve_ephemeral error (%d)\n"
             "%s: necp_client_add netns_reserve error (%d)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: necp_client_add, flow demux pattern not supported for %d protocol\n"
-            "%s: %s\n"
             "%s: necp_client_add, flow demux pattern not supported for %d family\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "necp_client_add"
         caller = "?"
@@ -14135,7 +13881,6 @@ signatures {
         args = 0
         anchors {
             "necp_client_update_local_port_parameters"
-            "%s: Invalid TLV length (%u)\n"
         }
         symbol = "necp_client_update_local_port_parameters"
         caller = "?"
@@ -14152,7 +13897,6 @@ signatures {
         args = 0
         anchors {
             "necp_find_conn_netstat_data"
-            "%s: Invalid TLV length (%u)\n"
         }
         symbol = "necp_find_conn_netstat_data"
         caller = "?"
@@ -14162,7 +13906,6 @@ signatures {
         anchors {
             "necp_client_claim cannot claim from flow UUID"
             "%s: necp_client_claim copyin client_id error (%d)\n"
-            "%s: %s\n"
             "%s: NECP_CLIENT_LOG <pid %d %s>: Claiming client\n\n"
         }
         symbol = "necp_client_claim"
@@ -14176,7 +13919,6 @@ signatures {
             "%s: necp_client_remove flow_ifnet_stats copyin error (%d)\n"
             "%s: necp_client_remove unexpected parameters length (%zu)\n"
             "%s: NECP_CLIENT_LOG <pid %d %s>: Removing client\n\n"
-            "%s: %s\n"
             "%s: necp_client_remove invalid client_id (%d)\n"
         }
         symbol = "necp_client_remove"
@@ -14195,7 +13937,6 @@ signatures {
         args = 0
         anchors {
             "Client does not hold necessary entitlement to list other NECP clients"
-            "%s: %s\n"
             "%s: necp_client_list buffer copyout error (%d)\n"
             "%s: necp_client_list client count copyout error (%d)\n"
         }
@@ -14210,13 +13951,10 @@ signatures {
             "%s: necp_client_add_flow invalid buffer (length %zu)\n"
             "%s: necp_client_add_flow copyin client_id error (%d)\n"
             "%s: necp_client_add_flow copyin default_add_request error (%d)\n"
-            "%s: necp_client_add_flow copyin default_add_request error (%d)\n"
             "%s: necp_client_add_flow process not found for pid %d error (%d)\n"
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: adding flow\n\n"
-            "%s: %s\n"
             "%s: netagent_client_message error (%d)\n"
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: Initializing stats\n\n"
-            "%s: netagent_client_message error (%d)\n"
             "%s: necp_client_add_flow copyout add_request error (%d)\n"
             "%s: Add flow error (%d)\n"
         }
@@ -14243,7 +13981,6 @@ signatures {
             "necp_stats_initialize"
             "necp_find_netstat_initial_properties"
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: Initialized stats <error %d>\n\n"
-            "%s: Invalid TLV length (%u)\n"
         }
         symbol = "necp_stats_initialize"
         caller = "?"
@@ -14252,7 +13989,6 @@ signatures {
         args = 0
         anchors {
             "necp_find_netstat_data"
-            "%s: Invalid TLV length (%u)\n"
         }
         symbol = "necp_find_netstat_data"
         caller = "?"
@@ -14263,8 +13999,6 @@ signatures {
             "necp_client_remove_flow"
             "%s: necp_client_remove_flow invalid client_id (length %zu)\n"
             "%s: necp_client_remove_flow copyin client_id error (%d)\n"
-            "%s: necp_client_remove flow_ifnet_stats copyin error (%d)\n"
-            "%s: necp_client_remove unexpected parameters length (%zu)\n"
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: removing flow\n\n"
             "%s: Remove flow error (%d)\n"
         }
@@ -14276,12 +14010,9 @@ signatures {
         anchors {
             "necp_client_agent_action invalid parameters"
             "Invalid TLV value"
-            "%s: %s\n"
             "%s: necp_client_agent_action copyin client_id error (%d)\n"
             "%s: necp_client_agent_action invalid buffer size (>%u)\n"
             "%s: necp_client_agent_action parameters copyin error (%d)\n"
-            "%s: Invalid TLV length (%u)\n"
-            "%s: %s\n"
         }
         symbol = "necp_client_agent_action"
         caller = "?"
@@ -14290,7 +14021,6 @@ signatures {
         args = 0
         anchors {
             "necp_client_copy_interface bad input"
-            "%s: %s\n"
             "%s: necp_client_copy_interface copyin interface_index error (%d)\n"
             "%s: necp_client_copy_interface bad interface_index (%d)\n"
             "%s: necp_client_copy_interface copyout error (%d)\n"
@@ -14304,14 +14034,11 @@ signatures {
             "necp_client_get_interface_address bad input"
             "necp_client_get_interface_address no matching interface found"
             "necp_client_get_interface_address route lookup failed"
-            "%s: %s\n"
             "%s: necp_client_get_interface_address copyin interface_index error (%d)\n"
             "%s: necp_client_get_interface_address bad interface_index (%d)\n"
             "%s: necp_client_get_interface_address copyin address error (%d)\n"
             "%s: necp_client_get_interface_address invalid address family (%u)\n"
             "%s: necp_client_get_interface_address invalid address length (%u)\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: necp_client_get_interface_address local address selection failed (%d)\n"
             "%s: necp_client_get_interface_address local address too long for buffer (%u)\n"
             "%s: necp_client_get_interface_address copyout error (%d)\n"
@@ -14333,7 +14060,6 @@ signatures {
         args = 0
         anchors {
             "necp_client_copy_route_statistics bad input"
-            "%s: %s\n"
             "%s: necp_client_copy_route_statistics copyin client_id error (%d)\n"
             "%s: necp_client_copy_route_statistics copyout error (%d)\n"
         }
@@ -14347,9 +14073,6 @@ signatures {
             "Client id invalid, cannot copy client update"
             "Buffer invalid, cannot copy client update"
             "fd_data->update_count > 0"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Copy client update copyout client id error (%d)\n"
             "%s: Buffer size cannot hold update (%zu < %zu)\n"
             "%s: Copy client update copyout error (%d)\n"
@@ -14361,7 +14084,6 @@ signatures {
         args = 0
         anchors {
             "Process does not hold the necessary entitlement to sign resolver answers"
-            "%s: %s\n"
             "%s: necp_client_sign allocate signable %zu failed\n"
             "%s: necp_client_sign copyin signable error (%d)\n"
             "%s: necp_client_sign unknown signable type (%u)\n"
@@ -14375,7 +14097,6 @@ signatures {
         args = 0
         anchors {
             "Process does not hold the necessary entitlement to directly validate resolver answers"
-            "%s: %s\n"
             "%s: necp_client_validate allocate struct %zu failed\n"
             "%s: necp_client_validate copyin error (%d)\n"
         }
@@ -14386,7 +14107,6 @@ signatures {
         args = 0
         anchors {
             "necp_client_get_signed_client_id bad input"
-            "%s: %s\n"
             "%s: necp_client_get_signed_client_id copyin request_type error (%d)\n"
             "%s: necp_client_get_signed_client_id bad request_type (%d)\n"
             "%s: necp_client_get_signed_client_id unexpected tag size %zu\n"
@@ -14400,8 +14120,6 @@ signatures {
         anchors {
             "necp_client_set_signed_client_id client lacks the necessary entitlement"
             "necp_client_set_signed_client_id bad input"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: necp_client_set_signed_client_id copyin request_type error (%d)\n"
             "%s: necp_client_set_signed_client_id bad request_type (%d)\n"
             "%s: necp_client_set_signed_client_id copyin request error (%d)\n"
@@ -14415,7 +14133,6 @@ signatures {
         anchors {
             "Failed to get socket attribute"
             "%s: Failed to allocate a socket attribute buffer (size %zu)\n"
-            "%s: %s\n"
         }
         symbol = "necp_set_socket_attribute"
         caller = "?"
@@ -14434,10 +14151,7 @@ signatures {
         anchors {
             "Cannot register agent on NULL session"
             "Cannot register NULL agent"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Register message size could not be read, data_size %zu\n"
-            "%s: %s\n"
         }
         symbol = "netagent_register"
         caller = "?"
@@ -14448,7 +14162,6 @@ signatures {
             "netagent_unregister"
             "Cannot unregister NULL session"
             "FlowSwitch"
-            "%s: %s\n"
         }
         symbol = "fsw_netagent_register"
         caller = "?"
@@ -14458,7 +14171,6 @@ signatures {
         anchors {
             "netagent_post_updated_interfaces"
             "Interface event with no associated agent"
-            "%s: %s\n"
         }
         symbol = "netagent_post_updated_interfaces"
         caller = "?"
@@ -14468,7 +14180,6 @@ signatures {
         anchors {
             "netagent_ioctl"
             "Client does not hold the necessary entitlement to get netagent information"
-            "%s: %s\n"
         }
         symbol = "netagent_ioctl"
         caller = "?"
@@ -14478,7 +14189,6 @@ signatures {
         anchors {
             "netagent_get_flags"
             "Flags requested for invalid netagent"
-            "%s: %s\n"
         }
         symbol = "netagent_get_flags"
         caller = "?"
@@ -14488,7 +14198,6 @@ signatures {
         anchors {
             "netagent_set_flags"
             "Attempt to set flags for invalid netagent"
-            "%s: %s\n"
         }
         symbol = "netagent_set_flags"
         caller = "?"
@@ -14498,7 +14207,6 @@ signatures {
         anchors {
             "netagent_get_generation"
             "Generation requested for invalid netagent"
-            "%s: %s\n"
         }
         symbol = "netagent_get_generation"
         caller = "?"
@@ -14508,7 +14216,6 @@ signatures {
         anchors {
             "Type requested for invalid netagent"
             "%s: Invalid arguments for netagent_get_agent_domain_and_type %p %p\n"
-            "%s: %s\n"
         }
         symbol = "netagent_get_agent_domain_and_type"
         caller = "?"
@@ -14519,10 +14226,6 @@ signatures {
             "Requested netagent for kernel trigger could not be found"
             "Requested netagent for kernel trigger is not kernel activated"
             "Requested netagent for kernel trigger is already active"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Triggered netagent from kernel (error %d)\n"
             "%s: Triggered netagent from kernel (error %d)\n"
         }
         symbol = "netagent_kernel_trigger"
@@ -14542,18 +14245,10 @@ signatures {
             "netagent_send_group_message"
             "netagent_send_client_message"
             "%s: Client netagent message type (%d) is invalid\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Send message %d for client (error %d)\n"
             "%s: Send message %d for client (error %d)\n"
             "%s: Triggered network agent %s, error = %d\n"
             "%s: Failed to send client message %d on control unit %d\n"
             "%s: Failed to send client group message %d on control unit %d\n"
-            "%s: Failed to send client message %d on control unit %d\n"
         }
         symbol = "netagent_client_message_with_params"
         caller = "?"
@@ -14563,7 +14258,6 @@ signatures {
         anchors {
             "netagent_use"
             "netagent_assert: Requested netagent UUID is not registered"
-            "%s: %s\n"
         }
         symbol = "netagent_use"
         caller = "?"
@@ -14573,10 +14267,6 @@ signatures {
         anchors {
             "Network agent for request UUID could not be found"
             "Network agent does not have any tokens"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Provided user buffer is too small (%u < %u)\n"
-            "%s: Copied token content (error %d)\n"
             "%s: Copied token content (error %d)\n"
         }
         symbol = "netagent_acquire_token"
@@ -14590,14 +14280,8 @@ signatures {
             "Requested netagent UUID is not registered"
             "Requested netagent UUID is not eligible for triggering"
             "Requested netagent UUID is already active"
-            "%s: %s\n"
             "%s: Incorrect length (got %zu, expected %lu)\n"
             "%s: copyin error (%d)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Triggered netagent (error %d)\n"
             "%s: Triggered netagent (error %d)\n"
         }
         symbol = "netagent_trigger"
@@ -14610,12 +14294,8 @@ signatures {
             "NETAGENT_MESSAGE_TYPE_GET no longer supported"
             "NETAGENT_MESSAGE_TYPE_ASSERT no longer supported"
             "NETAGENT_MESSAGE_TYPE_UNASSERT no longer supported"
-            "%s: %s\n"
             "%s: Got a bad packet, length (%lu) < sizeof header (%lu)\n"
             "%s: mbuf_copydata failed for the header: %d\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Received unknown message type %d\n"
         }
         symbol = "netagent_ctl_send"
@@ -14625,7 +14305,6 @@ signatures {
         args = 0
         anchors {
             "netagent_send_success_response"
-            "%s: %s\n"
         }
         symbol = "netagent_send_success_response"
         caller = "?"
@@ -14634,7 +14313,6 @@ signatures {
         args = 0
         anchors {
             "netagent_send_error_response"
-            "%s: %s\n"
         }
         symbol = "netagent_send_error_response"
         caller = "?"
@@ -14658,51 +14336,13 @@ signatures {
             "Session cannot add more tokens"
             "netagent_handle_flush_tokens_setopt"
             "netagent_handle_reset_client_error_setopt"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Register message size too small for agent: (%zu < %zu)\n"
-            "%s: Register message size could not be read, data_size %zu\n"
             "%s: Mismatch between data size and payload length (%lu != %zu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Update message size too small for agent: (%zu < %zu)\n"
             "%s: Update message size (%zu > %u) too large\n"
-            "%s: Mismatch between data size and payload length (%lu != %zu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Failed to allocate assign message (%lu bytes)\n"
-            "%s: Client assignment failed: %d\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Failed to allocate group assign message (%lu bytes)\n"
             "%s: Client group assignment failed: %d\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Payload length is invalid (%lu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Token length is invalid (%lu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Buffer length is invalid (%lu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "netagent_ctl_setopt"
         caller = "?"
@@ -14713,20 +14353,6 @@ signatures {
             "Request to get use count"
             "Request to get token count"
             "Request to get token low water mark"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Buffer length is invalid (%lu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Buffer length is invalid (%lu)\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: Buffer length is invalid (%lu)\n"
-            "%s: %s\n"
         }
         symbol = "netagent_ctl_getopt"
         caller = "?"
@@ -14736,7 +14362,6 @@ signatures {
         anchors {
             "netagent_unregister_session_wrapper"
             "Unregistered agent"
-            "%s: %s\n"
         }
         symbol = "netagent_unregister_session_wrapper"
         caller = "?"
@@ -14748,10 +14373,6 @@ signatures {
             "Basic agent parameters do not match, cannot update"
             "Updated agent (no changes)"
             "Updated agent"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
-            "%s: %s\n"
         }
         symbol = "netagent_handle_update_inner"
         caller = "?"
@@ -15823,7 +15444,6 @@ signatures {
         args = 1
         anchors {
             "pktap_clone_destroy"
-            "%s:%d %s\n"
         }
         symbol = "pktap_clone_destroy"
         caller = "?"
@@ -15840,7 +15460,6 @@ signatures {
         args = 1
         anchors {
             "pktap_if_output"
-            "%s:%d %s\n"
         }
         symbol = "pktap_if_output"
         caller = "?"
@@ -15849,7 +15468,6 @@ signatures {
         args = 0
         anchors {
             "pktap_demux"
-            "%s:%d %s\n"
         }
         symbol = "pktap_demux"
         caller = "?"
@@ -15867,7 +15485,6 @@ signatures {
         args = 0
         anchors {
             "pktap_del_proto"
-            "%s:%d %s pf %u\n"
         }
         symbol = "pktap_del_proto"
         caller = "?"
@@ -15877,7 +15494,6 @@ signatures {
         anchors {
             "%s: PKTP_CMD_FILTER_GET ifd_len %llu too small - error %d\n"
             "%s: PKTP_CMD_FILTER_GET copyout - error %d\n"
-            "%s:%d %s\n"
         }
         symbol = "pktap_getdrvspec"
         caller = "?"
@@ -15887,7 +15503,6 @@ signatures {
         anchors {
             "%s: PKTP_CMD_FILTER_SET bad ifd_len %llu - error %d\n"
             "%s: copyin - error %d\n"
-            "%s:%d %s\n"
         }
         symbol = "pktap_setdrvspec"
         caller = "?"
@@ -15896,7 +15511,6 @@ signatures {
         args = 0
         anchors {
             "pktap_detach"
-            "%s:%d %s\n"
         }
         symbol = "pktap_detach"
         caller = "?"
@@ -15914,7 +15528,6 @@ signatures {
         args = 0
         anchors {
             "pktap_output"
-            "%s:%d ifp %s proto %u pre %u post %u\n"
         }
         symbol = "pktap_output"
         caller = "?"
@@ -16647,7 +16260,6 @@ signatures {
             "entitlement restricted port %u for protocol %u via %s cannot be used by kernel"
             "entitlement restricted port %u for protocol %u via %s cannot be used by process %s:%u -- IOTaskHasEntitlement(%s) failed"
             "entitlement restricted port %u for protocol %u via %s can be used by process %s:%u"
-            "port %u for protocol %u via %s can be used by process %s:%u"
         }
         symbol = "current_task_can_use_restricted_in_port"
         caller = "?"
@@ -17099,7 +16711,6 @@ signatures {
             "igmp_domifdetach"
             "%s: igmp_ifinfo not found for ifp %p(%s) @%s:%d"
             "igi_delete"
-            "%s: called for ifp %s\n"
         }
         symbol = "igmp_domifdetach"
         caller = "?"
@@ -17181,9 +16792,7 @@ signatures {
             "%s: ignore v3 query in v%d mode on ifp %s\n"
             "%s: process v3 general query on ifp %s\n"
             "%s: GS query throttled.\n"
-            "%s: process v3 query on ifp %s\n"
             "%s: v3 general query response scheduled in T+%d seconds on ifp %s\n"
-            "%s: schedule response to SG query\n"
         }
         symbol = "igmp_input_v3_query"
         caller = "?"
@@ -17215,10 +16824,6 @@ signatures {
             "igmp_v3_dispatch_general_query"
             "igi == inm->inm_igi"
             "%s: transition from v%d->v%d on %s\n"
-            "%s: transition from v%d->v%d on %s\n"
-            "%s: transition from v%d->v%d on %s\n"
-            "%s: transition from v%d->v%d on %s\n"
-            "%s: outbound queue full on %s\n"
         }
         symbol = "igmp_timeout"
         caller = "?"
@@ -17230,13 +16835,8 @@ signatures {
             "%s: m_adj(m, -ig)\n"
             "%s: outbound queue full on %s\n"
             "%s: m_append() failed\n"
-            "%s: m_append() failed\n"
-            "%s: outbound queue full on %s\n"
-            "%s: m_append() failed\n"
             "%s: m_append() failed"
             "%s: m_get*() failed"
-            "%s: m_append() failed\n"
-            "%s: m_append() failed\n"
         }
         symbol = "igmp_v3_enqueue_group_record"
         caller = "?"
@@ -17868,8 +17468,6 @@ signatures {
         args = 0
         anchors {
             "in_ifadownkill"
-            "%s: deleting route to %s->%s->%s, flags=0x%x\n"
-            "%s: error deleting route to %s->%s->%s, flags=0x%x, err=%d\n"
         }
         symbol = "in_ifadownkill"
         caller = "?"
@@ -18021,7 +17619,6 @@ signatures {
         anchors {
             "dummynet_event"
             "eventhandler_invoke(\"dummynet_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "dummynet_event_callback"
         caller = "?"
@@ -18300,7 +17897,6 @@ signatures {
             "rfc5961 rcvacktoomuch"
             "rfc5961 bad ACK"
             "INPCB_STATE_DEAD"
-            "%s 5-tuple does not match: %u:%u %u:%u\n"
             "%s 5-tuple does not match: %u:%u %u:%u\n"
             "17 {curProtocol: 100, prevProtocol: 80, localPort: %hu, remotePort: %hu, tcpSeq: %u, tcpAck: %u, tcpLen: %hu, tcpFlags: 0x%02x, pid: %hu, logSeqn: %hhu}"
             "TE_SENDIPECT flag is set but TCP_L4S_ENABLED is not"
@@ -18767,7 +18363,6 @@ signatures {
         args = 1
         anchors {
             "NULL pointer passed to ip64_ecn_ingress @%s:%d"
-            "IPv4 ipsec: size exceeds limit: leave ip_len as is (invalid packet)\n"
         }
         symbol = "ipsec64_encapsulate"
         caller = "?"
@@ -18961,7 +18556,6 @@ signatures {
         args = 0
         anchors {
             "mptcp_sched_create_subflows"
-            "%s - %lx: not a good time for subflows, state %u flags %#x"
         }
         symbol = "mptcp_sched_create_subflows"
         caller = "?"
@@ -19134,7 +18728,6 @@ signatures {
             "%s - %lx: rxt %u sb_cc %u wifi quality %d\n"
             "%s - %lx: Found Wi-Fi: %u Found Cellular %u"
             "%s - %lx: removing wifi subflow\n"
-            "%s - %lx: rxt %u sb_cc %u wifi quality %d\n"
         }
         symbol = "mptcp_check_subflows_and_remove"
         caller = "?"
@@ -19181,7 +18774,6 @@ signatures {
         anchors {
             "(mpts->mpts_flags & (MPTSF_CONNECTING | MPTSF_CONNECTED)) == MPTSF_CONNECTING"
             "%s - %lx: ifindex %u dst %s:%d pended %u\n"
-            "%s - %lx: Couldn\\'t find proc for pid %u\n"
             "%s - %lx: connectx failed with error %d ifscope %u\n"
         }
         symbol = "mptcp_subflow_soconnectx"
@@ -19509,15 +19101,6 @@ signatures {
             "%s - %lx: not enough space in TCP option, optlen: %u, mmco_len: %d\n"
             "%s: dssoptlen %d optlen %d \n"
             "%s: nosp %d len %d opt %d %d %d\n"
-            "%s: dssoptlen %d optlen %d \n"
-            "%s: nosp %d len %d opt %d %d %d\n"
-            "%s: dssoptlen %d optlen %d \n"
-            "%s: dssoptlen %d optlen %d \n"
-            "%s: dssoptlen %d optlen %d \n"
-            "%s: nosp %d len %d opt %d %d %d\n"
-            "%s: dssoptlen %d optlen %d \n"
-            "%s: nosp %d len %d opt %d %d %d\n"
-            "%s: dssoptlen %d optlen %d \n"
         }
         symbol = "mptcp_setup_opts"
         caller = "?"
@@ -19553,13 +19136,6 @@ signatures {
             "local version: %d > peer version %d"
             "%s - %lx: SYN_ACK: unexpected optlen = %u mp option = %lu\n"
             "%s - %lx: SYN_ACK error = %d \n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
-            "%s - %lx: bad len = %d dss: %x\n"
             "%s - %lx: bad len = %d dss: %x\n"
         }
         symbol = "tcp_do_mptcp_options"
@@ -19681,7 +19257,6 @@ signatures {
             "ah4_finaldst: parameter mbuf wrong (not pulled up)\n"
             "ah4_finaldst: wrong optlen %d\n"
             "ip_finaldst: invalid IP option (code=%02x len=%02x)\n"
-            "ip_finaldst: invalid IP option (code=%02x len=%02x)\n"
         }
         symbol = "ah4_output"
         caller = "?"
@@ -19758,12 +19333,10 @@ signatures {
             "inproper ivlen in IPv4 ESP input: %s %s\n"
             "replay packet in IPv4 ESP input: seq(%u) idx(%u) %s %s\n"
             "invalid ESP packet length %u, missing ICV\n"
-            "invalid ESP packet length %u, missing ICV\n"
             "internal error: AH_MAXSUMSIZE must be larger than %u\n"
             "auth fail in IPv4 ESP input: %s %s\n"
             "cc_cmp fail in IPv4 ESP input: %s %s\n"
             "IPv4 ESP input: packet too short\n"
-            "IPv4 ESP input: can't pullup in esp4_input\n"
             "decrypt fail in IPv4 ESP input: %s\n"
             "esp4 packet decryption ICV failure: %s\n"
             "bad pad length in IPv4 ESP input: %s %s\n"
@@ -19772,7 +19345,6 @@ signatures {
             "no input interface for ipsec wake packet\n"
             "IPv4 ESP input: can't pullup UDP header in esp4_input\n"
             "IPv4 ESP input: decrypted packet too short %d < %u\n"
-            "no input interface for ipsec wake packet\n"
         }
         symbol = "esp4_input_extended"
         caller = "?"
@@ -19791,18 +19363,12 @@ signatures {
             "IPv6 ESP input: unsupported encryption algorithm for spi %u (0x%08x)\n"
             "improper ivlen in IPv6 ESP input: %s %s\n"
             "replay packet in IPv6 ESP input: seq(%u) idx(%u) %s %s\n"
-            "invalid ESP packet length %u, missing ICV\n"
-            "invalid ESP packet length %u, missing ICV\n"
-            "internal error: AH_MAXSUMSIZE must be larger than %u\n"
-            "auth fail in IPv6 ESP input: %s %s\n"
             "auth fail in IPv6 ESP input: %s %s\n"
             "IPv6 ESP input: packet too short\n"
             "decrypt fail in IPv6 ESP input: %s\n"
             "esp6 packet decryption ICV failure: %s\n"
             "bad pad length in IPv6 ESP input: %s %s\n"
             "IPv6 ESP input: invalid udp encapsulated ESP packet length\n"
-            "no input interface for ipsec wake packet\n"
-            "no input interface for ipsec wake packet\n"
         }
         symbol = "esp6_input_extended"
         caller = "?"
@@ -19880,14 +19446,11 @@ signatures {
             "esp_output: unsupported algorithm: SPI=%u\n"
             "esp%d_output: md is not in chain\n"
             "IPv4 ESP output: size exceeds limit\n"
-            "replay counter overflowed. %s\n"
             "esp%d_output: can't alloc mbuf"
-            "IPv4 ESP output: size exceeds limit\n"
             "packet encryption failure\n"
             "packet encryption ICV failure\n"
             "ESP checksum generation failure\n"
             "can't alloc mbuf in esp%d_output"
-            "IPv4 ESP output: size exceeds limit\n"
             "18 {curProtocol: 80, spi: 0x%X, espSeq: %u, PayloadProtocol: 100, localPort: %hu, remotePort: %hu, tcpSeq: %u, tcpAck: %u, tcpLen: %hu, tcpFlags: 0x%02x}"
         }
         symbol = "esp_output"
@@ -20021,8 +19584,6 @@ signatures {
             "fixed system default policy: %d->%d\n"
             "ipsec4_getpolicybysock: Invalid policy for PCB %d\n"
             "ipsec4_getpolicybysock: Illegal policy for non-priviliged defined %d\n"
-            "fixed system default policy: %d->%d\n"
-            "ipsec4_getpolicybysock: Invalid policy for PCB %d\n"
         }
         symbol = "ipsec4_getpolicybysock"
         caller = "?"
@@ -20050,10 +19611,8 @@ signatures {
             "ipsec6_getpolicybysock: NULL pointer was passed. @%s:%d"
             "ipsec6_getpolicybysock: illegal direction. @%s:%d"
             "ipsec6_getpolicybysock: currsp is NULL. @%s:%d"
-            "fixed system default policy: %d->%d\n"
             "ipsec6_getpolicybysock: Invalid policy for PCB %d\n"
             "ipsec6_getpolicybysock: Illegal policy for non-priviliged defined %d\n"
-            "fixed system default policy: %d->%d\n"
             "ipsec6_policybysock: Invalid policy for PCB %d\n"
         }
         symbol = "ipsec6_getpolicybysock"
@@ -20063,7 +19622,6 @@ signatures {
         args = 0
         anchors {
             "ipsec6_getpolicybyaddr: NULL pointer was passed. @%s:%d"
-            "fixed system default policy: %d->%d\n"
         }
         symbol = "ipsec6_getpolicybyaddr"
         caller = "?"
@@ -20288,7 +19846,6 @@ signatures {
             "pp == NULL || (pp->pr_flags & (PR_INITIALIZED | PR_ATTACHED)) == PR_ATTACHED"
             "/AppleInternal/Library/BuildRoots/d3a62b52-2ef5-11ef-9ecd-e2437461156c/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/icmp6.c"
             "mld_init"
-            "%s: initializing\n"
         }
         symbol = "icmp6_init"
         caller = "?"
@@ -20466,9 +20023,6 @@ signatures {
             "%s: in6_setscope failed\n"
             "%s - %s ifp %s ia6_flags 0x%x ifaupflags 0x%x\n"
             "%s: addmulti failed for %s on %s (errno=%d)\n"
-            "%s: addmulti failed for %s on %s (errno=%d)\n"
-            "%s: addmulti failed for %s on %s (errno=%d)\n"
-            "%s: addmulti failed for %s on %s (errno=%d)\n"
         }
         symbol = "in6_ifaupdate_aux"
         caller = "?"
@@ -20614,7 +20168,6 @@ signatures {
         anchors {
             "llcgasr != NULL"
             "in6_ifattach_llcgareq"
-            "%s: %s could not attach link-local address.\n"
         }
         symbol = "in6_ifattach_llcgareq"
         caller = "?"
@@ -20658,8 +20211,6 @@ signatures {
             "ip6_input"
             "!ours || (m->m_pkthdr.pkt_flags & PKTF_PROXY_DST)"
             "rin6.ro_rt != NULL"
-            "%s: weak ES interface match to %s for packet from %s to %s proto %u received via %s"
-            "%s: no interface match for packet from %s to %s proto %u received via %s"
         }
         symbol = "ip6_input"
         caller = "?"
@@ -20777,32 +20328,10 @@ signatures {
             "%s:%d NEXT ia %s ifp1 %s IN6_IFF_OPTIMISTIC\n"
             "%s:%d BREAK r %s ia %s ifp1 %s\n"
             "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
             "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
             "%s:%d Address list seems to have changed. Restarting source address selection.\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d REPLACE r %s ia %s ifp1 %s\n"
-            "%s:%d NEXTSRC r %s ia %s ifp1 %s\n"
             "%s:%d NEXT ia %s ifp1 %s IFEF_EXPENSIVE\n"
             "%s:%d NEXT ia %s ifp1 %s last resort\n"
-            "%s:%d NEXT ia %s ifp1 %s IFEF_EXPENSIVE\n"
             "%s:%d NEXT ia %s ifp1 %s best_scope %d new_scope %d dst_scope %d\n"
             "%s out src %s dst %s dst_scope %d best_scope %d"
         }
@@ -21069,7 +20598,6 @@ signatures {
         args = 1
         anchors {
             "in6_validate"
-            "%s: route to %s->%s->%s validated, flags=0x%x\n"
         }
         symbol = "in6_validate"
         caller = "?"
@@ -21078,7 +20606,6 @@ signatures {
         args = 0
         anchors {
             "in6_rtqdrain"
-            "%s: draining routes\n"
         }
         symbol = "in6_rtqdrain"
         caller = "?"
@@ -21095,9 +20622,6 @@ signatures {
         args = 0
         anchors {
             "in6_rmx.c"
-            "%s: deleting route to %s->%s->%s, flags=0x%x, draining=%d\n"
-            "%s: error deleting route to %s->%s->%s, flags=0x%x, err=%d\n"
-            "%s: route to %s->%s->%s, flags=0x%x, adjusted expire=T+%u (was T+%u)\n"
         }
         symbol = "in6_rtqkill"
         caller = "?"
@@ -21106,7 +20630,6 @@ signatures {
         args = 0
         anchors {
             "in6_deleteroute"
-            "%s: route to %s->%s->%s deleted, flags=0x%x\n"
         }
         symbol = "in6_deleteroute"
         caller = "?"
@@ -21115,7 +20638,6 @@ signatures {
         args = 0
         anchors {
             "mld_domifattach"
-            "%s: called for ifp %s\n"
         }
         symbol = "mld_domifattach"
         caller = "?"
@@ -21136,7 +20658,6 @@ signatures {
             "mld_domifdetach"
             "%s: mld_ifinfo not found for ifp %p(%s) @%s:%d"
             "mli_delete"
-            "%s: called for ifp %s\n"
         }
         symbol = "mld_domifdetach"
         caller = "?"
@@ -21165,7 +20686,6 @@ signatures {
             "%s: process v1 general query on ifp %s\n"
             "%s: process v1 query %s on ifp %s\n"
             "%s: ignore v1 report on ifp %s\n"
-            "%s: ignore v1 query src %s on ifp %s\n"
             "%s: ignore v1 query dst %s on ifp %s\n"
             "%s: process v1 report %s on ifp %s\n"
         }
@@ -21219,13 +20739,7 @@ signatures {
             "%s: m_adj(m, -mr)\n"
             "%s: outbound queue full\n"
             "%s: m_append() failed.\n"
-            "%s: m_append() failed\n"
-            "%s: outbound queue full\n"
-            "%s: m_append() failed.\n"
-            "%s: m_append() failed\n"
             "%s: m_get*() failed\n"
-            "%s: m_append() failed\n"
-            "%s: m_append() failed\n"
         }
         symbol = "mld_v2_enqueue_group_record"
         caller = "?"
@@ -21252,8 +20766,6 @@ signatures {
         anchors {
             "%s: warning: ia is NULL\n"
             "%s: mldreclen is %d\n"
-            "%s: dropped 0x%llx as interface went away\n"
-            "%s: dropped 0x%llx\n"
             "%s: ip6_output(0x%llx) = %d\n"
         }
         symbol = "mld_dispatch_packet"
@@ -21328,7 +20840,6 @@ signatures {
             "%s: failed to lookup %s (if = %s)\n"
             "unspec"
             "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_lookup"
         caller = "?"
@@ -21337,7 +20848,6 @@ signatures {
         args = 1
         anchors {
             "nd6_free"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_free"
         caller = "?"
@@ -21346,12 +20856,6 @@ signatures {
         args = 1
         anchors {
             "nd6_init_done"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
             "%s: failed to join %s (errno=%d)\n"
         }
         symbol = "nd6_rtrequest"
@@ -21364,7 +20868,6 @@ signatures {
             "from == NULL in nd6_cache_lladdr @%s:%d"
             "nd6_cache_lladdr"
             "(newstate) != ND6_LLINFO_STALE && (newstate) != ND6_LLINFO_DELAY && (newstate) != ND6_LLINFO_PROBE"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_cache_lladdr"
         caller = "?"
@@ -21373,9 +20876,6 @@ signatures {
         args = 0
         anchors {
             "nd6_output: can't allocate llinfo for %s (ln=0x%llx, rt=0x%llx)\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_output_list"
         caller = "?"
@@ -21405,14 +20905,7 @@ signatures {
             "%s: in6_pfx_newpersistaddr failed %d\n"
             "nd6_handle_duplicated_ip6_addr"
             "%s: found %u, aging_lazy %u, aging %u, sticky %u, killed %u\n"
-            "%s: not rescheduling timer\n"
             "%s: %s is blocked by %d waiters\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "%s: Refreshing expired default router entry %s for interface %s\n"
             "%s: Refreshing expired default router entry %s for interface %s\n"
         }
         symbol = "nd6_timeout"
@@ -21455,7 +20948,6 @@ signatures {
         args = 0
         anchors {
             "nd6_llinfo_refresh"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_llinfo_refresh"
         caller = "?"
@@ -21479,7 +20971,6 @@ signatures {
             "optimistic "
             "immediately "
             "!dp->dad_attached"
-            "%s - %s ifp %s ia6_flags 0x%x\n"
             "nd6_dad_start: not a tentative or optimistic address %s(%s)\n"
             "%s: starting %sDAD %sfor %s\n"
         }
@@ -21505,7 +20996,6 @@ signatures {
             "rt->rt_flags & RTF_LLINFO"
             "rt->rt_llinfo"
             "%s: failed to add/update host route to %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
             "%s: Successfully added/updated host route to %s [lr=0x%llx]\n"
         }
         symbol = "nd6_alt_node_present"
@@ -21537,7 +21027,6 @@ signatures {
             "%s: possible hardware address duplication detected, disabling IPv6 for interface.\n"
             "%s: manual intervention may be required.\n"
             "nd6_dad_timer: called with null parameter\n"
-            "%s - %s ifp %s ia6_flags 0x%x\n"
             "nd6_dad_timer: DAD structure not found\n"
             "nd6_dad_timer: called with duplicated address %s(%s)\n"
             "nd6_dad_timer: not a tentative or optimistic address %s(%s)\n"
@@ -22025,10 +21514,8 @@ signatures {
             "key_msg2sp: invalid request address length.\n"
             "key_msg2sp: invalid request ipsecrequest len invalid for src address.\n"
             "key_msg2sp: invalid request invalid source address length.\n"
-            "key_msg2sp: invalid request address length.\n"
             "key_msg2sp: invalid request ipsecrequest len invalid for dst address.\n"
             "key_msg2sp: invalid request invalid dest address length.\n"
-            "key_msg2sp: invalid request address length.\n"
             "key_msg2sp: becoming tlen < 0.\n"
             "key_msg2sp: invalid policy type.\n"
         }
@@ -22095,7 +21582,6 @@ signatures {
             "key_timehandler: spbufcount overflow, ipsec policy count %u.\n"
             "key_timehandler: savbufcount overflow, ipsec sa count %u.\n"
             "key_timehandler: There is no CURRENT time, why?\n"
-            "key_timehandler: There is no CURRENT time, why?\n"
             "key_timehandler: invalid sav->state (queue: %d SA: %d): kill it anyway\n"
             "key_setdumpsp: packet header length > UINT16_MAX\n"
         }
@@ -22120,7 +21606,6 @@ signatures {
             "key_parse: must specify satype when msg type=%u.\n"
             "key_parse: illegal satype=%u\n"
             "key_parse: type %u isn't supported.\n"
-            "key_parse: invalid type %u is passed.\n"
         }
         symbol = "key_parse"
         caller = "?"
@@ -22174,7 +21659,6 @@ signatures {
         anchors {
             "key_do_get_translated_port"
             "key_do_get_translated_port: lifetime_current is NULL.\n @%s:%d"
-            "%s: state mismatched (TREE=%d SA=%d)\n"
         }
         symbol = "key_natt_get_translated_port"
         caller = "?"
@@ -22211,7 +21695,6 @@ signatures {
         anchors {
             "key_getspi: NULL pointer is passed. @%s:%d"
             "key_getspi: invalid message is passed.\n"
-            "key_getspi: invalid message is passed.\n"
             "key_getspi: invalid satype is passed.\n"
             "key_getspi: custom ipsec exists\n"
             "key_getspi: security association head is dead\n"
@@ -22237,7 +21720,6 @@ signatures {
             "key_setsaval: NULL pointer is passed. @%s:%d"
             "key_setsaval: invalid message size.\n"
             "key_setsaval: natt port not set.\n"
-            "key_setsaval: natt port not set.\n"
             "key_setsaval: invalid auth key ext len. len = %d\n"
             "key_setsaval: invalid key_auth values.\n"
             "key_setsaval: invalid encryption key ext len. len = %d\n"
@@ -22258,7 +21740,6 @@ signatures {
         anchors {
             "key_update: NULL pointer is passed. @%s:%d"
             "key_update: invalid satype is passed.\n"
-            "key_update: invalid message is passed.\n"
             "key_update: invalid message is passed.\n"
             "key_update: no SA index found.\n"
             "key_update: no such a SA found (spi:%u)\n"
@@ -22284,11 +21765,9 @@ signatures {
             "key_add: NULL pointer is passed. @%s:%d"
             "key_add: invalid satype is passed.\n"
             "key_add: invalid message is passed.\n"
-            "key_add: invalid message is passed.\n"
             "key_add: custom ipsec exists\n"
             "key_add: SA already exists.\n"
             "key_add: security association head is dead\n"
-            "key_update: No more memory.\n"
         }
         symbol = "key_add"
         caller = "?"
@@ -22299,9 +21778,7 @@ signatures {
             "key_delete: NULL pointer is passed. @%s:%d"
             "key_delete: invalid satype is passed.\n"
             "key_delete: invalid message is passed.\n"
-            "key_delete: invalid message is passed.\n"
             "key_delete: doing delete all.\n"
-            "key_delete: invalid message is passed.\n"
             "key_delete: no SA found.\n"
             "key_delete_all: invalid sav->state (queue: %d SA: %d)\n"
         }
@@ -22313,7 +21790,6 @@ signatures {
         anchors {
             "key_get: NULL pointer is passed. @%s:%d"
             "key_get: invalid satype is passed.\n"
-            "key_get: invalid message is passed.\n"
             "key_get: invalid message is passed.\n"
             "key_get: no SA found.\n"
             "key_get: there was invalid proto in SAD.\n"
@@ -22327,7 +21803,6 @@ signatures {
             "key_acquire2: NULL pointer is passed. @%s:%d"
             "key_acquire2: must specify sequence number.\n"
             "key_acquire2: invalid satype is passed.\n"
-            "key_acquire2: invalid message is passed.\n"
             "key_acquire2: invalid message is passed.\n"
             "key_acquire2: a SA exists already.\n"
             "key_acquire2: error %d returned from key_acquire.\n"
@@ -22380,9 +21855,6 @@ signatures {
         anchors {
             "key_spdadd: NULL pointer is passed. @%s:%d"
             "key_spdadd: invalid message is passed.\n"
-            "key_spdadd: invalid message is passed.\n"
-            "key_spdadd: invalid message is passed.\n"
-            "key_spdadd: invalid message is passed.\n"
             "key_spdadd: Invalid SP direction.\n"
             "key_spdadd: Invalid policy type.\n"
             "key_spdadd: some policy requests part required.\n"
@@ -22405,7 +21877,6 @@ signatures {
         args = 0
         anchors {
             "key_spddelete: NULL pointer is passed. @%s:%d"
-            "key_spddelete: invalid message is passed.\n"
             "key_spddelete: invalid message is passed.\n"
             "key_spddelete: Invalid SP direction.\n"
             "key_spddelete: no SP found.\n"
@@ -22496,7 +21967,6 @@ signatures {
         anchors {
             "key_migrate: NULL pointer is passed. @%s:%d"
             "key_migrate: invalid satype is passed.\n"
-            "key_migrate: invalid message is passed.\n"
             "key_migrate: invalid message is passed.\n"
             "key_migrate: no mature SAH found.\n"
             "key_migrate: custom ipsec exists\n"
@@ -24733,10 +24203,7 @@ signatures {
             "RTC debug alarm"
             "hibernate user wake"
             "PMRD: Force re-evaluating aggressiveness\n"
-            "PMRD: PowerChangeDone: %s->%s\n"
             "PMRD: clamshell closed %d, disabled %d/%x, desktopMode %d, ac %d\n"
-            "PMRD: Updated sleepDelaysReport %lu %lu\n"
-            "PMRD: Force re-evaluating aggressiveness\n"
         }
         symbol = "__ZN14IOPMrootDomain15powerChangeDoneEm"
         caller = "?"
@@ -26620,7 +26087,6 @@ signatures {
             "TRACKER - %s:%d Could not dump entries, failed to calculate total size needed for memory used)\n"
             "TRACKER - %s:%d Could not dump entries, failed to add 4-bytes size to start of buffer\n"
             "TRACKER - %s:%d Could not dump entries, output buffer too small %lu (needed %lu)\n"
-            "TRACKER - %s:%d Failed to allocate buffer, size exceeded max allowed\n"
             "TRACKER - %s:%d Could not dump entries, failed to allocate buffer\n"
             "TRACKER - %s:%d Could not dump entry, exceeded entry tlv buffer size\n"
             "TRACKER - %s:%d Could not dump entries, failed to calculate total memory used\n"
@@ -26640,7 +26106,6 @@ signatures {
             "Matched entry"
             "Updated entry"
             "Failed to Update entry, deleting found entry"
-            "TRACKER - %s:%d Max link count %d (hash 0x%X)\n"
             "TRACKER - %s:%d Max link count %d (hash 0x%X)\n"
             "TRACKER - %s:%d Total entries %d (hashmask 0x%lX)\n"
         }
@@ -27083,7 +26548,6 @@ signatures {
         args = 3
         anchors {
             "netns_get_local_ports"
-            "%s: ifnet_list_get_all() failed %d"
         }
         symbol = "netns_get_local_ports"
         caller = "?"
@@ -27332,7 +26796,6 @@ signatures {
         anchors {
             "/AppleInternal/Library/BuildRoots/d3a62b52-2ef5-11ef-9ecd-e2437461156c/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/lib/net_filter_event.c"
             "eventhandler_invoke(\"net_filter_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "net_filter_event_enqueue_callback"
         caller = "?"
@@ -27881,8 +27344,6 @@ signatures {
         args = 3
         anchors {
             "ln->ln_state > ND6_LLINFO_INCOMPLETE"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "fsw_ethernet_resolve"
         caller = "?"
@@ -29983,8 +29444,6 @@ signatures {
             "No service matching %s"
             "Unable to match CoreAnalyticsHub"
             "CoreAnalyticsHub"
-            "No service matching %s"
-            "Unable to match CoreAnalyticsHub"
         }
         symbol = "core_analytics_family_match"
         caller = "?"
@@ -29996,9 +29455,6 @@ signatures {
             "Unable to serialize CoreAnalytics event: %d"
             "Unable to send CoreAnalytics event. Giving up."
             "Unknown CoreAnalytics event type: %s. @%s:%d"
-            "Dropping attempt to send a CoreAnalytics event before CoreAnalyticsHub has registered."
-            "Unable to serialize CoreAnalytics event: %d"
-            "Unable to send CoreAnalytics event. Giving up."
         }
         symbol = "core_analytics_send_event_lazy"
         caller = "?"
@@ -30007,7 +29463,6 @@ signatures {
         args = 0
         anchors {
             "CoreAnalyticsHub is out of sync with xnu. CoreAnalyticsHub table version: %d. xnu table version: %d @%s:%d"
-            "Registered CoreAnalyticsHub functions with xnu."
             "Registered CoreAnalyticsHub functions with xnu."
         }
         symbol = "core_analytics_hub_register"
@@ -30899,6 +30354,7 @@ signatures {
         anchors {
             "%s: match category %s exists\n"
             "%s: stalling for module\n"
+            "Couldn\\'t alloc class \"%s\"\n"
             "%s::init fails\n"
             "%s::probe(%s)\n"
             "%s::probe fails\n"
@@ -33476,7 +32932,6 @@ signatures {
             "kPMMotionSensor"
             "kPMLastAggressivenessType"
             "PMRD: setAggressiveness(%x) %s = %u\n"
-            "PMRD: setAggressiveness(%x) %s = %u\n"
         }
         symbol = "__ZN14IOPMrootDomain17setAggressivenessEmmj"
         caller = "?"
@@ -33577,7 +33032,6 @@ signatures {
             "DisplayDims"
             "Hibernation"
             "BootSessionUUID"
-            "PMRD: Setting gNoIdleFlag to %u from device tree\n"
         }
         symbol = "__ZN14IOPMrootDomain5startEP9IOService"
         caller = "?"
@@ -33604,9 +33058,6 @@ signatures {
             "UserWakeAlarmScheduled"
             "PMRD: _userScheduledAlarmMask 0x%x\n"
             "PMRD: setProperties(%s) not handled\n"
-            "PMRD: %s failed, process %s is not %s\n"
-            "PMRD: _userScheduledAlarmMask 0x%x\n"
-            "PMRD: setProperties(%s) not handled\n"
         }
         symbol = "__ZN14IOPMrootDomain13setPropertiesEP8OSObject"
         caller = "?"
@@ -33614,7 +33065,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: getAggressiveness type 0x%x not found\n"
             "PMRD: getAggressiveness type 0x%x not found\n"
         }
         symbol = "__ZN14IOPMrootDomain17getAggressivenessEmPm"
@@ -33627,9 +33077,6 @@ signatures {
             "PMRD: disk spindown restored to %u min\n"
             "PMRD: disk spindown accelerated\n"
             "bad aggressives request type %x @%s:%d"
-            "PMRD: disk spindown accelerated, was %u min\n"
-            "PMRD: disk spindown restored to %u min\n"
-            "PMRD: disk spindown accelerated\n"
         }
         symbol = "__ZN14IOPMrootDomain25handleAggressivesRequestsEv"
         caller = "?"
@@ -33637,9 +33084,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: idle timer not set (noidle=%d)\n"
-            "PMRD: startIdleSleepTimer increasing timeout from %u to %u\n"
-            "PMRD: idle timer set for %u milliseconds\n"
             "PMRD: idle timer not set (noidle=%d)\n"
             "PMRD: startIdleSleepTimer increasing timeout from %u to %u\n"
             "PMRD: idle timer set for %u milliseconds\n"
@@ -33651,7 +33095,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: idle timer cancelled\n"
-            "PMRD: idle timer cancelled\n"
             "PMRD: Updated assertOnWake %lu\n"
         }
         symbol = "__ZN14IOPMrootDomain20cancelIdleSleepTimerEv"
@@ -33661,7 +33104,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: sleep timer expired\n"
-            "PMRD: sleep timer expired\n"
         }
         symbol = "__ZN14IOPMrootDomain26handleSleepTimerExpirationEv"
         caller = "?"
@@ -33669,8 +33111,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: ignoring lastActivityTime 0x%qx, now 0x%qx, wake 0x%qx\n"
-            "PMRD: user inactive %u min, time to idle sleep %u min\n"
             "PMRD: ignoring lastActivityTime 0x%qx, now 0x%qx, wake 0x%qx\n"
             "PMRD: user inactive %u min, time to idle sleep %u min\n"
         }
@@ -33692,10 +33132,7 @@ signatures {
             "PMRD: Added %s to idle sleep preventers list (Total %u)\n"
             "PMRD: Removed %s from idle sleep preventers list (Total %u)\n"
             "PMRD: Cannot cancel idle sleep\n"
-            "PMRD: Added %s to idle sleep preventers list (Total %u)\n"
-            "PMRD: Removed %s from idle sleep preventers list (Total %u)\n"
             "PMRD: %s\n"
-            "PMRD: Cannot cancel idle sleep\n"
         }
         symbol = "__ZN14IOPMrootDomain34updatePreventIdleSleepListInternalEP9IOServicebj"
         caller = "?"
@@ -33705,10 +33142,6 @@ signatures {
         anchors {
             "PMRD: Added %s to system sleep preventers list (Total %u)\n"
             "PMRD: Removed %s from system sleep preventers list (Total %u)\n"
-            "PMRD: Added %s to system sleep preventers list (Total %u)\n"
-            "PMRD: Updated assertOnWake %lu\n"
-            "PMRD: Removed %s from system sleep preventers list (Total %u)\n"
-            "PMRD: %s\n"
         }
         symbol = "__ZN14IOPMrootDomain28updatePreventSystemSleepListEP9IOServiceb"
         caller = "?"
@@ -33718,8 +33151,6 @@ signatures {
         anchors {
             "PMRD: tellChangeDown %s->%s\n"
             "PMRD: tellChangeDown::userActivityAtSleep %d\n"
-            "PMRD: tellChangeDown %s->%s\n"
-            "PMRD: tellChangeDown::userActivityAtSleep %d\n"
         }
         symbol = "__ZN14IOPMrootDomain14tellChangeDownEm"
         caller = "?"
@@ -33727,7 +33158,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: askChangeDown %s->%s\n"
             "PMRD: askChangeDown %s->%s\n"
         }
         symbol = "__ZN14IOPMrootDomain13askChangeDownEm"
@@ -33739,8 +33169,6 @@ signatures {
             "PMRD: askChangeDownDone(0x%x, %u) type %x, cap %x->%x\n"
             "PMRD: cancel dark->sleep\n"
             "AOT wake window cancel: %qd, %qd\n"
-            "PMRD: askChangeDownDone(0x%x, %u) type %x, cap %x->%x\n"
-            "PMRD: cancel dark->sleep\n"
         }
         symbol = "__ZN14IOPMrootDomain17askChangeDownDoneEPjPb"
         caller = "?"
@@ -33748,7 +33176,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: MESG cap %x->%x did change\n"
             "PMRD: MESG cap %x->%x did change\n"
         }
         symbol = "__ZN14IOPMrootDomain17systemDidNotSleepEv"
@@ -33758,7 +33185,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: tellNoChangeDown %s->%s\n"
-            "PMRD: tellNoChangeDown %s->%s\n"
         }
         symbol = "__ZN14IOPMrootDomain16tellNoChangeDownEm"
         caller = "?"
@@ -33766,7 +33192,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: tellChangeUp %s->%s\n"
             "PMRD: tellChangeUp %s->%s\n"
         }
         symbol = "__ZN14IOPMrootDomain12tellChangeUpEm"
@@ -33778,9 +33203,6 @@ signatures {
             "PMRD: sysPowerDownHandler message %s\n"
             "PMRD: sysPowerDownHandler cap %x -> %x (flags %x)\n"
             "PMRD: sysPowerDownHandler max wait %d s\n"
-            "PMRD: sysPowerDownHandler message %s\n"
-            "PMRD: sysPowerDownHandler cap %x -> %x (flags %x)\n"
-            "PMRD: sysPowerDownHandler max wait %d s\n"
         }
         symbol = "__ZN14IOPMrootDomain19sysPowerDownHandlerEPvS0_jP9IOServiceS0_m"
         caller = "?"
@@ -33789,7 +33211,6 @@ signatures {
         args = 1
         anchors {
             "PMRD: SleepWake UUID queued: %s\n"
-            "PMRD: SleepWake UUID queued: %s\n"
         }
         symbol = "__ZN14IOPMrootDomain24handleQueueSleepWakeUUIDEP8OSObject"
         caller = "?"
@@ -33797,7 +33218,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: SleepWake UUID cleared\n"
             "PMRD: SleepWake UUID cleared\n"
         }
         symbol = "__ZN14IOPMrootDomain26handlePublishSleepWakeUUIDEb"
@@ -33824,7 +33244,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: dark wake promotion disabled at %u ms\n"
-            "PMRD: dark wake promotion disabled at %u ms\n"
         }
         symbol = "__ZN14IOPMrootDomain33willTellSystemCapabilityDidChangeEv"
         caller = "?"
@@ -33842,7 +33261,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: setSleepSupported(%x)\n"
-            "PMRD: setSleepSupported(%x)\n"
         }
         symbol = "__ZN14IOPMrootDomain17setSleepSupportedEj"
         caller = "?"
@@ -33851,7 +33269,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: setClamShellSleepDisable(%x->%x)\n"
-            "PMRD: setClamShellSleepDisable(%x->%x)\n"
         }
         symbol = "__ZN14IOPMrootDomain24setClamShellSleepDisableEbj"
         caller = "?"
@@ -33859,10 +33276,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: next alarm (%s) in %u secs\n"
-            "PMRD: %s %04d/%02d/%d %02d:%02d:%02d\n"
-            "PMRD: next alarm (%s) %04d/%02d/%d %02d:%02d:%02d\n"
-            "PMRD: scheduled alarm mask 0x%x\n"
             "PMRD: next alarm (%s) in %u secs\n"
             "PMRD: %s %04d/%02d/%d %02d:%02d:%02d\n"
             "PMRD: next alarm (%s) %04d/%02d/%d %02d:%02d:%02d\n"
@@ -33902,10 +33315,6 @@ signatures {
             "PMRD: sleep policy handler error\n"
             "sleep policy handler error\n"
             "PMRD: sleep params v%u, type %u, flags 0x%x, wake 0x%x, timer %u, poweroff %u\n"
-            "PMRD: phase %d, standby %d delay %u timer %u, poweroff %d delay %u timer %u, hibernate 0x%x\n"
-            "PMRD: HibernateMode is 0. Not sending LowBattery factor to IOPPF\n"
-            "PMRD: sleep factors 0x%llx%s\n"
-            "PMRD: sleep params v%u, type %u, flags 0x%x, wake 0x%x, timer %u, poweroff %u\n"
         }
         symbol = "__ZN14IOPMrootDomain25evaluateSystemSleepPolicyEP25IOPMSystemSleepParametersiPj"
         caller = "?"
@@ -33914,7 +33323,6 @@ signatures {
         args = 0
         anchors {
             "IOPMSystemSleepType"
-            "PMRD: %s\n"
         }
         symbol = "__ZN14IOPMrootDomain30evaluateSystemSleepPolicyEarlyEv"
         caller = "?"
@@ -33922,8 +33330,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: wake in %u secs for hibernateDisabled %d, hibernateAborted %d, standbyNixed %d\n"
-            "PMRD: %s\n"
             "PMRD: wake in %u secs for hibernateDisabled %d, hibernateAborted %d, standbyNixed %d\n"
         }
         symbol = "__ZN14IOPMrootDomain30evaluateSystemSleepPolicyFinalEv"
@@ -33933,7 +33339,6 @@ signatures {
         args = 1
         anchors {
             "PMRD: hibernateMode 0x%x\n"
-            "PMRD: hibernateMode 0x%x\n"
         }
         symbol = "__ZN14IOPMrootDomain20getHibernateSettingsEPjS0_S0_"
         caller = "?"
@@ -33941,7 +33346,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: Standby delay is not set\n"
             "PMRD: Standby delay is not set\n"
         }
         symbol = "__ZN14IOPMrootDomain18getSystemSleepTypeEPjS0_"
@@ -33958,12 +33362,6 @@ signatures {
             "%s total %d ms:%s\n"
             "PMRD: %s msgType = 0x%x\n"
             "PMShutdown"
-            "PMRD: Skipped PM node %s\n"
-            "PMRD: Nodes at depth %u = %u\n"
-            "PMRD: PM nodes %u, maxDepth %u, workers %u\n"
-            "PMRD: %s done\n"
-            "PMRD: PM quiesce took %u ms\n"
-            "PMRD: %s msgType = 0x%x\n"
             "PMRD: Skipped PM node %s\n"
             "PMRD: Nodes at depth %u = %u\n"
             "PMRD: PM nodes %u, maxDepth %u, workers %u\n"
@@ -33985,10 +33383,6 @@ signatures {
             "PMRD: PMTrace found PCI host bridge %s->%s\n"
             "IOPCIDevice"
             "acpi-device"
-            "PMRD: Avoiding delayChildNotification on object 0x%llx. flags: 0x%x\n"
-            "PMRD: delayChildNotification for 0x%llx\n"
-            "PMRD: %s tag flags %x\n"
-            "PMRD: PMTrace found PCI host bridge %s->%s\n"
         }
         symbol = "__ZN14IOPMrootDomain20tagPowerPlaneServiceEP9IOServiceP11IOPMActionsm"
         caller = "?"
@@ -33996,8 +33390,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: PowerChangeOverride (%s->%s, %x, 0x%x) tag 0x%x\n"
-            "PMRD: Duplicate lowBattery sleep"
             "PMRD: PowerChangeOverride (%s->%s, %x, 0x%x) tag 0x%x\n"
             "PMRD: Duplicate lowBattery sleep"
         }
@@ -34012,10 +33404,6 @@ signatures {
             "PMRD: sleep reason %s\n"
             "PMRD: === START (%s->%s, %x->%x, 0x%x) gen %u, msg %x, tag %x\n"
             "illegal AOT entry from %s @%s:%d"
-            "PMRD: sleepDelaysReport f->9 start at 0x%llx\n"
-            "PMRD: sleepDelaysReport 9->0 start at 0x%llx\n"
-            "PMRD: sleep reason %s\n"
-            "PMRD: === START (%s->%s, %x->%x, 0x%x) gen %u, msg %x, tag %x\n"
         }
         symbol = "__ZN14IOPMrootDomain25handleOurPowerChangeStartEP9IOServiceP11IOPMActionsPK11IOPMRequestmPj"
         caller = "?"
@@ -34023,9 +33411,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "PMRD: sleepDelaysReport f->9 end 0x%llx\n"
-            "PMRD: === FINISH (%s->%s, %x->%x, 0x%x) gen %u, msg %x, tag %x\n"
-            "PMRD: DisplayOn fullwake request is removed\n"
             "PMRD: sleepDelaysReport f->9 end 0x%llx\n"
             "PMRD: === FINISH (%s->%s, %x->%x, 0x%x) gen %u, msg %x, tag %x\n"
             "PMRD: DisplayOn fullwake request is removed\n"
@@ -34040,10 +33425,6 @@ signatures {
             "PMRD: power clamp removed %s %qx, pendingCap 0x%x, ps %d, cflags 0x%x\n"
             "PMRD: power clamped %s %qx, ps %u->%u, cflags 0x%x)\n"
             "PMRD: dark wake power clamped after %u ms\n"
-            "PMRD: power clamp enabled %s %qx, pendingCap 0x%x, ps %d, cflags 0x%x\n"
-            "PMRD: power clamp removed %s %qx, pendingCap 0x%x, ps %d, cflags 0x%x\n"
-            "PMRD: power clamped %s %qx, ps %u->%u, cflags 0x%x)\n"
-            "PMRD: dark wake power clamped after %u ms\n"
         }
         symbol = "__ZN14IOPMrootDomain29overridePowerChangeForServiceEP9IOServiceP11IOPMActionsPK11IOPMRequestPmPj"
         caller = "?"
@@ -34051,7 +33432,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: %s: delay child notify\n"
             "PMRD: %s: delay child notify\n"
         }
         symbol = "__ZN14IOPMrootDomain28shouldDelayChildNotificationEP9IOService"
@@ -34077,7 +33457,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: user activity reported %d lastSleepReason %d\n"
-            "PMRD: user activity reported %d lastSleepReason %d\n"
         }
         symbol = "__ZN14IOPMrootDomain15reportUserInputEv"
         caller = "?"
@@ -34088,9 +33467,6 @@ signatures {
             "PMRD: requestUserActive: device is null\n"
             "PMRD: requestUserActive: no device name or registry entry\n"
             "%s:%s"
-            "PMRD: requestUserActive from %s (0x%llx) for %s\n"
-            "PMRD: requestUserActive: device is null\n"
-            "PMRD: requestUserActive: no device name or registry entry\n"
             "PMRD: requestUserActive from %s (0x%llx) for %s\n"
         }
         symbol = "__ZN14IOPMrootDomain17requestUserActiveEP9IOServicePKc"
@@ -34118,7 +33494,6 @@ signatures {
         anchors {
             "PMRD: System cannot sustain full wake\n"
             "Notification"
-            "PMRD: System cannot sustain full wake\n"
         }
         symbol = "__ZN14IOPMrootDomain23handleSetDisplayPowerOnEb"
         caller = "?"
@@ -34134,17 +33509,6 @@ signatures {
             "SleepService"
             "Maintenance"
             "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: Setting gSleepDisabledFlag to %u from device tree\n"
-            "PMRD: Clearing gSleepDisabledFlag due to test_sleep_in_vm boot-arg\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
-            "PMRD: power event %u args %p 0x%llx\n"
         }
         symbol = "__ZN14IOPMrootDomain18dispatchPowerEventEjPvy"
         caller = "?"
@@ -34157,18 +33521,6 @@ signatures {
             "PMRD: Received kIOPMPowerEmergency"
             "PMRD: Clamshell opened\n"
             "Lid Open"
-            "PMRD: clamshell tickled %d lastSleepReason %d\n"
-            "PMRD: Ignoring redundant Clamshell close event\n"
-            "PMRD: Clamshell closed\n"
-            "PMRD: Desktop mode %d\n"
-            "PMRD: Clamshell enabled\n"
-            "PMRD: Clamshell disabled\n"
-            "PMRD: ProModeEngaged\n"
-            "PMRD: ProModeDisengaged\n"
-            "PMRD: Thermal overtemp message received!\n"
-            "PMRD: DarkWake thermal limits message received!\n"
-            "PMRD: Received kIOPMPowerEmergency"
-            "PMRD: Clamshell opened\n"
             "PMRD: clamshell tickled %d lastSleepReason %d\n"
             "PMRD: Ignoring redundant Clamshell close event\n"
             "PMRD: Clamshell closed\n"
@@ -34200,27 +33552,6 @@ signatures {
             "PMRD: idle sleep timer enabled\n"
             "PMRD: idle sleep timer disabled\n"
             "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: user active dropped\n"
-            "PMRD: User activity while in notification wake\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: aggressiveness changed: system %u->%u, display %u\n"
-            "PMRD: idle time -> %d ms (ena %d)\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: Requested wrangler idle\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: Requesting full wake due to dark wake activity tickle\n"
-            "PMRD: evaluatePolicy( %d, 0x%x )\n"
-            "PMRD: dark wake entry\n"
-            "PMRD: User activity recorded while going to darkwake\n"
-            "PMRD: DarkWake: sleepASAP %d, clamshell closed %d, disabled %d/%x, desktopMode %d, ac %d\n"
-            "PMRD: Display sleep while in notification wake\n"
-            "PMRD: extra sleep timer changed\n"
-            "PMRD: user inactive\n"
-            "PMRD: idle sleep timer enabled\n"
-            "PMRD: idle sleep timer disabled\n"
         }
         symbol = "__ZN14IOPMrootDomain14evaluatePolicyEij"
         caller = "?"
@@ -34248,10 +33579,6 @@ signatures {
         anchors {
             "PMRD: wrangler->setIgnoreIdleTimer(%d)\n"
             "CPU assertions %d\n"
-            "PMRD: PreventIdleSleep driver assertion raised\n"
-            "PMRD: PreventIdleSleep driver assertion dropped\n"
-            "PMRD: wrangler->setIgnoreIdleTimer(%d)\n"
-            "PMRD: Updated assertOnWake %lu\n"
             "PMRD: PreventIdleSleep driver assertion raised\n"
             "PMRD: PreventIdleSleep driver assertion dropped\n"
         }
@@ -34293,8 +33620,6 @@ signatures {
         anchors {
             "PMRD: %s[%u] to %s\n"
             "PMRD: %s to %s\n"
-            "PMRD: %s[%u] to %s\n"
-            "PMRD: %s to %s\n"
         }
         symbol = "__ZN14IOPMrootDomain17traceNotificationEP8OSObjectbyj"
         caller = "?"
@@ -34302,7 +33627,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: %s[%u] ack from %s took %d ms\n"
             "PMRD: %s[%u] ack from %s took %d ms\n"
         }
         symbol = "__ZN14IOPMrootDomain20traceNotificationAckEP8OSObjectj"
@@ -34313,8 +33637,6 @@ signatures {
         anchors {
             "PMRD: %s[%u] response from %s took %d ms\n"
             "PMRD: %s[%u] response from %s took %d ms (ack in %d us)\n"
-            "PMRD: %s[%u] response from %s took %d ms\n"
-            "PMRD: %s[%u] response from %s took %d ms (ack in %d us)\n"
         }
         symbol = "__ZN14IOPMrootDomain25traceNotificationResponseEP8OSObjectjj"
         caller = "?"
@@ -34322,7 +33644,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: %s to %s dropped\n"
             "PMRD: %s to %s dropped\n"
         }
         symbol = "__ZN14IOPMrootDomain25traceFilteredNotificationEP8OSObject"
@@ -34332,7 +33653,6 @@ signatures {
         args = 2
         anchors {
             "PMRD: trace point 0x%02x msgType 0x%x detail 0x%08x\n"
-            "PMRD: trace point 0x%02x msgType 0x%x detail 0x%08x\n"
         }
         symbol = "__ZN14IOPMrootDomain11traceDetailEjjj"
         caller = "?"
@@ -34340,7 +33660,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: PMTraceWorker %p\n"
             "PMRD: PMTraceWorker %p\n"
         }
         symbol = "__ZN13PMTraceWorker6tracerEP14IOPMrootDomain"
@@ -34358,7 +33677,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: trace point 0x%02x\n"
-            "PMRD: trace point 0x%02x\n"
         }
         symbol = "__ZN13PMTraceWorker10tracePointEh"
         caller = "?"
@@ -34366,7 +33684,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: component trace point 0x%02x data 0x%08x\n"
             "PMRD: component trace point 0x%02x data 0x%08x\n"
         }
         symbol = "__ZN13PMTraceWorker26traceComponentWakeProgressEjj"
@@ -34376,7 +33693,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: trace point 0x%02x detail 0x%08x\n"
-            "PMRD: trace point 0x%02x detail 0x%08x\n"
         }
         symbol = "__ZN13PMTraceWorker19tracePCIPowerChangeENS_8change_tEP9IOServicejj"
         caller = "?"
@@ -34384,7 +33700,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: PMHaltWorker %p\n"
             "PMRD: PMHaltWorker %p\n"
         }
         symbol = "__ZN12PMHaltWorker6workerEv"
@@ -34394,7 +33709,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: PMHaltWorker free %p\n"
-            "PMRD: PMHaltWorker free %p\n"
         }
         symbol = "__ZN12PMHaltWorker4freeEv"
         caller = "?"
@@ -34402,7 +33716,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "PMRD: All done for worker: %p (visits = %u)\n"
             "PMRD: All done for worker: %p (visits = %u)\n"
         }
         symbol = "__ZN12PMHaltWorker4mainEPvi"
@@ -34430,7 +33743,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: %s acknowledged without worker property\n"
             "PMRD: %s acknowledged without worker property\n"
         }
         symbol = "__ZN14IOPMrootDomain29acknowledgeSystemWillShutdownEP9IOService"
@@ -34496,7 +33808,6 @@ signatures {
         args = 0
         anchors {
             "PMRD: cpu assertion held for %llu ms by 0x%llx\n"
-            "PMRD: cpu assertion held for %llu ms by 0x%llx\n"
         }
         symbol = "__ZN19PMAssertionsTracker22reportCPUBitAccountingEv"
         caller = "?"
@@ -34512,7 +33823,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "PMRD: assertionsUser 0x%llx->0x%llx\n"
             "PMRD: assertionsUser 0x%llx->0x%llx\n"
         }
         symbol = "__ZN19PMAssertionsTracker28handleSetUserAssertionLevelsEPv"
@@ -34598,7 +33908,6 @@ signatures {
             " while "
             " Suspected bundle: "
             " Thread 0x%llx."
-            "PMRD: %s\n"
         }
         symbol = "__ZN14IOPMrootDomain14getFailureDataEPP6threadPcm"
         caller = "?"
@@ -34623,11 +33932,6 @@ signatures {
             "PMRD: No buffer allocated to save failure stackshot\n"
             "bounded_array_ref: n + m is larger than the size of any bounded_array_ref"
             "bounded_array_ref: invalid slice provided, the indices are of bounds for the bounded_array_ref"
-            "PMRD: No sleep wake failure string\n"
-            "PMRD: Ignoring zero byte SleepWake failure string\n"
-            "PMRD: Deleting stackshot on successful wake\n"
-            "PMRD: Failed to save SleepWake failure string to file. error:%d\n"
-            "PMRD: Saved SleepWake failure string to file.\n"
         }
         symbol = "__ZN14IOPMrootDomain20saveFailureData2FileEv"
         caller = "?"
@@ -34662,10 +33966,6 @@ signatures {
             "PMRD: PMRD inited the zlib allocation routines\n"
             "PMRD: ZERR %d\n"
             "PMRD: Total output size %d\n"
-            "PMRD: Taking snapshot. bytesRemaining: %d\n"
-            "PMRD: stack_snapshot_from_kernel returned 0x%x. pid: %d bufsize:0x%x flags:0x%llx bytesWritten: %d\n"
-            "PMRD: Failed to write SleepWake failure string\n"
-            "PMRD: Failed to force nvram sync\n"
         }
         symbol = "__ZN14IOPMrootDomain13takeStackshotEb"
         caller = "?"
@@ -34673,8 +33973,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: Failed to allocate Memory descriptor for sleepWake debug\n"
-            "PMRD: SleepWake debug buffer size:0x%x spindump offset:0x%x\n"
             "PMRD: Failed to allocate Memory descriptor for sleepWake debug\n"
             "PMRD: SleepWake debug buffer size:0x%x spindump offset:0x%x\n"
         }
@@ -34688,7 +33986,6 @@ signatures {
             "PMRD: Bailing as this is not a regular file\n"
             "PMRD: Failed to save sleep wake log. err 0x%x\n"
             "PMRD: Saved %d bytes to file %s\n"
-            "PMRD: Saved %d bytes to file %s\n"
         }
         symbol = "__ZN14IOPMrootDomain22sleepWakeDebugSaveFileEPKcPci"
         caller = "?"
@@ -34698,8 +33995,6 @@ signatures {
         anchors {
             "PMRD: disk_sync_callout ps=%u\n"
             "PMRD: disk_sync_callout finish\n"
-            "PMRD: disk_sync_callout ps=%u\n"
-            "PMRD: disk_sync_callout finish\n"
         }
         symbol = "__ZL17disk_sync_calloutPvS_"
         caller = "?"
@@ -34707,7 +34002,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "PMRD: Print buffer exhausted for sleep preventers list\n"
             "PMRD: Print buffer exhausted for sleep preventers list\n"
         }
         symbol = "__ZL26makeSleepPreventersListLogRK11OSSharedPtrI5OSSetEPcm"
@@ -35376,22 +34670,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "Extensible paniclog not supported"
-        }
-        symbol = "ext_paniclog_handle_alloc_with_uuid_1"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "Extensible paniclog not supported"
-        }
-        symbol = "ext_paniclog_handle_free_0"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
             "Failed to get memory error port - mcc"
         }
         symbol = "mcc_memory_error_event_queue_invoke"
@@ -35495,7 +34773,6 @@ signatures {
         args = 0
         anchors {
             "vm_reclaim: Userspace modified head or busy pointer! head: %llu (0x%llx) != busy: %llu (0x%llx) | tail = %llu (0x%llx)\n"
-            "vm_reclaim: Userspace modified head or tail pointer! head: %llu (0x%llx) > tail: %llu (0x%llx) | busy = %llu (0x%llx)\n"
             "vm_reclaim: Userspace modified head or tail pointer! head: %llu (0x%llx) > tail: %llu (0x%llx) | busy = %llu (0x%llx)\n"
             "vm_reclaim: Unable to copyin %llu entries in reclaim buffer at 0x%llx to 0x%llx: err=%d\n"
             "vm_reclaim: Unable to deallocate 0x%llx (%u) from 0x%llx err=%d\n"
@@ -35648,24 +34925,13 @@ signatures {
             "%s: bad ND6 DAD packet"
             "%s: source lladdrlen %d != %lu"
             "%s: short nd_na %d < %lu"
-            "%s: invalid target ignored"
             "%s: invalid ND6 NA option"
             "%s: target lladdrlen %d != %lu"
             "%s: short ND6 %s %d < %d"
             "%s: invalid ND6 %s option"
-            "%s: source lladdrlen %d != %lu"
             "%s: %s %s %s ip6len %d icmp6len %d lladdr offset %d"
         }
         symbol = "bridge_mac_nat_output"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s: IP %s short frame %lu < %lu"
-            "%s: IP %s size %lu mbuf_pullup fail"
-        }
-        symbol = "get_ether_ipv6_header_ptr"
         caller = "?"
     }
     new {
@@ -35705,7 +34971,6 @@ signatures {
         args = 0
         anchors {
             "%s: ifnet_get_address_list(%s) failed %d"
-            "%s: ifaddr_address failed %d"
             "%s: ifaddr_address failed %d"
             "%s: ifaddr_address_family unknown %d"
         }
@@ -35824,15 +35089,6 @@ signatures {
             "%s: %s MAC-NAT input for %s"
         }
         symbol = "bridge_mac_nat_input_list"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
-            "%s: (%s): sublist %u pkts %u"
-            "%s: (%s): sublist %u pkts %u"
-        }
-        symbol = "bridge_mac_nat_forward_list"
         caller = "?"
     }
     new {
@@ -36054,7 +35310,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s: detaching"
             "%s: %s: invalid tx qidx %d"
             "%s: %s: invalid rx qidx %d"
         }
@@ -36074,8 +35329,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s: nx not found"
-            "%s: %s: llink remove failed, llink_id 0x%llx, error %d"
             "%s: free_provider_instance failed %d"
             "%s: deregister_provider %d"
         }
@@ -36090,7 +35343,6 @@ signatures {
             "%s: if_redirect_request_copyin failed: error %d\n"
             "%s: NULL delegate name\n"
             "%s: delegate %s not found\n"
-            "%s: rd is NULL\n"
             "%s: %s's family %d not compatible with ethernet functional type\n"
             "%s: low latency %s cannot be a delegate\n"
             "%s: %s's family %d not compatible with cellular functional type\n"
@@ -36098,7 +35350,6 @@ signatures {
             "%s: user_addr(0x%llx) or len(%llu) < %lu\n"
             "%s: copyin failed: %d\n"
             "%s: reserved[0]=0x%llu, reserved[1]=0x%llureserved[2]=0x%llu, reserved[3]=0x%llu\n"
-            "%s: %s is detaching\n"
             "%s: cannot configure the same delegate\n"
             "%s: failed to get self reference\n"
             "%s: failed to get delegate reference\n"
@@ -36135,7 +35386,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s: %s\n"
             "%s: %s: Tx refill (sync) %d\n"
             "%s: %s: Tx refilled (sync)\n"
             "%s: %s: schedule async refill\n"
@@ -36161,15 +35411,6 @@ signatures {
             "%s: delegate is not set on %s\n"
         }
         symbol = "redirect_nx_intf_adv_config"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s: rd is NULL\n"
-            "%s: %s is detaching\n"
-        }
-        symbol = "redirect_clone_destroy"
         caller = "?"
     }
     new {
@@ -36201,10 +35442,8 @@ signatures {
             "%s: (%s, %s): SIOCSIFFLAGS failed %d"
             "%s: (%s, %s): if_siflladdr failed %d"
             "%s: (%s, %s): set promiscuous failed %d"
-            "%s: (%s, %s): set promiscuous failed %d"
             "%s: (%s, %s): if_siflladdr restore failed %d"
             "%s: (%s, %s): promiscous mode disable failed %d"
-            "%s: (%s, %s): SIOCSIFMTU %d failed %d"
             "%s: name too large"
             "%s: SIOCGIFDEVMTU %s failed, %d"
         }
@@ -36242,7 +35481,6 @@ signatures {
             "%s: [%s] periodic_transmit Start"
             "%s: [%s] periodic_transmit: Need To Transmit"
             "%s: [%s] Periodic Transmission Timer: %d secs"
-            "%s: [%s] Periodic Transmission Timer: %d secs"
         }
         symbol = "bondport_periodic_transmit_machine"
         caller = "?"
@@ -36251,10 +35489,7 @@ signatures {
         args = 1
         anchors {
             "%s: (%s, %s): if_siflladdr (%s) failed %d"
-            "%s: (%s, %s): if_siflladdr failed %d"
             "%s: (%s, %s): disable promiscuous failed %d"
-            "%s: (%s, %s): disable promiscuous failed %d"
-            "%s: (%s, %s): SIOCSIFMTU %d failed %d"
         }
         symbol = "bond_remove_interface"
         caller = "?"
@@ -36278,15 +35513,6 @@ signatures {
             "%s - called with incorrect shadow magic 0x%x"
         }
         symbol = "nstat_provider_stats_close"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s - called with null reference"
-            "%s - called with incorrect shadow magic 0x%x"
-        }
-        symbol = "nstat_provider_stats_event"
         caller = "?"
     }
     new {
@@ -36370,7 +35596,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: ifindex %u too big"
             "%s: unexpected protocol %u for nfi %p"
         }
         symbol = "if_ports_used_add_flow_entry"
@@ -36445,7 +35670,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s: data path stopped for %s\n"
             "%s, tx refill failed %d\n"
             "utun_netif_tx_doorbell: ifnet_disable_output returned error %d\n"
         }
@@ -36455,20 +35679,10 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s free_provider_instance failed %d\n"
-            "%s deregister_provider %d\n"
-        }
-        symbol = "utun_detach_provider_and_instance"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
             "utun_cleanup_family - invalid protocol family %d\n"
             "utun_cleanup_family - failed to create %s socket: %d\n"
             "utun_cleanup_family - utun_detach_ip failed: %d\n"
             "fnet_get_address_list_family(%s%d, 0xblah, %s) - failed: %d\n"
-            "utun_cleanup_family - utun_detach_ip failed: %d\n"
             "utun_remove_address - ifaddr_address failed: %d"
             "utun_remove_address - SIOCDIFADDR failed: %d"
             "utun_remove_address - ifaddr_address failed (v6): %d"
@@ -36511,19 +35725,8 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s free_provider_instance failed %d\n"
-            "%s deregister_provider %d\n"
-        }
-        symbol = "utun_detach_provider_and_instance_0"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
             "ipsec_cleanup_family - invalid protocol family %d\n"
             "ipsec_cleanup_family - failed to create %s socket: %d\n"
-            "ipsec_cleanup_family - ipsec_detach_ip failed: %d\n"
-            "fnet_get_address_list_family(%s%d, 0xblah, %s) - failed: %d\n"
             "ipsec_cleanup_family - ipsec_detach_ip failed: %d\n"
             "ipsec_remove_address - ifaddr_address failed: %d"
             "ipsec_remove_address - SIOCDIFADDR failed: %d"
@@ -36555,7 +35758,6 @@ signatures {
         anchors {
             "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> <socket policy id %d socket skip id %d> <mbuf %X len %d %d>\n"
             "%s: DATA-TRACE: IP Output: RESULT - MATCHED (ID %d BoundInterface %d LastInterface %d Proto %d) Policy %d Result %d Parameter %d Route Rule %u\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> <socket policy id %d socket skip id %d> <mbuf %X len %d %d>\n"
             "%s: DATA-TRACE: IP Output: RESULT - NO MATCH (ID %d BoundInterface %d LastInterface %d Proto %d)\n"
         }
         symbol = "necp_ip_output_find_policy_match"
@@ -36566,7 +35768,6 @@ signatures {
         anchors {
             "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> <socket policy id %d socket skip id %d> <mbuf %X len %d %d %d>\n"
             "%s: DATA-TRACE: IP6 Output: RESULT - MATCHED (ID %d BoundInterface %d LastInterface %d Proto %d) Policy %d Result %d Parameter %d Route Rule %u\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> <socket policy id %d socket skip id %d> <mbuf %X len %d %d %d>\n"
             "%s: DATA-TRACE: IP6 Output: RESULT - NO MATCH (ID %d BoundInterface %d LastInterface %d Proto %d)\n"
         }
         symbol = "necp_ip6_output_find_policy_match"
@@ -36659,7 +35860,6 @@ signatures {
         args = 1
         anchors {
             "%s (process %s:%u) %s matches %s/%u"
-            "%s (process %s:%u) %s matches %s/%u"
             "%s (process %s:%u) %s no match"
         }
         symbol = "necp_address_matches_drop_dest_policy"
@@ -36670,26 +35870,6 @@ signatures {
         anchors {
             "%s: DATA-TRACE <%s>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
             "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s>: %s - policy id=%d session_order=%d policy_order=%d result=%s (cond_policy_id %d) (skip_session_order %d skip_order %d)\n"
-            "%s: DATA-TRACE <%s>: %s - fam %d proto %d port <local %d/%d remote %d/%d> <local %s remote %s> <drop-all order %d> <BoundInterface %d> (policy id=%d session_order=%d policy_order=%d result=%s)\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
-            "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
             "%s: DATA-TRACE <%s>: ------ %smatching <%s> <value (%d / 0x%X) (%d / 0x%X) (%d / 0x%X) input (%d / 0x%X) (%d / 0x%X) (%d / 0x%X)>\n"
         }
         symbol = "necp_ip_output_find_policy_match_locked"
@@ -36769,7 +35949,6 @@ signatures {
         args = 1
         anchors {
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: Collecting stats\n\n"
-            "%s: Invalid TLV length (%u)\n"
             "%s: NECP CLIENT FLOW TRACE <pid %d %s> <flow %s>: Collected stats - domain <%s> owner <%s> ctxt <%s> bundle id <%s> is_tracker %d is_non_app_initiated %d is_silent %d\n\n"
         }
         symbol = "necp_find_domain_info_common"
@@ -36840,7 +36019,6 @@ signatures {
         anchors {
             "%s: necp_client_request_nexus copyin client_id error (%d)\n"
             "%s: necp_client_request_nexus process not found for pid %d error (%d)\n"
-            "%s: netagent_client_message error (%d)\n"
             "%s: necp_client_request_nexus copyin bufreq error (%d)\n"
             "%s: necp_client_request_nexus copyout bufreq error (%d)\n"
             "%s: Request nexus error (%d)\n"
@@ -36851,7 +36029,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s\n"
             "%s: necp_client_copy_agent copyin agent_uuid error (%d)\n"
         }
         symbol = "necp_client_copy_agent"
@@ -36870,15 +36047,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s\n"
-            "%s: necp_client_copy_agent copyin agent_uuid error (%d)\n"
-        }
-        symbol = "necp_client_acquire_agent_token"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
             "%s: necp_client_update_cache copyin client_id error (%d)\n"
             "%s: necp_client_update_cache no flow error (%d)\n"
             "%s: necp_client_update_cache copyin cache buffer error (%d)\n"
@@ -36891,11 +36059,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Client assignment failed: %d\n"
-            "%s: Client assignment failed: %d\n"
-            "%s: %s\n"
         }
         symbol = "netagent_assign_nexus"
         caller = "?"
@@ -36903,18 +36067,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s\n"
-            "%s: %s\n"
-        }
-        symbol = "netagent_update_flow_protoctl_event"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s: %s\n"
             "%s: Provided user buffer is too small (%u < %u)\n"
-            "%s: Copied agent content (error %d)\n"
             "%s: Copied agent content (error %d)\n"
         }
         symbol = "netagent_copyout"
@@ -36936,7 +36089,6 @@ signatures {
             "%s: Register message size could not be read, error %d data_size %zu\n"
             "%s: Failed to read data into agent structure: %d\n"
             "%s: Failed to register agent: %d\n"
-            "%s: %s\n"
         }
         symbol = "netagent_handle_register_message"
         caller = "?"
@@ -36946,7 +36098,6 @@ signatures {
         anchors {
             "%s: Update message size too small for agent: (%zu < %zu)\n"
             "%s: Update message size could not be read, error %d data_size %zu\n"
-            "%s: Failed to read data into agent structure: %d\n"
         }
         symbol = "netagent_handle_update_message"
         caller = "?"
@@ -36954,13 +36105,9 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: %s\n"
-            "%s: %s\n"
             "%s: Failed to read uuid for assign message: %d\n"
             "%s: Failed to allocate assign message (%lu bytes)\n"
             "%s: Failed to read assign message: %d\n"
-            "%s: Client assignment failed: %d\n"
-            "%s: %s\n"
         }
         symbol = "netagent_handle_assign_nexus_message"
         caller = "?"
@@ -36969,7 +36116,6 @@ signatures {
         args = 0
         anchors {
             "eventhandler_invoke(\"in6_clat46_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "in6_clat46_event_callback"
         caller = "?"
@@ -36985,7 +36131,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s:%d %s\n"
             "%s:%d %s: kauth_authorize_generic(KAUTH_GENERIC_ISSUSER) - error %d\n"
         }
         symbol = "pktap_ioctl"
@@ -37021,7 +36166,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s:%d ifp %s proto %u pre %u post %u\n"
             "%s:%d ifp %s proto %u pre %u post %u\n"
         }
         symbol = "pktap_input"
@@ -37077,7 +36221,6 @@ signatures {
         args = 1
         anchors {
             "%s: deleting route to %s->%s->%s, flags=0x%x\n"
-            "%s: error deleting route to %s->%s->%s, flags=0x%x, err=%d\n"
             "%s: route to %s->%s->%s invalidated, flags=0x%x, expire=T+%u\n"
         }
         symbol = "in_clsroute"
@@ -37089,7 +36232,6 @@ signatures {
             "%s: initial nextstop is T+%u seconds\n"
             "%s: found %u, killed %u\n"
             "%s: adjusted rtq_reallyold to %d seconds\n"
-            "%s: not rescheduling timer\n"
         }
         symbol = "in_rtqtimo"
         caller = "?"
@@ -37162,7 +36304,6 @@ signatures {
         anchors {
             "Segment start (%u) is not same as retransmitted start sequence number (%u)"
             "segment %p[%u %u) was not inserted in the RB tree"
-            "segment %p[%u %u) was not inserted in the RB tree"
         }
         symbol = "tcp_seg_sent_insert"
         caller = "?"
@@ -37201,19 +36342,10 @@ signatures {
         caller = "?"
     }
     new {
-        args = 0
-        anchors {
-            "segment %p[%u %u) was not inserted in the RB tree"
-        }
-        symbol = "tcp_seg_rto_insert_end"
-        caller = "?"
-    }
-    new {
         args = 2
         anchors {
             "bytes_lost (%u) can't be smaller than already lost segment length (%u)"
             "bytes_retransmitted (%u) can't be smaller than already retransmited segment length (%u)"
-            "bytes_sacked (%u) can't be smaller than already SACKed segment length (%u)"
         }
         symbol = "tcp_seg_delete_acked"
         caller = "?"
@@ -37221,16 +36353,7 @@ signatures {
     new {
         args = 0
         anchors {
-            "segment %p[%u %u) was not inserted in the RB tree"
-        }
-        symbol = "tcp_seg_sent_insert_before"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
             "bytes_lost (%u) and/or bytes_retransmitted (%u) can't be smaller than already lost/retransmitted segment length (%u)"
-            "bytes_lost (%u) can't be smaller than already lost segment length (%u)"
         }
         symbol = "tcp_seg_mark_sacked"
         caller = "?"
@@ -37440,7 +36563,6 @@ signatures {
             "(%u): mbuf_copym failed: %d\n"
             "(%u): failed to find type MT_DATA in the mbuf chain.\n"
             "(%u): mbuf_copym() data_len = %lu\n"
-            "(%u): mbuf_copym failed: %d\n"
             "(%u): sent %lu bytes of buffered data\n"
         }
         symbol = "flow_divert_send_buffered_data"
@@ -37457,7 +36579,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "(%u): failed to allocate the header mbuf: %d\n"
             "(%u): mbuf_copyback(hdr) failed: %d\n"
         }
         symbol = "flow_divert_packet_init"
@@ -37475,7 +36596,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "(%u): flow_divert_packet_init failed: %d\n"
             "(%u): flow_divert_append_target_endpoint_tlv() failed: %d\n"
             "(%u): flow_divert_packet_append_tlv(FLOW_DIVERT_TLV_IS_FRAGMENT) failed: %d\n"
             "(%u): flow_divert_packet_append_tlv(FLOW_DIVERT_TLV_DATAGRAM_SIZE) failed: %d\n"
@@ -37745,7 +36865,6 @@ signatures {
             "(%u): mbuf_copydata failed for the header: %d\n"
             "(%u): got an unknown message type: %d\n"
             "(%u): got a %s message from group %d for an unknown pcb: %u\n"
-            "(%u): got an unknown message type: %d\n"
             "(%u): failed to get the key size: %d\n"
             "(%u): Invalid key size: %u\n"
             "(%u): Skipping (re)initialization of defunct group %u\n"
@@ -37808,12 +36927,10 @@ signatures {
             "(%u): socket is not attached any more, ignoring close from provider\n"
             "(%u): socket is not attached any more, ignoring inbound data\n"
             "(%u): Receive buffer is full, will send read notification when app reads some data\n"
-            "(%u): No remote address provided\n"
             "(%u): Remote address is invalid\n"
             "(%u): app cannot receive any more data, dropping %lu bytes of data\n"
             "(%u): socket has an unsupported type: %d\n"
             "(%u): received %lu bytes of data\n"
-            "(%u): mbuf_split failed: %d\n"
             "(%u): failed to dup the socket address.\n"
             "(%u): failed to append %lu bytes of data: %d\n"
             "(%u): failed to get the read count: %d\n"
@@ -37878,7 +36995,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s - %lx: Couldn\\'t find proc for pid %u\n"
             "%s - %lx: unable to create subflow socket error %d\n"
             "%s - %lx: necp_client_register_socket_flow failed with error %d\n"
             "%s - %lx: state changed during unlock: %u flags %#x\n"
@@ -37904,7 +37020,6 @@ signatures {
         anchors {
             "%s - %lx: copyout failed: %d\n"
             "%s - %lx:error from in_getconninfo %d\n"
-            "%s - %lx:error from in_getconninfo %d\n"
             "%s - %lx: Asking for too many ifindex: %u subcount %u, mpts? %s\n"
         }
         symbol = "mptcp_getconninfo"
@@ -37926,11 +37041,8 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s - %lx: Wrong ADD_ADDR length %u\n"
             "%s - %lx: Received ADD_ADDR with echo bit\n"
-            "%s - %lx: ADD_ADDR invalid addr: %x\n"
             "%s - %lx: ADD_ADDR addr: %x invalid HMAC\n"
-            "%s - %lx: ADD_ADDRv6 invalid addr: %s\n"
             "%s - %lx: ADD_ADDR addr: %s invalid HMAC\n"
             "%s - %lx: Received ADD_ADDRv1\n"
         }
@@ -37998,7 +37110,6 @@ signatures {
             "ip6_output: AH with IPv6 jumbogram is not supported\n"
             "ah6_output: internal error: sav->replay is null: SPI=%u\n"
             "ah6_output: unsupported algorithm: SPI=%u\n"
-            "replay counter overflowed. %s\n"
         }
         symbol = "ah6_output"
         caller = "?"
@@ -38040,19 +37151,10 @@ signatures {
         args = 2
         anchors {
             "esp_cbc_encrypt %s: unsupported ivlen %d\n"
-            "esp_cbc_encrypt %s: unsupported ivlen/blocklen: %d %d\n"
             "esp_cbc_encrypt %s: bad len %d/%u\n"
             "esp_cbc_encrypt %s: payload length must be multiple of %u\n"
         }
         symbol = "esp_cbc_encrypt"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s:%d payload length %zu must be a multiple of ESP_CBC_DES_BLOCKLEN, SPI 0x%08x"
-        }
-        symbol = "esp_cbc_des_decrypt_data"
         caller = "?"
     }
     new {
@@ -38064,17 +37166,8 @@ signatures {
             "esp_cbc_mature: unsupported algorithm.\n"
             "esp_cbc_mature %s: invalid key length %d.\n"
             "esp_cbc_mature %s: weak key was passed.\n"
-            "esp_cbc_mature %s: invalid key length %d.\n"
         }
         symbol = "esp_cbc_mature"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s:%d payload length %zu must be a multiple of ESP_CBC_3DES_BLOCKLEN, SPI 0x%08x"
-        }
-        symbol = "esp_cbc_3des_decrypt_data"
         caller = "?"
     }
     new {
@@ -38084,7 +37177,6 @@ signatures {
             "esp_gcm_mature: algorithm incompatible with derived\n"
             "esp_gcm_mature: no key is given.\n"
             "esp_gcm_mature: unsupported algorithm.\n"
-            "esp_gcm_mature %s: invalid key length %d.\n"
             "esp_gcm_mature %s: invalid key length %d.\n"
             "esp_gcm_mature %s: invalid algo %d.\n"
         }
@@ -38118,18 +37210,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "esp_cbc_decrypt %s: unsupported ivlen %d\n"
-            "esp_cbc_decrypt %s: bad len %d/%u\n"
-            "esp_cbc_decrypt %s: payload length must be multiple of %d\n"
-        }
-        symbol = "esp_cbc_decrypt_aes"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
-            "esp_cbc_encrypt %s: unsupported ivlen %d\n"
-            "esp_cbc_encrypt %s: bad len %d/%u\n"
             "esp_cbc_encrypt %s: payload length must be multiple of %d\n"
         }
         symbol = "esp_cbc_encrypt_aes"
@@ -38147,8 +37227,6 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s: unsupported ivlen %d\n"
-            "%s: IIV and GMAC-only not supported together\n"
             "%s: gcm reset failure\n"
             "%s: iv generation failure\n"
             "%s: iv set failure\n"
@@ -38165,15 +37243,10 @@ signatures {
     new {
         args = 1
         anchors {
-            "%s: unsupported ivlen %d\n"
-            "%s: IIV and GMAC-only not supported together\n"
-            "%s: bad len %d/%u\n"
             "%s: failed to set IV\n"
             "%s: packet decryption ESP header AAD failure\n"
             "%s: packet decryption IV AAD failure\n"
             "%s: failed to decrypt\n"
-            "%s: failed to add data to AAD\n"
-            "%s: not enough mbufs %d %d, SPI 0x%08x"
         }
         symbol = "esp_gcm_decrypt_aes"
         caller = "?"
@@ -38190,7 +37263,6 @@ signatures {
         args = 1
         anchors {
             "%s:%d ChaChaPoly Packet too short %d < %u, SPI 0x%08x"
-            "%s:%d chacha20poly1305_decrypt failed %d, SPI 0x%08x"
             "%s:%d not enough mbufs %d %d, SPI 0x%08x"
         }
         symbol = "esp_chachapoly_decrypt"
@@ -38250,11 +37322,7 @@ signatures {
             "ipsec6 interface kpipe output: source buffer shorter than ipv6 header, %u\n"
             "ipsec6 interface kpipe output: failed to find outbound sav\n"
             "ipsec6 interface kpipe output: sah is NULL\n"
-            "ipsec tunnel mode not supported in kpipe mode, SPI=%x\n"
-            "sadb flag %x not supported in kpipe mode, SPI=%x\n"
             "ipsec6 interface kpipe outputbuflet size shorter than hlen %u, SPI=%x\n"
-            "AH not supported in kpipe mode\n"
-            "unknown ipsec protocol %d\n"
         }
         symbol = "ipsec6_interface_kpipe_output"
         caller = "?"
@@ -38262,7 +37330,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "ipsec6_tunnel_validate pkthdr %d off %d ip6hdr %zu"
             "ipsec6_tunnel_validate pkthdr %d off %d ip6hdr %zu"
             "ipsec6_tunnel_validate invalid nxt(%u) protocol"
         }
@@ -38280,7 +37347,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "%s: ifnet_list_get_all() failed %d"
             "%s: ifnet_get_local_ports_extended(%s) failed %d"
         }
         symbol = "ipsec_get_local_ports"
@@ -38307,7 +37373,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "ipsec4_output: unknown ipsec protocol %d\n"
             "ipsec6_output_tunnel: unsupported inner family, spi=%u\n"
             "ipsec6_output_tunnel: unknown ipsec protocol %d\n"
             "ipsec6_output_tunnel: IPsec with IPv6 jumbogram is not supported\n"
@@ -38359,7 +37424,6 @@ signatures {
         args = 0
         anchors {
             "eventhandler_invoke(\"in6_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "in6_event_callback"
         caller = "?"
@@ -38395,50 +37459,15 @@ signatures {
         args = 1
         anchors {
             "%s: unable to insert route to %s:%s, flags=0x%x, due to existing ND6 route %s->%s flags=0x%x, attempting to delete\n"
-            "%s: route to %s->%s->%s inserted, oflags=0x%x, flags=0x%x\n"
-            "%s: route to %s->%s->%s inserted, flags=0x%x\n"
-            "%s: unable to insert route to %s->%s->%s, flags=0x%x, already exists\n"
         }
         symbol = "in6_addroute"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
-            "%s: deleting route to %s->%s->%s, flags=0x%x\n"
-            "%s: error deleting route to %s->%s->%s, flags=0x%x, err=%d\n"
-            "%s: route to %s->%s->%s invalidated, flags=0x%x, expire=T+%u\n"
-        }
-        symbol = "in6_clsroute"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s: initial nextstop is T+%u seconds\n"
-            "%s: found %u, killed %u\n"
-            "%s: adjusted rtq_reallyold to %d seconds\n"
-            "%s: not rescheduling timer\n"
-        }
-        symbol = "in6_rtqtimo"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "%s: inm %llx already on relq ifp %s\n"
-            "%s: adding inm %llx on relq ifp %s\n"
-        }
-        symbol = "mld_append_relq"
         caller = "?"
     }
     new {
         args = 0
         anchors {
             "%s: ignore v2 query on ifp %s\n"
-            "%s: ignore v1 query src %s on ifp %s\n"
             "%s: input v2 query on ifp %s\n"
-            "%s: process v2 general query on ifp %s\n"
             "%s: GS query throttled\n"
             "%s: process v2 group query on ifp %s\n"
             "%s: v2 general query response scheduled in T+%d seconds on ifp %s\n"
@@ -38512,11 +37541,6 @@ signatures {
             "nd6_na_input: a solicited adv is multicasted\n"
             "nd6_na_input: invalid ND option, ignored\n"
             "nd6_na_input: lladdrlen mismatch for %s (if %d, NA packet %d)\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
-            "[%s:%d]: NDP cache entry changed from %s -> %s for address %s.\n"
         }
         symbol = "nd6_na_input"
         caller = "?"
@@ -38590,7 +37614,6 @@ signatures {
             "%s: invalid option len %d for route information option, ignored\n"
             "%s: invalid prefix length %d in the route information option, ignored\n"
             "%s: invalid prefix len %d is OOB for route information option, with total option length of %d. Ignored.\n"
-            "%s: invalid prefix len %d is OOB for route information option, with total option length of %d. Ignored.\n"
             "%s: using reserved preference mask, ignored\n"
             "%s: received RA with route opt, prefix %s/%u pref %u lifetime %u\n"
             "nd6_ra_input: invalid option len %d for prefix information option, ignored\n"
@@ -38612,7 +37635,6 @@ signatures {
             "prelist_update: failed to make the prefix %s/%d on-link on %s (errno=%d)\n"
             "prelist_update: nd6_prelist_add failed for %s/%d on %s errno=%d, returnpr=0x%llx\n"
             "prelist_update: failed to create a temporary address, errno=%d\n"
-            "Could not configure CLAT46 address on interface %s.\n"
         }
         symbol = "prelist_update"
         caller = "?"
@@ -38622,11 +37644,8 @@ signatures {
         anchors {
             "%s: is now the default interface (was %s)\n"
             "No default interface set\n"
-            "%s: failed to make %s/%d offlink on %s, errno=%d\n"
             "%s: scoped %s/%d on %s has no matching unscoped prefix\n"
-            "%s: failed to make %s/%d offlink on %s, errno=%d\n"
             "%s: failed to make %s/%d scoped onlink on %s, errno=%d\n"
-            "%s: failed to make %s/%d onlink on %s, errno=%d\n"
             "%s: error promoting %s/%d to %s from %s\n"
             "%s: %s/%d promoted, previously on %s\n"
         }
@@ -38656,8 +37675,6 @@ signatures {
             "register custom ipsec: address family mismatched\n"
             "register custom ipsec: address struct size mismatched\n"
             "register custom ipsec: invalid ipsec token\n"
-            "register custom esp: invalid address length\n"
-            "register custom esp: invalid address length\n"
             "register custom esp: invalid address length\n"
             "register custom esp: invalid proto %u\n"
             "register custom esp: SA exists\n"
@@ -38727,14 +37744,6 @@ signatures {
             "key_getnewspid: to allocate policy id is failed.\n"
         }
         symbol = "key_getnewspid"
-        caller = "?"
-    }
-    new {
-        args = 1
-        anchors {
-            "key_setdumpsp: packet header length > UINT16_MAX\n"
-        }
-        symbol = "key_setdumpsp"
         caller = "?"
     }
     new {
@@ -38919,14 +37928,6 @@ signatures {
         caller = "?"
     }
     new {
-        args = 1
-        anchors {
-            "jetsam: new idle delay interval has invalid value.\n"
-        }
-        symbol = "sysctl_jetsam_set_apps_idle_delay_time"
-        caller = "?"
-    }
-    new {
         args = 0
         anchors {
             "memorystatus_perform_idle_demotion()\n"
@@ -39039,8 +38040,6 @@ signatures {
         args = 1
         anchors {
             "mbuf_allocpacket %d"
-            "mbuf_allocpacket %d"
-            "mbuf_allocpacket %d"
         }
         symbol = "mbuf_allocpacket"
         caller = "?"
@@ -39049,7 +38048,6 @@ signatures {
         args = 0
         anchors {
             "eventhandler_invoke(\"protoctl_event\")"
-            "eventhandler_invoke: executing %p"
         }
         symbol = "protoctl_event_callback"
         caller = "?"
@@ -39057,7 +38055,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "sendit_x: internalize_user_msg_x error %d\n"
             "sendit_x: internalize_user_msg_x error %d\n"
             "sendit_x: mbuf_packet_from_uio error %d\n"
             "sendit_x: sockargs error %d\n"
@@ -39091,7 +38088,6 @@ signatures {
     new {
         args = 0
         anchors {
-            "TRACKER - %s:%d %s - %s <%s> len %d <%s> len %d <flags %X> %x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x (hash 0x%X hashsize %d)\n"
             "TRACKER - %s:%d %s - %s <%s> len %d <%s> len %d <flags %X> %x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x (hash 0x%X hashsize %d)\n"
         }
         symbol = "tracker_entry_log"
@@ -39132,30 +38128,6 @@ signatures {
             "PMRD: %s(%s, %x)\n"
         }
         symbol = "__ZN14IOPMrootDomain30changePowerStateWithOverrideToEmj"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "PMRD: %s(%s, %x)\n"
-        }
-        symbol = "__ZN14IOPMrootDomain25changePowerStateWithTagToEmj"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "PMRD: %s(%s, %x)\n"
-        }
-        symbol = "__ZN14IOPMrootDomain29changePowerStateWithTagToPrivEmj"
-        caller = "?"
-    }
-    new {
-        args = 0
-        anchors {
-            "PMRD: clamshell closed %d, disabled %d/%x, desktopMode %d, ac %d\n"
-        }
-        symbol = "__ZN14IOPMrootDomain28shouldSleepOnClamshellClosedEv"
         caller = "?"
     }
     new {

@@ -49,6 +49,7 @@ def find_single_refs() -> None:
     seg_start = get_segment_ea("__text")
     seg_end = idc.get_segm_end(seg_start)
     unique_function_names = set()
+    unique_anchor_strings = set()
 
     sigs = {}
 
@@ -57,6 +58,9 @@ def find_single_refs() -> None:
         # print(f'👀 for XREFs to 0x{s.address:x}: "{repr(s.content)}"')
         xrefs = get_xrefs(s.address)
         if xrefs is not None and len(xrefs) == 1:
+            if repr(s.content) in unique_anchor_strings:
+                continue
+            unique_anchor_strings.add(repr(s.content))
             if xrefs[0] < seg_start or xrefs[0] > seg_end:
                 continue
             func_name = idc.get_func_name(xrefs[0])
