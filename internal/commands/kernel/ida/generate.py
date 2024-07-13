@@ -18,19 +18,25 @@ def get_func_arg_count(ea: ea_t) -> int:
     return ida_funcs.get_func(ea).regargqty
 
 
-def get_segment_ea(segment_name: str) -> Optional[int]:
+def get_segment_ea(segment_name: str) -> Optional[Iterable[int]]:
     for seg in idautils.Segments():
         if idc.get_segm_name(seg) == segment_name:
-            return idc.get_segm_start(seg)
+            yield idc.get_segm_start(seg)
     return None
 
 
-def get_cstrings():
-    seg_start = get_segment_ea("__cstring")
-    seg_end = idc.get_segm_end(seg_start)
+def is_in_segment(ea: ea_t, segment_name: str) -> bool:
+    for seg_start in get_segment_ea(segment_name):
+        if seg_start is None:
+            return False
+        return seg_start <= ea < idc.get_segm_end(seg_start)
+    return False
+
+def get_unique_cstrings():
+    strs = []
     for string in idautils.Strings():
         # filter out strings that are not in the __cstring section
-        if seg_start <= string.ea < seg_end:
+        if is_in_segment(string.ea, "__cstring") or is_in_segment(string.ea, "__os_log"):
             yield StringInfo(string.ea, str(string))
 
 
@@ -50,7 +56,7 @@ def fix_string(s):
 
 
 def find_single_refs() -> None:
-    seg_start = get_segment_ea("__text")
+    seg_start = next(get_segment_ea("__text"))
     seg_end = idc.get_segm_end(seg_start)
     unique_function_names = set()
     # FIXME: If a string is NOT unique we can't use it as an anchor
@@ -65,7 +71,7 @@ def find_single_refs() -> None:
         xrefs = get_xrefs(cstr.address)
         if xrefs is not None and len(xrefs) == 1:
             if repr(cstr.content) in unique_anchor_strings:
-                print(f"Skipping duplicate string: {cstr.content}")
+                print(f"Skipping duplicate string: {repr(cstr.content)}")
                 continue
             unique_anchor_strings.add(repr(cstr.content))
             if xrefs[0] < seg_start or xrefs[0] > seg_end:
@@ -80,7 +86,7 @@ def find_single_refs() -> None:
                 sigs[func_name] = {"args": args, "anchors": []}
             sigs[func_name]["anchors"].append(repr(cstr.content))
             # print(f'0x{xrefs[0]:x}: {func_name}(args: {args}) -> "{repr(s.content)}"')
-    print("✅ Done looking for single references to strings")
+    print("✅ Done")
 
     # Output unique function names
     print(f"\n{len(unique_function_names)}: Unique Function Names\n")
