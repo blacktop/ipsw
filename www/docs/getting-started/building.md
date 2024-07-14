@@ -23,8 +23,6 @@ import TabItem from '@theme/TabItem';
 
 ## Install the Go binary
 
-Get *golang*
-
 ```bash
 brew install go
 ```
@@ -81,22 +79,19 @@ CGO_ENABLED=1 go build --mod=vendor ./cmd/ipsw
 ```
 ## Install the Golang
 
-Get *golang*
-
 ```bash
 sudo add-apt-repository ppa:longsleep/golang-backports
 sudo apt update
 sudo apt install -y golang-go
 ```
 
-:::info apfs-fuse
+:::info [apfs-fuse](https://github.com/sgan81/apfs-fuse)
 
-For many of the `ipsw` commands you will need to be able to `mount` DMGs and this is done via `apfs-fuse`
+For many of the `ipsw` commands you will need to be able to `mount` DMGs and this is done via [apfs-fuse](https://github.com/sgan81/apfs-fuse)
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libbz2-dev libz-dev cmake build-essential git libattr1-dev
-sudo apt-get install -y libfuse3-dev fuse3 tzdataxz-utils bzip2 unzip lzma
+sudo apt-get install -y libbz2-dev libz-dev cmake build-essential libattr1-dev libfuse3-dev fuse3 tzdataxz-utils bzip2 unzip lzma
 cd /tmp
 git clone https://github.com/sgan81/apfs-fuse.git
 cd apfs-fuse
@@ -105,7 +100,7 @@ git submodule update
 mkdir build
 cd build
 cmake ..
-make install
+sudo make install
 ```
 :::
 
