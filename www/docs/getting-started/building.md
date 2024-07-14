@@ -1,5 +1,6 @@
 ---
 description: How to build ipsw from source.
+hide_table_of_contents: true
 ---
 
 # Building
@@ -8,7 +9,17 @@ description: How to build ipsw from source.
 
 ## Requirements {#requirements}
 
-- [Golang](https://go.dev/dl/) *1.19+*
+- [Golang](https://go.dev/dl/) *1.22+*
+
+```mdx-code-block
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+```
+
+```mdx-code-block
+<Tabs>
+<TabItem value="macOS">
+```
 
 ## Install the Go binary
 
@@ -18,7 +29,7 @@ Get *golang*
 brew install go
 ```
 
-Build the `ipsw` binary
+## Build the `ipsw` binary
 
 ```bash
 git clone https://github.com/blacktop/ipsw.git
@@ -31,7 +42,7 @@ make build
 Get *goreleaser* and *zig*
 
 ```bash
-brew install goreleaser zig
+brew install goreleaser zig unicorn libusb
 ```
 
 Build for all supported platforms
@@ -63,3 +74,63 @@ CGO_ENABLED=1 go build --mod=vendor ./cmd/ipsw
 ```
 
 :::
+
+```mdx-code-block
+</TabItem>
+<TabItem value="Linux">
+```
+## Install the Golang
+
+Get *golang*
+
+```bash
+sudo add-apt-repository ppa:longsleep/golang-backports
+sudo apt update
+sudo apt install -y golang-go
+```
+
+:::info apfs-fuse
+
+For many of the `ipsw` commands you will need to be able to `mount` DMGs and this is done via `apfs-fuse`
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libbz2-dev libz-dev cmake build-essential git libattr1-dev
+sudo apt-get install -y libfuse3-dev fuse3 tzdataxz-utils bzip2 unzip lzma
+cd /tmp
+git clone https://github.com/sgan81/apfs-fuse.git
+cd apfs-fuse
+git submodule init
+git submodule update
+mkdir build
+cd build
+cmake ..
+make install
+```
+:::
+
+## Get the `ipsw` source
+
+```bash
+git clone https://github.com/blacktop/ipsw.git
+cd ipsw
+```
+
+## Build the `ipsw` binary
+
+```bash
+sudo CGO_ENABLED=1 go build -o /usr/local/bin/ipsw ./cmd/ipsw
+```
+
+## Build the `ipswd` binary
+
+Build the ipsw *daemon* binary
+
+```bash
+sudo CGO_ENABLED=1 go build -o /usr/local/bin/ipswd ./cmd/ipswd
+```
+
+```mdx-code-block
+</TabItem>
+</Tabs>
+```
