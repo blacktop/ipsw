@@ -113,6 +113,8 @@ cd ipsw
 
 ## Build the `ipsw` binary
 
+Build the ipsw *CLI* binary
+
 ```bash
 sudo CGO_ENABLED=1 go build -o /usr/local/bin/ipsw ./cmd/ipsw
 ```
