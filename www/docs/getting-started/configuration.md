@@ -1,17 +1,56 @@
 ---
-description: How to configure ipsw with ~/.config/ipsw/config.yml
+description: How to configure ipsw with `config.yml`
 ---
 
 # Configuration
 
-> How to configure ipsw with ~/.config/ipsw/config.yml
+> How to configure ipsw with `config.yml`
 
-## `ipsw` config
+## `ipsw` config.yml
 
-You can also use a config file with `ipsw` so you don't have to use the flags
+You can also use a config file with `ipsw`/`ipswd` so you don't have to use the flags
+
+```mdx-code-block
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+```
+
+```mdx-code-block
+<Tabs>
+<TabItem value="macOS">
+```
 
 ```bash
 ❯ cat ~/.config/ipsw/config.yml
+```
+
+```mdx-code-block
+</TabItem>
+<TabItem value="Linux">
+```
+
+```bash
+❯ cat /etc/ipsw/config.yml
+```
+
+Installed with `snap`
+
+```bash
+❯ cat /root/snap/ipswd/common/ipsw/config.yml
+```
+
+```mdx-code-block
+</TabItem>
+<TabItem value="Windows">
+```
+
+```bash
+PS> cat $AppData/ipsw/config.yml
+```
+
+```mdx-code-block
+</TabItem>
+</Tabs>
 ```
 
 ```yaml
