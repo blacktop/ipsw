@@ -121,6 +121,12 @@ update_frida: ## Updates the frida-core-devkits used in the frida cmd
 	@echo " > Updating frida-core-devkits"
 	@hack/make/frida-deps
 
+.PHONY: work-macho
+work-macho: ## Work on go-macho package
+	@echo " > Working on go-macho package"
+	@go work init
+	@go work use . ../go-macho
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
