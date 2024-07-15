@@ -71,7 +71,10 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	var strs []string
 	if conf.CStrings {
 		if cs, err := m.GetCStrings(); err == nil {
-			strs = maps.Values(cs)
+			for _, val := range cs {
+				str2addr := maps.Keys(val)
+				strs = append(strs, str2addr...)
+			}
 			slices.Sort(strs)
 		}
 	}
