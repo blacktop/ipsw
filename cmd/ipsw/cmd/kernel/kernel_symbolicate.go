@@ -22,7 +22,11 @@ THE SOFTWARE.
 package kernel
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
 	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
@@ -35,8 +39,13 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kernelSymbolicateCmd)
 
+	kernelSymbolicateCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
+	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
+	kernelSymbolicateCmd.MarkFlagDirname("output")
+	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
+	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
 }
 
 // kernelSymbolicateCmd represents the symbolicate command
@@ -64,9 +73,47 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 
 		// symbolicate kernelcache
+		symMap := make(map[uint64]string)
 		for _, sig := range sigs {
-			if err := kcmd.Symbolicate(args[0], sig); err != nil {
+			syms, err := kcmd.Symbolicate(args[0], sig)
+			if err != nil {
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+			}
+			maps.Copy(symMap, syms)
+		}
+
+		if viper.GetBool("kernel.symbolicate.json") {
+			jdat, err := json.Marshal(symMap)
+			if err != nil {
+				return fmt.Errorf("failed to marshal symbol map: %v", err)
+			}
+
+			if viper.IsSet("kernel.symbolicate.output") {
+				fname := filepath.Join(viper.GetString("kernel.symbolicate.output"), "symbols.json")
+				log.Infof("Writing symbols as JSON to %s", fname)
+				return os.WriteFile(fname, jdat, 0o644)
+			}
+
+			fmt.Println(string(jdat))
+
+			return nil
+		}
+
+		if viper.IsSet("kernel.symbolicate.output") {
+			fname := filepath.Join(viper.GetString("kernel.symbolicate.output"), "symbols.map")
+			log.Infof("Writing symbols to %s", fname)
+			f, err := os.Create(fname)
+			if err != nil {
+				return fmt.Errorf("failed to create symbols file: %v", err)
+			}
+			defer f.Close()
+			for addr, sym := range symMap {
+				fmt.Fprintf(f, "%#x %s\n", addr, sym)
+			}
+		} else {
+			fmt.Printf("%s symbols:\n", filepath.Base(args[0]))
+			for addr, sym := range symMap {
+				fmt.Printf("%#x %s\n", addr, sym)
 			}
 		}
 

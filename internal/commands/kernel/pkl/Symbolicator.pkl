@@ -3,9 +3,9 @@ module io.blacktop.Symbolicator
 
 import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl" 
 
+// TODO: add support for global variables/constants
 // TODO: byte pattern matching
-// TODO: use arg count to match functions with same anchor strings
-// TODO: use caller to get more symbols
+// TODO: use arg count to assist in identifying anchor caller (as arg position/register)
 
 /// The target for the signatures.
 target: String
