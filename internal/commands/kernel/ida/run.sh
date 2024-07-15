@@ -19,7 +19,8 @@ fi
 main() {
     KERNELCACHE_PATH="$1"
     echo "  🚀 Starting... $KERNELCACHE_PATH"
-    /Applications/IDA\ Pro\ 8.4/ida64.app/Contents/MacOS/idat64 -A -P -S"generate.py" -L/tmp/ida.log $KERNELCACHE_PATH
+    # IDA Help: Command line switches - https://www.hex-rays.com/products/ida/support/idadoc/417.shtml
+    /Applications/IDA\ Pro\ 8.4/ida64.app/Contents/MacOS/idat64 -A -P -S'generate/generate.py' -L/tmp/ida.log $KERNELCACHE_PATH
     echo "  🎉 Done!"
 }
 
