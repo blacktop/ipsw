@@ -77,37 +77,35 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 
 	for _, sig := range sigs.Signatures {
 		found := false
-		for addr, s := range cstrs {
-			for _, anchor := range sig.Anchors {
-				if s == anchor {
-					log.WithFields(log.Fields{
-						"pattern": truncate(strconv.Quote(s), 40),
-						"address": fmt.Sprintf("%#09x", addr),
+		for _, anchor := range sig.Anchors {
+			if addr, ok := cstrs[fmt.Sprintf("%s.%s", anchor.Segment, anchor.Section)][anchor.String]; ok {
+				log.WithFields(log.Fields{
+					"pattern": truncate(strconv.Quote(anchor.String), 40),
+					"address": fmt.Sprintf("%#09x", addr),
+					"file":    name,
+					"symbol":  sig.Symbol,
+				}).Debug("Found Signature")
+				if ok, loc := engine.Contains(addr); ok {
+					fn, err := m.GetFunctionForVMAddr(loc)
+					if err != nil {
+						log.Errorf("failed to get function for address: %v", err)
+						break
+					}
+					utils.Indent(log.WithFields(log.Fields{
 						"file":    name,
+						"address": fmt.Sprintf("%#09x", fn.StartAddr),
 						"symbol":  sig.Symbol,
-					}).Debug("Found Signature")
-					if ok, loc := engine.Contains(addr); ok {
-						fn, err := m.GetFunctionForVMAddr(loc)
-						if err != nil {
-							log.Errorf("failed to get function for address: %v", err)
-							break
-						}
-						utils.Indent(log.WithFields(log.Fields{
-							"file":    name,
-							"address": fmt.Sprintf("%#09x", fn.StartAddr),
-							"symbol":  sig.Symbol,
-						}).Info, 2)("Symbolicated")
-						found = true
-					}
-					if found {
-						break // break out of sig.Anchors loop
-					} else {
-						utils.Indent(log.WithFields(log.Fields{
-							"macho":  name,
-							"anchor": truncate(strconv.Quote(anchor), 40),
-							"symbol": sig.Symbol,
-						}).Warn, 2)("No XREFs found")
-					}
+					}).Info, 2)("Symbolicated")
+					found = true
+				}
+				if found {
+					break // break out of sig.Anchors loop
+				} else {
+					utils.Indent(log.WithFields(log.Fields{
+						"macho":  name,
+						"anchor": truncate(strconv.Quote(anchor.String), 40),
+						"symbol": sig.Symbol,
+					}).Warn, 2)("No XREFs found")
 				}
 			}
 			if found {
@@ -118,7 +116,6 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) error
 			utils.Indent(log.WithFields(log.Fields{
 				"macho":  name,
 				"symbol": sig.Symbol,
-				"anchor": truncate(strconv.Quote(sig.Anchors[0]), 40),
 			}).Warn, 2)("Signature Not Matched")
 			notFound++
 		}
