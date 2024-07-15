@@ -1,0 +1,58 @@
+@go.Package { name = "github.com/blacktop/ipsw/pkg/signature" }
+module io.blacktop.Symbolicator
+
+import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl" 
+
+// TODO: add support for global variables/constants
+// TODO: byte pattern matching
+// TODO: use arg count to assist in identifying anchor caller (as arg position/register)
+
+/// The target for the signatures.
+target: String
+
+// The number of symbols that can be symbolicated.
+total: UInt
+
+class Version {
+    /// The maximum version supported.
+    max: String
+
+    /// The minimum version supported.
+    min: String
+}
+
+/// The version of the signatures.
+version: Version
+
+class Anchor {
+    /// The unique string.
+    string: String
+
+    /// The segment the string is in.
+    segment: String
+
+    /// The section the string is in.
+    section: String
+
+    /// The name of the function that uses this as an argument.
+    caller: String    
+}
+
+class Signature {
+    /// The number of args.
+    args: UInt16
+
+    /// The unique anchors in function.
+    anchors: Listing<Anchor>
+
+    /// The name of the function this signature matches.
+    symbol: String
+
+    /// The function prototype.
+    prototype: String
+
+    /// The name of the function that calls this function.
+    caller: String
+}
+
+signatures: Listing<Signature>(isDistinct)
