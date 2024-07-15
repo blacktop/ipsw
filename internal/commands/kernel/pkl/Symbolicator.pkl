@@ -21,15 +21,32 @@ class Version {
 /// The version of the signatures.
 version: Version
 
+class Anchor {
+    /// The unique string.
+    string: String
+
+    /// The segment the string is in.
+    segment: String
+
+    /// The section the string is in.
+    section: String
+
+    /// The name of the function that uses this as an argument.
+    caller: String    
+}
+
 class Signature {
     /// The number of args.
     args: UInt16
 
-    /// The unique strings in function.
-    anchors: Listing<String>
+    /// The unique anchors in function.
+    anchors: Listing<Anchor>
 
     /// The name of the function this signature matches.
     symbol: String
+
+    /// The function prototype.
+    prototype: String
 
     /// The name of the function that calls this function.
     caller: String

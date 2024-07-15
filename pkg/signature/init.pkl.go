@@ -7,4 +7,5 @@ func init() {
 	pkl.RegisterMapping("io.blacktop.Symbolicator", Symbolicator{})
 	pkl.RegisterMapping("io.blacktop.Symbolicator#Version", Version{})
 	pkl.RegisterMapping("io.blacktop.Symbolicator#Signature", Signature{})
+	pkl.RegisterMapping("io.blacktop.Symbolicator#Anchor", Anchor{})
 }
