@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 from collections import Counter
 from typing import Iterable, Optional
 
@@ -240,5 +241,12 @@ def find_single_refs(pkl_path: str) -> None:
 
 
 if __name__ == "__main__":
-    find_single_refs("/tmp/kernel_symbols.pkl")
+    pkl_path = os.getenv('PKL_FILE')
+    if not pkl_path:
+        print("=======================================================================================")        
+        print("❌ ERROR: 'PKL_FILE' environment variable not set")
+        print("=======================================================================================")        
+        qexit(1)
+    else:
+        find_single_refs(pkl_path)
     qexit(0)
