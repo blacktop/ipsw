@@ -11,6 +11,8 @@ type Symbolicator struct {
 	// The target for the signatures.
 	Target string `pkl:"target"`
 
+	Total uint `pkl:"total"`
+
 	// The version of the signatures.
 	Version *Version `pkl:"version"`
 

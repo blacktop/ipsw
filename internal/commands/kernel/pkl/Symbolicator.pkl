@@ -10,6 +10,9 @@ import "package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.8.0#/go.pkl"
 /// The target for the signatures.
 target: String
 
+// The number of symbols that can be symbolicated.
+total: UInt
+
 class Version {
     /// The maximum version supported.
     max: String
