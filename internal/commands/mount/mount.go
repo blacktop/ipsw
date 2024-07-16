@@ -100,6 +100,7 @@ func DmgInIPSW(path, typ, pemDB string) (*Context, error) {
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
+		defer os.Remove(extractedDMG) // remove the encrypted AEA DMG decrypting and mounting
 		extractedDMG, err = aea.Decrypt(extractedDMG, filepath.Dir(extractedDMG), nil, pemDB)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)

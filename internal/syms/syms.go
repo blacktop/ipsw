@@ -50,7 +50,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 			// symbolicate kernelcache
 			for _, sig := range sigs {
 				kextSyms[sig.Target] = make(map[uint64]string)
-				syms, err := kcmd.Symbolicate(k, sig)
+				syms, err := kcmd.Symbolicate(k, sig, true)
 				if err != nil {
 					return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 				}

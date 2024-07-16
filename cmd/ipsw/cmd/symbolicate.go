@@ -51,6 +51,7 @@ func init() {
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -60,6 +61,7 @@ func init() {
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -95,6 +97,7 @@ var symbolicateCmd = &cobra.Command{
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
 		pemDB := viper.GetString("symbolicate.pem-db")
+		signaturesDir := viper.GetString("symbolicate.signatures")
 		/* validate flags */
 		if (Verbose || all) && len(proc) > 0 {
 			return fmt.Errorf("cannot use --verbose OR --all WITH --proc")
@@ -112,13 +115,14 @@ var symbolicateCmd = &cobra.Command{
 		switch hdr.BugType {
 		case "210", "309": // NEW JSON STYLE CRASHLOG
 			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
-				All:      all || Verbose,
-				Running:  running,
-				Process:  proc,
-				Unslid:   unslide,
-				Demangle: demangleFlag,
-				PemDB:    pemDB,
-				Verbose:  Verbose,
+				All:           all || Verbose,
+				Running:       running,
+				Process:       proc,
+				Unslid:        unslide,
+				Demangle:      demangleFlag,
+				PemDB:         pemDB,
+				SignaturesDir: signaturesDir,
+				Verbose:       Verbose,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to parse IPS file: %v", err)

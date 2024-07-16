@@ -20,7 +20,7 @@ import (
 	semver "github.com/hashicorp/go-version"
 )
 
-var UnsupportedVersion = errors.New("kernel version not supported")
+var ErrUnsupportedVersion = errors.New("kernel version not supported")
 
 func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -55,11 +55,11 @@ func CheckKernelVersion(m *macho.File, sigs *signature.Symbolicator) (bool, erro
 	}
 	minVer, err := semver.NewVersion(sigs.Version.Min)
 	if err != nil {
-		log.Fatal("failed to convert version into semver object")
+		log.Fatal("failed to convert signature min version into semver object")
 	}
 	maxVer, err := semver.NewVersion(sigs.Version.Max)
 	if err != nil {
-		log.Fatal("failed to convert version into semver object")
+		log.Fatal("failed to convert signature max version into semver object")
 	}
 	if darwin.GreaterThanOrEqual(minVer) && darwin.LessThanOrEqual(maxVer) {
 		return true, nil
@@ -74,7 +74,7 @@ func truncate(in string, length int) string {
 	return in
 }
 
-func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) (map[uint64]string, error) {
+func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator, quiet bool) (map[uint64]string, error) {
 	symbolMap := make(map[uint64]string)
 
 	text := m.Section("__TEXT_EXEC", "__text")
@@ -107,23 +107,27 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) (map[
 		found := false
 		for _, anchor := range sig.Anchors {
 			if addr, ok := cstrs[fmt.Sprintf("%s.%s", anchor.Segment, anchor.Section)][anchor.String]; ok {
-				log.WithFields(log.Fields{
-					"pattern": truncate(strconv.Quote(anchor.String), 40),
-					"address": fmt.Sprintf("%#09x", addr),
-					"file":    name,
-					"symbol":  sig.Symbol,
-				}).Debug("Found Signature")
+				if !quiet {
+					log.WithFields(log.Fields{
+						"pattern": truncate(strconv.Quote(anchor.String), 40),
+						"address": fmt.Sprintf("%#09x", addr),
+						"file":    name,
+						"symbol":  sig.Symbol,
+					}).Debug("Found Signature")
+				}
 				if ok, loc := engine.Contains(addr); ok {
 					fn, err := m.GetFunctionForVMAddr(loc)
 					if err != nil {
 						log.Errorf("failed to get function for address: %v", err)
 						break
 					}
-					utils.Indent(log.WithFields(log.Fields{
-						"file":    name,
-						"address": fmt.Sprintf("%#09x", fn.StartAddr),
-						"symbol":  sig.Symbol,
-					}).Info, 2)("Symbolicated")
+					if !quiet {
+						utils.Indent(log.WithFields(log.Fields{
+							"file":    name,
+							"address": fmt.Sprintf("%#09x", fn.StartAddr),
+							"symbol":  sig.Symbol,
+						}).Info, 2)("Symbolicated")
+					}
 					symbolMap[fn.StartAddr] = sig.Symbol
 					found = true
 					if sig.Caller != "" {
@@ -134,18 +138,22 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) (map[
 								log.Errorf("failed to get function for address: %v", err)
 								break
 							}
-							utils.Indent(log.WithFields(log.Fields{
-								"file":    name,
-								"address": fmt.Sprintf("%#09x", fn.StartAddr),
-								"symbol":  sig.Caller,
-							}).Info, 2)("Symbolicated (Caller)")
+							if !quiet {
+								utils.Indent(log.WithFields(log.Fields{
+									"file":    name,
+									"address": fmt.Sprintf("%#09x", fn.StartAddr),
+									"symbol":  sig.Caller,
+								}).Info, 2)("Symbolicated (Caller)")
+							}
 							symbolMap[fn.StartAddr] = sig.Caller
 						} else {
-							utils.Indent(log.WithFields(log.Fields{
-								"macho":  name,
-								"caller": sig.Caller,
-								"symbol": sig.Symbol,
-							}).Warn, 2)("No XREFs to Caller found")
+							if !quiet {
+								utils.Indent(log.WithFields(log.Fields{
+									"macho":  name,
+									"caller": sig.Caller,
+									"symbol": sig.Symbol,
+								}).Warn, 2)("No XREFs to Caller found")
+							}
 							notFound++
 						}
 					}
@@ -153,11 +161,13 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) (map[
 				if found {
 					break // break out of sig.Anchors loop
 				} else {
-					utils.Indent(log.WithFields(log.Fields{
-						"macho":  name,
-						"anchor": truncate(strconv.Quote(anchor.String), 40),
-						"symbol": sig.Symbol,
-					}).Warn, 2)("No XREFs found")
+					if !quiet {
+						utils.Indent(log.WithFields(log.Fields{
+							"macho":  name,
+							"anchor": truncate(strconv.Quote(anchor.String), 40),
+							"symbol": sig.Symbol,
+						}).Warn, 2)("No XREFs found")
+					}
 				}
 			}
 			if found {
@@ -165,23 +175,26 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator) (map[
 			}
 		}
 		if !found {
-			utils.Indent(log.WithFields(log.Fields{
-				"macho":  name,
-				"symbol": sig.Symbol,
-			}).Warn, 2)("Signature Not Matched")
+			if !quiet {
+				utils.Indent(log.WithFields(log.Fields{
+					"macho":  name,
+					"symbol": sig.Symbol,
+				}).Warn, 2)("Signature Not Matched")
+			}
 			notFound++
 		}
 	}
 
 	log.WithFields(log.Fields{
 		"total":   sigs.Total,
-		"matched": fmt.Sprintf("%.4f%%", float64(int(sigs.Total)-notFound)*100/float64(sigs.Total)),
-	}).Info("STATS")
+		"matched": int(sigs.Total) - notFound,
+		"percent": fmt.Sprintf("%.4f%%", float64(int(sigs.Total)-notFound)*100/float64(sigs.Total)),
+	}).Info("Symbolication STATS")
 
 	return symbolMap, nil
 }
 
-func Symbolicate(infile string, sigs *signature.Symbolicator) (map[uint64]string, error) {
+func Symbolicate(infile string, sigs *signature.Symbolicator, quiet bool) (map[uint64]string, error) {
 	m, err := macho.Open(infile)
 	if err != nil {
 		return nil, err
@@ -192,7 +205,7 @@ func Symbolicate(infile string, sigs *signature.Symbolicator) (map[uint64]string
 		if err != nil {
 			return nil, err
 		}
-		return nil, UnsupportedVersion
+		return nil, ErrUnsupportedVersion
 	}
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
@@ -202,5 +215,5 @@ func Symbolicate(infile string, sigs *signature.Symbolicator) (map[uint64]string
 		}
 	}
 
-	return symbolicate(m, sigs.Target, sigs)
+	return symbolicate(m, sigs.Target, sigs, quiet)
 }
