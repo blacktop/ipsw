@@ -18,6 +18,7 @@ type daemon struct {
 	Debug   bool   `json:"debug" env:"DAEMON_DEBUG"`
 	LogFile string `json:"logfile" env:"DAEMON_LOGFILE"`
 	PemDB   string `json:"pem_db" mapstructure:"pem-db" env:"DAEMON_PEM_DB"`
+	SigsDir string `json:"sigs_dir" mapstructure:"sigs-dir" env:"DAEMON_SIGS_DIR"`
 }
 
 type database struct {

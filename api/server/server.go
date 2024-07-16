@@ -49,6 +49,7 @@ type Config struct {
 	Debug   bool
 	LogFile string
 	PemDB   string
+	SigsDir string
 }
 
 // Server is the main server struct
@@ -96,7 +97,7 @@ func (s *Server) Start(db db.Database) error {
 	routes.Add(rg, s.conf.PemDB)
 
 	if db != nil {
-		syms.AddRoutes(rg, db, s.conf.PemDB)
+		syms.AddRoutes(rg, db, s.conf.PemDB, s.conf.SigsDir)
 	}
 
 	if s.conf.PemDB != "" {

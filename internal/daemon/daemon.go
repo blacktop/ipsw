@@ -83,6 +83,7 @@ func (d *daemon) Start() (err error) {
 		Debug:   d.conf.Daemon.Debug,
 		LogFile: d.conf.Daemon.LogFile,
 		PemDB:   d.conf.Daemon.PemDB,
+		SigsDir: d.conf.Daemon.SigsDir,
 	})
 	if err := d.setupDB(); err != nil {
 		return err

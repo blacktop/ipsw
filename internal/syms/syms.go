@@ -10,6 +10,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/search"
@@ -23,7 +24,7 @@ const (
 	isKernelMask   uint64 = 1 << 62
 )
 
-func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
+func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 	var kcs []*model.Kernelcache
 
 	out, err := extract.Kernelcache(&extract.Config{
@@ -39,6 +40,24 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 		}
 	}()
 	for k := range out {
+		kextSyms := make(map[string]map[uint64]string)
+		if sigDir != "" {
+			// parse signatures
+			sigs, err := kcmd.ParseSignatures(sigDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse signatures: %v", err)
+			}
+			// symbolicate kernelcache
+			for _, sig := range sigs {
+				kextSyms[sig.Target] = make(map[uint64]string)
+				syms, err := kcmd.Symbolicate(k, sig)
+				if err != nil {
+					return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+				}
+				kextSyms[sig.Target] = syms
+			}
+		}
+
 		m, err := macho.Open(k)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open kernel: %w", err)
@@ -82,10 +101,20 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 							End:    fn.EndAddr & highestBitMask,
 						}
 					} else {
-						msym = model.Symbol{
-							Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-							Start:  fn.StartAddr & highestBitMask,
-							End:    fn.EndAddr & highestBitMask,
+						if syms, ok := kextSyms[fe.EntryID]; ok {
+							if sym, ok := syms[fn.StartAddr]; ok {
+								kext.Symbols = append(kext.Symbols, &model.Symbol{
+									Symbol: sym,
+									Start:  fn.StartAddr & highestBitMask,
+									End:    fn.EndAddr & highestBitMask,
+								})
+							}
+						} else {
+							msym = model.Symbol{
+								Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
+								Start:  fn.StartAddr & highestBitMask,
+								End:    fn.EndAddr & highestBitMask,
+							}
 						}
 					}
 					kext.Symbols = append(kext.Symbols, &msym)
@@ -113,10 +142,23 @@ func scanKernels(ipswPath string) ([]*model.Kernelcache, error) {
 						End:    fn.EndAddr & highestBitMask,
 					}
 				} else {
-					msym = model.Symbol{
-						Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
-						Start:  fn.StartAddr & highestBitMask,
-						End:    fn.EndAddr & highestBitMask,
+					found := false
+					for _, syms := range kextSyms {
+						if sym, ok := syms[fn.StartAddr]; ok {
+							kext.Symbols = append(kext.Symbols, &model.Symbol{
+								Symbol: sym,
+								Start:  fn.StartAddr & highestBitMask,
+								End:    fn.EndAddr & highestBitMask,
+							})
+							found = true
+						}
+					}
+					if !found {
+						msym = model.Symbol{
+							Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
+							Start:  fn.StartAddr & highestBitMask,
+							End:    fn.EndAddr & highestBitMask,
+						}
 					}
 				}
 				kext.Symbols = append(kext.Symbols, &msym)
@@ -195,7 +237,7 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 }
 
 // Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
-func Scan(ipswPath, pemDB string, db db.Database) (err error) {
+func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* IPSW */
 	sha1, err := utils.Sha1(ipswPath)
 	if err != nil {
@@ -224,7 +266,7 @@ func Scan(ipswPath, pemDB string, db db.Database) (err error) {
 	}
 
 	/* KERNEL */
-	if ipsw.Kernels, err = scanKernels(ipswPath); err != nil {
+	if ipsw.Kernels, err = scanKernels(ipswPath, sigsDir); err != nil {
 		return fmt.Errorf("failed to scan kernels: %w", err)
 	}
 	log.Debug("Saving IPSW with Kernels")
