@@ -31,9 +31,13 @@ class SymbolicatePlugin(idaapi.plugin_t):
     def process_symbol_map(self, data):
         # Process the symbol map JSON data
         addr2sym = json.dumps(data, indent=4)
+        count = 0
         for addr, sym in data.items():
-            print(f"[Symbolicated] Address: {addr}, Symbol: {sym}")
+            print(f'[Symbolicated] Address: 0x{int(addr, 10):x}, Symbol: {sym}')
             idc.set_name(int(addr, 10), sym, idc.SN_NOWARN)
+            count += 1
+        print(f"🎉 Symbolicated {count} addresses 🎉")
+
 
     def term(self):
         pass
