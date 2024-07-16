@@ -22,6 +22,8 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/commands/extract"
+	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/swift"
@@ -89,13 +91,14 @@ func GetLogTypes() (*LogTypes, error) {
 }
 
 type Config struct {
-	All      bool
-	Running  bool
-	Process  string
-	Unslid   bool
-	Demangle bool
-	Verbose  bool
-	PemDB    string
+	All           bool
+	Running       bool
+	Process       string
+	Unslid        bool
+	Demangle      bool
+	Verbose       bool
+	PemDB         string
+	SignaturesDir string
 }
 
 type Ips struct {
@@ -758,6 +761,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 		}
 	}
 
+	/* SYMBOLICATE FILESYSTEM MACHOS */
+
 	machoFuncMap := make(map[string][]types.Function)
 	if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
 		if total == 0 {
@@ -791,6 +796,96 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	}); err != nil {
 		if !errors.Is(err, ErrDone) {
 			return fmt.Errorf("failed to symbolicate: %w", err)
+		}
+	}
+
+	/* SYMBOLICATE KERNELCACHE */
+	{
+		out, err := extract.Kernelcache(&extract.Config{
+			IPSW:         ipswPath,
+			KernelDevice: i.Payload.Product,
+			Output:       os.TempDir(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to extract kernelcache: %w", err)
+		}
+		defer func() {
+			for k := range out {
+				os.Remove(k)
+			}
+		}()
+		for k := range out {
+			kextSyms := make(map[string]map[uint64]string)
+			if i.Config.SignaturesDir != "" {
+				// parse signatures
+				sigs, err := kcmd.ParseSignatures(i.Config.SignaturesDir)
+				if err != nil {
+					return fmt.Errorf("failed to parse signatures: %v", err)
+				}
+				// symbolicate kernelcache
+				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
+				for _, sig := range sigs {
+					syms, err := kcmd.Symbolicate(k, sig, true)
+					if err != nil {
+						if errors.Is(err, kcmd.ErrUnsupportedVersion) {
+							continue
+						}
+						return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+					}
+					kextSyms[sig.Target] = make(map[uint64]string)
+					kextSyms[sig.Target] = syms
+				}
+			}
+
+			kc, err := macho.Open(k)
+			if err != nil {
+				return fmt.Errorf("failed to open kernelcache: %v", err)
+			}
+			defer kc.Close()
+
+			if kc.FileTOC.FileHeader.Type == types.MH_FILESET {
+				for _, fe := range kc.FileSets() {
+					mfe, err := kc.GetFileSetFileByName(fe.EntryID)
+					if err != nil {
+						return fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
+					}
+					for _, fn := range mfe.GetFunctions() {
+						if syms, err := mfe.FindAddressSymbols(fn.StartAddr); err == nil {
+							for _, sym := range syms {
+								fn.Name = sym.Name
+							}
+						} else {
+							if syms, ok := kextSyms[fe.EntryID]; ok {
+								if sym, ok := syms[fn.StartAddr]; ok {
+									fn.Name = sym
+								}
+							}
+						}
+						if fn.Name == "" {
+							fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+						}
+						machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
+					}
+				}
+			} else { // non-fileset kernelcache
+				for _, fn := range kc.GetFunctions() {
+					if syms, err := kc.FindAddressSymbols(fn.StartAddr); err == nil {
+						for _, sym := range syms {
+							fn.Name = sym.Name
+						}
+					} else {
+						for _, syms := range kextSyms {
+							if sym, ok := syms[fn.StartAddr]; ok {
+								fn.Name = sym
+							}
+						}
+						if fn.Name == "" {
+							fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+						}
+					}
+					machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
+				}
+			}
 		}
 	}
 
@@ -893,6 +988,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					}
 				}
 			}
+			/* KernelFrames */
 			for idx, frame := range thread.KernelFrames {
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
@@ -902,9 +998,49 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (maybe a kext)"
 					}
 				}
-				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
-					// TODO: symbolicate kernelcache
-					// i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide =
+				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
+					continue // skip absolute
+				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
+					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
+						found := false
+						for _, fn := range funcs {
+							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset &&
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset < fn.EndAddr {
+								found = true
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - fn.StartAddr
+								}
+								break
+							}
+						}
+						if !found {
+							// if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "??" {
+							// 	i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (??? maybe kext?)"
+							// }
+							log.WithFields(log.Fields{
+								"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+								"thread": tid,
+								"frame":  idx,
+								"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+							}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
+						}
+					} else {
+						log.WithFields(log.Fields{
+							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+							"thread": tid,
+							"frame":  idx,
+							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+						}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+						"thread": tid,
+						"frame":  idx,
+						"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+						"offset": fmt.Sprintf("%#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset),
+					}).Errorf("unexpected image")
 				}
 			}
 		}
@@ -1081,7 +1217,6 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
 					continue // skip absolute
 				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
-					// TODO: symbolicate kernelcache
 					if sym, err := db.GetSymbol(
 						strings.ToUpper(i.Payload.BinaryImages[frame.ImageIndex].UUID),
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset & ^uint64(1<<63),
@@ -1102,7 +1237,13 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 						}).Debugf("failed to find symbol for kernel frame image offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
 					}
 				} else {
-					log.Debug("WHAT?")
+					log.WithFields(log.Fields{
+						"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+						"thread": tid,
+						"frame":  idx,
+						"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+						"offset": fmt.Sprintf("%#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset),
+					}).Errorf("unexpected image")
 				}
 			}
 		}

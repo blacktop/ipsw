@@ -42,12 +42,14 @@ func init() {
 
 	kernelSymbolicateCmd.Flags().BoolP("flat", "f", false, "Output results in flat file '.syms' format")
 	kernelSymbolicateCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
+	kernelSymbolicateCmd.Flags().BoolP("quiet", "q", false, "Don't display logging")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
 	kernelSymbolicateCmd.MarkFlagRequired("signatures")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
 	kernelSymbolicateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("kernel.symbolicate.flat", kernelSymbolicateCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
+	viper.BindPFlag("kernel.symbolicate.quiet", kernelSymbolicateCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
 }
@@ -68,6 +70,8 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		quiet := viper.GetBool("kernel.symbolicate.quiet")
+
 		output := viper.GetString("kernel.symbolicate.output")
 		if output == "" {
 			output = filepath.Dir(filepath.Clean(args[0]))
@@ -82,10 +86,11 @@ var kernelSymbolicateCmd = &cobra.Command{
 		// symbolicate kernelcache
 		symMap := make(map[uint64]string)
 		goodsig := false
+		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
 		for _, sig := range sigs {
-			syms, err := kcmd.Symbolicate(args[0], sig)
+			syms, err := kcmd.Symbolicate(args[0], sig, quiet)
 			if err != nil {
-				if errors.Is(err, kcmd.UnsupportedVersion) {
+				if errors.Is(err, kcmd.ErrUnsupportedVersion) {
 					continue
 				}
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
