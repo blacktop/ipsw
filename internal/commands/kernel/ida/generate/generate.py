@@ -32,6 +32,8 @@ def get_func_arg_count(ea: ea_t) -> int:
 def get_unique_cstrings(segment: str, section: str) -> Iterable[idautils.Strings]:
     strings = []
     start, end = get_section_by_name(segment, section)
+    if not start or not end:
+        return strings
     print(f"🔍 Searching for unique strings in {segment}.{section} section:\n    - 0x{start:x}-0x{end:x}")
     for string in idautils.Strings():
         # filter out strings that are not in the section
