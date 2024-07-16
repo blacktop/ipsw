@@ -1,0 +1,4527 @@
+amends "../pkl/Symbolicator.pkl"
+
+// MIT License
+//
+// Copyright (c) 2024 blacktop
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+target = "com.apple.sandbox"
+
+total = 236
+
+version {
+    max = "24.0.0"
+    min = "24.0.0"
+}
+
+signatures {
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "IODTNVRAMVariables"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_iokit_entry_is_nvram"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"Unable to allocate IOKit matching dictionary for %s\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_iokit_init.cold.1"
+        prototype = ""
+        caller = "_iokit_init"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "\"failed to grow bsddev cache\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "__ZL30iokit_bsddev_cache_grow_lockedP12bsddev_cachePP18bsddev_cache_entryPm"
+        prototype = ""
+        caller = "__ZL25iokit_bsddev_cache_insertPvS_P9IOServiceP10IONotifier"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "RemoteIpAddress"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "/options"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "csr-data"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_rootless_allowed_netboot_configuration"
+        prototype = ""
+        caller = "_eval"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "IOEFIBootOption"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "MediaFilePath"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOMatch"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOProviderClass"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOPropertyMatch"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOAPFSPreBootDevice"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_rootless_allowed_local_configuration"
+        prototype = ""
+        caller = "_eval"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "00000000-0000-0000-0000-000000000000"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.Preboot"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.Recovery"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.Update"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.VM"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__ZL34_walk_AppleAPFSContainerFromVolumeP15IORegistryEntryb"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"SIP recorded the same protected device with different entitlements\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "iokit_rootless.cpp"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__ZN16AppleT8006GPIOIC9startDoneEP9IOService.cold.2"
+        prototype = ""
+        caller = "__ZL23record_protected_deviceiPKc"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "boot-uuid"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__ZL22walk_iokit_root_devicev"
+        prototype = ""
+        caller = "__ZL21walk_all_root_devicesv"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "69646961-6700-11AA-AA11-00306543ECAC"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "52637672-7900-11AA-AA11-00306543ECAC"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOBlockStorageDevice"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "EmbeddedDeviceTypeRoot"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "__ZN8OSSymbol11withCStringEPKc"
+            }
+            new {
+                string = "com.apple.rootless.volume.iSCHardware"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.iSCPreboot"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.volume.iSCRecovery"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__ZL22walk_system_containersv"
+        prototype = ""
+        caller = "__ZL21walk_all_root_devicesv"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"unsupported mask type #%d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_syscallmask_apply_to_proc"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"profile mask count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"mask size (%zu) exceeds maximum (%zu)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"initial data not in profile\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_populate_syscall_mask"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"profile mask count underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_profile_syscallmask_destroy"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"sandbox mask count underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_sandbox_syscallmask_destroy"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"invalid # of syscalls from xnu\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"invalid # of mach traps from xnu\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"invalid # of mach kobject routines from xnu\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "sandbox.syscallmasks"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"%s: IOUserClient::registerFilterCallbacks failed: %d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "void iofilter_iokit_init(lck_grp_t *)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "iokit_iofilter.cpp"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "amfi_get_out_of_my_way"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "kern.hv_vmm_present"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"failed to set syscall filter callbacks\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "builtin collection"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"failed to initialize builtin collection: %d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"failed to initialize platform sandbox: %d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"delegation not supported for platform profile\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"platform profile references state flags\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"platform profile references profile flags\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"platform profile applies mach message filtering!\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "darwinos-security-environment"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sandbox.profiles"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sb_serial_reporting"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.sandbox.reporting"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "violation"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_os_log_create"
+            }
+            new {
+                string = "sandbox.sandboxes"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "syncroot_init"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "syncroots.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"Sandbox.kext configuration: failed to apply built-in defaults: %d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "kextconfig.cpp"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "<no error detail>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\"><plist version=\"1.0\"><dict></dict></dict></plist>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sandcastle_appbundle_init"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "appbundle.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sandbox.autobox.index"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "autobox collection"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"failed to initialize autobox collection: %d\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "autobox.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"%s: failed to allocate\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "sandcastle_appcontainer_init"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "appcontainer.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"failed to initialize authenticated pointers for bastion\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"expected NULL for `bastion_pointers`\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "<none>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "disabling app bundle protections because amfi_get_out_of_my_way is set"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "virtual machine detected"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "PrivateCloudOS detected"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "Applied builtin kext configuration."
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: OSUnserializeXML(): %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: plist isn't a dictionary"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_hook_policy_init"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"sandbox mask count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_sandbox_syscallmask_create"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "iofilter_resolver"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__ZL17iofilter_resolverP4taskP12IOUserClientjPm"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"index overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_pathindex_insert"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "pathindex_rename"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: rename target path %s unexpectedly exists as intermediate node; releasing subtree"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_pathindex_rename"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"path length underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "__path_buffer_strip_path_segment"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.installer"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_strcmp"
+            }
+            new {
+                string = "deconstruct_extension_data"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to lookup responsible identity: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to get responsibility for %s[%d]: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_record"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s called on incorrect vnode type\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "getrdev"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_getrdev"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Carrier"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "Internal"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"no profile to evaluate\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "bad opcode"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "bDeviceClass"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "bDeviceSubClass"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "bad filter type"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.rootless.restricted-block-devices.read"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_eval"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"reason string overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "killing %d: %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_kill_with_reason"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to set mach filter flag"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "invalid spawn attributes"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "invalid sandbox profile configuration"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to apply spawnattrs"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to allocate sandbox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to stash spawn attributes for userland"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to set container"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to set executable path"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "(apply-protobox)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "(unnamed)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.sandbox.profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.sandbox.profile:macos"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ".dext"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ".bundle"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ".pluginkit"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "/Extensions"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "/PlugIns"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "/Contents"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.security.app-sandbox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.no-sandbox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to assign runtime profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to assign builtin profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.sandbox.executable"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "uuid:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s[%d] ==> %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s[%d] is translated: cannot apply mach message filtering!"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "Sandbox: hook..execve() killing %s[pid=%d]: (err=%d) %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_hook_cred_label_update_execve"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"thread_call_allocate failed\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_perform_in_background"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "<bytes>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "Sandbox apply: %s[%d] %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_proc_apply_sandbox"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to apply unix syscall mask"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to apply mach trap mask"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to apply kernel MIG routine mask"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_proc_apply_syscall_masks"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "/usr/libexec/sandboxd"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_proc_is_sandboxd"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: mac_policy_register failed: %d\\n\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "kern_return_t kmod_start(kmod_info_t *, void *)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_kmod_start"
+        prototype = ""
+        caller = "__start_0"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "kern.osreleasetype"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "release type: %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_is_release_type"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "system_is_base_system"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_system_is_recovery_os"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Sealed"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_iokit_get_property"
+            }
+        }
+        symbol = "_is_volume_authenticated"
+        prototype = ""
+        caller = "_is_root_volume_authenticated"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "forbidden-protobox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_report_protobox_ineligible"
+        prototype = ""
+        caller = "_proc_apply_sandbox"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "forbidden-task-for-kernel"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_proc_check_get_task_with_flavor"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "External"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_io_string_is_equal"
+            }
+            new {
+                string = "Removable"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___removable_volume_check_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Physical Interconnect"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_io_dictionary_get_value"
+            }
+            new {
+                string = "Virtual Interface"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_io_string_is_equal"
+            }
+            new {
+                string = "identified %s (0x%x) as a disk image"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_disk_image_check"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.enable-state-flags"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.mutable-state-flags"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_enable_state_flag"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "com.apple.private.security.network-mount-authority"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.system-mount-authority"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "network approval not required for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_mount_flag_set"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.allow-autobox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.message-filter"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s[%d]: missing entitlement to use autobox from ephemeral profile"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s[%d]: missing message filter entitlement"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_set_userland_profile"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "driver extensions must be sandboxed"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"syscall mask mismatch: %s\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_hook_proc_notify_exec_complete"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "/private/var"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to lookup %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to parse sync root index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to parse app container index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_hook_mount_check_mount_late"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "forbidden-clone-priv<%s>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_clone"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "forbidden-file-create-unsupported"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "forbidden-file-create-unknown"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_create"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.application-identifier"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "59GAB85EFG.com.apple.dt.Xcode"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_io_string_is_equal"
+            }
+        }
+        symbol = "_hook_vnode_check_getextattr"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "forbidden-link-priv<%s>"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_link"
+        prototype = ""
+        caller = "_hook_vnode_check_rename"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "hook_thread_userret"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s called"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "userret(%llu): invoking callback; %u/%u remaining"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = "__os_log_internal"
+            }
+        }
+        symbol = "_hook_thread_userret"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "pathmonitor_prepare_rename"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_rename"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "pathmonitor_prepare_unlink"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_unlink"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "pathmonitor_notify_unlink"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_notify_unlink"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"pending update count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_pending_update_append"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: ref already held by process with uniqueid %llu\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "reference_add_locked"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_reference_retain"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: overrelease\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "reference_remove_locked"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_reference_remove_locked"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "_sfree_obj_track_decommit"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__sfree_obj_track_decommit"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: allocation header marked as sandbox tracked (%p)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "_sfree_data"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__sfree_data"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: allocation header marked as not sandbox tracked (%p)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "__sfree_data_track"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: allocation already tracked (%p)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_smalloc_set_tracking"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s: size underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "srealloc_data"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_srealloc_data"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"sfree on freed allocation at %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"sfree on invalid allocation at %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_assert_allocation_is_valid"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "AppleDiskImageDevice"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "DiskImageURL"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "IOHDIXHDDrive"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "image-path"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___derive_disk_image_path_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%n"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_match_any_uuid"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad address"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "backward reference"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__readaddr"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"platform sandbox invalid (%s)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"invalid builtin %s (%s)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "invalid sandbox profile for pid %d (%s)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_invalid"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "ANY_UUID"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "DIGITS"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "ANY_PATH_COMPONENT"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "ANY_USER_HOME"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "bad variable name size"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "variable name not terminated"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "unsupported pattern variable \"%s\""
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_variables_populate"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad regex size"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "invalid regex"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_re_cache_init"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad string address"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "string truncated"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "bad string"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "__readstr"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"unresolved delegation\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "denying due to unresolved delegation in platform profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"flag mask offset overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_sb_evaluate_internal"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad regex index"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_match_regex"
+        prototype = ""
+        caller = "_eval"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad string size"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_match_pattern"
+        prototype = ""
+        caller = "_eval"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "checker not authorized"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "ignoring request to send signal #%d: %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_is_signaling_allowed"
+        prototype = ""
+        caller = "_eval_modifier_descriptor"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "profile_retain_persistent_and_release_transient"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: base profile \"%s\" not found for \"%s\""
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: base profile \"%s\" not found"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: not allowed to extend profile \"%s\""
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_profile_populate_base_profile"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "profile_retain_persistent"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_profile_retain_persistent"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "profile_release_persistent"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_profile_release_persistent"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"profile state %p points back to %p instead of %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "___profile_failed_consistency_panic"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"released collection\\'s reference to profile\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"unexpected persistent refcount (%u) on profile %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_profile_uninit"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "execve.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "forbidden-exec-sugid"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_hook_vnode_check_exec"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "fseventsd"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.developer.endpoint-security.client"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: mac_schedule_telemetry failed (%d)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: report data overflow"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: sb_packbuff_alloc_vm_buffer failed (%d)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sb_event"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s = %d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_sbuf_printf"
+            }
+        }
+        symbol = "___serialize_state_flags_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "System Policy"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "XProtect Policy"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "Autobox"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"Invalid profile type %d for policy description\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "interface.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_policy_description_for_context"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "allow"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s(%d) %s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s %s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " [%s(%u)]"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " operation:%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " target:%s extension-class:%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " iokit-class:%s property:%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " path:%s ioctl-command:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " (xpc)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " (per-pid)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " role:%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " local:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " remote:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " ioctl-command:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " mach-exception-type:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " task-special-port:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " codesigning-operation:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " signum:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " domain:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " type:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " protocol:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " level:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " name:"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " policy:%s "
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = " extension-class:%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to allocate memory for operation summary"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: sbuf overflow"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: sbuf range error"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_populate_event_context"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = " [%s]"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_sbuf_printf"
+            }
+        }
+        symbol = "___derive_summary_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%u duplicate report%s for "
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: %s(%d) "
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s\n%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_log_kernel_report_summary"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "filecache_entry_invalidate"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_filecache_entry_invalidate"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"refcnt overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "filecache.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_filecache_entry_lookup"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "filecache_entry_set_syspolicy_locked"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "filecache_entry_make_expirable_locked"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: removing entry"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_filecache_entry_set_syspolicy_locked"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "timemachine_device_add_rdev"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: 0x%x"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_record_timemachine_volume_rdev"
+        prototype = ""
+        caller = "_match_file_attribute"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "timemachine_device_add"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_timemachine_device_add"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "timemachine_device_add_uuid"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "ignoring registry entry for device %s with no UUID"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: identified TM backup on volume %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_record_timemachine_volume_device"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_mount_prepare_unmount"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_macl_writeback_immediately"
+            }
+        }
+        symbol = "_hook_mount_check_umount"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "vol_name"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "mntfromname"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "autofs"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_strcmp"
+            }
+            new {
+                string = "mntonname"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "successfully parsed %u/%u entries for volume %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_copy_for_mount"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_match_context"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to derive responsible identity: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_check"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sandbox_retain_persistent"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "sandbox_release_persistent"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_label_set_sandbox"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "com.apple.private.security.container-manager"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s failed: %s[%d] not sandboxed"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s failed: container already set for %s[%d]"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s failed for %s[%u]: %u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_sandbox_set_container"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "com.apple.security.temporary-exception.audio-unit-host"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_sandbox_suspend"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"sandbox state %p points back to %p instead of %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "___sandbox_failed_consistency_panic"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"profile flag #%u out of range\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "___populate_sandbox_enabled_profile_flags_block_invoke_2"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"unexpected persistent refcount (%u) on sandbox %p\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"sandbox %p leaked %llu bytes\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_sandbox_uninit"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "pid %d not found"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "pid version mismatch for pid %d (%d <> %lld)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.user-intent-authority"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.private.security.access-learning"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "forbidden-issue-extension-with-flags"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ";%0*llx;%0*llx;%0*llx;%0*llx;%0*llx;%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ";%0*llx;%0*llx;%0*llx;%0*llx;%s"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "com.apple.appkit.xpc.openAndSavePanelService"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "ignoring user-intent from unentitled pid #%d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "ignoring user-intent for non-visible storage class \"%s\""
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_extension_issue"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "forbidden-extension-process-mismatch"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_extension_consume"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"in set count underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_extension_class_release_handle_for_extension_matching_locked"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = ".html"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ".xcodeproj"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = ".xcworkspace"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_access_extends_to_sibling_files"
+        prototype = ""
+        caller = "_syscall_extension_issue"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"extension handle count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_extension_assign_handle"
+        prototype = ""
+        caller = "_syscall_extension_consume"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "forbidden-release-protected-extension"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_extension_release_common"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "AppleMobileFileIntegrity"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"%s: failed to allocating matching dict\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"%s: failed to look up AMFI service\\n\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "__ZL8initAMFIPU9__ptrauthILj2ELb1ELj17928EEP24AppleMobileFileIntegrity"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.register-sync-root"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_syncroot_register"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "schedule_before_userret"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s(%llu): %u/%u tasks scheduled"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_schedule_before_userret"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "overflow"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "out of memory"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_userret_task_list_enlarge"
+        prototype = ""
+        caller = "_schedule_before_userret"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"failed to resolve static policy identifier\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "policy_id.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_policy_id_resolve"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_xlate_uuid_to_appid"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to find appid for uuid %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = "__os_log_internal"
+            }
+            new {
+                string = "successfully parsed %u/%u entries for file %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_copy_for_vnode"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_xlate_entry_to_uuid"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to create xlate entry"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "___macl_writeback_file_block_invoke_2"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"failed to generate unique uuid\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "macl_xlate.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_macl_xlate_lookup_by_entry"
+        prototype = ""
+        caller = "___macl_writeback_file_block_invoke_2"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "\"%s: resid (%d) > max_byte_count (%zu)\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "file_read"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "fileio.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to read %zu bytes from %s at offset %llu: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_file_read"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"collection builtin count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"cannot register builtin profile with no name\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"builtin %s already exists\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "\"builtin count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_builtin_register"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"unexpected destruction of builtin profile\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "mcache_init.cold.1"
+        prototype = ""
+        caller = "_profile_uninit"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "\"unexpected filter type\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "check.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_check_sandbox"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_prepare_xattr_read"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_macl_writeback_immediately"
+            }
+        }
+        symbol = "_macl_prepare_xattr_read"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "macl_get_vnode"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to write xattr for %s: %u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = "__os_log_internal"
+            }
+        }
+        symbol = "_macl_writeback_handler"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"invalid attempt to update connection port filters\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_update_port_label_with_message_filters"
+        prototype = ""
+        caller = "_fetch_filter_policy_callback"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"attempt to free invalid port label\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_port_label_release"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "connection-port"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"cannot derive connection port from bootstrap port\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_derive_sblabel_from_service_port_callback"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "(null)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "(invalid)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "(allow)"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_port_label_service_name_description"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "forbidden-rootless-xattr"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_rootless_forbid_xattr"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "os x installer"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_strnstr"
+            }
+        }
+        symbol = "_apply_rootless_modifier"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "failed to remove xattr"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_rootless_clear_storage_class"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"unknown storage class type\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "rootless.c"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_rootless_storage_class_type_for_flags"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "SystemExtensionManagement"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_trust_static_storage_class_as_rootless"
+        prototype = ""
+        caller = "_match_rootless"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"registered profile count underflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+        }
+        symbol = "_registered_profile_destroy"
+        prototype = ""
+        caller = "_profile_uninit"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.register-profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "\"registered profile count overflow\" @%s:%d"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_panic"
+            }
+            new {
+                string = "registered profile '%s'"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "unregistered runtime profile '%s'"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "unregistered all runtime profiles"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_profile_registration"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "syscall_sandcastle_appbundle_unregister"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_sandcastle_appbundle_unregister"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "IOHIDDevice"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "RequiresTCCAuthorization"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___match_sandcastle_ioservice_requires_approval_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "kTCCService"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "kTCCServiceAddressBook"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "kTCCServiceCalendar"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "kTCCServiceReminders"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "would require prompt"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "denied"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: no cred"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to derive responsible identity for %s [%d]"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to get discriminator for %s for %s [%d]"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: %s failed for %s [%d] with error %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to identify sync root for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sandcastle_apply_approval_modifier"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.tcc.allow"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_copy_entitlement_value_by_cred"
+            }
+        }
+        symbol = "_has_tcc_approval_entitlement"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sb_allow_prompt"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to derive responsibility: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sb_allow_prompt"
+        prototype = ""
+        caller = "_sandcastle_apply_approval_modifier"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.storage-exempt"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "59GAB85EFG"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_strcmp"
+            }
+        }
+        symbol = "_is_exempt_from_filesystem_restrictions"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "com.apple.private.security.storage-exempt.heritable"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___is_exempt_from_filesystem_restrictions_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "pending_approval_entry_create"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "serialize_context"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "failed to arm watchdog"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_approval_solicit"
+        prototype = ""
+        caller = "_sandcastle_apply_approval_modifier"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sandbox_user_approval"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "_approval_do_callout"
+        prototype = ""
+        caller = "_approval_solicit"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "__WAITING_ON_APPROVAL_FROM_SANDBOXD__"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___WAITING_ON_APPROVAL_FROM_SANDBOXD__"
+        prototype = ""
+        caller = "_approval_response_wait"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "kTCCServiceSystemPolicySysAdminFiles"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = "_strcmp"
+            }
+        }
+        symbol = "_may_cache_approval_for_category"
+        prototype = ""
+        caller = "_sandcastle_apply_approval_modifier"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "com.apple.private.security.register-xprotect-profile"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+            new {
+                string = "delegation not supported for x-protect profile"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "state flags not supported for x-protect profile"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "profile flags not supported for x-protect profile"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syscall_bastion_profile_registration"
+        prototype = ""
+        caller = "_hook_policy_syscall"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "kTCCServiceSystemPolicyDocumentsFolder"
+                segment = "__TEXT"
+                section = "__cstring"
+                caller = ""
+            }
+        }
+        symbol = "___storage_class_is_sandcastle_user_visible_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Sandbox unable to determine protected devices."
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_rootless_protect_device"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: called with unknown mfop=%s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: duplicate mfop=%s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "____ZL17iofilter_resolverP4taskP12IOUserClientjPm_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: ignoring unknown io_filter_type=%u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "__ZL16iofilter_applierP12IOUserClientm16io_filter_type_tj"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "msleep failed: %u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_writeback_immediately"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to get consistent timestamp; using %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_timestamp_init"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "thread_call_allocate failed"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_dirty_entry_locked"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Sandbox failed to revoke host port (%d) for pid %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_revoke_privileged_ports"
+        prototype = ""
+        caller = "_proc_apply_sandbox"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: %s renamed to %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = "__os_log_internal"
+            }
+        }
+        symbol = "_pathmonitor_notify_rename"
+        prototype = ""
+        caller = "_hook_vnode_notify_rename"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "allocation size overflow; requested %zu bytes"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to allocate %llu bytes"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_smalloc_data"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s exhausted sandbox memory capacity; may be leaking extensions"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_report_alloc_failure"
+        prototype = ""
+        caller = "_commit_sandbox_capacity"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "bad string size at index %u of table at %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "string not NUL terminated at index %u of table at %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_string_table_iterate"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sandbox profile invalid: operation count mismatch (%u vs %u)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: wrong flags"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to populate syscall masks for profile: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_profile_init"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s invalid: operation count mismatch (%u vs %u)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s invalid: wrong flags"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s invalid: requires %u state flags, max is %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s invalid: requires %u profile flags, max is %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to parse %s header: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_collection_init"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to get role for %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "__derive_vnode_apfs_volume_roles"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "sandbox profile invalid: %s depends on itself"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: %s depends on itself by way of %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_profile_depends_on_named_builtin"
+        prototype = ""
+        caller = "_profile_populate_base_profile"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sandbox profile invalid: requires %u profile flags, max is %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "sandbox profile invalid: requires %u state flags, max is %zu"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_validate_flag_counts"
+        prototype = ""
+        caller = "_profile_init"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to populate enabled profile flags for \"%s\": %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to populate syscall masks for \"%s\": %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "___collection_init_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to associate message filter %u: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to get id for static storage class \"%s\": %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_eval_modifier_descriptor"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "restored %u MACL entries to %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_transfer_entries_to_file"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to look up storage class: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_volume_granularity_for_storage_class"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "Profile %s extends autobox but no autobox profile available for its executable"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to allocate syscall mask"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sandbox_create"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "\"%s (%s)\" potentially leaks extensions for \"%s\""
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_extension_add"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "sync root flag on unexpected vnode type %u for path %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "path %s should not be in sync root index, removing"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_handle_unexpected_syncroot_vnode_type"
+        prototype = ""
+        caller = "_derive_syncroot"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "unregistered sync root for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to unregister sync root for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syncroot_unregister_path"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to persist sync root index"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_syncroot_index_persist_to_disk"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "registered sync root for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to register sync root for %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "___syncroot_register_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to update sync root index for %s -> %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_syncroot_index_after_rename"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to remove %s from sync root index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_syncroot_index_after_unlink"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 2
+        anchors {
+            new {
+                string = "failed to open %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_open_state_file"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to size %s"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s size %lld exceeds maximum (%zu)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_read_state_file"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "failed to get attributes of sandbox state directory: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "calling out to fixup state directory attributes"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s failed: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_state_directory_protections_if_necessary"
+        prototype = ""
+        caller = "_open_state_file"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "xlate entry #%u expired"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = "__os_log_internal"
+            }
+            new {
+                string = "successfully parsed %u/%u xlate entries"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_populate_xlate_mapping"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to truncate %s to %llu bytes: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "successfully truncated %s to %llu bytes"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_file_set_size"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "failed to write %zu bytes to %s at offset %llu: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_file_write"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed: vm_deallocate(%p, %zu)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sb_packbuff_free"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: vm_allocate failed"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: vm_map_wire failed kr = %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: vm_map_unwire failed kr = %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: vm_map_copyin failed kr = %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_sb_packbuff_alloc_vm_buffer"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: overflow"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: allocation failed"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_deviceset_enlarge_locked"
+        prototype = ""
+        caller = "_deviceset_add_rdev"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "%s: failed to get storage class: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: storage class mismatch; no match"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_check_file"
+        prototype = ""
+        caller = "_macl_check"
+    }
+    new {
+        args = 2
+        anchors {
+            new {
+                string = "%s: failed to size xattr: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: xattr size overflow"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: failed to read xattr: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_macl_read_xattr_contents"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "runtime '%s' removed"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_unregister_profile"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to parse app bundle index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "___appbundle_index_deserialize_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to persist app bundle index"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_appbundle_index_persist_to_disk"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to update app bundle index for %s -> %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_appbundle_index_after_rename"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to remove %s from app bundle index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_appbundle_index_after_unlink"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "restarting %u pending approvals"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_hook_proc_notify_exit"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to get kern.bootuuid"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "failed to get root device"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_match_sandcastle_constrained"
+        prototype = ""
+        caller = "_eval"
+    }
+    new {
+        args = 1
+        anchors {
+            new {
+                string = "share \"%s\" matches network exempt pattern"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "___sandcastle_apply_network_exemptions_block_invoke"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "watchdog expired for approval entry %u (%s, pid %u)"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_approval_watchdog_handler"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "spurious wake on entry #%u; going back to sleep"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: sleep interrupted"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+            new {
+                string = "%s: sleep returned %u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_approval_response_wait"
+        prototype = ""
+        caller = "_approval_solicit"
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to persist app container index"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_appcontainer_index_persist_to_disk"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to update app container index for %s -> %s: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_appcontainer_index_after_rename"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to remove %s from app container index: %d"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_update_appcontainer_index_after_unlink"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "failed to create storage class %s of type %u: %u"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_storage_class_lookup"
+        prototype = ""
+        caller = ""
+    }
+    new {
+        args = 0
+        anchors {
+            new {
+                string = "unique storage class limit exceeded"
+                segment = "__TEXT"
+                section = "__os_log"
+                caller = ""
+            }
+        }
+        symbol = "_storage_class_insert_locked"
+        prototype = ""
+        caller = ""
+    }
+}
