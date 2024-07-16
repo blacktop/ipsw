@@ -40,10 +40,13 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kernelSymbolicateCmd)
 
+	kernelSymbolicateCmd.Flags().BoolP("flat", "f", false, "Output results in flat file '.syms' format")
 	kernelSymbolicateCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
+	kernelSymbolicateCmd.MarkFlagRequired("signatures")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
 	kernelSymbolicateCmd.MarkFlagDirname("output")
+	viper.BindPFlag("kernel.symbolicate.flat", kernelSymbolicateCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
@@ -65,16 +68,20 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		output := viper.GetString("kernel.symbolicate.output")
+		if output == "" {
+			output = filepath.Dir(filepath.Clean(args[0]))
+		}
+
 		var sigs []*signature.Symbolicator
-		if viper.IsSet("kernel.symbolicate.signatures") {
-			sigs, err = kcmd.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
-			if err != nil {
-				return fmt.Errorf("failed to parse signatures: %v", err)
-			}
+		sigs, err = kcmd.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
+		if err != nil {
+			return fmt.Errorf("failed to parse signatures: %v", err)
 		}
 
 		// symbolicate kernelcache
 		symMap := make(map[uint64]string)
+		goodsig := false
 		for _, sig := range sigs {
 			syms, err := kcmd.Symbolicate(args[0], sig)
 			if err != nil {
@@ -84,27 +91,29 @@ var kernelSymbolicateCmd = &cobra.Command{
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 			}
 			maps.Copy(symMap, syms)
+			goodsig = true
 		}
+
+		if !goodsig {
+			return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can add them)")
+		}
+
+		/* JSON OUTPUT */
 
 		if viper.GetBool("kernel.symbolicate.json") {
 			jdat, err := json.Marshal(symMap)
 			if err != nil {
 				return fmt.Errorf("failed to marshal symbol map: %v", err)
 			}
-
-			if viper.IsSet("kernel.symbolicate.output") {
-				fname := filepath.Join(viper.GetString("kernel.symbolicate.output"), "symbols.json")
-				log.Infof("Writing symbols as JSON to %s", fname)
-				return os.WriteFile(fname, jdat, 0o644)
-			}
-
-			fmt.Println(string(jdat))
-
-			return nil
+			fname := filepath.Join(output, filepath.Base(args[0])+".symbols.json")
+			log.Infof("Writing symbols as JSON to %s", fname)
+			return os.WriteFile(fname, jdat, 0o644)
 		}
 
-		if viper.IsSet("kernel.symbolicate.output") {
-			fname := filepath.Join(viper.GetString("kernel.symbolicate.output"), "symbols.map")
+		/* FLAT FILE OUTPUT */
+
+		if viper.GetBool("kernel.symbolicate.flat") {
+			fname := filepath.Join(output, filepath.Base(args[0])+".syms")
 			log.Infof("Writing symbols to %s", fname)
 			f, err := os.Create(fname)
 			if err != nil {
@@ -114,11 +123,12 @@ var kernelSymbolicateCmd = &cobra.Command{
 			for addr, sym := range symMap {
 				fmt.Fprintf(f, "%#x %s\n", addr, sym)
 			}
-		} else {
-			fmt.Printf("%s symbols:\n", filepath.Base(args[0]))
-			for addr, sym := range symMap {
-				fmt.Printf("%#x %s\n", addr, sym)
-			}
+			return nil
+		}
+
+		fmt.Printf("%s symbols:\n", filepath.Base(args[0]))
+		for addr, sym := range symMap {
+			fmt.Printf("%#x %s\n", addr, sym)
 		}
 
 		return nil
