@@ -22,7 +22,7 @@ amends "../pkl/Symbolicator.pkl"
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-target = "com.apple.sandbox"
+target = "com.apple.security.sandbox"
 
 total = 236
 
