@@ -33,7 +33,7 @@ class SymbolicatePlugin(idaapi.plugin_t):
         addr2sym = json.dumps(data, indent=4)
         count = 0
         for addr, sym in data.items():
-            print(f'[Symbolicated] Address: 0x{int(addr, 10):x}, Symbol: {sym}')
+            print(f'[Symbolicated] 0x{int(addr, 10):x}: {sym}')
             idc.set_name(int(addr, 10), sym, idc.SN_NOWARN)
             count += 1
         print(f"🎉 Symbolicated {count} addresses 🎉")
