@@ -210,9 +210,12 @@ def find_single_refs(pkl_path: str) -> None:
     #     print(func_name)
 
     symctr = Symbolicator(
-        target="com.apple.kernel",
+        target=os.getenv("TARGET", "com.apple.kernel"),
         total=total,
-        version=Version("24.0.0", "24.0.0"),
+        version=Version(
+            os.getenv("MAX_VERSION", "24.0.0"),
+            os.getenv("MIN_VERSION", "24.0.0"),
+        ),
         signatures=[],
     )
 
@@ -243,7 +246,7 @@ def find_single_refs(pkl_path: str) -> None:
 
 
 if __name__ == "__main__":
-    pkl_path = os.getenv("PKL_FILE")
+    pkl_path = os.getenv("PKL_FILE", "/tmp/signature.pkl")
     if not pkl_path:
         print("=======================================================================================")
         print("❌ ERROR: 'PKL_FILE' environment variable not set")

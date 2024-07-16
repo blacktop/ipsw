@@ -99,7 +99,8 @@ class Symbolicator(object):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write('amends "../pkl/Symbolicator.pkl"\n')
-                f.write('''
+                f.write(
+                    """
 // MIT License
 //
 // Copyright (c) 2024 blacktop
@@ -120,7 +121,8 @@ class Symbolicator(object):
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.''')
+// SOFTWARE."""
+                )
                 f.write(f'\n\ntarget = "{self.target}"\n\n')
                 f.write(f"total = {self.total}\n\n")
                 self.version.write(f)
