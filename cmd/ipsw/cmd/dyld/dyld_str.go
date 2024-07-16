@@ -107,7 +107,6 @@ var StrSearchCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			log.Info("Searching for strings...")
 			var searchStrings []string
 
 			if len(args) > 1 {
@@ -125,19 +124,22 @@ var StrSearchCmd = &cobra.Command{
 					for {
 						part, err := reader.ReadString('\n')
 						if err == io.EOF {
+							if len(part) > 0 {
+								inputBuilder.WriteString(part)
+							}
 							break
 						}
 						if err != nil {
 							return fmt.Errorf("failed to read from stdin: %v", err)
 						}
-						inputBuilder.WriteString(strings.TrimSuffix(part, "\n"))
+						inputBuilder.WriteString(part)
 					}
-					searchStrings = strings.Split(inputBuilder.String(), " ")
+					searchStrings = strings.Split(inputBuilder.String(), "\n")
 				} else {
 					return fmt.Errorf("no input provided via stdin")
 				}
 			}
-
+			log.Infof("Searching for strings: %s", strings.Join(searchStrings, ", "))
 			strs, err = dscCmd.GetStrings(f, searchStrings...)
 			if err != nil {
 				return err
