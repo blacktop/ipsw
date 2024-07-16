@@ -62,7 +62,8 @@ def get_xrefs(ea: ea_t) -> Iterable[ea_t]:
 def fix_string(s):
     if s.startswith("'") and s.endswith("'"):
         s = '"' + s[1:-1].replace('"', '\\"') + '"'
-    return s.replace("Couldn't", "Couldn\\\\'t").replace("couldn't", "couldn\\\\'t")
+    s = s.replace("\\'", "\\\\'")
+    return s
 
 
 def get_caller(start_ea: ea_t):
@@ -171,6 +172,9 @@ def find_single_refs(pkl_path: str) -> None:
             if xrefs is not None and len(xrefs) == 1:
                 if "\\x" in repr(str(cstr)):
                     print(f"      ⚠️ Skipping non-ascii string: {repr(str(cstr))[:40]}")
+                    continue
+                if str(cstr).startswith("/AppleInternal/Library/BuildRoots/"):
+                    print(f"      ⚠️ Skipping BuildRoots string: {repr(str(cstr))[:40]}")
                     continue
                 if xrefs[0] < seg_start or xrefs[0] > seg_end:
                     continue

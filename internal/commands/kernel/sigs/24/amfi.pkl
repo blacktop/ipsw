@@ -2120,7 +2120,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "Couldn\\'t build index for %s: %s\n"
+                string = "Couldn't build index for %s: %s\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
@@ -2134,19 +2134,19 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "AMFI: couldn\\'t size xml deserialization\n"
+                string = "AMFI: couldn't size xml deserialization\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
             }
             new {
-                string = "AMFI: couldn\\'t size deserialize\n"
+                string = "AMFI: couldn't size deserialize\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
             }
             new {
-                string = "AMFI: couldn\\'t serialize XML\n"
+                string = "AMFI: couldn't serialize XML\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
@@ -3136,13 +3136,13 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "AMFI: Couldn\\'t allocate space for the profile\n"
+                string = "AMFI: Couldn't allocate space for the profile\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
             }
             new {
-                string = "AMFI: Couldn\\'t copy buffer for the profile\n"
+                string = "AMFI: Couldn't copy buffer for the profile\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
@@ -3184,7 +3184,7 @@ signatures {
                 caller = "_IOLog"
             }
             new {
-                string = "AMFI: Couldn\\'t copy buffer for the profile aux-sig\n"
+                string = "AMFI: Couldn't copy buffer for the profile aux-sig\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
@@ -3514,31 +3514,31 @@ signatures {
                 caller = "_IOLog"
             }
             new {
-                string = "Couldn\\'t allocate buffer for XML entitlements\n"
+                string = "Couldn't allocate buffer for XML entitlements\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
             }
             new {
-                string = "Couldn\\'t allocate buffer for DER entitlements\n"
+                string = "Couldn't allocate buffer for DER entitlements\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
             }
             new {
-                string = "Couldn\\'t copy buffer for DER entitlements\n"
+                string = "Couldn't copy buffer for DER entitlements\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
             }
             new {
-                string = "Couldn\\'t transmute entitlements\n"
+                string = "Couldn't transmute entitlements\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
             }
             new {
-                string = "Couldn\\'t find daemon.\n"
+                string = "Couldn't find daemon.\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "_IOLog"
