@@ -11,14 +11,27 @@ description: Search dyld_shared_cache for string
 Search dyld_shared_cache for string
 
 ```
-ipsw dyld str <DSC> [flags]
+ipsw dyld str <DSC> [STRING...] [flags]
+```
+
+### Examples
+
+```bash
+  # Perform FAST byte search for string in dyld_shared_cache
+  ❯ ipsw dsc str DSC "string1"
+  # Perform FAST byte search for multiple strings in dyld_shared_cache
+  ❯ ipsw dsc str DSC "string1" "string2"
+  # Perform FAST byte search for strings from stdin in dyld_shared_cache
+  ❯ cat strings.txt | ipsw dsc str DSC
+  # Perform SLOW regex search for string in dyld_shared_cache
+  ❯ ipsw dsc str DSC --pattern "REGEX_PATTERN"
 ```
 
 ### Options
 
 ```
   -h, --help             help for str
-  -p, --pattern string   Regex match strings
+  -p, --pattern string   Regex match strings (SLOW)
 ```
 
 ### Options inherited from parent commands
