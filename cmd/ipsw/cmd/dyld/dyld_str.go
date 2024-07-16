@@ -51,7 +51,7 @@ var StrSearchCmd = &cobra.Command{
 	Example: `  # Perform FAST byte search for string in dyld_shared_cache
   ❯ ipsw dsc str DSC "string1"
   # Perform FAST byte search for multiple strings in dyld_shared_cache
-  ❯ ipsw dsc str DSC "string1" "string2
+  ❯ ipsw dsc str DSC "string1" "string2"
   # Perform FAST byte search for strings from stdin in dyld_shared_cache
   ❯ cat strings.txt | ipsw dsc str DSC
   # Perform SLOW regex search for string in dyld_shared_cache
