@@ -147,8 +147,8 @@ def get_single_ref_funcs() -> {}:
 def find_single_refs(pkl_path: str) -> None:
     seg_start, seg_end = get_section_by_name("__TEXT_EXEC", "__text")
     unique_function_names = set()
+    unique_anchor_caller = set()
     unique_caller_names = set()
-    unique_callie_names = set()
 
     sigs = {}
     single_ref_funcs = get_single_ref_funcs()
@@ -177,11 +177,11 @@ def find_single_refs(pkl_path: str) -> None:
                 args = get_func_arg_count(xrefs[0])
                 caller = get_caller(xrefs[0])
                 if caller:
-                    unique_caller_names.add(caller)
+                    unique_anchor_caller.add(caller)
                 sym_caller = None
                 if func_name in single_ref_funcs:
                     sym_caller = single_ref_funcs[func_name]
-                    unique_callie_names.add(sym_caller)
+                    unique_caller_names.add(sym_caller)
                 if func_name:
                     unique_function_names.add(func_name)
                 if func_name not in sigs:
@@ -200,9 +200,9 @@ def find_single_refs(pkl_path: str) -> None:
     # Output unique function names
     print("[STATS]")
     print(f"\nUnique Function Names: {len(unique_function_names)}")
-    print(f"Unique Callie Names:   {len(unique_callie_names)}")
     print(f"Unique Caller Names:   {len(unique_caller_names)}")
-    total = len(unique_function_names) + len(unique_callie_names) + len(unique_caller_names)
+    print(f"Unique Anchor Caller:  {len(unique_anchor_caller)}")
+    total = len(unique_function_names) + len(unique_caller_names) + len(unique_anchor_caller)
     print("---------------------------")
     print(f"TOTAL 🎉:              {total}\n")
     print("=======================================================================================")
