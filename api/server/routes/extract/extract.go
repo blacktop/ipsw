@@ -3,9 +3,9 @@ package extract
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	cmd "github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -26,22 +26,27 @@ type extractKernelsReponse struct {
 	Artifacts map[string][]string `json:"artifacts"`
 }
 
-func extractDSC(c *gin.Context) {
-	var query extract.Config
-	if err := c.ShouldBindJSON(&query); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func extractDSC(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query extract.Config
+		if err := c.ShouldBindJSON(&query); err != nil {
+			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if query.PemDB == "" && pemDB != "" {
+			query.PemDB = filepath.Clean(pemDB)
+		}
+		artifacts, err := extract.DSC(&query)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 	}
-	artifacts, err := cmd.DSC(&query)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
 func extractDMG(c *gin.Context) {
-	var query cmd.Config
+	var query extract.Config
 	if err := c.ShouldBindJSON(&query); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -50,7 +55,7 @@ func extractDMG(c *gin.Context) {
 		c.IndentedJSON(http.StatusBadRequest, fmt.Errorf("invalid dmg type: %s", query.DmgType))
 		return
 	}
-	artifacts, err := cmd.DMG(&query)
+	artifacts, err := extract.DMG(&query)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -58,27 +63,32 @@ func extractDMG(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
-func extractKBAG(c *gin.Context) {
-	var query cmd.Config
-	if err := c.ShouldBindJSON(&query); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func extractKBAG(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query extract.Config
+		if err := c.ShouldBindJSON(&query); err != nil {
+			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if query.PemDB == "" && pemDB != "" {
+			query.PemDB = filepath.Clean(pemDB)
+		}
+		artifacts, err := extract.Keybags(&query)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: []string{artifacts}})
 	}
-	artifacts, err := cmd.Keybags(&query)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: []string{artifacts}})
 }
 
 func extractKernel(c *gin.Context) {
-	var query cmd.Config
+	var query extract.Config
 	if err := c.ShouldBindJSON(&query); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	artifacts, err := cmd.Kernelcache(&query)
+	artifacts, err := extract.Kernelcache(&query)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -86,27 +96,32 @@ func extractKernel(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, extractKernelsReponse{Artifacts: artifacts})
 }
 
-func extractPattern(c *gin.Context) {
-	var query cmd.Config
-	if err := c.ShouldBindJSON(&query); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func extractPattern(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query extract.Config
+		if err := c.ShouldBindJSON(&query); err != nil {
+			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if query.PemDB == "" && pemDB != "" {
+			query.PemDB = filepath.Clean(pemDB)
+		}
+		artifacts, err := extract.Search(&query)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 	}
-	artifacts, err := cmd.Search(&query)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
 func extractSPTM(c *gin.Context) {
-	var query cmd.Config
+	var query extract.Config
 	if err := c.ShouldBindJSON(&query); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	artifacts, err := cmd.SPTM(&query)
+	artifacts, err := extract.SPTM(&query)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

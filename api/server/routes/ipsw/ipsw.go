@@ -89,6 +89,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
 			}
+			defer os.Remove(dmgPath)
 		}
 
 		// mount filesystem DMG

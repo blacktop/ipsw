@@ -43,6 +43,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
+		defer os.Remove(dmgPath)
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
 	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
