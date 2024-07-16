@@ -192,6 +192,7 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
+		defer os.Remove(dmgPath)
 	}
 
 	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit, all)

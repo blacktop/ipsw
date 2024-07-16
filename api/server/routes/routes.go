@@ -25,7 +25,7 @@ func Add(rg *gin.RouterGroup, pemDB string) {
 	download.AddRoutes(rg)
 	// dtree.AddRoutes(rg) // TODO: add dtree routes
 	dsc.AddRoutes(rg)
-	extract.AddRoutes(rg)
+	extract.AddRoutes(rg, pemDB)
 	idev.AddRoutes(rg)
 	// img4.AddRoutes(rg) // TODO: add img4 routes
 	info.AddRoutes(rg)

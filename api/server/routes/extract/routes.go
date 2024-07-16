@@ -6,7 +6,7 @@ import (
 )
 
 // AddRoutes adds the download routes to the router
-func AddRoutes(rg *gin.RouterGroup) {
+func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	er := rg.Group("/extract")
 	// swagger:operation POST /extract/dsc Extract getExtractDsc
 	//
@@ -50,7 +50,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     description: extraction response
 	//     schema:
 	//       $ref: '#/responses/extractReponse'
-	er.POST("/dsc", extractDSC)
+	er.POST("/dsc", extractDSC(pemDB))
 	// swagger:operation POST /extract/dmg Extract getExtractDmg
 	//
 	// DMG
@@ -131,7 +131,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     description: extraction response
 	//     schema:
 	//       $ref: '#/responses/extractReponse'
-	er.POST("/kbag", extractKBAG)
+	er.POST("/kbag", extractKBAG(pemDB))
 	// swagger:operation POST /extract/kernel Extract getExtractKernel
 	//
 	// Kernel
@@ -211,7 +211,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     description: extraction response
 	//     schema:
 	//       $ref: '#/responses/extractReponse'
-	er.POST("/pattern", extractPattern)
+	er.POST("/pattern", extractPattern(pemDB))
 	// swagger:operation POST /extract/sptm Extract getExtractSPTM
 	//
 	// SPTM
