@@ -24,7 +24,7 @@ amends "../../pkl/Symbolicator.pkl"
 
 target = "com.apple.kernel"
 
-total = 4463
+total = 4453
 
 version {
     max = "23.5.0"
@@ -2868,7 +2868,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "couldn\\'t find stack %p in library %p @%s:%d"
+                string = "couldn't find stack %p in library %p @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -2928,13 +2928,13 @@ signatures {
                 caller = "ledger_template_create"
             }
             new {
-                string = "couldn\\'t create coalition ledger template @%s:%d"
+                string = "couldn't create coalition ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
             }
             new {
-                string = "couldn\\'t create entries for coaliton ledger template @%s:%d"
+                string = "couldn't create entries for coaliton ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -2946,7 +2946,7 @@ signatures {
                 caller = "ledger_template_copy"
             }
             new {
-                string = "couldn\\'t create coalition task ledger template @%s:%d"
+                string = "couldn't create coalition task ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -3582,7 +3582,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "Couldn\\'t obtain preoslog region: result = %d, preoslog_pa = %p, preoslog_size = %d\n"
+                string = "Couldn't obtain preoslog region: result = %d, preoslog_pa = %p, preoslog_size = %d\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "kprintf"
@@ -4152,7 +4152,7 @@ signatures {
                 caller = "getsectbynamefromheader"
             }
             new {
-                string = "kalloc_type_view_parse: couldn\\'t find kext @ offset:%lx @%s:%d"
+                string = "kalloc_type_view_parse: couldn't find kext @ offset:%lx @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -6100,7 +6100,7 @@ signatures {
                 caller = "ledger_template_create"
             }
             new {
-                string = "couldn\\'t create task ledger template @%s:%d"
+                string = "couldn't create task ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -6352,7 +6352,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "couldn\\'t create entries for task ledger template for SFI class 0x%x @%s:%d"
+                string = "couldn't create entries for task ledger template for SFI class 0x%x @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -6412,7 +6412,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "couldn\\'t create entries for task ledger template @%s:%d"
+                string = "couldn't create entries for task ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -6502,7 +6502,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "couldn\\'t take coredump of %s[%d]: %d\n"
+                string = "couldn't take coredump of %s[%d]: %d\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -6944,13 +6944,13 @@ signatures {
                 caller = "ledger_template_create"
             }
             new {
-                string = "couldn\\'t create thread ledger template @%s:%d"
+                string = "couldn't create thread ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
             }
             new {
-                string = "couldn\\'t create cpu_time entry for thread ledger template @%s:%d"
+                string = "couldn't create cpu_time entry for thread ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -7390,7 +7390,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "Couldn\\'t allocate send right for ux_handler_port! @%s:%d"
+                string = "Couldn't allocate send right for ux_handler_port! @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -8542,13 +8542,13 @@ signatures {
                 caller = "ledger_template_create"
             }
             new {
-                string = "couldn\\'t create bank ledger template @%s:%d"
+                string = "couldn't create bank ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
             }
             new {
-                string = "couldn\\'t create cpu_time entry for bank ledger template @%s:%d"
+                string = "couldn't create cpu_time entry for bank ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -8560,7 +8560,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "couldn\\'t create energy entry for bank ledger template @%s:%d"
+                string = "couldn't create energy entry for bank ledger template @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -12242,7 +12242,7 @@ signatures {
                 caller = "printf"
             }
             new {
-                string = "shared_region: create: couldn\\'t allocate map\n"
+                string = "shared_region: create: couldn't allocate map\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -19454,7 +19454,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "dtrace_open: couldn\\'t acquire minor number %d. This usually means that too many DTrace clients are in use at the moment"
+                string = "dtrace_open: couldn't acquire minor number %d. This usually means that too many DTrace clients are in use at the moment"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -19880,7 +19880,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "/dev/sdt couldn\\'t create minor node"
+                string = "/dev/sdt couldn't create minor node"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -20440,7 +20440,7 @@ signatures {
                 caller = "printf"
             }
             new {
-                string = "Couldn\\'t register buffer cache callout for vm pressure! @%s:%d"
+                string = "Couldn't register buffer cache callout for vm pressure! @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -23302,19 +23302,19 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "Couldn\\'t make stdin, err %d.\n"
+                string = "Couldn't make stdin, err %d.\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
             }
             new {
-                string = "Couldn\\'t make stdout, err %d.\n"
+                string = "Couldn't make stdout, err %d.\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
             }
             new {
-                string = "Couldn\\'t make stderr, err %d.\n"
+                string = "Couldn't make stderr, err %d.\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -26652,7 +26652,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s: ifp=%p couldn\\'t get an input thread; err=%d"
+                string = "%s: ifp=%p couldn't get an input thread; err=%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -26670,7 +26670,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s: ifp=%p couldn\\'t get a start thread; err=%d"
+                string = "%s: ifp=%p couldn't get a start thread; err=%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -26688,7 +26688,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s: ifp=%p couldn\\'t get a poll thread; err=%d"
+                string = "%s: ifp=%p couldn't get a poll thread; err=%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -27262,13 +27262,13 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s: couldn\\'t create main input thread"
+                string = "%s: couldn't create main input thread"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
             }
             new {
-                string = "%s: couldn\\'t create %s input thread"
+                string = "%s: couldn't create %s input thread"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -28068,13 +28068,13 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s: couldn\\'t allocate loopback ifnet (%d) @%s:%d"
+                string = "%s: couldn't allocate loopback ifnet (%d) @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
             }
             new {
-                string = "%s: couldn\\'t attach loopback ifnet (%d) @%s:%d"
+                string = "%s: couldn't attach loopback ifnet (%d) @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -30276,13 +30276,13 @@ signatures {
         args = 1
         anchors {
             new {
-                string = "rn_delete: couldn\\'t find our annotation\n"
+                string = "rn_delete: couldn't find our annotation\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "log"
             }
             new {
-                string = "rn_delete: couldn\\'t find us\n"
+                string = "rn_delete: couldn't find us\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "log"
@@ -31409,12 +31409,6 @@ signatures {
         anchors {
             new {
                 string = "TAILQ_EMPTY(&net_port_entry_hash_table[i])"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/net/if_ports_used.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -34070,7 +34064,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "Couldn\\'t find client"
+                string = "Couldn't find client"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -38397,12 +38391,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/net/pf_table.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "pfr_walktree"
         prototype = ""
@@ -38571,12 +38559,6 @@ signatures {
             }
             new {
                 string = "iptap_total_tap_count >= 0"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/net/iptap.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -39198,7 +39180,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "%s: couldn\\'t create flow event advisory thread @%s:%d"
+                string = "%s: couldn't create flow event advisory thread @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -40938,7 +40920,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "%s: couldn\\'t create network work queue thread"
+                string = "%s: couldn't create network work queue thread"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -44776,12 +44758,6 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet/raw_ip.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
                 string = "ripcb"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -45949,12 +45925,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet/tcp_ledbat.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "update_cwnd"
         prototype = ""
@@ -46280,20 +46250,6 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet/ip_encap.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "m_tag_kalloc_encap"
-        prototype = ""
-        caller = ""
-    }
-    new {
-        args = 0
-        anchors {
-            new {
                 string = "kipf_ref overflow @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -46397,20 +46353,6 @@ signatures {
             }
         }
         symbol = "flow_divert_kctl_disconnect"
-        prototype = ""
-        caller = ""
-    }
-    new {
-        args = 1
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet/mp_proto.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "mp_dinit"
         prototype = ""
         caller = ""
     }
@@ -48816,12 +48758,6 @@ signatures {
                 caller = ""
             }
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/ah_input.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
                 string = "IPv4 AH input: can't pullup;dropping the packet for simplicity\n"
                 segment = "__TEXT"
                 section = "__os_log"
@@ -48870,7 +48806,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "IPv4 AH input: couldn\\'t alloc temporary region for cksum\n"
+                string = "IPv4 AH input: couldn't alloc temporary region for cksum\n"
                 segment = "__TEXT"
                 section = "__os_log"
                 caller = ""
@@ -50690,12 +50626,6 @@ signatures {
                 caller = ""
             }
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/icmp6.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
                 string = "mld_init"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -52329,12 +52259,6 @@ signatures {
         anchors {
             new {
                 string = "!NETNS_TOKEN_VALID( &inp->inp_wildcard_netns_token)"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/in6_pcb.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -54546,12 +54470,6 @@ signatures {
                 caller = ""
             }
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/nd6_send.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
                 string = "%s: marshalled data too large.\n"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -54659,12 +54577,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/udp6_output.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "udp6_output"
         prototype = ""
@@ -54729,12 +54641,6 @@ signatures {
         anchors {
             new {
                 string = "salt_tmp != 0"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/netinet6/ip6_id.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -56774,7 +56680,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "audit_rotate_vnode: Couldn\\'t close audit file.\n"
+                string = "audit_rotate_vnode: Couldn't close audit file.\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -56788,7 +56694,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "audit_worker_init: Couldn\\'t create audit_worker thread @%s:%d"
+                string = "audit_worker_init: Couldn't create audit_worker thread @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -64595,12 +64501,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/kern/uipc_syscalls.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "sockargs"
         prototype = ""
@@ -65679,12 +65579,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/kern/kpi_socket.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "sock_release"
         prototype = ""
@@ -66099,12 +65993,6 @@ signatures {
             }
             new {
                 string = "g_tracker_gc_thread != NULL"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/kern/tracker.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -67234,7 +67122,7 @@ signatures {
                 caller = "panic"
             }
             new {
-                string = "%s: image file not found or couldn\\'t be read: %d\n"
+                string = "%s: image file not found or couldn't be read: %d\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "printf"
@@ -68151,12 +68039,6 @@ signatures {
     new {
         args = 0
         anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/lib/net_filter_event.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
             new {
                 string = "eventhandler_invoke(\"net_filter_event\")"
                 segment = "__TEXT"
@@ -69135,12 +69017,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/nexus_pktq.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "nx_netif_filter_fini"
         prototype = ""
@@ -69164,12 +69040,6 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/nexus_traffic_rule.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
                 string = "strcmp(ntr->ntr_ifname, ifname) == 0"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -69179,20 +69049,6 @@ signatures {
         symbol = "inet_traffic_rule_match"
         prototype = ""
         caller = "inet_traffic_rule_find"
-    }
-    new {
-        args = 0
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/nx_flowswitch.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "nx_fsw_prov_params_adjust"
-        prototype = ""
-        caller = ""
     }
     new {
         args = 1
@@ -69378,20 +69234,6 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/fsw_ip_frag.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "ipf_pkt2mbuf"
-        prototype = ""
-        caller = ""
-    }
-    new {
-        args = 0
-        anchors {
-            new {
                 string = "frag_limit"
                 segment = "__TEXT"
                 section = "__cstring"
@@ -69467,20 +69309,6 @@ signatures {
         symbol = "fsw_flow_del"
         prototype = ""
         caller = ""
-    }
-    new {
-        args = 0
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/fsw_classq.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "fsw_classq_kpkt_to_mbuf"
-        prototype = ""
-        caller = "fsw_ethernet_resolve"
     }
     new {
         args = 0
@@ -69571,20 +69399,6 @@ signatures {
         symbol = "flow_pkt_classify"
         prototype = ""
         caller = ""
-    }
-    new {
-        args = 0
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/flow/flow_entry.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "flow_entry_alloc"
-        prototype = ""
-        caller = "flow_mgr_flow_add"
     }
     new {
         args = 0
@@ -69821,12 +69635,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/flow/flow_stats.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "flow_stats_free"
         prototype = ""
@@ -69837,12 +69645,6 @@ signatures {
         anchors {
             new {
                 string = "m != 0"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/flowswitch/flow/flow_track.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -70128,7 +69930,7 @@ signatures {
         args = 1
         anchors {
             new {
-                string = "%s: ifp=%p couldn\\'t get a poll  thread; err=%d"
+                string = "%s: ifp=%p couldn't get a poll  thread; err=%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -70339,12 +70141,6 @@ signatures {
                 section = "__cstring"
                 caller = ""
             }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/nexus_pktq.h"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
         }
         symbol = "nx_netif_tx_processed_pkt_get_len"
         prototype = ""
@@ -70375,12 +70171,6 @@ signatures {
         anchors {
             new {
                 string = "(ft = nif->nif_flow_table) != NULL"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/netif/nx_netif_flow.c"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -70721,20 +70511,6 @@ signatures {
         caller = ""
     }
     new {
-        args = 0
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/upipe/nx_user_pipe.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "nx_upipe_na_activate"
-        prototype = ""
-        caller = ""
-    }
-    new {
         args = 1
         anchors {
             new {
@@ -70745,20 +70521,6 @@ signatures {
             }
         }
         symbol = "nx_kpipe_dom_connect"
-        prototype = ""
-        caller = ""
-    }
-    new {
-        args = 0
-        anchors {
-            new {
-                string = "/AppleInternal/Library/BuildRoots/08825dc9-0808-11ef-89d0-fe8bc7981bff/Library/Caches/com.apple.xbs/Sources/xnu/bsd/skywalk/nexus/kpipe/nx_kernel_pipe.c"
-                segment = "__TEXT"
-                section = "__cstring"
-                caller = ""
-            }
-        }
-        symbol = "nx_kpipe_na_activate"
         prototype = ""
         caller = ""
     }
@@ -74388,7 +74150,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "Couldn\\'t allocate kext panic log buffer."
+                string = "Couldn't allocate kext panic log buffer."
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = ""
@@ -75666,7 +75428,7 @@ signatures {
         args = 0
         anchors {
             new {
-                string = "couldn\\'t find sectHIBTEXTB in segInfo @%s:%d"
+                string = "couldn't find sectHIBTEXTB in segInfo @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -82024,7 +81786,7 @@ signatures {
                 caller = "IOLog"
             }
             new {
-                string = "Couldn\\'t retrieve volume status. Error %d\n"
+                string = "Couldn't retrieve volume status. Error %d\n"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "IOLog"
@@ -82992,7 +82754,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "Couldn\\'t allocate service dict @%s:%d"
+                string = "Couldn't allocate service dict @%s:%d"
                 segment = "__TEXT"
                 section = "__cstring"
                 caller = "panic"
@@ -92774,7 +92536,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "%s - %lx: Couldn\\'t find proc for uuid %s\n"
+                string = "%s - %lx: Couldn't find proc for uuid %s\n"
                 segment = "__TEXT"
                 section = "__os_log"
                 caller = ""
@@ -93084,7 +92846,7 @@ signatures {
                 caller = ""
             }
             new {
-                string = "IPv6 AH input: couldn\\'t alloc temporary region for cksum\n"
+                string = "IPv6 AH input: couldn't alloc temporary region for cksum\n"
                 segment = "__TEXT"
                 section = "__os_log"
                 caller = ""
