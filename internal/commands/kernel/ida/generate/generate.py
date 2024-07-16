@@ -26,7 +26,10 @@ def get_func_end(ea: ea_t) -> int:
 
 
 def get_func_arg_count(ea: ea_t) -> int:
-    return ida_funcs.get_func(ea).regargqty
+    func = ida_funcs.get_func(ea)
+    if not func:
+        return 0
+    return func.regargqty
 
 
 def get_unique_cstrings(segment: str, section: str) -> Iterable[idautils.Strings]:
