@@ -98,7 +98,7 @@ class Symbolicator(object):
     def write_to_pkl(self, filepath: str):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
-                f.write('amends "../pkl/Symbolicator.pkl"\n')
+                f.write('amends "../../pkl/Symbolicator.pkl"\n')
                 f.write(
                     """
 // MIT License
