@@ -128,7 +128,7 @@ You can use [ipswd](https://blacktop.github.io/ipsw/api) to also serve the fcs-k
 
 ```yaml
 daemon:
-  pemdb: /path/to/fcs-keys.json
+  pem-db: /path/to/fcs-keys.json
 ```
 
 Start the *daemon*
