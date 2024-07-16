@@ -24,7 +24,7 @@ type successResponse struct {
 }
 
 // AddRoutes adds the download routes to the router
-func AddRoutes(rg *gin.RouterGroup) {
+func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	// swagger:route POST /mount/{type} Mount postMount
 	//
 	// Mount
@@ -64,6 +64,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 		pemDbPath, ok := c.GetQuery("pem_db")
 		if ok {
 			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
+			}
 		}
 		dmgType := c.Param("type")
 		if !utils.StrSliceContains([]string{"app", "sys", "fs"}, dmgType) {
