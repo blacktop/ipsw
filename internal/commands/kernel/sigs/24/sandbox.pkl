@@ -1,4 +1,4 @@
-amends "../pkl/Symbolicator.pkl"
+amends "../../pkl/Symbolicator.pkl"
 
 // MIT License
 //
