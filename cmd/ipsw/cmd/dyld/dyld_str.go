@@ -22,7 +22,9 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,15 +40,23 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(StrSearchCmd)
-	StrSearchCmd.Flags().StringP("pattern", "p", "", "Regex match strings")
+	StrSearchCmd.Flags().StringP("pattern", "p", "", "Regex match strings (SLOW)")
 	viper.BindPFlag("dyld.str.pattern", StrSearchCmd.Flags().Lookup("pattern"))
 }
 
 // StrSearchCmd represents the str command
 var StrSearchCmd = &cobra.Command{
-	Use:   "str <DSC>",
+	Use:   "str <DSC> [STRING...]",
 	Short: "Search dyld_shared_cache for string",
-	Args:  cobra.ExactArgs(1),
+	Example: `  # Perform FAST byte search for string in dyld_shared_cache
+  ❯ ipsw dsc str DSC "string1"
+  # Perform FAST byte search for multiple strings in dyld_shared_cache
+  ❯ ipsw dsc str DSC "string1" "string2
+  # Perform FAST byte search for strings from stdin in dyld_shared_cache
+  ❯ cat strings.txt | ipsw dsc str DSC
+  # Perform SLOW regex search for string in dyld_shared_cache
+  ❯ ipsw dsc str DSC --pattern "REGEX_PATTERN"`,
+	Args: cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
@@ -58,15 +68,17 @@ var StrSearchCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		// flags
 		pattern := viper.GetString("dyld.str.pattern")
-
+		// validate flags
+		if pattern != "" && len(args) > 1 {
+			return fmt.Errorf("cannot use --pattern with positional STRING arguments")
+		}
 		dscPath := filepath.Clean(args[0])
-
 		fileInfo, err := os.Lstat(dscPath)
 		if err != nil {
 			return fmt.Errorf("file %s does not exist", dscPath)
 		}
-
 		// Check if file is a symlink
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			symlinkPath, err := os.Readlink(dscPath)
@@ -86,10 +98,50 @@ var StrSearchCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		log.Info("Searching for strings...")
-		strs, err := dscCmd.GetStrings(f, pattern)
-		if err != nil {
-			return err
+		var strs []dscCmd.String
+
+		if pattern != "" {
+			log.Info("Searching for strings via REGEX pattern...")
+			strs, err = dscCmd.GetStringsRegex(f, pattern)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Info("Searching for strings...")
+			var searchStrings []string
+
+			if len(args) > 1 {
+				// Read from positional args
+				searchStrings = args[1:]
+			} else {
+				// Read from stdin
+				stat, err := os.Stdin.Stat()
+				if err != nil {
+					return fmt.Errorf("failed to read from stdin: %v", err)
+				}
+				if (stat.Mode() & os.ModeCharDevice) == 0 {
+					reader := bufio.NewReader(os.Stdin)
+					var inputBuilder strings.Builder
+					for {
+						part, err := reader.ReadString('\n')
+						if err == io.EOF {
+							break
+						}
+						if err != nil {
+							return fmt.Errorf("failed to read from stdin: %v", err)
+						}
+						inputBuilder.WriteString(strings.TrimSuffix(part, "\n"))
+					}
+					searchStrings = strings.Split(inputBuilder.String(), " ")
+				} else {
+					return fmt.Errorf("no input provided via stdin")
+				}
+			}
+
+			strs, err = dscCmd.GetStrings(f, searchStrings...)
+			if err != nil {
+				return err
+			}
 		}
 
 		var out strings.Builder

@@ -592,52 +592,59 @@ func GetSymbols(f *dyld.File, lookups []Symbol) ([]Symbol, error) {
 }
 
 // GetStrings returns a list of strings from a dyld_shared_cache file for a given regex pattern
-func GetStrings(f *dyld.File, pattern string) ([]String, error) {
+func GetStrings(f *dyld.File, in ...string) ([]String, error) {
+	var strs []String
+
+	if len(in) == 0 {
+		return nil, fmt.Errorf("search strings cannot be empty")
+	}
+
+	for _, search := range in {
+		matches, err := f.Search([]byte(search))
+		if err != nil {
+			return nil, fmt.Errorf("failed to search for pattern: %v", err)
+		}
+		for uuid, ms := range matches {
+			for _, match := range ms {
+				s := String{Offset: match}
+				if mapping, err := f.GetMappingForOffsetForUUID(uuid, match); err == nil {
+					s.Mapping = mapping.Name
+					if sc := f.GetSubCacheInfo(uuid); sc != nil {
+						s.Mapping += fmt.Sprintf(", sub_cache (%s)", sc.Extention)
+					}
+				} else {
+					if sc := f.GetSubCacheInfo(uuid); sc != nil {
+						s.Mapping += fmt.Sprintf("sub_cache (%s)", sc.Extention)
+					}
+				}
+				if str, err := f.GetCStringAtOffsetForUUID(uuid, match); err == nil {
+					s.String = strings.TrimSuffix(strings.TrimSpace(str), "\n")
+				}
+				if addr, err := f.GetVMAddressForUUID(uuid, match); err == nil {
+					s.Address = addr
+					if image, err := f.GetImageContainingVMAddr(addr); err == nil {
+						s.Image = filepath.Base(image.Name)
+					}
+				}
+				strs = append(strs, s)
+			}
+		}
+	}
+
+	return strs, nil
+}
+
+func GetStringsRegex(f *dyld.File, pattern string) ([]String, error) {
 	var strs []String
 
 	if len(pattern) == 0 {
-		return nil, fmt.Errorf("pattern cannot be empty")
+		return nil, fmt.Errorf("'pattern' cannot be empty")
 	}
 
 	strRE, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("invalid regex: %w", err)
 	}
-
-	matches, err := f.Search([]byte(pattern))
-	if err != nil {
-		return nil, fmt.Errorf("failed to search for pattern: %v", err)
-	}
-	for uuid, ms := range matches {
-		for _, match := range ms {
-			s := String{Offset: match}
-			if mapping, err := f.GetMappingForOffsetForUUID(uuid, match); err == nil {
-				s.Mapping = mapping.Name
-				if sc := f.GetSubCacheInfo(uuid); sc != nil {
-					s.Mapping += fmt.Sprintf(", sub_cache (%s)", sc.Extention)
-				}
-			} else {
-				if sc := f.GetSubCacheInfo(uuid); sc != nil {
-					s.Mapping += fmt.Sprintf("sub_cache (%s)", sc.Extention)
-				}
-			}
-			if str, err := f.GetCStringAtOffsetForUUID(uuid, match); err == nil {
-				s.String = strings.TrimSuffix(strings.TrimSpace(str), "\n")
-			}
-			if addr, err := f.GetVMAddressForUUID(uuid, match); err == nil {
-				s.Address = addr
-				if image, err := f.GetImageContainingVMAddr(addr); err == nil {
-					s.Image = filepath.Base(image.Name)
-				}
-			}
-			strs = append(strs, s)
-		}
-	}
-	if len(matches) > 0 {
-		return strs, nil
-	}
-
-	log.Warn("No strings found in dyld_shared_cache using FAST byte search, falling back to slow MachO parsing/regex search...")
 
 	for _, i := range f.Images {
 		m, err := i.GetMacho()
