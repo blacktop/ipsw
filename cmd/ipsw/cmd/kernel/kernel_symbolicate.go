@@ -23,6 +23,7 @@ package kernel
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -77,6 +78,9 @@ var kernelSymbolicateCmd = &cobra.Command{
 		for _, sig := range sigs {
 			syms, err := kcmd.Symbolicate(args[0], sig)
 			if err != nil {
+				if errors.Is(err, kcmd.UnsupportedVersion) {
+					continue
+				}
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 			}
 			maps.Copy(symMap, syms)

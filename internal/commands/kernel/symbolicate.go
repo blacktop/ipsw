@@ -4,6 +4,7 @@ package kernel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,8 +15,12 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/signature"
+	semver "github.com/hashicorp/go-version"
 )
+
+var UnsupportedVersion = errors.New("kernel version not supported")
 
 func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -37,6 +42,29 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 		return nil, err
 	}
 	return sigs, nil
+}
+
+func CheckKernelVersion(m *macho.File, sigs *signature.Symbolicator) (bool, error) {
+	kv, err := kernelcache.GetVersion(m)
+	if err != nil {
+		return false, fmt.Errorf("failed to get kernelcache version: %v", err)
+	}
+	darwin, err := semver.NewVersion(kv.Darwin)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert kernel version into semver object: %v", err)
+	}
+	minVer, err := semver.NewVersion(sigs.Version.Min)
+	if err != nil {
+		log.Fatal("failed to convert version into semver object")
+	}
+	maxVer, err := semver.NewVersion(sigs.Version.Max)
+	if err != nil {
+		log.Fatal("failed to convert version into semver object")
+	}
+	if darwin.GreaterThanOrEqual(minVer) && darwin.LessThanOrEqual(maxVer) {
+		return true, nil
+	}
+	return false, nil
 }
 
 func truncate(in string, length int) string {
@@ -159,6 +187,13 @@ func Symbolicate(infile string, sigs *signature.Symbolicator) (map[uint64]string
 		return nil, err
 	}
 	defer m.Close()
+
+	if ok, err := CheckKernelVersion(m, sigs); !ok {
+		if err != nil {
+			return nil, err
+		}
+		return nil, UnsupportedVersion
+	}
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		m, err = m.GetFileSetFileByName(sigs.Target)
