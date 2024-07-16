@@ -18,7 +18,7 @@ import (
 )
 
 // Add adds the command routes to the router
-func Add(rg *gin.RouterGroup) {
+func Add(rg *gin.RouterGroup, pemDB string) {
 	daemon.AddRoutes(rg)
 	devicelist.AddRoutes(rg)
 	diff.AddRoutes(rg)
@@ -29,11 +29,11 @@ func Add(rg *gin.RouterGroup) {
 	idev.AddRoutes(rg)
 	// img4.AddRoutes(rg) // TODO: add img4 routes
 	info.AddRoutes(rg)
-	ipsw.AddRoutes(rg)
+	ipsw.AddRoutes(rg, pemDB)
 	kernel.AddRoutes(rg)
 	macho.AddRoutes(rg)
 	// mdevs.AddRoutes(rg) // TODO: add mdevs routes
-	mount.AddRoutes(rg)
+	mount.AddRoutes(rg, pemDB)
 	// ota.AddRoutes(rg) // TODO: add ota routes
 	// pongo.AddRoutes(rg) // TODO: add pongo routes
 	// sepfw.AddRoutes(rg) // TODO: add sepfw routes

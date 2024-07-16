@@ -93,10 +93,10 @@ func (s *Server) Start(db db.Database) error {
 
 	rg := s.router.Group("/v" + api.DefaultVersion)
 
-	routes.Add(rg)
+	routes.Add(rg, s.conf.PemDB)
 
 	if db != nil {
-		syms.AddRoutes(rg, db)
+		syms.AddRoutes(rg, db, s.conf.PemDB)
 	}
 
 	if s.conf.PemDB != "" {

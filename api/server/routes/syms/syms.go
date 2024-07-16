@@ -41,7 +41,7 @@ type IpswParams struct {
 }
 
 // AddRoutes adds the syms routes to the router
-func AddRoutes(rg *gin.RouterGroup, db db.Database) {
+func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB string) {
 	// swagger:route POST /syms/scan Syms postScan
 	//
 	// Scan
@@ -76,6 +76,10 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database) {
 		pemDbPath, ok := c.GetQuery("pem_db")
 		if ok {
 			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
+			}
 		}
 		if err := syms.Scan(ipswPath, pemDbPath, db); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
