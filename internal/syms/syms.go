@@ -10,13 +10,13 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/signature"
 )
 
 const (
@@ -43,14 +43,14 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 		kextSyms := make(map[string]map[uint64]string)
 		if sigDir != "" {
 			// parse signatures
-			sigs, err := kcmd.ParseSignatures(sigDir)
+			sigs, err := signature.ParseSignatures(sigDir)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse signatures: %v", err)
 			}
 			// symbolicate kernelcache
 			for _, sig := range sigs {
 				kextSyms[sig.Target] = make(map[uint64]string)
-				syms, err := kcmd.Symbolicate(k, sig, true)
+				syms, err := signature.Symbolicate(k, sig, true)
 				if err != nil {
 					return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 				}
