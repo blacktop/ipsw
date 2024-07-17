@@ -23,12 +23,12 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
 )
 
@@ -818,16 +818,16 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			kextSyms := make(map[string]map[uint64]string)
 			if i.Config.SignaturesDir != "" {
 				// parse signatures
-				sigs, err := kcmd.ParseSignatures(i.Config.SignaturesDir)
+				sigs, err := signature.ParseSignatures(i.Config.SignaturesDir)
 				if err != nil {
 					return fmt.Errorf("failed to parse signatures: %v", err)
 				}
 				// symbolicate kernelcache
 				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
 				for _, sig := range sigs {
-					syms, err := kcmd.Symbolicate(k, sig, true)
+					syms, err := signature.Symbolicate(k, sig, true)
 					if err != nil {
-						if errors.Is(err, kcmd.ErrUnsupportedVersion) {
+						if errors.Is(err, signature.ErrUnsupportedVersion) {
 							continue
 						}
 						return fmt.Errorf("failed to symbolicate kernelcache: %v", err)

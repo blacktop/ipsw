@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -77,8 +76,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			output = filepath.Dir(filepath.Clean(args[0]))
 		}
 
-		var sigs []*signature.Symbolicator
-		sigs, err = kcmd.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
+		sigs, err := signature.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
 		if err != nil {
 			return fmt.Errorf("failed to parse signatures: %v", err)
 		}
@@ -88,9 +86,9 @@ var kernelSymbolicateCmd = &cobra.Command{
 		goodsig := false
 		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
 		for _, sig := range sigs {
-			syms, err := kcmd.Symbolicate(args[0], sig, quiet)
+			syms, err := signature.Symbolicate(args[0], sig, quiet)
 			if err != nil {
-				if errors.Is(err, kcmd.ErrUnsupportedVersion) {
+				if errors.Is(err, signature.ErrUnsupportedVersion) {
 					continue
 				}
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)

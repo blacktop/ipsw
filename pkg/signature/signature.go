@@ -1,6 +1,6 @@
-package kernel
+package signature
 
-//go:generate pkl-gen-go ../../../../symbolicator/Symbolicator.pkl --base-path github.com/blacktop/ipsw --output-path ../../../
+//go:generate pkl-gen-go ../../../symbolicator/Symbolicator.pkl --base-path github.com/blacktop/ipsw --output-path ../../
 
 import (
 	"context"
@@ -16,13 +16,12 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/pkg/signature"
 	semver "github.com/hashicorp/go-version"
 )
 
 var ErrUnsupportedVersion = errors.New("kernel version not supported")
 
-func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
+func ParseSignatures(dir string) (sigs []*Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -31,7 +30,7 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 			if filepath.Ext(path) != ".pkl" {
 				return nil
 			}
-			sig, err := signature.LoadFromPath(context.Background(), path)
+			sig, err := LoadFromPath(context.Background(), path)
 			if err != nil {
 				return err
 			}
@@ -44,7 +43,7 @@ func ParseSignatures(dir string) (sigs []*signature.Symbolicator, err error) {
 	return sigs, nil
 }
 
-func CheckKernelVersion(m *macho.File, sigs *signature.Symbolicator) (bool, error) {
+func CheckKernelVersion(m *macho.File, sigs *Symbolicator) (bool, error) {
 	kv, err := kernelcache.GetVersion(m)
 	if err != nil {
 		return false, fmt.Errorf("failed to get kernelcache version: %v", err)
@@ -74,7 +73,7 @@ func truncate(in string, length int) string {
 	return in
 }
 
-func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator, quiet bool) (map[uint64]string, error) {
+func symbolicate(m *macho.File, name string, sigs *Symbolicator, quiet bool) (map[uint64]string, error) {
 	symbolMap := make(map[uint64]string)
 
 	text := m.Section("__TEXT_EXEC", "__text")
@@ -194,7 +193,7 @@ func symbolicate(m *macho.File, name string, sigs *signature.Symbolicator, quiet
 	return symbolMap, nil
 }
 
-func Symbolicate(infile string, sigs *signature.Symbolicator, quiet bool) (map[uint64]string, error) {
+func Symbolicate(infile string, sigs *Symbolicator, quiet bool) (map[uint64]string, error) {
 	m, err := macho.Open(infile)
 	if err != nil {
 		return nil, err
