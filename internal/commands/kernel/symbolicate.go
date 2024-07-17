@@ -1,6 +1,6 @@
 package kernel
 
-//go:generate pkl-gen-go pkl/Symbolicator.pkl --base-path github.com/blacktop/ipsw --output-path ../../../
+//go:generate pkl-gen-go ../../../../symbolicator/Symbolicator.pkl --base-path github.com/blacktop/ipsw --output-path ../../../
 
 import (
 	"context"
