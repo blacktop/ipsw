@@ -108,6 +108,7 @@ type AppleDbOsFile struct {
 	Build     string         `json:"build"`
 	Released  ReleasedDate   `json:"released"`
 	Beta      bool           `json:"beta"`
+	RC        bool           `json:"rc"`
 	DeviceMap []string       `json:"deviceMap"`
 	Sources   []OsFileSource `json:"sources"`
 }
@@ -148,6 +149,9 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			}
 		}
 		if query.IsBeta && !f.Beta {
+			continue
+		}
+		if query.IsRC && !f.RC {
 			continue
 		}
 		if len(query.Version) > 0 && f.Version != query.Version {
@@ -224,6 +228,7 @@ type ADBQuery struct {
 	PrerequisiteBuild string
 	Device            string
 	IsBeta            bool
+	IsRC              bool
 	Latest            bool
 	Proxy             string
 	Insecure          bool
