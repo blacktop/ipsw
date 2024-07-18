@@ -178,7 +178,10 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		if query.IsRC && !f.RC {
 			continue
 		}
-		if len(query.Version) > 0 && f.Version != query.Version {
+		if (!query.IsBeta && !query.IsRC) && (f.Beta || f.RC) { // release only
+			continue
+		}
+		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
 			continue
 		}
 		if len(query.Build) > 0 && f.Build != query.Build {
