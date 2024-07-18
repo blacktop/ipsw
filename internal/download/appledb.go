@@ -109,6 +109,7 @@ type AppleDbOsFile struct {
 	Released  ReleasedDate   `json:"released"`
 	Beta      bool           `json:"beta"`
 	RC        bool           `json:"rc"`
+	Internal  bool           `json:"internal"`
 	DeviceMap []string       `json:"deviceMap"`
 	Sources   []OsFileSource `json:"sources"`
 }
@@ -127,12 +128,35 @@ func (fs OsFiles) Swap(i, j int) {
 	fs[i], fs[j] = fs[j], fs[i]
 }
 
-func (fs OsFiles) Latest() *AppleDbOsFile {
-	if len(fs) == 0 {
+func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
+	var tmpFS OsFiles
+	for _, f := range fs {
+		if len(query.OSes) > 0 {
+			for _, os := range query.OSes {
+				if f.OS == os {
+					continue
+				}
+			}
+		}
+		if query.IsBeta && !f.Beta {
+			continue
+		}
+		if query.IsRC && !f.RC {
+			continue
+		}
+		if (!query.IsBeta && !query.IsRC) && (f.Beta || f.RC) { // release only
+			continue
+		}
+		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
+			continue
+		}
+		tmpFS = append(tmpFS, f)
+	}
+	if len(tmpFS) == 0 {
 		return nil
 	}
-	sort.Sort(fs)
-	return &fs[0]
+	sort.Sort(tmpFS)
+	return &tmpFS[0]
 }
 
 // Query returns a list of OsFileSource objects that match the query
@@ -295,6 +319,9 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 						osfile.Sources[i].Type = "rsr"
 					}
 				}
+				if osfile.Internal {
+					return nil // skip internal metadata
+				}
 
 				osfiles = append(osfiles, osfile)
 			}
@@ -312,7 +339,7 @@ func LocalAppleDBLatest(q *ADBQuery) (*AppleDbOsFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return osfiles.Latest(), nil
+	return osfiles.Latest(q), nil
 }
 
 func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {

@@ -277,12 +277,18 @@ var downloadAppledbCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+				if latest == nil {
+					return fmt.Errorf("query return 0 results")
+				}
 				b, err := json.MarshalIndent(&struct {
+					OS       string                `os:"version"`
 					Version  string                `json:"version"`
 					Build    string                `json:"build"`
-					Beta     bool                  `json:"beta"`
+					Beta     bool                  `json:"beta,omitempty"`
+					RC       bool                  `json:"rc,omitempty"`
 					Released download.ReleasedDate `json:"released"`
 				}{
+					OS:       latest.OS,
 					Version:  latest.Version,
 					Build:    latest.Build,
 					Beta:     latest.Beta,
