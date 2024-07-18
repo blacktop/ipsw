@@ -761,43 +761,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 		}
 	}
 
-	/* SYMBOLICATE FILESYSTEM MACHOS */
-
 	machoFuncMap := make(map[string][]types.Function)
-	if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
-		if total == 0 {
-			return ErrDone // break
-		}
-		for idx, img := range i.Payload.BinaryImages {
-			if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
-				i.Payload.BinaryImages[idx].Path = path
-				i.Payload.BinaryImages[idx].Name = path
-				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
-				i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
-				for _, fn := range m.GetFunctions() {
-					if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
-						for _, sym := range syms {
-							fn.Name = sym.Name
-						}
-						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
-						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
-						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
-					} else {
-						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
-						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
-						fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
-						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
-					}
-				}
-				total--
-			}
-		}
-		return nil
-	}); err != nil {
-		if !errors.Is(err, ErrDone) {
-			return fmt.Errorf("failed to symbolicate: %w", err)
-		}
-	}
 
 	/* SYMBOLICATE KERNELCACHE */
 	{
@@ -835,6 +799,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					kextSyms[sig.Target] = make(map[uint64]string)
 					kextSyms[sig.Target] = syms
 				}
+				log.WithField("kernelcache", filepath.Base(k)).Warn("No signatures found for kernelcache")
 			}
 
 			kc, err := macho.Open(k)
@@ -886,6 +851,42 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
 				}
 			}
+		}
+	}
+
+	/* SYMBOLICATE FILESYSTEM MACHOS */
+	if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
+		if total == 0 {
+			return ErrDone // break
+		}
+		for idx, img := range i.Payload.BinaryImages {
+			if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
+				i.Payload.BinaryImages[idx].Path = path
+				i.Payload.BinaryImages[idx].Name = path
+				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+				i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
+				for _, fn := range m.GetFunctions() {
+					if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+						for _, sym := range syms {
+							fn.Name = sym.Name
+						}
+						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+					} else {
+						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+						fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+					}
+				}
+				total--
+			}
+		}
+		return nil
+	}); err != nil {
+		if !errors.Is(err, ErrDone) {
+			return fmt.Errorf("failed to symbolicate: %w", err)
 		}
 	}
 
