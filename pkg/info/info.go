@@ -406,6 +406,7 @@ func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
 	}
 	return nil, fmt.Errorf("no RestoreRamDisk DMG found")
 }
+
 func (i *Info) GetExclaveOSDmg() (string, error) {
 	var dmgs []string
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
@@ -424,6 +425,15 @@ func (i *Info) GetExclaveOSDmg() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no BuildManifest.plist found")
+}
+
+func (i *Info) IsMacOS() bool {
+	for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
+		if strings.Contains(dev, "Mac") {
+			return true
+		}
+	}
+	return false
 }
 
 // GetOsDmg returns the name of the OS dmg
