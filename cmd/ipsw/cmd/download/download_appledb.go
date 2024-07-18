@@ -180,6 +180,9 @@ var downloadAppledbCmd = &cobra.Command{
 		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
 		}
+		if viper.GetBool("download.appledb.show-latest") && (asURLs || asJSON || kernel || len(pattern) > 0 || fcsKeys || fcsKeysJson) {
+			return fmt.Errorf("cannot use --show-latest with --urls, --json, --kernel, --pattern, --fcs-keys or --fcs-keys-json")
+		}
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
