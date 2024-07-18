@@ -55,6 +55,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	downloadAppledbCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	downloadAppledbCmd.Flags().Bool("rc", false, "Download RC (release candidate) IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	downloadAppledbCmd.Flags().Bool("show-latest", false, "Show latest version/build")
 	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
@@ -74,6 +75,7 @@ func init() {
 	viper.BindPFlag("download.appledb.fcs-keys", downloadAppledbCmd.Flags().Lookup("fcs-keys"))
 	viper.BindPFlag("download.appledb.fcs-keys-json", downloadAppledbCmd.Flags().Lookup("fcs-keys-json"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.appledb.rc", downloadAppledbCmd.Flags().Lookup("rc"))
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.appledb.show-latest", downloadAppledbCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.appledb.prereq-build", downloadAppledbCmd.Flags().Lookup("prereq-build"))
@@ -156,6 +158,7 @@ var downloadAppledbCmd = &cobra.Command{
 		fcsKeys := viper.GetBool("download.appledb.fcs-keys")
 		fcsKeysJson := viper.GetBool("download.appledb.fcs-keys-json")
 		isBeta := viper.GetBool("download.appledb.beta")
+		isRC := viper.GetBool("download.appledb.rc")
 		latest := viper.GetBool("download.appledb.latest")
 		prereqBuild := viper.GetString("download.appledb.prereq-build")
 		output := viper.GetString("download.appledb.output")
@@ -174,8 +177,11 @@ var downloadAppledbCmd = &cobra.Command{
 		if (asURLs || asJSON) && (kernel || len(pattern) > 0) {
 			return fmt.Errorf("cannot use (--urls OR --json) with (--kernel, --pattern OR --fcs-key)")
 		}
-		if isBeta && len(build) > 0 {
-			return fmt.Errorf("cannot use --beta with --build")
+		if isBeta && isRC {
+			return fmt.Errorf("cannot use --beta with --rc")
+		}
+		if (isBeta || isRC || latest) && len(build) > 0 {
+			return fmt.Errorf("cannot use --beta, --rc or --latest with --build")
 		}
 		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
@@ -229,6 +235,7 @@ var downloadAppledbCmd = &cobra.Command{
 				PrerequisiteBuild: prereqBuild,
 				Device:            device,
 				IsBeta:            isBeta,
+				IsRC:              isRC,
 				Latest:            latest,
 				Proxy:             proxy,
 				Insecure:          insecure,
@@ -260,6 +267,7 @@ var downloadAppledbCmd = &cobra.Command{
 					PrerequisiteBuild: prereqBuild,
 					Device:            device,
 					IsBeta:            isBeta,
+					IsRC:              isRC,
 					Latest:            latest,
 					Proxy:             proxy,
 					Insecure:          insecure,
@@ -300,6 +308,7 @@ var downloadAppledbCmd = &cobra.Command{
 					PrerequisiteBuild: prereqBuild,
 					Device:            device,
 					IsBeta:            isBeta,
+					IsRC:              isRC,
 					Latest:            latest,
 					Proxy:             proxy,
 					Insecure:          insecure,
