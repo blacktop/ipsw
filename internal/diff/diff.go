@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"golang.org/x/exp/maps"
 )
 
 type kernel struct {
@@ -73,6 +75,7 @@ type Context struct {
 	SystemOsDmgPath string
 	MountPath       string
 	IsMounted       bool
+	IsMacOS         bool
 	Kernel          kernel
 	DSC             string
 	Webkit          string
@@ -208,6 +211,11 @@ func (d *Diff) getInfo() (err error) {
 
 	if d.Title == "" {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
+	}
+
+	if d.Old.Info.IsMacOS() || d.New.Info.IsMacOS() {
+		d.Old.IsMacOS = true
+		d.New.IsMacOS = true
 	}
 
 	return nil
@@ -361,29 +369,41 @@ func (d *Diff) unmountSystemOsDMGs() error {
 }
 
 func (d *Diff) parseKernelcache() error {
-	if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
-		return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
-	}
-	if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
-		return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
-	}
-
-	for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
-		if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-		} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
+	if d.Old.IsMacOS || d.New.IsMacOS {
+		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, "Macmini9,1"); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
+		} else {
+			d.Old.Kernel.Path = maps.Keys(out)[0]
 		}
-		if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-		} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
+		if out, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, "Macmini9,1"); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
+		} else {
+			d.New.Kernel.Path = maps.Keys(out)[0]
 		}
-		kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
-		kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
-		d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
-		d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
-		break // just use first kernelcache for now
+	} else {
+		if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
+		}
+		if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
+		}
+		for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
+			if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+			} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
+			}
+			if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+			} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
+			}
+			kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
+			kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
+			d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
+			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
+			break // just use first kernelcache for now
+		}
 	}
 
 	m1, err := macho.Open(d.Old.Kernel.Path)
@@ -468,6 +488,19 @@ func (d *Diff) parseDSC() error {
 	if len(oldDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
 	}
+	if d.Old.IsMacOS {
+		var filtered []string
+		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		for _, match := range oldDSCes {
+			if r.MatchString(match) {
+				filtered = append(filtered, match)
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+		}
+		oldDSCes = filtered
+	}
 
 	dscOLD, err := dyld.Open(oldDSCes[0])
 	if err != nil {
@@ -483,6 +516,19 @@ func (d *Diff) parseDSC() error {
 	}
 	if len(newDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
+	}
+	if d.New.IsMacOS {
+		var filtered []string
+		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		for _, match := range newDSCes {
+			if r.MatchString(match) {
+				filtered = append(filtered, match)
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+		}
+		newDSCes = filtered
 	}
 
 	dscNEW, err := dyld.Open(newDSCes[0])
