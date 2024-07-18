@@ -126,6 +126,14 @@ func (fs OsFiles) Swap(i, j int) {
 	fs[i], fs[j] = fs[j], fs[i]
 }
 
+func (fs OsFiles) Latest() *AppleDbOsFile {
+	if len(fs) == 0 {
+		return nil
+	}
+	sort.Sort(fs)
+	return &fs[0]
+}
+
 // Query returns a list of OsFileSource objects that match the query
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 	var tmpFS OsFiles
@@ -223,7 +231,7 @@ type ADBQuery struct {
 	ConfigDir         string
 }
 
-func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 	var osfiles OsFiles
 
 	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
@@ -291,6 +299,22 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 		}
 	}
 
+	return osfiles, nil
+}
+
+func LocalAppleDBLatest(q *ADBQuery) (*AppleDbOsFile, error) {
+	osfiles, err := getLocalOsfiles(q)
+	if err != nil {
+		return nil, err
+	}
+	return osfiles.Latest(), nil
+}
+
+func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+	osfiles, err := getLocalOsfiles(q)
+	if err != nil {
+		return nil, err
+	}
 	return osfiles.Query(q), nil
 }
 
