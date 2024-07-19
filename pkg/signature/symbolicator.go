@@ -11,7 +11,7 @@ type Anchor struct {
 	Section string `json:"section"`
 
 	// The name of the function that uses this anchor as an argument.
-	Caller string `json:"caller"`
+	Caller string `json:"caller,omitempty" jsonschema:"oneof_type=string;null"`
 }
 
 type Signature struct {
