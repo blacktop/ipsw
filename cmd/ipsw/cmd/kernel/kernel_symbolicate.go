@@ -28,8 +28,10 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -42,6 +44,8 @@ func init() {
 	kernelSymbolicateCmd.Flags().BoolP("flat", "f", false, "Output results in flat file '.syms' format")
 	kernelSymbolicateCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
 	kernelSymbolicateCmd.Flags().BoolP("quiet", "q", false, "Don't display logging")
+	kernelSymbolicateCmd.Flags().Bool("test", false, "Test symbol matches")
+	kernelSymbolicateCmd.Flags().MarkHidden("test")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
 	kernelSymbolicateCmd.MarkFlagRequired("signatures")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
@@ -49,6 +53,7 @@ func init() {
 	viper.BindPFlag("kernel.symbolicate.flat", kernelSymbolicateCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.symbolicate.quiet", kernelSymbolicateCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("kernel.symbolicate.test", kernelSymbolicateCmd.Flags().Lookup("test"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
 }
@@ -101,6 +106,39 @@ var kernelSymbolicateCmd = &cobra.Command{
 
 		if !goodsig {
 			return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can add them)")
+		}
+
+		if viper.GetBool("kernel.symbolicate.test") {
+			match := 0
+			miss := 0
+			log.Warn("Testing symbol matches")
+			m, err := macho.Open(args[0] + ".dSYM/Contents/Resources/DWARF/" + filepath.Base(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to open kernelcache: %v", err)
+			}
+			defer m.Close()
+			for addr, sym := range symMap {
+				syms, err := m.FindAddressSymbols(addr)
+				if err != nil {
+					log.WithError(err).Errorf("symbol '%s' with addr %#x not found in kernelcache", sym, addr)
+					continue
+				}
+				for _, s := range syms {
+					log.Debug(s.String(m))
+					if before, ok := strings.CutSuffix(s.Name, sym); ok {
+						if before != "_" && before != "" {
+							log.Warnf("Unexpected symbol prefix: %s", before)
+						}
+						log.Infof("✅ Symbol '%s' matches", sym)
+						match++
+					} else {
+						log.Errorf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, s.Name)
+						miss++
+					}
+				}
+			}
+			log.Infof("Matched %d symbols, missed %d symbols", match, miss)
+			return nil
 		}
 
 		/* JSON OUTPUT */
