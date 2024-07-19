@@ -103,8 +103,6 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use <address> OR --section")
 		} else if len(filesetEntry) > 0 && len(segmentSection) == 0 {
 			return fmt.Errorf("you must specify a --section when using --entry")
-		} else if len(segmentSection) > 0 && len(filesetEntry) == 0 {
-			return fmt.Errorf("you must specify an --entry when using --section")
 		}
 
 		machoPath := filepath.Clean(args[0])
