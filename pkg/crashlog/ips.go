@@ -788,6 +788,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 				// symbolicate kernelcache
 				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
+				goodsig := false
 				for _, sig := range sigs {
 					syms, err := signature.Symbolicate(k, sig, true)
 					if err != nil {
@@ -798,8 +799,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					}
 					kextSyms[sig.Target] = make(map[uint64]string)
 					kextSyms[sig.Target] = syms
+					goodsig = true
 				}
-				log.WithField("kernelcache", filepath.Base(k)).Warn("No signatures found for kernelcache")
+				if !goodsig {
+					log.Warn("no valid signatures found for kernelcache (let author know and we can try add them)")
+				}
 			}
 
 			kc, err := macho.Open(k)

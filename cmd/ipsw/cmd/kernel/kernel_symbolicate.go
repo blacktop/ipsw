@@ -105,7 +105,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 		}
 
 		if !goodsig {
-			return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can add them)")
+			return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
 		}
 
 		if viper.GetBool("kernel.symbolicate.test") {
