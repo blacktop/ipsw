@@ -34,6 +34,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
+	"github.com/invopop/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,6 +47,8 @@ func init() {
 	kernelSymbolicateCmd.Flags().BoolP("quiet", "q", false, "Don't display logging")
 	kernelSymbolicateCmd.Flags().Bool("test", false, "Test symbol matches")
 	kernelSymbolicateCmd.Flags().MarkHidden("test")
+	kernelSymbolicateCmd.Flags().Bool("schema", false, "Generate JSON schema")
+	kernelSymbolicateCmd.Flags().MarkHidden("schema")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
 	kernelSymbolicateCmd.MarkFlagRequired("signatures")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
@@ -54,6 +57,7 @@ func init() {
 	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.symbolicate.quiet", kernelSymbolicateCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("kernel.symbolicate.test", kernelSymbolicateCmd.Flags().Lookup("test"))
+	viper.BindPFlag("kernel.symbolicate.schema", kernelSymbolicateCmd.Flags().Lookup("schema"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
 }
@@ -79,6 +83,24 @@ var kernelSymbolicateCmd = &cobra.Command{
 		output := viper.GetString("kernel.symbolicate.output")
 		if output == "" {
 			output = filepath.Dir(filepath.Clean(args[0]))
+		}
+
+		if viper.GetBool("kernel.symbolicate.schema") {
+			schema := jsonschema.Reflect(&signature.Symbolicator{})
+			schema.Description = "ipsw Symbolicator definition file"
+			bts, err := json.MarshalIndent(schema, "	", "	")
+			if err != nil {
+				return fmt.Errorf("failed to create jsonschema: %w", err)
+			}
+			if viper.IsSet("kernel.symbolicate.output") {
+				if viper.GetString("kernel.symbolicate.output") == "-" {
+					fmt.Println(string(bts))
+					return nil
+				}
+				schemaFile := filepath.Join(output, "symbolicator.schema.json")
+				log.Infof("Writing JSON schema to %s", schemaFile)
+				return os.WriteFile(schemaFile, bts, 0o644)
+			}
 		}
 
 		log.Info("Parsing Signatures")
@@ -124,20 +146,22 @@ var kernelSymbolicateCmd = &cobra.Command{
 					continue
 				}
 				for _, s := range syms {
-					log.Debug(s.String(m))
 					if before, ok := strings.CutSuffix(s.Name, sym); ok {
 						if before != "_" && before != "" {
 							log.Warnf("Unexpected symbol prefix: %s", before)
 						}
-						log.Infof("✅ Symbol '%s' matches", sym)
+						if !quiet {
+							log.Infof("✅ Symbol '%s' matches", sym)
+						}
 						match++
 					} else {
+						log.Debug(s.String(m))
 						log.Errorf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, s.Name)
 						miss++
 					}
 				}
 			}
-			log.Infof("Matched %d symbols, missed %d symbols", match, miss)
+			log.Infof("Matched %d symbols, Missed %d symbols: %.4f%%", match, miss, 100*float64(match)/float64(len(symMap)))
 			return nil
 		}
 
