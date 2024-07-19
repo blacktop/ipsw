@@ -1,14 +1,13 @@
 package signature
 
-//go:generate pkl-gen-go ../../../symbolicator/Symbolicator.pkl --base-path github.com/blacktop/ipsw --output-path ../../
-
 import (
-	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -19,19 +18,24 @@ import (
 	semver "github.com/hashicorp/go-version"
 )
 
-var ErrUnsupportedVersion = errors.New("kernel version not supported")
+var ErrUnsupportedTarget = errors.New("target not supported")
+var ErrUnsupportedVersion = errors.New("version not supported")
 
-func ParseSignatures(dir string) (sigs []*Symbolicator, err error) {
+func Parse(dir string) (sigs []Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			if filepath.Ext(path) != ".pkl" {
+			if filepath.Ext(path) != ".json" {
 				return nil
 			}
-			sig, err := LoadFromPath(context.Background(), path)
+			data, err := os.ReadFile(path)
 			if err != nil {
+				return err
+			}
+			var sig Symbolicator
+			if err := json.Unmarshal(data, &sig); err != nil {
 				return err
 			}
 			sigs = append(sigs, sig)
@@ -43,7 +47,7 @@ func ParseSignatures(dir string) (sigs []*Symbolicator, err error) {
 	return sigs, nil
 }
 
-func CheckKernelVersion(m *macho.File, sigs *Symbolicator) (bool, error) {
+func CheckVersion(m *macho.File, sigs Symbolicator) (bool, error) {
 	kv, err := kernelcache.GetVersion(m)
 	if err != nil {
 		return false, fmt.Errorf("failed to get kernelcache version: %v", err)
@@ -73,7 +77,7 @@ func truncate(in string, length int) string {
 	return in
 }
 
-func symbolicate(m *macho.File, name string, sigs *Symbolicator, quiet bool) (map[uint64]string, error) {
+func symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) (map[uint64]string, error) {
 	symbolMap := make(map[uint64]string)
 
 	text := m.Section("__TEXT_EXEC", "__text")
@@ -100,25 +104,15 @@ func symbolicate(m *macho.File, name string, sigs *Symbolicator, quiet bool) (ma
 		return nil, err
 	}
 
-	var notFound int
-
 	for _, sig := range sigs.Signatures {
 		found := false
 		for _, anchor := range sig.Anchors {
 			if addr, ok := cstrs[fmt.Sprintf("%s.%s", anchor.Segment, anchor.Section)][anchor.String]; ok {
-				if !quiet {
-					log.WithFields(log.Fields{
-						"pattern": truncate(strconv.Quote(anchor.String), 40),
-						"address": fmt.Sprintf("%#09x", addr),
-						"file":    name,
-						"symbol":  sig.Symbol,
-					}).Debug("Found Signature")
-				}
 				if ok, loc := engine.Contains(addr); ok {
 					fn, err := m.GetFunctionForVMAddr(loc)
 					if err != nil {
 						log.Errorf("failed to get function for address: %v", err)
-						break
+						continue
 					}
 					if !quiet {
 						utils.Indent(log.WithFields(log.Fields{
@@ -129,48 +123,53 @@ func symbolicate(m *macho.File, name string, sigs *Symbolicator, quiet bool) (ma
 					}
 					symbolMap[fn.StartAddr] = sig.Symbol
 					found = true
-					if sig.Caller != "" {
-						// attempt to symbolicate signature caller
-						if ok, loc := engine.Contains(fn.StartAddr); ok {
+					callerLoc := fn.StartAddr
+					// attempt to symbolicate signature backtrace
+					for _, caller := range sig.Backtrace {
+						if ok, loc := engine.Contains(callerLoc); ok {
 							fn, err := m.GetFunctionForVMAddr(loc)
 							if err != nil {
 								log.Errorf("failed to get function for address: %v", err)
-								break
+								break // don't continue because we broke the caller chain (backtrace)
 							}
 							if !quiet {
 								utils.Indent(log.WithFields(log.Fields{
 									"file":    name,
 									"address": fmt.Sprintf("%#09x", fn.StartAddr),
-									"symbol":  sig.Caller,
-								}).Info, 2)("Symbolicated (Caller)")
+									"symbol":  caller,
+								}).Info, 3)("Symbolicated (Caller)")
 							}
-							symbolMap[fn.StartAddr] = sig.Caller
+							symbolMap[fn.StartAddr] = caller
+							callerLoc = fn.StartAddr
 						} else {
 							if !quiet {
 								utils.Indent(log.WithFields(log.Fields{
 									"macho":  name,
-									"caller": sig.Caller,
+									"caller": caller,
 									"symbol": sig.Symbol,
 								}).Warn, 2)("No XREFs to Caller found")
 							}
-							notFound++
+							break
 						}
 					}
-				}
-				if found {
-					break // break out of sig.Anchors loop
+					break // found symbol so break out of anchor loop
 				} else {
 					if !quiet {
 						utils.Indent(log.WithFields(log.Fields{
 							"macho":  name,
 							"anchor": truncate(strconv.Quote(anchor.String), 40),
 							"symbol": sig.Symbol,
-						}).Warn, 2)("No XREFs found")
+						}).Warn, 2)("XREF Not Found For Anchor")
 					}
 				}
-			}
-			if found {
-				break // break out of cstr loop
+			} else {
+				if !quiet {
+					utils.Indent(log.WithFields(log.Fields{
+						"macho":  name,
+						"anchor": truncate(strconv.Quote(anchor.String), 40),
+						"symbol": sig.Symbol,
+					}).Debug, 3)("Anchor Not Found")
+				}
 			}
 		}
 		if !found {
@@ -180,27 +179,27 @@ func symbolicate(m *macho.File, name string, sigs *Symbolicator, quiet bool) (ma
 					"symbol": sig.Symbol,
 				}).Warn, 2)("Signature Not Matched")
 			}
-			notFound++
 		}
 	}
 
 	log.WithFields(log.Fields{
 		"total":   sigs.Total,
-		"matched": int(sigs.Total) - notFound,
-		"percent": fmt.Sprintf("%.4f%%", float64(int(sigs.Total)-notFound)*100/float64(sigs.Total)),
+		"matched": len(symbolMap),
+		"missed":  int(sigs.Total) - len(symbolMap),
+		"percent": fmt.Sprintf("%.4f%%", 100*float64(len(symbolMap))/float64(sigs.Total)),
 	}).Info("Symbolication STATS")
 
 	return symbolMap, nil
 }
 
-func Symbolicate(infile string, sigs *Symbolicator, quiet bool) (map[uint64]string, error) {
+func Symbolicate(infile string, sigs Symbolicator, quiet bool) (map[uint64]string, error) {
 	m, err := macho.Open(infile)
 	if err != nil {
 		return nil, err
 	}
 	defer m.Close()
 
-	if ok, err := CheckKernelVersion(m, sigs); !ok {
+	if ok, err := CheckVersion(m, sigs); !ok {
 		if err != nil {
 			return nil, err
 		}
@@ -211,6 +210,13 @@ func Symbolicate(infile string, sigs *Symbolicator, quiet bool) (map[uint64]stri
 		m, err = m.GetFileSetFileByName(sigs.Target)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		parts := strings.Split(sigs.Target, ".")
+		if len(parts) > 1 {
+			if !strings.HasPrefix(strings.ToLower(filepath.Base(infile)), strings.ToLower(parts[len(parts)-1])) {
+				return nil, ErrUnsupportedTarget
+			}
 		}
 	}
 

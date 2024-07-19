@@ -782,7 +782,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			kextSyms := make(map[string]map[uint64]string)
 			if i.Config.SignaturesDir != "" {
 				// parse signatures
-				sigs, err := signature.ParseSignatures(i.Config.SignaturesDir)
+				sigs, err := signature.Parse(i.Config.SignaturesDir)
 				if err != nil {
 					return fmt.Errorf("failed to parse signatures: %v", err)
 				}
