@@ -140,11 +140,9 @@ func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 		}
 		if query.IsBeta && !f.Beta {
 			continue
-		}
-		if query.IsRC && !f.RC {
+		} else if query.IsRC && !f.RC {
 			continue
-		}
-		if (!query.IsBeta && !query.IsRC) && (f.Beta || f.RC) { // release only
+		} else if query.IsRelease && (f.Beta || f.RC) {
 			continue
 		}
 		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
@@ -174,11 +172,9 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		}
 		if query.IsBeta && !f.Beta {
 			continue
-		}
-		if query.IsRC && !f.RC {
+		} else if query.IsRC && !f.RC {
 			continue
-		}
-		if (!query.IsBeta && !query.IsRC) && (f.Beta || f.RC) { // release only
+		} else if query.IsRelease && (f.Beta || f.RC) {
 			continue
 		}
 		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
@@ -254,6 +250,7 @@ type ADBQuery struct {
 	Build             string
 	PrerequisiteBuild string
 	Device            string
+	IsRelease         bool
 	IsBeta            bool
 	IsRC              bool
 	Latest            bool
