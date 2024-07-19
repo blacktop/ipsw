@@ -1001,7 +1001,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
 					continue // skip absolute
-				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" {
+				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" ||
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache (__TEXT_EXEC)" {
 					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
 						found := false
 						for _, fn := range funcs {
