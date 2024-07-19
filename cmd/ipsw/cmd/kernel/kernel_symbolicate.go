@@ -76,7 +76,8 @@ var kernelSymbolicateCmd = &cobra.Command{
 			output = filepath.Dir(filepath.Clean(args[0]))
 		}
 
-		sigs, err := signature.ParseSignatures(viper.GetString("kernel.symbolicate.signatures"))
+		log.Info("Parsing Signatures")
+		sigs, err := signature.Parse(viper.GetString("kernel.symbolicate.signatures"))
 		if err != nil {
 			return fmt.Errorf("failed to parse signatures: %v", err)
 		}
@@ -88,7 +89,8 @@ var kernelSymbolicateCmd = &cobra.Command{
 		for _, sig := range sigs {
 			syms, err := signature.Symbolicate(args[0], sig, quiet)
 			if err != nil {
-				if errors.Is(err, signature.ErrUnsupportedVersion) {
+				if errors.Is(err, signature.ErrUnsupportedTarget) ||
+					errors.Is(err, signature.ErrUnsupportedVersion) {
 					continue
 				}
 				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)

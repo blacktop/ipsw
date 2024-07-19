@@ -43,7 +43,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 		kextSyms := make(map[string]map[uint64]string)
 		if sigDir != "" {
 			// parse signatures
-			sigs, err := signature.ParseSignatures(sigDir)
+			sigs, err := signature.Parse(sigDir)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse signatures: %v", err)
 			}
