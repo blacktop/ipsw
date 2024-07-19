@@ -54,6 +54,7 @@ func init() {
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	downloadAppledbCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
+	downloadAppledbCmd.Flags().Bool("release", false, "Download release IPSWs")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	downloadAppledbCmd.Flags().Bool("rc", false, "Download RC (release candidate) IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
@@ -66,6 +67,7 @@ func init() {
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
+	downloadAppledbCmd.MarkFlagsMutuallyExclusive("release", "beta", "rc")
 
 	viper.BindPFlag("download.appledb.os", downloadAppledbCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.appledb.type", downloadAppledbCmd.Flags().Lookup("type"))
@@ -74,6 +76,7 @@ func init() {
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.fcs-keys", downloadAppledbCmd.Flags().Lookup("fcs-keys"))
 	viper.BindPFlag("download.appledb.fcs-keys-json", downloadAppledbCmd.Flags().Lookup("fcs-keys-json"))
+	viper.BindPFlag("download.appledb.release", downloadAppledbCmd.Flags().Lookup("release"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.appledb.rc", downloadAppledbCmd.Flags().Lookup("rc"))
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
@@ -157,6 +160,7 @@ var downloadAppledbCmd = &cobra.Command{
 		pattern := viper.GetString("download.appledb.pattern")
 		fcsKeys := viper.GetBool("download.appledb.fcs-keys")
 		fcsKeysJson := viper.GetBool("download.appledb.fcs-keys-json")
+		isRelease := viper.GetBool("download.appledb.release")
 		isBeta := viper.GetBool("download.appledb.beta")
 		isRC := viper.GetBool("download.appledb.rc")
 		latest := viper.GetBool("download.appledb.latest")
@@ -234,6 +238,7 @@ var downloadAppledbCmd = &cobra.Command{
 				Build:             build,
 				PrerequisiteBuild: prereqBuild,
 				Device:            device,
+				IsRelease:         isRelease,
 				IsBeta:            isBeta,
 				IsRC:              isRC,
 				Latest:            latest,
@@ -266,6 +271,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Build:             build,
 					PrerequisiteBuild: prereqBuild,
 					Device:            device,
+					IsRelease:         isRelease,
 					IsBeta:            isBeta,
 					IsRC:              isRC,
 					Latest:            latest,
@@ -313,6 +319,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Build:             build,
 					PrerequisiteBuild: prereqBuild,
 					Device:            device,
+					IsRelease:         isRelease,
 					IsBeta:            isBeta,
 					IsRC:              isRC,
 					Latest:            latest,
