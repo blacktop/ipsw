@@ -29,14 +29,15 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 ### Options
 
 ```
-  -a, --all             Show all threads in crashlog
-  -d, --demangle        Demangle symbol names
-  -h, --help            help for symbolicate
-      --pem-db string   AEA pem DB JSON file
-  -p, --proc string     Filter crashlog by process name
-  -r, --running         Show all running (TH_RUN) threads in crashlog
-  -s, --server string   Symbol Server DB URL
-  -u, --unslide         Unslide the crashlog for easier static analysis
+  -a, --all                 Show all threads in crashlog
+  -d, --demangle            Demangle symbol names
+  -h, --help                help for symbolicate
+      --pem-db string       AEA pem DB JSON file
+  -p, --proc string         Filter crashlog by process name
+  -r, --running             Show all running (TH_RUN) threads in crashlog
+  -s, --server string       Symbol Server DB URL
+      --signatures string   Path to signatures folder
+  -u, --unslide             Unslide the crashlog for easier static analysis
 ```
 
 ### Options inherited from parent commands
