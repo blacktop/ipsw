@@ -23,15 +23,15 @@ package kernel
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
 	"github.com/invopop/jsonschema"
@@ -109,25 +109,12 @@ var kernelSymbolicateCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse signatures: %v", err)
 		}
 
-		// symbolicate kernelcache
-		symMap := make(map[uint64]string)
-		goodsig := false
-		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
-		for _, sig := range sigs {
-			syms, err := signature.Symbolicate(args[0], sig, quiet)
-			if err != nil {
-				if errors.Is(err, signature.ErrUnsupportedTarget) ||
-					errors.Is(err, signature.ErrUnsupportedVersion) {
-					continue
-				}
-				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
-			}
-			maps.Copy(symMap, syms)
-			goodsig = true
-		}
+		smap := signature.NewSymbolMap()
 
-		if !goodsig {
-			return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
+		// symbolicate kernelcache
+		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
+		if err := smap.Symbolicate(args[0], sigs, quiet); err != nil {
+			return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 		}
 
 		if viper.GetBool("kernel.symbolicate.test") {
@@ -139,36 +126,51 @@ var kernelSymbolicateCmd = &cobra.Command{
 				return fmt.Errorf("failed to open kernelcache: %v", err)
 			}
 			defer m.Close()
-			for addr, sym := range symMap {
+			for addr, sym := range smap {
 				syms, err := m.FindAddressSymbols(addr)
 				if err != nil {
 					log.WithError(err).Errorf("symbol '%s' with addr %#x not found in kernelcache", sym, addr)
 					continue
 				}
+				matched := false
 				for _, s := range syms {
-					if before, ok := strings.CutSuffix(s.Name, sym); ok {
-						if before != "_" && before != "" {
-							log.Warnf("Unexpected symbol prefix: %s", before)
-						}
+					s.Name = regexp.MustCompile(`\.\d+$`).ReplaceAllString(s.Name, "")
+					s.Name = strings.TrimPrefix(s.Name, "__kernelrpc")
+					switch {
+					case strings.TrimLeft(sym, "_") == strings.TrimLeft(s.Name, "_"):
+						fallthrough
+					case strings.TrimSuffix(sym, "_trap") == strings.TrimLeft(s.Name, "_"):
+						matched = true
 						if !quiet {
 							log.Infof("✅ Symbol '%s' matches", sym)
 						}
-						match++
-					} else {
-						log.Debug(s.String(m))
-						log.Errorf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, s.Name)
-						miss++
+					default:
+						// log.Debug(s.String(m))
 					}
 				}
+				if matched {
+					match++
+				} else {
+					var ss []string
+					for _, s := range syms {
+						ss = append(ss, s.Name)
+					}
+					utils.Indent(log.Error, 2)(
+						fmt.Sprintf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, strings.Join(ss, ", ")),
+					)
+					miss++
+				}
 			}
-			log.Infof("Matched %d symbols, Missed %d symbols: %.4f%%", match, miss, 100*float64(match)/float64(len(symMap)))
+			utils.Indent(log.Info, 2)(
+				fmt.Sprintf("Matched %d symbols, Missed %d symbols: %.4f%%", match, miss, 100*float64(match)/float64(len(smap))),
+			)
 			return nil
 		}
 
 		/* JSON OUTPUT */
 
 		if viper.GetBool("kernel.symbolicate.json") {
-			jdat, err := json.Marshal(symMap)
+			jdat, err := json.Marshal(smap)
 			if err != nil {
 				return fmt.Errorf("failed to marshal symbol map: %v", err)
 			}
@@ -187,14 +189,14 @@ var kernelSymbolicateCmd = &cobra.Command{
 				return fmt.Errorf("failed to create symbols file: %v", err)
 			}
 			defer f.Close()
-			for addr, sym := range symMap {
+			for addr, sym := range smap {
 				fmt.Fprintf(f, "%#x %s\n", addr, sym)
 			}
 			return nil
 		}
 
 		fmt.Printf("%s symbols:\n", filepath.Base(args[0]))
-		for addr, sym := range symMap {
+		for addr, sym := range smap {
 			fmt.Printf("%#x %s\n", addr, sym)
 		}
 

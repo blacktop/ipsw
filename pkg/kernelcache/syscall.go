@@ -249,7 +249,9 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 						isNew = true
 					}
 				} else { // found
-					name = sc.Name
+					if name == "<unknown>" {
+						name = sc.Name
+					}
 				}
 
 				syscalls = append(syscalls, Sysent{

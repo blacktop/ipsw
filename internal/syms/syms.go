@@ -40,7 +40,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 		}
 	}()
 	for k := range out {
-		kextSyms := make(map[string]map[uint64]string)
+		smap := signature.NewSymbolMap()
 		if sigDir != "" {
 			// parse signatures
 			sigs, err := signature.Parse(sigDir)
@@ -48,13 +48,8 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 				return nil, fmt.Errorf("failed to parse signatures: %v", err)
 			}
 			// symbolicate kernelcache
-			for _, sig := range sigs {
-				kextSyms[sig.Target] = make(map[uint64]string)
-				syms, err := signature.Symbolicate(k, sig, true)
-				if err != nil {
-					return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
-				}
-				kextSyms[sig.Target] = syms
+			if err := smap.Symbolicate(k, sigs, true); err != nil {
+				return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 			}
 		}
 
@@ -101,14 +96,12 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 							End:    fn.EndAddr & highestBitMask,
 						}
 					} else {
-						if syms, ok := kextSyms[fe.EntryID]; ok {
-							if sym, ok := syms[fn.StartAddr]; ok {
-								kext.Symbols = append(kext.Symbols, &model.Symbol{
-									Symbol: sym,
-									Start:  fn.StartAddr & highestBitMask,
-									End:    fn.EndAddr & highestBitMask,
-								})
-							}
+						if sym, ok := smap[fn.StartAddr]; ok {
+							kext.Symbols = append(kext.Symbols, &model.Symbol{
+								Symbol: sym,
+								Start:  fn.StartAddr & highestBitMask,
+								End:    fn.EndAddr & highestBitMask,
+							})
 						} else {
 							msym = model.Symbol{
 								Symbol: fmt.Sprintf("func_%x", fn.StartAddr),
@@ -143,15 +136,13 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 					}
 				} else {
 					found := false
-					for _, syms := range kextSyms {
-						if sym, ok := syms[fn.StartAddr]; ok {
-							kext.Symbols = append(kext.Symbols, &model.Symbol{
-								Symbol: sym,
-								Start:  fn.StartAddr & highestBitMask,
-								End:    fn.EndAddr & highestBitMask,
-							})
-							found = true
-						}
+					if sym, ok := smap[fn.StartAddr]; ok {
+						kext.Symbols = append(kext.Symbols, &model.Symbol{
+							Symbol: sym,
+							Start:  fn.StartAddr & highestBitMask,
+							End:    fn.EndAddr & highestBitMask,
+						})
+						found = true
 					}
 					if !found {
 						msym = model.Symbol{
