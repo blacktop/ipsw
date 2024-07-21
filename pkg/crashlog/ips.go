@@ -779,7 +779,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			}
 		}()
 		for k := range out {
-			kextSyms := make(map[string]map[uint64]string)
+			smap := signature.NewSymbolMap()
 			if i.Config.SignaturesDir != "" {
 				// parse signatures
 				sigs, err := signature.Parse(i.Config.SignaturesDir)
@@ -788,21 +788,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 				// symbolicate kernelcache
 				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
-				goodsig := false
-				for _, sig := range sigs {
-					syms, err := signature.Symbolicate(k, sig, true)
-					if err != nil {
-						if errors.Is(err, signature.ErrUnsupportedVersion) {
-							continue
-						}
-						return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
-					}
-					kextSyms[sig.Target] = make(map[uint64]string)
-					kextSyms[sig.Target] = syms
-					goodsig = true
-				}
-				if !goodsig {
-					log.Warn("no valid signatures found for kernelcache (let author know and we can try add them)")
+				if err := smap.Symbolicate(k, sigs, true); err != nil {
+					return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 				}
 			}
 
@@ -824,10 +811,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 								fn.Name = sym.Name
 							}
 						} else {
-							if syms, ok := kextSyms[fe.EntryID]; ok {
-								if sym, ok := syms[fn.StartAddr]; ok {
-									fn.Name = sym
-								}
+							if sym, ok := smap[fn.StartAddr]; ok {
+								fn.Name = sym
 							}
 						}
 						if fn.Name == "" {
@@ -843,10 +828,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 							fn.Name = sym.Name
 						}
 					} else {
-						for _, syms := range kextSyms {
-							if sym, ok := syms[fn.StartAddr]; ok {
-								fn.Name = sym
-							}
+						if sym, ok := smap[fn.StartAddr]; ok {
+							fn.Name = sym
 						}
 						if fn.Name == "" {
 							fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)

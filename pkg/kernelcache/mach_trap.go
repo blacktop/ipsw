@@ -78,6 +78,9 @@ func (s SyscallsData) GetMachSyscallByNumber(num int) (MachSyscall, error) {
 func (s SyscallsData) GetBsdSyscallByNumber(num int) (BsdSyscall, error) {
 	for _, sc := range s.BsdSyscalls {
 		if sc.Number == num {
+			if sc.Old {
+				sc.Name = "nosys"
+			}
 			return sc, nil
 		}
 	}

@@ -2,8 +2,8 @@ package signature
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,11 +15,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	semver "github.com/hashicorp/go-version"
 )
-
-var ErrUnsupportedTarget = errors.New("target not supported")
-var ErrUnsupportedVersion = errors.New("version not supported")
 
 func Parse(dir string) (sigs []Symbolicator, err error) {
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -47,61 +43,54 @@ func Parse(dir string) (sigs []Symbolicator, err error) {
 	return sigs, nil
 }
 
-func CheckVersion(m *macho.File, sigs Symbolicator) (bool, error) {
-	kv, err := kernelcache.GetVersion(m)
-	if err != nil {
-		return false, fmt.Errorf("failed to get kernelcache version: %v", err)
-	}
-	darwin, err := semver.NewVersion(kv.Darwin)
-	if err != nil {
-		return false, fmt.Errorf("failed to convert kernel version into semver object: %v", err)
-	}
-	minVer, err := semver.NewVersion(sigs.Version.Min)
-	if err != nil {
-		log.Fatal("failed to convert signature min version into semver object")
-	}
-	maxVer, err := semver.NewVersion(sigs.Version.Max)
-	if err != nil {
-		log.Fatal("failed to convert signature max version into semver object")
-	}
-	if darwin.GreaterThanOrEqual(minVer) && darwin.LessThanOrEqual(maxVer) {
-		return true, nil
-	}
-	return false, nil
+type SymbolMap map[uint64]string
+
+func NewSymbolMap() SymbolMap {
+	return make(SymbolMap)
 }
 
-func truncate(in string, length int) string {
-	if len(in) > length {
-		return in[:length] + "..."
+func (sm SymbolMap) Add(addr uint64, symbol string) error {
+	if sym, ok := sm[addr]; ok {
+		if sym == symbol || sym == symbol+"_trap" {
+			return nil // NOP
+		}
+		return fmt.Errorf("%#x already has symbol '%s', cannot add symbol '%s'", addr, sym, symbol)
 	}
-	return in
+	sm[addr] = symbol
+	return nil
 }
 
-func symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) (map[uint64]string, error) {
-	symbolMap := make(map[uint64]string)
+func (sm SymbolMap) Copy(m map[uint64]string) {
+	maps.Copy(sm, m)
+}
+
+func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) error {
+
+	sigs.Total += uint(len(sm))
 
 	text := m.Section("__TEXT_EXEC", "__text")
 	if text == nil {
-		return nil, fmt.Errorf("failed to find __TEXT_EXEC.__text section")
+		return fmt.Errorf("failed to find __TEXT_EXEC.__text section")
 	}
 	data, err := text.Data()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
+		return fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
 	}
 
-	engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+	engine := disass.NewMachoDisass(m, &map[uint64]string{}, &disass.Config{
 		Data:         data,
 		StartAddress: text.Addr,
+		Quite:        true,
 	})
 
 	log.WithField("name", name).Info("Analyzing MachO...")
 	if err := engine.Triage(); err != nil {
-		return nil, fmt.Errorf("first pass triage failed: %v", err)
+		return fmt.Errorf("first pass triage failed: %v", err)
 	}
 
 	cstrs, err := m.GetCStrings()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to get cstrings: %v", err)
 	}
 
 	for _, sig := range sigs.Signatures {
@@ -121,13 +110,16 @@ func symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) (map
 							"symbol":  sig.Symbol,
 						}).Info, 2)("Symbolicated")
 					}
-					symbolMap[fn.StartAddr] = sig.Symbol
+					if err := sm.Add(fn.StartAddr, sig.Symbol); err != nil {
+						utils.Indent(log.WithError(err).Error, 3)("failed to add to symbol map")
+						// return fmt.Errorf("failed to add to symbol map: %v", err)
+					}
 					found = true
-					callerLoc := fn.StartAddr
 					// attempt to symbolicate signature backtrace
+					callerLoc := fn.StartAddr
 					for _, caller := range sig.Backtrace {
 						if ok, loc := engine.Contains(callerLoc); ok {
-							fn, err := m.GetFunctionForVMAddr(loc)
+							fcn, err := m.GetFunctionForVMAddr(loc)
 							if err != nil {
 								log.Errorf("failed to get function for address: %v", err)
 								break // don't continue because we broke the caller chain (backtrace)
@@ -139,8 +131,11 @@ func symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) (map
 									"symbol":  caller,
 								}).Info, 3)("Symbolicated (Caller)")
 							}
-							symbolMap[fn.StartAddr] = caller
-							callerLoc = fn.StartAddr
+							if err := sm.Add(fcn.StartAddr, caller); err != nil {
+								utils.Indent(log.WithError(err).WithField("signature", sig.Symbol).Error, 4)("failed to add 'caller' to symbol map")
+								// return nil, fmt.Errorf("failed to add 'caller' to symbol map (for signature '%s'): %v", sig.Symbol, err)
+							}
+							callerLoc = fcn.StartAddr
 						} else {
 							if !quiet {
 								utils.Indent(log.WithFields(log.Fields{
@@ -184,41 +179,107 @@ func symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) (map
 
 	log.WithFields(log.Fields{
 		"total":   sigs.Total,
-		"matched": len(symbolMap),
-		"missed":  int(sigs.Total) - len(symbolMap),
-		"percent": fmt.Sprintf("%.4f%%", 100*float64(len(symbolMap))/float64(sigs.Total)),
-	}).Info("Symbolication STATS")
+		"matched": len(sm),
+		"missed":  int(sigs.Total) - len(sm),
+		"percent": fmt.Sprintf("%.4f%%", 100*float64(len(sm))/float64(sigs.Total)),
+	}).Info("📈 Symbolication STATS")
 
-	return symbolMap, nil
+	return nil
 }
 
-func Symbolicate(infile string, sigs Symbolicator, quiet bool) (map[uint64]string, error) {
-	m, err := macho.Open(infile)
+func (sm SymbolMap) getSyscalls(m *macho.File) error {
+	syscalls, err := kernelcache.GetSyscallTable(m)
 	if err != nil {
-		return nil, err
-	}
-	defer m.Close()
-
-	if ok, err := CheckVersion(m, sigs); !ok {
-		if err != nil {
-			return nil, err
-		}
-		return nil, ErrUnsupportedVersion
+		return err
 	}
 
-	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-		m, err = m.GetFileSetFileByName(sigs.Target)
-		if err != nil {
-			return nil, err
+	for _, syscall := range syscalls {
+		if syscall.Name == "syscall" || syscall.Name == "enosys" {
+			continue
 		}
-	} else {
-		parts := strings.Split(sigs.Target, ".")
-		if len(parts) > 1 {
-			if !strings.HasPrefix(strings.ToLower(filepath.Base(infile)), strings.ToLower(parts[len(parts)-1])) {
-				return nil, ErrUnsupportedTarget
+		if err := sm.Add(syscall.Call, syscall.Name); err != nil {
+			utils.Indent(log.WithError(err).Debug, 2)("Adding syscall")
+		}
+	}
+
+	return nil
+}
+
+func (sm SymbolMap) getMachTraps(m *macho.File) error {
+	machtraps, err := kernelcache.GetMachTrapTable(m)
+	if err != nil {
+		return fmt.Errorf("failed to get mach trap table: %v", err)
+	}
+
+	for _, machtrap := range machtraps {
+		if machtrap.Name == "kern_invalid" {
+			continue
+		}
+		if err := sm.Add(machtrap.Function, machtrap.Name+"_trap"); err != nil {
+			utils.Indent(log.WithError(err).Debug, 2)("Adding mach_trap")
+		}
+	}
+
+	return nil
+}
+
+func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) error {
+	kc, err := macho.Open(infile)
+	if err != nil {
+		return fmt.Errorf("failed to open kernelcache: %v", err)
+	}
+	defer kc.Close()
+
+	kv, err := kernelcache.GetVersion(kc)
+	if err != nil {
+		return fmt.Errorf("failed to get kernelcache version: %v", err)
+	}
+
+	if err := sm.getSyscalls(kc); err != nil {
+		return err
+	}
+	if err := sm.getMachTraps(kc); err != nil {
+		return err
+	}
+
+	goodsig := false
+
+	for _, sig := range sigs {
+		if ok, err := checkVersion(kv, sig); !ok {
+			continue
+		} else if err != nil {
+			return err
+		}
+		// TODO: add support for OLD non-fileset KEXTs
+		if kc.FileTOC.FileHeader.Type == types.MH_FILESET {
+			m, err := kc.GetFileSetFileByName(sig.Target)
+			if err != nil {
+				return err
+			}
+			// symbolicate with signature
+			if err := sm.symbolicate(m, sig.Target, sig, quiet); err != nil {
+				return err
+			}
+		} else {
+			parts := strings.Split(sig.Target, ".")
+			if len(parts) > 1 {
+				// check if target macho file matches signature target
+				if !strings.HasPrefix(strings.ToLower(filepath.Base(infile)), strings.ToLower(parts[len(parts)-1])) {
+					continue
+				}
+			}
+			// symbolicate with signature
+			if err := sm.symbolicate(kc, sig.Target, sig, quiet); err != nil {
+				return err
 			}
 		}
+
+		goodsig = true
 	}
 
-	return symbolicate(m, sigs.Target, sigs, quiet)
+	if !goodsig {
+		return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
+	}
+
+	return nil
 }
