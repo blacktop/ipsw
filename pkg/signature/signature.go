@@ -72,6 +72,8 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 
 	sigs.Total += uint(len(sm))
 
+	seen := make(map[string]bool)
+
 	text := m.Section("__TEXT_EXEC", "__text")
 	if text == nil {
 		return fmt.Errorf("failed to find __TEXT_EXEC.__text section")
@@ -115,40 +117,43 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 						}).Info, 2)("Symbolicated")
 					}
 					if err := sm.Add(fn.StartAddr, sig.Symbol); err != nil {
-						utils.Indent(log.WithError(err).Error, 3)("failed to add to symbol map")
+						utils.Indent(log.WithError(err).Debug, 3)("failed to add to symbol map")
 						// return fmt.Errorf("failed to add to symbol map: %v", err)
 					}
 					found = true
 					// attempt to symbolicate signature backtrace
 					callerLoc := fn.StartAddr
 					for _, caller := range sig.Backtrace {
-						if ok, loc := engine.Contains(callerLoc); ok {
-							fcn, err := m.GetFunctionForVMAddr(loc)
-							if err != nil {
-								log.Errorf("failed to get function for address: %v", err)
-								break // don't continue because we broke the caller chain (backtrace)
+						if !seen[caller] {
+							if ok, loc := engine.Contains(callerLoc); ok {
+								fcn, err := m.GetFunctionForVMAddr(loc)
+								if err != nil {
+									log.Errorf("failed to get function for address: %v", err)
+									break // don't continue because we broke the caller chain (backtrace)
+								}
+								if !quiet {
+									utils.Indent(log.WithFields(log.Fields{
+										"file":    name,
+										"address": fmt.Sprintf("%#09x", fn.StartAddr),
+										"symbol":  caller,
+									}).Info, 3)("Symbolicated (Caller)")
+								}
+								if err := sm.Add(fcn.StartAddr, caller); err != nil {
+									utils.Indent(log.WithError(err).WithField("signature", sig.Symbol).Debug, 4)("failed to add 'caller' to symbol map")
+									// return nil, fmt.Errorf("failed to add 'caller' to symbol map (for signature '%s'): %v", sig.Symbol, err)
+								}
+								callerLoc = fcn.StartAddr
+							} else {
+								if !quiet {
+									utils.Indent(log.WithFields(log.Fields{
+										"macho":  name,
+										"caller": caller,
+										"symbol": sig.Symbol,
+									}).Warn, 2)("No XREFs to Caller found")
+								}
+								break
 							}
-							if !quiet {
-								utils.Indent(log.WithFields(log.Fields{
-									"file":    name,
-									"address": fmt.Sprintf("%#09x", fn.StartAddr),
-									"symbol":  caller,
-								}).Info, 3)("Symbolicated (Caller)")
-							}
-							if err := sm.Add(fcn.StartAddr, caller); err != nil {
-								utils.Indent(log.WithError(err).WithField("signature", sig.Symbol).Error, 4)("failed to add 'caller' to symbol map")
-								// return nil, fmt.Errorf("failed to add 'caller' to symbol map (for signature '%s'): %v", sig.Symbol, err)
-							}
-							callerLoc = fcn.StartAddr
-						} else {
-							if !quiet {
-								utils.Indent(log.WithFields(log.Fields{
-									"macho":  name,
-									"caller": caller,
-									"symbol": sig.Symbol,
-								}).Warn, 2)("No XREFs to Caller found")
-							}
-							break
+							seen[caller] = true
 						}
 					}
 					break // found symbol so break out of anchor loop
@@ -258,7 +263,7 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		if kc.FileTOC.FileHeader.Type == types.MH_FILESET {
 			m, err := kc.GetFileSetFileByName(sig.Target)
 			if err != nil {
-				return err
+				continue // fileset doesn't contain target
 			}
 			// symbolicate with signature
 			if err := sm.symbolicate(m, sig.Target, sig, quiet); err != nil {
