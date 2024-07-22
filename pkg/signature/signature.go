@@ -60,6 +60,10 @@ func (sm SymbolMap) Add(addr uint64, symbol string) error {
 	return nil
 }
 
+func (sm SymbolMap) overwrite(addr uint64, symbol string) {
+	sm[addr] = symbol
+}
+
 func (sm SymbolMap) Copy(m map[uint64]string) {
 	maps.Copy(sm, m)
 }
