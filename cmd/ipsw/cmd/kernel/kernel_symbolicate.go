@@ -117,6 +117,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 		}
 
+		// test the accuracy of the symbolication on the source KDK material
 		if viper.GetBool("kernel.symbolicate.test") {
 			match := 0
 			miss := 0
