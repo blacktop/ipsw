@@ -86,10 +86,13 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colorize output")
 	rootCmd.PersistentFlags().String("diff-tool", "", "git diff tool (for --diff commands)")
 	rootCmd.PersistentFlags().MarkHidden("diff-tool")
+	rootCmd.PersistentFlags().Bool("config-quiet", false, "silence config file loading message")
+	rootCmd.PersistentFlags().MarkHidden("config-quiet")
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("color", rootCmd.PersistentFlags().Lookup("color"))
 	viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
 	viper.BindPFlag("diff-tool", rootCmd.PersistentFlags().Lookup("diff-tool"))
+	viper.BindPFlag("config-quiet", rootCmd.PersistentFlags().Lookup("config-quiet"))
 	viper.BindEnv("color", "CLICOLOR")
 	viper.BindEnv("no-color", "NO_COLOR")
 	// Add subcommand groups
@@ -131,6 +134,8 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		if !viper.GetBool("config-quiet") {
+			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		}
 	}
 }
