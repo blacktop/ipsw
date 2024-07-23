@@ -48,6 +48,7 @@ func init() {
 	DisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	DisassCmd.Flags().String("input", "", "Input function JSON file")
 	DisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	// DisassCmd.Flags().Bool("replace", false, "Replace .a2s")
 
 	viper.BindPFlag("dyld.disass.symbol", DisassCmd.Flags().Lookup("symbol"))
 	viper.BindPFlag("dyld.disass.vaddr", DisassCmd.Flags().Lookup("vaddr"))
@@ -59,6 +60,7 @@ func init() {
 	viper.BindPFlag("dyld.disass.color", DisassCmd.Flags().Lookup("color"))
 	viper.BindPFlag("dyld.disass.input", DisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("dyld.disass.cache", DisassCmd.Flags().Lookup("cache"))
+	// viper.BindPFlag("dyld.disass.replace", DisassCmd.Flags().Lookup("replace"))
 }
 
 // DisassCmd represents the disass command
