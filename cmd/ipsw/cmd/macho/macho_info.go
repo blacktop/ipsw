@@ -806,7 +806,6 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			var label string
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			if m.Symtab != nil {
 				label = "Symtab"
 				fmt.Printf("\n%s\n", label)
@@ -814,7 +813,6 @@ var machoInfoCmd = &cobra.Command{
 				undeflush := false
 				for _, sym := range m.Symtab.Syms {
 					if sym.Type.IsUndefinedSym() && !undeflush {
-						w.Flush()
 						undeflush = true
 					}
 					if doDemangle {
@@ -839,12 +837,11 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					if sym.Value == 0 {
-						fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+						fmt.Printf("              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					} else {
-						fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+						fmt.Printf("%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					}
 				}
-				w.Flush()
 			} else {
 				fmt.Println("  - no symbol table")
 			}
@@ -869,9 +866,8 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, export := range exports {
-					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
+					fmt.Printf("%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
-				w.Flush()
 			}
 			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
 				label = "Dyld Exports Trie"
@@ -889,9 +885,8 @@ var machoInfoCmd = &cobra.Command{
 							export.Name = demangle.Do(export.Name, false, false)
 						}
 					}
-					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
+					fmt.Printf("%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
-				w.Flush()
 			}
 			println()
 		}
