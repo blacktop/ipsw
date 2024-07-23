@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
@@ -346,7 +345,6 @@ var MachoCmd = &cobra.Command{
 
 				if showSymbols {
 					image.ParseLocalSymbols(false)
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					if options != onlySymbols {
 						fmt.Println("SYMBOLS")
 						fmt.Println("=======")
@@ -357,7 +355,6 @@ var MachoCmd = &cobra.Command{
 						undeflush := false
 						for _, sym := range m.Symtab.Syms {
 							if sym.Type.IsUndefinedSym() && !undeflush {
-								w.Flush()
 								undeflush = true
 							}
 							if !fixedLocals && sym.Name == "<redacted>" {
@@ -387,12 +384,11 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 							if sym.Value == 0 {
-								fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+								fmt.Printf("              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 							} else {
-								fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+								fmt.Printf("%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 							}
 						}
-						w.Flush()
 					} else {
 						fmt.Println("  - no symbol table")
 					}
@@ -403,9 +399,8 @@ var MachoCmd = &cobra.Command{
 							if doDemangle {
 								bind.Name, _ = swift.Demangle(bind.Name)
 							}
-							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+							fmt.Printf("%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 						}
-						w.Flush()
 					}
 					// Dedup these symbols (has repeats but also additional symbols??)
 					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && verbose {
