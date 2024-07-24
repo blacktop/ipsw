@@ -49,6 +49,17 @@ func NewSymbolMap() SymbolMap {
 	return make(SymbolMap)
 }
 
+func (sm SymbolMap) LoadJSON(infile string) error {
+	data, err := os.ReadFile(infile)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %v", err)
+	}
+	if err := json.Unmarshal(data, &sm); err != nil {
+		return fmt.Errorf("failed to unmarshal json: %v", err)
+	}
+	return nil
+}
+
 func (sm SymbolMap) Add(addr uint64, symbol string) error {
 	if sym, ok := sm[addr]; ok {
 		if sym == symbol || sym == symbol+"_trap" {
