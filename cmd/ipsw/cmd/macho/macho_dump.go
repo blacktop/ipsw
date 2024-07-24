@@ -154,23 +154,32 @@ var machoDumpCmd = &cobra.Command{
 
 		var addr uint64
 		if len(segmentSection) != 0 {
-			seg, sec, ok := strings.Cut(segmentSection, ".")
+			segName, secName, ok := strings.Cut(segmentSection, ".")
 			if !ok {
 				return fmt.Errorf("invalid section")
 			}
-			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-				m, err = m.GetFileSetFileByName(filesetEntry)
-				if err != nil {
-					return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
-				}
-			}
-			if sec := m.Section(seg, sec); sec != nil {
+			if sec := m.Section(segName, secName); sec != nil {
 				addr = sec.Addr
 				if size == 0 && count == 0 {
 					size = sec.Size
 				}
 			} else {
-				return fmt.Errorf("failed to find section %s", segmentSection)
+				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+					m, err = m.GetFileSetFileByName(filesetEntry)
+					if err != nil {
+						return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
+					}
+					if sec := m.Section(segName, secName); sec != nil {
+						addr = sec.Addr
+						if size == 0 && count == 0 {
+							size = sec.Size
+						}
+					} else {
+						return fmt.Errorf("failed to find section '%s' in '%s'", segmentSection, filesetEntry)
+					}
+				} else {
+					return fmt.Errorf("failed to find section '%s'", segmentSection)
+				}
 			}
 		} else {
 			addr, err = utils.ConvertStrToInt(args[1])
