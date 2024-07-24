@@ -744,13 +744,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			i.Payload.BinaryImages[idx].Name = "absolute"
 			total--
 		case "Kernel":
-			i.Payload.BinaryImages[idx].Name = "kernel"
-			total--
+			fallthrough
 		case "KernelCache":
-			i.Payload.BinaryImages[idx].Name = "kernelcache"
-			total--
+			fallthrough
 		case "KernelTextExec":
-			i.Payload.BinaryImages[idx].Name = "kernelcache (__TEXT_EXEC)"
+			i.Payload.BinaryImages[idx].Name = "kernelcache"
 			total--
 		case "SharedCache":
 			i.Payload.BinaryImages[idx].Name = "dyld_shared_cache"
@@ -764,6 +762,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	machoFuncMap := make(map[string][]types.Function)
 
 	/* SYMBOLICATE KERNELCACHE */
+	var kc *macho.File
 	{
 		out, err := extract.Kernelcache(&extract.Config{
 			IPSW:         ipswPath,
@@ -793,7 +792,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 			}
 
-			kc, err := macho.Open(k)
+			kc, err = macho.Open(k)
 			if err != nil {
 				return fmt.Errorf("failed to open kernelcache: %v", err)
 			}
@@ -988,25 +987,30 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
 					continue // skip absolute
-				} else if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache" ||
-					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "kernelcache (__TEXT_EXEC)" {
-					if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
-						found := false
-						for _, fn := range funcs {
-							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset &&
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset < fn.EndAddr {
-								found = true
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
-								if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-fn.StartAddr != 0 {
-									i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - fn.StartAddr
-								}
-								break
+				} else if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
+					found := false
+					for _, fn := range funcs {
+						if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset &&
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset < fn.EndAddr {
+							found = true
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
+							if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-fn.StartAddr != 0 {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - fn.StartAddr
 							}
+							break
 						}
-						if !found {
-							// if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "??" {
-							// 	i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (??? maybe kext?)"
-							// }
+					}
+					if !found {
+						// if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "??" {
+						// 	i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (??? maybe kext?)"
+						// }
+						if seg := kc.FindSegmentForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); seg != nil {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = seg.Name
+							if sec := kc.FindSectionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); sec != nil {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol += "." + sec.Name
+							}
+						} else {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = "???"
 							log.WithFields(log.Fields{
 								"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
 								"thread": tid,
@@ -1014,13 +1018,6 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 								"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
 							}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
 						}
-					} else {
-						log.WithFields(log.Fields{
-							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
-							"thread": tid,
-							"frame":  idx,
-							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
-						}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
 					}
 				} else {
 					log.WithFields(log.Fields{
