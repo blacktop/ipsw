@@ -50,7 +50,7 @@ func init() {
 	kernelSymbolicateCmd.Flags().Bool("schema", false, "Generate JSON schema")
 	kernelSymbolicateCmd.Flags().MarkHidden("schema")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
-	kernelSymbolicateCmd.MarkFlagRequired("signatures")
+	kernelSymbolicateCmd.Flags().Uint64P("lookup", "l", 0, "Lookup a symbol by address")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
 	kernelSymbolicateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("kernel.symbolicate.flat", kernelSymbolicateCmd.Flags().Lookup("flat"))
@@ -59,6 +59,7 @@ func init() {
 	viper.BindPFlag("kernel.symbolicate.test", kernelSymbolicateCmd.Flags().Lookup("test"))
 	viper.BindPFlag("kernel.symbolicate.schema", kernelSymbolicateCmd.Flags().Lookup("schema"))
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
+	viper.BindPFlag("kernel.symbolicate.lookup", kernelSymbolicateCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
 }
 
@@ -101,6 +102,24 @@ var kernelSymbolicateCmd = &cobra.Command{
 				log.Infof("Writing JSON schema to %s", schemaFile)
 				return os.WriteFile(schemaFile, bts, 0o644)
 			}
+		}
+
+		if viper.IsSet("kernel.symbolicate.lookup") {
+			log.Info("Looking up symbol")
+			smap := signature.NewSymbolMap()
+			if err := smap.LoadJSON(args[0]); err != nil {
+				return fmt.Errorf("failed to load symbol map: %v", err)
+			}
+			addr := viper.GetUint64("kernel.symbolicate.lookup")
+			if sym, ok := smap[addr]; ok {
+				fmt.Printf("%#x %s\n", addr, sym)
+				return nil
+			}
+			return fmt.Errorf("symbol not found at address %#x", addr)
+		}
+
+		if !viper.IsSet("kernel.symbolicate.signatures") {
+			return fmt.Errorf("you must provide a path to the --signatures folder")
 		}
 
 		log.Info("Parsing Signatures")
