@@ -50,6 +50,7 @@ func init() {
 	machoDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 	machoDumpCmd.Flags().StringP("entry", "e", "", "Dump from fileset entry (requires --section)")
+	machoDumpCmd.Flags().StringP("segment", "g", "", "Dump a specific segment (i.e. __TEXT)")
 	machoDumpCmd.Flags().StringP("section", "x", "", "Dump a specific segment/section (i.e. __TEXT.__text)")
 
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
@@ -59,6 +60,7 @@ func init() {
 	viper.BindPFlag("macho.dump.bytes", machoDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("macho.dump.entry", machoDumpCmd.Flags().Lookup("entry"))
+	viper.BindPFlag("macho.dump.segment", machoDumpCmd.Flags().Lookup("segment"))
 	viper.BindPFlag("macho.dump.section", machoDumpCmd.Flags().Lookup("section"))
 
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
@@ -69,10 +71,7 @@ var machoDumpCmd = &cobra.Command{
 	Use:   "dump <macho> <address>",
 	Short: "Dump MachO data at given virtual address",
 	Args:  cobra.MaximumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		var err error
-		var m *macho.File
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -87,10 +86,9 @@ var machoDumpCmd = &cobra.Command{
 		asBytes := viper.GetBool("macho.dump.bytes")
 		outFile := viper.GetString("macho.dump.output")
 		filesetEntry := viper.GetString("macho.dump.entry")
-		segmentSection := viper.GetString("macho.dump.section")
-
-		color.NoColor = viper.GetBool("no-color")
-
+		segment := viper.GetString("macho.dump.segment")
+		section := viper.GetString("macho.dump.section")
+		// validate flags
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
 		} else if asAddrs && asBytes {
@@ -99,13 +97,17 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --addr with --count")
 		} else if asBytes && count > 0 {
 			return fmt.Errorf("you can only use --bytes with --size")
-		} else if len(segmentSection) > 0 && len(args) != 1 {
+		} else if viper.IsSet("macho.dump.section") && len(args) != 1 {
 			return fmt.Errorf("you can only use <address> OR --section")
-		} else if len(filesetEntry) > 0 && len(segmentSection) == 0 {
+		} else if len(filesetEntry) > 0 && !viper.IsSet("macho.dump.section") {
 			return fmt.Errorf("you must specify a --section when using --entry")
+		} else if viper.IsSet("macho.dump.segment") && viper.IsSet("macho.dump.section") {
+			return fmt.Errorf("you can only use --segment OR --section")
 		}
 
 		machoPath := filepath.Clean(args[0])
+
+		var m *macho.File
 
 		// first check for fat file
 		fat, err := macho.OpenFat(machoPath)
@@ -153,32 +155,59 @@ var machoDumpCmd = &cobra.Command{
 		}
 
 		var addr uint64
-		if len(segmentSection) != 0 {
-			segName, secName, ok := strings.Cut(segmentSection, ".")
-			if !ok {
-				return fmt.Errorf("invalid section")
-			}
-			if sec := m.Section(segName, secName); sec != nil {
-				addr = sec.Addr
-				if size == 0 && count == 0 {
-					size = sec.Size
-				}
-			} else {
-				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-					m, err = m.GetFileSetFileByName(filesetEntry)
-					if err != nil {
-						return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
-					}
-					if sec := m.Section(segName, secName); sec != nil {
-						addr = sec.Addr
-						if size == 0 && count == 0 {
-							size = sec.Size
-						}
-					} else {
-						return fmt.Errorf("failed to find section '%s' in '%s'", segmentSection, filesetEntry)
+		if viper.IsSet("macho.dump.segment") || viper.IsSet("macho.dump.section") {
+			switch {
+			case viper.IsSet("macho.dump.segment"):
+				if seg := m.Segment(segment); seg != nil {
+					addr = seg.Addr
+					if size == 0 && count == 0 {
+						size = seg.Filesz
 					}
 				} else {
-					return fmt.Errorf("failed to find section '%s'", segmentSection)
+					if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+						m, err = m.GetFileSetFileByName(filesetEntry)
+						if err != nil {
+							return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
+						}
+						if seg := m.Segment(segment); seg != nil {
+							addr = seg.Addr
+							if size == 0 && count == 0 {
+								size = seg.Filesz
+							}
+						} else {
+							return fmt.Errorf("failed to find segment '%s' in '%s'", segment, filesetEntry)
+						}
+					} else {
+						return fmt.Errorf("failed to find segment '%s'", segment)
+					}
+				}
+			case viper.IsSet("macho.dump.section"):
+				segName, secName, ok := strings.Cut(section, ".")
+				if !ok {
+					return fmt.Errorf("invalid __SEGMENT.__section input format '%s'", section)
+				}
+				if sec := m.Section(segName, secName); sec != nil {
+					addr = sec.Addr
+					if size == 0 && count == 0 {
+						size = sec.Size
+					}
+				} else {
+					if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+						m, err = m.GetFileSetFileByName(filesetEntry)
+						if err != nil {
+							return fmt.Errorf("failed to get fileset entry '%s': %v", filesetEntry, err)
+						}
+						if sec := m.Section(segName, secName); sec != nil {
+							addr = sec.Addr
+							if size == 0 && count == 0 {
+								size = sec.Size
+							}
+						} else {
+							return fmt.Errorf("failed to find section '%s' in '%s'", section, filesetEntry)
+						}
+					} else {
+						return fmt.Errorf("failed to find section '%s'", section)
+					}
 				}
 			}
 		} else {
@@ -238,13 +267,22 @@ var machoDumpCmd = &cobra.Command{
 					os.WriteFile(outFile, dat, 0660)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
-					if s := m.FindSegmentForVMAddr(addr); s != nil {
-						if s.Nsect > 0 {
-							if c := m.FindSectionForVMAddr(addr); c != nil {
-								log.WithFields(log.Fields{"section": fmt.Sprintf("%s.%s", c.Seg, c.Name)}).Info("Address location")
+					if viper.IsSet("macho.dump.segment") || viper.IsSet("macho.dump.section") {
+						switch {
+						case viper.IsSet("macho.dump.segment"):
+							if s := m.FindSegmentForVMAddr(addr); s != nil {
+								log.WithFields(log.Fields{"segment": s.Name, "size": len(dat)}).Info("Address location")
 							}
-						} else {
-							log.WithFields(log.Fields{"segment": s.Name}).Info("Address location")
+						case viper.IsSet("macho.dump.section"):
+							if s := m.FindSegmentForVMAddr(addr); s != nil {
+								if s.Nsect > 0 {
+									if c := m.FindSectionForVMAddr(addr); c != nil {
+										log.WithFields(log.Fields{"section": fmt.Sprintf("%s.%s", c.Seg, c.Name), "size": len(dat)}).Info("Address location")
+									}
+								} else {
+									log.WithFields(log.Fields{"segment": s.Name, "size": len(dat)}).Info("Address location")
+								}
+							}
 						}
 					}
 					fmt.Println(utils.HexDump(dat, addr))
