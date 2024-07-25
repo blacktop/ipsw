@@ -25,6 +25,7 @@ ipsw macho dump <macho> <address> [flags]
   -h, --help             help for dump
   -o, --output string    Output to a file
   -x, --section string   Dump a specific segment/section (i.e. __TEXT.__text)
+  -g, --segment string   Dump a specific segment (i.e. __TEXT)
   -s, --size uint        Size of data in bytes
 ```
 

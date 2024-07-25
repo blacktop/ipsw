@@ -27,6 +27,7 @@ ipsw macho disass <MACHO> [flags]
   -j, --json                   Output as JSON
   -o, --off uint               File offset to start disassembling
   -q, --quiet                  Do NOT markup analysis (Faster)
+      --replace                Replace .a2s
   -x, --section string         Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)
   -s, --symbol string          Function to disassemble
   -a, --vaddr uint             Virtual address to start disassembling
