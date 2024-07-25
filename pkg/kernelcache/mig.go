@@ -81,7 +81,7 @@ type MigKernSubsystem struct {
 	Routines []KernRoutineDescriptor /* Kernel routine descriptor array */
 }
 
-func (m MigKernSubsystem) LookupRoutineName(SubsystemStart, idx int) string {
+func (m MigKernSubsystem) LookupRoutineName(idx int) string {
 	switch m.Start {
 	case mach_vm_subsystem:
 		if idx >= len(machVmSubsystemFuncs) {
@@ -216,7 +216,7 @@ func (m MigKernSubsystem) String() string {
 			continue // skip empty routines
 		}
 		out += fmt.Sprintf("    %s: ", colorAddr("%#x", r.KStubRoutine))
-		out += colorBold(m.LookupRoutineName(int(m.Start), idx))
+		out += colorBold(m.LookupRoutineName(idx))
 		out += fmt.Sprintf("\t%s=%#x %s=%02d %s=%d %s=%d %s=%d\n",
 			colorName("impl"), r.ImplRoutine,
 			colorName("argc"), r.ArgC,

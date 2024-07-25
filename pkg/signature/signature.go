@@ -243,6 +243,26 @@ func (sm SymbolMap) getMachTraps(m *macho.File) error {
 	return nil
 }
 
+func (sm SymbolMap) getMig(m *macho.File) error {
+	migs, err := kernelcache.GetMigSubsystems(m)
+	if err != nil {
+		return fmt.Errorf("failed to get mach trap table: %v", err)
+	}
+
+	for _, mig := range migs {
+		if err := sm.Add(mig.KServer, strings.TrimSuffix(mig.Start.String(), "_subsystem")+"_server_routine"); err != nil {
+			utils.Indent(log.WithError(err).Debug, 2)("Adding mig server_routine")
+		}
+		for idx, routine := range mig.Routines {
+			if err := sm.Add(routine.KStubRoutine, mig.LookupRoutineName(idx)); err != nil {
+				utils.Indent(log.WithError(err).Debug, 2)("Adding mig routine")
+			}
+		}
+	}
+
+	return nil
+}
+
 func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) error {
 	kc, err := macho.Open(infile)
 	if err != nil {
@@ -259,6 +279,9 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		return err
 	}
 	if err := sm.getMachTraps(kc); err != nil {
+		return err
+	}
+	if err := sm.getMig(kc); err != nil {
 		return err
 	}
 
