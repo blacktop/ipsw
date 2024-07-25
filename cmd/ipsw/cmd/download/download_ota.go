@@ -367,6 +367,8 @@ var otaDLCmd = &cobra.Command{
 						KernelDevice: device,
 						Flatten:      flat,
 						Progress:     true,
+						Encrypted:    o.IsEncrypted,
+						AEAKey:       o.ArchiveDecryptionKey,
 						Output:       destPath,
 					}
 
@@ -427,7 +429,14 @@ var otaDLCmd = &cobra.Command{
 					if o.SplatOnly {
 						isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
 					}
-					destName := filepath.Join(folder, fmt.Sprintf("%s%s_%s", isRSR, devices, getDestName(url, removeCommas)))
+					var isAEA string
+					if o.IsEncrypted {
+						filesafe := o.ArchiveDecryptionKey
+						filesafe = strings.ReplaceAll(filesafe, "/", "_")
+						filesafe = strings.ReplaceAll(filesafe, "+", "-")
+						isAEA = "KEY_[" + filesafe + "]_"
+					}
+					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s", devices, isRSR, isAEA, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						fields := log.Fields{
 							"device": strings.Join(o.SupportedDevices, " "),

@@ -59,8 +59,12 @@ type Config struct {
 	Flatten bool `json:"flatten,omitempty"`
 	// show the progress bar (when using the CLI)
 	Progress bool `json:"progress,omitempty"`
+	// Is AEA private key encrypted
+	Encrypted bool `json:"encrypted,omitempty"`
 	// AEA private key PEM DB JSON file
 	PemDB string `json:"pem_db,omitempty"`
+	// AEA private key in base64 format
+	AEAKey string `json:"aea_key,omitempty"`
 	// output directory to write extracted files to
 	Output string `json:"output,omitempty"`
 	// output as JSON
