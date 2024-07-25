@@ -179,6 +179,77 @@ func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.
 	return nil
 }
 
+// ForEachMacho walks the folder and calls the handler for each macho file found
+func ForEachMacho(folder string, handler func(string, *macho.File) error) error {
+	var files []string
+	// Use a map to keep track of visited directories to avoid infinite loops
+	visited := make(map[string]bool)
+	if err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("failed to walk mount %s: %v", path, err)
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
+			// Resolve the symlink
+			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
+				// Get the info of the target file/directory
+				info, err = os.Stat(linkPath)
+				if err != nil {
+					return err
+				}
+				// If it's a directory and not visited, follow it
+				if info.IsDir() && !visited[linkPath] {
+					visited[linkPath] = true
+					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
+						if subErr != nil {
+							log.WithError(subErr).Error("failed to walk symlinked path")
+							return nil
+						}
+						files = append(files, subPath)
+						return nil
+					})
+				}
+			}
+		} else {
+			if !info.IsDir() {
+				if !visited[path] {
+					visited[path] = true
+					files = append(files, path)
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk files in dir %s: %v", folder, err)
+	}
+
+	for _, file := range files {
+		if ok, _ := magic.IsMachO(file); ok {
+			var m *macho.File
+			// UNIVERSAL MACHO
+			if fat, err := macho.OpenFat(file); err == nil {
+				defer fat.Close()
+				m = fat.Arches[len(fat.Arches)-1].File
+			} else { // SINGLE MACHO
+				if errors.Is(err, macho.ErrNotFat) {
+					m, err = macho.Open(file)
+					if err != nil {
+						return nil
+					}
+					defer m.Close()
+				} else { // NOT a macho file
+					return nil
+				}
+			}
+			if err := handler(file, m); err != nil {
+				return fmt.Errorf("failed to handle macho %s: %w", file, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p firmware macho file found
 func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_im4p")

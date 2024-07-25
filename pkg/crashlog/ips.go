@@ -99,6 +99,7 @@ type Config struct {
 	Verbose       bool
 	PemDB         string
 	SignaturesDir string
+	ExtrasDir     string
 }
 
 type Ips struct {
@@ -836,6 +837,41 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					}
 					machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
 				}
+			}
+		}
+	}
+
+	/* SYMBOLICATE EXTRA MACHOS */
+	if i.Config.ExtrasDir != "" {
+		if err := search.ForEachMacho(i.Config.ExtrasDir, func(path string, m *macho.File) error {
+			for idx, img := range i.Payload.BinaryImages {
+				if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
+					i.Payload.BinaryImages[idx].Path = path
+					i.Payload.BinaryImages[idx].Name = path
+					// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+					i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
+					for _, fn := range m.GetFunctions() {
+						if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+							for _, sym := range syms {
+								fn.Name = sym.Name
+							}
+							fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+							fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+							machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+						} else {
+							fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+							fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+							fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+							machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+						}
+					}
+					total--
+				}
+			}
+			return nil
+		}); err != nil {
+			if !errors.Is(err, ErrDone) {
+				return fmt.Errorf("failed to symbolicate: %w", err)
 			}
 		}
 	}
