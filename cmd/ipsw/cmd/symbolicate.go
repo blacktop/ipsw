@@ -52,6 +52,7 @@ func init() {
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
+	symbolicateCmd.Flags().String("extra", "x", "Path to folder with extra files for symbolication")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -62,6 +63,7 @@ func init() {
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
+	viper.BindPFlag("symbolicate.extra", symbolicateCmd.Flags().Lookup("extra"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -98,6 +100,7 @@ var symbolicateCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("symbolicate.demangle")
 		pemDB := viper.GetString("symbolicate.pem-db")
 		signaturesDir := viper.GetString("symbolicate.signatures")
+		extrasDir := viper.GetString("symbolicate.extra")
 		/* validate flags */
 		if (Verbose || all) && len(proc) > 0 {
 			return fmt.Errorf("cannot use --verbose OR --all WITH --proc")
@@ -122,6 +125,7 @@ var symbolicateCmd = &cobra.Command{
 				Demangle:      demangleFlag,
 				PemDB:         pemDB,
 				SignaturesDir: signaturesDir,
+				ExtrasDir:     extrasDir,
 				Verbose:       Verbose,
 			})
 			if err != nil {

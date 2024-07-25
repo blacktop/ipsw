@@ -246,7 +246,7 @@ func (sm SymbolMap) getMachTraps(m *macho.File) error {
 func (sm SymbolMap) getMig(m *macho.File) error {
 	migs, err := kernelcache.GetMigSubsystems(m)
 	if err != nil {
-		return fmt.Errorf("failed to get mach trap table: %v", err)
+		return fmt.Errorf("failed to get MIG subsystems: %v", err)
 	}
 
 	for _, mig := range migs {
@@ -276,13 +276,13 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 	}
 
 	if err := sm.getSyscalls(kc); err != nil {
-		return err
+		log.WithError(err).Warn("failed to get syscalls")
 	}
 	if err := sm.getMachTraps(kc); err != nil {
-		return err
+		log.WithError(err).Warn("failed to get mach traps")
 	}
 	if err := sm.getMig(kc); err != nil {
-		return err
+		log.WithError(err).Warn("failed to get MIG subsystems")
 	}
 
 	goodsig := false
