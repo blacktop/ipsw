@@ -227,14 +227,15 @@ jobs:
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw download rss
-      - name: Run download iOS beta OTA (kernelcache and DSC)
-        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
-        working-directory: /tmp/ipsw-beta
-        run: ipsw download ota --platform ios --device iPhone16,2 --beta --kernel --dyld
-      - name: Run download macOS beta OTA (kernelcache and DSC)
-        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
-        working-directory: /tmp/ipsw-beta
-        run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
+      # FIXME: put these back in once AAR OTA support is added
+      # - name: Run download iOS beta OTA (kernelcache and DSC)
+      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
+      #   working-directory: /tmp/ipsw-beta
+      #   run: ipsw download ota --platform ios --device iPhone16,2 --beta --kernel --dyld
+      # - name: Run download macOS beta OTA (kernelcache and DSC)
+      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
+      #   working-directory: /tmp/ipsw-beta
+      #   run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
 
       #
       # INFO CMD (macOS)
