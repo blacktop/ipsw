@@ -217,7 +217,8 @@ func (m MigKernSubsystem) String() string {
 		}
 		out += fmt.Sprintf("    %s: ", colorAddr("%#x", r.KStubRoutine))
 		out += colorBold(m.LookupRoutineName(idx))
-		out += fmt.Sprintf("\t%s=%#x %s=%02d %s=%d %s=%d %s=%d\n",
+		out += fmt.Sprintf("\t%s=%02d %s=%#x %s=%02d %s=%d %s=%d %s=%d\n",
+			colorName("num"), idx+int(m.Start),
 			colorName("impl"), r.ImplRoutine,
 			colorName("argc"), r.ArgC,
 			colorName("descr"), r.DescrCount,
