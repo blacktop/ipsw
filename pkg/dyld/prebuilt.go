@@ -151,6 +151,10 @@ func (f *File) SupportsDylibPrebuiltLoader() bool {
 	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].DylibsPblSetAddr)) {
 		return false
 	}
+	// FIXME: REMOVE once I have added iOS 18.x support
+	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].TPROMappingOffset)) {
+		return false
+	}
 	if f.Headers[f.UUID].DylibsPblSetAddr == 0 {
 		return false
 	}
@@ -164,6 +168,10 @@ func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, e
 		return nil, ErrPrebuiltLoaderSetNotSupported
 	}
 	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].DylibsPblSetAddr)) {
+		return nil, ErrPrebuiltLoaderSetNotSupported
+	}
+	// FIXME: REMOVE once I have added iOS 18.x support
+	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].TPROMappingOffset)) {
 		return nil, ErrPrebuiltLoaderSetNotSupported
 	}
 	if f.Headers[f.UUID].DylibsPblSetAddr == 0 {
