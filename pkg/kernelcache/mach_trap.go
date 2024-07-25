@@ -92,6 +92,7 @@ var colorBold = color.New(color.Bold).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
 var colorName = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 var colorType = color.New(color.Bold, color.FgHiYellow).SprintFunc()
+var colorSubSystem = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 
 func (m MachTrap) String() string {
 	var funcStr string
