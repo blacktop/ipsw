@@ -195,7 +195,7 @@ var plistCmd = &cobra.Command{
 
 		// print mode
 		var data []byte
-		if len(args) > 1 {
+		if len(args) > 0 {
 			data, err = os.ReadFile(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to read plist: %v", err)
