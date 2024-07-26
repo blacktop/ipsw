@@ -253,27 +253,45 @@ func aeaDecrypt(in, out string, akey []byte) (string, error) {
 	return out, nil
 }
 
-func Decrypt(in, out string, privKeyData []byte, pemDB string) (string, error) {
-	metadata, err := Info(in)
+type DecryptConfig struct {
+	Input       string // Input AEA file
+	Output      string // Output directory
+	PrivKeyData []byte // Private key data
+	B64SymKey   string // Base64 encoded Symmetric encryption key
+	PemDB       string // Path to PEM database
+
+	symEncKey []byte // Symmetric encryption key bytes
+}
+
+func Decrypt(c *DecryptConfig) (string, error) {
+	metadata, err := Info(c.Input)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse AEA: %v", err)
 	}
 
-	wkey, err := metadata.DecryptFCS(privKeyData, pemDB)
-	if err != nil {
-		return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
+	if c.B64SymKey == "" {
+		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB)
+		if err != nil {
+			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
+		}
+		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
+	} else {
+		c.symEncKey, err = base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(c.B64SymKey)
+		if err != nil {
+			return "", fmt.Errorf("failed to decode base64 sym key: %v", err)
+		}
 	}
 
 	// if true {
 	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
-		return aeaDecrypt(in, filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))), wkey)
+		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
 	// use 'aea' binary (as is the fastest way to decrypt AEA on macOS)
 	return aea(
-		in,
-		filepath.Join(out, filepath.Base(strings.TrimSuffix(in, filepath.Ext(in)))),
-		base64.StdEncoding.EncodeToString(wkey),
+		c.Input,
+		filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))),
+		c.B64SymKey,
 	)
 }
 

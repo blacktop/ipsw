@@ -159,7 +159,12 @@ var aeaCmd = &cobra.Command{
 					return fmt.Errorf("failed to read pem file: %v", err)
 				}
 			}
-			out, err := aea.Decrypt(args[0], output, pemData, pemDB)
+			out, err := aea.Decrypt(&aea.DecryptConfig{
+				Input:       args[0],
+				Output:      output,
+				PrivKeyData: pemData,
+				PemDB:       pemDB,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
