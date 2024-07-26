@@ -186,8 +186,9 @@ var machoDisassCmd = &cobra.Command{
 			return fmt.Errorf("can only disassemble arm64 binaries")
 		}
 
-		if m.FileTOC.FileHeader.Type == types.MH_FILESET && len(filesetEntry) == 0 {
-			return fmt.Errorf("file is a MH_FILESET, you must supply a --fileset-entry")
+		if m.FileTOC.FileHeader.Type == types.MH_FILESET &&
+			len(filesetEntry) == 0 && !viper.GetBool("macho.disass.all-fileset-entries") {
+			return fmt.Errorf("file is a MH_FILESET, you must supply a --fileset-entry OR --all-fileset-entries")
 		}
 
 		if len(filesetEntry) > 0 {
