@@ -34,15 +34,15 @@ import (
 )
 
 func init() {
-	OtaCmd.AddCommand(extractCmd)
+	OtaCmd.AddCommand(otaExtractCmd)
 
-	extractCmd.Flags().StringP("output", "o", "", "Output folder")
-	extractCmd.MarkFlagDirname("output")
-	viper.BindPFlag("ota.extract.output", extractCmd.Flags().Lookup("output"))
+	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
+	otaExtractCmd.MarkFlagDirname("output")
+	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
 }
 
-// extractCmd represents the extract command
-var extractCmd = &cobra.Command{
+// otaExtractCmd represents the extract command
+var otaExtractCmd = &cobra.Command{
 	Use:           "extract <OTA> <PATTERN>",
 	Aliases:       []string{"e"},
 	Short:         "Extract OTA payload files",

@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
@@ -39,11 +38,11 @@ import (
 )
 
 func init() {
-	OtaCmd.AddCommand(lsCmd)
+	OtaCmd.AddCommand(otaLsCmd)
 }
 
-// lsCmd represents the ls command
-var lsCmd = &cobra.Command{
+// otaLsCmd represents the ls command
+var otaLsCmd = &cobra.Command{
 	Use:           "ls <OTA>",
 	Aliases:       []string{"l"},
 	Short:         "List OTA files",
@@ -57,36 +56,29 @@ var lsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		otaPath := filepath.Clean(args[0])
-
-		log.Info("Listing files in OTA zip...")
-		files, err := ota.ListZip(otaPath)
+		ota, err := ota.Open(filepath.Clean(args[0]))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open OTA file: %v", err)
 		}
+		defer ota.Close()
+
+		// log.Info("OTA Assets")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "[ OTA zip files ] %s\n", strings.Repeat("-", 50))
-		for _, f := range files {
-			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range ota.File {
+			if !f.Mod.IsDir() {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
 			}
 		}
 		w.Flush()
-
-		log.Info("Listing files in OTA payload...")
-		utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		fmt.Fprintf(w, "\n[ payload files ] %s\n", strings.Repeat("-", 50))
-		files, err = ota.List(otaPath)
-		if err != nil {
-			return err
-		}
-		for _, f := range files {
-			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+		// utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
+		fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range ota.Payload {
+			if !f.Mod.IsDir() {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
 			}
 		}
 		w.Flush()
-
 		return nil
 	},
 }
