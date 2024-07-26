@@ -33,11 +33,11 @@ import (
 )
 
 func init() {
-	OtaCmd.AddCommand(infoCmd)
+	OtaCmd.AddCommand(otaInfoCmd)
 }
 
-// infoCmd represents the info command
-var infoCmd = &cobra.Command{
+// otaInfoCmd represents the info command
+var otaInfoCmd = &cobra.Command{
 	Use:           "info <OTA>",
 	Aliases:       []string{"i"},
 	Short:         "Display OTA metadata",
@@ -51,16 +51,14 @@ var infoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		otaPath := filepath.Clean(args[0])
-
-		pOTA, err := info.Parse(otaPath)
+		i, err := info.Parse(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse OTA: %v", err)
 		}
 
 		fmt.Println("\n[OTA Info]")
 		fmt.Println("==========")
-		fmt.Println(pOTA)
+		fmt.Println(i)
 
 		return nil
 
