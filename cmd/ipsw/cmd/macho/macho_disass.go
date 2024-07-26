@@ -128,7 +128,7 @@ var machoDisassCmd = &cobra.Command{
 		if len(filesetEntry) > 0 && viper.GetBool("macho.disass.all-fileset-entries") {
 			return fmt.Errorf("you can only use --fileset-entry OR --all-fileset-entries (not both)")
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
-			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS")
+			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
 
 		machoPath := filepath.Clean(args[0])
