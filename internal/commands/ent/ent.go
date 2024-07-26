@@ -259,7 +259,7 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 	return dat.String(), nil
 }
 
-func scanEnts(ipswPath, dmgPath, dmgType, pemDB string) (map[string]string, error) {
+func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -278,7 +278,11 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDB string) (map[string]string, erro
 
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  dmgPath,
+			Output: filepath.Dir(dmgPath),
+			PemDB:  pemDbPath,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

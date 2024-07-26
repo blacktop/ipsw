@@ -104,7 +104,11 @@ var mdevsCmd = &cobra.Command{
 			log.Debugf("Found extracted %s", dmgPath)
 		}
 		if filepath.Ext(dmgPath) == ".aea" {
-			dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:  dmgPath,
+				Output: filepath.Dir(dmgPath),
+				PemDB:  pemDB,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}

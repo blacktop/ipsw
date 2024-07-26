@@ -188,7 +188,11 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDB)
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  dmgPath,
+			Output: filepath.Dir(dmgPath),
+			PemDB:  pemDB,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

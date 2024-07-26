@@ -85,7 +85,11 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 		}
 
 		if filepath.Ext(dmgPath) == ".aea" {
-			dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil, pemDbPath)
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:  dmgPath,
+				Output: filepath.Dir(dmgPath),
+				PemDB:  pemDbPath,
+			})
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
 			}

@@ -318,7 +318,11 @@ func mountDMG(ctx *Context) (err error) {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
 	}
 	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
-		ctx.SystemOsDmgPath, err = aea.Decrypt(ctx.SystemOsDmgPath, filepath.Dir(ctx.SystemOsDmgPath), nil, ctx.PemDB)
+		ctx.SystemOsDmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  ctx.SystemOsDmgPath,
+			Output: filepath.Dir(ctx.SystemOsDmgPath),
+			PemDB:  ctx.PemDB,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
