@@ -865,7 +865,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		output(dump, "page_extras_count  = %d\n", slideInfo.PageExtrasCount)
 
 		var targetValue uint64
-		var pointer uint64
+		var pointer CacheSlidePointer2
 
 		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageStartsOffset)), io.SeekStart)
 		starts := make([]uint16, slideInfo.PageStartsCount)
@@ -896,8 +896,8 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						return err
 					}
 
-					delta = uint32(pointer & slideInfo.DeltaMask >> deltaShift)
-					targetValue = slideInfo.SlidePointer(pointer)
+					delta = uint32(uint64(pointer) & slideInfo.DeltaMask >> deltaShift)
+					targetValue = slideInfo.SlidePointer(uint64(pointer))
 
 					if dump {
 						sym, ok := f.AddressToSymbol[targetValue]
@@ -1033,7 +1033,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						CacheFileOffset: rebaseLocation,
 						CacheVMAddress:  rebaseAddr,
 						Target:          targetValue,
-						Pointer:         uint64(pointer),
+						Pointer:         pointer,
 						Symbol:          symName,
 					})
 				}
@@ -1071,7 +1071,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		output(dump, "page_extras_count  = %d\n", slideInfo.PageExtrasCount)
 
 		var targetValue uint64
-		var pointer uint32
+		var pointer CacheSlidePointer4 // uint32
 
 		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageStartsOffset)), io.SeekStart)
 		starts := make([]uint16, slideInfo.PageStartsCount)
@@ -1125,7 +1125,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 							CacheFileOffset: pageContent + uint64(pageOffset),
 							CacheVMAddress:  pageContent + uint64(pageAddress),
 							Target:          targetValue,
-							Pointer:         uint64(pointer),
+							Pointer:         pointer,
 							Symbol:          symName,
 						})
 					}
@@ -1234,7 +1234,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						CacheFileOffset: rebaseLocation,
 						CacheVMAddress:  rebaseAddr,
 						Target:          targetValue,
-						Pointer:         pointer.Raw(),
+						Pointer:         pointer,
 						Symbol:          symName,
 					})
 				}
