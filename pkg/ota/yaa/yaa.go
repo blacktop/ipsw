@@ -5,7 +5,6 @@ package yaa
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/dustin/go-humanize"
 )
@@ -73,6 +70,7 @@ type Entry struct {
 	PatchType patchType
 	Label     string
 
+	r          *io.ReadSeeker
 	fileOffset int64
 }
 
@@ -133,8 +131,12 @@ func (e *Entry) String() string {
 	}
 }
 
-func DecodeEntry(r *bytes.Reader) (*Entry, error) {
+func (e *Entry) Read(out []byte) (int, error) {
+	(*e.r).Seek(e.fileOffset, io.SeekStart)
+	return (*e.r).Read(out)
+}
 
+func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 	entry := &Entry{}
 	field := make([]byte, 4)
 
@@ -530,8 +532,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 
 type YAA struct {
 	Entries []*Entry
-
-	sr io.ReadSeeker
+	sr      io.ReadSeeker
 }
 
 func (y *YAA) ReadAt(p []byte, off int64) (n int, err error) {
@@ -542,7 +543,11 @@ func (y *YAA) ReadAt(p []byte, off int64) (n int, err error) {
 func (y *YAA) PostBOM() ([]fs.FileInfo, error) {
 	for _, ent := range y.Entries {
 		if strings.EqualFold(filepath.Base(ent.Path), "post.bom") && ent.Size > 0 {
-			bom, err := bom.New(y)
+			bdata := make([]byte, ent.Size)
+			if _, err := ent.Read(bdata); err != nil {
+				return nil, fmt.Errorf("init: failed to read BOM data: %v", err)
+			}
+			bom, err := bom.New(bytes.NewReader(bdata))
 			if err != nil {
 				return nil, fmt.Errorf("init: failed to parse BOM: %v", err)
 			}
@@ -575,37 +580,36 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, fmt.Errorf("ParseYAA: failed to read magic: %v", err)
+			return nil, fmt.Errorf("Parse: failed to read magic: %v", err)
 		}
 
 		if magic != MagicYAA1 && magic != MagicAA01 {
 			return nil, ErrInvalidMagic
 		}
 		if err := binary.Read(r, binary.LittleEndian, &headerSize); err != nil {
-			return nil, fmt.Errorf("ParseYAA: failed to read header size: %v", err)
+			return nil, fmt.Errorf("Parse: failed to read header size: %v", err)
 		}
 		if headerSize <= 5 {
-			return nil, fmt.Errorf("ParseYAA invalid header size: %d", headerSize)
+			return nil, fmt.Errorf("Parse invalid header size: %d", headerSize)
 		}
 
 		header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
 		if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-			return nil, fmt.Errorf("failed to read header: %v", err)
+			return nil, fmt.Errorf("Parse: failed to read header: %v", err)
 		}
 
 		ent, err = DecodeEntry(bytes.NewReader(header))
 		if err != nil {
-			// dump header if in Verbose mode
-			utils.Indent(log.Debug, 2)(hex.Dump(header))
-			return nil, fmt.Errorf("failed to decode AA entry: %v", err)
+			return nil, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
 		}
 
 		if ent.Type == RegularFile {
 			curr, _ := r.Seek(0, io.SeekCurrent)
 			ent.fileOffset = curr
+			ent.r = &r
 			// skip file data
 			if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
-				return nil, fmt.Errorf("failed to seek to next entry: %v", err)
+				return nil, fmt.Errorf("Parse: failed to seek to next entry: %v", err)
 			}
 		}
 
