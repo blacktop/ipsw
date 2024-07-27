@@ -54,10 +54,10 @@ func init() {
 
 // otaLsPayloadCmd represents the payload command
 var otaLsPayloadCmd = &cobra.Command{
-	Use:           "payload <OTA> <PAYLOAD>",
+	Use:           "payload <PAYLOAD>|<OTA> <PAYLOAD>",
 	Aliases:       []string{"p"},
 	Short:         "List contents of a payloadv2 file",
-	Args:          cobra.ExactArgs(2),
+	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,59 +71,90 @@ var otaLsPayloadCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both --files and --dirs flags")
 		}
 
-		o, err := ota.Open(filepath.Clean(args[0]))
-		if err != nil {
-			return fmt.Errorf("failed to open OTA file: %v", err)
-		}
-		defer o.Close()
+		var aa *yaa.YAA
 
-		for _, payload := range o.File {
-			if strings.HasSuffix(payload.Name, args[1]) {
-				pf, err := payload.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open payload: %v", err)
+		if len(args) < 2 {
+			isPBZX, err := magic.IsPBZX(filepath.Clean(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to check if payload is pbzx: %v", err)
+			}
+			pf, err := os.Open(filepath.Clean(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to open payload: %v", err)
+			}
+			defer pf.Close()
+			if isPBZX {
+				var pbuf bytes.Buffer
+				if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
+					return err
 				}
-				isPBZX, err := magic.IsPBZXData(pf)
+				pr := bytes.NewReader(pbuf.Bytes())
+				aa, err = yaa.Parse(pr)
 				if err != nil {
-					return fmt.Errorf("failed to check if payload is pbzx: %v", err)
+					return fmt.Errorf("failed to parse payload: %v", err)
 				}
-				pf.Close()
-				pf, _ = payload.Open()
-				var aa *yaa.YAA
-				if isPBZX {
-					var pbuf bytes.Buffer
-					if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
-						return err
-					}
-					pr := bytes.NewReader(pbuf.Bytes())
-					aa, err = yaa.Parse(pr)
+			} else {
+				aa, err = yaa.Parse(pf)
+				if err != nil {
+					return fmt.Errorf("failed to parse payload: %v", err)
+				}
+			}
+		} else {
+			o, err := ota.Open(filepath.Clean(args[0]))
+			if err != nil {
+				return fmt.Errorf("failed to open OTA file: %v", err)
+			}
+			defer o.Close()
+
+			for _, payload := range o.File {
+				if strings.HasSuffix(payload.Name, args[1]) {
+					pf, err := payload.Open()
 					if err != nil {
-						return fmt.Errorf("failed to parse payload: %v", err)
+						return fmt.Errorf("failed to open payload: %v", err)
 					}
-				} else {
-					// aa, err = yaa.Parse(pf)
-					// if err != nil {
-					// 	return fmt.Errorf("failed to parse payload: %v", err)
-					// }
+					isPBZX, err := magic.IsPBZXData(pf)
+					if err != nil {
+						return fmt.Errorf("failed to check if payload is pbzx: %v", err)
+					}
+					pf.Close()
+					pf, _ = payload.Open()
+					if isPBZX {
+						var pbuf bytes.Buffer
+						if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
+							return err
+						}
+						pr := bytes.NewReader(pbuf.Bytes())
+						aa, err = yaa.Parse(pr)
+						if err != nil {
+							return fmt.Errorf("failed to parse payload: %v", err)
+						}
+					} else {
+						// aa, err = yaa.Parse(pf)
+						// if err != nil {
+						// 	return fmt.Errorf("failed to parse payload: %v", err)
+						// }
+					}
 				}
-				log.WithFields(log.Fields{
-					"bytes": aa.FileSize(),
-					"size":  humanize.Bytes(uint64(aa.FileSize())),
-				}).Info("Total Size")
 
-				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-				fmt.Fprintf(w, "- [ PAYLOAD ENTRIES ] %s\n\n", strings.Repeat("-", 50))
-				for _, f := range aa.Entries {
-					if viper.GetBool("ota.ls.payload.files") && f.Type != yaa.RegularFile {
-						continue
-					} else if viper.GetBool("ota.ls.payload.dirs") && f.Type != yaa.Directory {
-						continue
-					}
-					fmt.Fprintf(w, "%s\n", f)
-				}
-				w.Flush()
 			}
 		}
+
+		log.WithFields(log.Fields{
+			"bytes": aa.FileSize(),
+			"size":  humanize.Bytes(uint64(aa.FileSize())),
+		}).Info("Total Size")
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		fmt.Fprintf(w, "- [ PAYLOAD ENTRIES ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range aa.Entries {
+			if viper.GetBool("ota.ls.payload.files") && f.Type != yaa.RegularFile {
+				continue
+			} else if viper.GetBool("ota.ls.payload.dirs") && f.Type != yaa.Directory {
+				continue
+			}
+			fmt.Fprintf(w, "%s\n", f)
+		}
+		w.Flush()
 
 		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 		// fmt.Fprintf(w, "- [ PAYLOAD ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
