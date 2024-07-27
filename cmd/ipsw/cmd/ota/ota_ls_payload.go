@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2024 blacktop
+Copyright © 2024 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,15 +38,15 @@ import (
 )
 
 func init() {
-	OtaCmd.AddCommand(otaLsCmd)
+	otaLsCmd.AddCommand(otaLsPayloadCmd)
 }
 
-// otaLsCmd represents the ls command
-var otaLsCmd = &cobra.Command{
-	Use:           "ls <OTA>",
-	Aliases:       []string{"l"},
-	Short:         "List OTA files",
-	Args:          cobra.MinimumNArgs(1),
+// otaLsPayloadCmd represents the payload command
+var otaLsPayloadCmd = &cobra.Command{
+	Use:           "payload <OTA> <PAYLOAD>",
+	Aliases:       []string{"p"},
+	Short:         "List contents of a payloadv2 file",
+	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,22 +62,21 @@ var otaLsCmd = &cobra.Command{
 		}
 		defer ota.Close()
 
+		payload, err := ota.Open(filepath.Clean(args[1]))
+		if err != nil {
+			return fmt.Errorf("failed to open payload file: %v", err)
+		}
+		defer payload.Close()
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
-		for _, f := range ota.File {
+		fmt.Fprintf(w, "- [ PAYLOAD ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range payload.File {
 			if !f.Mod.IsDir() {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
 			}
 		}
 		w.Flush()
-		// utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
-		for _, f := range ota.Payload {
-			if !f.Mod.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-			}
-		}
-		w.Flush()
+
 		return nil
 	},
 }

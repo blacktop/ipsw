@@ -1,6 +1,8 @@
 module github.com/blacktop/ipsw
 
-go 1.22
+go 1.22.0
+
+toolchain go1.22.5
 
 require (
 	github.com/99designs/keyring v1.2.2
@@ -48,10 +50,9 @@ require (
 	github.com/spf13/cast v1.6.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/ulikunitz/xz v0.5.12
+	github.com/ulikunitz/xz v0.6.0-alpha.3.0.20240501181208-1e8b7722f248
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
 	github.com/vbauerster/mpb/v8 v8.7.4
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.25.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/net v0.27.0
@@ -169,6 +170,7 @@ require (
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/ulikunitz/lz v0.4.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect

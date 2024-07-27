@@ -438,8 +438,10 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65EE=
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-github.com/ulikunitz/xz v0.5.12 h1:37Nm15o69RwBkXM0J6A5OlE67RZTfzUxTj8fB3dfcsc=
-github.com/ulikunitz/xz v0.5.12/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
+github.com/ulikunitz/lz v0.4.0 h1:L/saNWzCLpvNpoACMWSsLqq7bPJO1iFPFqOImWVmKwk=
+github.com/ulikunitz/lz v0.4.0/go.mod h1:UaONuXdzFuN/Ptzl0KTUYFL18y/mcJqtypeT2N6G5F4=
+github.com/ulikunitz/xz v0.6.0-alpha.3.0.20240501181208-1e8b7722f248 h1:+Z0xE8fBgXE+6/LjNthwyr4GpA7XzwUBdTfonfAOmcs=
+github.com/ulikunitz/xz v0.6.0-alpha.3.0.20240501181208-1e8b7722f248/go.mod h1:bsjrfxUsIlzP9lsXDKXdRzzpS8rpBVZEr5Vll2+k5fY=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2 h1:OdPisKdOPzRKzftIO1yYQ9MurwDeELs0t17bSzXWkpI=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2/go.mod h1:mcHBrigWSHlMZYol9QOFnK7sbltIt/OaKP5CQBZsC+4=
 github.com/vbauerster/mpb/v8 v8.7.4 h1:p4f16iMfUt3PkAC73SCzAtgtSf8TYDqEbJUT3odPrPo=
@@ -448,8 +450,6 @@ github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/
 github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
 github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI1Bc68Uw=
-github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 h1:nIPpBwaJSVYIxUFsDv3M8ofmx9yWTog9BfvIu0q41lo=
-github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
