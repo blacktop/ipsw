@@ -667,7 +667,7 @@ func (i *CacheImage) ParseSlideInfo() error {
 		}
 
 		for _, r := range rs {
-			i.sinfo[r.Pointer] = r.Target
+			i.sinfo[r.Pointer.Raw()] = r.Target
 		}
 	}
 
