@@ -16,7 +16,7 @@
 
 ## What is `ipsw` 🤔
 
-- IPSW downloader/exploder
+- [IPSW](https://en.wikipedia.org/wiki/IPSW) downloader/exploder
 - OTA downloader/exploder
 - macho parser
 - ObjC class-dump
