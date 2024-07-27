@@ -27,11 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/ota"
-	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,19 +62,19 @@ var otaLsCmd = &cobra.Command{
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
-		for _, f := range ota.File {
-			if !f.Mod.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-			}
-		}
-		w.Flush()
-		// utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
-		for _, f := range ota.Payload {
-			if !f.Mod.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-			}
-		}
+		// for _, f := range ota.File {
+		// 	if !f.Mod.IsDir() {
+		// 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
+		// 	}
+		// }
+		// w.Flush()
+		// // utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
+		// fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+		// for _, f := range ota.Payload {
+		// 	if !f.Mod.IsDir() {
+		// 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
+		// 	}
+		// }
 		w.Flush()
 		return nil
 	},

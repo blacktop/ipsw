@@ -3,35 +3,25 @@ package ota
 import (
 	"archive/zip"
 	"bytes"
-	"context"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/bom"
-	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 )
 
-const (
-	MagicYAA1 = 0x31414159 // "YAA1"
-	MagicAA01 = 0x31304141 // "AA01"
-)
-
 type File struct {
-	yaa.Entry
+	entry *yaa.Entry
+	zf    *zip.File
+
 	r  *Reader
 	rr io.ReaderAt
 
@@ -40,10 +30,10 @@ type File struct {
 
 // A Reader serves content from a Apple Archive.
 type Reader struct {
-	r       io.ReaderAt
-	zr      *zip.Reader
-	File    []*File
-	Payload []*File
+	r    io.ReaderAt
+	zr   *zip.Reader
+	File []*zip.File
+	yaa  *yaa.YAA
 
 	// fileList is a list of files sorted by ename,
 	// for use by the Open method.
@@ -123,17 +113,7 @@ func (r *Reader) initZip(rdr io.ReaderAt, size int64) (err error) {
 		return err
 	}
 	for _, zf := range r.zr.File {
-		f := &File{Entry: yaa.Entry{
-			Path: zf.Name,
-			Type: yaa.RegularFile,
-			Size: uint32(zf.UncompressedSize64),
-			Flag: uint32(zf.Flags),
-			Mtm:  zf.Modified,
-			Mod:  zf.Mode(),
-		}, r: r, rr: rdr}
-		if zf.FileInfo().IsDir() {
-			f.Entry.Type = yaa.Directory
-		}
+		r.File = append(r.File, zf)
 		if strings.EqualFold(filepath.Base(zf.Name), "post.bom") {
 			zr, err := zf.Open()
 			if err != nil {
@@ -150,18 +130,19 @@ func (r *Reader) initZip(rdr io.ReaderAt, size int64) (err error) {
 			if err != nil {
 				return fmt.Errorf("initZip: failed to get BOM paths: %v", err)
 			}
-			for _, bf := range bfiles {
-				if !bf.IsDir() {
-					r.Payload = append(r.Payload, &File{Entry: yaa.Entry{
-						Path: bf.Name(),
-						Type: yaa.RegularFile,
-						Size: uint32(bf.Size()),
-						Flag: uint32(bf.Mode()),
-						Mtm:  bf.ModTime(),
-						Mod:  bf.Mode(),
-					}, r: r, rr: rdr})
-				}
-			}
+			_ = bfiles
+			// for _, bf := range bfiles {
+			// if !bf.IsDir() {
+			// 	r.Payload = append(r.Payload, &File{Entry: yaa.Entry{
+			// 		Path: bf.Name(),
+			// 		Type: yaa.RegularFile,
+			// 		Size: uint32(bf.Size()),
+			// 		Flag: uint32(bf.Mode()),
+			// 		Mtm:  bf.ModTime(),
+			// 		Mod:  bf.Mode(),
+			// 	}, r: r, rr: rdr})
+			// }
+			// }
 		}
 		// if strings.Contains(f.Path, "payloadv2/payload.") && filepath.Ext(f.Path) != ".ecc" {
 		// 	log.Debugf("Parsing payload %s", f.Path)
@@ -213,148 +194,58 @@ func (r *Reader) initZip(rdr io.ReaderAt, size int64) (err error) {
 		// 	}
 		// 	zff.Close()
 		// }
-		r.File = append(r.File, f)
 	}
 	return nil
 }
 
-func (r *Reader) init(rdr io.ReaderAt, size int64) error {
+func (r *Reader) init(rdr io.ReaderAt, size int64) (err error) {
 	r.r = rdr
 	rs := io.NewSectionReader(rdr, 0, size)
 	// buf := bufio.NewReader(rs)
-	var magic uint32
-	var headerSize uint16
-	seen := make(map[string]bool)
-	var total uint64
-	var pfiles []*File
-	for {
-		var ent *yaa.Entry
-		err := binary.Read(rs, binary.LittleEndian, &magic)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("init: failed to read magic: %v", err)
-		}
-
-		if magic != MagicYAA1 && magic != MagicAA01 {
-			return fmt.Errorf("init: found unknown header magic: %x (%s)", magic, string(magic))
-		}
-		if err := binary.Read(rs, binary.LittleEndian, &headerSize); err != nil {
-			return fmt.Errorf("init: failed to read header size: %v", err)
-		}
-		if headerSize <= 5 {
-			return fmt.Errorf("init: invalid header size: %d", headerSize)
-		}
-
-		header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
-		if err := binary.Read(rs, binary.LittleEndian, &header); err != nil {
-			return fmt.Errorf("init: failed to read header: %v", err)
-		}
-		ent, err = yaa.Decode(bytes.NewReader(header))
-		if err != nil {
-			// dump header if in Verbose mode
-			utils.Indent(log.Debug, 2)(hex.Dump(header))
-			return fmt.Errorf("init: failed to decode AA header: %v", err)
-		}
-		// if ent.Type == yaa.RegularFile || ent.Type == yaa.Directory {
-		if ent.Type == yaa.RegularFile {
-			curr, _ := rs.Seek(0, io.SeekCurrent)
-			if ok := seen[ent.Path]; ok {
-				continue
-			}
-			r.File = append(r.File, &File{Entry: *ent, r: r, rr: rdr, offset: curr})
-			seen[ent.Path] = true
-			if strings.EqualFold(filepath.Base(ent.Path), "post.bom") && ent.Size > 0 {
-				bomData := make([]byte, ent.Size)
-				if err := binary.Read(rs, binary.LittleEndian, &bomData); err != nil {
-					return fmt.Errorf("init: failed to read BOM data: %v", err)
-				}
-				bom, err := bom.New(bytes.NewReader(bomData))
-				if err != nil {
-					return fmt.Errorf("init: failed to parse BOM: %v", err)
-				}
-				bpaths, err := bom.GetPaths()
-				if err != nil {
-					return fmt.Errorf("init: failed to get BOM paths: %v", err)
-				}
-				for _, bf := range bpaths {
-					if !bf.IsDir() && bf.Size() > 0 {
-						r.Payload = append(r.Payload, &File{Entry: yaa.Entry{
-							Path: bf.Name(),
-							Type: yaa.RegularFile,
-							Size: uint32(bf.Size()),
-							Flag: uint32(bf.Mode()),
-							Mtm:  bf.ModTime(),
-							Mod:  bf.Mode(),
-						}, r: r, rr: rdr})
-					}
-				}
-				// } else if strings.EqualFold(filepath.Base(ent.Path), "payload.000") && ent.Size > 0 {
-			} else if strings.EqualFold(filepath.Base(ent.Path), "fixup.manifest") && ent.Size > 0 {
-				pdata := make([]byte, ent.Size)
-				if err := binary.Read(rs, binary.LittleEndian, &pdata); err != nil {
-					return fmt.Errorf("init: failed to read payload data: %v", err)
-				}
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), bytes.NewReader(pdata), &pbuf, runtime.NumCPU()); err != nil {
-					return err
-				}
-				pfiles, total, err = parsePayloadV2(pbuf)
-				if err != nil {
-					return err
-				}
-				return nil
-			} else {
-				rs.Seek(int64(ent.Size), io.SeekCurrent)
-			}
-		}
-	}
-	_ = pfiles
-	btotal := uint64(0)
-	for idx, bf := range r.Payload {
-		if bf.Path != pfiles[idx].Path {
-			log.Errorf("Payload file mismatch: '%s' != '%s'", bf.Path, pfiles[idx].Path)
-		}
-		btotal += uint64(bf.Size)
-		if btotal > total {
-			fmt.Printf("Found all payload files: %d\n", idx)
-			break
-		}
+	r.yaa, err = yaa.Parse(rs)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-// Open returns a [SectionReader] that provides access to the [File]'s contents.
-// Multiple files may be read concurrently.
-func (f *File) Open() *io.SectionReader {
-	return io.NewSectionReader(f.rr, f.offset, int64(f.Size))
+// var pbuf bytes.Buffer
+// if err := pbzx.Extract(context.Background(), r, &pbuf, runtime.NumCPU()); err != nil {
+// 	return nil, 0, err
+// }
+// pr := bytes.NewReader(pbuf.Bytes())
+
+// OpenRaw returns a [Reader] that provides access to the [File]'s contents without
+// decompression.
+func (f *File) OpenRaw() io.Reader {
+	// return io.NewSectionReader(f.rr, f.offset, int64(f.Size))
+	return nil
 }
 
 // Open opens the named file in the ZIP archive,
 // using the semantics of fs.FS.Open:
 // paths are always slash separated, with no
 // leading / or ../ elements.
-func (r *Reader) Open(name string) (fs.File, error) {
-	// r.initFileList()
+// func (r *Reader) Open(name string) (fs.File, error) {
+// 	// r.initFileList()
 
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	e := r.openLookup(name)
-	if e == nil {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-	}
-	// if e.isDir {
-	// 	return &openDir{e, r.openReadDir(name), 0}, nil
-	// }
-	rc := e.file.Open()
-	// rc, err := e.file.Open()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	return rc.(fs.File), nil
-}
+// 	if !fs.ValidPath(name) {
+// 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+// 	}
+// 	e := r.openLookup(name)
+// 	if e == nil {
+// 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+// 	}
+// 	// if e.isDir {
+// 	// 	return &openDir{e, r.openReadDir(name), 0}, nil
+// 	// }
+// 	rc := e.file.Open()
+// 	// rc, err := e.file.Open()
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
+// 	return rc.(fs.File), nil
+// }
 
 func split(name string) (dir, elem string, isDir bool) {
 	if len(name) > 0 && name[len(name)-1] == '/' {
@@ -393,65 +284,11 @@ func (r *Reader) openLookup(name string) *fileListEntry {
 	return nil
 }
 
-func parsePayloadV2(pbuf bytes.Buffer) ([]*File, uint64, error) {
-	var total uint64
-
-	var magic uint32
-	var headerSize uint16
-
-	pr := bytes.NewReader(pbuf.Bytes())
-
-	var fs []*File
-
-	for {
-		var ent *yaa.Entry
-		err := binary.Read(pr, binary.LittleEndian, &magic)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, 0, err
-		}
-
-		if magic != MagicYAA1 && magic != MagicAA01 {
-			return nil, 0, fmt.Errorf("found unknown header magic: %x (%s)", magic, string(magic))
-		}
-		if err := binary.Read(pr, binary.LittleEndian, &headerSize); err != nil {
-			return nil, 0, err
-		}
-		if headerSize <= 5 {
-			return nil, 0, fmt.Errorf("invalid header size: %d", headerSize)
-		}
-
-		header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
-		if err := binary.Read(pr, binary.LittleEndian, &header); err != nil {
-			return nil, 0, err
-		}
-		ent, err = yaa.Decode(bytes.NewReader(header))
-		if err != nil {
-			// dump header if in Verbose mode
-			utils.Indent(log.Debug, 2)(hex.Dump(header))
-			return nil, 0, fmt.Errorf("failed to decode AA header: %v", err)
-		}
-		// if ent.Type == yaa.RegularFile || ent.Type == yaa.Directory {
-		if ent.Type == yaa.RegularFile {
-			log.Debug(ent.String())
-			total += uint64(ent.Size)
-			fs = append(fs, &File{Entry: *ent})
-		}
-		pr.Seek(int64(ent.Size), io.SeekCurrent)
-	}
-
-	sortFileByName(fs)
-
-	return fs, total, nil
-}
-
-func sortFileByName(files []*File) {
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Path < files[j].Path
-	})
-}
+// func sortFileByName(files []*File) {
+// 	sort.Slice(files, func(i, j int) bool {
+// 		return files[i].Path < files[j].Path
+// 	})
+// }
 
 type fileListEntry struct {
 	name  string

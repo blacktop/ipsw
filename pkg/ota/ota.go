@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -511,39 +510,13 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 
 	rr := bytes.NewReader(xzBuf.Bytes())
 
-	var magic uint32
-	var headerSize uint16
-
-	for {
-		var ent *yaa.Entry
-
-		err := binary.Read(rr, binary.LittleEndian, &magic)
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
+	aa, err := yaa.Parse(rr)
+	if err != nil {
+		if !errors.Is(err, yaa.ErrInvalidMagic) {
 			return false, "", err
 		}
-
-		if magic == MagicYAA1 || magic == MagicAA01 { // NEW iOS 14.x OTA payload format
-			if err := binary.Read(rr, binary.LittleEndian, &headerSize); err != nil {
-				return false, "", err
-			}
-			header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
-			if err := binary.Read(rr, binary.LittleEndian, &header); err != nil {
-				return false, "", err
-			}
-
-			ent, err = yaa.Decode(bytes.NewReader(header))
-			if err != nil {
-				// dump header if in Verbose mode
-				utils.Indent(log.Debug, 2)(hex.Dump(header))
-				return false, "", err
-			}
-
-		} else { // pre iOS14.x OTA file
+		for {
+			// pre iOS14.x OTA file
 			var e entry
 			if err := binary.Read(rr, binary.BigEndian, &e); err != nil {
 				if err == io.EOF {
@@ -580,12 +553,15 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 				fmt.Printf("%s (%s): %#v\n", fileName, os.FileMode(e.Perms), e)
 			}
 
-			ent.Mod = os.FileMode(e.Perms)
-			ent.Path = string(fileName)
-			ent.Size = uint32(e.FileSize)
+			// FIXME: need to figure out how to support OLD OTAs as well
+			// ent.Mod = os.FileMode(e.Perms)
+			// ent.Path = string(fileName)
+			// ent.Size = uint32(e.FileSize)
 		}
+	}
 
-		if len(extractPattern) > 0 {
+	if len(extractPattern) > 0 {
+		for _, ent := range aa.Entries {
 			match, _ := regexp.MatchString(extractPattern, ent.Path)
 			if match || strings.Contains(strings.ToLower(string(ent.Path)), strings.ToLower(extractPattern)) {
 				fileBytes := make([]byte, ent.Size)
@@ -608,8 +584,6 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 				return true, fname, nil
 			}
 		}
-
-		rr.Seek(int64(ent.Size), io.SeekCurrent)
 	}
 
 	return false, "", nil
