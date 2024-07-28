@@ -131,6 +131,10 @@ func (e *Entry) String() string {
 	}
 }
 
+func (e *Entry) IsDir() bool {
+	return e.Type == Directory
+}
+
 func (e *Entry) Read(out []byte) (int, error) {
 	(*e.r).Seek(e.fileOffset, io.SeekStart)
 	return (*e.r).Read(out)

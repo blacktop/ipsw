@@ -25,11 +25,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -106,64 +108,33 @@ var otaLsPayloadCmd = &cobra.Command{
 			}
 			defer o.Close()
 
-			for _, payload := range o.File {
-				if strings.HasSuffix(payload.Name, args[1]) {
-					pf, err := payload.Open()
-					if err != nil {
-						return fmt.Errorf("failed to open payload: %v", err)
-					}
-					isPBZX, err := magic.IsPBZXData(pf)
-					if err != nil {
-						return fmt.Errorf("failed to check if payload is pbzx: %v", err)
-					}
-					pf.Close()
-					pf, _ = payload.Open()
-					if isPBZX {
-						var pbuf bytes.Buffer
-						if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
-							return err
-						}
-						pr := bytes.NewReader(pbuf.Bytes())
-						aa, err = yaa.Parse(pr)
-						if err != nil {
-							return fmt.Errorf("failed to parse payload: %v", err)
-						}
-					} else {
-						// aa, err = yaa.Parse(pf)
-						// if err != nil {
-						// 	return fmt.Errorf("failed to parse payload: %v", err)
-						// }
-					}
-				}
+			f, err := o.Open(filepath.Clean(args[1]))
+			if err != nil {
+				return fmt.Errorf("failed to open payload: %v", err)
+			}
 
+			data, err := io.ReadAll(f)
+			if err != nil {
+				return fmt.Errorf("failed to read payload: %v", err)
+			}
+
+			aa, err = yaa.Parse(bytes.NewReader(data))
+			if err != nil {
+				return fmt.Errorf("failed to parse payload: %v", err)
 			}
 		}
 
-		log.WithFields(log.Fields{
-			"bytes": aa.FileSize(),
-			"size":  humanize.Bytes(uint64(aa.FileSize())),
-		}).Info("Total Size")
-
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "- [ PAYLOAD ENTRIES ] %s\n\n", strings.Repeat("-", 50))
+		fmt.Fprintf(w, "- [ PAYLOAD ENTRIES ] SIZE: %d BYTES (%s) %s\n\n", aa.FileSize(), humanize.Bytes(uint64(aa.FileSize())), strings.Repeat("-", 50))
 		for _, f := range aa.Entries {
 			if viper.GetBool("ota.ls.payload.files") && f.Type != yaa.RegularFile {
 				continue
 			} else if viper.GetBool("ota.ls.payload.dirs") && f.Type != yaa.Directory {
 				continue
 			}
-			fmt.Fprintf(w, "%s\n", f)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mod), colorModTime(f.Mtm.Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size))), colorName(f.Path))
 		}
 		w.Flush()
-
-		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		// fmt.Fprintf(w, "- [ PAYLOAD ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
-		// for _, f := range payload.File {
-		// 	if !f.Mod.IsDir() {
-		// 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-		// 	}
-		// }
-		// w.Flush()
 
 		return nil
 	},

@@ -27,9 +27,11 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,6 +39,9 @@ import (
 
 func init() {
 	OtaCmd.AddCommand(otaLsCmd)
+
+	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
+	viper.BindPFlag("ota.ls.bom", otaLsCmd.Flags().Lookup("bom"))
 }
 
 // otaLsCmd represents the ls command
@@ -61,21 +66,28 @@ var otaLsCmd = &cobra.Command{
 		defer ota.Close()
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
-		// for _, f := range ota.File {
-		// 	if !f.Mod.IsDir() {
-		// 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-		// 	}
-		// }
-		// w.Flush()
-		// // utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		// fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
-		// for _, f := range ota.Payload {
-		// 	if !f.Mod.IsDir() {
-		// 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Entry.Mod, f.Entry.Mtm.Format(time.RFC3339), humanize.Bytes(uint64(f.Entry.Size)), f.Entry.Path)
-		// 	}
-		// }
-		w.Flush()
+
+		if viper.GetBool("ota.ls.bom") {
+			fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+			fmt.Fprintf(w, "      (OTA might not actually contain all these files if it is a partial update file)\n\n")
+			for _, f := range ota.PostFiles() {
+				if !f.IsDir() {
+					sys := f.Sys()
+					_ = sys
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Name()))
+				}
+			}
+			w.Flush()
+		} else {
+			fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
+			for _, f := range ota.Files() {
+				if !f.IsDir() {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Path()))
+				}
+			}
+			w.Flush()
+		}
+
 		return nil
 	},
 }
