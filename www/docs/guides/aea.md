@@ -74,6 +74,15 @@ Decrypt with `/usr/bin/aea`
       -o TEST.dmg -key-value 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
 ```
 
+You can also use `ipsw`
+
+```bash
+❯ ipsw fw aea --key-val 'base64:S8f/KZsKuRXg/RnkMlG6SWiFtSPlmwz9YFdBnyPc1EQ='
+                    '22A5307f__iPhone16,2/090-29713-065.dmg.aea' --output /tmp
+                    
+   • Extracted AEA to /tmp/090-29713-065.dmg
+```
+
 ### Download AEA PEMs as JSON "Database"
 
 Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **partial-partialzip** ™️)*
@@ -163,6 +172,5 @@ This works because `ipsw` will:
 
 1) Try it's embedded PEM keys
 2) Try the `--pem-db` you provided
-3) Try and reach out to Apple's server to get the PEM
- 
-Which `ipswd` will happily serve to it 😎
+3) Try and reach out to Apple's server to get the PEM  
+   i) Which `ipswd` will happily serve to it *(if you follow the above steps)* 😎
