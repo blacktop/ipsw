@@ -298,7 +298,7 @@ func (r *Reader) PostFiles() []fs.FileInfo {
 // using the semantics of fs.FS.Open:
 // paths are always slash separated, with no
 // leading / or ../ elements.
-func (r *Reader) Open(name string) (fs.File, error) {
+func (r *Reader) Open(name string, decomp bool) (fs.File, error) {
 	r.initFileList()
 
 	if !fs.ValidPath(name) {
@@ -308,7 +308,7 @@ func (r *Reader) Open(name string) (fs.File, error) {
 	if e == nil {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 	}
-	rc, err := e.Open()
+	rc, err := e.Open(decomp)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (r *otaReader) Read(b []byte) (n int, err error) {
 
 func (r *otaReader) Close() error { return r.rc.Close() }
 
-func (f *File) Open() (io.ReadCloser, error) {
+func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 	var mdata [4]byte
 	var rc io.ReadCloser
 	if f.zfile != nil {
@@ -412,20 +412,23 @@ func (f *File) Open() (io.ReadCloser, error) {
 		zf.Close()
 		switch magic.Magic(binary.BigEndian.Uint32(mdata[:])) {
 		case magic.MagicPBZX:
-			var pbuf bytes.Buffer
-			zf, err := f.zfile.Open()
-			if err != nil {
-				return nil, err
+			if decomp {
+				var pbuf bytes.Buffer
+				zf, err := f.zfile.Open()
+				if err != nil {
+					return nil, err
+				}
+				if err := pbzx.Extract(context.Background(), zf, &pbuf, runtime.NumCPU()); err != nil {
+					return nil, err
+				}
+				rc = &otaReader{
+					rc: io.NopCloser(bytes.NewReader(pbuf.Bytes())),
+					f:  f,
+				}
+				zf.Close()
+				return rc, nil
 			}
-			if err := pbzx.Extract(context.Background(), zf, &pbuf, runtime.NumCPU()); err != nil {
-				return nil, err
-			}
-			rc = &otaReader{
-				rc: io.NopCloser(bytes.NewReader(pbuf.Bytes())),
-				f:  f,
-			}
-			zf.Close()
-			return rc, nil
+			fallthrough
 		default:
 			zf.Close()
 			return f.zfile.Open()
@@ -443,19 +446,22 @@ func (f *File) Open() (io.ReadCloser, error) {
 	}
 	switch magic.Magic(binary.BigEndian.Uint32(mdata[:])) {
 	case magic.MagicPBZX:
-		data := make([]byte, f.entry.Size)
-		if _, err := f.entry.Read(data); err != nil {
-			return nil, err
+		if decomp {
+			data := make([]byte, f.entry.Size)
+			if _, err := f.entry.Read(data); err != nil {
+				return nil, err
+			}
+			var pbuf bytes.Buffer
+			if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
+				return nil, err
+			}
+			rc = &otaReader{
+				rc: io.NopCloser(bytes.NewReader(pbuf.Bytes())),
+				f:  f,
+			}
+			return rc, nil
 		}
-		var pbuf bytes.Buffer
-		if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
-			return nil, err
-		}
-		rc = &otaReader{
-			rc: io.NopCloser(bytes.NewReader(pbuf.Bytes())),
-			f:  f,
-		}
-		return rc, nil
+		fallthrough
 	default:
 		edata := make([]byte, f.entry.Size)
 		if _, err := f.entry.Read(edata); err != nil {

@@ -108,7 +108,7 @@ var otaLsPayloadCmd = &cobra.Command{
 			}
 			defer o.Close()
 
-			f, err := o.Open(filepath.Clean(args[1]))
+			f, err := o.Open(filepath.Clean(args[1]), false)
 			if err != nil {
 				return fmt.Errorf("failed to open payload: %v", err)
 			}

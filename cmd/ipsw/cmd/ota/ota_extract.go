@@ -40,9 +40,11 @@ func init() {
 	OtaCmd.AddCommand(otaExtractCmd)
 
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
+	otaExtractCmd.Flags().BoolP("decomp", "d", false, "Decompress pbzx files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.extract.pattern", otaExtractCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
 	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
 }
 
@@ -61,6 +63,9 @@ var otaExtractCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		// flags
+		decomp := viper.GetBool("ota.extract.decomp")
+		// validate flags
 		if len(args) > 1 && viper.IsSet("ota.extract.pattern") {
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
 		}
@@ -86,7 +91,7 @@ var otaExtractCmd = &cobra.Command{
 					log.Warnf("already exists: '%s' ", fname)
 					continue
 				}
-				ff, err := o.Open(f.Path())
+				ff, err := o.Open(f.Path(), decomp)
 				if err != nil {
 					return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
 				}
@@ -104,7 +109,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 			}
 		} else if len(args) > 1 {
-			f, err := o.Open(filepath.Clean(args[1]))
+			f, err := o.Open(filepath.Clean(args[1]), decomp)
 			if err != nil {
 				return fmt.Errorf("failed to open file '%s' in OTA: %v", filepath.Clean(args[1]), err)
 			}
@@ -135,7 +140,7 @@ var otaExtractCmd = &cobra.Command{
 					continue
 				}
 				if re.MatchString(f.Path()) {
-					ff, err := o.Open(f.Path())
+					ff, err := o.Open(f.Path(), decomp)
 					if err != nil {
 						return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
 					}
