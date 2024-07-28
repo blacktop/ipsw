@@ -1,26 +1,24 @@
 ---
-id: extract
-title: extract
+id: ls
+title: ls
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: extract
-description: Extract OTA payload files
+sidebar_label: ls
+description: List OTA files
 ---
-## ipsw ota extract
+## ipsw ota ls
 
-Extract OTA payload files
+List OTA files
 
 ```
-ipsw ota extract <OTA> [FILENAME]> [flags]
+ipsw ota ls <OTA> [flags]
 ```
 
 ### Options
 
 ```
-  -d, --decomp           Decompress pbzx files
-  -h, --help             help for extract
-  -o, --output string    Output folder
-  -p, --pattern string   Regex pattern to match files
+  -b, --bom    List the post.bom files
+  -h, --help   help for ls
 ```
 
 ### Options inherited from parent commands
@@ -35,4 +33,5 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
 ### SEE ALSO
 
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
+* [ipsw ota ls payload](/docs/cli/ipsw/ota/ls/payload)	 - List contents of a payloadv2 file
 
