@@ -2233,6 +2233,16 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
     },
+    "CacheSlidePointer": {
+      "type": "object",
+      "properties": {
+        "Raw": {
+          "type": "integer",
+          "format": "uint64"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
+    },
     "CodeDirectory": {
       "description": "CodeDirectory object",
       "type": "object",
@@ -3912,9 +3922,7 @@
           "x-go-name": "CacheVMAddress"
         },
         "pointer": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "Pointer"
+          "$ref": "#/definitions/CacheSlidePointer"
         },
         "symbol": {
           "type": "string",
