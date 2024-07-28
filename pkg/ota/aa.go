@@ -147,7 +147,7 @@ func toValidName(name string) string {
 	return p
 }
 
-func (r *Reader) initFileList() {
+func (r *Reader) initFileList() (ferr error) {
 	r.fileListOnce.Do(func() {
 		// files and knownDirs map from a file/directory name
 		// to an index into the r.fileList entry that we are
@@ -192,16 +192,27 @@ func (r *Reader) initFileList() {
 				files[name] = idx
 			}
 			if strings.EqualFold(filepath.Base(file.Name), "post.bom") {
-				if zr, err := file.Open(); err == nil {
-					bdata := make([]byte, file.UncompressedSize64)
-					if _, err := zr.Read(bdata); err == nil {
-						if bom, err := bom.New(bytes.NewReader(bdata)); err == nil {
-							if bfiles, err := bom.GetPaths(); err == nil {
-								r.bomFiles = bfiles
-							}
-						}
-					}
+				zr, err := file.Open()
+				if err != nil {
+					ferr = err
+					return
 				}
+				bdata, err := io.ReadAll(zr)
+				if err != nil {
+					ferr = err
+					return
+				}
+				bom, err := bom.New(bytes.NewReader(bdata))
+				if err != nil {
+					ferr = err
+					return
+				}
+				bfiles, err := bom.GetPaths()
+				if err != nil {
+					ferr = err
+					return
+				}
+				r.bomFiles = bfiles
 			}
 		}
 		for dir := range dirs {
@@ -251,15 +262,20 @@ func (r *Reader) initFileList() {
 					files[name] = idx
 				}
 			}
-			// add BOM files
 			// TODO: some of these aren't in the payloads ??
-			if bomFiles, err := r.yaa.PostBOM(); err == nil {
-				r.bomFiles = bomFiles
+			// add BOM files
+			bomFiles, err := r.yaa.PostBOM()
+			if err != nil {
+				ferr = err
+				return
 			}
+			r.bomFiles = bomFiles
 		}
 
 		sort.Slice(r.fileList, func(i, j int) bool { return fileEntryLess(r.fileList[i].name, r.fileList[j].name) })
 	})
+
+	return ferr
 }
 
 func fileEntryLess(x, y string) bool {

@@ -72,8 +72,6 @@ var otaLsCmd = &cobra.Command{
 			fmt.Fprintf(w, "      (OTA might not actually contain all these files if it is a partial update file)\n\n")
 			for _, f := range ota.PostFiles() {
 				if !f.IsDir() {
-					sys := f.Sys()
-					_ = sys
 					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Name()))
 				}
 			}
