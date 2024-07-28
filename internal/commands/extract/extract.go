@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -19,6 +21,7 @@ import (
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -134,6 +137,32 @@ func FirmwareType(c *Config) (string, error) {
 		return c.info.Plists.Type, nil
 	}
 	return "", fmt.Errorf("no IPSW or URL provided")
+}
+
+func IsAEA(c *Config) (bool, error) {
+	if len(c.IPSW) > 0 {
+		return magic.IsAA(filepath.Clean(c.IPSW))
+	} else if len(c.URL) > 0 {
+		if !isURL(c.URL) {
+			return false, fmt.Errorf("invalid URL provided: %s", c.URL)
+		}
+		req, err := http.NewRequest("GET", c.URL, nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to create HTTP request: %v", err)
+		}
+		req.Header.Set("Range", "bytes=0-4")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, fmt.Errorf("client failed to perform request: %v", err)
+		}
+		defer resp.Body.Close()
+		mdata, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, fmt.Errorf("failed to read remote data: %v", err)
+		}
+		return magic.IsAEAData(bytes.NewReader(mdata))
+	}
+	return false, fmt.Errorf("no IPSW or URL provided")
 }
 
 // Kernelcache extracts the kernelcache from an IPSW

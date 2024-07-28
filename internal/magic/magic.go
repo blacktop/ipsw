@@ -193,9 +193,9 @@ func IsPBZX(filePath string) (bool, error) {
 	}
 }
 
-func IsPBZXData(rc io.ReadCloser) (bool, error) {
+func IsPBZXData(r io.Reader) (bool, error) {
 	magic := make([]byte, 4)
-	if _, err := rc.Read(magic); err != nil {
+	if _, err := r.Read(magic); err != nil {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
 	switch Magic(binary.BigEndian.Uint32(magic[:])) {
@@ -232,6 +232,19 @@ func IsAEA(filePath string) (bool, error) {
 	defer f.Close()
 	magic := make([]byte, 4)
 	if _, err := f.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	switch Magic(binary.BigEndian.Uint32(magic[:])) {
+	case MagicAEA1:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func IsAEAData(rc io.Reader) (bool, error) {
+	magic := make([]byte, 4)
+	if _, err := rc.Read(magic); err != nil {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
 	switch Magic(binary.BigEndian.Uint32(magic[:])) {
