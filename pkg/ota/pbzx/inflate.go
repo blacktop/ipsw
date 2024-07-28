@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ulikunitz/xz"
+	"github.com/xi2/xz"
 )
 
 func inflate(ctx context.Context, reader <-chan _Chunk, writeCh chan<- _Chunk) error {
@@ -21,7 +21,8 @@ func inflate(ctx context.Context, reader <-chan _Chunk, writeCh chan<- _Chunk) e
 		if !ok {
 			return nil
 		}
-		rd, err := xz.NewReader(bytes.NewReader(chunk.data))
+		rd, err := xz.NewReader(bytes.NewBuffer(chunk.data), 0)
+		rd.Multistream(false)
 		if err != nil {
 			return fmt.Errorf("inflate error: %w", err)
 		}
@@ -31,7 +32,6 @@ func inflate(ctx context.Context, reader <-chan _Chunk, writeCh chan<- _Chunk) e
 			return fmt.Errorf("inflate error: %w", err)
 		}
 		chunk.data = buf[:chunk.meta]
-		rd.Close()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
