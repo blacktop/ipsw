@@ -27,6 +27,7 @@ const (
 	MagicYAA1  Magic = 0x31414159 // "YAA1"
 	MagicAA01  Magic = 0x31304141 // "AA01"
 	MagicAEA1  Magic = 0x41454131 // "AEA1"
+	MagicPBZX        = 0x70627a78 // "pbzx"
 )
 
 func IsMachO(filePath string) (bool, error) {
@@ -168,6 +169,37 @@ func IsZip(filePath string) (bool, error) {
 	}
 	switch Magic(binary.BigEndian.Uint32(magic[:])) {
 	case MagicZip:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func IsPBZX(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	magic := make([]byte, 4)
+	if _, err := f.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	switch Magic(binary.BigEndian.Uint32(magic[:])) {
+	case MagicPBZX:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func IsPBZXData(rc io.ReadCloser) (bool, error) {
+	magic := make([]byte, 4)
+	if _, err := rc.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	switch Magic(binary.BigEndian.Uint32(magic[:])) {
+	case MagicPBZX:
 		return true, nil
 	default:
 		return false, nil

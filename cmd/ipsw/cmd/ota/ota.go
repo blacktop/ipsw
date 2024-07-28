@@ -22,9 +22,15 @@ THE SOFTWARE.
 package ota
 
 import (
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var colorMode = color.New(color.FgHiBlue).SprintFunc()
+var colorModTime = color.New(color.Faint).SprintFunc()
+var colorSize = color.New(color.FgHiCyan).SprintFunc()
+var colorName = color.New(color.Bold).SprintFunc()
 
 // OtaCmd represents the ota command
 var OtaCmd = &cobra.Command{
