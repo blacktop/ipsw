@@ -1,4 +1,4 @@
-package ota
+package ridiff
 
 import (
 	"bytes"

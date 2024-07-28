@@ -472,6 +472,5 @@ func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 			f:  f,
 		}
 		return rc, nil
-		return nil, fmt.Errorf("unknown magic: %v (%s)", mdata, string(mdata[:]))
 	}
 }
