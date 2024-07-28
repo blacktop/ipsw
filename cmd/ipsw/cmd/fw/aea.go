@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -47,6 +48,7 @@ func init() {
 	aeaCmd.Flags().BoolP("info", "i", false, "Print info")
 	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
 	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
+	aeaCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
@@ -55,6 +57,7 @@ func init() {
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.aea.fcs-key", aeaCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
+	viper.BindPFlag("fw.aea.key-val", aeaCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
@@ -62,9 +65,11 @@ func init() {
 
 // aeaCmd represents the ane command
 var aeaCmd = &cobra.Command{
-	Use:   "aea",
-	Short: "Parse AEA1 DMGs",
-	Args:  cobra.ExactArgs(1),
+	Use:           "aea",
+	Short:         "Parse AEA1 DMGs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var pemData []byte
 
@@ -76,6 +81,7 @@ var aeaCmd = &cobra.Command{
 		// flags
 		fcsKey := viper.GetBool("fw.aea.fcs-key")
 		adKey := viper.GetBool("fw.aea.key")
+		base64Key := viper.GetString("fw.aea.key-val")
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
 		pemDB := viper.GetString("fw.aea.pem-db")
@@ -83,6 +89,13 @@ var aeaCmd = &cobra.Command{
 		// validate flags
 		if (adKey || showInfo) && output != "" {
 			return fmt.Errorf("--output flag is not valid with --info or --key flags")
+		} else if (adKey || showInfo) && (fcsKey || base64Key != "") {
+			return fmt.Errorf("cannot use --info or --key flags with --fcs-key or --key-val")
+		} else if fcsKey && base64Key != "" {
+			return fmt.Errorf("cannot use --fcs-key with --key-val")
+		}
+		if base64Key != "" {
+			base64Key = strings.TrimPrefix(base64Key, "base64:")
 		}
 
 		var bold = color.New(color.Bold).SprintFunc()
@@ -163,6 +176,7 @@ var aeaCmd = &cobra.Command{
 				Input:       args[0],
 				Output:      output,
 				PrivKeyData: pemData,
+				B64SymKey:   base64Key,
 				PemDB:       pemDB,
 			})
 			if err != nil {
