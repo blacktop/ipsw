@@ -136,6 +136,9 @@ func (e *Entry) IsDir() bool {
 }
 
 func (e *Entry) Read(out []byte) (int, error) {
+	if e.r == nil {
+		return 0, fmt.Errorf("yaa entry reader is nil")
+	}
 	(*e.r).Seek(e.fileOffset, io.SeekStart)
 	return (*e.r).Read(out)
 }

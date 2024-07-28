@@ -422,12 +422,9 @@ func (f *File) Open() (io.ReadCloser, error) {
 			}
 			zf.Close()
 			return rc, nil
-		case magic.MagicYAA1, magic.MagicAA01:
-			zf.Close()
-			return f.zfile.Open()
 		default:
 			zf.Close()
-			return nil, fmt.Errorf("unknown magic: %v", mdata)
+			return f.zfile.Open()
 		}
 	}
 	if _, err := f.entry.Read(mdata[:]); err != nil {
@@ -448,7 +445,7 @@ func (f *File) Open() (io.ReadCloser, error) {
 			f:  f,
 		}
 		return rc, nil
-	case magic.MagicYAA1, magic.MagicAA01:
+	default:
 		edata := make([]byte, f.entry.Size)
 		if _, err := f.entry.Read(edata); err != nil {
 			return nil, err
@@ -458,7 +455,6 @@ func (f *File) Open() (io.ReadCloser, error) {
 			f:  f,
 		}
 		return rc, nil
-	default:
-		return nil, fmt.Errorf("unknown magic: %v", mdata)
+		return nil, fmt.Errorf("unknown magic: %v (%s)", mdata, string(mdata[:]))
 	}
 }

@@ -23,10 +23,13 @@ package ota
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -62,30 +65,62 @@ var otaExtractCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
 		}
 
-		log.Infof("Extracting files that match '%s'", args[1])
 		o, err := ota.Open(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to open OTA file: %v", err)
 		}
 
-		// inf, err := info.Parse(otaPath)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
-		// }
-		// folder, err := inf.GetFolder()
-		// if err != nil {
-		// 	log.Errorf("failed to get folder from remote zip metadata: %v", err)
-		// }
-		// output := filepath.Join(filepath.Clean(viper.GetString("ota.extract.output")), folder)
-		// _ = output
+		output := filepath.Dir(filepath.Clean(args[0]))
+		if viper.IsSet("ota.extract.output") {
+			output = filepath.Clean(viper.GetString("ota.extract.output"))
+		}
 
-		if len(args) > 1 {
-			// f, err := o.Open(args[1])
-			// if err != nil {
-			// 	return fmt.Errorf("failed to open file in OTA: %v", err)
-			// }
-			// defer f.Close()
-			// return os.WriteFile(filepath.Join(output, filepath.Base(args[1])), f.Raw, 0644)
+		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
+			log.Info("Extracting All Files From OTA")
+			for _, f := range o.Files() {
+				if f.IsDir() {
+					continue
+				}
+				fname := filepath.Join(output, f.Path())
+				if _, err := os.Stat(fname); err == nil {
+					log.Warnf("already exists: '%s' ", fname)
+					continue
+				}
+				ff, err := o.Open(f.Path())
+				if err != nil {
+					return fmt.Errorf("failed to open file in OTA: %v", err)
+				}
+				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+					return fmt.Errorf("failed to create output directory: %v", err)
+				}
+				out, err := os.Create(fname)
+				if err != nil {
+					return fmt.Errorf("failed to create file: %v", err)
+				}
+				defer out.Close()
+				utils.Indent(log.Info, 2)(fname)
+				if _, err := io.Copy(out, ff); err != nil {
+					return fmt.Errorf("failed to write file: %v", err)
+				}
+			}
+		} else if len(args) > 1 {
+			f, err := o.Open(filepath.Clean(args[1]))
+			if err != nil {
+				return fmt.Errorf("failed to open file in OTA: %v", err)
+			}
+			fname := filepath.Join(output, filepath.Clean(args[1]))
+			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
+			out, err := os.Create(fname)
+			if err != nil {
+				return fmt.Errorf("failed to create file: %v", err)
+			}
+			defer out.Close()
+			log.Infof("Extracting to '%s'", out.Name())
+			if _, err := io.Copy(out, f); err != nil {
+				return fmt.Errorf("failed to write file: %v", err)
+			}
 		} else {
 			if !viper.IsSet("ota.extract.pattern") {
 				return fmt.Errorf("must provide a --pattern to match files")
@@ -94,22 +129,39 @@ var otaExtractCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
 			}
-			for _, f := range o.File {
-				if re.MatchString(f.Name) {
-					log.Infof("Extracting %s", f.Name)
-					// if err := os.WriteFile(filepath.Join(output, filepath.Base(f.Name)), f.Raw, 0644); err != nil {
-					// 	return fmt.Errorf("failed to write file: %v", err)
-					// }
+			log.WithField("pattern", re.String()).Info("Extracting Files Matching Pattern")
+			for _, f := range o.Files() { // search in OTA asset files
+				if f.IsDir() {
+					continue
+				}
+				if re.MatchString(f.Path()) {
+					ff, err := o.Open(f.Path())
+					if err != nil {
+						return fmt.Errorf("failed to open file in OTA: %v", err)
+					}
+					fname := filepath.Join(output, f.Path())
+					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+						return fmt.Errorf("failed to create output directory: %v", err)
+					}
+					out, err := os.Create(fname)
+					if err != nil {
+						return fmt.Errorf("failed to create file: %v", err)
+					}
+					defer out.Close()
+					utils.Indent(log.Info, 2)(fname)
+					if _, err := io.Copy(out, ff); err != nil {
+						return fmt.Errorf("failed to write file: %v", err)
+					}
 				}
 			}
-			// for _, f := range o.Entries {
-			// 	if re.MatchString(f.Name) {
-			// 		log.Infof("Extracting %s", f.Name)
-			// 		if err := os.WriteFile(filepath.Join(output, filepath.Base(f.Name)), f.Raw, 0644); err != nil {
-			// 			return fmt.Errorf("failed to write file: %v", err)
-			// 		}
-			// 	}
-			// }
+			for _, f := range o.PostFiles() { // search in OTA post.bom files
+				if f.IsDir() {
+					continue
+				}
+				if re.MatchString(f.Name()) {
+					log.Warnf("'%s' most likely in payloadv2 files", f.Name())
+				}
+			}
 		}
 
 		return nil
