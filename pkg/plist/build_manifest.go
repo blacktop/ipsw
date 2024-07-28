@@ -151,6 +151,9 @@ func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
+		if _, ok := bID.Manifest["KernelCache"]; !ok {
+			continue
+		}
 		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string)) {
 			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string))
 		}
