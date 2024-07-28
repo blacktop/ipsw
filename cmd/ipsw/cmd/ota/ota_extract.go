@@ -80,6 +80,7 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Clean(viper.GetString("ota.extract.output"))
 		}
 
+		/* ALL FILES */
 		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
 			log.Info("Extracting All Files From OTA")
 			for _, f := range o.Files() {
@@ -108,6 +109,7 @@ var otaExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to write file: %v", err)
 				}
 			}
+			/* SINGLE FILE */
 		} else if len(args) > 1 {
 			f, err := o.Open(filepath.Clean(args[1]), decomp)
 			if err != nil {
@@ -126,6 +128,7 @@ var otaExtractCmd = &cobra.Command{
 			if _, err := io.Copy(out, f); err != nil {
 				return fmt.Errorf("failed to write file: %v", err)
 			}
+			/* PATTERN */
 		} else {
 			if !viper.IsSet("ota.extract.pattern") {
 				return fmt.Errorf("must provide a --pattern to match files")

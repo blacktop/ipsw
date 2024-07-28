@@ -81,9 +81,9 @@ func (e *Entry) String() string {
 		case Patch_C:
 			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
 		case Patch_Entry:
-			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x, in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, e.ESize, humanize.Bytes(uint64(e.ESize)))
+			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x (%s), in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, humanize.Bytes(uint64(e.Index)), e.ESize, humanize.Bytes(uint64(e.ESize)))
 		case Patch_Metadata:
-			return fmt.Sprintf("[%s    ] %s: size: %d", e.Type, e.PatchType, e.Size)
+			return fmt.Sprintf("[%s    ] %s: size: %#x (%s)", e.Type, e.PatchType, e.Size, humanize.Bytes(uint64(e.Size)))
 		case Patch_P:
 			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
 		case Patch_R:
@@ -577,6 +577,8 @@ func (y *YAA) FileSize() uint64 {
 func Parse(r io.ReadSeeker) (*YAA, error) {
 	yaa := &YAA{sr: r}
 
+	seen := make(map[string]int)
+
 	var magic uint32
 	var headerSize uint16
 
@@ -620,7 +622,23 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			}
 		}
 
+		// Added for NEW YOP format
+		if idx, ok := seen[ent.Path]; ok {
+			yaa.Entries[idx-1].Uid = ent.Uid
+			yaa.Entries[idx-1].Gid = ent.Gid
+			yaa.Entries[idx-1].Mod = ent.Mod
+			yaa.Entries[idx-1].Flag = ent.Flag
+			yaa.Entries[idx-1].Mtm = ent.Mtm
+			yaa.Entries[idx-1].Btm = ent.Btm
+			yaa.Entries[idx-1].Ctm = ent.Ctm
+			continue // skip duplicate
+		}
+
 		yaa.Entries = append(yaa.Entries, ent)
+		// add to seen
+		if len(ent.Path) > 0 {
+			seen[ent.Path] = len(yaa.Entries)
+		}
 	}
 
 	return yaa, nil
