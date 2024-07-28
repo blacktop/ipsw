@@ -88,7 +88,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 				ff, err := o.Open(f.Path())
 				if err != nil {
-					return fmt.Errorf("failed to open file in OTA: %v", err)
+					return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
 				}
 				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 					return fmt.Errorf("failed to create output directory: %v", err)
@@ -106,7 +106,7 @@ var otaExtractCmd = &cobra.Command{
 		} else if len(args) > 1 {
 			f, err := o.Open(filepath.Clean(args[1]))
 			if err != nil {
-				return fmt.Errorf("failed to open file in OTA: %v", err)
+				return fmt.Errorf("failed to open file '%s' in OTA: %v", filepath.Clean(args[1]), err)
 			}
 			fname := filepath.Join(output, filepath.Clean(args[1]))
 			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
@@ -137,7 +137,7 @@ var otaExtractCmd = &cobra.Command{
 				if re.MatchString(f.Path()) {
 					ff, err := o.Open(f.Path())
 					if err != nil {
-						return fmt.Errorf("failed to open file in OTA: %v", err)
+						return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
 					}
 					fname := filepath.Join(output, f.Path())
 					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {

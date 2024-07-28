@@ -403,6 +403,10 @@ func (f *File) Open() (io.ReadCloser, error) {
 			return nil, err
 		}
 		if _, err := zf.Read(mdata[:]); err != nil {
+			if err == io.EOF {
+				zf.Close()
+				return f.zfile.Open()
+			}
 			return nil, err
 		}
 		zf.Close()
@@ -428,6 +432,13 @@ func (f *File) Open() (io.ReadCloser, error) {
 		}
 	}
 	if _, err := f.entry.Read(mdata[:]); err != nil {
+		if err == io.EOF {
+			rc = &otaReader{
+				rc: io.NopCloser(bytes.NewReader([]byte{})),
+				f:  f,
+			}
+			return rc, nil
+		}
 		return nil, err
 	}
 	switch magic.Magic(binary.BigEndian.Uint32(mdata[:])) {
