@@ -45,17 +45,17 @@ import (
 )
 
 func init() {
-	otaLsCmd.AddCommand(otaLsPayloadCmd)
+	OtaCmd.AddCommand(otaPayloadCmd)
 
-	otaLsPayloadCmd.Flags().BoolP("files", "f", false, "Files only")
-	otaLsPayloadCmd.Flags().BoolP("dirs", "d", false, "Directories only")
+	otaPayloadCmd.Flags().BoolP("files", "f", false, "Files only")
+	otaPayloadCmd.Flags().BoolP("dirs", "d", false, "Directories only")
 
-	viper.BindPFlag("ota.ls.payload.files", otaLsPayloadCmd.Flags().Lookup("files"))
-	viper.BindPFlag("ota.ls.payload.dirs", otaLsPayloadCmd.Flags().Lookup("dirs"))
+	viper.BindPFlag("ota.ls.payload.files", otaPayloadCmd.Flags().Lookup("files"))
+	viper.BindPFlag("ota.ls.payload.dirs", otaPayloadCmd.Flags().Lookup("dirs"))
 }
 
-// otaLsPayloadCmd represents the payload command
-var otaLsPayloadCmd = &cobra.Command{
+// otaPayloadCmd represents the payload command
+var otaPayloadCmd = &cobra.Command{
 	Use:           "payload <PAYLOAD>|<OTA> <PAYLOAD>",
 	Aliases:       []string{"p"},
 	Short:         "List contents of a payloadv2 file",
