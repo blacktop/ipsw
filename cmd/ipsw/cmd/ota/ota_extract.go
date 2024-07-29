@@ -76,8 +76,6 @@ var otaExtractCmd = &cobra.Command{
 		// validate flags
 		if len(args) > 1 && viper.IsSet("ota.extract.pattern") {
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
-		} else if len(args) > 1 && (viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel")) {
-			return fmt.Errorf("cannot use both FILENAME and flag for --dyld or --kernel")
 		}
 
 		o, err := ota.Open(filepath.Clean(args[0]))
@@ -90,6 +88,11 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Clean(viper.GetString("ota.extract.output"))
 		}
 
+		/* DYLD_SHARED_CACHE */
+		if viper.GetBool("ota.extract.dyld") {
+			log.Info("Extracting dyld_shared_cache Files")
+			return fmt.Errorf("--dyld extraction not implemented yet")
+		}
 		/* KERNELCACHE */
 		if viper.GetBool("ota.extract.kernel") {
 			re := regexp.MustCompile(`kernelcache.*$`)
@@ -124,8 +127,9 @@ var otaExtractCmd = &cobra.Command{
 					}
 				}
 			}
-			/* ALL FILES */
-		} else if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
+		}
+		/* ALL FILES */
+		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
 			log.Info("Extracting All Files From OTA")
 			for _, f := range o.Files() {
 				if f.IsDir() {
@@ -227,10 +231,6 @@ var otaExtractCmd = &cobra.Command{
 					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), output)
 				}
 			}
-			/* DYLD_SHARED_CACHE */
-		} else if viper.GetBool("ota.extract.dyld") {
-			log.Info("Extracting dyld_shared_cache Files")
-			return fmt.Errorf("--dyld extraction not implemented yet")
 		}
 
 		return nil
