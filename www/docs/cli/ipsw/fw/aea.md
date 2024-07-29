@@ -17,13 +17,14 @@ ipsw fw aea [flags]
 ### Options
 
 ```
-  -f, --fcs-key         Get fcs-key JSON
-  -h, --help            help for aea
-  -i, --info            Print info
-  -k, --key             Get archive decryption key
-  -o, --output string   Folder to extract files to
-  -p, --pem string      AEA private_key.pem file
-      --pem-db string   AEA pem DB JSON file
+  -f, --fcs-key          Get fcs-key JSON
+  -h, --help             help for aea
+  -i, --info             Print info
+  -k, --key              Get archive decryption key
+  -b, --key-val string   Base64 encoded symmetric encryption key
+  -o, --output string    Folder to extract files to
+  -p, --pem string       AEA private_key.pem file
+      --pem-db string    AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands

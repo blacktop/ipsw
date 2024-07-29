@@ -36,4 +36,5 @@ ipsw ota [flags]
 * [ipsw ota info](/docs/cli/ipsw/ota/info)	 - Display OTA metadata
 * [ipsw ota ls](/docs/cli/ipsw/ota/ls)	 - List OTA files
 * [ipsw ota patch](/docs/cli/ipsw/ota/patch)	 - Patch OTAs
+* [ipsw ota payload](/docs/cli/ipsw/ota/payload)	 - List contents of a payloadv2 file
 

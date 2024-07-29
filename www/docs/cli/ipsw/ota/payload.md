@@ -1,27 +1,25 @@
 ---
-id: ls
-title: ls
+id: payload
+title: payload
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List OTA files
+sidebar_label: payload
+description: List contents of a payloadv2 file
 ---
-## ipsw ota ls
+## ipsw ota payload
 
-List OTA files
+List contents of a payloadv2 file
 
 ```
-ipsw ota ls <OTA> [flags]
+ipsw ota payload <PAYLOAD>|<OTA> <PAYLOAD> [flags]
 ```
 
 ### Options
 
 ```
-  -b, --bom              List the post.bom files
-  -h, --help             help for ls
-  -j, --json             Output in JSON format
-  -r, --pattern string   Regex pattern to match payloadv2 files
-  -p, --payload          List the payloadv2 files
+  -d, --dirs    Directories only
+  -f, --files   Files only
+  -h, --help    help for payload
 ```
 
 ### Options inherited from parent commands
