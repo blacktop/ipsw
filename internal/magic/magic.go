@@ -174,6 +174,18 @@ func IsZip(filePath string) (bool, error) {
 		return false, nil
 	}
 }
+func IsZipData(r io.Reader) (bool, error) {
+	magic := make([]byte, 4)
+	if _, err := r.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	switch Magic(binary.BigEndian.Uint32(magic[:])) {
+	case MagicZip:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
 
 func IsPBZX(filePath string) (bool, error) {
 	f, err := os.Open(filePath)
