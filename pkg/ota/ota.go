@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -62,18 +60,6 @@ type entry struct {
 	Perms                 uint16
 	//  char name[0];
 	// Followed by file contents
-}
-
-func sortFileBySize(files []*zip.File) {
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].UncompressedSize64 > files[j].UncompressedSize64
-	})
-}
-
-func sortFileByNameAscend(files []*zip.File) {
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name < files[j].Name
-	})
 }
 
 // ListZip lists the files in the OTA zip file
@@ -155,98 +141,13 @@ func parseBOMFromZip(zr *zip.Reader, bomPathPattern string) ([]os.FileInfo, erro
 	return nil, fmt.Errorf("post.bom not found in zip")
 }
 
-// func parseBOMFromZip(zr *zip.Reader, bomPathPattern string) ([]os.FileInfo, error) {
-// 	var validPostBOM = regexp.MustCompile(bomPathPattern)
-
-// 	for _, f := range zr.File {
-// 		if validPostBOM.MatchString(f.Name) {
-// 			r, err := f.Open()
-// 			if err != nil {
-// 				return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-// 			}
-// 			bomData := make([]byte, f.UncompressedSize64)
-// 			io.ReadFull(r, bomData)
-// 			r.Close()
-// 			bm, err := bom.New(bytes.NewReader(bomData))
-// 			if err != nil {
-// 				return nil, fmt.Errorf("failed to parse bom: %v", err)
-// 			}
-// 			return bm.GetPaths()
-// 		}
-// 	}
-
-// 	return nil, fmt.Errorf("post.bom not found in zip")
-// }
-
-// Extract extracts and decompresses OTA payload files
-func Extract(otaZIP, extractPattern, folder string) error {
-	// open the OTA ZIP file
-	zr, err := zip.OpenReader(otaZIP)
-	if err != nil {
-		return errors.Wrap(err, "failed to open ota zip")
-	}
-	defer zr.Close()
-
-	if err := os.MkdirAll(folder, 0750); err != nil {
-		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
-	}
-
-	re, err := regexp.Compile(extractPattern)
-	if err != nil {
-		return fmt.Errorf("failed to compile extract regex pattern: %v", err)
-	}
-
-	// check for matches in the OTA zip
-	utils.Indent(log.Info, 2)("Searching in OTA zip files...")
-	if _, err := utils.SearchZip(zr.File, re, folder, false, false); err != nil {
-		log.Errorf("failed to find in OTA zip: %v", err)
-	}
-
-	if runtime.GOOS == "darwin" {
-		utils.Indent(log.Info, 2)("Searching in OTA cryptexes files...")
-		if err := ExtractFromCryptexes(zr, extractPattern, folder, func(string) bool { return false }); err != nil {
-			log.Errorf("failed to find in OTA cryptexes: %v", err)
-		}
-	} else {
-		utils.Indent(log.Warn, 2)("Skipping searching OTA cryptexes files... (macOS only)")
-	}
-
-	utils.Indent(log.Info, 2)("Searching in OTA payload files...")
-
-	// hack: to get a priori list of files to extract (so we know when to stop)
-	// this prevents us from having to parse ALL the payload.0?? files
-	rfiles, err := parseBOMFromZip(&zr.Reader, `post.bom$`)
-	if err != nil {
-		return fmt.Errorf("failed to list remote OTA files: %v", err)
-	}
-	var matches []string
-	for _, rf := range rfiles {
-		if !rf.IsDir() {
-			if re.MatchString(rf.Name()) {
-				matches = append(matches, rf.Name())
-			}
-		}
-	}
-	return parsePayload(&zr.Reader, extractPattern, folder, func(path string) bool {
-		i := 0
-		for _, v := range matches {
-			if !strings.HasSuffix(path, v) {
-				matches[i] = v
-				i++
-			}
-		}
-		matches = matches[:i]
-		return len(matches) == 0 // stop if we've extracted all matches
-	})
-}
-
 // RemoteExtract extracts and decompresses remote OTA payload files
 func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop func(string) bool) ([]string, error) {
 	var outfiles []string
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
 
 	// sortFileBySize(zr.File)
-	sortFileByNameAscend(zr.File)
+	// sortFileByNameAscend(zr.File)
 
 	found := false
 	for _, f := range zr.File {
@@ -366,37 +267,6 @@ func ExtractFromCryptexes(zr *zip.ReadCloser, extractPattern, destPath string, s
 	}
 
 	return fmt.Errorf("'%s' not found", extractPattern)
-}
-
-func parsePayload(zr *zip.Reader, extractPattern, folder string, shouldStop func(string) bool) error {
-	var validPayload = regexp.MustCompile(`payload.0\d+$`)
-
-	// sortFileBySize(zr.File)
-	// sortFileByNameAscend(zr.File)
-
-	found := false
-	for _, f := range zr.File {
-		if validPayload.MatchString(f.Name) {
-			utils.Indent(log.WithFields(log.Fields{
-				"filename": f.Name,
-				"size":     humanize.Bytes(f.UncompressedSize64),
-			}).Debug, 2)("Processing OTA payload")
-			goteet, path, err := Parse(f, folder, extractPattern)
-			if err != nil {
-				log.Error(err.Error())
-			}
-			if goteet {
-				found = true
-				if shouldStop(path) {
-					return nil
-				}
-			}
-		}
-	}
-	if found {
-		return nil
-	}
-	return fmt.Errorf("no payload files matched '%s'", extractPattern)
 }
 
 // Parse parses a ota payload file inside the zip

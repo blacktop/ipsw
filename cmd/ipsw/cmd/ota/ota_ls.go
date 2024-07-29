@@ -40,8 +40,15 @@ import (
 func init() {
 	OtaCmd.AddCommand(otaLsCmd)
 
+	otaLsCmd.Flags().BoolP("payload", "p", false, "List the payloadv2 files")
+	otaLsCmd.Flags().StringP("pattern", "r", "", "Regex pattern to match payloadv2 files")
 	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
+	otaLsCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
+	otaLsCmd.MarkFlagsMutuallyExclusive("payload", "bom")
+	viper.BindPFlag("ota.ls.pattern", otaLsCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("ota.ls.payload", otaLsCmd.Flags().Lookup("payload"))
 	viper.BindPFlag("ota.ls.bom", otaLsCmd.Flags().Lookup("bom"))
+	viper.BindPFlag("ota.ls.json", otaLsCmd.Flags().Lookup("json"))
 }
 
 // otaLsCmd represents the ls command
@@ -65,10 +72,17 @@ var otaLsCmd = &cobra.Command{
 		}
 		defer ota.Close()
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 
-		if viper.GetBool("ota.ls.bom") {
+		/* PAYLOAD FILES */
+		if viper.GetBool("ota.ls.payload") {
 			fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+			w.Flush()
+			return ota.PayloadFiles(viper.GetString("ota.ls.pattern"), viper.GetBool("ota.ls.json"))
+		}
+		/* BOM FILES */
+		if viper.GetBool("ota.ls.bom") {
+			fmt.Fprintf(w, "\n- [ BOM FILES        ] %s\n\n", strings.Repeat("-", 50))
 			fmt.Fprintf(w, "      (OTA might not actually contain all these files if it is a partial update file)\n\n")
 			for _, f := range ota.PostFiles() {
 				if !f.IsDir() {
@@ -76,15 +90,17 @@ var otaLsCmd = &cobra.Command{
 				}
 			}
 			w.Flush()
-		} else {
-			fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
-			for _, f := range ota.Files() {
-				if !f.IsDir() {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Path()))
-				}
-			}
-			w.Flush()
+
+			return nil
 		}
+		/* OTA ASSETS FILES */
+		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range ota.Files() {
+			if !f.IsDir() {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Path()))
+			}
+		}
+		w.Flush()
 
 		return nil
 	},
