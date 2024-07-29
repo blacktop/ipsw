@@ -171,9 +171,11 @@ type AssetAudienceID struct {
 	Release  string `json:"release"`
 	Generic  string `json:"generic"`
 	Versions map[string]struct {
-		DeveloperBeta string `json:"developer-beta,omitempty"`
-		AppleSeedBeta string `json:"appleseed-beta,omitempty"`
-		PublicBeta    string `json:"public-beta,omitempty"`
+		DeveloperBeta   string `json:"developer-beta,omitempty"`
+		AppleSeedBeta   string `json:"appleseed-beta,omitempty"`
+		DeveloperBetaAI string `json:"developer-beta-ai,omitempty"`
+		AppleSeedBetaAI string `json:"appleseed-beta-a,omitempty"`
+		PublicBeta      string `json:"public-beta,omitempty"`
 	}
 }
 
@@ -336,6 +338,8 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 					return []string{
 						assetAudienceDB["macos"].Versions[latest].DeveloperBeta,
 						assetAudienceDB["macos"].Versions[latest].AppleSeedBeta,
+						assetAudienceDB["macos"].Versions[latest].DeveloperBetaAI,
+						assetAudienceDB["macos"].Versions[latest].AppleSeedBetaAI,
 						assetAudienceDB["macos"].Versions[latest].PublicBeta,
 						assetAudienceDB["macos"].Generic}, nil
 				}
@@ -345,6 +349,8 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 						return []string{
 							v.DeveloperBeta,
 							v.AppleSeedBeta,
+							v.DeveloperBetaAI,
+							v.AppleSeedBetaAI,
 							v.PublicBeta}, nil
 					}
 				} else {
@@ -353,6 +359,8 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 						return []string{
 							v.DeveloperBeta,
 							v.AppleSeedBeta,
+							v.DeveloperBetaAI,
+							v.AppleSeedBetaAI,
 							v.PublicBeta}, nil
 					}
 				}
@@ -382,6 +390,8 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 					return []string{
 						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
 						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
+						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBetaAI,
+						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBetaAI,
 						assetAudienceDB[o.Config.Platform].Versions[latest].PublicBeta,
 						assetAudienceDB[o.Config.Platform].Generic}, nil
 				}
