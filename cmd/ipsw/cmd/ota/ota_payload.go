@@ -50,8 +50,8 @@ func init() {
 	otaPayloadCmd.Flags().BoolP("files", "f", false, "Files only")
 	otaPayloadCmd.Flags().BoolP("dirs", "d", false, "Directories only")
 
-	viper.BindPFlag("ota.ls.payload.files", otaPayloadCmd.Flags().Lookup("files"))
-	viper.BindPFlag("ota.ls.payload.dirs", otaPayloadCmd.Flags().Lookup("dirs"))
+	viper.BindPFlag("ota.payload.files", otaPayloadCmd.Flags().Lookup("files"))
+	viper.BindPFlag("ota.payload.dirs", otaPayloadCmd.Flags().Lookup("dirs"))
 }
 
 // otaPayloadCmd represents the payload command
@@ -69,7 +69,7 @@ var otaPayloadCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		if viper.GetBool("ota.ls.payload.files") && viper.GetBool("ota.ls.payload.dirs") {
+		if viper.GetBool("ota.payload.files") && viper.GetBool("ota.payload.dirs") {
 			return fmt.Errorf("cannot use both --files and --dirs flags")
 		}
 
@@ -146,9 +146,9 @@ var otaPayloadCmd = &cobra.Command{
 					fmt.Fprintf(w, "%s\n", colorModTime(f.String()))
 				}
 			} else {
-				if viper.GetBool("ota.ls.payload.files") && f.Type != yaa.RegularFile {
+				if viper.GetBool("ota.payload.files") && f.Type != yaa.RegularFile {
 					continue
-				} else if viper.GetBool("ota.ls.payload.dirs") && f.Type != yaa.Directory {
+				} else if viper.GetBool("ota.payload.dirs") && f.Type != yaa.Directory {
 					continue
 				}
 				if f.Path == "" {
