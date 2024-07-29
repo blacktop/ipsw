@@ -173,10 +173,7 @@ var otaExtractCmd = &cobra.Command{
 				return fmt.Errorf("failed to write file: %v", err)
 			}
 			/* PATTERN */
-		} else {
-			if !viper.IsSet("ota.extract.pattern") {
-				return fmt.Errorf("must provide a --pattern to match files")
-			}
+		} else if viper.IsSet("ota.extract.pattern") {
 			re, err := regexp.Compile(viper.GetString("ota.extract.pattern"))
 			if err != nil {
 				return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
@@ -230,6 +227,10 @@ var otaExtractCmd = &cobra.Command{
 					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), output)
 				}
 			}
+			/* DYLD_SHARED_CACHE */
+		} else if viper.GetBool("ota.extract.dyld") {
+			log.Info("Extracting dyld_shared_cache Files")
+			return fmt.Errorf("--dyld extraction not implemented yet")
 		}
 
 		return nil
