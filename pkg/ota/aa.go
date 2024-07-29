@@ -5,23 +5,32 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
+	"github.com/dustin/go-humanize"
+	"golang.org/x/exp/maps"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/execabs"
 )
 
 type File struct {
@@ -48,6 +57,9 @@ type Reader struct {
 	fileListOnce sync.Once
 	fileList     []*File
 	bomFiles     []fs.FileInfo
+
+	payloadMapOnce sync.Once
+	payloadMap     map[string]string
 }
 
 type AA struct {
@@ -278,6 +290,65 @@ func (r *Reader) initFileList() (ferr error) {
 	return ferr
 }
 
+func (r *Reader) initPayloadMap() (perr error) {
+	r.payloadMapOnce.Do(func() {
+		pre := regexp.MustCompile(`^payload.\d+$`)
+		r.payloadMap = make(map[string]string)
+		hdr := make([]byte, binary.Size(pbzx.Header{}))
+		var pbuf bytes.Buffer
+		for _, file := range r.Files() {
+			if file.isDir {
+				continue
+			}
+			if pre.MatchString(file.Name()) {
+				f, err := r.Open(file.Path(), false)
+				if err != nil {
+					perr = err
+					return
+				}
+				defer f.Close()
+				var header pbzx.Header
+				if err := binary.Read(f, binary.BigEndian, &header); err != nil {
+					perr = fmt.Errorf("failed to read pbzx header: %v", err)
+					return
+				}
+				if err := binary.Write(bytes.NewBuffer(hdr[:0]), binary.BigEndian, &header); err != nil {
+					perr = fmt.Errorf("failed to write pbzx header: %v", err)
+					return
+				}
+				cache := make([]byte, header.DeflateSize)
+				if _, err := f.Read(cache); err != nil {
+					perr = fmt.Errorf("failed to read pbzx block: %v", err)
+					return
+				}
+				block := make([]byte, len(hdr)+int(header.DeflateSize))
+				copy(block, hdr)
+				copy(block[len(hdr):], cache)
+				if err := pbzx.Extract(context.Background(), bytes.NewReader(block), &pbuf, runtime.NumCPU()); err != nil {
+					perr = err
+					return
+				}
+				aa, err := yaa.Parse(bytes.NewReader(pbuf.Bytes()))
+				if err != nil {
+					if !errors.Is(err, io.ErrUnexpectedEOF) {
+						perr = fmt.Errorf("failed to parse payload: %v", err)
+						return
+					}
+				}
+				for _, entry := range aa.Entries {
+					if entry.Type == yaa.RegularFile && entry.Path != "" && entry.Size > 0 {
+						r.payloadMap[file.Name()] = entry.Path
+						pbuf.Reset()
+						break
+					}
+				}
+			}
+		}
+	})
+
+	return
+}
+
 func fileEntryLess(x, y string) bool {
 	xdir, xelem, _ := split(x)
 	ydir, yelem, _ := split(y)
@@ -292,6 +363,132 @@ func (r *Reader) Files() []*File {
 func (r *Reader) PostFiles() []fs.FileInfo {
 	r.initFileList()
 	return r.bomFiles
+}
+
+func (r *Reader) GetPayloadFiles(pattern, output string) error {
+	r.initFileList()
+	pre := regexp.MustCompile(`^payload.\d+$`)
+	eg, _ := errgroup.WithContext(context.Background())
+	for _, file := range r.Files() {
+		if file.isDir {
+			continue
+		}
+		if pre.MatchString(file.Name()) {
+			eg.Go(func() error {
+				f, err := r.Open(file.Path(), false)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				tmpdir, err := os.MkdirTemp("", "ota_payload_extract")
+				if err != nil {
+					return err
+				}
+				defer os.RemoveAll(tmpdir)
+				if err := aaExtractPattern(f, pattern, tmpdir); err != nil {
+					return err
+				}
+				if err := filepath.Walk(tmpdir, func(path string, f os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					if !f.IsDir() {
+						fname := filepath.Join(output, filepath.Clean(strings.TrimPrefix(path, tmpdir)))
+						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+							return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
+						}
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Name(), humanize.Bytes(uint64(f.Size())), fname))
+						if err := os.Rename(path, fname); err != nil {
+							return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, tmpdir), fname, err)
+						}
+					}
+					return nil
+				}); err != nil {
+					return fmt.Errorf("failed to read files in tmp folder: %v", err)
+				}
+				return nil
+			})
+		}
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Reader) PayloadFiles(pattern string, json bool) error {
+	r.initFileList()
+	pre := regexp.MustCompile(`^payload.\d+$`)
+	// TODO: add mutex around writing to stdout
+	eg, _ := errgroup.WithContext(context.Background())
+	for _, file := range r.Files() {
+		if file.isDir {
+			continue
+		}
+		if pre.MatchString(file.Name()) {
+			eg.Go(func() error {
+				f, err := r.Open(file.Path(), false)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				out, err := aaList(f, pattern, json)
+				if err != nil {
+					return err
+				}
+				if len(out) > 0 && out != "[]" {
+					fmt.Println(out)
+				}
+				return nil
+			})
+		}
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func aaList(in io.Reader, pattern string, json bool) (string, error) {
+	aaPath, err := execabs.LookPath("aa")
+	if err != nil {
+		return "", err
+	}
+
+	args := []string{"list", "-exclude-field", "all", "-include-field", "attr"}
+
+	if len(pattern) > 0 {
+		args = append(args, []string{"-include-regex", pattern}...)
+	}
+	if json {
+		args = append(args, []string{"-list-format", "json"}...)
+	}
+	if len(pattern) == 0 && !json {
+		args = append(args, "-v")
+	}
+
+	cmd := exec.Command(aaPath, args...)
+	cmd.Stdin = in
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v: %s", err, out)
+	}
+
+	return strings.TrimSpace(string(out)), nil
+}
+
+func aaExtractPattern(in io.Reader, pattern, output string) error {
+	aaPath, err := execabs.LookPath("aa")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(aaPath, "extract", "-d", output, "-include-regex", pattern)
+	cmd.Stdin = in
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+	return nil
 }
 
 // Open opens the named file in the ZIP archive,
@@ -313,6 +510,24 @@ func (r *Reader) Open(name string, decomp bool) (fs.File, error) {
 		return nil, err
 	}
 	return rc.(fs.File), nil
+}
+
+func (r *Reader) OpenInPayload(name string) (fs.File, error) {
+	if err := r.initPayloadMap(); err != nil {
+		return nil, err
+	}
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	payload := r.payloadLookuo(name)
+	if payload == "" {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	rc, err := r.Open(payload, true)
+	if err != nil {
+		return nil, err
+	}
+	return rc, nil
 }
 
 func split(name string) (dir, elem string, isDir bool) {
@@ -349,6 +564,24 @@ func (r *Reader) openLookup(name string) *File {
 		}
 	}
 	return nil
+}
+
+func (r *Reader) payloadLookuo(name string) string {
+	dir, elem, _ := split(name)
+	startFiles := maps.Values(r.payloadMap)
+	sort.Strings(startFiles)
+	i := sort.Search(len(startFiles), func(i int) bool {
+		idir, ielem, _ := split(startFiles[i])
+		return idir > dir || idir == dir && ielem >= elem
+	})
+	if i < len(startFiles) {
+		for k, v := range r.payloadMap {
+			if k == startFiles[i] {
+				return v
+			}
+		}
+	}
+	return ""
 }
 
 func (f *File) Name() string { _, elem, _ := split(f.name); return elem }

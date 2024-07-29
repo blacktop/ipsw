@@ -154,7 +154,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, fmt.Errorf("failed to read YAA header field: %w", err)
 		}
 
 		switch string(field[:3]) {
@@ -163,7 +163,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '1':
 				var etype byte
 				if etype, err = r.ReadByte(); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read TYP1 field: %w", err)
 				}
 				entry.Type = entryType(etype)
 			default:
@@ -174,11 +174,11 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case 'P':
 				var pathLength uint16
 				if err := binary.Read(r, binary.LittleEndian, &pathLength); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read PATP field: %w", err)
 				}
 				path := make([]byte, int(pathLength))
 				if err := binary.Read(r, binary.LittleEndian, &path); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read PATP path: %w", err)
 				}
 				entry.Path = string(path)
 			default:
@@ -189,11 +189,11 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case 'P':
 				var pathLength uint16
 				if err := binary.Read(r, binary.LittleEndian, &pathLength); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read LNKP field: %w", err)
 				}
 				path := make([]byte, int(pathLength))
 				if err := binary.Read(r, binary.LittleEndian, &path); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read LNKP path: %w", err)
 				}
 				entry.Link = string(path)
 			default:
@@ -206,12 +206,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read UID1 field: %w", err)
 				}
 				entry.Uid = uint16(dat)
 			case '2':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Uid); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read UID2 field: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("found unknown UID field: %s", string(field))
@@ -221,12 +221,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read GID1 field: %w", err)
 				}
 				entry.Gid = uint16(dat)
 			case '2':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Gid); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read GID2 field: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("found unknown UID field: %s", string(field))
@@ -236,7 +236,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '2':
 				var mod uint16
 				if err := binary.Read(r, binary.LittleEndian, &mod); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read MOD2 field: %w", err)
 				}
 				entry.Mod = fs.FileMode(mod)
 			default:
@@ -247,12 +247,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '1':
 				flag, err := r.ReadByte()
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read FLG1 field: %w", err)
 				}
 				entry.Flag = uint32(flag)
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Flag); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read FLG4 field: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("found unknown FLG field: %s", string(field))
@@ -263,16 +263,16 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				var secs int64
 				var nsecs int32
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read MTMT field: %w", err)
 				}
 				if err := binary.Read(r, binary.LittleEndian, &nsecs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read MTMT nsecs: %w", err)
 				}
 				entry.Mtm = time.Unix(secs, int64(nsecs))
 			case 'S':
 				var secs int64
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read MTMS field: %w", err)
 				}
 				entry.Mtm = time.Unix(secs, 0)
 			default:
@@ -284,16 +284,16 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				var secs int64
 				var nsecs int32
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read BTMT field: %w", err)
 				}
 				if err := binary.Read(r, binary.LittleEndian, &nsecs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read BTMT nsecs: %w", err)
 				}
 				entry.Btm = time.Unix(secs, int64(nsecs))
 			case 'S':
 				var secs int64
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read BTMS field: %w", err)
 				}
 				entry.Btm = time.Unix(secs, 0)
 			default:
@@ -305,16 +305,16 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				var secs int64
 				var nsecs int32
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read CTMT field: %w", err)
 				}
 				if err := binary.Read(r, binary.LittleEndian, &nsecs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read CTMT nsecs: %w", err)
 				}
 				entry.Ctm = time.Unix(secs, int64(nsecs))
 			case 'S':
 				var secs int64
 				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read CTMS field: %w", err)
 				}
 				entry.Ctm = time.Unix(secs, 0)
 			default:
@@ -324,12 +324,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case 'B':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Size); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read DATB field: %w", err)
 				}
 			case 'A':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read DATA field: %w", err)
 				}
 				entry.Size = uint32(dat)
 			default:
@@ -339,24 +339,24 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '8':
 				if err := binary.Read(r, binary.LittleEndian, &entry.ESize); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDX8 field: %w", err)
 				}
 			case '4':
 				var dat uint32
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDX4 field: %w", err)
 				}
 				entry.Index = uint64(dat)
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDX2 field: %w", err)
 				}
 				entry.Index = uint64(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDX1 field: %w", err)
 				}
 				entry.Index = uint64(dat)
 			default:
@@ -366,24 +366,24 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '8':
 				if err := binary.Read(r, binary.LittleEndian, &entry.ESize); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDZ8 field: %w", err)
 				}
 			case '4':
 				var dat uint32
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDZ4 field: %w", err)
 				}
 				entry.ESize = uint64(dat)
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDZ2 field: %w", err)
 				}
 				entry.ESize = uint64(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read IDZ1 field: %w", err)
 				}
 				entry.ESize = uint64(dat)
 			default:
@@ -393,18 +393,18 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Size); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read SIZ4 field: %w", err)
 				}
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read SIZ2 field: %w", err)
 				}
 				entry.Size = uint32(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read SIZ1 field: %w", err)
 				}
 				entry.Size = uint32(dat)
 			default:
@@ -414,18 +414,18 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Afr); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFR4 field: %w", err)
 				}
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFR2 field: %w", err)
 				}
 				entry.Afr = uint32(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFR1 field: %w", err)
 				}
 				entry.Afr = uint32(dat)
 			default:
@@ -435,18 +435,18 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Aft); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFT4 field: %w", err)
 				}
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFT2 field: %w", err)
 				}
 				entry.Aft = uint32(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read AFT1 field: %w", err)
 				}
 				entry.Aft = uint32(dat)
 			default:
@@ -456,18 +456,18 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Hlc); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLC4 field: %w", err)
 				}
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLC2 field: %w", err)
 				}
 				entry.Hlc = uint32(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLC1 field: %w", err)
 				}
 				entry.Hlc = uint32(dat)
 			default:
@@ -477,18 +477,18 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Hlo); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLO4 field: %w", err)
 				}
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLO2 field: %w", err)
 				}
 				entry.Hlo = uint32(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read HLO1 field: %w", err)
 				}
 				entry.Hlo = uint32(dat)
 			default:
@@ -498,7 +498,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			switch field[3] {
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Fli); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read FLI4 field: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("found unknown FLI field: %s", string(field))
@@ -508,7 +508,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case '1':
 				var ptype byte
 				if ptype, err = r.ReadByte(); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read YOP1 field: %w", err)
 				}
 				entry.PatchType = patchType(ptype)
 			default:
@@ -519,11 +519,11 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			case 'P':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read LBLP field: %w", err)
 				}
 				label := make([]byte, dat)
 				if err := binary.Read(r, binary.LittleEndian, &label); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read LBLP label: %w", err)
 				}
 				entry.Label = string(label)
 			default:
@@ -589,27 +589,27 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, fmt.Errorf("Parse: failed to read magic: %v", err)
+			return yaa, fmt.Errorf("Parse: failed to read magic: %w", err)
 		}
 
 		if magic != MagicYAA1 && magic != MagicAA01 {
 			return nil, ErrInvalidMagic
 		}
 		if err := binary.Read(r, binary.LittleEndian, &headerSize); err != nil {
-			return nil, fmt.Errorf("Parse: failed to read header size: %v", err)
+			return yaa, fmt.Errorf("Parse: failed to read header size: %w", err)
 		}
 		if headerSize <= 5 {
-			return nil, fmt.Errorf("Parse invalid header size: %d", headerSize)
+			return yaa, fmt.Errorf("Parse invalid header size: %d", headerSize)
 		}
 
 		header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
 		if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-			return nil, fmt.Errorf("Parse: failed to read header: %v", err)
+			return yaa, fmt.Errorf("Parse: failed to read header: %w", err)
 		}
 
 		ent, err = DecodeEntry(bytes.NewReader(header))
 		if err != nil {
-			return nil, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
+			return yaa, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
 		}
 
 		if ent.Type == RegularFile {
@@ -618,7 +618,7 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			ent.r = &r
 			// skip file data
 			if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
-				return nil, fmt.Errorf("Parse: failed to seek to next entry: %v", err)
+				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
 			}
 		}
 
