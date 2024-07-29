@@ -28,8 +28,10 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -43,12 +45,14 @@ func init() {
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
+	otaExtractCmd.Flags().BoolP("confirm", "u", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.extract.dyld", otaExtractCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("ota.extract.kernel", otaExtractCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("ota.extract.pattern", otaExtractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
+	viper.BindPFlag("ota.extract.confirm", otaExtractCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
 }
 
@@ -72,6 +76,8 @@ var otaExtractCmd = &cobra.Command{
 		// validate flags
 		if len(args) > 1 && viper.IsSet("ota.extract.pattern") {
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
+		} else if len(args) > 1 && (viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel")) {
+			return fmt.Errorf("cannot use both FILENAME and flag for --dyld or --kernel")
 		}
 
 		o, err := ota.Open(filepath.Clean(args[0]))
@@ -84,8 +90,42 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Clean(viper.GetString("ota.extract.output"))
 		}
 
-		/* ALL FILES */
-		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
+		/* KERNELCACHE */
+		if viper.GetBool("ota.extract.kernel") {
+			re := regexp.MustCompile(`kernelcache.*$`)
+			for _, f := range o.Files() { // search in OTA asset files
+				if f.IsDir() {
+					continue
+				}
+				if re.MatchString(f.Path()) {
+					ff, err := o.Open(f.Path(), false)
+					if err != nil {
+						return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+					}
+					data, err := io.ReadAll(ff)
+					if err != nil {
+						return fmt.Errorf("failed to read kernelcache: %v", err)
+					}
+					comp, err := kernelcache.ParseImg4Data(data)
+					if err != nil {
+						return fmt.Errorf("failed to parse kernelcache: %v", err)
+					}
+					kdata, err := kernelcache.DecompressData(comp)
+					if err != nil {
+						return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
+					}
+					fname := filepath.Join(output, f.Name())
+					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+						return fmt.Errorf("failed to create output directory: %v", err)
+					}
+					utils.Indent(log.Info, 2)(fname)
+					if err := os.WriteFile(fname, kdata, 0o644); err != nil {
+						return fmt.Errorf("failed to write kernelcache: %v", err)
+					}
+				}
+			}
+			/* ALL FILES */
+		} else if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
 			log.Info("Extracting All Files From OTA")
 			for _, f := range o.Files() {
 				if f.IsDir() {
@@ -166,16 +206,30 @@ var otaExtractCmd = &cobra.Command{
 					}
 				}
 			}
+			bomFound := false
 			for _, f := range o.PostFiles() { // search in OTA post.bom files
 				if f.IsDir() {
 					continue
 				}
 				if re.MatchString(f.Name()) {
 					utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", f.Name()))
+					bomFound = true
 				}
 			}
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
-			return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), output)
+			if bomFound {
+				cont := true
+				if !viper.GetBool("ota.extract.confirm") {
+					cont = false
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()),
+					}
+					survey.AskOne(prompt, &cont)
+				}
+				if cont {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
+					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), output)
+				}
+			}
 		}
 
 		return nil
