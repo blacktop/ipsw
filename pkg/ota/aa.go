@@ -81,6 +81,24 @@ func getKeyFromName(name string) (string, error) {
 	return key, nil
 }
 
+func NewOTA(r io.ReaderAt, size int64) (*AA, error) {
+	var err error
+	f := new(AA)
+	if f.isZip, err = magic.IsZipData(io.NewSectionReader(r, 0, 4)); err != nil {
+		return nil, err
+	} else if f.isZip { // check if file is a zip
+		f.isZip = true
+		if err := f.initZip(r, size); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := f.init(r, size); err != nil {
+			return nil, err
+		}
+	}
+	return f, nil
+}
+
 func Open(name string) (*AA, error) {
 	if isAEA, err := magic.IsAEA(name); err != nil {
 		return nil, err

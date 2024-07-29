@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
@@ -60,31 +59,6 @@ type entry struct {
 	Perms                 uint16
 	//  char name[0];
 	// Followed by file contents
-}
-
-// ListZip lists the files in the OTA zip file
-func ListZip(otaZIP string) ([]os.FileInfo, error) {
-	zr, err := zip.OpenReader(otaZIP)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open ota zip")
-	}
-	defer zr.Close()
-	return parseBOMFromZip(&zr.Reader, `payload.bom$`)
-}
-
-// List lists the files in the OTA payloads
-func List(ota string) ([]os.FileInfo, error) {
-	if ok, _ := magic.IsZip(ota); ok {
-		zr, err := zip.OpenReader(ota)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to open ota zip")
-		}
-		defer zr.Close()
-		return parseBOMFromZip(&zr.Reader, `post.bom$`)
-	} else {
-		// return parseBOMFromZip(&zr.Reader, `post.bom$`)
-	}
-	return nil, fmt.Errorf("not a zip file")
 }
 
 // RemoteList lists the files in a remote ota payloads
