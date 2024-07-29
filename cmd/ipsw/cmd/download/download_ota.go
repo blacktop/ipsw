@@ -363,6 +363,7 @@ var otaDLCmd = &cobra.Command{
 						Pattern:      remotePattern,
 						Proxy:        proxy,
 						Insecure:     insecure,
+						Arches:       dyldArches,
 						DriverKit:    dyldDriverKit,
 						KernelDevice: device,
 						Flatten:      flat,
