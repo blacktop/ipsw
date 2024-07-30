@@ -150,8 +150,7 @@ func deriveKey(inkey, salt, info []byte) ([]byte, error) {
 	return key, nil
 }
 
-func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader, out chan work) error {
-	defer close(out)
+func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader) error {
 	eg, _ := errgroup.WithContext(ctx)
 
 	segmentHeaderSize := checksumSize[rootHdr.Checksum] + 8
@@ -432,7 +431,7 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 	}
 	defer of.Close()
 
-	if err := decryptCluster(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr, dec); err != nil {
+	if err := decryptCluster(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr); err != nil {
 		log.WithError(err).Error("failed to decrypt cluster")
 	}
 
