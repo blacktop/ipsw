@@ -23,7 +23,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/lzfse-cgo"
-	"github.com/dustin/go-humanize"
 	"github.com/twmb/murmur3"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/sync/errgroup"
@@ -151,7 +150,7 @@ func deriveKey(inkey, salt, info []byte) ([]byte, error) {
 	return key, nil
 }
 
-func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader, out chan work) error {
+func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader, out chan work) error {
 	defer close(out)
 	eg, _ := errgroup.WithContext(ctx)
 
@@ -203,8 +202,6 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 		}
 		if !hmac.Equal(clusterMAC[:], shmac.Sum(nil)) {
 			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac.Sum(nil))
-		} else {
-			log.Debugf("Cluster %d HMAC OK", cindex)
 		}
 		segmentMACs := make([]HMAC, rootHdr.SegmentsPerCluster)
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
@@ -220,28 +217,27 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 		}
 
 		// decrypt segments
-		segments := make([][]byte, 256)
+		// segments := make([][]byte, rootHdr.SegmentsPerCluster)
 		for idx, seg := range segmentHdrs {
-			totalSize += uint64(seg.DecompressedSize)
 			if seg.DecompressedSize == 0 {
 				continue
 			}
+			totalSize += uint64(seg.DecompressedSize)
 			segmentData := make([]byte, seg.RawSize)
 			if _, err = r.Read(segmentData); err != nil {
 				return err
 			}
+			decomp := make([]byte, 0, seg.DecompressedSize)
 			func(index int, data []byte, size uint32) {
 				eg.Go(func() error {
-					info := new(bytes.Buffer)
-					if err := binary.Write(info, binary.LittleEndian, []byte(SegmentKeyInfo)); err != nil {
-						return err
-					}
-					if err := binary.Write(info, binary.LittleEndian, uint32(index)); err != nil {
-						return err
-					}
+					pos := int64(cindex)*int64(rootHdr.SegmentSize)*int64(rootHdr.SegmentsPerCluster) +
+						int64(index)*int64(rootHdr.SegmentSize)
 					var segmentKey headerKey
 					if err := binary.Read(
-						hkdf.New(sha256.New, clusterKey, []byte{}, info.Bytes()),
+						hkdf.New(sha256.New, clusterKey, []byte{}, binary.LittleEndian.AppendUint32(
+							[]byte(SegmentKeyInfo[:]),
+							uint32(index),
+						)),
 						binary.LittleEndian,
 						&segmentKey,
 					); err != nil {
@@ -264,82 +260,51 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 					if err != nil {
 						return err
 					}
-					if seg.DecompressedSize > seg.RawSize {
+					if seg.DecompressedSize == seg.RawSize { // no compression
+						if _, err := outfile.WriteAt(decryptedData, pos); err != nil {
+							return err
+						}
+					} else {
 						switch rootHdr.Compression {
 						case NONE:
-							log.WithFields(log.Fields{
-								"cluster": cindex,
-								"segment": index,
-								"size":    humanize.IBytes(uint64(len(decryptedData))),
-								"all":     len(decryptedData) == int(size),
-							}).Debug("NOCOMPRESS")
-							segments[index] = decryptedData
-							// <-decryptedData
+							decomp = decryptedData
 						case LZBITMAP:
-							var decomp []byte
 							lzfse.LzBitMapDecompress(decryptedData, decomp)
-							log.WithFields(log.Fields{
-								"cluster": cindex,
-								"segment": index,
-								"size":    humanize.IBytes(uint64(len(decomp))),
-								"all":     len(decomp) == int(size),
-							}).Debug("LZBITMAP")
-							segments[index] = decomp[:seg.DecompressedSize]
 						case LZFSE:
-							decomp := lzfse.DecodeBuffer(decryptedData)
-							log.WithFields(log.Fields{
-								"cluster": cindex,
-								"segment": index,
-								"size":    humanize.IBytes(uint64(len(decomp))),
-								"all":     len(decomp) == int(size),
-							}).Debug("LZFSE")
-							segments[index] = decomp[:seg.DecompressedSize]
+							decomp = lzfse.DecodeBuffer(decryptedData)
 						case LZMA:
-							var decomp []byte
 							lzfse.DecodeLZVNBuffer(decryptedData, decomp)
-							log.WithFields(log.Fields{
-								"cluster": cindex,
-								"segment": index,
-								"size":    humanize.IBytes(uint64(len(decomp))),
-								"all":     len(decomp) == int(size),
-							}).Debug("LZMA")
-							segments[index] = decomp[:seg.DecompressedSize]
 						case ZLIB:
 							zr, err := zlib.NewReader(bytes.NewReader(decryptedData))
 							if err != nil {
 								return err
 							}
-							segments[index], err = io.ReadAll(zr)
+							decomp, err = io.ReadAll(zr)
 							if err != nil {
 								return err
 							}
-							log.WithFields(log.Fields{
-								"cluster": cindex,
-								"segment": index,
-								"size":    humanize.IBytes(uint64(len(segments[index]))),
-								"all":     len(segments[index]) == int(size),
-							}).Debug("ZLIB")
-						// <-decomp
 						default:
 							// TODO: https://github.com/pierrec/lz4
 							// TODO: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
 							return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
 						}
-					} else { // no compression
-						segments[index] = decryptedData
-					}
-					switch rootHdr.Checksum {
-					case None:
-					case Sha256:
-						if sha256.Sum256(segments[index]) != seg.Checksum {
-							return fmt.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, sha256.Sum256(segments[index]))
+						switch rootHdr.Checksum {
+						case None:
+						case Sha256:
+							if sha256.Sum256(decomp) != seg.Checksum {
+								return fmt.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, sha256.Sum256(decomp))
+							}
+						case Murmur:
+							if murmur3.SeedSum64(0xE2236FDC26A5F6D2, decomp) != binary.LittleEndian.Uint64(seg.Checksum[:8]) {
+								return fmt.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, binary.LittleEndian.Uint64(seg.Checksum[:8]), murmur3.SeedSum64(0xE2236FDC26A5F6D2, decomp))
+							}
+						default:
+							return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
 						}
-					case Murmur:
-						if murmur3.SeedSum64(0xE2236FDC26A5F6D2, segments[index]) != binary.LittleEndian.Uint64(seg.Checksum[:8]) {
-							return fmt.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, murmur3.Sum64(segments[index]))
+						/* write decompressed data to file */
+						if _, err := outfile.WriteAt(decomp, pos); err != nil {
+							return err
 						}
-					default:
-						return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
 					}
 					return nil
 				})
@@ -350,7 +315,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 			return err
 		}
 
-		out <- work{ClusterIndex: cindex, Data: bytes.Join(segments, nil)}
+		// out <- work{ClusterIndex: cindex, Data: bytes.Join(segments, nil)}
 
 		clusterMAC = nextClusterMac
 		cindex++
@@ -466,32 +431,32 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 
 	dec := make(chan work) // decrypted data channel
 
-	go func() {
-		if err := decryptCluster(context.Background(), f, mainKey, encRootHdr.ClusterHmac, rootHdr, dec); err != nil {
-			log.WithError(err).Error("failed to decrypt cluster")
-		}
-	}()
-
 	of, err := os.Create(out)
 	if err != nil {
 		return "", err
 	}
 	defer of.Close()
 
-	total := 0
-	for d := range dec {
-		log.Debugf("Writing cluster %d", d.ClusterIndex)
-		if n, err := of.Write(d.Data); err != nil {
-			return "", err
-		} else {
-			log.Debugf("Wrote %s", humanize.Bytes(uint64(n)))
-			total += n
-		}
+	// go func() {
+	if err := decryptCluster(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr, dec); err != nil {
+		log.WithError(err).Error("failed to decrypt cluster")
 	}
-	log.Debugf("TOTAL: %s", humanize.Bytes(uint64(total)))
-	if total != int(rootHdr.FileSize) {
-		return "", fmt.Errorf("invalid file size: %d; expected %d", total, rootHdr.FileSize)
-	}
+	// }()
+
+	// total := 0
+	// for d := range dec {
+	// 	log.Debugf("Writing cluster %d", d.ClusterIndex)
+	// 	if n, err := of.Write(d.Data); err != nil {
+	// 		return "", err
+	// 	} else {
+	// 		log.Debugf("Wrote %s", humanize.Bytes(uint64(n)))
+	// 		total += n
+	// 	}
+	// }
+	// log.Debugf("TOTAL: %s", humanize.Bytes(uint64(total)))
+	// if total != int(rootHdr.FileSize) {
+	// 	return "", fmt.Errorf("invalid file size: %d; expected %d", total, rootHdr.FileSize)
+	// }
 	return out, nil
 }
 
