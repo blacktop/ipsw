@@ -1,5 +1,7 @@
 package aea
 
+//go:generate stringer -type=compressionType -output aea_string.go
+
 import (
 	"bytes"
 	"context"
@@ -282,18 +284,18 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 						segments[index] = decomp[:seg.DecompressedSize]
 					// <-decomp
 					default:
-						return fmt.Errorf("unsupported compression type: '%c'", rootHdr.Compression)
+						return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
 					}
 					switch rootHdr.Checksum {
 					case None:
 					case Sha256:
 						if sha256.Sum256(segments[index]) != seg.Checksum {
 							// FIXME: why is this happening?
-							log.Errorf("invalid checksum for cluster #%d: segment #%d: expected %x; got %x", cindex, index, seg.Checksum, sha256.Sum256(segments[index]))
+							log.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, sha256.Sum256(segments[index]))
 						}
 					case Murmur:
 						if murmur3.SeedSum64(0xE2236FDC26A5F6D2, segments[index]) != binary.LittleEndian.Uint64(seg.Checksum[:8]) {
-							return fmt.Errorf("invalid checksum for cluster #%d: segment #%d: expected %x; got %x", cindex, index, seg.Checksum, murmur3.Sum64(segments[index]))
+							log.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, murmur3.Sum64(segments[index]))
 						}
 					default:
 						return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
