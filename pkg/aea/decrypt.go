@@ -274,6 +274,10 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 						segments[index] = decryptedData
 						// <-decryptedData
 					case LZFSE:
+						if seg.DecompressedSize == seg.RawSize { // FIXME: why is this NONE ??
+							segments[index] = decryptedData
+							break
+						}
 						decomp := lzfse.DecodeBuffer(decryptedData)
 						log.WithFields(log.Fields{
 							"cluster": cindex,
@@ -290,12 +294,11 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 					case None:
 					case Sha256:
 						if sha256.Sum256(segments[index]) != seg.Checksum {
-							// FIXME: why is this happening?
-							log.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, sha256.Sum256(segments[index]))
+							return fmt.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, sha256.Sum256(segments[index]))
 						}
 					case Murmur:
 						if murmur3.SeedSum64(0xE2236FDC26A5F6D2, segments[index]) != binary.LittleEndian.Uint64(seg.Checksum[:8]) {
-							log.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, murmur3.Sum64(segments[index]))
+							return fmt.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", index, cindex, seg.Checksum, murmur3.Sum64(segments[index]))
 						}
 					default:
 						return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
