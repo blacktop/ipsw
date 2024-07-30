@@ -383,9 +383,12 @@ func (r *Reader) PostFiles() []fs.FileInfo {
 	return r.bomFiles
 }
 
-func (r *Reader) GetPayloadFiles(pattern, output string) error {
+func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 	r.initFileList()
 	pre := regexp.MustCompile(`^payload.\d+$`)
+	if payloadRange != "" {
+		pre = regexp.MustCompile(payloadRange)
+	}
 	eg, _ := errgroup.WithContext(context.Background())
 	for _, file := range r.Files() {
 		if file.isDir {

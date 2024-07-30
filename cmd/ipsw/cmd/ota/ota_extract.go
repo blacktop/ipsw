@@ -44,15 +44,17 @@ func init() {
 	otaExtractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache files")
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
+	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern control the payloadv2 file range to search")
+	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
-	otaExtractCmd.Flags().BoolP("confirm", "u", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.extract.dyld", otaExtractCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("ota.extract.kernel", otaExtractCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("ota.extract.pattern", otaExtractCmd.Flags().Lookup("pattern"))
-	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
+	viper.BindPFlag("ota.extract.range", otaExtractCmd.Flags().Lookup("range"))
 	viper.BindPFlag("ota.extract.confirm", otaExtractCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
 	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
 }
 
@@ -228,7 +230,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 				if cont {
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
-					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), output)
+					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), viper.GetString("ota.extract.range"), output)
 				}
 			}
 		}
