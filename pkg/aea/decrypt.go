@@ -477,8 +477,8 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 	}
 
-	if true {
-		// if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
+	// if true {
+	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
