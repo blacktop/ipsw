@@ -21,18 +21,21 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/lzfse-cgo"
 	"github.com/dustin/go-humanize"
+	"github.com/twmb/murmur3"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	Magic                      = "AEA1"
-	MainKeyInfo                = "AEA_AMK"
-	RootHeaderEncryptedKeyInfo = "AEA_RHEK"
-	ClusterKeyInfo             = "AEA_CK"
-	ClusterKeyMaterialInfo     = "AEA_CHEK"
-	SegmentKeyInfo             = "AEA_SK"
-	PaddingKeyInfo             = "AEA_PAK"
+	Magic                                = "AEA1"
+	MainKeyInfo                          = "AEA_AMK"
+	RootHeaderEncryptedKeyInfo           = "AEA_RHEK"
+	ClusterKeyInfo                       = "AEA_CK"
+	ClusterKeyMaterialInfo               = "AEA_CHEK"
+	SegmentKeyInfo                       = "AEA_SK"
+	SignatureEncryptionDerivationKeyInfo = "AEA_SEK"
+	SignatureEncryptionKeyInfo           = "AEA_SEK2"
+	PaddingKeyInfo                       = "AEA_PAK"
 )
 
 type profileType uint32
@@ -289,7 +292,9 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 							log.Errorf("invalid checksum for cluster #%d: segment #%d: expected %x; got %x", cindex, index, seg.Checksum, sha256.Sum256(segments[index]))
 						}
 					case Murmur:
-						fallthrough // TODO: implement murmur checksum
+						if murmur3.SeedSum64(0xE2236FDC26A5F6D2, segments[index]) != binary.LittleEndian.Uint64(seg.Checksum[:8]) {
+							return fmt.Errorf("invalid checksum for cluster #%d: segment #%d: expected %x; got %x", cindex, index, seg.Checksum, murmur3.Sum64(segments[index]))
+						}
 					default:
 						return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
 					}
