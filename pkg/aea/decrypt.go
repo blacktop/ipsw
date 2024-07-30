@@ -272,7 +272,17 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 							"all":     len(decryptedData) == int(size),
 						}).Debug("NOCOMPRESS")
 						segments[index] = decryptedData
-						// <-decryptedData
+					// <-decryptedData
+					case LZMA:
+						var decomp []byte
+						lzfse.DecodeLZVNBuffer(decryptedData, decomp)
+						log.WithFields(log.Fields{
+							"cluster": cindex,
+							"segment": index,
+							"size":    humanize.IBytes(uint64(len(decomp))),
+							"all":     len(decomp) == int(size),
+						}).Debug("LZMA")
+						segments[index] = decomp[:seg.DecompressedSize]
 					case LZFSE:
 						if seg.DecompressedSize == seg.RawSize { // FIXME: why is this NONE ??
 							segments[index] = decryptedData
