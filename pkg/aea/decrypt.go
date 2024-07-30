@@ -264,69 +264,69 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 					if err != nil {
 						return err
 					}
-					switch rootHdr.Compression {
-					// TODO: https://github.com/pierrec/lz4
-					// TODO: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
-					case NONE:
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(decryptedData))),
-							"all":     len(decryptedData) == int(size),
-						}).Debug("NOCOMPRESS")
-						segments[index] = decryptedData
-						// <-decryptedData
-					case LZBITMAP:
-						var decomp []byte
-						lzfse.LzBitMapDecompress(decryptedData, decomp)
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(decomp))),
-							"all":     len(decomp) == int(size),
-						}).Debug("LZBITMAP")
-						segments[index] = decomp[:seg.DecompressedSize]
-					case LZFSE:
-						if seg.DecompressedSize == seg.RawSize { // FIXME: why is this NONE ??
+					if seg.DecompressedSize > seg.RawSize {
+						switch rootHdr.Compression {
+						case NONE:
+							log.WithFields(log.Fields{
+								"cluster": cindex,
+								"segment": index,
+								"size":    humanize.IBytes(uint64(len(decryptedData))),
+								"all":     len(decryptedData) == int(size),
+							}).Debug("NOCOMPRESS")
 							segments[index] = decryptedData
-							break
+							// <-decryptedData
+						case LZBITMAP:
+							var decomp []byte
+							lzfse.LzBitMapDecompress(decryptedData, decomp)
+							log.WithFields(log.Fields{
+								"cluster": cindex,
+								"segment": index,
+								"size":    humanize.IBytes(uint64(len(decomp))),
+								"all":     len(decomp) == int(size),
+							}).Debug("LZBITMAP")
+							segments[index] = decomp[:seg.DecompressedSize]
+						case LZFSE:
+							decomp := lzfse.DecodeBuffer(decryptedData)
+							log.WithFields(log.Fields{
+								"cluster": cindex,
+								"segment": index,
+								"size":    humanize.IBytes(uint64(len(decomp))),
+								"all":     len(decomp) == int(size),
+							}).Debug("LZFSE")
+							segments[index] = decomp[:seg.DecompressedSize]
+						case LZMA:
+							var decomp []byte
+							lzfse.DecodeLZVNBuffer(decryptedData, decomp)
+							log.WithFields(log.Fields{
+								"cluster": cindex,
+								"segment": index,
+								"size":    humanize.IBytes(uint64(len(decomp))),
+								"all":     len(decomp) == int(size),
+							}).Debug("LZMA")
+							segments[index] = decomp[:seg.DecompressedSize]
+						case ZLIB:
+							zr, err := zlib.NewReader(bytes.NewReader(decryptedData))
+							if err != nil {
+								return err
+							}
+							segments[index], err = io.ReadAll(zr)
+							if err != nil {
+								return err
+							}
+							log.WithFields(log.Fields{
+								"cluster": cindex,
+								"segment": index,
+								"size":    humanize.IBytes(uint64(len(segments[index]))),
+								"all":     len(segments[index]) == int(size),
+							}).Debug("ZLIB")
+						// <-decomp
+						default:
+							// TODO: https://github.com/pierrec/lz4
+							// TODO: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
+							return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
 						}
-						decomp := lzfse.DecodeBuffer(decryptedData)
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(decomp))),
-							"all":     len(decomp) == int(size),
-						}).Debug("LZFSE")
-						segments[index] = decomp[:seg.DecompressedSize]
-					case LZMA:
-						var decomp []byte
-						lzfse.DecodeLZVNBuffer(decryptedData, decomp)
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(decomp))),
-							"all":     len(decomp) == int(size),
-						}).Debug("LZMA")
-						segments[index] = decomp[:seg.DecompressedSize]
-					case ZLIB:
-						zr, err := zlib.NewReader(bytes.NewReader(decryptedData))
-						if err != nil {
-							return err
-						}
-						segments[index], err = io.ReadAll(zr)
-						if err != nil {
-							return err
-						}
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(segments[index]))),
-							"all":     len(segments[index]) == int(size),
-						}).Debug("ZLIB")
-					// <-decomp
-					default:
-						return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
+					} else { // no compression
+						segments[index] = decryptedData
 					}
 					switch rootHdr.Checksum {
 					case None:
@@ -524,8 +524,8 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 	}
 
-	// if true {
-	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
+	if true {
+		// if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
