@@ -163,7 +163,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 			return err
 		}
 
-		// read clusterHeader
+		// read segment headers
 		var clusterHeaderKey headerKey
 		if err := binary.Read(
 			hkdf.New(sha256.New, clusterKey, []byte{}, []byte(ClusterKeyMaterialInfo)),
@@ -172,8 +172,8 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 		); err != nil {
 			return err
 		}
-		segmmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
-		if _, err := r.Read(segmmentHdrData); err != nil {
+		encSegmmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
+		if _, err := r.Read(encSegmmentHdrData); err != nil {
 			return err
 		}
 		var nextClusterMac HMAC
@@ -189,7 +189,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 		if _, err := shmac.Write(slices.Concat(
 			ssalt,
 			binary.LittleEndian.AppendUint64(
-				[]byte(segmmentHdrData[:]),
+				[]byte(encSegmmentHdrData[:]),
 				uint64(len(ssalt)),
 			),
 		)); err != nil {
@@ -204,13 +204,12 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
 			return err
 		}
-		clusterHdrData, err := decryptCTR(segmmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
+		segmmentHdrData, err := decryptCTR(encSegmmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
 			return err
 		}
-		// read segment headers
 		segmentHdrs := make([]SegmentHeader, rootHdr.SegmentsPerCluster)
-		if err := binary.Read(bytes.NewReader(clusterHdrData), binary.LittleEndian, segmentHdrs); err != nil {
+		if err := binary.Read(bytes.NewReader(segmmentHdrData), binary.LittleEndian, segmentHdrs); err != nil {
 			return err
 		}
 
