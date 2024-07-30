@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -24,29 +26,96 @@ import (
 )
 
 const (
-	mainKeyInfo            = "AEA_AMK"
-	clusterKeyInfo         = "AEA_CK"
-	clusterKeyMaterialInfo = "AEA_CHEK"
-	segmentKeyInfo         = "AEA_SK"
+	Magic                      = "AEA1"
+	MainKeyInfo                = "AEA_AMK"
+	RootHeaderEncryptedKeyInfo = "AEA_RHEK"
+	ClusterKeyInfo             = "AEA_CK"
+	ClusterKeyMaterialInfo     = "AEA_CHEK"
+	SegmentKeyInfo             = "AEA_SK"
+	PaddingKeyInfo             = "AEA_PAK"
 )
 
-type clusterHeaderKey struct {
-	MAC [32]byte
+type profileType uint32
+
+const (
+	Signed                     profileType = 0
+	SymmetricEncryption        profileType = 1
+	SymmetricEncryptionSigned  profileType = 2
+	AsymmetricEncryption       profileType = 3
+	AsymmetricEncryptionSigned profileType = 4
+	PasswordEncryption         profileType = 5
+)
+
+type checksumType uint8
+
+const (
+	None   checksumType = 0
+	Murmur checksumType = 1
+	Sha256 checksumType = 2
+)
+
+var checksumSize = map[checksumType]uint32{
+	None:   0,
+	Murmur: 8,
+	Sha256: 32,
+}
+
+type compressionType uint8
+
+const (
+	NONE     compressionType = '-'
+	LZ4      compressionType = '4'
+	LZBITMAP compressionType = 'b'
+	LZFSE    compressionType = 'e'
+	LZVN     compressionType = 'f'
+	LZMA     compressionType = 'x'
+	ZLIB     compressionType = 'z'
+)
+
+type Header struct {
+	Magic                    [4]byte // AEA1
+	ProfileAndScryptStrength uint32
+	AuthDataLength           uint32
+}
+
+func (h Header) ProfileID() profileType {
+	return profileType(h.ProfileAndScryptStrength & 0xffffff)
+}
+func (h Header) ScryptStrength() uint8 {
+	return uint8(h.ProfileAndScryptStrength >> 24)
+}
+func (h Header) String() string {
+	return fmt.Sprintf("magic: %s profile: %d scrypt_strength: %d length: %#x", string(h.Magic[:]), h.ProfileID(), h.ScryptStrength(), h.AuthDataLength)
+}
+
+type HMAC [32]byte
+
+type encRootHeader struct {
+	Hmac        HMAC
+	Data        [48]byte
+	ClusterHmac HMAC
+}
+
+type RootHeader struct {
+	FileSize           uint64
+	EncyptedSize       uint64
+	SegmentSize        uint32
+	SegmentsPerCluster uint32
+	Compression        compressionType
+	Checksum           checksumType
+	_                  [22]byte // padding
+}
+
+type headerKey struct {
+	MAC HMAC
 	Key [32]byte
 	IV  [aes.BlockSize]byte
 }
 
-type segmentHeader struct {
+type SegmentHeader struct {
 	DecompressedSize uint32
 	RawSize          uint32
 	Checksum         [32]byte
-}
-
-type ClusterHeader struct {
-	NumSegments      uint32
-	DecompressedSize uint32
-	RawSize          uint32
-	Segments         []segmentHeader
 }
 
 type work struct {
@@ -64,64 +133,91 @@ func decryptCTR(ciphertext, key, iv []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan work) error {
+func deriveKey(inkey, salt, info []byte) ([]byte, error) {
+	key := make([]byte, len(inkey))
+	n, err := hkdf.New(sha256.New, inkey, salt, info).Read(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %v", err)
+	}
+	if n != len(key) {
+		return nil, fmt.Errorf("invalid key length: %d; expected %d", n, len(key))
+	}
+	return key, nil
+}
+
+func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader, out chan work) error {
 	defer close(out)
 	eg, _ := errgroup.WithContext(ctx)
 
-	data := make([]byte, 0x2800)
-	clusterKey := make([]byte, 32)
-
+	segmentHeaderSize := checksumSize[rootHdr.Checksum] + 8
 	cindex := uint32(0)
+	totalSize := uint64(0)
 
 	for {
-		info := new(bytes.Buffer)
-		if err := binary.Write(info, binary.LittleEndian, []byte(clusterKeyInfo)); err != nil {
+		clusterKey, err := deriveKey(mainKey, []byte{},
+			binary.LittleEndian.AppendUint32(
+				[]byte(ClusterKeyInfo),
+				uint32(cindex),
+			))
+		if err != nil {
 			return err
 		}
-		if err := binary.Write(info, binary.LittleEndian, uint32(cindex)); err != nil {
-			return err
-		}
-		if n, err := hkdf.New(sha256.New, key, []byte{}, info.Bytes()).Read(clusterKey); n != 32 || err != nil {
-			return err
-		}
+
 		// read clusterHeader
-		var chkey clusterHeaderKey
+		var clusterHeaderKey headerKey
 		if err := binary.Read(
-			hkdf.New(sha256.New, clusterKey, []byte{}, []byte(clusterKeyMaterialInfo)),
+			hkdf.New(sha256.New, clusterKey, []byte{}, []byte(ClusterKeyMaterialInfo)),
 			binary.LittleEndian,
-			&chkey,
+			&clusterHeaderKey,
 		); err != nil {
 			return err
 		}
-
-		n, err := r.Read(data)
+		segmmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
+		if _, err := r.Read(segmmentHdrData); err != nil {
+			return err
+		}
+		var nextClusterMac HMAC
+		if err := binary.Read(r, binary.LittleEndian, &nextClusterMac); err != nil {
+			return err
+		}
+		segmentMacData := make([]byte, 32*rootHdr.SegmentsPerCluster)
+		if _, err := r.Read(segmentMacData); err != nil {
+			return err
+		}
+		shmac := hmac.New(sha256.New, clusterHeaderKey.MAC[:])
+		ssalt := slices.Concat(nextClusterMac[:], segmentMacData)
+		if _, err := shmac.Write(slices.Concat(
+			ssalt,
+			binary.LittleEndian.AppendUint64(
+				[]byte(segmmentHdrData[:]),
+				uint64(len(ssalt)),
+			),
+		)); err != nil {
+			return err
+		}
+		if !hmac.Equal(clusterMAC[:], shmac.Sum(nil)) {
+			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac.Sum(nil))
+		} else {
+			log.Debugf("Cluster %d HMAC OK", cindex)
+		}
+		segmentMACs := make([]HMAC, rootHdr.SegmentsPerCluster)
+		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
+			return err
+		}
+		clusterHdrData, err := decryptCTR(segmmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			return err
-		} else if n < 0x2800 {
-			return fmt.Errorf("invalid cluster header size: %#x; expected 0x2800", n)
+		}
+		// read segment headers
+		segmentHdrs := make([]SegmentHeader, rootHdr.SegmentsPerCluster)
+		if err := binary.Read(bytes.NewReader(clusterHdrData), binary.LittleEndian, segmentHdrs); err != nil {
+			return err
 		}
 
-		r.Seek(0x20, io.SeekCurrent)   // maybe cluster header auth tag?
-		r.Seek(0x2000, io.SeekCurrent) // per-segment auth tags
-
-		clusterHdrData, err := decryptCTR(data, chkey.Key[:], chkey.IV[:])
-		if err != nil {
-			return err
-		}
-		var hdr ClusterHeader
-		hdr.Segments = make([]segmentHeader, 256)
-		if err := binary.Read(bytes.NewReader(clusterHdrData), binary.LittleEndian, hdr.Segments); err != nil {
-			return err
-		}
-		if hdr.Segments[0].DecompressedSize > 0x100000 {
-			break // TODO: RE last cluster
-		}
 		// decrypt segments
 		segments := make([][]byte, 256)
-		for idx, seg := range hdr.Segments {
+		for idx, seg := range segmentHdrs {
+			totalSize += uint64(seg.DecompressedSize)
 			if seg.DecompressedSize == 0 {
 				continue
 			}
@@ -132,13 +228,13 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 			func(index int, data []byte, size uint32) {
 				eg.Go(func() error {
 					info := new(bytes.Buffer)
-					if err := binary.Write(info, binary.LittleEndian, []byte(segmentKeyInfo)); err != nil {
+					if err := binary.Write(info, binary.LittleEndian, []byte(SegmentKeyInfo)); err != nil {
 						return err
 					}
 					if err := binary.Write(info, binary.LittleEndian, uint32(index)); err != nil {
 						return err
 					}
-					var segmentKey clusterHeaderKey
+					var segmentKey headerKey
 					if err := binary.Read(
 						hkdf.New(sha256.New, clusterKey, []byte{}, info.Bytes()),
 						binary.LittleEndian,
@@ -146,21 +242,25 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 					); err != nil {
 						return err
 					}
+					shmac := hmac.New(sha256.New, segmentKey.MAC[:])
+					if _, err := shmac.Write(slices.Concat(
+						[]byte{},
+						binary.LittleEndian.AppendUint64(
+							[]byte(data[:]),
+							uint64(len([]byte{})),
+						),
+					)); err != nil {
+						return err
+					}
+					if !hmac.Equal(segmentMACs[index][:], shmac.Sum(nil)) {
+						return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", index, segmentMACs[index], shmac.Sum(nil))
+					}
 					decryptedData, err := decryptCTR(data, segmentKey.Key[:], segmentKey.IV[:])
 					if err != nil {
 						return err
 					}
-					if bytes.Contains(decryptedData[:4], []byte("bvx2")) {
-						decomp := lzfse.DecodeBuffer(decryptedData)
-						log.WithFields(log.Fields{
-							"cluster": cindex,
-							"segment": index,
-							"size":    humanize.IBytes(uint64(len(decomp))),
-							"all":     len(decomp) == int(size),
-						}).Debug("LZFSE")
-						segments[index] = decomp
-						// <-decomp
-					} else {
+					switch rootHdr.Compression {
+					case NONE:
 						log.WithFields(log.Fields{
 							"cluster": cindex,
 							"segment": index,
@@ -169,6 +269,30 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 						}).Debug("NOCOMPRESS")
 						segments[index] = decryptedData
 						// <-decryptedData
+					case LZFSE:
+						decomp := lzfse.DecodeBuffer(decryptedData)
+						log.WithFields(log.Fields{
+							"cluster": cindex,
+							"segment": index,
+							"size":    humanize.IBytes(uint64(len(decomp))),
+							"all":     len(decomp) == int(size),
+						}).Debug("LZFSE")
+						segments[index] = decomp[:seg.DecompressedSize]
+					// <-decomp
+					default:
+						return fmt.Errorf("unsupported compression type: '%c'", rootHdr.Compression)
+					}
+					switch rootHdr.Checksum {
+					case None:
+					case Sha256:
+						if sha256.Sum256(segments[index]) != seg.Checksum {
+							// FIXME: why is this happening?
+							log.Errorf("invalid checksum for cluster #%d: segment #%d: expected %x; got %x", cindex, index, seg.Checksum, sha256.Sum256(segments[index]))
+						}
+					case Murmur:
+						fallthrough // TODO: implement murmur checksum
+					default:
+						return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
 					}
 					return nil
 				})
@@ -181,13 +305,39 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, key []byte, out chan w
 
 		out <- work{ClusterIndex: cindex, Data: bytes.Join(segments, nil)}
 
+		clusterMAC = nextClusterMac
 		cindex++
+
+		if totalSize >= rootHdr.FileSize {
+			break
+		}
+	}
+
+	/* padding key */
+	var paddingKey headerKey
+	if err := binary.Read(
+		hkdf.New(sha256.New, mainKey, []byte{}, []byte(PaddingKeyInfo)),
+		binary.LittleEndian,
+		&paddingKey,
+	); err != nil {
+		return err
+	}
+	paddingData, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	phmac := hmac.New(sha256.New, paddingKey.MAC[:])
+	if _, err := phmac.Write(paddingData); err != nil {
+		return err
+	}
+	if !hmac.Equal(clusterMAC[:], phmac.Sum(nil)) {
+		return fmt.Errorf("invalid padding HMAC: %x; expected %x", phmac.Sum(nil), paddingKey.IV)
 	}
 
 	return nil
 }
 
-func aeaDecrypt(in, out string, akey []byte) (string, error) {
+func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 	f, err := os.Open(in)
 	if err != nil {
 		return "", err
@@ -199,35 +349,78 @@ func aeaDecrypt(in, out string, akey []byte) (string, error) {
 		return "", err
 	}
 
-	if string(hdr.Magic[:]) != "AEA1" {
-		return "", fmt.Errorf("invalid AEA header: found '%s' expected 'AEA1'", string(hdr.Magic[:]))
+	if string(hdr.Magic[:]) != Magic {
+		return "", fmt.Errorf("invalid AEA header: found '%s' expected '%s'", string(hdr.Magic[:]), Magic)
 	}
 
-	f.Seek(int64(hdr.Length), io.SeekCurrent)
+	if hdr.ProfileID() != SymmetricEncryption {
+		return "", fmt.Errorf("invalid profile: %d; expected %d", hdr.ProfileID(), SymmetricEncryption)
+	}
 
-	salt := make([]byte, 32)
-	if _, err := f.Read(salt); err != nil {
+	authData := make([]byte, hdr.AuthDataLength)
+	if _, err := f.Read(authData); err != nil {
 		return "", err
 	}
 
-	info := new(bytes.Buffer)
-	if err := binary.Write(info, binary.LittleEndian, []byte(mainKeyInfo)); err != nil {
-		return "", err
-	}
-	if err := binary.Write(info, binary.LittleEndian, uint32(1)); err != nil {
+	mainSalt := make([]byte, 32)
+	if _, err := f.Read(mainSalt); err != nil {
 		return "", err
 	}
 
-	key := make([]byte, len(akey))
-	if n, err := hkdf.New(sha256.New, akey, salt, info.Bytes()).Read(key); n != len(key) || err != nil {
+	/* main key */
+	mainKey, err := deriveKey(
+		symmetricKey,
+		mainSalt,
+		binary.LittleEndian.AppendUint32(
+			[]byte(MainKeyInfo),
+			hdr.ProfileAndScryptStrength,
+		))
+	if err != nil {
 		return "", err
 	}
 
-	f.Seek(0x70, io.SeekCurrent) // TODO: WAT is this?
+	var encRootHdr encRootHeader
+	if err := binary.Read(f, binary.LittleEndian, &encRootHdr); err != nil {
+		return "", err
+	}
 
-	dec := make(chan work)
+	/* root header */
+	var rootHdrKey headerKey
+	if err := binary.Read(
+		hkdf.New(sha256.New, mainKey, []byte{}, []byte(RootHeaderEncryptedKeyInfo)),
+		binary.LittleEndian,
+		&rootHdrKey,
+	); err != nil {
+		return "", err
+	}
+	// verify root header HMAC
+	rsalt := slices.Concat(encRootHdr.ClusterHmac[:], authData[:])
+	rhmac := hmac.New(sha256.New, rootHdrKey.MAC[:])
+	if _, err := rhmac.Write(slices.Concat(
+		rsalt,
+		binary.LittleEndian.AppendUint64(
+			[]byte(encRootHdr.Data[:]),
+			uint64(len(rsalt)),
+		),
+	)); err != nil {
+		return "", err
+	}
+	if !hmac.Equal(encRootHdr.Hmac[:], rhmac.Sum(nil)) {
+		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac.Sum(nil))
+	}
+	rootHdrData, err := decryptCTR(append(encRootHdr.Data[:], authData...), rootHdrKey.Key[:], rootHdrKey.IV[:])
+	if err != nil {
+		return "", err
+	}
+	var rootHdr RootHeader
+	if err := binary.Read(bytes.NewReader(rootHdrData), binary.LittleEndian, &rootHdr); err != nil {
+		return "", err
+	}
+
+	dec := make(chan work) // decrypted data channel
+
 	go func() {
-		if err := decryptCluster(context.Background(), f, key, dec); err != nil {
+		if err := decryptCluster(context.Background(), f, mainKey, encRootHdr.ClusterHmac, rootHdr, dec); err != nil {
 			log.WithError(err).Error("failed to decrypt cluster")
 		}
 	}()
@@ -244,12 +437,14 @@ func aeaDecrypt(in, out string, akey []byte) (string, error) {
 		if n, err := of.Write(d.Data); err != nil {
 			return "", err
 		} else {
-			log.Debugf("Wrote %s", humanize.IBytes(uint64(n)))
+			log.Debugf("Wrote %s", humanize.Bytes(uint64(n)))
 			total += n
 		}
 	}
-	log.Debugf("TOTAL: %s", humanize.IBytes(uint64(total)))
-
+	log.Debugf("TOTAL: %s", humanize.Bytes(uint64(total)))
+	if total != int(rootHdr.FileSize) {
+		return "", fmt.Errorf("invalid file size: %d; expected %d", total, rootHdr.FileSize)
+	}
 	return out, nil
 }
 
@@ -282,8 +477,8 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 	}
 
-	// if true {
-	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
+	if true {
+		// if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
