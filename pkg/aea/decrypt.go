@@ -4,6 +4,7 @@ package aea
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -264,6 +265,8 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 						return err
 					}
 					switch rootHdr.Compression {
+					// TODO: https://github.com/pierrec/lz4
+					// TODO: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
 					case NONE:
 						log.WithFields(log.Fields{
 							"cluster": cindex,
@@ -283,6 +286,16 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 							"all":     len(decomp) == int(size),
 						}).Debug("LZMA")
 						segments[index] = decomp[:seg.DecompressedSize]
+					case LZBITMAP:
+						var decomp []byte
+						lzfse.LzBitMapDecompress(decryptedData, decomp)
+						log.WithFields(log.Fields{
+							"cluster": cindex,
+							"segment": index,
+							"size":    humanize.IBytes(uint64(len(decomp))),
+							"all":     len(decomp) == int(size),
+						}).Debug("LZBITMAP")
+						segments[index] = decomp[:seg.DecompressedSize]
 					case LZFSE:
 						if seg.DecompressedSize == seg.RawSize { // FIXME: why is this NONE ??
 							segments[index] = decryptedData
@@ -296,6 +309,21 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, mainKey []byte, cluste
 							"all":     len(decomp) == int(size),
 						}).Debug("LZFSE")
 						segments[index] = decomp[:seg.DecompressedSize]
+					case ZLIB:
+						zr, err := zlib.NewReader(bytes.NewReader(decryptedData))
+						if err != nil {
+							return err
+						}
+						segments[index], err = io.ReadAll(zr)
+						if err != nil {
+							return err
+						}
+						log.WithFields(log.Fields{
+							"cluster": cindex,
+							"segment": index,
+							"size":    humanize.IBytes(uint64(len(segments[index]))),
+							"all":     len(segments[index]) == int(size),
+						}).Debug("ZLIB")
 					// <-decomp
 					default:
 						return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
