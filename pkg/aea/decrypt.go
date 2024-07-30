@@ -217,7 +217,6 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 		}
 
 		// decrypt segments
-		// segments := make([][]byte, rootHdr.SegmentsPerCluster)
 		for idx, seg := range segmentHdrs {
 			if seg.DecompressedSize == 0 {
 				continue
