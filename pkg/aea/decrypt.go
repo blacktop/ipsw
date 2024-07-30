@@ -123,11 +123,6 @@ type SegmentHeader struct {
 	Checksum         [32]byte
 }
 
-type work struct {
-	ClusterIndex uint32
-	Data         []byte
-}
-
 func decryptCTR(ciphertext, key, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
