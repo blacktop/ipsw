@@ -314,8 +314,6 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 			return err
 		}
 
-		// out <- work{ClusterIndex: cindex, Data: bytes.Join(segments, nil)}
-
 		clusterMAC = nextClusterMac
 		cindex++
 
@@ -428,34 +426,24 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 		return "", err
 	}
 
-	dec := make(chan work) // decrypted data channel
-
 	of, err := os.Create(out)
 	if err != nil {
 		return "", err
 	}
 	defer of.Close()
 
-	// go func() {
 	if err := decryptCluster(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr, dec); err != nil {
 		log.WithError(err).Error("failed to decrypt cluster")
 	}
-	// }()
 
-	// total := 0
-	// for d := range dec {
-	// 	log.Debugf("Writing cluster %d", d.ClusterIndex)
-	// 	if n, err := of.Write(d.Data); err != nil {
-	// 		return "", err
-	// 	} else {
-	// 		log.Debugf("Wrote %s", humanize.Bytes(uint64(n)))
-	// 		total += n
-	// 	}
-	// }
-	// log.Debugf("TOTAL: %s", humanize.Bytes(uint64(total)))
-	// if total != int(rootHdr.FileSize) {
-	// 	return "", fmt.Errorf("invalid file size: %d; expected %d", total, rootHdr.FileSize)
-	// }
+	finfo, err := of.Stat()
+	if err != nil {
+		return "", err
+	}
+	if int(finfo.Size()) != int(rootHdr.FileSize) {
+		return "", fmt.Errorf("invalid file size: %d; expected %d", finfo.Size(), rootHdr.FileSize)
+	}
+
 	return out, nil
 }
 
@@ -488,8 +476,8 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 	}
 
-	if true {
-		// if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
+	// if true {
+	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
