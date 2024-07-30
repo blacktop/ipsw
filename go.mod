@@ -1,8 +1,6 @@
 module github.com/blacktop/ipsw
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.22
 
 require (
 	github.com/99designs/keyring v1.2.2
@@ -36,7 +34,7 @@ require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
-	github.com/gomarkdown/markdown v0.0.0-20240723152757-afa4a469d4f9
+	github.com/gomarkdown/markdown v0.0.0-20240729215908-77f4768f716d
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.7.0
@@ -50,7 +48,8 @@ require (
 	github.com/spf13/cast v1.6.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/ulikunitz/xz v0.6.0-alpha.3.0.20240501181208-1e8b7722f248
+	github.com/twmb/murmur3 v1.1.8
+	github.com/ulikunitz/xz v0.6.0-alpha.3
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
 	github.com/vbauerster/mpb/v8 v8.7.5
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
@@ -88,7 +87,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic v1.11.9 // indirect
-	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -170,7 +169,6 @@ require (
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/twmb/murmur3 v1.1.8 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ulikunitz/lz v0.4.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
@@ -189,7 +187,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
-	modernc.org/libc v1.55.5 // indirect
+	modernc.org/libc v1.55.6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.31.1 // indirect
