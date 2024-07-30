@@ -26,12 +26,6 @@ const aeaBinPath = "/usr/bin/aea"
 //go:embed data/fcs-keys.gz
 var keyData []byte
 
-type Header struct {
-	Magic   [4]byte // AEA1
-	Version uint32
-	Length  uint32
-}
-
 type fcsResponse struct {
 	EncRequest string `json:"enc-request,omitempty"`
 	WrappedKey string `json:"wrapped-key,omitempty"`
@@ -227,7 +221,7 @@ func Info(in string) (Metadata, error) {
 	}
 
 	metadata = make(map[string][]byte)
-	mdr := io.NewSectionReader(f, int64(binary.Size(hdr)), int64(hdr.Length))
+	mdr := io.NewSectionReader(f, int64(binary.Size(hdr)), int64(hdr.AuthDataLength))
 
 	// parse key-value pairs
 	for {
