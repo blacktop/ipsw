@@ -145,7 +145,7 @@ func deriveKey(inkey, salt, info []byte) ([]byte, error) {
 	return key, nil
 }
 
-func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader) error {
+func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader) error {
 	eg, _ := errgroup.WithContext(ctx)
 
 	segmentHeaderSize := checksumSize[rootHdr.Checksum] + 8
@@ -159,7 +159,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 				uint32(cindex),
 			))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to derive cluster key: %v", err)
 		}
 
 		// read segment headers
@@ -169,19 +169,19 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 			binary.LittleEndian,
 			&clusterHeaderKey,
 		); err != nil {
-			return err
+			return fmt.Errorf("failed to derive cluster header key: %v", err)
 		}
 		encSegmmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
 		if _, err := r.Read(encSegmmentHdrData); err != nil {
-			return err
+			return fmt.Errorf("failed to read encrypted segment headers data: %v", err)
 		}
 		var nextClusterMac HMAC
 		if err := binary.Read(r, binary.LittleEndian, &nextClusterMac); err != nil {
-			return err
+			return fmt.Errorf("failed to read next cluster HMAC: %v", err)
 		}
 		segmentMacData := make([]byte, 32*rootHdr.SegmentsPerCluster)
 		if _, err := r.Read(segmentMacData); err != nil {
-			return err
+			return fmt.Errorf("failed to read segment HMAC data: %v", err)
 		}
 		shmac := hmac.New(sha256.New, clusterHeaderKey.MAC[:])
 		ssalt := slices.Concat(nextClusterMac[:], segmentMacData)
@@ -192,22 +192,22 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 				uint64(len(ssalt)),
 			),
 		)); err != nil {
-			return err
+			return fmt.Errorf("failed to write encrypted segment headers data HMAC: %v", err)
 		}
 		if !hmac.Equal(clusterMAC[:], shmac.Sum(nil)) {
 			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac.Sum(nil))
 		}
 		segmentMACs := make([]HMAC, rootHdr.SegmentsPerCluster)
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
-			return err
+			return fmt.Errorf("failed to read segment HMACs: %v", err)
 		}
 		segmmentHdrData, err := decryptCTR(encSegmmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to decrypt segment headers: %v", err)
 		}
 		segmentHdrs := make([]SegmentHeader, rootHdr.SegmentsPerCluster)
 		if err := binary.Read(bytes.NewReader(segmmentHdrData), binary.LittleEndian, segmentHdrs); err != nil {
-			return err
+			return fmt.Errorf("failed to read segment headers: %v", err)
 		}
 
 		// decrypt segments
@@ -218,7 +218,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 			totalSize += uint64(seg.DecompressedSize)
 			segmentData := make([]byte, seg.RawSize)
 			if _, err = r.Read(segmentData); err != nil {
-				return err
+				return fmt.Errorf("failed to read segment data: %v", err)
 			}
 			decomp := make([]byte, 0, seg.DecompressedSize)
 			func(index int, data []byte, size uint32) {
@@ -234,7 +234,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 						binary.LittleEndian,
 						&segmentKey,
 					); err != nil {
-						return err
+						return fmt.Errorf("failed to derive segment key: %v", err)
 					}
 					shmac := hmac.New(sha256.New, segmentKey.MAC[:])
 					if _, err := shmac.Write(slices.Concat(
@@ -244,18 +244,18 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 							uint64(len([]byte{})),
 						),
 					)); err != nil {
-						return err
+						return fmt.Errorf("failed to write encrypted segment data HMAC: %v", err)
 					}
 					if !hmac.Equal(segmentMACs[index][:], shmac.Sum(nil)) {
 						return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", index, segmentMACs[index], shmac.Sum(nil))
 					}
 					decryptedData, err := decryptCTR(data, segmentKey.Key[:], segmentKey.IV[:])
 					if err != nil {
-						return err
+						return fmt.Errorf("failed to decrypt segment data: %v", err)
 					}
 					if seg.DecompressedSize == seg.RawSize { // no compression
 						if _, err := outfile.WriteAt(decryptedData, pos); err != nil {
-							return err
+							return fmt.Errorf("failed to write uncompressed decrypted data to file: %v", err)
 						}
 					} else {
 						switch rootHdr.Compression {
@@ -270,11 +270,11 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 						case ZLIB:
 							zr, err := zlib.NewReader(bytes.NewReader(decryptedData))
 							if err != nil {
-								return err
+								return fmt.Errorf("failed to create zlib reader: %v", err)
 							}
 							decomp, err = io.ReadAll(zr)
 							if err != nil {
-								return err
+								return fmt.Errorf("failed to read zlib decompressed data: %v", err)
 							}
 						default:
 							// TODO: https://github.com/pierrec/lz4
@@ -296,7 +296,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 						}
 						/* write decompressed data to file */
 						if _, err := outfile.WriteAt(decomp, pos); err != nil {
-							return err
+							return fmt.Errorf("failed to write decompressed decrypted data to file: %v", err)
 						}
 					}
 					return nil
@@ -305,7 +305,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 		}
 
 		if err := eg.Wait(); err != nil {
-			return err
+			return fmt.Errorf("failed to decrypt cluster #%d: %v", cindex, err)
 		}
 
 		clusterMAC = nextClusterMac
@@ -323,15 +323,15 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 		binary.LittleEndian,
 		&paddingKey,
 	); err != nil {
-		return err
+		return fmt.Errorf("failed to derive padding key: %v", err)
 	}
 	paddingData, err := io.ReadAll(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read padding data: %v", err)
 	}
 	phmac := hmac.New(sha256.New, paddingKey.MAC[:])
 	if _, err := phmac.Write(paddingData); err != nil {
-		return err
+		return fmt.Errorf("failed to write padding data HMAC: %v", err)
 	}
 	if !hmac.Equal(clusterMAC[:], phmac.Sum(nil)) {
 		return fmt.Errorf("invalid padding HMAC: %x; expected %x", phmac.Sum(nil), paddingKey.IV)
@@ -340,7 +340,7 @@ func decryptCluster(ctx context.Context, r io.ReadSeeker, outfile *os.File, main
 	return nil
 }
 
-func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
+func decrypt(in, out string, symmetricKey []byte) (string, error) {
 	f, err := os.Open(in)
 	if err != nil {
 		return "", err
@@ -349,7 +349,7 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 
 	var hdr Header
 	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read AEA header: %v", err)
 	}
 
 	if string(hdr.Magic[:]) != Magic {
@@ -362,12 +362,12 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 
 	authData := make([]byte, hdr.AuthDataLength)
 	if _, err := f.Read(authData); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read auth data: %v", err)
 	}
 
 	mainSalt := make([]byte, 32)
 	if _, err := f.Read(mainSalt); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read main salt: %v", err)
 	}
 
 	/* main key */
@@ -379,12 +379,12 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 			hdr.ProfileAndScryptStrength,
 		))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to derive main key: %v", err)
 	}
 
 	var encRootHdr encRootHeader
 	if err := binary.Read(f, binary.LittleEndian, &encRootHdr); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read encrypted root header: %v", err)
 	}
 
 	/* root header */
@@ -394,7 +394,7 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 		binary.LittleEndian,
 		&rootHdrKey,
 	); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to derive root header key: %v", err)
 	}
 	// verify root header HMAC
 	rsalt := slices.Concat(encRootHdr.ClusterHmac[:], authData[:])
@@ -406,14 +406,14 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 			uint64(len(rsalt)),
 		),
 	)); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to write encrypted root header HMAC: %v", err)
 	}
 	if !hmac.Equal(encRootHdr.Hmac[:], rhmac.Sum(nil)) {
 		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac.Sum(nil))
 	}
 	rootHdrData, err := decryptCTR(append(encRootHdr.Data[:], authData...), rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decrypt root header: %v", err)
 	}
 	var rootHdr RootHeader
 	if err := binary.Read(bytes.NewReader(rootHdrData), binary.LittleEndian, &rootHdr); err != nil {
@@ -422,17 +422,17 @@ func aeaDecrypt(in, out string, symmetricKey []byte) (string, error) {
 
 	of, err := os.Create(out)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create output file: %v", err)
 	}
 	defer of.Close()
 
-	if err := decryptCluster(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr); err != nil {
+	if err := decryptClusters(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr); err != nil {
 		log.WithError(err).Error("failed to decrypt cluster")
 	}
 
 	finfo, err := of.Stat()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get output file info: %v", err)
 	}
 	if int(finfo.Size()) != int(rootHdr.FileSize) {
 		return "", fmt.Errorf("invalid file size: %d; expected %d", finfo.Size(), rootHdr.FileSize)
@@ -473,7 +473,7 @@ func Decrypt(c *DecryptConfig) (string, error) {
 	// if true {
 	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
-		return aeaDecrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
+		return decrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
 	// use 'aea' binary (as is the fastest way to decrypt AEA on macOS)
 	return aea(
