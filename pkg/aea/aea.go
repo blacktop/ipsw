@@ -21,8 +21,6 @@ import (
 	"github.com/cloudflare/circl/hpke"
 )
 
-const aeaBinPath = "/usr/bin/aea"
-
 //go:embed data/fcs-keys.gz
 var keyData []byte
 

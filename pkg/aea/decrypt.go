@@ -28,6 +28,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const aeaBinPath = "/usr/bin/aea"
+
 const (
 	Magic                                = "AEA1"
 	MainKeyInfo                          = "AEA_AMK"
@@ -171,8 +173,8 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		); err != nil {
 			return fmt.Errorf("failed to derive cluster header key: %v", err)
 		}
-		encSegmmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
-		if _, err := r.Read(encSegmmentHdrData); err != nil {
+		encSegmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
+		if _, err := r.Read(encSegmentHdrData); err != nil {
 			return fmt.Errorf("failed to read encrypted segment headers data: %v", err)
 		}
 		var nextClusterMac HMAC
@@ -188,7 +190,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		if _, err := shmac.Write(slices.Concat(
 			ssalt,
 			binary.LittleEndian.AppendUint64(
-				[]byte(encSegmmentHdrData[:]),
+				[]byte(encSegmentHdrData[:]),
 				uint64(len(ssalt)),
 			),
 		)); err != nil {
@@ -201,7 +203,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
 			return fmt.Errorf("failed to read segment HMACs: %v", err)
 		}
-		segmmentHdrData, err := decryptCTR(encSegmmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
+		segmmentHdrData, err := decryptCTR(encSegmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
 			return fmt.Errorf("failed to decrypt segment headers: %v", err)
 		}
