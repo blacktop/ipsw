@@ -80,14 +80,14 @@ var otaExtractCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
 		}
 
-		o, err := ota.Open(filepath.Clean(args[0]))
-		if err != nil {
-			return fmt.Errorf("failed to open OTA file: %v", err)
-		}
-
 		output := filepath.Dir(filepath.Clean(args[0]))
 		if viper.IsSet("ota.extract.output") {
 			output = filepath.Clean(viper.GetString("ota.extract.output"))
+		}
+
+		o, err := ota.Open(filepath.Clean(args[0]))
+		if err != nil {
+			return fmt.Errorf("failed to open OTA file: %v", err)
 		}
 
 		/* DYLD_SHARED_CACHE */
