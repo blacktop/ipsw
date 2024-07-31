@@ -14,7 +14,7 @@ require (
 	github.com/blacktop/go-dwarf v1.0.10
 	github.com/blacktop/go-macho v1.1.231
 	github.com/blacktop/go-plist v1.0.2
-	github.com/blacktop/lzfse-cgo v1.1.19
+	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/boombuler/barcode v1.0.2

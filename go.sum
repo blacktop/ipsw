@@ -71,8 +71,8 @@ github.com/blacktop/go-macho v1.1.231 h1:P6Yf+RggbxzHHZ4JDqFtzVJGOfy4WHm2zN371Hr
 github.com/blacktop/go-macho v1.1.231/go.mod h1:dtlW2AJKQpFzImBVPWiUKZ6OxrQ2MLfWi/BPPe0EONE=
 github.com/blacktop/go-plist v1.0.2 h1:DMX8uBiE308HWZkO9o37j7Z2b0neI3GSzN2caNa2zXk=
 github.com/blacktop/go-plist v1.0.2/go.mod h1:fqVhCVVXVJWsIGY9QPgdK0mDWZD82HrRMfU5PanvdTA=
-github.com/blacktop/lzfse-cgo v1.1.19 h1:1I/1y9/sjyDLomACLrR4f7GFJ1fTaIjhWb1PQrEtKiw=
-github.com/blacktop/lzfse-cgo v1.1.19/go.mod h1:VoBC8Nle73KZg/4X9NW94jkFrQkNwQ18SMMu5ev8zSA=
+github.com/blacktop/lzfse-cgo v1.1.20 h1:xlfMq7g1aaMCyWr8/hHqsWzvfaF8QaliU1YxDCfMx68=
+github.com/blacktop/lzfse-cgo v1.1.20/go.mod h1:VoBC8Nle73KZg/4X9NW94jkFrQkNwQ18SMMu5ev8zSA=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=
 github.com/blacktop/lzss v0.1.1/go.mod h1:eWPx0Tq21QndictvoAb20bFvvhDDbZ3mkcZ/mDHkwBk=
 github.com/blacktop/ranger v1.0.3 h1:uIWlR8chK6AtNNPZz67+cwibOe8T5XnYyQfkk04ueZA=

@@ -230,7 +230,10 @@ var otaExtractCmd = &cobra.Command{
 				}
 				if cont {
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
-					return o.GetPayloadFiles(viper.GetString("ota.extract.pattern"), viper.GetString("ota.extract.range"), output)
+					return o.GetPayloadFiles(
+						viper.GetString("ota.extract.pattern"),
+						viper.GetString("ota.extract.range"),
+						output)
 				}
 			}
 		}
