@@ -43,7 +43,7 @@ func init() {
 	otaLsCmd.Flags().BoolP("payload", "p", false, "List the payloadv2 files")
 	otaLsCmd.Flags().StringP("pattern", "r", "", "Regex pattern to match payloadv2 files")
 	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
-	otaLsCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
+	otaLsCmd.Flags().String("key-val", "", "Base64 encoded symmetric encryption key")
 	otaLsCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
 	otaLsCmd.MarkFlagsMutuallyExclusive("payload", "bom")
 	viper.BindPFlag("ota.ls.pattern", otaLsCmd.Flags().Lookup("pattern"))

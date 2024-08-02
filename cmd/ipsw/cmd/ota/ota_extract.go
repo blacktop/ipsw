@@ -45,7 +45,7 @@ func init() {
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
 	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern control the payloadv2 file range to search")
-	otaExtractCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
+	otaExtractCmd.Flags().String("key-val", "", "Base64 encoded symmetric encryption key")
 	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
@@ -99,6 +99,7 @@ var otaExtractCmd = &cobra.Command{
 		}
 		/* KERNELCACHE */
 		if viper.GetBool("ota.extract.kernel") {
+			log.Info("Extracting kernelcache(s)")
 			re := regexp.MustCompile(`kernelcache.*$`)
 			for _, f := range o.Files() { // search in OTA asset files
 				if f.IsDir() {
@@ -131,6 +132,7 @@ var otaExtractCmd = &cobra.Command{
 					}
 				}
 			}
+			return nil
 		}
 		/* ALL FILES */
 		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
