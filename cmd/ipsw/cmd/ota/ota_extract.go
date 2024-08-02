@@ -45,6 +45,7 @@ func init() {
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
 	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern control the payloadv2 file range to search")
+	otaExtractCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
 	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
@@ -53,6 +54,7 @@ func init() {
 	viper.BindPFlag("ota.extract.kernel", otaExtractCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("ota.extract.pattern", otaExtractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("ota.extract.range", otaExtractCmd.Flags().Lookup("range"))
+	viper.BindPFlag("ota.extract.key-val", otaExtractCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("ota.extract.confirm", otaExtractCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
 	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
@@ -85,7 +87,7 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Clean(viper.GetString("ota.extract.output"))
 		}
 
-		o, err := ota.Open(filepath.Clean(args[0]))
+		o, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.extract.key-val"))
 		if err != nil {
 			return fmt.Errorf("failed to open OTA file: %v", err)
 		}

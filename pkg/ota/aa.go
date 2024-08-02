@@ -99,11 +99,16 @@ func NewOTA(r io.ReaderAt, size int64) (*AA, error) {
 	return f, nil
 }
 
-func Open(name string) (*AA, error) {
+func Open(name string, symmetricKey ...string) (*AA, error) {
 	if isAEA, err := magic.IsAEA(name); err != nil {
 		return nil, err
 	} else if isAEA { // check if file is AEA encrypted
-		key, _ := getKeyFromName(name)
+		var key string
+		if len(symmetricKey) > 0 {
+			key = symmetricKey[0]
+		} else {
+			key, _ = getKeyFromName(name)
+		}
 		name, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:     name,
 			Output:    os.TempDir(),
