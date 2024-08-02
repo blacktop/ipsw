@@ -55,7 +55,7 @@ func getHMACsData(hmacs []HMAC) []byte {
 func generateRandomSalt() ([32]byte, error) {
 	var salt [32]byte
 	if _, err := rand.Read(salt[:]); err != nil {
-		return [32]byte{}, err
+		return [32]byte{}, fmt.Errorf("failed to generate random salt: %v", err)
 	}
 	return salt, nil
 }
@@ -63,7 +63,7 @@ func generateRandomSalt() ([32]byte, error) {
 func generateRandomHMAC() (HMAC, error) {
 	salt, err := generateRandomSalt()
 	if err != nil {
-		return [32]byte{}, err
+		return [32]byte{}, fmt.Errorf("failed to generate random HMAC: %v", err)
 	}
 	return HMAC(salt), nil
 }
@@ -87,12 +87,12 @@ func encrypt(in string, conf *EncryptConfig) error {
 
 	finfo, err := f.Stat()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get file info: %v", err)
 	}
 
 	mainSalt, err := generateRandomSalt()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate main salt: %v", err)
 	}
 
 	mainKey, err := deriveKey(
@@ -103,12 +103,12 @@ func encrypt(in string, conf *EncryptConfig) error {
 			uint32(conf.ProfileID)+(conf.ScryptStrength<<24),
 		))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to derive main key: %v", err)
 	}
 
 	nextClusterMac, err := generateRandomHMAC()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate next cluster HMAC: %v", err)
 	}
 
 	clusterSize := segmentSize * segmentsPerCluster
@@ -142,7 +142,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 		for j := 0; j < segmentsPerCluster; j++ {
 			n, ferr := f.ReadAt(data, int64(i*int64(clusterSize)+int64(j*segmentSize)))
 			if ferr != nil && ferr != io.EOF {
-				return ferr
+				return fmt.Errorf("failed to read segment data: %v", ferr)
 			}
 			if n != 0 && n < segmentSize {
 				data = data[:n]
@@ -155,7 +155,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 				}
 				segmentHMACs[j], err = generateRandomHMAC()
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to generate segment HMAC: %v", err)
 				}
 			} else {
 				switch conf.Compression {
@@ -206,16 +206,23 @@ func encrypt(in string, conf *EncryptConfig) error {
 			return fmt.Errorf("failed to encrypt segment: %v", err)
 		}
 
-		clustersData.Write(encryptedSegmentHdrs)
-		clustersData.Write(nextClusterMac[:])
-		segmentHMACsData := getHMACsData(segmentHMACs)
-		clustersData.Write(segmentHMACsData)
-		clustersData.Write(segmentsData.Bytes())
+		if _, err := clustersData.Write(encryptedSegmentHdrs); err != nil {
+			return fmt.Errorf("failed to write encrypted segment headers: %v", err)
+		}
+		if _, err := clustersData.Write(nextClusterMac[:]); err != nil {
+			return fmt.Errorf("failed to write next cluster HMAC: %v", err)
+		}
+		if err := binary.Write(clustersData, binary.LittleEndian, segmentHMACs); err != nil {
+			return fmt.Errorf("failed to write segment HMACs: %v", err)
+		}
+		if _, err := clustersData.Write(segmentsData.Bytes()); err != nil {
+			return fmt.Errorf("failed to write segments data: %v", err)
+		}
 
 		nextClusterMac, err = getHMAC(
 			clusterHeaderKey.MAC[:],
 			encryptedSegmentHdrs,
-			slices.Concat(nextClusterMac[:], segmentHMACsData), // salt
+			slices.Concat(nextClusterMac[:], getHMACsData(segmentHMACs)), // salt
 		)
 		if err != nil {
 			return fmt.Errorf("failed to write next cluster MAC: %v", err)
@@ -224,11 +231,11 @@ func encrypt(in string, conf *EncryptConfig) error {
 
 	fname := filepath.Join(conf.Output, filepath.Base(in)+".aea")
 	if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-		return err
+		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 	out, err := os.Create(fname)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create output file: %v", err)
 	}
 	defer out.Close()
 
@@ -254,7 +261,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 	}
 	rootHdrData := new(bytes.Buffer)
 	if err := binary.Write(rootHdrData, binary.LittleEndian, rootHeader); err != nil {
-		return err
+		return fmt.Errorf("failed to write root header: %v", err)
 	}
 	encRootHdr, err := encryptCTR(rootHdrData.Bytes(), rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
@@ -271,39 +278,39 @@ func encrypt(in string, conf *EncryptConfig) error {
 		ProfileAndScryptStrength: uint32(conf.ProfileID) + (conf.ScryptStrength << 24),
 		AuthDataLength:           uint32(len(conf.AuthData)),
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to write AEA header: %v", err)
 	}
 
 	// write auth data
 	if err := binary.Write(out, binary.LittleEndian, conf.AuthData); err != nil {
-		return err
+		return fmt.Errorf("failed to write auth data: %v", err)
 	}
 
 	// TODO: write public key
 
 	// write main salt
 	if err := binary.Write(out, binary.LittleEndian, mainSalt); err != nil {
-		return err
+		return fmt.Errorf("failed to write main salt: %v", err)
 	}
 
 	// write root header HMAC
 	if err := binary.Write(out, binary.LittleEndian, rootHdrHMAC); err != nil {
-		return err
+		return fmt.Errorf("failed to write root header HMAC: %v", err)
 	}
 
 	// write encrypted root header
 	if _, err := out.Write(encRootHdr); err != nil {
-		return err
+		return fmt.Errorf("failed to write encrypted root header: %v", err)
 	}
 
 	// write next cluster HMAC
 	if _, err := out.Write(nextClusterMac[:]); err != nil {
-		return err
+		return fmt.Errorf("failed to write next cluster HMAC: %v", err)
 	}
 
 	// write clusters data
 	if _, err := out.Write(clustersData.Bytes()); err != nil {
-		return err
+		return fmt.Errorf("failed to write clusters data: %v", err)
 	}
 
 	log.Infof("Created %s", fname)
