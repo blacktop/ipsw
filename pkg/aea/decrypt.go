@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -121,7 +122,7 @@ type headerKey struct {
 
 type SegmentHeader struct {
 	DecompressedSize uint32
-	RawSize          uint32
+	CompressedSize   uint32
 	Checksum         [32]byte
 }
 
@@ -145,6 +146,20 @@ func deriveKey(inkey, salt, info []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid key length: %d; expected %d", n, len(key))
 	}
 	return key, nil
+}
+
+func getHMAC(key, data, salt []byte) (HMAC, error) {
+	mac := hmac.New(sha256.New, key)
+	if _, err := mac.Write(slices.Concat(
+		salt,
+		binary.LittleEndian.AppendUint64(
+			data,
+			uint64(len(salt)),
+		),
+	)); err != nil {
+		return HMAC{}, fmt.Errorf("failed to write HMAC: %v", err)
+	}
+	return HMAC(mac.Sum(nil)), nil
 }
 
 func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader) error {
@@ -185,19 +200,12 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		if _, err := r.Read(segmentMacData); err != nil {
 			return fmt.Errorf("failed to read segment HMAC data: %v", err)
 		}
-		shmac := hmac.New(sha256.New, clusterHeaderKey.MAC[:])
-		ssalt := slices.Concat(nextClusterMac[:], segmentMacData)
-		if _, err := shmac.Write(slices.Concat(
-			ssalt,
-			binary.LittleEndian.AppendUint64(
-				[]byte(encSegmentHdrData[:]),
-				uint64(len(ssalt)),
-			),
-		)); err != nil {
-			return fmt.Errorf("failed to write encrypted segment headers data HMAC: %v", err)
+		shmac, err := getHMAC(clusterHeaderKey.MAC[:], encSegmentHdrData, slices.Concat(nextClusterMac[:], segmentMacData))
+		if err != nil {
+			return fmt.Errorf("failed to get HMAC for encrypted segment headers data: %v", err)
 		}
-		if !hmac.Equal(clusterMAC[:], shmac.Sum(nil)) {
-			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac.Sum(nil))
+		if !hmac.Equal(clusterMAC[:], shmac[:]) {
+			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac)
 		}
 		segmentMACs := make([]HMAC, rootHdr.SegmentsPerCluster)
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
@@ -218,7 +226,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 				continue
 			}
 			totalSize += uint64(seg.DecompressedSize)
-			segmentData := make([]byte, seg.RawSize)
+			segmentData := make([]byte, seg.CompressedSize)
 			if _, err = r.Read(segmentData); err != nil {
 				return fmt.Errorf("failed to read segment data: %v", err)
 			}
@@ -238,24 +246,18 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 					); err != nil {
 						return fmt.Errorf("failed to derive segment key: %v", err)
 					}
-					shmac := hmac.New(sha256.New, segmentKey.MAC[:])
-					if _, err := shmac.Write(slices.Concat(
-						[]byte{},
-						binary.LittleEndian.AppendUint64(
-							[]byte(data[:]),
-							uint64(len([]byte{})),
-						),
-					)); err != nil {
-						return fmt.Errorf("failed to write encrypted segment data HMAC: %v", err)
+					shmac, err := getHMAC(segmentKey.MAC[:], data, []byte{})
+					if err != nil {
+						return fmt.Errorf("failed to get HMAC for segment header: %v", err)
 					}
-					if !hmac.Equal(segmentMACs[index][:], shmac.Sum(nil)) {
-						return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", index, segmentMACs[index], shmac.Sum(nil))
+					if !hmac.Equal(segmentMACs[index][:], shmac[:]) {
+						return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", index, segmentMACs[index], shmac)
 					}
 					decryptedData, err := decryptCTR(data, segmentKey.Key[:], segmentKey.IV[:])
 					if err != nil {
 						return fmt.Errorf("failed to decrypt segment data: %v", err)
 					}
-					if seg.DecompressedSize == seg.RawSize { // no compression
+					if seg.DecompressedSize == seg.CompressedSize { // no compression
 						if _, err := outfile.WriteAt(decryptedData, pos); err != nil {
 							return fmt.Errorf("failed to write uncompressed decrypted data to file: %v", err)
 						}
@@ -331,12 +333,19 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 	if err != nil {
 		return fmt.Errorf("failed to read padding data: %v", err)
 	}
-	phmac := hmac.New(sha256.New, paddingKey.MAC[:])
-	if _, err := phmac.Write(paddingData); err != nil {
-		return fmt.Errorf("failed to write padding data HMAC: %v", err)
-	}
-	if !hmac.Equal(clusterMAC[:], phmac.Sum(nil)) {
-		return fmt.Errorf("invalid padding HMAC: %x; expected %x", phmac.Sum(nil), paddingKey.IV)
+	if len(paddingData) != 0 {
+		decryptedPadding, err := decryptCTR(paddingData, paddingKey.Key[:], paddingKey.IV[:])
+		if err != nil {
+			return fmt.Errorf("failed to decrypt segment data: %v", err)
+		}
+		log.Debugf("PADDING:\n%s", hex.Dump(decryptedPadding))
+		phmac := hmac.New(sha256.New, paddingKey.MAC[:])
+		if _, err := phmac.Write(paddingData); err != nil {
+			return fmt.Errorf("failed to write padding data HMAC: %v", err)
+		}
+		if !hmac.Equal(clusterMAC[:], phmac.Sum(nil)) {
+			return fmt.Errorf("invalid padding HMAC: %x; expected %x", phmac.Sum(nil), paddingKey.IV)
+		}
 	}
 
 	return nil
@@ -399,19 +408,12 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 		return "", fmt.Errorf("failed to derive root header key: %v", err)
 	}
 	// verify root header HMAC
-	rsalt := slices.Concat(encRootHdr.ClusterHmac[:], authData[:])
-	rhmac := hmac.New(sha256.New, rootHdrKey.MAC[:])
-	if _, err := rhmac.Write(slices.Concat(
-		rsalt,
-		binary.LittleEndian.AppendUint64(
-			[]byte(encRootHdr.Data[:]),
-			uint64(len(rsalt)),
-		),
-	)); err != nil {
-		return "", fmt.Errorf("failed to write encrypted root header HMAC: %v", err)
+	rhmac, err := getHMAC(rootHdrKey.MAC[:], encRootHdr.Data[:], slices.Concat(encRootHdr.ClusterHmac[:], authData[:]))
+	if err != nil {
+		return "", fmt.Errorf("failed to get encrypted root header HMAC: %v", err)
 	}
-	if !hmac.Equal(encRootHdr.Hmac[:], rhmac.Sum(nil)) {
-		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac.Sum(nil))
+	if !hmac.Equal(encRootHdr.Hmac[:], rhmac[:]) {
+		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac)
 	}
 	rootHdrData, err := decryptCTR(append(encRootHdr.Data[:], authData...), rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
@@ -472,7 +474,7 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 	}
 
-	// if true {
+	// if true { // uncomment this is to test the pure Go implementation on darwin
 	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return decrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
