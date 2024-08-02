@@ -49,7 +49,6 @@ func init() {
 
 	otaPayloadCmd.Flags().BoolP("files", "f", false, "Files only")
 	otaPayloadCmd.Flags().BoolP("dirs", "d", false, "Directories only")
-
 	viper.BindPFlag("ota.payload.files", otaPayloadCmd.Flags().Lookup("files"))
 	viper.BindPFlag("ota.payload.dirs", otaPayloadCmd.Flags().Lookup("dirs"))
 }
@@ -101,7 +100,7 @@ var otaPayloadCmd = &cobra.Command{
 				}
 			}
 		} else {
-			o, err := ota.Open(filepath.Clean(args[0]))
+			o, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
 			if err != nil {
 				return fmt.Errorf("failed to open OTA file: %v", err)
 			}

@@ -25,6 +25,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
@@ -145,6 +146,24 @@ func Open(name string, symmetricKey ...string) (*AA, error) {
 	}
 	r.f = f
 	return r, err
+}
+
+func (a *AA) Info() (*info.Info, error) {
+	var pfiles []fs.File
+	for _, file := range a.Files() {
+		if filepath.Ext(file.Name()) == ".plist" || regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Name()) {
+			f, err := a.Open(file.Path(), true)
+			if err != nil {
+				return nil, err
+			}
+			defer f.Close()
+			pfiles = append(pfiles, f)
+		}
+	}
+	if len(pfiles) == 0 {
+		return nil, fmt.Errorf("no plist files found")
+	}
+	return info.ParseOTAFiles(pfiles)
 }
 
 // Close closes the AA file, rendering it unusable for I/O.

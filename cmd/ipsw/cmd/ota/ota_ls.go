@@ -43,13 +43,11 @@ func init() {
 	otaLsCmd.Flags().BoolP("payload", "p", false, "List the payloadv2 files")
 	otaLsCmd.Flags().StringP("pattern", "r", "", "Regex pattern to match payloadv2 files")
 	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
-	otaLsCmd.Flags().String("key-val", "", "Base64 encoded symmetric encryption key")
 	otaLsCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
 	otaLsCmd.MarkFlagsMutuallyExclusive("payload", "bom")
 	viper.BindPFlag("ota.ls.pattern", otaLsCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("ota.ls.payload", otaLsCmd.Flags().Lookup("payload"))
 	viper.BindPFlag("ota.ls.bom", otaLsCmd.Flags().Lookup("bom"))
-	viper.BindPFlag("ota.ls.key-val", otaLsCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("ota.ls.json", otaLsCmd.Flags().Lookup("json"))
 }
 
@@ -68,7 +66,7 @@ var otaLsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		ota, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.ls.key-val"))
+		ota, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
 		if err != nil {
 			return fmt.Errorf("failed to open OTA file: %v", err)
 		}

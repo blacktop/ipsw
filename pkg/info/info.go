@@ -7,6 +7,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -711,6 +713,42 @@ func ParseZipFiles(files []*zip.File) (*Info, error) {
 			log.Error(err.Error())
 		} else {
 			log.Errorf("failed to parse devicetree: %v", err)
+		}
+	}
+
+	return i, nil
+}
+
+func ParseOTAFiles(files []fs.File) (*Info, error) {
+	var err error
+
+	i := &Info{}
+
+	i.DeviceTrees = make(map[string]*devicetree.DeviceTree)
+
+	i.Plists, err = plist.ParsePlistFiles(files)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse plists: %v", err)
+	}
+	for _, f := range files {
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get file info: %v", err)
+		}
+		if filepath.Ext(fi.Name()) == ".im4p" {
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read file: %v", err)
+			}
+			dt, err := devicetree.ParseImg4Data(dat)
+			if err != nil {
+				if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
+					log.Error(err.Error())
+				} else {
+					log.Errorf("failed to parse devicetree: %v", err)
+				}
+			}
+			i.DeviceTrees[fi.Name()] = dt
 		}
 	}
 

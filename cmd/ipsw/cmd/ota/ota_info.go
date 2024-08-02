@@ -23,10 +23,9 @@ package ota
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,14 +50,18 @@ var otaInfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		i, err := info.Parse(filepath.Clean(args[0]))
+		o, err := ota.Open(args[0], viper.GetString("ota.key-val"))
 		if err != nil {
-			return fmt.Errorf("failed to parse OTA: %v", err)
+			return fmt.Errorf("failed to open OTA: %v", err)
+		}
+		inf, err := o.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get OTA info: %v", err)
 		}
 
 		fmt.Println("\n[OTA Info]")
 		fmt.Println("==========")
-		fmt.Println(i)
+		fmt.Println(inf)
 
 		return nil
 
