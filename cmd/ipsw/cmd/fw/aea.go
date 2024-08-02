@@ -23,6 +23,7 @@ package fw
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -45,21 +46,25 @@ import (
 func init() {
 	FwCmd.AddCommand(aeaCmd)
 
+	aeaCmd.Flags().Bool("id", false, "Print AEA file ID")
 	aeaCmd.Flags().BoolP("info", "i", false, "Print info")
 	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
 	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
 	aeaCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	aeaCmd.Flags().BoolP("encrypt", "e", false, "AEA encrypt file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
+	viper.BindPFlag("fw.aea.id", aeaCmd.Flags().Lookup("id"))
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.aea.fcs-key", aeaCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
 	viper.BindPFlag("fw.aea.key-val", aeaCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("fw.aea.encrypt", aeaCmd.Flags().Lookup("encrypt"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
 }
 
@@ -82,9 +87,11 @@ var aeaCmd = &cobra.Command{
 		fcsKey := viper.GetBool("fw.aea.fcs-key")
 		adKey := viper.GetBool("fw.aea.key")
 		base64Key := viper.GetString("fw.aea.key-val")
+		showID := viper.GetBool("fw.aea.id")
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
 		pemDB := viper.GetString("fw.aea.pem-db")
+		doEncrypt := viper.GetBool("fw.aea.encrypt")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
 		if (adKey || showInfo) && output != "" {
@@ -100,13 +107,17 @@ var aeaCmd = &cobra.Command{
 
 		var bold = color.New(color.Bold).SprintFunc()
 
-		if output != "" {
-			if err := os.MkdirAll(output, 0o750); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
-			}
+		if output == "" {
+			output = filepath.Dir(args[0])
 		}
 
-		if showInfo {
+		if showID {
+			id, err := aea.ID(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA id: %v", err)
+			}
+			fmt.Println(hex.EncodeToString(id[:]))
+		} else if showInfo {
 			metadata, err := aea.Info(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
@@ -165,6 +176,13 @@ var aeaCmd = &cobra.Command{
 				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 			}
 			fmt.Printf("base64:%s\n", base64.StdEncoding.EncodeToString(wkey))
+		} else if doEncrypt {
+			if err := aea.Encrypt(args[0], &aea.EncryptConfig{
+				Output:    output,
+				B64SymKey: base64Key,
+			}); err != nil {
+				return fmt.Errorf("failed to encrypt AEA: %v", err)
+			}
 		} else {
 			if pemFile != "" {
 				pemData, err = os.ReadFile(pemFile)
