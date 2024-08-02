@@ -94,10 +94,10 @@ var aeaCmd = &cobra.Command{
 		doEncrypt := viper.GetBool("fw.aea.encrypt")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
-		if (adKey || showInfo) && output != "" {
-			return fmt.Errorf("--output flag is not valid with --info or --key flags")
-		} else if (adKey || showInfo) && (fcsKey || base64Key != "") {
-			return fmt.Errorf("cannot use --info or --key flags with --fcs-key or --key-val")
+		if (adKey || showID || showInfo) && output != "" {
+			return fmt.Errorf("--output flag is not valid with --id, --info or --key flags")
+		} else if (adKey || showID || showInfo) && (fcsKey || base64Key != "") {
+			return fmt.Errorf("cannot use --id, --info or --key flags with --fcs-key or --key-val")
 		} else if fcsKey && base64Key != "" {
 			return fmt.Errorf("cannot use --fcs-key with --key-val")
 		}
