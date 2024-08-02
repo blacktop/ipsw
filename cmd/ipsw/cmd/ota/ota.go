@@ -33,6 +33,11 @@ var colorSize = color.New(color.FgHiCyan).SprintFunc()
 var colorName = color.New(color.Bold).SprintFunc()
 var colorLink = color.New(color.FgHiMagenta).SprintFunc()
 
+func init() {
+	OtaCmd.PersistentFlags().String("key-val", "", "Base64 encoded symmetric encryption key")
+	viper.BindPFlag("ota.key-val", OtaCmd.PersistentFlags().Lookup("key-val"))
+}
+
 // OtaCmd represents the ota command
 var OtaCmd = &cobra.Command{
 	Use:   "ota",
