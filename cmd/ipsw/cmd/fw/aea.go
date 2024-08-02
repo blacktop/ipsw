@@ -39,10 +39,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NOTES:
-//   key-val is 32 bytes or 64 char hex string
-//   aea decrypt -i iPhone16,2_d34efba2646b219d16b6ffcb93998bd4feed028516c7c42bc1ecc368561f7ce6.aea -o ota.dec -key-value 'base64:TSKOZk6rDQtoDOAWuPBcJsSnNraBWANU1lcIcIIk5iU='
-
 func init() {
 	FwCmd.AddCommand(aeaCmd)
 
