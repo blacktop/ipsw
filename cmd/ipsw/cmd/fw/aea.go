@@ -177,6 +177,9 @@ var aeaCmd = &cobra.Command{
 			}
 			fmt.Printf("base64:%s\n", base64.StdEncoding.EncodeToString(wkey))
 		} else if doEncrypt {
+			if base64Key == "" {
+				return fmt.Errorf("must provide a base64 encoded symmetric encryption key via --key-val")
+			}
 			if err := aea.Encrypt(args[0], &aea.EncryptConfig{
 				Output:    output,
 				B64SymKey: base64Key,
