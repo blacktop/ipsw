@@ -531,7 +531,9 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 	cmd.Stdin = in
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
+		if _, ok := err.(*exec.ExitError); !ok {
+			return fmt.Errorf("%v: %s", err, out)
+		}
 	}
 	return nil
 }
