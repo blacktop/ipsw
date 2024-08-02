@@ -69,6 +69,7 @@ type Entry struct {
 	Fli       uint32
 	PatchType patchType
 	Label     string
+	Xat       uint32 // extended attributes
 
 	r          *io.ReadSeeker
 	fileOffset int64
@@ -334,6 +335,21 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				entry.Size = uint32(dat)
 			default:
 				return nil, fmt.Errorf("found unknown DAT field: %s", string(field))
+			}
+		case "XAT": // extended attributes
+			switch field[3] {
+			case 'B':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Xat); err != nil {
+					return nil, fmt.Errorf("failed to read XATB field: %w", err)
+				}
+			case 'A':
+				var dat uint16
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+					return nil, fmt.Errorf("failed to read XATA field: %w", err)
+				}
+				entry.Xat = uint32(dat)
+			default:
+				return nil, fmt.Errorf("found unknown XAT field: %s", string(field))
 			}
 		case "IDX": // entry index in input archive
 			switch field[3] {
@@ -618,6 +634,13 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			ent.r = &r
 			// skip file data
 			if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
+				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+			}
+		}
+
+		if ent.Xat > 0 {
+			// skip extended attributes
+			if _, err := r.Seek(int64(ent.Xat), io.SeekCurrent); err != nil {
 				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
 			}
 		}
