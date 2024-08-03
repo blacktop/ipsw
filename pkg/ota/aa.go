@@ -27,6 +27,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
+	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"golang.org/x/exp/maps"
@@ -536,6 +537,99 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 		}
 	}
 	return nil
+}
+
+func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) {
+	var out []string
+
+	match, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile extract regex pattern '%s': %v", pattern, err)
+	}
+
+	tmpdir, err := os.MkdirTemp("", "ota_extract_cryptexes")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	for _, cryptex := range []string{"cryptex-system-arm64?e$", "cryptex-app$"} {
+		re := regexp.MustCompile(cryptex)
+		for _, file := range r.Files() {
+			if re.MatchString(file.Name()) {
+				cryptexFile, err := r.Open(file.Path(), false)
+				if err != nil {
+					return nil, fmt.Errorf("failed to open cryptex file: %v", err)
+				}
+				defer cryptexFile.Close()
+				// create a temp file to hold the OTA cryptex
+				cf, err := os.Create(filepath.Join(tmpdir, file.Name()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to create file: %v", err)
+				}
+				// create a temp file to hold the PATCHED OTA cryptex DMG
+				dcf, err := os.Create(filepath.Join(tmpdir, file.Name()+".dmg"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to create file: %v", err)
+				}
+				if _, err := io.Copy(cf, cryptexFile); err != nil {
+					return nil, fmt.Errorf("failed to write file: %v", err)
+				}
+				cf.Close()
+				// patch the cryptex
+				if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
+					return nil, fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Path()), err)
+				}
+				dcf.Close()
+				// mount the patched cryptex
+				utils.Indent(log.Info, 4)(fmt.Sprintf("Mounting DMG %s", dcf.Name()))
+				mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name())
+				if err != nil {
+					return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
+				}
+				if alreadyMounted {
+					utils.Indent(log.Debug, 5)(fmt.Sprintf("%s already mounted", dcf.Name()))
+				} else {
+					defer func() {
+						utils.Indent(log.Debug, 4)(fmt.Sprintf("Unmounting %s", dcf.Name()))
+						if err := utils.Retry(3, 2*time.Second, func() error {
+							return utils.Unmount(mountPoint, false)
+						}); err != nil {
+							log.Errorf("failed to unmount DMG %s at %s: %v", dcf.Name(), mountPoint, err)
+						}
+					}()
+				}
+				// extract files from the mounted cryptex
+				if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
+					if err != nil {
+						return fmt.Errorf("failed to walk %s: %v", path, err)
+					}
+					if info.IsDir() {
+						return nil
+					}
+					if match.MatchString(path) {
+						fname := filepath.Join(output, strings.TrimPrefix(path, mountPoint))
+						if err := utils.MkdirAndCopy(path, fname); err != nil {
+							return fmt.Errorf("failed to copy %s to %s: %v", path, fname, err)
+						}
+						out = append(out, fname)
+					}
+					return nil
+				}); err != nil {
+					if errors.Is(err, filepath.SkipDir) {
+						break
+					}
+					return nil, fmt.Errorf("failed to read files in cryptex folder: %v", err)
+				}
+			}
+		}
+	}
+
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no files found matching pattern '%s'", pattern)
+	}
+
+	return out, nil
 }
 
 // Open opens the named file in the ZIP archive,

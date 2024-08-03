@@ -6,17 +6,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
-	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
@@ -147,100 +144,6 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 		return outfiles, nil
 	}
 	return nil, fmt.Errorf("%s not found", extractPattern)
-}
-
-// ExtractFromCryptexes extracts files from patched OTA cryptexes
-func ExtractFromCryptexes(zr *zip.ReadCloser, extractPattern, destPath string, shouldStop func(string) bool) error {
-	found := false
-
-	for _, cryptex := range []string{"cryptex-system-arm64?e$", "cryptex-app$"} {
-		re := regexp.MustCompile(cryptex)
-		for _, zf := range zr.File {
-			if re.MatchString(zf.Name) {
-				rc, err := zf.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open %s: %v", zf.Name, err)
-				}
-				defer rc.Close()
-
-				in, err := os.CreateTemp("", filepath.Base(zf.Name))
-				if err != nil {
-					return fmt.Errorf("failed to create temp file for %s: %v", filepath.Base(zf.Name), err)
-				}
-				defer os.Remove(in.Name())
-
-				utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting '%s' from remote OTA", filepath.Base(zf.Name)))
-				io.Copy(in, rc)
-				in.Close()
-
-				out, err := os.CreateTemp("", filepath.Base(zf.Name)+".decrypted.*.dmg")
-				if err != nil {
-					return fmt.Errorf("failed to create temp file for cryptex-system-arm64e.decrypted: %v", err)
-				}
-				defer os.Remove(out.Name())
-				out.Close()
-
-				utils.Indent(log.Info, 3)(fmt.Sprintf("Patching '%s'", filepath.Base(zf.Name)))
-				if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
-					return fmt.Errorf("failed to patch %s: %v", filepath.Base(zf.Name), err)
-				}
-
-				utils.Indent(log.Info, 4)(fmt.Sprintf("Mounting DMG %s", out.Name()))
-				var alreadyMounted bool
-				mountPoint, alreadyMounted, err := utils.MountDMG(out.Name())
-				if err != nil {
-					return fmt.Errorf("failed to IPSW FS dmg: %v", err)
-				}
-				if alreadyMounted {
-					utils.Indent(log.Debug, 5)(fmt.Sprintf("%s already mounted", out.Name()))
-				} else {
-					defer func() {
-						utils.Indent(log.Debug, 4)(fmt.Sprintf("Unmounting %s", out.Name()))
-						if err := utils.Retry(3, 2*time.Second, func() error {
-							return utils.Unmount(mountPoint, false)
-						}); err != nil {
-							log.Errorf("failed to unmount DMG %s at %s: %v", out.Name(), mountPoint, err)
-						}
-					}()
-				}
-
-				match, err := regexp.Compile(extractPattern)
-				if err != nil {
-					return fmt.Errorf("failed to compile extract regex pattern '%s': %v", extractPattern, err)
-				}
-				if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
-					if err != nil {
-						return fmt.Errorf("failed to walk %s: %v", path, err)
-					}
-					if info.IsDir() {
-						return nil
-					}
-					if match.MatchString(path) {
-						found = true
-						utils.Indent(log.Debug, 5)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(path, mountPoint)))
-						if err := utils.MkdirAndCopy(path, filepath.Join(destPath, strings.TrimPrefix(path, mountPoint))); err != nil {
-							return fmt.Errorf("failed to copy %s to %s: %v", path, filepath.Join(destPath, strings.TrimPrefix(path, mountPoint)), err)
-						}
-						if shouldStop(path) {
-							return filepath.SkipAll
-						}
-					}
-					return nil
-				}); err != nil {
-					if errors.Is(err, filepath.SkipDir) {
-						break
-					}
-					return fmt.Errorf("failed to read files in cryptex folder: %v", err)
-				}
-			}
-		}
-	}
-
-	if found {
-		return nil
-	}
-
-	return fmt.Errorf("'%s' not found", extractPattern)
 }
 
 // Parse parses a ota payload file inside the zip

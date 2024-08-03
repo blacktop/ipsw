@@ -31,6 +31,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
@@ -98,48 +99,60 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Join(viper.GetString("ota.extract.output"), output)
 		}
 
-		/* DYLD_SHARED_CACHE */
-		if viper.GetBool("ota.extract.dyld") {
-			log.Info("Extracting dyld_shared_cache Files")
-			return fmt.Errorf("--dyld extraction not implemented yet")
-		}
-		/* KERNELCACHE */
-		if viper.GetBool("ota.extract.kernel") {
-			log.Info("Extracting kernelcache(s)")
-			re := regexp.MustCompile(`kernelcache.*$`)
-			for _, f := range o.Files() { // search in OTA asset files
-				if f.IsDir() {
-					continue
+		if viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") {
+			cwd, _ := os.Getwd()
+			/* DYLD_SHARED_CACHE */
+			if viper.GetBool("ota.extract.dyld") {
+				log.Info("Extracting dyld_shared_cache Files")
+				out, err := o.ExtractFromCryptexes(dyld.CacheUberRegex, output)
+				if err != nil {
+					return fmt.Errorf("failed to extract dyld_shared_cache: %v", err)
 				}
-				if re.MatchString(f.Path()) {
-					ff, err := o.Open(f.Path(), false)
-					if err != nil {
-						return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+				for _, fname := range out {
+					rel, _ := filepath.Rel(cwd, fname)
+					utils.Indent(log.Info, 2)(rel)
+				}
+			}
+			/* KERNELCACHE */
+			if viper.GetBool("ota.extract.kernel") {
+				log.Info("Extracting kernelcache(s)")
+				re := regexp.MustCompile(`kernelcache.*$`)
+				for _, f := range o.Files() { // search in OTA asset files
+					if f.IsDir() {
+						continue
 					}
-					data, err := io.ReadAll(ff)
-					if err != nil {
-						return fmt.Errorf("failed to read kernelcache: %v", err)
-					}
-					comp, err := kernelcache.ParseImg4Data(data)
-					if err != nil {
-						return fmt.Errorf("failed to parse kernelcache: %v", err)
-					}
-					kdata, err := kernelcache.DecompressData(comp)
-					if err != nil {
-						return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
-					}
-					fname := filepath.Join(output, f.Name())
-					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-						return fmt.Errorf("failed to create output directory: %v", err)
-					}
-					utils.Indent(log.Info, 2)(fname)
-					if err := os.WriteFile(fname, kdata, 0o644); err != nil {
-						return fmt.Errorf("failed to write kernelcache: %v", err)
+					if re.MatchString(f.Path()) {
+						ff, err := o.Open(f.Path(), false)
+						if err != nil {
+							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+						}
+						data, err := io.ReadAll(ff)
+						if err != nil {
+							return fmt.Errorf("failed to read kernelcache: %v", err)
+						}
+						comp, err := kernelcache.ParseImg4Data(data)
+						if err != nil {
+							return fmt.Errorf("failed to parse kernelcache: %v", err)
+						}
+						kdata, err := kernelcache.DecompressData(comp)
+						if err != nil {
+							return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
+						}
+						fname := filepath.Join(output, f.Name())
+						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+							return fmt.Errorf("failed to create output directory: %v", err)
+						}
+						rel, _ := filepath.Rel(cwd, fname)
+						utils.Indent(log.Info, 2)(rel)
+						if err := os.WriteFile(fname, kdata, 0o644); err != nil {
+							return fmt.Errorf("failed to write kernelcache: %v", err)
+						}
 					}
 				}
 			}
 			return nil
 		}
+
 		/* ALL FILES */
 		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
 			log.Info("Extracting All Files From OTA")
