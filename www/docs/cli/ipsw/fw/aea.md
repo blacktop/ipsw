@@ -17,8 +17,10 @@ ipsw fw aea [flags]
 ### Options
 
 ```
+  -e, --encrypt          AEA encrypt file
   -f, --fcs-key          Get fcs-key JSON
   -h, --help             help for aea
+      --id               Print AEA file ID
   -i, --info             Print info
   -k, --key              Get archive decryption key
   -b, --key-val string   Base64 encoded symmetric encryption key
