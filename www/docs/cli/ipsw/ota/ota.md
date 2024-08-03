@@ -17,7 +17,8 @@ ipsw ota [flags]
 ### Options
 
 ```
-  -h, --help   help for ota
+  -h, --help             help for ota
+      --key-val string   Base64 encoded symmetric encryption key
 ```
 
 ### Options inherited from parent commands

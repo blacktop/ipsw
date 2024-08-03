@@ -25,10 +25,11 @@ ipsw ota patch bxdiff <DELTA> <TARGET> [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color            colorize output
+      --config string    config file (default is $HOME/.config/ipsw/config.yaml)
+      --key-val string   Base64 encoded symmetric encryption key
+      --no-color         disable colorize output
+  -V, --verbose          verbose output
 ```
 
 ### SEE ALSO
