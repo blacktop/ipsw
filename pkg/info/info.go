@@ -78,6 +78,33 @@ type processors struct {
 	Devices       []string
 }
 
+type ProcessorDB []processors
+
+func GetProcessorDB() (*ProcessorDB, error) {
+	var ps ProcessorDB
+
+	zr, err := gzip.NewReader(bytes.NewReader(procsData))
+	if err != nil {
+		return nil, err
+	}
+	defer zr.Close()
+
+	if err := json.NewDecoder(zr).Decode(&ps); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling procs.gz data: %w", err)
+	}
+
+	return &ps, nil
+}
+
+func (p *ProcessorDB) GetProcessor(cpuid string) (*processors, error) {
+	for _, proc := range *p {
+		if strings.EqualFold(proc.CPUID, cpuid) {
+			return &proc, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find processor for '%s'", cpuid)
+}
+
 // getProcessors reads the processors from embedded JSON
 func getProcessor(cpuid string) (processors, error) {
 	var ps []processors
