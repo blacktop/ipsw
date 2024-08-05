@@ -26,7 +26,9 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,8 +54,27 @@ var gpuCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := fwcmd.SplitGpuFW(filepath.Clean(args[0]), viper.GetString("fw.gpu.output")); err != nil {
-			return fmt.Errorf("failed to split GPU firmware: %v", err)
+		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Search(&extract.Config{
+				IPSW:    filepath.Clean(args[0]),
+				Pattern: "armfw_.*.im4p$",
+				Output:  viper.GetString("fw.gpu.output"),
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				folder := filepath.Join(filepath.Dir(f), "extracted")
+				if _, err := fwcmd.SplitGpuFW(f, folder); err != nil {
+					return fmt.Errorf("failed to split GPU firmware: %v", err)
+				}
+			}
+		} else {
+			if _, err := fwcmd.SplitGpuFW(filepath.Clean(args[0]), viper.GetString("fw.gpu.output")); err != nil {
+				return fmt.Errorf("failed to split GPU firmware: %v", err)
+			}
 		}
 
 		return nil
