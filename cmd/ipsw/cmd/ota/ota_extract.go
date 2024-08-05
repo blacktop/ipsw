@@ -109,8 +109,11 @@ var otaExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to extract dyld_shared_cache: %v", err)
 				}
 				for _, fname := range out {
-					rel, _ := filepath.Rel(cwd, fname)
-					utils.Indent(log.Info, 2)(rel)
+					if rel, err := filepath.Rel(cwd, fname); err != nil {
+						utils.Indent(log.Info, 2)(fname)
+					} else {
+						utils.Indent(log.Info, 2)(rel)
+					}
 				}
 			}
 			/* KERNELCACHE */
@@ -142,8 +145,11 @@ var otaExtractCmd = &cobra.Command{
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create output directory: %v", err)
 						}
-						rel, _ := filepath.Rel(cwd, fname)
-						utils.Indent(log.Info, 2)(rel)
+						if rel, err := filepath.Rel(cwd, fname); err != nil {
+							utils.Indent(log.Info, 2)(fname)
+						} else {
+							utils.Indent(log.Info, 2)(rel)
+						}
 						if err := os.WriteFile(fname, kdata, 0o644); err != nil {
 							return fmt.Errorf("failed to write kernelcache: %v", err)
 						}
