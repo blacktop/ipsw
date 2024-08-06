@@ -33,6 +33,7 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
   -d, --demangle            Demangle symbol names
       --extra string        Path to folder with extra files for symbolication (default "x")
   -h, --help                help for symbolicate
+      --hex                 Display function offsets in hexadecimal
       --pem-db string       AEA pem DB JSON file
   -p, --proc string         Filter crashlog by process name
   -r, --running             Show all running (TH_RUN) threads in crashlog
