@@ -49,6 +49,7 @@ func init() {
 	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().Bool("hex", false, "Display function offsets in hexadecimal")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
@@ -60,6 +61,7 @@ func init() {
 	viper.BindPFlag("symbolicate.proc", symbolicateCmd.Flags().Lookup("proc"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("symbolicate.hex", symbolicateCmd.Flags().Lookup("hex"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
@@ -98,6 +100,7 @@ var symbolicateCmd = &cobra.Command{
 		unslide := viper.GetBool("symbolicate.unslide")
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
+		asHex := viper.GetBool("symbolicate.hex")
 		pemDB := viper.GetString("symbolicate.pem-db")
 		signaturesDir := viper.GetString("symbolicate.signatures")
 		extrasDir := viper.GetString("symbolicate.extra")
@@ -123,6 +126,7 @@ var symbolicateCmd = &cobra.Command{
 				Process:       proc,
 				Unslid:        unslide,
 				Demangle:      demangleFlag,
+				Hex:           asHex,
 				PemDB:         pemDB,
 				SignaturesDir: signaturesDir,
 				ExtrasDir:     extrasDir,

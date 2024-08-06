@@ -96,6 +96,7 @@ type Config struct {
 	Process       string
 	Unslid        bool
 	Demangle      bool
+	Hex           bool
 	Verbose       bool
 	PemDB         string
 	SignaturesDir string
@@ -1400,6 +1401,9 @@ func (i *Ips) String() string {
 						symloc := ""
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+							if i.Config.Hex {
+								symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
+							}
 						}
 						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), symloc)
 					}
@@ -1424,6 +1428,9 @@ func (i *Ips) String() string {
 						symloc := ""
 						if f.SymbolLocation > 0 {
 							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+							if i.Config.Hex {
+								symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
+							}
 						}
 						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", f.ImageOffset), slide, colorField(f.Symbol), symloc)
 					}
@@ -1504,6 +1511,9 @@ func (i *Ips) String() string {
 					symloc := ""
 					if f.SymbolLocation > 0 {
 						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+						if i.Config.Hex {
+							symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
+						}
 					}
 					fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), symloc)
 				}
@@ -1578,6 +1588,9 @@ func (i *Ips) String() string {
 				symloc := ""
 				if f.SymbolLocation > 0 {
 					symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
+					if i.Config.Hex {
+						symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
+					}
 				}
 				fmt.Fprintf(w, "  %02d: %s\t%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", i.Payload.UsedImages[f.ImageIndex].Base+f.ImageOffset), colorField(f.Symbol), symloc)
 			}
