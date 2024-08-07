@@ -2,7 +2,6 @@ package ssh
 
 import (
 	_ "embed"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -16,8 +15,6 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-const defaultKeyPath = "$HOME/.ssh/id_rsa"
-
 var (
 	//go:embed data/debugserver.plist
 	entitlementsData []byte
@@ -27,19 +24,33 @@ var (
 	symbolicationPlistData []byte
 )
 
-func keyString(k ssh.PublicKey) string {
-	return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
-}
+func hostKeyCallback(path string) ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		kh, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600) //nolint:gomnd
+		if err != nil {
+			return fmt.Errorf("failed to open known_hosts: %w", err)
+		}
+		defer func() { _ = kh.Close() }()
 
-func addHostKey(knownHosts string, remote net.Addr, pubKey ssh.PublicKey) error {
-	f, err := os.OpenFile(knownHosts, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open known_hosts: %w", err)
+		callback, err := knownhosts.New(kh.Name())
+		if err != nil {
+			return fmt.Errorf("failed to check known_hosts: %w", err)
+		}
+
+		if err := callback(hostname, remote, key); err != nil {
+			var kerr *knownhosts.KeyError
+			if errors.As(err, &kerr) {
+				if len(kerr.Want) > 0 {
+					return fmt.Errorf("possible man-in-the-middle attack: %w", err)
+				}
+				// if want is empty, it means the host was not in the known_hosts file, so lets add it there.
+				fmt.Fprintln(kh, knownhosts.Line([]string{hostname}, key))
+				return nil
+			}
+			return fmt.Errorf("failed to check known_hosts: %w", err)
+		}
+		return nil
 	}
-	defer f.Close()
-
-	_, err = f.WriteString(knownhosts.Line([]string{knownhosts.Normalize(remote.String())}, pubKey))
-	return err
 }
 
 // Config is the configuration for an SSH connection
@@ -68,9 +79,6 @@ func NewSSH(conf *Config) (*SSH, error) {
 
 	var signer ssh.Signer
 	if len(conf.Key) > 0 {
-		if conf.Key == defaultKeyPath {
-			conf.Key = filepath.Join(home, ".ssh", "id_rsa")
-		}
 		key, err := os.ReadFile(conf.Key)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read private key: %w", err)
@@ -86,34 +94,21 @@ func NewSSH(conf *Config) (*SSH, error) {
 		sshConfig = &ssh.ClientConfig{
 			User: "root",
 			Auth: []ssh.AuthMethod{
-				ssh.PublicKeys(signer),
-				ssh.Password("alpine"),
+				ssh.Password(conf.Pass),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		}
 	} else {
-		// create known_hosts file if it doesn't exist
-		if _, err := os.Stat(knownhostsPath); errors.Is(err, os.ErrNotExist) {
-			f, err := os.OpenFile(knownhostsPath, os.O_CREATE, 0600)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create known_hosts: %w", err)
-			}
-			f.Close()
-		}
-
-		hostKeyCallback, err := knownhosts.New(knownhostsPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ssh host key callback: %w", err)
-		}
-
 		sshConfig = &ssh.ClientConfig{
 			User: "root",
 			Auth: []ssh.AuthMethod{
-				ssh.PublicKeys(signer),
-				ssh.Password("alpine"),
+				ssh.Password(conf.Pass),
 			},
-			HostKeyCallback: hostKeyCallback,
+			HostKeyCallback: hostKeyCallback(knownhostsPath),
 		}
+	}
+	if signer != nil {
+		sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
 	}
 
 	client, err := ssh.Dial("tcp", conf.Host+":"+conf.Port, sshConfig)
@@ -310,23 +305,9 @@ func (s *SSH) EnableSymbolication() error {
 func (s *SSH) GetShshBlobs() ([]byte, error) {
 	session, err := s.client.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %s", err)
+		return nil, fmt.Errorf("failed to create ssh session: %w", err)
 	}
 	defer session.Close()
 
-	r, err := session.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := session.Start("cat /dev/rdisk1 | dd bs=256 count=$((0x4000))"); err != nil {
-		return nil, err
-	}
-
-	var out []byte
-	if _, err := r.Read(out); err != nil {
-		return nil, err
-	}
-
-	return out, session.Wait()
+	return session.Output("cat /dev/rdisk1 | dd bs=256 count=$((0x4000))")
 }
