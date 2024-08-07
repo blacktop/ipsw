@@ -35,14 +35,16 @@ func (r KDKDate) Format(s string) string {
 
 // KDK is a Kernel Development Kit download object
 type KDK struct {
-	Build     string  `json:"build,omitempty"`
-	Date      KDKDate `json:"date,omitempty"`
-	FileSize  int     `json:"fileSize,omitempty"`
-	Md5Sum    string  `json:"md5sum,omitempty"`
-	Name      string  `json:"name,omitempty"`
-	Sha256Sum string  `json:"sha256sum,omitempty"`
-	URL       string  `json:"url,omitempty"`
-	Version   string  `json:"version,omitempty"`
+	Build          string            `json:"build,omitempty"`
+	Date           KDKDate           `json:"date,omitempty"`
+	FileSize       int               `json:"fileSize,omitempty"`
+	KernelVersions map[string]string `json:"kernel_versions"`
+	Md5Sum         string            `json:"md5sum,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	Seen           time.Time         `json:"seen,omitempty"`
+	Sha256Sum      string            `json:"sha256sum,omitempty"`
+	URL            string            `json:"url,omitempty"`
+	Version        string            `json:"version,omitempty"`
 }
 
 type KDKs []KDK
@@ -52,7 +54,7 @@ func (ks KDKs) Len() int {
 }
 
 func (ks KDKs) Less(i, j int) bool {
-	return time.Time(ks[i].Date).After(time.Time((ks[j].Date)))
+	return time.Time(ks[i].Seen).After(time.Time((ks[j].Seen)))
 }
 
 func (ks KDKs) Swap(i, j int) {

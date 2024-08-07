@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -40,9 +41,13 @@ import (
 func init() {
 	DownloadCmd.AddCommand(downloadKdkCmd)
 	downloadKdkCmd.Flags().Bool("host", false, "Download KDK for current host OS")
+	downloadKdkCmd.Flags().StringP("build", "b", "", "Download KDK for build")
+	downloadKdkCmd.Flags().BoolP("latest", "l", false, "Download latest KDK")
+	downloadKdkCmd.Flags().BoolP("all", "a", false, "Download all KDKs")
 	downloadKdkCmd.Flags().BoolP("install", "i", false, "Install KDK after download")
 	downloadKdkCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadKdkCmd.MarkFlagDirname("output")
+	downloadKdkCmd.MarkFlagsMutuallyExclusive("host", "build", "latest", "all")
 	downloadKdkCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
@@ -55,6 +60,9 @@ func init() {
 		c.Parent().HelpFunc()(c, s)
 	})
 	viper.BindPFlag("download.kdk.host", downloadKdkCmd.Flags().Lookup("host"))
+	viper.BindPFlag("download.kdk.build", downloadKdkCmd.Flags().Lookup("build"))
+	viper.BindPFlag("download.kdk.latest", downloadKdkCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.kdk.all", downloadKdkCmd.Flags().Lookup("all"))
 	viper.BindPFlag("download.kdk.install", downloadKdkCmd.Flags().Lookup("install"))
 	viper.BindPFlag("download.kdk.output", downloadKdkCmd.Flags().Lookup("output"))
 }
@@ -87,6 +95,9 @@ var downloadKdkCmd = &cobra.Command{
 		restartAll := viper.GetBool("download.restart-all")
 		// flags
 		forHost := viper.GetBool("download.kdk.host")
+		forBuild := viper.GetString("download.kdk.build")
+		latest := viper.GetBool("download.kdk.latest")
+		all := viper.GetBool("download.kdk.all")
 		install := viper.GetBool("download.kdk.install")
 		output := viper.GetString("download.kdk.output")
 
@@ -95,7 +106,7 @@ var downloadKdkCmd = &cobra.Command{
 			return err
 		}
 
-		var aKDK download.KDK
+		var dlKDKs []download.KDK
 
 		if forHost {
 			binfo, err := utils.GetBuildInfo()
@@ -105,7 +116,7 @@ var downloadKdkCmd = &cobra.Command{
 			found := false
 			for _, kdk := range kdks {
 				if kdk.Version == binfo.ProductVersion && kdk.Build == binfo.BuildVersion {
-					aKDK = kdk
+					dlKDKs = append(dlKDKs, kdk)
 					found = true
 					break
 				}
@@ -113,6 +124,24 @@ var downloadKdkCmd = &cobra.Command{
 			if !found {
 				return fmt.Errorf("failed to find KDK for %s (%s)", binfo.ProductVersion, binfo.BuildVersion)
 			}
+		} else if len(forBuild) > 0 {
+			found := false
+			for _, kdk := range kdks {
+				if kdk.Build == forBuild {
+					dlKDKs = append(dlKDKs, kdk)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("failed to find KDK for '%s'", forBuild)
+			}
+		} else if latest {
+			// sort by seen date
+			sort.Sort(kdks)
+			dlKDKs = append(dlKDKs, kdks[0])
+		} else if all {
+			dlKDKs = append(dlKDKs, kdks...)
 		} else {
 			var choices []string
 			for _, kdk := range kdks {
@@ -132,36 +161,42 @@ var downloadKdkCmd = &cobra.Command{
 
 			for _, kdk := range kdks {
 				if kdk.Name == choice {
-					aKDK = kdk
+					dlKDKs = append(dlKDKs, kdk)
 					break
 				}
 			}
 		}
 
-		destName := path.Base(aKDK.URL)
-		if len(output) > 0 {
-			destName = filepath.Join(filepath.Clean(output), path.Base(aKDK.URL))
-		}
-		if err := os.MkdirAll(filepath.Dir(destName), 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %v", err)
+		if len(dlKDKs) > 1 && install {
+			log.Warn("Installing multiple KDKs")
 		}
 
-		if _, err := os.Stat(destName); os.IsNotExist(err) {
-			log.Infof("Downloading to %s...", destName)
-			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
-			downloader.URL = aKDK.URL
-			downloader.DestName = destName
-			if err := downloader.Do(); err != nil {
-				return err
+		for _, kdk := range dlKDKs {
+			destName := path.Base(kdk.URL)
+			if len(output) > 0 {
+				destName = filepath.Join(filepath.Clean(output), path.Base(kdk.URL))
 			}
-		} else {
-			log.Warnf("File already exists: %s", destName)
-		}
+			if err := os.MkdirAll(filepath.Dir(destName), 0755); err != nil {
+				return fmt.Errorf("failed to create directory: %v", err)
+			}
 
-		if install {
-			log.Infof("Installing %s...", destName)
-			if err := utils.InstallKDK(destName); err != nil {
-				return err
+			if _, err := os.Stat(destName); os.IsNotExist(err) {
+				log.Infof("Downloading to %s...", destName)
+				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+				downloader.URL = kdk.URL
+				downloader.DestName = destName
+				if err := downloader.Do(); err != nil {
+					return err
+				}
+			} else {
+				log.Warnf("File already exists: %s", destName)
+			}
+
+			if install {
+				log.Infof("Installing %s...", destName)
+				if err := utils.InstallKDK(destName); err != nil {
+					return err
+				}
 			}
 		}
 
