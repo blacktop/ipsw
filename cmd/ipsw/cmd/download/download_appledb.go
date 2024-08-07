@@ -60,6 +60,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	downloadAppledbCmd.Flags().Bool("show-latest", false, "Show latest version/build")
 	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
+	downloadAppledbCmd.Flags().Bool("deltas", false, "Download all OTA deltas")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().BoolP("json", "j", false, "Dump DB query results as JSON")
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
@@ -82,6 +83,7 @@ func init() {
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.appledb.show-latest", downloadAppledbCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.appledb.prereq-build", downloadAppledbCmd.Flags().Lookup("prereq-build"))
+	viper.BindPFlag("download.appledb.deltas", downloadAppledbCmd.Flags().Lookup("deltas"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.json", downloadAppledbCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
@@ -165,6 +167,7 @@ var downloadAppledbCmd = &cobra.Command{
 		isRC := viper.GetBool("download.appledb.rc")
 		latest := viper.GetBool("download.appledb.latest")
 		prereqBuild := viper.GetString("download.appledb.prereq-build")
+		otaDeltas := viper.GetBool("download.appledb.deltas")
 		output := viper.GetString("download.appledb.output")
 		useAPI := viper.GetBool("download.appledb.api")
 		apiToken := viper.GetString("download.appledb.api-token")
@@ -188,6 +191,12 @@ var downloadAppledbCmd = &cobra.Command{
 			return fmt.Errorf("cannot use --beta, --rc or --latest with --build")
 		}
 		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
+			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
+		}
+		if len(prereqBuild) > 0 && otaDeltas {
+			return fmt.Errorf("cannot use --prereq-build with --deltas")
+		}
+		if otaDeltas && !(fwType == "ota" || fwType == "rsr") {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
 		}
 		if viper.GetBool("download.appledb.show-latest") && (asURLs || asJSON || kernel || len(pattern) > 0 || fcsKeys || fcsKeysJson) {
@@ -237,6 +246,7 @@ var downloadAppledbCmd = &cobra.Command{
 				Version:           version,
 				Build:             build,
 				PrerequisiteBuild: prereqBuild,
+				Deltas:            otaDeltas,
 				Device:            device,
 				IsRelease:         isRelease,
 				IsBeta:            isBeta,
@@ -270,6 +280,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Version:           version,
 					Build:             build,
 					PrerequisiteBuild: prereqBuild,
+					Deltas:            otaDeltas,
 					Device:            device,
 					IsRelease:         isRelease,
 					IsBeta:            isBeta,
@@ -318,6 +329,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Version:           version,
 					Build:             build,
 					PrerequisiteBuild: prereqBuild,
+					Deltas:            otaDeltas,
 					Device:            device,
 					IsRelease:         isRelease,
 					IsBeta:            isBeta,

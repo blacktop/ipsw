@@ -230,13 +230,16 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			}
 			sources = tmpSources
 		} else {
-			var tmpSources []OsFileSource
-			for _, source := range sources {
-				if len(source.PrerequisiteBuild.Builds) == 0 {
-					tmpSources = append(tmpSources, source)
+			// if deltas are NOT requested, filter out sources that have prerequisite builds (only take full OTAs)
+			if !query.Deltas {
+				var tmpSources []OsFileSource
+				for _, source := range sources {
+					if len(source.PrerequisiteBuild.Builds) == 0 {
+						tmpSources = append(tmpSources, source)
+					}
 				}
+				sources = tmpSources
 			}
-			sources = tmpSources
 		}
 	}
 
@@ -249,6 +252,7 @@ type ADBQuery struct {
 	Version           string
 	Build             string
 	PrerequisiteBuild string
+	Deltas            bool
 	Device            string
 	IsRelease         bool
 	IsBeta            bool
