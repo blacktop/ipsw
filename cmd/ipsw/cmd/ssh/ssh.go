@@ -31,7 +31,7 @@ func init() {
 	SSHCmd.PersistentFlags().StringP("port", "p", "2222", "ssh port")
 	SSHCmd.PersistentFlags().StringP("user", "u", "root", "ssh user")
 	SSHCmd.PersistentFlags().StringP("password", "s", "alpine", "ssh password")
-	SSHCmd.PersistentFlags().StringP("key", "i", "$HOME/.ssh/id_rsa", "ssh key")
+	SSHCmd.PersistentFlags().StringP("key", "i", "", "ssh key (e.g. ~/.ssh/id_rsa)")
 	SSHCmd.PersistentFlags().BoolP("insecure", "n", false, "ignore known_hosts")
 	viper.BindPFlag("ssh.host", SSHCmd.Flags().Lookup("host"))
 	viper.BindPFlag("ssh.port", SSHCmd.Flags().Lookup("port"))
