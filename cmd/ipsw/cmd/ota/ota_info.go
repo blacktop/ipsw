@@ -22,6 +22,7 @@ THE SOFTWARE.
 package ota
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/apex/log"
@@ -33,6 +34,8 @@ import (
 
 func init() {
 	OtaCmd.AddCommand(otaInfoCmd)
+	otaInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("ota.info.json", otaInfoCmd.Flags().Lookup("json"))
 }
 
 // otaInfoCmd represents the info command
@@ -59,9 +62,17 @@ var otaInfoCmd = &cobra.Command{
 			return fmt.Errorf("failed to get OTA info: %v", err)
 		}
 
-		fmt.Println("\n[OTA Info]")
-		fmt.Println("==========")
-		fmt.Println(inf)
+		if viper.GetBool("ota.info.json") {
+			dat, err := json.Marshal(inf)
+			if err != nil {
+				return fmt.Errorf("failed to marshal OTA info: %v", err)
+			}
+			fmt.Println(string(dat))
+		} else {
+			fmt.Println("\n[OTA Info]")
+			fmt.Println("==========")
+			fmt.Println(inf)
+		}
 
 		return nil
 
