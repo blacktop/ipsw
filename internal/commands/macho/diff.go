@@ -11,12 +11,13 @@ import (
 )
 
 type DiffConfig struct {
-	Markdown bool
-	Color    bool
-	DiffTool string
-	Filter   []string
-	CStrings bool
-	PemDB    string
+	Markdown  bool
+	Color     bool
+	DiffTool  string
+	AllowList []string
+	BlockList []string
+	CStrings  bool
+	PemDB     string
 }
 
 type MachoDiff struct {
@@ -42,8 +43,13 @@ type DiffInfo struct {
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	var secs []section
 	for _, s := range m.Sections {
-		if len(conf.Filter) > 0 {
-			if !slices.Contains(conf.Filter, s.Seg+"."+s.Name) {
+		if len(conf.AllowList) > 0 {
+			if !slices.Contains(conf.AllowList, s.Seg+"."+s.Name) {
+				continue
+			}
+		}
+		if len(conf.BlockList) > 0 {
+			if slices.Contains(conf.BlockList, s.Seg+"."+s.Name) {
 				continue
 			}
 		}
