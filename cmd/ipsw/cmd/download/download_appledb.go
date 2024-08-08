@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -174,12 +175,12 @@ var downloadAppledbCmd = &cobra.Command{
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
 		for _, osType := range osTypes {
-			if !utils.StrSliceHas(supportedOSes, osType) {
-				return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
+			if !slices.Contains(supportedOSes, osType) {
+				return fmt.Errorf("valid --os flag choices are: %v", strings.Join(supportedOSes, ", "))
 			}
 		}
-		if !utils.StrSliceHas(supportedFWs, fwType) {
-			return fmt.Errorf("valid --type flag choices are: %v", supportedFWs)
+		if !slices.Contains(supportedFWs, fwType) {
+			return fmt.Errorf("valid --type flag choices are: %v", strings.Join(supportedFWs, ", "))
 		}
 		if (asURLs || asJSON) && (kernel || len(pattern) > 0) {
 			return fmt.Errorf("cannot use (--urls OR --json) with (--kernel, --pattern OR --fcs-key)")
@@ -215,7 +216,7 @@ var downloadAppledbCmd = &cobra.Command{
 
 		if fwType == "rsr" {
 			for idx, osType := range osTypes {
-				if utils.StrSliceContains(supportedRsrOSes, osType) {
+				if slices.Contains(supportedRsrOSes, osType) {
 					osTypes[idx] = filepath.Join("Rapid Security Responses", osType)
 				} else {
 					return fmt.Errorf("for --type 'rsr', the valid --os choices are: %v", supportedRsrOSes)

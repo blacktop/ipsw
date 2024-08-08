@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"slices"
 
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/mount"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/gin-gonic/gin"
 )
@@ -70,7 +70,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 			}
 		}
 		dmgType := c.Param("type")
-		if !utils.StrSliceContains([]string{"app", "sys", "fs"}, dmgType) {
+		if !slices.Contains([]string{"app", "sys", "fs"}, dmgType) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
 			return
 		}
