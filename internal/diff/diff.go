@@ -51,17 +51,18 @@ type PlistDiff struct {
 }
 
 type Config struct {
-	Title    string
-	IpswOld  string
-	IpswNew  string
-	KDKs     []string
-	LaunchD  bool
-	Firmware bool
-	Features bool
-	CStrings bool
-	Filter   []string
-	PemDB    string
-	Output   string
+	Title     string
+	IpswOld   string
+	IpswNew   string
+	KDKs      []string
+	LaunchD   bool
+	Firmware  bool
+	Features  bool
+	CStrings  bool
+	AllowList []string
+	BlockList []string
+	PemDB     string
+	Output    string
 }
 
 // Context is the context for the diff
@@ -431,11 +432,12 @@ func (d *Diff) parseKernelcache() error {
 	defer m2.Close()
 
 	d.Kexts, err = kcmd.Diff(m1, m2, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
-		CStrings: d.conf.CStrings,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -554,11 +556,12 @@ func (d *Diff) parseDSC() error {
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
-		CStrings: d.conf.CStrings,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -587,11 +590,12 @@ func (d *Diff) parseEntitlements() (string, error) {
 
 func (d *Diff) parseMachos() (err error) {
 	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
-		CStrings: d.conf.CStrings,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	return
 }
@@ -621,11 +625,12 @@ func (d *Diff) parseLaunchdPlists() error {
 
 func (d *Diff) parseFirmwares() (err error) {
 	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
-		CStrings: d.conf.CStrings,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	return
 }

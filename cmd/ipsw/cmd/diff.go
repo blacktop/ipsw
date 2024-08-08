@@ -46,7 +46,8 @@ func init() {
 	diffCmd.Flags().Bool("fw", false, "Diff other firmwares")
 	diffCmd.Flags().Bool("feat", false, "Diff feature flags")
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
-	diffCmd.Flags().StringSliceP("filter", "f", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
+	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
+	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	diffCmd.MarkFlagDirname("output")
 	diffCmd.MarkFlagsMutuallyExclusive("markdown", "json", "html")
@@ -60,7 +61,8 @@ func init() {
 	viper.BindPFlag("diff.fw", diffCmd.Flags().Lookup("fw"))
 	viper.BindPFlag("diff.feat", diffCmd.Flags().Lookup("feat"))
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
-	viper.BindPFlag("diff.filter", diffCmd.Flags().Lookup("filter"))
+	viper.BindPFlag("diff.allow-list", diffCmd.Flags().Lookup("allow-list"))
+	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 }
 
@@ -113,16 +115,17 @@ var diffCmd = &cobra.Command{
 				return fmt.Errorf("you must specify two IPSWs to diff")
 			}
 			d = diff.New(&diff.Config{
-				Title:    viper.GetString("diff.title"),
-				IpswOld:  filepath.Clean(args[0]),
-				IpswNew:  filepath.Clean(args[1]),
-				KDKs:     viper.GetStringSlice("diff.kdk"),
-				LaunchD:  viper.GetBool("diff.launchd"),
-				Firmware: viper.GetBool("diff.fw"),
-				Features: viper.GetBool("diff.feat"),
-				CStrings: viper.GetBool("diff.strs"),
-				Filter:   viper.GetStringSlice("diff.filter"),
-				Output:   viper.GetString("diff.output"),
+				Title:     viper.GetString("diff.title"),
+				IpswOld:   filepath.Clean(args[0]),
+				IpswNew:   filepath.Clean(args[1]),
+				KDKs:      viper.GetStringSlice("diff.kdk"),
+				LaunchD:   viper.GetBool("diff.launchd"),
+				Firmware:  viper.GetBool("diff.fw"),
+				Features:  viper.GetBool("diff.feat"),
+				CStrings:  viper.GetBool("diff.strs"),
+				AllowList: viper.GetStringSlice("diff.allow-list"),
+				BlockList: viper.GetStringSlice("diff.block-list"),
+				Output:    viper.GetString("diff.output"),
 			})
 			if err := d.Diff(); err != nil {
 				return err
