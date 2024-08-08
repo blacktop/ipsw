@@ -807,7 +807,7 @@ func (o *ObjC) XCFramework() error {
 			reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
 		}
 	}
-	t, err := tbd.NewTBD(image, reexports, false, false)
+	t, err := tbd.NewTBD(image, reexports, false)
 	if err != nil {
 		return fmt.Errorf("failed to create tbd: %w", err)
 	}
