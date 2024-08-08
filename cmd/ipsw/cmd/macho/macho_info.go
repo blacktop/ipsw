@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"unicode"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alecthomas/chroma/v2/quick"
@@ -946,7 +947,7 @@ var machoInfoCmd = &cobra.Command{
 			}
 			// TODO: add option to dump all strings - https://github.com/robpike/strings/blob/master/strings.go
 			for _, sec := range m.Sections {
-				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
+				if sec.Flags.IsCstringLiterals() || sec.Name == "__os_log" || (sec.Seg == "__TEXT" && sec.Name == "__const") {
 					off, err := m.GetOffset(sec.Addr)
 					if err != nil {
 						return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
@@ -956,26 +957,28 @@ var machoInfoCmd = &cobra.Command{
 						return fmt.Errorf("failed to read cstring data in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
 
+					fmt.Printf("\n[%s.%s]\n", sec.Seg, sec.Name)
+
 					csr := bytes.NewBuffer(dat)
 
 					for {
 						pos := sec.Addr + uint64(csr.Cap()-csr.Len())
 
 						s, err := csr.ReadString('\x00')
-
-						if err == io.EOF {
-							break
-						}
-
 						if err != nil {
+							if err == io.EOF {
+								break
+							}
 							return fmt.Errorf("failed to read string: %v", err)
 						}
 
 						s = strings.Trim(s, "\x00")
 
 						if len(s) > 0 {
-							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) { // TODO: does this skip unicode strings?
-								continue // skip non-ascii strings when dumping __TEXT.__const
+							for _, r := range s {
+								if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+									continue // skip non-ascii strings
+								}
 							}
 							fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
 						}
