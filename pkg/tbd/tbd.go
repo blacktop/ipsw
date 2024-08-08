@@ -36,7 +36,7 @@ type TBD struct {
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (*TBD, error) {
+func NewTBD(image *dyld.CacheImage, reexports []string, generic bool) (*TBD, error) {
 	var targets []string
 	var currentVersion string
 	var syms []string
@@ -135,16 +135,6 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (
 	if exports, err := m.GetExports(); err == nil {
 		for _, export := range exports {
 			syms = utils.UniqueAppend(syms, export.Name)
-		}
-	}
-
-	// get private symbols
-	if private {
-		if err := image.ParseLocalSymbols(false); err != nil {
-			return nil, err
-		}
-		for _, sym := range image.LocalSymbols {
-			syms = append(syms, sym.Name)
 		}
 	}
 

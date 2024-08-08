@@ -801,7 +801,7 @@ func OpenFromIPSW(ipswPath, pemDB string, driverKit, all bool) (*mount.Context, 
 	return ctx, fs, nil
 }
 
-func GetTBD(f *dyld.File, dylib string, private, generic bool) (string, error) {
+func GetTBD(f *dyld.File, dylib string, generic bool) (string, error) {
 	image, err := f.Image(dylib)
 	if err != nil {
 		return "", fmt.Errorf("image not in DSC: %v", err)
@@ -820,7 +820,7 @@ func GetTBD(f *dyld.File, dylib string, private, generic bool) (string, error) {
 		}
 	}
 
-	t, err := tbd.NewTBD(image, reexports, private, generic)
+	t, err := tbd.NewTBD(image, reexports, generic)
 	if err != nil {
 		return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
 	}
@@ -836,7 +836,7 @@ func GetTBD(f *dyld.File, dylib string, private, generic bool) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("image not in DSC: %v", err)
 			}
-			t, err := tbd.NewTBD(image, nil, private, generic)
+			t, err := tbd.NewTBD(image, nil, generic)
 			if err != nil {
 				return "", fmt.Errorf("failed to create tbd file for %s: %v", dylib, err)
 			}
