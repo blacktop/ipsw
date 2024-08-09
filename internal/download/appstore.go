@@ -207,8 +207,10 @@ type downloadMetrics struct {
 }
 
 type downloadSinfResult struct {
-	ID   int64  `plist:"id,omitempty"`
-	Data []byte `plist:"sinf,omitempty"`
+	ID     int64  `plist:"id,omitempty"`
+	Sinf   []byte `plist:"sinf,omitempty"`
+	Pinf   []byte `plist:"pinf,omitempty"`
+	DPInfo []byte `plist:"dpInfo,omitempty"`
 }
 
 type downloadAppResult struct {
@@ -952,7 +954,7 @@ func (as *AppStore) applySinfPatches(zip *zip.Writer, manifestData []byte, appBu
 			return fmt.Errorf("failed to create sinf file: %w", err)
 		}
 
-		if _, err := file.Write(pair.First.Data); err != nil {
+		if _, err := file.Write(pair.First.Sinf); err != nil {
 			return fmt.Errorf("failed to write sinf data: %w", err)
 		}
 	}
@@ -974,7 +976,7 @@ func (as *AppStore) applyLegacySinfPatches(zip *zip.Writer, infoData []byte, app
 		return fmt.Errorf("failed to create sinf file: %w", err)
 	}
 
-	if _, err := file.Write(info.Sinfs[0].Data); err != nil {
+	if _, err := file.Write(info.Sinfs[0].Sinf); err != nil {
 		return fmt.Errorf("failed to write sinf data: %w", err)
 	}
 
