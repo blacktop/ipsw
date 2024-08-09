@@ -18,6 +18,7 @@ ipsw ota info <OTA> [flags]
 
 ```
   -h, --help   help for info
+  -j, --json   Output as JSON
 ```
 
 ### Options inherited from parent commands

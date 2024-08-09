@@ -20,7 +20,6 @@ ipsw dyld tbd <DSC> <DYLIB> [flags]
   -g, --generic         Generate for ALL targets
   -h, --help            help for tbd
   -o, --output string   Directory to extract the dylibs (default: CWD)
-  -p, --private         Add private symbols
 ```
 
 ### Options inherited from parent commands

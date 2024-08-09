@@ -30,19 +30,20 @@ ipsw diff <IPSW> <IPSW> [flags]
 ### Options
 
 ```
-      --feat              Diff feature flags
-  -f, --filter strings    Filter MachO sections to diff (e.g. __TEXT.__text)
-      --fw                Diff other firmwares
-  -h, --help              help for diff
-      --html              Save diff as HTML file
-  -i, --in string         Path to IPSW .idiff file
-      --json              Save diff as JSON file
-  -k, --kdk stringArray   Path to KDKs to diff
-      --launchd           Diff launchd configs
-  -m, --markdown          Save diff as Markdown file
-  -o, --output string     Folder to save diff output
-      --strs              Diff MachO cstrings
-  -t, --title string      Title of the diff
+      --allow-list strings   Filter MachO sections to diff (e.g. __TEXT.__text)
+      --block-list strings   Remove MachO sections to diff (e.g. __TEXT.__info_plist)
+      --feat                 Diff feature flags
+      --fw                   Diff other firmwares
+  -h, --help                 help for diff
+      --html                 Save diff as HTML file
+  -i, --in string            Path to IPSW .idiff file
+      --json                 Save diff as JSON file
+  -k, --kdk stringArray      Path to KDKs to diff
+      --launchd              Diff launchd configs
+  -m, --markdown             Save diff as Markdown file
+  -o, --output string        Folder to save diff output
+      --strs                 Diff MachO cstrings
+  -t, --title string         Title of the diff
 ```
 
 ### Options inherited from parent commands

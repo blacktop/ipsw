@@ -31,6 +31,7 @@ ipsw download appledb [flags]
   -a, --api                   Use Github API
       --api-token string      Github API Token
       --beta                  Download beta IPSWs
+      --deltas                Download all OTA deltas
       --dyld                  Extract dyld_shared_cache(s) from remote OTA
       --fcs-keys              Download AEA1 DMG fcs-key pem files
       --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
