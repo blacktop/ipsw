@@ -27,7 +27,7 @@ ipsw ssh shsh [flags]
       --config string     config file (default is $HOME/.config/ipsw/config.yaml)
   -t, --host string       ssh host (default "localhost")
   -n, --insecure          ignore known_hosts
-  -i, --key string        ssh key (default "$HOME/.ssh/id_rsa")
+  -i, --key string        ssh key (e.g. ~/.ssh/id_rsa)
       --no-color          disable colorize output
   -s, --password string   ssh password (default "alpine")
   -p, --port string       ssh port (default "2222")
