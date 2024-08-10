@@ -438,10 +438,7 @@ func Mount(image, mountPoint string) error {
 	} else {
 		out, err := exec.Command("apfs-fuse", image, mountPoint).CombinedOutput()
 		if err != nil {
-			if _, perr := exec.LookPath("apfs-fuse"); perr != nil {
-				return fmt.Errorf("utils.Mount: 'apfs-fuse' not found (required on non-darwin systems): %v: %v: %s", perr, err, out)
-			}
-			return fmt.Errorf("%v: %s", err, out)
+			return fmt.Errorf("failed to mount '%s' via apfs-fuse: %v: cmd output - '%s'", image, err, out)
 		}
 	}
 
