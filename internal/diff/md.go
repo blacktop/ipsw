@@ -429,11 +429,11 @@ func (d *Diff) Markdown() error {
 
 	out.WriteString("## EOF\n")
 
-	// Write TOC.md
+	// Write README.md
 	if err := os.MkdirAll(d.conf.Output, 0o750); err != nil {
 		return err
 	}
-	fname := filepath.Join(d.conf.Output, "TOC.md")
-	log.Infof("Creating diff file Markdown TOC: %s", fname)
+	fname := filepath.Join(d.conf.Output, "README.md")
+	log.Infof("Creating diff file Markdown README: %s", fname)
 	return os.WriteFile(fname, []byte(out.String()), 0o644)
 }
