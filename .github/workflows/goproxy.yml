@@ -22,7 +22,7 @@ jobs:
           GOPROXY=${{ secrets.GOPROXY }} go mod tidy
 
       - name: Actions Status Discord
-        uses: sarisia/actions-status-discord@v1.14.6
+        uses: sarisia/actions-status-discord@v1.14.7
         if: always()
         with:
           webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}
