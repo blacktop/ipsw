@@ -20,16 +20,24 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
 1. Install the `ipsw` tool from [GitHub](https://github.com/blacktop/ipsw) if you haven't already.
 2. Fetch the latest **kernelcache** you’re interested in:
    ```bash
-   ❯ ipsw dl ipsw --build 21E219 --device iPad7,4 --kernel
-      • Parsing remote IPSW       build=21E219 device=iPad7,4 signed=false version=17.4
+   ❯ ipsw dl appledb --os iOS 
+                     --device iPhone16,2 
+                     --version 18.1 
+                     --beta 
+                     --latest 
+                     --kernel
+      • Querying AppleDB...
+         • Updating 'appledb' repo ~/.config/ipsw/appledb
+      • Parsing remote IPSW       build=22B5023e devices=iPhone16,2 version=18.1
       • Extracting remote kernelcache
-         • Created 21E219__iPad7,4/kernelcache.release.iPad7,1_2_3_4
+         • Created 22B5023e__iPhone16,2/kernelcache.release.iPhone16,2
    ```
 3. Check how many symbols we have to start with:
    ```bash
-   ❯ ipsw macho info kernelcache.release.iPad7,1_2_3_4 | grep LC_SYMTAB
+   ❯ ipsw macho info --fileset-entry com.apple.kernel \
+      '22B5023e__iPhone16,2/kernelcache.release.iPhone16,2' | grep LC_SYMTAB
 
-   018: LC_SYMTAB Symbol offset=0x009FE1D0, Num Syms: 6052, String offset=...
+   021: LC_SYMTAB Symbol offset=0x03AD8000, Num Syms: '0', String offset=...
    ```
 4. Get the **latest** signature files:
    ```bash
@@ -38,28 +46,24 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
 5. Use the new feature to **symbolicate** it:
    ```bash
    ❯ ipsw kernel symbolicate --signatures 'symbolicator/kernel' --json \
-                '21E219__iPad7,4/kernelcache.release.iPad7,1_2_3_4'
-      • Parsing Signatures       
-      • Symbolicating...          kernelcache=kernelcache.release.iPad7,1_2_3_4
-      • Found                     bsd_syscall_table=0xfffffff007156bd8
-      • Found                     mach_trap_table=0xfffffff00710d448
-      • Found                     mig_kern_subsystem table=0xfffffff0071009c8
-      • failed to get MIG subsystems error=failed to get MIG subsystems: EOF
-      • Analyzing MachO...        name=com.apple.kernel
-         • Signature Not Matched     macho=com.apple.kernel symbol=fbt_provide_probe
-         • Symbolicated              address=0xfffffff007337338 file=com.apple.kernel symbol=__stack_chk_fail
-         • Signature Not Matched     macho=com.apple.kernel symbol=kdp_packet
-         • Signature Not Matched     macho=com.apple.kernel symbol=kdp_set_breakpoint_internal
-         • Signature Not Matched     macho=com.apple.kernel symbol=kdp_remove_all_breakpoints
-         • Signature Not Matched     macho=com.apple.kernel symbol=kdp_unknown
-         • Symbolicated              address=0xfffffff00723aebc file=com.apple.kernel symbol=kernel_bootstrap
-            • Symbolicated (Caller)     address=0xfffffff00723aebc file=com.apple.kernel symbol=machine_startup
-            • Symbolicated (Caller)     address=0xfffffff00723aebc file=com.apple.kernel symbol=arm_init
-            • Symbolicated (Caller)     address=0xfffffff00723aebc file=com.apple.kernel symbol=_start_first_cpu
-            • Symbolicated (Caller)     address=0xfffffff00723aebc file=com.apple.kernel symbol=_LowResetVectorEnd
-         • Symbolicated              address=0xfffffff0071d3b5c file=com.apple.kernel symbol=finalize_kcdata                
+                '22B5023e__iPhone16,2/kernelcache.release.iPhone16,2'
+      • Parsing Signatures
+      • Symbolicating...          kernelcache=kernelcache.release.iPhone16,2
+      • Found                     bsd_syscall_table=0xfffffff007a3d3b0
+      • Found                     mach_trap_table=0xfffffff007a14028
+      • Found                     mig_kern_subsystem table=0xfffffff00a86ca78
+      • Analyzing MachO...        name=com.apple.AUC
+         • Symbolicated              address=0xfffffff0087cc7bc file=com.apple.AUC symbol=__ZN3AUC5startEP9IOService
+         • Symbolicated              address=0xfffffff0087ccd68 file=com.apple.AUC symbol=__ZN3AUC4freeEv
+         • Symbolicated              address=0xfffffff0087cd2c8 file=com.apple.AUC symbol=__ZN3AUC30checkForHooverProtocolRequiredEv
+            • Symbolicated (Caller)     address=0xfffffff0087cd2c8 file=com.apple.AUC symbol=__ZN3AUC26DPPluggedNotificationGatedEP9IOService
+            • Symbolicated (Caller)     address=0xfffffff0087cd2c8 file=com.apple.AUC symbol=__ZN3AUC31call_DPPluggedNotificationGatedEP9IOService
+         • Symbolicated              address=0xfffffff0087cc5c4 file=com.apple.AUC symbol=__ZN3AUC25AUCVideoInterfaceMatchingE12IOAVLocation
+            • Symbolicated (Caller)     address=0xfffffff0087cc5c4 file=com.apple.AUC symbol=__ZN3AUC26createDisplayNotificationsEv
+            • Symbolicated (Caller)     address=0xfffffff0087cc5c4 file=com.apple.AUC symbol=__ZN3AUC5startEP9IOService
+         • Symbolicated              address=0xfffffff0087cd6e4 file=com.apple.AUC symbol=__ZN3AUC22InterfaceStatusAndTypeEP18IOAVVideoInterfacePjS2_
          <SNIP>
-      • Writing symbols as JSON to 21E219__iPad7,4/kernelcache.release.iPad7,1_2_3_4.symbols.json      
+      • Writing symbols as JSON to 22B5023e__iPhone16,2/kernelcache.release.iPhone16,2.symbols.json      
    ```
 6. Install the **IDA Pro** [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins):
    ```bash
@@ -69,10 +73,10 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
    ![ida_load](./ida_load.webp)
 8. Press `Alt + F8` and watch as the new plugin kicks in, instantly transforming the stripped **kernelcache** into a fully symbolicated treasure trove of information.
 
-![IDAPro](https://raw.githubusercontent.com/blacktop/symbolicator/main/ida/docs/ida.png)
+   ![IDAPro](https://raw.githubusercontent.com/blacktop/symbolicator/main/ida/docs/ida.png)
 
-:::info GYATT
-#### Notice that's 20k *NEW* symbols!!
+:::info notice
+#### That's **20k** *NEW* symbols!!
 :::
 
 With this new feature, you can now see the NEW symbols directly in IDA Pro, allowing for deeper analysis and a better understanding of the **kernelcache** you’re working with.
