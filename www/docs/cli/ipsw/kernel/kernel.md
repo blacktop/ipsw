@@ -40,6 +40,7 @@ ipsw kernel [flags]
 * [ipsw kernel kexts](/docs/cli/ipsw/kernel/kexts)	 - List kernel extentions
 * [ipsw kernel mach](/docs/cli/ipsw/kernel/mach)	 - Dump kernelcache mach_traps
 * [ipsw kernel mig](/docs/cli/ipsw/kernel/mig)	 - Dump kernelcache mig subsystem
+* [ipsw kernel symbolicate](/docs/cli/ipsw/kernel/symbolicate)	 - Symbolicate kernelcache
 * [ipsw kernel symbolsets](/docs/cli/ipsw/kernel/symbolsets)	 - Dump kernel symbolsets
 * [ipsw kernel syscall](/docs/cli/ipsw/kernel/syscall)	 - Dump kernelcache syscalls
 * [ipsw kernel version](/docs/cli/ipsw/kernel/version)	 - Dump kernelcache version
