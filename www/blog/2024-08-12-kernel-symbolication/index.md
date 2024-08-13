@@ -292,7 +292,7 @@ By combining these powerful tools, you’re well-equipped to take your kernel an
 
 A few ideas I have to improve upon what we have now are:
 
-- These symbols also get ingested into the [symbol server](http://localhost:3001/ipsw/docs/guides/symbolicate#-symbol-server) when analyzing an **IPSW**, which means that a future version of the [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins) could query the server to *symbolicate* a *kernelcache* remotely.
+- These symbols also get ingested into the [symbol server](https://blacktop.github.io/ipsw/docs/guides/symbolicate#-symbol-server) when analyzing an **IPSW**, which means that a future version of the [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins) could query the server to *symbolicate* a *kernelcache* remotely.
 - Add binary pattern matching to the signature format to allow matching unique sets of opcodes/instructions to identify more symbols.
 - Identify static variables in the DATA __const section via strings/byte patterns.
 - Implement something similar to the epic [iometa](https://github.com/Siguza/iometa) tool to capture valuable C++ symbols.
