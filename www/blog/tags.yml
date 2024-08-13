@@ -1,0 +1,8 @@
+kernel:
+  label: Kernel
+  permalink: /kernel
+  description: IPSW kernel information
+symbolication:
+  label: Symbolication
+  permalink: /symbolication
+  description: IPSW symbolication
