@@ -77,7 +77,7 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
 
 With this new feature, you can now see the NEW symbols directly in IDA Pro, allowing for deeper analysis and a better understanding of the **kernelcache** you’re working with.
 
-### Another Demo: `panic` kernel frame back trace **symbolication**
+### Another Demo: `panic` kernel frames **symbolication**
 
 This NEW `ipsw` feature can also be used to enrich a `panic.ips` file:
 
@@ -86,7 +86,7 @@ This NEW `ipsw` feature can also be used to enrich a `panic.ips` file:
     'panic-full-2023-08-04-191003.000.ips' \
     'iPhone_4.7_15.4.1_19E258_Restore.ipsw' 
 ```
-:::info
+:::info panic
 <details>
   <summary><i>BEFORE</i></summary>
 
