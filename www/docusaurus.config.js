@@ -51,6 +51,14 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
         },
+        blog: {
+          showReadingTime: true,
+          feedOptions: {
+            type: ['rss', 'atom'],
+            xslt: true,
+          },
+          editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
+        },
         gtag: {
           trackingID: "G-6PLDXGZBEK",
           anonymizeIP: false,
@@ -155,6 +163,7 @@ const config = {
             position: "left",
             sidebarId: "api",
           },
+          { to: '/blog', label: 'Blog', position: 'left' },
           // {
           //   label: "DIFF",
           //   to: "/diff",
