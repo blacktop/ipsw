@@ -230,6 +230,8 @@ The magic behind this new feature lies in the signatures that are essential for 
 
 1. **Signature Extraction:** We use **IDA Pro** to analyze a symbolicated **KDK kernelcache**. Through this process, we extract unique signatures that correspond to various functions and elements within the **kernelcache**.
 2. **Integration with `ipsw`:** Once these signatures are extracted, they’re utilized by the `ipsw` tool to map the stripped **kernelcache**. This mapping process effectively restores the symbols, making the previously cryptic **kernelcache** readable and analyzable.
+   1. `ipsw` parses the **signature** files and applies them by leveraging it's internal disassembler to perform *light* emulation to track cstring XREFs and tracking down callers and symbol single XREF chains.
+   2. `ipsw` also parses the *syscall table*, *mach traps* and *mig subsystem* to add even **MORE** symbols.
 3. **IDA Pro Plugin:** The new IDA Pro [plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins/README.md), which accompanies this feature, automatically applies these symbols within your IDA Pro environment. This seamless integration means you can move from a stripped **kernelcache** to a fully symbolicated one in just a few steps.
 
 ### Signatures
@@ -275,8 +277,8 @@ Here is an example of [kernel/24/xnu.json](https://github.com/blacktop/symbolica
 :::info Notice  
 - The field `target` is used to limit what file the **signature** will be applied to. This one is for the `kernel` itself; others are for **KEXTs**.  
 - The field `total` is used for metrics and debugging how well the **signature** is performing.
-- The `version` field allows for **signature** versioning, meaning that there will be a **kernel** signature file for: `iOS 14`, `iOS 15`, `iOS 16`, `iOS 17`, and `iOS 18` etc.
-- The `signatures` field is an array of **symbols** and their **anchors** *(and which section they came from and the `caller` that uses it as an argument)*; there is also `backtrace`, which is an array of strings that represent its XREF chain.
+- The `version` field allows for **signature** versioning, meaning that there will be a **kernel** signature file for: **iOS 14**, **iOS 15**, **iOS 16**, **iOS 17**, and **iOS 18** etc.
+- The `signatures` field is an array of **symbols** and their `anchors` *(and which section they came from and the `caller` that uses it as an argument)*; there is also `backtrace`, which is an array of strings that represent its XREF chain.
 :::  
 
 ### Why This Matters
