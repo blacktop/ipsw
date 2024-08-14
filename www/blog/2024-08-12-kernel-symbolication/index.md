@@ -11,7 +11,7 @@ hide_table_of_contents: true
 
 ## 🔐 Unlocking the Power of Kernelcache Symbolication
 
-In the world of reverse engineering and kernel analysis, being able to **symbolicate** a stripped Apple **kernelcache** is a game-changer. With the latest feature added to `ipsw`, you can now effortlessly symbolicate a kernelcache, even when it’s stripped of symbols. To make it even better, we’ve integrated this functionality directly into IDA Pro via a brand new [plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins/README.md), streamlining the entire process for you.
+In the world of reverse engineering and kernel analysis, being able to **symbolicate** a stripped Apple **kernelcache** is a game-changer. With the latest feature added to `ipsw`, you can now effortlessly symbolicate a kernelcache, even when it’s stripped of symbols. To make it even better, we’ve integrated this functionality directly into IDA Pro via a brand new [plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida), streamlining the entire process for you.
 
 ### A Quick Demo: Symbolicating a Kernelcache in IDA Pro
 
@@ -65,7 +65,7 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
          <SNIP>
       • Writing symbols as JSON to 22B5023e__iPhone16,2/kernelcache.release.iPhone16,2.symbols.json      
    ```
-6. Install the **IDA Pro** [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins):
+6. Install the **IDA Pro** [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida):
    ```bash
    ❯ bash ida/plugins/install.sh
    ```
@@ -73,13 +73,19 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
    ![ida_load](./ida_load.webp)
 8. Press `Alt + F8` and watch as the new plugin kicks in, instantly transforming the stripped **kernelcache** into a fully symbolicated treasure trove of information.
 
-   ![IDAPro](https://raw.githubusercontent.com/blacktop/symbolicator/main/ida/docs/ida.png)
+   ![IDAPro](https://github.com/blacktop/symbolicator/blob/main/plugins/ida/docs/ida.png?raw=true)
 
 :::info notice
 #### That's **20k** *NEW* symbols!!
 :::
 
 With this new feature, you can now see the NEW symbols directly in IDA Pro, allowing for deeper analysis and a better understanding of the **kernelcache** you’re working with.
+
+:::info NOTE  
+We also have plugins for:
+- [Binary Ninja](https://github.com/blacktop/symbolicator/tree/main/plugins/binja)  
+- [Ghidra](https://github.com/blacktop/symbolicator/tree/main/plugins/ghidra)  
+:::  
 
 ### Another Demo: `panic` kernel frames **symbolication**
 
@@ -232,7 +238,7 @@ The magic behind this new feature lies in the signatures that are essential for 
 2. **Integration with `ipsw`:** Once these signatures are extracted, they’re utilized by the `ipsw` tool to map the stripped **kernelcache**. This mapping process effectively restores the symbols, making the previously cryptic **kernelcache** readable and analyzable.
    1. `ipsw` parses the **signature** files and applies them by leveraging it's internal disassembler to perform *light* emulation to track cstring XREFs and tracking down callers and symbol single XREF chains.
    2. `ipsw` also parses the *syscall table*, *mach traps* and *mig subsystem* to add even **MORE** symbols.
-3. **IDA Pro Plugin:** The new IDA Pro [plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins/README.md), which accompanies this feature, automatically applies these symbols within your IDA Pro environment. This seamless integration means you can move from a stripped **kernelcache** to a fully symbolicated one in just a few steps.
+3. **IDA Pro Plugin:** The new IDA Pro [plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida), which accompanies this feature, automatically applies these symbols within your IDA Pro environment. This seamless integration means you can move from a stripped **kernelcache** to a fully symbolicated one in just a few steps.
 
 ### Signatures
 
@@ -294,14 +300,12 @@ By combining these powerful tools, you’re well-equipped to take your kernel an
 
 A few ideas I have to improve upon what we have now are:
 
-- These symbols also get ingested into the [symbol server](/docs/guides/symbolicate#-symbol-server) when analyzing an **IPSW**, which means that a future version of the [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/ida/plugins) could query the server to *symbolicate* a *kernelcache* remotely.
+- These symbols also get ingested into the [symbol server](/docs/guides/symbolicate#-symbol-server) when analyzing an **IPSW**, which means that a future version of the [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida) could query the server to *symbolicate* a *kernelcache* remotely.
 - Add binary pattern matching to the signature format to allow matching unique sets of opcodes/instructions to identify more symbols.
 - Identify static variables in the DATA __const section via strings/byte patterns.
 - Implement something similar to the epic [iometa](https://github.com/Siguza/iometa) tool to capture valuable C++ symbols.
+- Add 'light' binary function matching by implementing the 'cheapest/fastest' heuristics from bindiff/diaphora etc
 
 🙏 **Help Wanted**
 
 - The hope in creating something like this publicly, is to have the community contribute *artisanal* hand-crafted signatures for some of their favorite/important symbols as well as help maintain these and keep them working long into the future.  
-- We'd ❤️ to also have **plugins** for:
-  - Ghidra
-  - Binary Ninja
