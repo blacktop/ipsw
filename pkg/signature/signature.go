@@ -254,8 +254,10 @@ func (sm SymbolMap) getMig(m *macho.File) error {
 			utils.Indent(log.WithError(err).Debug, 2)("Adding mig server_routine")
 		}
 		for idx, routine := range mig.Routines {
-			if err := sm.Add(routine.KStubRoutine, mig.LookupRoutineName(idx)); err != nil {
-				utils.Indent(log.WithError(err).Debug, 2)("Adding mig routine")
+			if routine.KStubRoutine != 0 {
+				if err := sm.Add(routine.KStubRoutine, mig.LookupRoutineName(idx)); err != nil {
+					utils.Indent(log.WithError(err).Debug, 2)("Adding mig routine")
+				}
 			}
 		}
 	}
