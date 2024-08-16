@@ -20,12 +20,13 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
 1. Install the `ipsw` tool from [GitHub](https://github.com/blacktop/ipsw) if you haven't already.
 2. Fetch the latest **kernelcache** you’re interested in:
    ```bash
-   ❯ ipsw dl appledb --os iOS 
-                     --device iPhone16,2 
-                     --version 18.1 
-                     --beta 
-                     --latest 
+   ❯ ipsw dl appledb --os iOS \
+                     --device iPhone16,2 \
+                     --version 18.1 \
+                     --beta \
+                     --latest \
                      --kernel
+                 
       • Querying AppleDB...
          • Updating 'appledb' repo ~/.config/ipsw/appledb
       • Parsing remote IPSW   build=22B5023e devices=iPhone16,2 version=18.1
@@ -67,7 +68,7 @@ Let’s jump straight into the action. Here’s how you can use the new feature:
    ```
 6. Install the **IDA Pro** [Symbolicate Plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida):
    ```bash
-   ❯ bash ida/plugins/install.sh
+   ❯ bash plugins/ida/install.sh
    ```
 7. Load the **kernelcache** into **IDA Pro**.
    ![ida_load](./ida_load.webp)
