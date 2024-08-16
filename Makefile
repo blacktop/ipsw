@@ -128,6 +128,12 @@ update_frida: ## Updates the frida-core-devkits used in the frida cmd
 	@echo " > Updating frida-core-devkits"
 	@hack/make/frida-deps
 
+.PHONY: update_proxy
+update_proxy: ## Update the proxy pkgs
+	@echo " > Updating proxy list"
+	@GOPROXY=${IPSW_GO_PROXY} go mod download all
+	@GOPROXY=${IPSW_GO_PROXY} go mod tidy
+
 .PHONY: work-macho
 work-macho: ## Work on go-macho package
 	@echo " > Working on go-macho package"
