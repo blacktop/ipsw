@@ -7,10 +7,12 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"maps"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -125,20 +127,15 @@ func Reverse[T any](input []T) {
 	}
 }
 
-func Difference[T comparable](l1 []T, l2 []T) (diff []T) {
-	m := make(map[T]bool)
-
-	for _, item := range l2 {
-		m[item] = true
+func Difference[T comparable](a []T, b []T) []T {
+	amap := make(map[T]bool)
+	for _, item := range a {
+		amap[item] = true
 	}
-
-	for _, item := range l1 {
-		if _, ok := m[item]; !ok {
-			diff = append(diff, item)
-		}
+	for _, item := range b {
+		delete(amap, item)
 	}
-
-	return
+	return slices.Collect(maps.Keys(amap))
 }
 
 // ReverseBytes reverse byte array order

@@ -2,12 +2,12 @@ package macho
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
-	"golang.org/x/exp/maps"
 )
 
 type DiffConfig struct {
@@ -78,7 +78,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	if conf.CStrings {
 		if cs, err := m.GetCStrings(); err == nil {
 			for _, val := range cs {
-				str2addr := maps.Keys(val)
+				str2addr := slices.Collect(maps.Keys(val))
 				strs = append(strs, str2addr...)
 			}
 			slices.Sort(strs)
@@ -141,24 +141,16 @@ func (i *DiffInfo) String() string {
 
 func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfig) error {
 
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
 	/* DIFF IPSW */
-	diff.New = utils.Difference(nextFiles, prevFiles)
-	diff.Removed = utils.Difference(prevFiles, nextFiles)
+	diff.New = utils.Difference(slices.Collect(maps.Keys(next)), slices.Collect(maps.Keys(prev)))
+	diff.Removed = utils.Difference(slices.Collect(maps.Keys(prev)), slices.Collect(maps.Keys(next)))
+
+	if len(diff.New) > 0 || len(diff.Removed) > 0 {
+		println("WHAT")
+	}
 
 	var err error
-	for _, f2 := range nextFiles {
+	for _, f2 := range slices.Sorted(maps.Keys(next)) {
 		dat2 := next[f2]
 		if dat1, ok := prev[f2]; ok {
 			if dat2.Equal(*dat1) {
