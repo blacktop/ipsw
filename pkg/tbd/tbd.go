@@ -20,8 +20,8 @@ var macOs64bitArmTargets = []string{"arm64-macos", "arm64e-macos"}
 var macCatalyst32bitTargets = []string{"i386-maccatalyst"}
 var macCatalyst64bitIntelTargets = []string{"x86_64-maccatalyst", "x86_64h-maccatalyst"}
 var macCatalyst64bitArmTargets = []string{"arm64-maccatalyst", "arm64e-maccatalyst"}
-var iOS32bitTargets = []string{"armv7-ios", "armv7s-ios"}
-var iOS64bitTargets = []string{"arm64-ios", "arm64e-ios"}
+var iOS32bitTargets = []string{"armv7-ios", "armv7s-ios", "i386-ios-simulator"}
+var iOS64bitTargets = []string{"arm64-ios", "arm64e-ios", "x86_64-ios-simulator", "arm64-ios-simulator"}
 
 // TBD object
 type TBD struct {
