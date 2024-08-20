@@ -50,7 +50,7 @@ var lipoCmd = &cobra.Command{
 	Use:     "lipo",
 	Aliases: []string{"l"},
 	Short:   "Extract single MachO out of a universal/fat MachO",
-	Args:    cobra.MinimumNArgs(1),
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var farch macho.FatArch
@@ -72,66 +72,64 @@ var lipoCmd = &cobra.Command{
 
 		// first check for fat file
 		fat, err := macho.OpenFat(machoPath)
-		if err != nil && err != macho.ErrNotFat {
+		if err != nil {
+			if err == macho.ErrNotFat {
+				return fmt.Errorf("input file is not a universal/fat MachO")
+			}
 			return fmt.Errorf("failed to open file: %v", err)
 		}
 		defer fat.Close()
 
-		if err == macho.ErrNotFat {
-			log.Error("input file is not a universal/fat MachO")
-			return nil
-		} else {
-			var options []string
-			var shortOptions []string
-			for _, arch := range fat.Arches {
-				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-				shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
-			}
-
-			if len(selectedArch) > 0 {
-				found := false
-				for i, opt := range shortOptions {
-					if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-						farch = fat.Arches[i]
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
-				}
-			} else {
-				choice := 0
-				prompt := &survey.Select{
-					Message: "Detected a universal MachO file, please select an architecture to extract:",
-					Options: options,
-				}
-				survey.AskOne(prompt, &choice)
-				farch = fat.Arches[choice]
-			}
-
-			f, err := os.Open(machoPath)
-			if err != nil {
-				return fmt.Errorf("failed to open file %s: %v", machoPath, err)
-			}
-			defer f.Close()
-
-			dat := make([]byte, farch.Size)
-			if _, err := f.ReadAt(dat, int64(farch.Offset)); err != nil {
-				return fmt.Errorf("failed to read data in file at %#x: %v", farch.Offset, err)
-			}
-
-			outFile := fmt.Sprintf("%s.%s", machoPath, strings.ToLower(farch.SubCPU.String(farch.CPU)))
-			folder := filepath.Dir(outFile) // default to folder of shared cache
-			if len(extractPath) > 0 {
-				folder = extractPath
-			}
-			fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
-			if err := os.WriteFile(fname, dat, 0660); err != nil {
-				return fmt.Errorf("failed to create file %s: %v", outFile, err)
-			}
-			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)
+		var options []string
+		var shortOptions []string
+		for _, arch := range fat.Arches {
+			options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+			shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
 		}
+
+		if len(selectedArch) > 0 {
+			found := false
+			for i, opt := range shortOptions {
+				if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
+					farch = fat.Arches[i]
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
+			}
+		} else {
+			choice := 0
+			prompt := &survey.Select{
+				Message: "Detected a universal MachO file, please select an architecture to extract:",
+				Options: options,
+			}
+			survey.AskOne(prompt, &choice)
+			farch = fat.Arches[choice]
+		}
+
+		f, err := os.Open(machoPath)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %v", machoPath, err)
+		}
+		defer f.Close()
+
+		dat := make([]byte, farch.Size)
+		if _, err := f.ReadAt(dat, int64(farch.Offset)); err != nil {
+			return fmt.Errorf("failed to read data in file at %#x: %v", farch.Offset, err)
+		}
+
+		outFile := fmt.Sprintf("%s.%s", machoPath, strings.ToLower(farch.SubCPU.String(farch.CPU)))
+		folder := filepath.Dir(outFile) // default to folder of shared cache
+		if len(extractPath) > 0 {
+			folder = extractPath
+		}
+		fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
+		if err := os.WriteFile(fname, dat, 0660); err != nil {
+			return fmt.Errorf("failed to create file %s: %v", outFile, err)
+		}
+		log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)
 
 		return nil
 	},
