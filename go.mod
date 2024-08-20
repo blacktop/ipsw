@@ -20,7 +20,7 @@ require (
 	github.com/boombuler/barcode v1.0.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/cloudflare/circl v1.3.9
+	github.com/cloudflare/circl v1.4.0
 	github.com/docker/docker v27.1.2+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
@@ -51,7 +51,7 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
-	github.com/vbauerster/mpb/v8 v8.7.5
+	github.com/vbauerster/mpb/v8 v8.8.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
@@ -74,7 +74,7 @@ replace github.com/spf13/cast => github.com/blacktop/cast v1.5.2
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
 require (
-	dario.cat/mergo v1.0.0 // indirect
+	dario.cat/mergo v1.0.1 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
@@ -187,7 +187,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
-	modernc.org/libc v1.59.4 // indirect
+	modernc.org/libc v1.59.9 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.32.0 // indirect
