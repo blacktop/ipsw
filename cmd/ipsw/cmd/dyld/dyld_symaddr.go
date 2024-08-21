@@ -53,7 +53,7 @@ var SymAddrCmd = &cobra.Command{
 	Use:     "symaddr <DSC>",
 	Aliases: []string{"sym"},
 	Short:   "Lookup or dump symbol(s)",
-	Args:    cobra.MaximumNArgs(2),
+	Args:    cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
