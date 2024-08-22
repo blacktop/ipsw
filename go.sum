@@ -443,8 +443,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/ulikunitz/lz v0.4.0 h1:L/saNWzCLpvNpoACMWSsLqq7bPJO1iFPFqOImWVmKwk=
 github.com/ulikunitz/lz v0.4.0/go.mod h1:UaONuXdzFuN/Ptzl0KTUYFL18y/mcJqtypeT2N6G5F4=
-github.com/ulikunitz/xz v0.6.0-alpha.3 h1:7IGVhjpaTpgeNBUPQcbtooPhFXDgeGxzhFki5B8E2FY=
-github.com/ulikunitz/xz v0.6.0-alpha.3/go.mod h1:ndJU5gy7q0Ffe1saQwmPKbMhIhJbwdu4+3t8eTxRF5U=
+github.com/ulikunitz/xz v0.6.0-alpha1 h1:e6/p7+AUDC9BVzQ7Hnh/71X9l5JYDC8MYMgaeOpP4gk=
+github.com/ulikunitz/xz v0.6.0-alpha1/go.mod h1:bnlx7JnnkXLMlSXkX0urCejaIjoT6O9Pc4AF0nM1ltc=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2 h1:OdPisKdOPzRKzftIO1yYQ9MurwDeELs0t17bSzXWkpI=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2/go.mod h1:mcHBrigWSHlMZYol9QOFnK7sbltIt/OaKP5CQBZsC+4=
 github.com/vbauerster/mpb/v8 v8.8.2 h1:j9D/WmvKZw0BK1etRkw8lxVMKs4KO3TgdXsQWyEyPuc=

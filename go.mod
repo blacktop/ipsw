@@ -50,7 +50,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
 	github.com/twmb/murmur3 v1.1.8
-	github.com/ulikunitz/xz v0.6.0-alpha.3
+	github.com/ulikunitz/xz v0.6.0-alpha1
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
 	github.com/vbauerster/mpb/v8 v8.8.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
