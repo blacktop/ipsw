@@ -72,7 +72,7 @@ var otaLsCmd = &cobra.Command{
 		}
 		defer ota.Close()
 
-		w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 
 		/* PAYLOAD FILES */
 		if viper.GetBool("ota.ls.payload") {
