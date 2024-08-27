@@ -447,8 +447,8 @@ github.com/ulikunitz/xz v0.6.0-alpha.3 h1:7IGVhjpaTpgeNBUPQcbtooPhFXDgeGxzhFki5B
 github.com/ulikunitz/xz v0.6.0-alpha.3/go.mod h1:ndJU5gy7q0Ffe1saQwmPKbMhIhJbwdu4+3t8eTxRF5U=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2 h1:OdPisKdOPzRKzftIO1yYQ9MurwDeELs0t17bSzXWkpI=
 github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2/go.mod h1:mcHBrigWSHlMZYol9QOFnK7sbltIt/OaKP5CQBZsC+4=
-github.com/vbauerster/mpb/v8 v8.8.2 h1:j9D/WmvKZw0BK1etRkw8lxVMKs4KO3TgdXsQWyEyPuc=
-github.com/vbauerster/mpb/v8 v8.8.2/go.mod h1:JfCCrtcMsJwP6ZwMn9e5LMnNyp3TVNpUWWkN+nd4EWk=
+github.com/vbauerster/mpb/v8 v8.8.3 h1:dTOByGoqwaTJYPubhVz3lO5O6MK553XVgUo33LdnNsQ=
+github.com/vbauerster/mpb/v8 v8.8.3/go.mod h1:JfCCrtcMsJwP6ZwMn9e5LMnNyp3TVNpUWWkN+nd4EWk=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
 github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
