@@ -5,7 +5,7 @@ import (
 )
 
 // AddRoutes adds the download routes to the router
-func AddRoutes(rg *gin.RouterGroup) {
+func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	dl := rg.Group("/ipsw")
 	// swagger:route GET /ipsw/fs/files IPSW getIpswFsFiles
 	//
@@ -22,11 +22,16 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsFilesResponse
 	//       500: genericError
-	dl.GET("/fs/files", getFsFiles)
+	dl.GET("/fs/files", getFsFiles(pemDB))
 	// swagger:route GET /ipsw/fs/ents IPSW getIpswFsEntitlements
 	//
 	// Entitlements
@@ -42,11 +47,16 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsEntitlementsResponse
 	//       500: genericError
-	dl.GET("/fs/ents", getFsEntitlements)
+	dl.GET("/fs/ents", getFsEntitlements(pemDB))
 	// swagger:route GET /ipsw/fs/launchd IPSW getIpswFsLaunchd
 	//
 	// launchd Config
@@ -62,9 +72,14 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsLaunchdConfigResponse
 	//       500: genericError
-	dl.GET("/fs/launchd", getFsLaunchdConfig)
+	dl.GET("/fs/launchd", getFsLaunchdConfig(pemDB))
 }

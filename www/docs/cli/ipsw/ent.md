@@ -45,6 +45,9 @@ ipsw ent [flags]
       --ipsw stringArray    IPSWs to analyze
   -k, --key string          Entitlement KEY regex to search for
   -m, --md                  Markdown style output
+      --ui                  Show entitlements Web UI
+      --ui-host string      UI host to server on (default "localhost")
+      --ui-port int         UI port to server on (default 3993)
   -v, --val string          Entitlement VALUE regex to search for (i.e. <array> strings)
 ```
 

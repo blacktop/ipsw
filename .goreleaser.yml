@@ -12,7 +12,10 @@ before:
     - ./hack/make/py_mini
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
+# gomod:
+#   proxy: true
 
 report_sizes: true
 

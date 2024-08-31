@@ -40,6 +40,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
@@ -64,7 +65,9 @@ func init() {
 	entCmd.Flags().Bool("file-only", false, "Only output the file path of matches")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
-	entCmd.Flags().Bool("ui", false, "Show entitlements UI")
+	entCmd.Flags().Bool("ui", false, "Show entitlements Web UI")
+	entCmd.Flags().String("ui-host", "localhost", "UI host to server on")
+	entCmd.Flags().Int("ui-port", 3993, "UI port to server on")
 	viper.BindPFlag("ent.ipsw", entCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
 	viper.BindPFlag("ent.key", entCmd.Flags().Lookup("key"))
@@ -75,8 +78,9 @@ func init() {
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("ent.md", entCmd.Flags().Lookup("md"))
 	viper.BindPFlag("ent.ui", entCmd.Flags().Lookup("ui"))
+	viper.BindPFlag("ent.ui-host", entCmd.Flags().Lookup("ui-host"))
+	viper.BindPFlag("ent.ui-port", entCmd.Flags().Lookup("ui-port"))
 	entCmd.MarkFlagsMutuallyExclusive("key", "val", "ui")
-	entCmd.Flags().MarkHidden("ui")
 }
 
 // entCmd represents the ent command
@@ -122,6 +126,8 @@ var entCmd = &cobra.Command{
 		// check flags
 		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
+		} else if showUI && doDiff || len(ipsws) > 1 {
+			return fmt.Errorf("cannot use --ui with --diff OR multiple IPSWs")
 		}
 		color.NoColor = viper.GetBool("no-color") || onlyFiles
 
@@ -185,7 +191,26 @@ var entCmd = &cobra.Command{
 		}
 
 		if showUI {
-			panic("not implemented")
+			var version string
+			if len(ipsws) == 1 {
+				if i, err := info.Parse(ipsws[0]); err == nil {
+					version = fmt.Sprintf("for %s (%s)",
+						i.Plists.BuildManifest.ProductVersion,
+						i.Plists.BuildManifest.ProductBuildVersion)
+				}
+			}
+			db := make(map[string]string)
+			for f, e := range entDBs[0] {
+				if len(e) == 0 {
+					continue
+				}
+				db[f] = e
+			}
+			return ent.UI(db, &ent.Config{
+				Version: version,
+				Host:    viper.GetString("ent.ui-host"),
+				Port:    viper.GetInt("ent.ui-port"),
+			})
 		} else if doDiff { // DIFF ENTITLEMENTS
 			if len(searchFile) > 0 { // DIFF MACHO'S ENTITLEMENTS
 				dmp := diffmatchpatch.New()

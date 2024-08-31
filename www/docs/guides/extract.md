@@ -67,6 +67,7 @@ Global Flags:
 ❯ docker run --init -it --rm \
              --device /dev/fuse \
              --cap-add=SYS_ADMIN \
+             --security-opt apparmor:unconfined \
              -v `pwd` :/data \
              blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```

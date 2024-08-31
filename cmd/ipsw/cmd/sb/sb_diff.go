@@ -45,6 +45,7 @@ import (
 func init() {
 	SbCmd.AddCommand(sbDiffCmd)
 
+	sbDiffCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(2, "*.ipsw", "*.zip")
 	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -67,6 +68,8 @@ var sbDiffCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
+
+		pemDB, _ := cmd.Flags().GetString("pem-db")
 
 		var sbDBs []map[string]string
 
@@ -115,7 +118,11 @@ var sbDiffCmd = &cobra.Command{
 				}
 
 				if filepath.Ext(dmgPath) == ".aea" {
-					dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+					dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+						Input:  dmgPath,
+						Output: filepath.Dir(dmgPath),
+						PemDB:  pemDB,
+					})
 					if err != nil {
 						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 					}

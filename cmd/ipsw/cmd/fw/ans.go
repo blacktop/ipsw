@@ -27,6 +27,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// NOTE:
+//   Firmware/rans.t8130.release.im4p
+//   Firmware/ansf.t8130.release.im4p
+
 func init() {
 	FwCmd.AddCommand(ansCmd)
 
@@ -46,9 +50,6 @@ var ansCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		// Firmware/rans.t8130.release.im4p
-		// Firmware/ansf.t8130.release.im4p
 
 		// flags
 		// output := viper.GetString("fw.ans.output")

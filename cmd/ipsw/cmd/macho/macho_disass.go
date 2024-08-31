@@ -58,6 +58,7 @@ func init() {
 	machoDisassCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	machoDisassCmd.Flags().Bool("replace", false, "Replace .a2s")
 
 	viper.BindPFlag("macho.disass.arch", machoDisassCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.disass.symbol", machoDisassCmd.Flags().Lookup("symbol"))
@@ -72,6 +73,7 @@ func init() {
 	viper.BindPFlag("macho.disass.all-fileset-entries", machoDisassCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.disass.section", machoDisassCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("macho.disass.replace", machoDisassCmd.Flags().Lookup("replace"))
 
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -126,7 +128,7 @@ var machoDisassCmd = &cobra.Command{
 		if len(filesetEntry) > 0 && viper.GetBool("macho.disass.all-fileset-entries") {
 			return fmt.Errorf("you can only use --fileset-entry OR --all-fileset-entries (not both)")
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
-			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS")
+			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
 
 		machoPath := filepath.Clean(args[0])
@@ -181,8 +183,12 @@ var machoDisassCmd = &cobra.Command{
 		}
 
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
-			log.Errorf("can only disassemble arm64 binaries")
-			return nil
+			return fmt.Errorf("can only disassemble arm64 binaries")
+		}
+
+		if m.FileTOC.FileHeader.Type == types.MH_FILESET &&
+			len(filesetEntry) == 0 && !viper.GetBool("macho.disass.all-fileset-entries") {
+			return fmt.Errorf("file is a MH_FILESET, you must supply a --fileset-entry OR --all-fileset-entries")
 		}
 
 		if len(filesetEntry) > 0 {
@@ -231,13 +237,17 @@ var machoDisassCmd = &cobra.Command{
 							return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
 						} else {
 							if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
-								log.Errorf("address-to-symbol cache file is corrupt: %v", err)
 								yes := false
-								prompt := &survey.Confirm{
-									Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
-									Default: true,
+								if viper.GetBool("macho.disass.replace") {
+									yes = true
+								} else {
+									log.Errorf("address-to-symbol cache file is corrupt: %v", err)
+									prompt := &survey.Confirm{
+										Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
+										Default: true,
+									}
+									survey.AskOne(prompt, &yes)
 								}
-								survey.AskOne(prompt, &yes)
 								if yes {
 									f.Close()
 									if err := os.Remove(cacheFile); err != nil {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"regexp"
 	"strings"
 
@@ -23,6 +24,7 @@ type Plists struct {
 	*Restore       `json:"restore,omitempty"`
 	*AssetDataInfo `json:"asset_data_info,omitempty"`
 	*OTAInfo       `json:"ota_info,omitempty"`
+	*SystemVersion `json:"system_version,omitempty"`
 }
 
 // AssetDataInfo AssetData/Info.plist object found in OTAs
@@ -206,6 +208,80 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				if err != nil {
 					return nil, err
 				}
+			case strings.HasSuffix(f.Name, "SystemVersion.plist"):
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.SystemVersion, err = ParseSystemVersion(dat)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	return ipsw, nil
+}
+
+func ParsePlistFiles(files []fs.File) (*Plists, error) {
+	ipsw := &Plists{Type: "IPSW"}
+
+	for _, f := range files {
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get file info: %s", err)
+		}
+		switch {
+		case strings.HasSuffix(fi.Name(), "Restore.plist"):
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read plist file: %s", err)
+			}
+			ipsw.Restore, err = ParseRestore(dat)
+			if err != nil {
+				return nil, err
+			}
+		case strings.HasSuffix(fi.Name(), "BuildManifest.plist"):
+			if strings.Contains(fi.Name(), "Restore") {
+				continue
+			}
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read plist file: %s", err)
+			}
+			ipsw.BuildManifest, err = ParseBuildManifest(dat)
+			if err != nil {
+				return nil, err
+			}
+		case strings.HasSuffix(fi.Name(), "AssetData/Info.plist"):
+			ipsw.Type = "OTA"
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read plist file: %s", err)
+			}
+			ipsw.AssetDataInfo, err = ParseAssetDataInfoPlist(dat)
+			if err != nil {
+				return nil, err
+			}
+		case strings.EqualFold(fi.Name(), "Info.plist"):
+			ipsw.Type = "OTA"
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read plist file: %s", err)
+			}
+			ipsw.OTAInfo, err = ParseOTAInfo(dat)
+			if err != nil {
+				return nil, err
+			}
+		case strings.HasSuffix(fi.Name(), "SystemVersion.plist"):
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read plist file: %s", err)
+			}
+			ipsw.SystemVersion, err = ParseSystemVersion(dat)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}

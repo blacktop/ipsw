@@ -193,6 +193,9 @@ var otaDLCmd = &cobra.Command{
 		if getRSR && len(build) == 0 {
 			return fmt.Errorf("for now you will need to supply a --build number when using --rsr")
 		}
+		if viper.GetBool("download.ota.delta") && len(build) == 0 || len(version) == 0 {
+			return fmt.Errorf("for now you will need to supply a --version AND --build number when using --delta")
+		}
 		if len(build) == 0 {
 			build = "0"
 		}
@@ -360,11 +363,23 @@ var otaDLCmd = &cobra.Command{
 						Pattern:      remotePattern,
 						Proxy:        proxy,
 						Insecure:     insecure,
+						Arches:       dyldArches,
 						DriverKit:    dyldDriverKit,
 						KernelDevice: device,
 						Flatten:      flat,
 						Progress:     true,
+						Encrypted:    o.IsEncrypted,
+						AEAKey:       o.ArchiveDecryptionKey,
 						Output:       destPath,
+					}
+
+					// check if AEA encryption
+					isAEA, err := extract.IsAEA(config)
+					if err != nil {
+						return err
+					} else if isAEA {
+						log.Warn("This OTA is AEA encrypted and is NOT supported for remote extraction (yet 🤞)")
+						return nil
 					}
 
 					if remoteKernel {
@@ -424,7 +439,14 @@ var otaDLCmd = &cobra.Command{
 					if o.SplatOnly {
 						isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
 					}
-					destName := filepath.Join(folder, fmt.Sprintf("%s%s_%s", isRSR, devices, getDestName(url, removeCommas)))
+					var isAEA string
+					if o.IsEncrypted {
+						filesafe := o.ArchiveDecryptionKey
+						filesafe = strings.ReplaceAll(filesafe, "/", "_")
+						filesafe = strings.ReplaceAll(filesafe, "+", "-")
+						isAEA = "KEY_[" + filesafe + "]_"
+					}
+					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s", devices, isRSR, isAEA, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						fields := log.Fields{
 							"device": strings.Join(o.SupportedDevices, " "),

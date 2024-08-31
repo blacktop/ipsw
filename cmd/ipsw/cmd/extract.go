@@ -50,6 +50,7 @@ func init() {
 	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 DMG fcs-key pem files")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
+	extractCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.MarkFlagDirname("output")
@@ -81,6 +82,7 @@ func init() {
 	viper.BindPFlag("extract.fcs-key", extractCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("extract.sys-ver", extractCmd.Flags().Lookup("sys-ver"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
+	viper.BindPFlag("extract.pem-db", extractCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
@@ -145,6 +147,7 @@ var extractCmd = &cobra.Command{
 			Insecure:     viper.GetBool("extract.insecure"),
 			DMGs:         false,
 			DmgType:      viper.GetString("extract.dmg"),
+			PemDB:        viper.GetString("extract.pem-db"),
 			Flatten:      viper.GetBool("extract.flat"),
 			Progress:     true,
 			Output:       viper.GetString("extract.output"),
@@ -357,7 +360,7 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetBool("extract.sys-ver") {
 			log.Info("Extracting SystemVersion")
-			out, err := extract.SystemVersion(config.IPSW)
+			out, err := extract.SystemVersion(config.IPSW, config.PemDB)
 			if err != nil {
 				return err
 			}

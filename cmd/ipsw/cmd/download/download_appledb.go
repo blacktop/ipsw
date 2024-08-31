@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -54,9 +55,13 @@ func init() {
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	downloadAppledbCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
+	downloadAppledbCmd.Flags().Bool("release", false, "Download release IPSWs")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	downloadAppledbCmd.Flags().Bool("rc", false, "Download RC (release candidate) IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
+	downloadAppledbCmd.Flags().Bool("show-latest", false, "Show latest version/build")
 	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
+	downloadAppledbCmd.Flags().Bool("deltas", false, "Download all OTA deltas")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().BoolP("json", "j", false, "Dump DB query results as JSON")
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
@@ -64,6 +69,7 @@ func init() {
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
+	downloadAppledbCmd.MarkFlagsMutuallyExclusive("release", "beta", "rc")
 
 	viper.BindPFlag("download.appledb.os", downloadAppledbCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.appledb.type", downloadAppledbCmd.Flags().Lookup("type"))
@@ -72,9 +78,13 @@ func init() {
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.fcs-keys", downloadAppledbCmd.Flags().Lookup("fcs-keys"))
 	viper.BindPFlag("download.appledb.fcs-keys-json", downloadAppledbCmd.Flags().Lookup("fcs-keys-json"))
+	viper.BindPFlag("download.appledb.release", downloadAppledbCmd.Flags().Lookup("release"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.appledb.rc", downloadAppledbCmd.Flags().Lookup("rc"))
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.appledb.show-latest", downloadAppledbCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.appledb.prereq-build", downloadAppledbCmd.Flags().Lookup("prereq-build"))
+	viper.BindPFlag("download.appledb.deltas", downloadAppledbCmd.Flags().Lookup("deltas"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.json", downloadAppledbCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
@@ -153,30 +163,45 @@ var downloadAppledbCmd = &cobra.Command{
 		pattern := viper.GetString("download.appledb.pattern")
 		fcsKeys := viper.GetBool("download.appledb.fcs-keys")
 		fcsKeysJson := viper.GetBool("download.appledb.fcs-keys-json")
+		isRelease := viper.GetBool("download.appledb.release")
 		isBeta := viper.GetBool("download.appledb.beta")
+		isRC := viper.GetBool("download.appledb.rc")
 		latest := viper.GetBool("download.appledb.latest")
 		prereqBuild := viper.GetString("download.appledb.prereq-build")
+		otaDeltas := viper.GetBool("download.appledb.deltas")
 		output := viper.GetString("download.appledb.output")
 		useAPI := viper.GetBool("download.appledb.api")
 		apiToken := viper.GetString("download.appledb.api-token")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
 		for _, osType := range osTypes {
-			if !utils.StrSliceHas(supportedOSes, osType) {
-				return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
+			if !slices.Contains(supportedOSes, osType) {
+				return fmt.Errorf("valid --os flag choices are: %v", strings.Join(supportedOSes, ", "))
 			}
 		}
-		if !utils.StrSliceHas(supportedFWs, fwType) {
-			return fmt.Errorf("valid --type flag choices are: %v", supportedFWs)
+		if !slices.Contains(supportedFWs, fwType) {
+			return fmt.Errorf("valid --type flag choices are: %v", strings.Join(supportedFWs, ", "))
 		}
 		if (asURLs || asJSON) && (kernel || len(pattern) > 0) {
 			return fmt.Errorf("cannot use (--urls OR --json) with (--kernel, --pattern OR --fcs-key)")
 		}
-		if isBeta && len(build) > 0 {
-			return fmt.Errorf("cannot use --beta with --build")
+		if isBeta && isRC {
+			return fmt.Errorf("cannot use --beta with --rc")
+		}
+		if (isBeta || isRC || latest) && len(build) > 0 {
+			return fmt.Errorf("cannot use --beta, --rc or --latest with --build")
 		}
 		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
+		}
+		if len(prereqBuild) > 0 && otaDeltas {
+			return fmt.Errorf("cannot use --prereq-build with --deltas")
+		}
+		if otaDeltas && !(fwType == "ota" || fwType == "rsr") {
+			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
+		}
+		if viper.GetBool("download.appledb.show-latest") && (asURLs || asJSON || kernel || len(pattern) > 0 || fcsKeys || fcsKeysJson) {
+			return fmt.Errorf("cannot use --show-latest with --urls, --json, --kernel, --pattern, --fcs-keys or --fcs-keys-json")
 		}
 
 		if len(apiToken) == 0 {
@@ -191,7 +216,7 @@ var downloadAppledbCmd = &cobra.Command{
 
 		if fwType == "rsr" {
 			for idx, osType := range osTypes {
-				if utils.StrSliceContains(supportedRsrOSes, osType) {
+				if slices.Contains(supportedRsrOSes, osType) {
 					osTypes[idx] = filepath.Join("Rapid Security Responses", osType)
 				} else {
 					return fmt.Errorf("for --type 'rsr', the valid --os choices are: %v", supportedRsrOSes)
@@ -222,8 +247,11 @@ var downloadAppledbCmd = &cobra.Command{
 				Version:           version,
 				Build:             build,
 				PrerequisiteBuild: prereqBuild,
+				Deltas:            otaDeltas,
 				Device:            device,
+				IsRelease:         isRelease,
 				IsBeta:            isBeta,
+				IsRC:              isRC,
 				Latest:            latest,
 				Proxy:             proxy,
 				Insecure:          insecure,
@@ -246,22 +274,76 @@ var downloadAppledbCmd = &cobra.Command{
 			} else {
 				configDir = filepath.Dir(viper.ConfigFileUsed())
 			}
-			results, err = download.LocalAppleDBQuery(&download.ADBQuery{
-				OSes:              osTypes,
-				Type:              fwType,
-				Version:           version,
-				Build:             build,
-				PrerequisiteBuild: prereqBuild,
-				Device:            device,
-				IsBeta:            isBeta,
-				Latest:            latest,
-				Proxy:             proxy,
-				Insecure:          insecure,
-				APIToken:          apiToken,
-				ConfigDir:         configDir,
-			})
-			if err != nil {
-				return err
+			if viper.GetBool("download.appledb.show-latest") {
+				latest, err := download.LocalAppleDBLatest(&download.ADBQuery{
+					OSes:              osTypes,
+					Type:              fwType,
+					Version:           version,
+					Build:             build,
+					PrerequisiteBuild: prereqBuild,
+					Deltas:            otaDeltas,
+					Device:            device,
+					IsRelease:         isRelease,
+					IsBeta:            isBeta,
+					IsRC:              isRC,
+					Latest:            latest,
+					Proxy:             proxy,
+					Insecure:          insecure,
+					APIToken:          apiToken,
+					ConfigDir:         configDir,
+				})
+				if err != nil {
+					return err
+				}
+				if latest == nil {
+					return fmt.Errorf("query return 0 results")
+				}
+				b, err := json.MarshalIndent(&struct {
+					OS       string                `os:"version"`
+					Version  string                `json:"version"`
+					Build    string                `json:"build"`
+					Beta     bool                  `json:"beta,omitempty"`
+					RC       bool                  `json:"rc,omitempty"`
+					Released download.ReleasedDate `json:"released"`
+				}{
+					OS:       latest.OS,
+					Version:  latest.Version,
+					Build:    latest.Build,
+					Beta:     latest.Beta,
+					Released: latest.Released,
+				}, "", "  ")
+				if err != nil {
+					return err
+				}
+				if viper.GetBool("color") && !viper.GetBool("no-color") {
+					if err := quick.Highlight(os.Stdout, string(b)+"\n", "json", "terminal256", "nord"); err != nil {
+						return fmt.Errorf("failed to highlight json: %v", err)
+					}
+				} else {
+					fmt.Println(string(b))
+				}
+				return nil
+			} else {
+				results, err = download.LocalAppleDBQuery(&download.ADBQuery{
+					OSes:              osTypes,
+					Type:              fwType,
+					Version:           version,
+					Build:             build,
+					PrerequisiteBuild: prereqBuild,
+					Deltas:            otaDeltas,
+					Device:            device,
+					IsRelease:         isRelease,
+					IsBeta:            isBeta,
+					IsRC:              isRC,
+					Latest:            latest,
+					Proxy:             proxy,
+					Insecure:          insecure,
+					APIToken:          apiToken,
+					ConfigDir:         configDir,
+				})
+				if err != nil {
+					return err
+				}
 			}
 		}
 

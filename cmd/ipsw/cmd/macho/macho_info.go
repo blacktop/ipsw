@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"unicode"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alecthomas/chroma/v2/quick"
@@ -52,6 +53,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
@@ -193,6 +195,7 @@ var machoInfoCmd = &cobra.Command{
 		showStrings := viper.GetBool("macho.info.strings")
 		showSplitSeg := viper.GetBool("macho.info.split-seg")
 		showBitCode := viper.GetBool("macho.info.bit-code")
+		asJSON := viper.GetBool("macho.info.json")
 
 		doDemangle := viper.GetBool("macho.info.demangle")
 
@@ -215,6 +218,18 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
+		if options > onlyLoadCommands {
+			var setFlags []string
+			cmd.Flags().VisitAll(func(f *pflag.Flag) {
+				if f.Changed {
+					if !slices.Contains([]string{"all-fileset-entries", "fileset-entry", "json", "verbose"}, f.Name) {
+						setFlags = append(setFlags, f.Name)
+					}
+				}
+			})
+			log.Warnf("--json flag is set; other flag(s) [ %s ] not currently supported (if needed create an Github issue)", "--"+strings.Join(setFlags, ", --"))
+		}
+
 		machoPath := filepath.Clean(args[0])
 
 		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
@@ -227,7 +242,12 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return err
+		}
+
+		folder := filepath.Dir(machoPath) // default to folder of macho file
+		if len(extractPath) > 0 {
+			folder = extractPath
 		}
 
 		// first check for fat file
@@ -241,13 +261,14 @@ var machoInfoCmd = &cobra.Command{
 				return err
 			}
 		} else {
+			defer fat.Close()
+
 			var arches []string
 			var shortArches []string
 			for _, arch := range fat.Arches {
 				arches = append(arches, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
 				shortArches = append(shortArches, strings.ToLower(arch.SubCPU.String(arch.CPU)))
 			}
-
 			if len(selectedArch) > 0 {
 				found := false
 				for i, opt := range shortArches {
@@ -269,11 +290,6 @@ var machoInfoCmd = &cobra.Command{
 				survey.AskOne(prompt, &choice)
 				m = fat.Arches[choice].File
 			}
-		}
-
-		folder := filepath.Dir(machoPath) // default to folder of macho file
-		if len(extractPath) > 0 {
-			folder = extractPath
 		}
 
 		if dumpCert {
@@ -394,22 +410,21 @@ var machoInfoCmd = &cobra.Command{
 		// Fileset MachO type
 		if len(filesetEntry) > 0 {
 			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-				var dcf *fixupchains.DyldChainedFixups
-				if m.HasFixups() {
-					dcf, err = m.DyldChainedFixups()
-					if err != nil {
-						return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
-					}
-				}
-
-				baseAddress := m.GetBaseAddress()
 				m, err = m.GetFileSetFileByName(filesetEntry)
 				if err != nil {
 					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
-
 				if extractfilesetEntry {
-					if err := m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
+					var dcf *fixupchains.DyldChainedFixups
+					if m.HasFixups() {
+						dcf, err = m.DyldChainedFixups()
+						if err != nil {
+							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+						}
+					}
+					baseAddress := m.GetBaseAddress()
+					// TODO: do I want to add any extra syms?
+					if err := m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil); err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
 					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
@@ -419,28 +434,51 @@ var machoInfoCmd = &cobra.Command{
 			}
 		} else if viper.GetBool("macho.info.all-fileset-entries") {
 			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+				filesetEntries := []*macho.File{m}
 				for _, fe := range m.FileSets() {
 					mfe, err := m.GetFileSetFileByName(fe.EntryID)
 					if err != nil {
 						return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 					}
-					fmt.Printf("\n%s\n\n%s\n", fe.EntryID, mfe.FileTOC.String())
+					if asJSON {
+						filesetEntries = append(filesetEntries, mfe)
+					} else {
+						fmt.Printf("\n%s\n\n%s\n", fe.EntryID, mfe.FileTOC.String())
+					}
 				}
+				if asJSON {
+					dat, err := json.Marshal(filesetEntries)
+					if err != nil {
+						return fmt.Errorf("failed to marshal MachO fileset entries as JSON: %v", err)
+					}
+					fmt.Println(string(dat))
+				}
+				return nil
 			} else {
 				return fmt.Errorf("MachO type is not MH_FILESET (cannot use --fileset-entry)")
 			}
 		}
 
 		if showHeader && !showLoadCommands {
-			fmt.Println(m.FileHeader.String())
+			if asJSON {
+				dat, err := m.FileHeader.MarshalJSON()
+				if err != nil {
+					return fmt.Errorf("failed to marshal MachO header as JSON: %v", err)
+				}
+				fmt.Println(string(dat))
+				return nil
+			} else {
+				fmt.Println(m.FileHeader.String())
+			}
 		}
 		if showLoadCommands || options == 0 {
-			if viper.GetBool("macho.info.json") {
+			if asJSON {
 				dat, err := m.FileTOC.MarshalJSON()
 				if err != nil {
 					return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
 				}
 				fmt.Println(string(dat))
+				return nil
 			} else {
 				fmt.Println(m.FileTOC.String())
 			}
@@ -806,7 +844,6 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			var label string
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			if m.Symtab != nil {
 				label = "Symtab"
 				fmt.Printf("\n%s\n", label)
@@ -814,7 +851,6 @@ var machoInfoCmd = &cobra.Command{
 				undeflush := false
 				for _, sym := range m.Symtab.Syms {
 					if sym.Type.IsUndefinedSym() && !undeflush {
-						w.Flush()
 						undeflush = true
 					}
 					if doDemangle {
@@ -839,12 +875,11 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					if sym.Value == 0 {
-						fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+						fmt.Printf("              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					} else {
-						fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+						fmt.Printf("%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					}
 				}
-				w.Flush()
 			} else {
 				fmt.Println("  - no symbol table")
 			}
@@ -869,9 +904,8 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, export := range exports {
-					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
+					fmt.Printf("%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
-				w.Flush()
 			}
 			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
 				label = "Dyld Exports Trie"
@@ -889,9 +923,8 @@ var machoInfoCmd = &cobra.Command{
 							export.Name = demangle.Do(export.Name, false, false)
 						}
 					}
-					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
+					fmt.Printf("%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
-				w.Flush()
 			}
 			println()
 		}
@@ -951,7 +984,7 @@ var machoInfoCmd = &cobra.Command{
 			}
 			// TODO: add option to dump all strings - https://github.com/robpike/strings/blob/master/strings.go
 			for _, sec := range m.Sections {
-				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
+				if sec.Flags.IsCstringLiterals() || sec.Name == "__os_log" || (sec.Seg == "__TEXT" && sec.Name == "__const") {
 					off, err := m.GetOffset(sec.Addr)
 					if err != nil {
 						return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
@@ -961,26 +994,28 @@ var machoInfoCmd = &cobra.Command{
 						return fmt.Errorf("failed to read cstring data in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
 
+					fmt.Printf("\n[%s.%s]\n", sec.Seg, sec.Name)
+
 					csr := bytes.NewBuffer(dat)
 
 					for {
 						pos := sec.Addr + uint64(csr.Cap()-csr.Len())
 
 						s, err := csr.ReadString('\x00')
-
-						if err == io.EOF {
-							break
-						}
-
 						if err != nil {
+							if err == io.EOF {
+								break
+							}
 							return fmt.Errorf("failed to read string: %v", err)
 						}
 
 						s = strings.Trim(s, "\x00")
 
 						if len(s) > 0 {
-							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) { // TODO: does this skip unicode strings?
-								continue // skip non-ascii strings when dumping __TEXT.__const
+							for _, r := range s {
+								if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+									continue // skip non-ascii strings
+								}
 							}
 							fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
 						}

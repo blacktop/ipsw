@@ -4,32 +4,54 @@
 //      File: AEA.bt
 //   Authors: blacktop
 //   Version: 1.0
-//   Purpose: 
+//   Purpose:
 //  Category: Operating System
 // File Mask: *.aea
 //  ID Bytes: 41 45 41 31 01 00 00 00
-//   History: 
+//   History:
 //------------------------------------------------
 
-typedef struct 
+typedef enum<uint>
+{
+	Signed                     = 0,
+	SymmetricEncryption        = 1,
+	SymmetricEncryptionSigned  = 2,
+	AsymmetricEncryption       = 3,
+	AsymmetricEncryptionSigned = 4,
+	PasswordEncryption         = 5,
+} profileType<format = hex>;
+
+typedef struct
 {
   char magic[4]<bgcolor = cLtBlue>; // "AEA1"
-  uint version;  // Always 1
-  uint length;   // Length of metadata
+  profileType profileID : 24;
+  uint scryptStrength   : 8;
+  uint authDataLength;   // Length of metadata
 } AEAHeader;
 
-typedef struct 
+typedef struct
+{
+  char rootHMAC[32]<bgcolor = cLtGreen>;
+  char rootData[48]<bgcolor = cLtGreen>;
+  char clusterHMAC[32]<bgcolor = cLtGreen>;
+} EncryptedRootHeader;
+
+typedef struct
 {
   uint address;
   uint length;
 } ClusterHeader;
 
+typedef struct {
+  char data[32];
+} HMAC;
+
 LittleEndian();
 
 AEAHeader header;
-char metadata[header.length]<bgcolor = cLtGreen>;
+char authData[header.authDataLength]<bgcolor = cLtGreen>;
 char salt[32]<bgcolor = cLtPurple>;
-char unknown[70h]<bgcolor = cLtRed>;
-char clusterHeader[2800h]<bgcolor = cDkAqua>;
-char unknown2[20h]<bgcolor = cLtRed>;
-char segAuthTags[2000h]<bgcolor = cDkAqua>;
+EncryptedRootHeader encRootHeader;
+char segmmentHdrData[40*256]<bgcolor = cDkAqua>;
+char nextClusterMac[20h]<bgcolor = cLtRed>;
+HMAC segHMACs[256]<bgcolor = cDkBlue>;

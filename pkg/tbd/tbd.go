@@ -20,8 +20,8 @@ var macOs64bitArmTargets = []string{"arm64-macos", "arm64e-macos"}
 var macCatalyst32bitTargets = []string{"i386-maccatalyst"}
 var macCatalyst64bitIntelTargets = []string{"x86_64-maccatalyst", "x86_64h-maccatalyst"}
 var macCatalyst64bitArmTargets = []string{"arm64-maccatalyst", "arm64e-maccatalyst"}
-var iOS32bitTargets = []string{"armv7-ios", "armv7s-ios"}
-var iOS64bitTargets = []string{"arm64-ios", "arm64e-ios"}
+var iOS32bitTargets = []string{"armv7-ios", "armv7s-ios", "i386-ios-simulator"}
+var iOS64bitTargets = []string{"arm64-ios", "arm64e-ios", "x86_64-ios-simulator", "arm64-ios-simulator"}
 
 // TBD object
 type TBD struct {
@@ -36,7 +36,7 @@ type TBD struct {
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (*TBD, error) {
+func NewTBD(image *dyld.CacheImage, reexports []string, generic bool) (*TBD, error) {
 	var targets []string
 	var currentVersion string
 	var syms []string
@@ -135,16 +135,6 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private, generic bool) (
 	if exports, err := m.GetExports(); err == nil {
 		for _, export := range exports {
 			syms = utils.UniqueAppend(syms, export.Name)
-		}
-	}
-
-	// get private symbols
-	if private {
-		if err := image.ParseLocalSymbols(false); err != nil {
-			return nil, err
-		}
-		for _, sym := range image.LocalSymbols {
-			syms = append(syms, sym.Name)
 		}
 	}
 

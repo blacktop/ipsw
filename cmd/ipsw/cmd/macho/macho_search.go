@@ -70,6 +70,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	machoSearchCmd.Flags().StringP("ivar", "r", "", "Search for specific ObjC instance variable regex")
+	machoSearchCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -85,6 +86,7 @@ func init() {
 	viper.BindPFlag("macho.search.category", machoSearchCmd.Flags().Lookup("category"))
 	viper.BindPFlag("macho.search.sel", machoSearchCmd.Flags().Lookup("sel"))
 	viper.BindPFlag("macho.search.ivar", machoSearchCmd.Flags().Lookup("ivar"))
+	viper.BindPFlag("macho.search.pem-db", machoSearchCmd.Flags().Lookup("pem-db"))
 }
 
 // machoSearchCmd represents the search command
@@ -128,7 +130,7 @@ var machoSearchCmd = &cobra.Command{
 			return errors.New("you must specify a search criteria via one of the flags")
 		}
 
-		if err := search.ForEachMachoInIPSW(filepath.Clean(args[0]), func(path string, m *macho.File) error {
+		if err := search.ForEachMachoInIPSW(filepath.Clean(args[0]), viper.GetString("macho.search.pem-db"), func(path string, m *macho.File) error {
 			if loadCmdReStr != "" {
 				re, err := regexp.Compile(loadCmdReStr)
 				if err != nil {

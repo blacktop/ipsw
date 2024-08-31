@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
@@ -55,7 +55,7 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 	found := false
 	for _, image := range images {
-		if utils.StrSliceContains(image.RepoTags, c.Image) {
+		if slices.Contains(image.RepoTags, c.Image) {
 			found = true
 			break
 		}

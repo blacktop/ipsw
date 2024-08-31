@@ -3,10 +3,14 @@ package diff
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,11 +23,13 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"golang.org/x/exp/maps"
 )
 
 type kernel struct {
@@ -38,15 +44,25 @@ type mount struct {
 	IsMounted bool
 }
 
+type PlistDiff struct {
+	New     []string          `json:"new,omitempty"`
+	Removed []string          `json:"removed,omitempty"`
+	Updated map[string]string `json:"changed,omitempty"`
+}
+
 type Config struct {
-	Title    string
-	IpswOld  string
-	IpswNew  string
-	KDKs     []string
-	LaunchD  bool
-	Firmware bool
-	Filter   []string
-	Output   string
+	Title     string
+	IpswOld   string
+	IpswNew   string
+	KDKs      []string
+	LaunchD   bool
+	Firmware  bool
+	Features  bool
+	CStrings  bool
+	AllowList []string
+	BlockList []string
+	PemDB     string
+	Output    string
 }
 
 // Context is the context for the diff
@@ -60,10 +76,12 @@ type Context struct {
 	SystemOsDmgPath string
 	MountPath       string
 	IsMounted       bool
+	IsMacOS         bool
 	Kernel          kernel
 	DSC             string
 	Webkit          string
 	KDK             string
+	PemDB           string
 
 	mu *sync.Mutex
 }
@@ -82,6 +100,7 @@ type Diff struct {
 	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
 	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
 	Launchd   string          `json:"launchd,omitempty"`
+	Features  *PlistDiff      `json:"features,omitempty"`
 
 	tmpDir string `json:"-"`
 	conf   *Config
@@ -119,23 +138,50 @@ func New(conf *Config) *Diff {
 	}
 }
 
+func (d *Diff) SetOutput(output string) {
+	if d.conf == nil {
+		d.conf = &Config{Output: output}
+	} else {
+		d.conf.Output = output
+	}
+}
+
+func (d *Diff) TitleToFilename() string {
+	out := strings.ReplaceAll(d.Title, " ", "_")
+	out = strings.ReplaceAll(out, ".", "_")
+	out = strings.ReplaceAll(out, "(", "")
+	return strings.ReplaceAll(out, ")", "")
+}
+
 // Save saves the diff
 func (d *Diff) Save() error {
 	if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 		return err
 	}
 
-	fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.md", d.Title))
-	log.Infof("Creating diff file: %s", fname)
-	f, err := os.Create(fname)
+	idiff, err := os.Create(filepath.Join(d.conf.Output, d.TitleToFilename()+".idiff"))
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer idiff.Close()
 
-	_, err = f.WriteString(d.String())
+	d.Old.Info = nil
+	d.New.Info = nil
 
-	return err
+	gob.Register([]any{})
+	gob.Register(map[string]any{})
+
+	buff := new(bytes.Buffer)
+	if err := gob.NewEncoder(buff).Encode(&d); err != nil {
+		return fmt.Errorf("failed to encode diff: %v", err)
+	}
+
+	log.Infof("Saving pickled IPSW diff: %s", idiff.Name())
+	if _, err = buff.WriteTo(idiff); err != nil {
+		return fmt.Errorf("failed to write diff to file: %v", err)
+	}
+
+	return nil
 }
 
 func (d *Diff) getInfo() (err error) {
@@ -166,6 +212,11 @@ func (d *Diff) getInfo() (err error) {
 
 	if d.Title == "" {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
+	}
+
+	if d.Old.Info.IsMacOS() || d.New.Info.IsMacOS() {
+		d.Old.IsMacOS = true
+		d.New.IsMacOS = true
 	}
 
 	return nil
@@ -225,6 +276,13 @@ func (d *Diff) Diff() (err error) {
 		}
 	}
 
+	if d.conf.Features {
+		log.Info("Diffing Feature Flags")
+		if err := d.parseFeatureFlags(); err != nil {
+			return err
+		}
+	}
+
 	log.Info("Diffing ENTITLEMENTS")
 	d.Ents, err = d.parseEntitlements()
 	if err != nil {
@@ -261,7 +319,11 @@ func mountDMG(ctx *Context) (err error) {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
 	}
 	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
-		ctx.SystemOsDmgPath, err = aea.Decrypt(ctx.SystemOsDmgPath, filepath.Dir(ctx.SystemOsDmgPath), nil)
+		ctx.SystemOsDmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  ctx.SystemOsDmgPath,
+			Output: filepath.Dir(ctx.SystemOsDmgPath),
+			PemDB:  ctx.PemDB,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
@@ -312,29 +374,41 @@ func (d *Diff) unmountSystemOsDMGs() error {
 }
 
 func (d *Diff) parseKernelcache() error {
-	if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
-		return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
-	}
-	if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
-		return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
-	}
-
-	for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
-		if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-		} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
+	if d.Old.IsMacOS || d.New.IsMacOS {
+		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, "Macmini9,1"); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
+		} else {
+			d.Old.Kernel.Path = maps.Keys(out)[0]
 		}
-		if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-		} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
+		if out, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, "Macmini9,1"); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
+		} else {
+			d.New.Kernel.Path = maps.Keys(out)[0]
 		}
-		kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
-		kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
-		d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
-		d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
-		break // just use first kernelcache for now
+	} else {
+		if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
+		}
+		if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
+			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
+		}
+		for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
+			if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+			} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
+			}
+			if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+			} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
+			}
+			kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
+			kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
+			d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
+			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
+			break // just use first kernelcache for now
+		}
 	}
 
 	m1, err := macho.Open(d.Old.Kernel.Path)
@@ -358,10 +432,12 @@ func (d *Diff) parseKernelcache() error {
 	defer m2.Close()
 
 	d.Kexts, err = kcmd.Diff(m1, m2, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -411,12 +487,25 @@ func (d *Diff) parseKDKs() (err error) {
 
 func (d *Diff) parseDSC() error {
 	/* OLD DSC */
-	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false)
+	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
 	}
 	if len(oldDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
+	}
+	if d.Old.IsMacOS {
+		var filtered []string
+		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		for _, match := range oldDSCes {
+			if r.MatchString(match) {
+				filtered = append(filtered, match)
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+		}
+		oldDSCes = filtered
 	}
 
 	dscOLD, err := dyld.Open(oldDSCes[0])
@@ -427,12 +516,25 @@ func (d *Diff) parseDSC() error {
 
 	/* NEW DSC */
 
-	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false)
+	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
 	}
 	if len(newDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
+	}
+	if d.New.IsMacOS {
+		var filtered []string
+		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		for _, match := range newDSCes {
+			if r.MatchString(match) {
+				filtered = append(filtered, match)
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+		}
+		newDSCes = filtered
 	}
 
 	dscNEW, err := dyld.Open(newDSCes[0])
@@ -454,10 +556,12 @@ func (d *Diff) parseDSC() error {
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	if err != nil {
 		return err
@@ -486,20 +590,22 @@ func (d *Diff) parseEntitlements() (string, error) {
 
 func (d *Diff) parseMachos() (err error) {
 	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-		Filter:   d.conf.Filter,
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
 	})
 	return
 }
 
 func (d *Diff) parseLaunchdPlists() error {
-	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath)
+	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath, d.conf.PemDB)
 	if err != nil {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
 	}
-	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath)
+	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath, d.conf.PemDB)
 	if err != nil {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
 	}
@@ -519,10 +625,86 @@ func (d *Diff) parseLaunchdPlists() error {
 
 func (d *Diff) parseFirmwares() (err error) {
 	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+		Markdown:  true,
+		Color:     false,
+		DiffTool:  "git",
+		AllowList: d.conf.AllowList,
+		BlockList: d.conf.BlockList,
+		CStrings:  d.conf.CStrings,
+	})
+	return
+}
+
+func (d *Diff) parseFeatureFlags() (err error) {
+	d.Features = &PlistDiff{
+		Updated: make(map[string]string),
+	}
+	conf := &mcmd.DiffConfig{
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
-		Filter:   d.conf.Filter,
-	})
-	return
+	}
+
+	oldPlists := make(map[string]string)
+	if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
+		oldPlists[path] = content
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	var prevFiles []string
+	for f := range oldPlists {
+		prevFiles = append(prevFiles, f)
+	}
+	slices.Sort(prevFiles)
+
+	newPlists := make(map[string]string)
+	if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
+		newPlists[path] = content
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	var nextFiles []string
+	for f := range newPlists {
+		nextFiles = append(nextFiles, f)
+	}
+	slices.Sort(nextFiles)
+
+	/* DIFF IPSW */
+	d.Features.New = utils.Difference(nextFiles, prevFiles)
+	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
+
+	for _, f2 := range nextFiles {
+		dat2 := newPlists[f2]
+		if dat1, ok := oldPlists[f2]; ok {
+			if strings.EqualFold(dat2, dat1) {
+				continue
+			}
+			var out string
+			if conf.Markdown {
+				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			} else {
+				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+				if err != nil {
+					return err
+				}
+			}
+			if len(out) == 0 { // no diff
+				continue
+			}
+			if conf.Markdown {
+				d.Features.Updated[f2] = "```diff\n" + out + "\n```\n"
+			} else {
+				d.Features.Updated[f2] = out
+			}
+		}
+	}
+
+	return nil
 }

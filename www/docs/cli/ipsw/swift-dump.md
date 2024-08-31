@@ -17,12 +17,13 @@ ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ### Options
 
 ```
-      --all             Dump all other Swift sections/info
+      --all             Dump ALL dylbs from DSC
       --arch string     Which architecture to use for fat/universal MachO
   -a, --ass string      Dump associated type (regex)
       --demangle        Demangle symbol names
-      --deps            Dump imported private frameworks
+      --deps            Dump imported private frameworks as well
   -e, --ext string      Dump extension (regex)
+      --extra           Dump all other Swift sections/info
   -h, --help            help for swift-dump
   -i, --interface       🚧 Dump Swift Interface
   -o, --output string   🚧 Folder to write interface to

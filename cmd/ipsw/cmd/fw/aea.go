@@ -23,10 +23,12 @@ package fw
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -37,32 +39,38 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NOTES:
-//   key-val is 32 bytes or 64 char hex string
-//   aea decrypt -i iPhone16,2_d34efba2646b219d16b6ffcb93998bd4feed028516c7c42bc1ecc368561f7ce6.aea -o ota.dec -key-value 'base64:TSKOZk6rDQtoDOAWuPBcJsSnNraBWANU1lcIcIIk5iU='
-
 func init() {
 	FwCmd.AddCommand(aeaCmd)
 
+	aeaCmd.Flags().Bool("id", false, "Print AEA file ID")
 	aeaCmd.Flags().BoolP("info", "i", false, "Print info")
 	aeaCmd.Flags().BoolP("fcs-key", "f", false, "Get fcs-key JSON")
 	aeaCmd.Flags().BoolP("key", "k", false, "Get archive decryption key")
+	aeaCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
+	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	aeaCmd.Flags().BoolP("encrypt", "e", false, "AEA encrypt file")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
+	viper.BindPFlag("fw.aea.id", aeaCmd.Flags().Lookup("id"))
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.aea.fcs-key", aeaCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("fw.aea.key", aeaCmd.Flags().Lookup("key"))
+	viper.BindPFlag("fw.aea.key-val", aeaCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
+	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("fw.aea.encrypt", aeaCmd.Flags().Lookup("encrypt"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
 }
 
 // aeaCmd represents the ane command
 var aeaCmd = &cobra.Command{
-	Use:   "aea",
-	Short: "Parse ANE1 DMGs",
-	Args:  cobra.ExactArgs(1),
+	Use:           "aea",
+	Short:         "Parse AEA1 DMGs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var pemData []byte
 
@@ -74,23 +82,38 @@ var aeaCmd = &cobra.Command{
 		// flags
 		fcsKey := viper.GetBool("fw.aea.fcs-key")
 		adKey := viper.GetBool("fw.aea.key")
+		base64Key := viper.GetString("fw.aea.key-val")
+		showID := viper.GetBool("fw.aea.id")
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
+		pemDB := viper.GetString("fw.aea.pem-db")
+		doEncrypt := viper.GetBool("fw.aea.encrypt")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
-		if (adKey || showInfo) && output != "" {
-			return fmt.Errorf("--output flag is not valid with --info or --key flags")
+		if (adKey || showID || showInfo) && output != "" {
+			return fmt.Errorf("--output flag is not valid with --id, --info or --key flags")
+		} else if (adKey || showID || showInfo) && (fcsKey || base64Key != "") {
+			return fmt.Errorf("cannot use --id, --info or --key flags with --fcs-key or --key-val")
+		} else if fcsKey && base64Key != "" {
+			return fmt.Errorf("cannot use --fcs-key with --key-val")
+		}
+		if base64Key != "" {
+			base64Key = strings.TrimPrefix(base64Key, "base64:")
 		}
 
 		var bold = color.New(color.Bold).SprintFunc()
 
-		if output != "" {
-			if err := os.MkdirAll(output, 0o750); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
-			}
+		if output == "" {
+			output = filepath.Dir(args[0])
 		}
 
-		if showInfo {
+		if showID {
+			id, err := aea.ID(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA id: %v", err)
+			}
+			fmt.Println(hex.EncodeToString(id[:]))
+		} else if showInfo {
 			metadata, err := aea.Info(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
@@ -115,7 +138,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil)
+			pkmap, err := metadata.GetPrivateKey(nil, pemDB, false)
 			if err != nil {
 				return fmt.Errorf("failed to get private key: %v", err)
 			}
@@ -144,11 +167,21 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			wkey, err := metadata.DecryptFCS(pemData)
+			wkey, err := metadata.DecryptFCS(pemData, pemDB)
 			if err != nil {
 				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 			}
 			fmt.Printf("base64:%s\n", base64.StdEncoding.EncodeToString(wkey))
+		} else if doEncrypt {
+			if base64Key == "" {
+				return fmt.Errorf("must provide a base64 encoded symmetric encryption key via --key-val")
+			}
+			if err := aea.Encrypt(args[0], &aea.EncryptConfig{
+				Output:    output,
+				B64SymKey: base64Key,
+			}); err != nil {
+				return fmt.Errorf("failed to encrypt AEA: %v", err)
+			}
 		} else {
 			if pemFile != "" {
 				pemData, err = os.ReadFile(pemFile)
@@ -156,7 +189,13 @@ var aeaCmd = &cobra.Command{
 					return fmt.Errorf("failed to read pem file: %v", err)
 				}
 			}
-			out, err := aea.Decrypt(args[0], output, pemData)
+			out, err := aea.Decrypt(&aea.DecryptConfig{
+				Input:       args[0],
+				Output:      output,
+				PrivKeyData: pemData,
+				B64SymKey:   base64Key,
+				PemDB:       pemDB,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}

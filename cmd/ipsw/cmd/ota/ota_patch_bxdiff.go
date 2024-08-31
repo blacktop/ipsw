@@ -35,17 +35,17 @@ import (
 )
 
 func init() {
-	otaPatchCmd.AddCommand(otaBxdiffCmd)
+	otaPatchCmd.AddCommand(otaPatchBxdiffCmd)
 
-	otaBxdiffCmd.Flags().BoolP("single", "s", false, "Patch single file")
-	otaBxdiffCmd.Flags().StringP("output", "o", "", "Output folder")
-	otaBxdiffCmd.MarkFlagDirname("output")
-	viper.BindPFlag("ota.patch.bxdiff.single", otaBxdiffCmd.Flags().Lookup("single"))
-	viper.BindPFlag("ota.patch.bxdiff.output", otaBxdiffCmd.Flags().Lookup("output"))
+	otaPatchBxdiffCmd.Flags().BoolP("single", "s", false, "Patch single file")
+	otaPatchBxdiffCmd.Flags().StringP("output", "o", "", "Output folder")
+	otaPatchBxdiffCmd.MarkFlagDirname("output")
+	viper.BindPFlag("ota.patch.bxdiff.single", otaPatchBxdiffCmd.Flags().Lookup("single"))
+	viper.BindPFlag("ota.patch.bxdiff.output", otaPatchBxdiffCmd.Flags().Lookup("output"))
 }
 
-// otaBxdiffCmd represents the bxdiff command
-var otaBxdiffCmd = &cobra.Command{
+// otaPatchBxdiffCmd represents the bxdiff command
+var otaPatchBxdiffCmd = &cobra.Command{
 	Use:           "bxdiff <DELTA> <TARGET>",
 	Aliases:       []string{"b"},
 	Short:         "Patch BXDIFF50 OTAs",

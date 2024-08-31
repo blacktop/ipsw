@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -96,7 +97,7 @@ var plistCmd = &cobra.Command{
 	Aliases: []string{"pl"},
 	Short:   "Dump plist as JSON",
 	Args:    cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -193,9 +194,26 @@ var plistCmd = &cobra.Command{
 		}
 
 		// print mode
-		data, err := os.ReadFile(args[0])
-		if err != nil {
-			return fmt.Errorf("failed to read plist: %v", err)
+		var data []byte
+		if len(args) > 0 {
+			data, err = os.ReadFile(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to read plist: %v", err)
+			}
+		} else {
+			// Read from stdin
+			stat, err := os.Stdin.Stat()
+			if err != nil {
+				return fmt.Errorf("failed to read from stdin: %v", err)
+			}
+			if (stat.Mode() & os.ModeCharDevice) == 0 {
+				data, err = io.ReadAll(os.Stdin)
+				if err != nil {
+					return fmt.Errorf("failed to read from stdin: %v", err)
+				}
+			} else {
+				return fmt.Errorf("no input provided via stdin")
+			}
 		}
 
 		var out map[string]any

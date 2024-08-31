@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
+	"github.com/fatih/color"
 )
 
 //go:embed data/ipsw_db.gz
@@ -32,6 +33,7 @@ type Board struct {
 
 type Device struct {
 	Name        string           `json:"name,omitempty"`
+	Product     string           `json:"product,omitempty"`
 	Description string           `json:"desc,omitempty"`
 	Boards      map[string]Board `json:"boards,omitempty"`
 	MemClass    uint64           `json:"mem_class,omitempty"`
@@ -40,6 +42,52 @@ type Device struct {
 }
 
 type Devices map[string]Device
+
+var colorName = color.New(color.Bold).SprintFunc()
+var colorBoard = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+
+func (d Device) String() string {
+	var sb strings.Builder
+	sb.WriteString("\n" + colorName(d.Name) + "\n")
+	if len(d.Description) > 0 {
+		sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Description"), d.Description))
+	}
+	if len(d.Product) > 0 {
+		sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Prod"), d.Product))
+	}
+	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Type"), d.Type))
+	sb.WriteString(fmt.Sprintf("  %s:  %s\n", colorField("SDK"), d.SDKPlatform))
+	sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Memory Class"), d.MemClass))
+	sb.WriteString(fmt.Sprintf("  %s:\n", colorField("Boards")))
+	for board, b := range d.Boards {
+		sb.WriteString(fmt.Sprintf("    %s:\n", colorBoard(board)))
+		sb.WriteString(fmt.Sprintf("      %s:           %s\n", colorField("CPU"), b.CPU))
+		sb.WriteString(fmt.Sprintf("      %s:       %s\n", colorField("CPU ISA"), b.CpuISA))
+		sb.WriteString(fmt.Sprintf("      %s:       %s\n", colorField("Chip ID"), b.ChipID))
+		sb.WriteString(fmt.Sprintf("      %s:      %s\n", colorField("Platform"), b.Platform))
+		sb.WriteString(fmt.Sprintf("      %s: %s\n", colorField("Platform Name"), b.PlatformName))
+		sb.WriteString(fmt.Sprintf("      %s:          %s\n", colorField("Arch"), b.Arch))
+		sb.WriteString(fmt.Sprintf("      %s:      %s\n", colorField("Board ID"), b.BoardID))
+		sb.WriteString(fmt.Sprintf("      %s:  %s\n", colorField("Baseband Chip ID"), b.BasebandChipID))
+		sb.WriteString(fmt.Sprintf("      %s: %s\n", colorField("Kernel Cache Type"), b.KernelCacheType))
+		if b.ResearchSupported {
+			sb.WriteString(fmt.Sprintf("      %s: %t\n", colorField("Research Supported"), b.ResearchSupported))
+		}
+	}
+	return sb.String()
+}
+
+type DeviceQuery struct {
+	Name     string
+	Prod     string
+	Model    string
+	Board    string
+	CPU      string
+	Platform string
+	CPID     string
+	BDID     string
+}
 
 func GetIpswDB() (*Devices, error) {
 	var db Devices
@@ -55,6 +103,90 @@ func GetIpswDB() (*Devices, error) {
 	}
 
 	return &db, nil
+}
+
+func (ds Devices) Query(q *DeviceQuery) *Devices {
+	db := make(Devices)
+	for prod, dev := range ds {
+		dev.Product = prod
+		if strings.EqualFold(dev.Name, "iFPGA") ||
+			strings.HasSuffix(strings.ToLower(dev.Name), "sim") ||
+			strings.HasSuffix(strings.ToLower(dev.Name), "xxx") ||
+			strings.HasSuffix(strings.ToLower(dev.Name), "ref") {
+			continue
+		}
+		if len(dev.Type) == 0 || strings.EqualFold(dev.Type, "unknown") {
+			continue
+		}
+		// Name
+		if len(q.Name) > 0 {
+			if strings.EqualFold(dev.Name, q.Name) || strings.EqualFold(dev.Description, q.Name) {
+				db[prod] = dev
+				goto next
+			}
+		}
+		// Prod
+		if len(q.Prod) > 0 && strings.EqualFold(prod, q.Prod) {
+			db[prod] = dev
+			goto next
+		}
+		// Model
+		if len(q.Model) > 0 {
+			for m := range dev.Boards {
+				if strings.EqualFold(m, q.Model) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+		// Board
+		if len(q.Board) > 0 {
+			for id := range dev.Boards {
+				if strings.EqualFold(id, q.Board) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+		// CPU
+		if len(q.CPU) > 0 {
+			for _, b := range dev.Boards {
+				if strings.EqualFold(b.CPU, q.CPU) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+		// Platform
+		if len(q.Platform) > 0 {
+			for _, b := range dev.Boards {
+				if strings.EqualFold(b.Platform, q.Platform) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+		// CPID
+		if len(q.CPID) > 0 {
+			for _, b := range dev.Boards {
+				if strings.EqualFold(b.ChipID, q.CPID) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+		// BDID
+		if len(q.BDID) > 0 {
+			for _, b := range dev.Boards {
+				if strings.EqualFold(b.BoardID, q.BDID) {
+					db[prod] = dev
+					goto next
+				}
+			}
+		}
+	next:
+	}
+	return &db
 }
 
 func (ds Devices) LookupDevice(prod string) (Device, error) {

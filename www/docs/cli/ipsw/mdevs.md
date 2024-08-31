@@ -17,7 +17,8 @@ ipsw mdevs [flags]
 ### Options
 
 ```
-  -h, --help   help for mdevs
+  -h, --help            help for mdevs
+      --pem-db string   AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands

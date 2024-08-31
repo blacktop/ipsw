@@ -18,22 +18,28 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 
 ```bash
 # Symbolicate a panic crashlog (BugType=210) with an IPSW
-  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
 # Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
-  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
-# Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
-  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
-    ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
+	  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
+	  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+	  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
+	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
 ```
 
 ### Options
 
 ```
-  -a, --all        Show all threads in crashlog
-  -d, --demangle   Demangle symbol names
-  -h, --help       help for symbolicate
-  -r, --running    Show all running (TH_RUN) threads in crashlog
-  -u, --unslide    Unslide the crashlog for easier static analysis
+  -a, --all                 Show all threads in crashlog
+  -d, --demangle            Demangle symbol names
+      --extra string        Path to folder with extra files for symbolication (default "x")
+  -h, --help                help for symbolicate
+      --hex                 Display function offsets in hexadecimal
+      --pem-db string       AEA pem DB JSON file
+  -p, --proc string         Filter crashlog by process name
+  -r, --running             Show all running (TH_RUN) threads in crashlog
+  -s, --server string       Symbol Server DB URL
+      --signatures string   Path to signatures folder
+  -u, --unslide             Unslide the crashlog for easier static analysis
 ```
 
 ### Options inherited from parent commands

@@ -20,7 +20,7 @@ const (
 	CacheRegex                           = `System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DriverKitCacheRegex                  = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
 	CacheRegexEnding                     = `(\..*)?$`
-	CacheUberRegex                       = `(System/DriverKit/)?System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_(arm64e|x86_64)(\..*)?$`
+	CacheUberRegex                       = `(System/DriverKit/)?System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DYLD_SHARED_CACHE_DYNAMIC_DATA_MAGIC = "dyld_data    v0"
 )
 
@@ -300,12 +300,16 @@ type CacheImageInfo struct {
 	Pad            uint32
 }
 
+type CacheSlidePointer interface {
+	Raw() uint64
+}
+
 type Rebase struct {
-	CacheFileOffset uint64 `json:"cache_file_offset,omitempty"`
-	CacheVMAddress  uint64 `json:"cache_vm_address,omitempty"`
-	Target          uint64 `json:"target,omitempty"`
-	Pointer         any    `json:"pointer,omitempty"`
-	Symbol          string `json:"symbol,omitempty"`
+	CacheFileOffset uint64            `json:"cache_file_offset,omitempty"`
+	CacheVMAddress  uint64            `json:"cache_vm_address,omitempty"`
+	Target          uint64            `json:"target,omitempty"`
+	Pointer         CacheSlidePointer `json:"pointer,omitempty"`
+	Symbol          string            `json:"symbol,omitempty"`
 }
 
 type slideInfo interface {
@@ -371,6 +375,12 @@ func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
 		return (ptr & ^i.DeltaMask) + i.ValueAdd
 	}
 	return 0
+}
+
+type CacheSlidePointer2 uint64
+
+func (p CacheSlidePointer2) Raw() uint64 {
+	return uint64(p)
 }
 
 const (
@@ -565,6 +575,20 @@ func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 		value += i.ValueAdd
 	}
 	return value
+}
+
+type CacheSlidePointer4 uint32
+
+func (p CacheSlidePointer4) Raw() uint64 {
+	return uint64(p)
+}
+
+func (p CacheSlidePointer4) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Value uint32 `json:"value"`
+	}{
+		Value: uint32(p),
+	})
 }
 
 type CacheSlideInfo5 struct {

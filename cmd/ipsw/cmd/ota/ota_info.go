@@ -22,22 +22,24 @@ THE SOFTWARE.
 package ota
 
 import (
+	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	OtaCmd.AddCommand(infoCmd)
+	OtaCmd.AddCommand(otaInfoCmd)
+	otaInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("ota.info.json", otaInfoCmd.Flags().Lookup("json"))
 }
 
-// infoCmd represents the info command
-var infoCmd = &cobra.Command{
+// otaInfoCmd represents the info command
+var otaInfoCmd = &cobra.Command{
 	Use:           "info <OTA>",
 	Aliases:       []string{"i"},
 	Short:         "Display OTA metadata",
@@ -51,16 +53,26 @@ var infoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		otaPath := filepath.Clean(args[0])
-
-		pOTA, err := info.Parse(otaPath)
+		o, err := ota.Open(args[0], viper.GetString("ota.key-val"))
 		if err != nil {
-			return fmt.Errorf("failed to parse OTA: %v", err)
+			return fmt.Errorf("failed to open OTA: %v", err)
+		}
+		inf, err := o.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get OTA info: %v", err)
 		}
 
-		fmt.Println("\n[OTA Info]")
-		fmt.Println("==========")
-		fmt.Println(pOTA)
+		if viper.GetBool("ota.info.json") {
+			dat, err := json.Marshal(inf)
+			if err != nil {
+				return fmt.Errorf("failed to marshal OTA info: %v", err)
+			}
+			fmt.Println(string(dat))
+		} else {
+			fmt.Println("\n[OTA Info]")
+			fmt.Println("==========")
+			fmt.Println(inf)
+		}
 
 		return nil
 

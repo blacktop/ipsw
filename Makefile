@@ -8,16 +8,18 @@ NEXT_VERSION=$(shell svu patch)
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install go goreleaser zig unicorn libusb go-swagger/go-swagger/go-swagger
+	brew install gh go git goreleaser zig unicorn libusb
 
 .PHONY: dev-deps
-dev-deps: ## Install the dev dependencies
-	@echo " > Installing dev deps"
-	@go install golang.org/x/tools/...@latest
-	@go install github.com/spf13/cobra-cli@latest
-	@go get -d golang.org/x/tools/cmd/cover
-	@go get -d golang.org/x/tools/cmd/stringer
+dev-deps: download
+	@echo " > Installing Go dev tools"
+	@go mod download
 	@go install github.com/caarlos0/svu@v1.4.1
+	@go install github.com/go-swagger/go-swagger/cmd/swagger@latest
+	@go install github.com/goreleaser/goreleaser@latest
+	@go install github.com/spf13/cobra-cli@latest
+	@go install golang.org/x/perf/cmd/benchstat@latest
+	@go install golang.org/x/tools/cmd/stringer@latest
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
@@ -65,19 +67,20 @@ build: ## Build ipsw
 	@go mod download
 	@CGO_ENABLED=1 go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 
+.PHONY: build-ios
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
 	@go mod download
 	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit==$(CUR_COMMIT)" ./cmd/ipsw
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
+.PHONY: build-linux
 build-linux: ## Build ipsw (linux)
 	@echo " > Building ipsw (linux)"
 	@go mod download
 	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit=$(CUR_COMMIT)" ./cmd/ipsw
 	@echo " > Building ipswd (linux)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
-
 
 .PHONY: docs
 docs: ## Build the cli docs
@@ -87,23 +90,19 @@ docs: ## Build the cli docs
 
 .PHONY: docs-search
 docs-search: ## Build/Update the docs search index
-	@echo " > Updating Docs Search Index"
-	@docker run -t --rm \
-                  -e MEILISEARCH_HOST_URL=$(MEILISEARCH_HOST_URL) \
-                  -e MEILISEARCH_API_KEY=$(MEILISEARCH_API_KEY) \
-                  -v $(PWD)/hack/scripts/scraper.json:/docs-scraper/scraper.json \
-                  getmeili/docs-scraper:v0.12.8 pipenv run ./docs_scraper ./scraper.json
-	# @curl -X POST "$(MEILISEARCH_HOST_URL)/swap-indexes" -H "Authorization: Bearer $(MEILISEARCH_API_KEY)" -H "Content-Type: application/json" --data-binary '[ { "indexes": ["docs-v1", "docs-v1-staging"] } ]'
+	@echo " > 🕸️ Crawling Docs 🕸️"
+	@http -a ${CRAWLER_USER_ID}:${CRAWLER_API_KEY} POST "https://crawler.algolia.com/api/1/crawlers/${CRAWLER_ID}/reindex"
 
 .PHONY: test-docs
 test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
-	cd www; npm start
+	cd www; pnpm start
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
 	rm go.sum || true
+	# go list -f '{{if not (or .Main .Indirect)}}{{.Path}}{{end}}' -m all | xargs --no-run-if-empty go get
 	go mod download
 	go mod tidy
 
@@ -111,6 +110,13 @@ update_mod: ## Update go.mod file
 update_devs: ## Parse XCode database for new devices
 	@echo " > Updating device_traits.json"
 	go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
+
+.PHONY: update_fcs_keys
+update_fcs_keys: ## Scrape the iPhoneWiki for AES keys
+	@echo " > Updating fcs-keys.json"
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
+	@hack/make/json_mini
 
 .PHONY: update_keys
 update_keys: ## Scrape the iPhoneWiki for AES keys
@@ -121,6 +127,18 @@ update_keys: ## Scrape the iPhoneWiki for AES keys
 update_frida: ## Updates the frida-core-devkits used in the frida cmd
 	@echo " > Updating frida-core-devkits"
 	@hack/make/frida-deps
+
+.PHONY: update_proxy
+update_proxy: ## Update the proxy pkgs
+	@echo " > Updating proxy list"
+	@GOPROXY=${IPSW_GO_PROXY} go mod download all
+	@GOPROXY=${IPSW_GO_PROXY} go mod tidy
+
+.PHONY: work-macho
+work-macho: ## Work on go-macho package
+	@echo " > Working on go-macho package"
+	@go work init
+	@go work use . ../go-macho
 
 .PHONY: docker
 docker: ## Build docker image

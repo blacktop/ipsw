@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
@@ -39,11 +38,21 @@ import (
 )
 
 func init() {
-	OtaCmd.AddCommand(lsCmd)
+	OtaCmd.AddCommand(otaLsCmd)
+
+	otaLsCmd.Flags().BoolP("payload", "p", false, "List the payloadv2 files")
+	otaLsCmd.Flags().StringP("pattern", "r", "", "Regex pattern to match payloadv2 files")
+	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
+	otaLsCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
+	otaLsCmd.MarkFlagsMutuallyExclusive("payload", "bom")
+	viper.BindPFlag("ota.ls.pattern", otaLsCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("ota.ls.payload", otaLsCmd.Flags().Lookup("payload"))
+	viper.BindPFlag("ota.ls.bom", otaLsCmd.Flags().Lookup("bom"))
+	viper.BindPFlag("ota.ls.json", otaLsCmd.Flags().Lookup("json"))
 }
 
-// lsCmd represents the ls command
-var lsCmd = &cobra.Command{
+// otaLsCmd represents the ls command
+var otaLsCmd = &cobra.Command{
 	Use:           "ls <OTA>",
 	Aliases:       []string{"l"},
 	Short:         "List OTA files",
@@ -57,32 +66,38 @@ var lsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		otaPath := filepath.Clean(args[0])
-
-		log.Info("Listing files in OTA zip...")
-		files, err := ota.ListZip(otaPath)
+		ota, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open OTA file: %v", err)
 		}
+		defer ota.Close()
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "[ OTA zip files ] %s\n", strings.Repeat("-", 50))
-		for _, f := range files {
-			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
-			}
-		}
-		w.Flush()
 
-		log.Info("Listing files in OTA payload...")
-		utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		fmt.Fprintf(w, "\n[ payload files ] %s\n", strings.Repeat("-", 50))
-		files, err = ota.List(otaPath)
-		if err != nil {
-			return err
+		/* PAYLOAD FILES */
+		if viper.GetBool("ota.ls.payload") {
+			fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+			w.Flush()
+			return ota.PayloadFiles(viper.GetString("ota.ls.pattern"), viper.GetBool("ota.ls.json"))
 		}
-		for _, f := range files {
+		/* BOM FILES */
+		if viper.GetBool("ota.ls.bom") {
+			fmt.Fprintf(w, "\n- [ BOM FILES        ] %s\n\n", strings.Repeat("-", 50))
+			fmt.Fprintf(w, "      (OTA might not actually contain all these files if it is a partial update file)\n\n")
+			for _, f := range ota.PostFiles() {
+				if !f.IsDir() {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Name()))
+				}
+			}
+			w.Flush()
+
+			return nil
+		}
+		/* OTA ASSETS FILES */
+		fmt.Fprintf(w, "- [ OTA ASSETS FILES ] %s\n\n", strings.Repeat("-", 50))
+		for _, f := range ota.Files() {
 			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", colorMode(f.Mode()), colorModTime(f.ModTime().Format(time.RFC3339)), colorSize(humanize.Bytes(uint64(f.Size()))), colorName(f.Path()))
 			}
 		}
 		w.Flush()

@@ -23,8 +23,11 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -32,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -42,14 +46,26 @@ func init() {
 
 	symbolicateCmd.Flags().BoolP("all", "a", false, "Show all threads in crashlog")
 	symbolicateCmd.Flags().BoolP("running", "r", false, "Show all running (TH_RUN) threads in crashlog")
+	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().Bool("hex", false, "Display function offsets in hexadecimal")
+	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
+	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
+	symbolicateCmd.Flags().String("extra", "x", "Path to folder with extra files for symbolication")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
 	viper.BindPFlag("symbolicate.running", symbolicateCmd.Flags().Lookup("running"))
+	viper.BindPFlag("symbolicate.proc", symbolicateCmd.Flags().Lookup("proc"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("symbolicate.hex", symbolicateCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
+	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
+	viper.BindPFlag("symbolicate.extra", symbolicateCmd.Flags().Lookup("extra"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -59,15 +75,17 @@ var symbolicateCmd = &cobra.Command{
 	Use:     "symbolicate <CRASHLOG> [IPSW|DSC]",
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
-	Args:    cobra.MinimumNArgs(1),
 	Example: heredoc.Doc(`
-		# Symbolicate a panic crashlog (BugType=210) with an IPSW
-		  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
-		# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
+	# Symbolicate a panic crashlog (BugType=210) with an IPSW
+	❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+	# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
 		  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
-		# Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
+		  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
 		  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
-		    ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
+		  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -75,11 +93,21 @@ var symbolicateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		/* flags */
 		all := viper.GetBool("symbolicate.all")
 		running := viper.GetBool("symbolicate.running")
+		proc := viper.GetString("symbolicate.proc")
 		unslide := viper.GetBool("symbolicate.unslide")
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
+		asHex := viper.GetBool("symbolicate.hex")
+		pemDB := viper.GetString("symbolicate.pem-db")
+		signaturesDir := viper.GetString("symbolicate.signatures")
+		extrasDir := viper.GetString("symbolicate.extra")
+		/* validate flags */
+		if (Verbose || all) && len(proc) > 0 {
+			return fmt.Errorf("cannot use --verbose OR --all WITH --proc")
+		}
 
 		hdr, err := crashlog.ParseHeader(args[0])
 		if err != nil {
@@ -93,25 +121,60 @@ var symbolicateCmd = &cobra.Command{
 		switch hdr.BugType {
 		case "210", "309": // NEW JSON STYLE CRASHLOG
 			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
-				All:      all || Verbose,
-				Running:  running,
-				Unslid:   unslide,
-				Demangle: demangleFlag,
+				All:           all || Verbose,
+				Running:       running,
+				Process:       proc,
+				Unslid:        unslide,
+				Demangle:      demangleFlag,
+				Hex:           asHex,
+				PemDB:         pemDB,
+				SignaturesDir: signaturesDir,
+				ExtrasDir:     extrasDir,
+				Verbose:       Verbose,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to parse IPS file: %v", err)
 			}
 
 			if len(args) < 2 && hdr.BugType == "210" {
-				log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
+				if viper.IsSet("symbolicate.server") {
+					u, err := url.ParseRequestURI(viper.GetString("symbolicate.server"))
+					if err != nil {
+						return fmt.Errorf("failed to parse symbol server URL: %v", err)
+					}
+					if u.Scheme == "" || u.Host == "" {
+						return fmt.Errorf("invalid symbol server URL: %s (needs a valid schema AND host)", u.String())
+					}
+					log.WithField("server", u.String()).Info("Symbolicating 210 Panic with Symbol Server")
+					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
+						return err
+					}
+				} else {
+					log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
+				}
 			} else {
+				// TODO: use IPSW to populate symbol server if both are supplied
 				if hdr.BugType == "210" {
+					/* validate IPSW */
+					i, err := info.Parse(args[1])
+					if err != nil {
+						return err
+					}
+					if i.Plists.BuildManifest.ProductVersion != ips.Header.Version() ||
+						i.Plists.BuildManifest.ProductBuildVersion != ips.Header.Build() ||
+						!slices.Contains(i.Plists.Restore.SupportedProductTypes, ips.Payload.Product) {
+						return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s)",
+							filepath.Base(args[1]),
+							ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
+							strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
+							i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
+						)
+					}
 					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
 						return err
 					}
 				}
 			}
-
 			fmt.Println(ips)
 		case "109": // OLD STYLE CRASHLOG
 			crashLog, err := crashlog.Open(args[0])

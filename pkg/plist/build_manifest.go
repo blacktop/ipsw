@@ -33,6 +33,7 @@ func (b *BuildManifest) String() string {
 }
 
 type buildIdentity struct {
+	ApOSLongVersion               string                      `plist:"Ap,OSLongVersion,omitempty" json:"ap_os_long_version,omitempty"`
 	ApBoardID                     string                      `json:"ap_board_id,omitempty"`
 	ApChipID                      string                      `json:"ap_chip_id,omitempty"`
 	ApSecurityDomain              string                      `json:"ap_security_domain,omitempty"`
@@ -49,7 +50,13 @@ type buildIdentity struct {
 
 func (i buildIdentity) String() string {
 	var out string
-	out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ProductMarketingVersion)
+	if len(i.ProductMarketingVersion) > 0 {
+		out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ProductMarketingVersion)
+	}
+	if len(i.ApOSLongVersion) > 0 {
+		out += fmt.Sprintf("    Ap,OSLongVersion:        %s\n", i.ApOSLongVersion)
+	}
+	out += fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID)
 	out += fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID)
 	out += fmt.Sprintf("    ApChipID:                %s\n", i.ApChipID)
 	out += fmt.Sprintf("    ApSecurityDomain:        %s\n", i.ApSecurityDomain)
@@ -144,6 +151,9 @@ func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
+		if _, ok := bID.Manifest["KernelCache"]; !ok {
+			continue
+		}
 		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string)) {
 			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string))
 		}

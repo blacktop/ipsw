@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,7 +58,8 @@ func getImages(dscPath string) []string {
 func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
-	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
+	classDumpCmd.Flags().Bool("all", false, "Dump ALL dylbs from DSC")
+	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks as well")
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
 	// classDumpCmd.Flags().BoolP("generic", "g", false, "🚧 Generate a XCFramework for ALL targets")
 	classDumpCmd.Flags().BoolP("spm", "s", false, "🚧 Generate a Swift Package for the dylib")
@@ -77,6 +79,7 @@ func init() {
 	classDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 	classDumpCmd.MarkFlagsMutuallyExclusive("headers", "xcfw", "spm")
 
+	viper.BindPFlag("class-dump.all", classDumpCmd.Flags().Lookup("all"))
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.xcfw", classDumpCmd.Flags().Lookup("xcfw"))
 	// viper.BindPFlag("class-dump.generic", classDumpCmd.Flags().Lookup("generic"))
@@ -128,6 +131,15 @@ var classDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot use --re without --verbose")
 		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") && !viper.GetBool("class-dump.xcfw") && !viper.GetBool("class-dump.spm")) {
 			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
+		}
+		doDump := false
+		if !viper.IsSet("class-dump.class") &&
+			!viper.IsSet("class-dump.proto") &&
+			!viper.IsSet("class-dump.cat") &&
+			!viper.GetBool("class-dump.headers") &&
+			!viper.GetBool("class-dump.xcfw") &&
+			!viper.GetBool("class-dump.spm") {
+			doDump = true
 		}
 		// } else if viper.GetBool("class-dump.generic") && !viper.GetBool("class-dump.xcfw") {
 		// 	return fmt.Errorf("cannot use --generic without --xcfw")
@@ -208,69 +220,125 @@ var classDumpCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
+			if viper.GetBool("class-dump.headers") {
+				return o.Headers()
+			}
+
+			if viper.GetBool("class-dump.xcfw") {
+				return o.XCFramework()
+			}
+
+			if viper.GetBool("class-dump.spm") {
+				return o.SwiftPackage()
+			}
+
+			if viper.GetString("class-dump.class") != "" {
+				if err := o.DumpClass(viper.GetString("class-dump.class")); err != nil {
+					return err
+				}
+			}
+
+			if viper.GetString("class-dump.proto") != "" {
+				if err := o.DumpProtocol(viper.GetString("class-dump.proto")); err != nil {
+					return err
+				}
+			}
+
+			if viper.GetString("class-dump.cat") != "" {
+				if err := o.DumpCategory(viper.GetString("class-dump.cat")); err != nil {
+					return err
+				}
+			}
+
+			if doDump {
+				return o.Dump()
+			}
 		} else { /* DSC file */
-			if len(args) < 2 {
+			if len(args) < 2 && !viper.GetBool("class-dump.all") {
 				return fmt.Errorf("must provide an in-cache DYLIB to dump")
 			}
 
-			f, err := dyld.Open(args[0])
+			var images []*dyld.CacheImage
+
+			f, err := dyld.Open(filepath.Clean(args[0]))
 			if err != nil {
 				return err
 			}
 			defer f.Close()
 
-			img, err := f.Image(args[1])
-			if err != nil {
-				return fmt.Errorf("failed to find dylib in DSC: %v", err)
+			if viper.GetBool("class-dump.all") {
+				images = f.Images
+			} else {
+				img, err := f.Image(args[1])
+				if err != nil {
+					return fmt.Errorf("failed to find dylib '%s' in DSC: %v", args[1], err)
+				}
+				images = append(images, img)
 			}
 
-			m, err = img.GetMacho()
-			if err != nil {
-				return fmt.Errorf("failed to parse MachO from dylib: %v", err)
+			for _, img := range images {
+				m, err = img.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(img.Name), err)
+				}
+
+				conf.Name = filepath.Base(img.Name)
+
+				o, err = mcmd.NewObjC(m, f, &conf)
+				if err != nil {
+					if errors.Is(err, mcmd.ErrNoObjc) {
+						if !viper.GetBool("class-dump.all") {
+							log.Warn("no ObjC data found in dylib")
+						}
+						continue
+					}
+				}
+
+				if viper.GetBool("class-dump.headers") {
+					log.WithField("dylib", filepath.Base(img.Name)).Info("Dumping ObjC headers")
+					if err := o.Headers(); err != nil {
+						return fmt.Errorf("failed to dump headers for dylib '%s': %v", filepath.Base(img.Name), err)
+					}
+					continue
+				}
+
+				if viper.GetBool("class-dump.xcfw") {
+					if err := o.XCFramework(); err != nil {
+						return fmt.Errorf("failed to generate XCFramework for dylib '%s': %v", filepath.Base(img.Name), err)
+					}
+				}
+
+				if viper.GetBool("class-dump.spm") {
+					if err := o.SwiftPackage(); err != nil {
+						return fmt.Errorf("failed to generate Swift Package for dylib '%s': %v", filepath.Base(img.Name), err)
+					}
+				}
+
+				if viper.GetString("class-dump.class") != "" {
+					if err := o.DumpClass(viper.GetString("class-dump.class")); err != nil {
+						return fmt.Errorf("failed to dump class '%s' from dylib '%s': %v", viper.GetString("class-dump.class"), filepath.Base(img.Name), err)
+					}
+				}
+
+				if viper.GetString("class-dump.proto") != "" {
+					if err := o.DumpProtocol(viper.GetString("class-dump.proto")); err != nil {
+						return fmt.Errorf("failed to dump protocol '%s' from dylib '%s': %v", viper.GetString("class-dump.proto"), filepath.Base(img.Name), err)
+					}
+				}
+
+				if viper.GetString("class-dump.cat") != "" {
+					if err := o.DumpCategory(viper.GetString("class-dump.cat")); err != nil {
+						return fmt.Errorf("failed to dump category '%s' from dylib '%s': %v", viper.GetString("class-dump.cat"), filepath.Base(img.Name), err)
+					}
+				}
+
+				if doDump {
+					if err := o.Dump(); err != nil {
+						return fmt.Errorf("failed to dump dylib '%s': %v", filepath.Base(img.Name), err)
+					}
+				}
 			}
-
-			conf.Name = filepath.Base(img.Name)
-
-			o, err = mcmd.NewObjC(m, f, &conf)
-			if err != nil {
-				return err
-			}
-		}
-
-		if viper.GetBool("class-dump.headers") {
-			return o.Headers()
-		}
-
-		if viper.GetBool("class-dump.xcfw") {
-			return o.XCFramework()
-		}
-
-		if viper.GetBool("class-dump.spm") {
-			return o.SwiftPackage()
-		}
-
-		if viper.GetString("class-dump.class") != "" {
-			if err := o.DumpClass(viper.GetString("class-dump.class")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("class-dump.proto") != "" {
-			if err := o.DumpProtocol(viper.GetString("class-dump.proto")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("class-dump.cat") != "" {
-			if err := o.DumpCategory(viper.GetString("class-dump.cat")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("class-dump.class") == "" &&
-			viper.GetString("class-dump.proto") == "" &&
-			viper.GetString("class-dump.cat") == "" {
-			return o.Dump()
 		}
 
 		return nil

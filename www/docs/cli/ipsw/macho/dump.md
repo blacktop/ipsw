@@ -21,9 +21,11 @@ ipsw macho dump <macho> <address> [flags]
   -a, --arch string      Which architecture to use for fat/universal MachO
   -b, --bytes            Output as bytes
   -c, --count uint       The number of total items to display
+  -e, --entry string     Dump from fileset entry (requires --section)
   -h, --help             help for dump
   -o, --output string    Output to a file
   -x, --section string   Dump a specific segment/section (i.e. __TEXT.__text)
+  -g, --segment string   Dump a specific segment (i.e. __TEXT)
   -s, --size uint        Size of data in bytes
 ```
 

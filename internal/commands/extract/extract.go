@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,9 +19,9 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-plist"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -28,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/blacktop/ipsw/pkg/plist"
 )
 
 // Config is the extract command configuration.
@@ -42,6 +45,8 @@ type Config struct {
 	Arches []string `json:"arches,omitempty"`
 	// extract the DriverKit DSCs
 	DriverKit bool `json:"driver_kit,omitempty"`
+	// extract the DriverKit DSCs
+	AllDSCs bool `json:"all_dscs,omitempty"`
 	// extract a single device's kernelcache
 	KernelDevice string `json:"kernel_device,omitempty"`
 	// http proxy to use
@@ -57,6 +62,12 @@ type Config struct {
 	Flatten bool `json:"flatten,omitempty"`
 	// show the progress bar (when using the CLI)
 	Progress bool `json:"progress,omitempty"`
+	// Is AEA private key encrypted
+	Encrypted bool `json:"encrypted,omitempty"`
+	// AEA private key PEM DB JSON file
+	PemDB string `json:"pem_db,omitempty"`
+	// AEA private key in base64 format
+	AEAKey string `json:"aea_key,omitempty"`
 	// output directory to write extracted files to
 	Output string `json:"output,omitempty"`
 	// output as JSON
@@ -126,6 +137,32 @@ func FirmwareType(c *Config) (string, error) {
 		return c.info.Plists.Type, nil
 	}
 	return "", fmt.Errorf("no IPSW or URL provided")
+}
+
+func IsAEA(c *Config) (bool, error) {
+	if len(c.IPSW) > 0 {
+		return magic.IsAA(filepath.Clean(c.IPSW))
+	} else if len(c.URL) > 0 {
+		if !isURL(c.URL) {
+			return false, fmt.Errorf("invalid URL provided: %s", c.URL)
+		}
+		req, err := http.NewRequest("GET", c.URL, nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to create HTTP request: %v", err)
+		}
+		req.Header.Set("Range", "bytes=0-4")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, fmt.Errorf("client failed to perform request: %v", err)
+		}
+		defer resp.Body.Close()
+		mdata, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, fmt.Errorf("failed to read remote data: %v", err)
+		}
+		return magic.IsAEAData(bytes.NewReader(mdata))
+	}
+	return false, fmt.Errorf("no IPSW or URL provided")
 }
 
 // Kernelcache extracts the kernelcache from an IPSW
@@ -305,7 +342,7 @@ func DSC(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return dyld.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+		return dyld.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
@@ -316,7 +353,7 @@ func DSC(c *Config) ([]string, error) {
 		}
 		if i.Plists.Type == "OTA" {
 			if runtime.GOOS == "darwin" {
-				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
 				if err != nil {
 					if errors.Is(err, dyld.ErrNoCryptex) {
 						c.Pattern = `^` + dyld.CacheRegex
@@ -366,7 +403,7 @@ func DSC(c *Config) ([]string, error) {
 		if _, err := utils.SearchZip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, c.Flatten, true); err != nil {
 			return nil, fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 		}
-		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
@@ -571,7 +608,7 @@ func FcsKeys(c *Config) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil)
+			pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true)
 			if err != nil {
 				return nil, err
 			}
@@ -650,28 +687,28 @@ func Search(c *Config) ([]string, error) {
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, appOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, systemOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, fsOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, excOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
 				}
@@ -700,7 +737,7 @@ func Search(c *Config) ([]string, error) {
 }
 
 // LaunchdConfig extracts launchd config from an IPSW
-func LaunchdConfig(path string) (string, error) {
+func LaunchdConfig(path, pemDB string) (string, error) {
 	ipswPath := filepath.Clean(path)
 
 	i, err := info.Parse(ipswPath)
@@ -711,7 +748,7 @@ func LaunchdConfig(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get filesystem DMG path: %v", err)
 	}
-	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), regexp.MustCompile(`.*/sbin/launchd$`))
+	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`.*/sbin/launchd$`))
 	if err != nil {
 		return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
 	}
@@ -746,19 +783,8 @@ func LaunchdConfig(path string) (string, error) {
 	return string(data), nil
 }
 
-// SystemVersionPlist is the SystemVersion.plist struct
-type SystemVersionPlist struct {
-	BuildID             string `json:"build_id,omitempty"`
-	ProductBuildVersion string `json:"product_build_version,omitempty"`
-	ProductCopyright    string `json:"product_copyright,omitempty"`
-	ProductName         string `json:"product_name,omitempty"`
-	ProductVersion      string `json:"product_version,omitempty"`
-	ReleaseType         string `json:"release_type,omitempty"`
-	SystemImageID       string `json:"system_image_id,omitempty"`
-}
-
 // SystemVersion extracts the system version info from an IPSW
-func SystemVersion(path string) (*SystemVersionPlist, error) {
+func SystemVersion(path, pemDB string) (*plist.SystemVersion, error) {
 	ipswPath := filepath.Clean(path)
 
 	i, err := info.Parse(ipswPath)
@@ -770,7 +796,7 @@ func SystemVersion(path string) (*SystemVersionPlist, error) {
 		return nil, fmt.Errorf("failed to get filesystem DMG path: %v", err)
 	}
 
-	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
+	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
 	}
@@ -787,10 +813,5 @@ func SystemVersion(path string) (*SystemVersionPlist, error) {
 		return nil, fmt.Errorf("failed to read SystemVersion.plist: %v", err)
 	}
 
-	var sysVer SystemVersionPlist
-	if err := plist.NewDecoder(bytes.NewReader(dat)).Decode(&sysVer); err != nil {
-		return nil, fmt.Errorf("failed to decode SystemVersion.plist: %v", err)
-	}
-
-	return &sysVer, nil
+	return plist.ParseSystemVersion(dat)
 }

@@ -51,6 +51,14 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
         },
+        blog: {
+          showReadingTime: true,
+          feedOptions: {
+            type: ['rss', 'atom'],
+            xslt: true,
+          },
+          editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
+        },
         gtag: {
           trackingID: "G-6PLDXGZBEK",
           anonymizeIP: false,
@@ -119,7 +127,7 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
-        additionalLanguages: ["armasm", "llvm", "bash"],
+        additionalLanguages: ["armasm", "llvm", "bash", "json", "yaml", "toml"],
       },
       algolia: {
         appId: "KYIBYORJ9P",
@@ -155,6 +163,13 @@ const config = {
             position: "left",
             sidebarId: "api",
           },
+          { to: '/blog', label: 'Blog', position: 'left' },
+          // {
+          //   label: "DIFF",
+          //   to: "/diff",
+          //   position: "left",
+          //   sidebarId: "diff",
+          // },
           // Right
           {
             href: "https://github.com/blacktop/ipsw",

@@ -170,11 +170,19 @@ func (s State) String() string {
 	return fmt.Sprintf(colorImage("lr")+": %#016x - "+colorImage("fp")+": %#016x", s.LR, s.FP)
 }
 
+type BackTraceKext struct {
+	Name    string
+	Version string
+	UUID    string
+	Range   Range
+}
+
 type PanickedThread struct {
 	TID       int
 	Backtrace uint64
 	Address   uint64
 	CallStack []State
+	Kexts     []BackTraceKext
 }
 
 func (p PanickedThread) String() string {
@@ -182,7 +190,14 @@ func (p PanickedThread) String() string {
 	for _, state := range p.CallStack {
 		callstack += fmt.Sprintf("    %s\n", state)
 	}
-	return fmt.Sprintf(colorField("Panicked Thread")+": %#016x, "+colorField("backtrace")+": %#016x, "+colorField("tid")+": %d%s", p.Address, p.Backtrace, p.TID, callstack)
+	kexts := ""
+	if len(p.Kexts) > 0 {
+		kexts = colorField("Kernel Extensions In Backtrace") + ":\n"
+	}
+	for _, kext := range p.Kexts {
+		kexts += fmt.Sprintf("    %s (%v) %s @ %s\n", kext.Name, kext.Version, kext.UUID, kext.Range)
+	}
+	return fmt.Sprintf(colorField("Panicked Thread")+": %#016x, "+colorField("backtrace")+": %#016x, "+colorField("tid")+": %d%s%s", p.Address, p.Backtrace, p.TID, callstack, kexts)
 }
 
 type LastStartedKext struct {
@@ -231,27 +246,35 @@ func (l LoadedKext) String() string {
 }
 
 type Panic210 struct {
-	Panic                  string
-	DebuggerMessage        *Field // string
-	MemoryID               *Field // uint64
-	OsReleaseType          *Field // string
-	OsVersion              *Field // string
-	KernelVersion          *Field // string
-	FilesetKernelCacheUUID *Field // string
-	KernelCacheUUID        *Field // string
-	KernelUUID             *Field // string
-	BootSessionUUID        *Field // string
-	IBootVersion           *Field // string
-	SecureBoot             *Field // bool
-	RootsInstalled         *Field // bool
-	PaniclogVersion        *Field // string
-	KernelCacheSlide       *Field // uint64
-	KernelCacheBase        *Field // uint64
-	KernelSlide            *Field // uint64
-	KernelTextBase         *Field // uint64
-	KernelTextExecSlide    *Field // uint64
-	KernelTextExecBase     *Field // uint64
-	MachAbsoluteTime       *Field // uint64
+	Panic                          string
+	DebuggerMessage                *Field // string
+	MemoryID                       *Field // uint64
+	OsReleaseType                  *Field // string
+	OsVersion                      *Field // string
+	KernelVersion                  *Field // string
+	FilesetKernelCacheUUID         *Field // string
+	KernelCacheUUID                *Field // string
+	KernelUUID                     *Field // string
+	BootSessionUUID                *Field // string
+	IBootVersion                   *Field // string
+	SecureBoot                     *Field // bool
+	RootsInstalled                 *Field // bool
+	PaniclogVersion                *Field // string
+	KernelCacheSlide               *Field // uint64
+	KernelCacheBase                *Field // uint64
+	KernelSlide                    *Field // uint64
+	KernelTextBase                 *Field // uint64
+	KernelTextExecSlide            *Field // uint64
+	KernelTextExecBase             *Field // uint64
+	SptmLoadAddress                *Field // uint64
+	SptmUUID                       *Field // string
+	TxmLoadAddress                 *Field // uint64
+	TxmUUID                        *Field // string
+	DebugHdrAddress                *Field // uint64
+	DebugHdrEntryCount             *Field // uint64
+	DebugHdrKernelCacheLoadAddress *Field // uint64
+	DebugHdrKernelCacheUUID        *Field // string
+	MachAbsoluteTime               *Field // uint64
 
 	EpochTime EpochTime
 
@@ -290,7 +313,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 	if err != nil {
 		log.WithError(err).Error("failed to get debugger message")
 	}
-	crash.MemoryID, err = crash.getIntField("Memory ID", "Memory ID: ")
+	crash.MemoryID, err = crash.getIntField("Memory ID", "Memory ID:")
 	if err != nil {
 		log.WithError(err).Error("failed to get memory ID")
 	}
@@ -338,31 +361,63 @@ func parsePanicString210(in string) (*Panic210, error) {
 	if err != nil {
 		log.WithError(err).Error("failed to get paniclog version")
 	}
-	crash.KernelCacheSlide, err = crash.getIntField("KernelCache Slide", "KernelCache slide:      ")
+	crash.KernelCacheSlide, err = crash.getIntField("KernelCache Slide", "KernelCache slide:")
 	if err != nil {
 		log.WithError(err).Debug("failed to get kernelcache slide")
 	}
-	crash.KernelCacheBase, err = crash.getIntField("KernelCache Base", "KernelCache base:  ")
+	crash.KernelCacheBase, err = crash.getIntField("KernelCache Base", "KernelCache base:")
 	if err != nil {
 		log.WithError(err).Debug("failed to get kernelcache base")
 	}
-	crash.KernelSlide, err = crash.getIntField("Kernel Slide", "Kernel slide:      ")
+	crash.KernelSlide, err = crash.getIntField("Kernel Slide", "Kernel slide:")
 	if err != nil {
 		log.WithError(err).Error("failed to get kernel slide")
 	}
-	crash.KernelTextBase, err = crash.getIntField("Kernel Text Base", "Kernel text base:  ")
+	crash.KernelTextBase, err = crash.getIntField("Kernel Text Base", "Kernel text base:")
 	if err != nil {
 		log.WithError(err).Error("failed to get kernel text base")
 	}
-	crash.KernelTextExecSlide, err = crash.getIntField("Kernel Text Exec Slide", "Kernel text exec slide:      ")
+	crash.KernelTextExecSlide, err = crash.getIntField("Kernel Text Exec Slide", "Kernel text exec slide:")
 	if err != nil {
 		log.WithError(err).Debug("failed to get kernel text exec slide")
 	}
-	crash.KernelTextExecBase, err = crash.getIntField("Kernel Text Exec Base", "Kernel text exec base:  ")
+	crash.KernelTextExecBase, err = crash.getIntField("Kernel Text Exec Base", "Kernel text exec base:")
 	if err != nil {
 		log.WithError(err).Debug("failed to get kernel text exec base")
 	}
-	crash.MachAbsoluteTime, err = crash.getIntField("Mach Absolute Time", "mach_absolute_time: ")
+	crash.SptmLoadAddress, err = crash.getIntField("SPTM Load Address", "SPTM load address:")
+	if err != nil {
+		log.WithError(err).Debug("failed to get SPTM load address")
+	}
+	crash.SptmUUID, err = crash.getStrField("SPTM UUID", "SPTM UUID: ")
+	if err != nil {
+		log.WithError(err).Debug("failed to get SPTM UUID")
+	}
+	crash.TxmLoadAddress, err = crash.getIntField("TXM Load Address", "TXM load address:")
+	if err != nil {
+		log.WithError(err).Debug("failed to get TXM load address")
+	}
+	crash.TxmUUID, err = crash.getStrField("TXM UUID", "TXM UUID: ")
+	if err != nil {
+		log.WithError(err).Debug("failed to get TXM UUID")
+	}
+	crash.DebugHdrAddress, err = crash.getIntField("Debug Header Address", "Debug Header address:")
+	if err != nil {
+		log.WithError(err).Debug("failed to get Debug Header address")
+	}
+	crash.DebugHdrEntryCount, err = crash.getStrField("Debug Header Entry Count", "Debug Header entry count:")
+	if err != nil {
+		log.WithError(err).Debug("failed to get Debug Header entry count")
+	}
+	crash.DebugHdrKernelCacheLoadAddress, err = crash.getIntField("Debug Header KernelCache Load Address", "Debug Header kernelcache load address:")
+	if err != nil {
+		log.WithError(err).Debug("failed to get TXM load address")
+	}
+	crash.DebugHdrKernelCacheUUID, err = crash.getStrField("Debug Header KernelCache UUID", "Debug Header kernelcache UUID: ")
+	if err != nil {
+		log.WithError(err).Debug("failed to get TXM UUID")
+	}
+	crash.MachAbsoluteTime, err = crash.getIntField("Mach Absolute Time", "mach_absolute_time:")
 	if err != nil {
 		log.WithError(err).Error("failed to get mach absolute time")
 	}
@@ -383,7 +438,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 		log.WithError(err).Debug("failed to get compressor info")
 	}
 	if err := crash.getPanickedTask(); err != nil {
-		log.WithError(err).Error("failed to get panicked task")
+		return nil, fmt.Errorf("failed to get panicked task: %v", err)
 	}
 	if err := crash.getPanickedThread(); err != nil {
 		log.WithError(err).Error("failed to get panicked thread")
@@ -424,7 +479,7 @@ func (p *Panic210) getStrField(title, key string) (*Field, error) {
 func (p *Panic210) getIntField(title, key string) (*Field, error) {
 	for _, line := range p.lines {
 		if strings.HasPrefix(line, key) {
-			return &Field{Title: title, Value: cast.ToUint64(strings.TrimPrefix(line, key))}, nil
+			return &Field{Title: title, Value: cast.ToUint64(strings.TrimSpace(strings.TrimPrefix(line, key)))}, nil
 		}
 	}
 	return nil, fmt.Errorf("failed to find '%s'", key)
@@ -666,6 +721,7 @@ func (p *Panic210) getPanickedTask() (err error) {
 func (p *Panic210) getPanickedThread() (err error) {
 	re := regexp.MustCompile(`^Panicked thread:`)
 	found := false
+	kextsFound := false
 	for _, line := range p.lines {
 		if re.MatchString(line) {
 			ptRE := regexp.MustCompile(`^Panicked thread: (?P<thread>\w+), backtrace: (?P<backtrace>\w+), tid: (?P<tid>\d+)`)
@@ -691,6 +747,24 @@ func (p *Panic210) getPanickedThread() (err error) {
 				LR: cast.ToUint64(matches[1]),
 				FP: cast.ToUint64(matches[2]),
 			})
+			kextInBtRE := regexp.MustCompile(`^\s+Kernel Extensions in backtrace:`)
+			if kextInBtRE.MatchString(line) {
+				kextsFound = true
+				continue
+			}
+			if kextsFound {
+				kextRE := regexp.MustCompile(`^\s+(?P<name>\w+)\((?P<version>[0-9.]+)\) \[(?P<uuid>.*)\]@(?P<start>\w+)->(?P<end>\w+)`)
+				matches := kextRE.FindStringSubmatch(line)
+				if len(matches) < 6 {
+					continue
+				}
+				p.PanickedThread.Kexts = append(p.PanickedThread.Kexts, BackTraceKext{
+					Name:    matches[1],
+					Version: matches[2],
+					UUID:    matches[3],
+					Range:   Range{Start: cast.ToUint64(matches[4]), End: cast.ToUint64(matches[5])},
+				})
+			}
 		}
 	}
 	if found {
@@ -780,6 +854,14 @@ func (p *Panic210) String() string {
 			"%s"+
 			"%s"+
 			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
+			"%s"+
 			"\n%s\n"+ // EpochTime
 			"%s"+ // ZoneInfo
 			"%s"+ // TPIDRx_ELy
@@ -808,6 +890,14 @@ func (p *Panic210) String() string {
 		p.KernelTextBase,
 		p.KernelTextExecSlide,
 		p.KernelTextExecBase,
+		p.SptmLoadAddress,
+		p.SptmUUID,
+		p.TxmLoadAddress,
+		p.TxmUUID,
+		p.DebugHdrAddress,
+		p.DebugHdrEntryCount,
+		p.DebugHdrKernelCacheLoadAddress,
+		p.DebugHdrKernelCacheUUID,
 		p.MachAbsoluteTime,
 		p.EpochTime,
 		p.ZoneInfo,

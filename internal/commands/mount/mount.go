@@ -42,7 +42,7 @@ func (c Context) Unmount() error {
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
-func DmgInIPSW(path, typ string) (*Context, error) {
+func DmgInIPSW(path, typ, pemDbPath string) (*Context, error) {
 	ipswPath := filepath.Clean(path)
 
 	i, err := info.Parse(ipswPath)
@@ -62,7 +62,7 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 		dmgPath, err = i.GetSystemOsDmg()
 		if err != nil {
 			if errors.Is(err, info.ErrorCryptexNotFound) {
-				log.Warn("failed to get SystemOS DMG; trying filesystem DMG")
+				log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
 				dmgPath, err = i.GetFileSystemOsDmg()
 				if err != nil {
 					return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
@@ -100,7 +100,12 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
-		extractedDMG, err = aea.Decrypt(extractedDMG, filepath.Dir(extractedDMG), nil)
+		defer os.Remove(extractedDMG) // remove the encrypted AEA DMG decrypting and mounting
+		extractedDMG, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  extractedDMG,
+			Output: filepath.Dir(extractedDMG),
+			PemDB:  pemDbPath,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}

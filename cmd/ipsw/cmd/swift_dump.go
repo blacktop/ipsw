@@ -44,9 +44,10 @@ import (
 func init() {
 	rootCmd.AddCommand(swiftDumpCmd)
 
-	swiftDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
+	swiftDumpCmd.Flags().Bool("all", false, "Dump ALL dylbs from DSC")
+	swiftDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks as well")
 	swiftDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names")
-	swiftDumpCmd.Flags().Bool("all", false, "Dump all other Swift sections/info")
+	swiftDumpCmd.Flags().Bool("extra", false, "Dump all other Swift sections/info")
 	swiftDumpCmd.Flags().BoolP("interface", "i", false, "🚧 Dump Swift Interface")
 	swiftDumpCmd.Flags().StringP("output", "o", "", "🚧 Folder to write interface to")
 	swiftDumpCmd.MarkFlagDirname("output")
@@ -61,9 +62,10 @@ func init() {
 	// swiftDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
 	swiftDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 
+	viper.BindPFlag("swift-dump.all", swiftDumpCmd.Flags().Lookup("all"))
 	viper.BindPFlag("swift-dump.deps", swiftDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("swift-dump.demangle", swiftDumpCmd.Flags().Lookup("demangle"))
-	viper.BindPFlag("swift-dump.all", swiftDumpCmd.Flags().Lookup("all"))
+	viper.BindPFlag("swift-dump.extra", swiftDumpCmd.Flags().Lookup("extra"))
 	viper.BindPFlag("swift-dump.interface", swiftDumpCmd.Flags().Lookup("interface"))
 	viper.BindPFlag("swift-dump.output", swiftDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("swift-dump.theme", swiftDumpCmd.Flags().Lookup("theme"))
@@ -108,6 +110,14 @@ var swiftDumpCmd = &cobra.Command{
 		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") {
 			return fmt.Errorf("cannot set --output without setting --interface")
 		}
+		doDump := false
+		if !viper.IsSet("swift-dump.interface") &&
+			!viper.IsSet("swift-dump.type") &&
+			!viper.IsSet("swift-dump.proto") &&
+			!viper.GetBool("swift-dump.ext") &&
+			!viper.GetBool("swift-dump.ass") {
+			doDump = true
+		}
 
 		if len(viper.GetString("swift-dump.output")) > 0 {
 			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {
@@ -120,7 +130,7 @@ var swiftDumpCmd = &cobra.Command{
 		conf := mcmd.SwiftConfig{
 			Verbose: Verbose,
 			// Addrs:       viper.GetBool("swift-dump.re"),
-			All:         viper.GetBool("swift-dump.all"),
+			All:         viper.GetBool("swift-dump.extra"),
 			Interface:   viper.GetBool("swift-dump.interface"),
 			Deps:        viper.GetBool("swift-dump.deps"),
 			Demangle:    doDemangle,
@@ -182,88 +192,130 @@ var swiftDumpCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
+			if viper.GetBool("swift-dump.interface") {
+				return s.Interface()
+			}
+
+			if viper.GetString("swift-dump.type") != "" {
+				if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
+					return fmt.Errorf("failed to dump type: %v", err)
+				}
+			}
+
+			if viper.GetString("swift-dump.proto") != "" {
+				if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
+					return fmt.Errorf("failed to dump protocol: %v", err)
+				}
+			}
+
+			if viper.GetString("swift-dump.ext") != "" {
+				if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
+					return fmt.Errorf("failed to dump extension: %v", err)
+				}
+			}
+
+			if viper.GetString("swift-dump.ass") != "" {
+				if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
+					return fmt.Errorf("failed to dump associated type: %v", err)
+				}
+			}
+
+			if doDump {
+				return s.Dump()
+			}
 		} else { /* DSC file */
-			if len(args) < 2 {
+			if len(args) < 2 && !viper.GetBool("swift-dump.all") {
 				return fmt.Errorf("must provide an in-cache DYLIB to dump")
 			}
 
-			f, err := dyld.Open(args[0])
+			var images []*dyld.CacheImage
+
+			f, err := dyld.Open(filepath.Clean(args[0]))
 			if err != nil {
 				return err
 			}
 			defer f.Close()
 
-			image, err := f.Image(args[1])
-			if err != nil {
-				return err
+			if viper.GetBool("swift-dump.all") {
+				images = f.Images
+			} else {
+				img, err := f.Image(args[1])
+				if err != nil {
+					return fmt.Errorf("failed to find dylib '%s' in DSC: %v", args[1], err)
+				}
+				images = append(images, img)
 			}
 
-			m, err = image.GetMacho()
-			if err != nil {
-				return err
-			}
+			for _, image := range images {
+				m, err = image.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(image.Name), err)
+				}
 
-			image.ParseLocalSymbols(false) // parse local symbols for swift demangling
-			if m.Symtab != nil {
-				for idx, sym := range m.Symtab.Syms {
-					if sym.Value != 0 {
-						if sym.Name == "<redacted>" {
-							if name, ok := f.AddressToSymbol[sym.Value]; ok {
-								m.Symtab.Syms[idx].Name = name
+				image.ParseLocalSymbols(false) // parse local symbols for swift demangling
+				if m.Symtab != nil {
+					for idx, sym := range m.Symtab.Syms {
+						if sym.Value != 0 {
+							if sym.Name == "<redacted>" {
+								if name, ok := f.AddressToSymbol[sym.Value]; ok {
+									m.Symtab.Syms[idx].Name = name
+								}
+							}
+						}
+						if doDemangle {
+							if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") {
+								m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
+							} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
+								m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
 							}
 						}
 					}
-					if doDemangle {
-						if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") {
-							m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
-						} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
-							m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
-						}
+				}
+
+				conf.Name = filepath.Base(image.Name)
+
+				s, err = mcmd.NewSwift(m, f, &conf)
+				if err != nil {
+					return err
+				}
+
+				if viper.GetBool("swift-dump.interface") {
+					if err := s.Interface(); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetString("swift-dump.type") != "" {
+					if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetString("swift-dump.proto") != "" {
+					if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetString("swift-dump.ext") != "" {
+					if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetString("swift-dump.ass") != "" {
+					if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
+						return err
+					}
+				}
+
+				if doDump {
+					if err := s.Dump(); err != nil {
+						return fmt.Errorf("failed to dump Swift info for dylib '%s': %v", filepath.Base(image.Name), err)
 					}
 				}
 			}
-
-			conf.Name = filepath.Base(image.Name)
-
-			s, err = mcmd.NewSwift(m, f, &conf)
-			if err != nil {
-				return err
-			}
-		}
-
-		if viper.GetBool("swift-dump.interface") {
-			return s.Interface()
-		}
-
-		if viper.GetString("swift-dump.type") != "" {
-			if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("swift-dump.proto") != "" {
-			if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("swift-dump.ext") != "" {
-			if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("swift-dump.ass") != "" {
-			if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
-				return err
-			}
-		}
-
-		if viper.GetString("swift-dump.type") == "" &&
-			viper.GetString("swift-dump.proto") == "" &&
-			viper.GetString("swift-dump.ext") == "" &&
-			viper.GetString("swift-dump.ass") == "" {
-			return s.Dump()
 		}
 
 		return nil

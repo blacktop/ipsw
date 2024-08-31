@@ -234,7 +234,7 @@ jobs:
       - name: Run download macOS beta OTA (kernelcache and DSC)
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw-beta
-        run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
+        run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 14.5
 
       #
       # INFO CMD (macOS)

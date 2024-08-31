@@ -45,6 +45,36 @@
         }
       }
     },
+    "/aea/fcs-keys/{key}": {
+      "get": {
+        "description": "Get fsc-keys PEM bytes for a given key.",
+        "produces": [
+          "application/octet-stream"
+        ],
+        "tags": [
+          "AEA"
+        ],
+        "summary": "FcsKeys",
+        "operationId": "getFcsKeys",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "fcs-keys.json PEM lookup key",
+            "name": "key",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/aeaPemResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/device_list": {
       "get": {
         "description": "This will return JSON of all XCode devices.",
@@ -1125,6 +1155,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1155,6 +1191,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1185,6 +1227,12 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1351,11 +1399,261 @@
             "name": "path",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
             "$ref": "#/responses/mountReponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/dsc/{uuid}": {
+      "get": {
+        "description": "Get dyld_shared_cache for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "DSC",
+        "operationId": "getDSC",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "dsc UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symDscResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/dsc/{uuid}/{addr}": {
+      "get": {
+        "description": "Get image from a DSC for a given uuid and address.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Dylib",
+        "operationId": "getDylib",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "dsc UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "pointer address",
+            "name": "addr",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/ipsw": {
+      "get": {
+        "description": "Get IPSW for a given version OR build AND device.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "IPSW",
+        "operationId": "getIPSW",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "version of IPSW",
+            "name": "version",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "build of IPSW",
+            "name": "build",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "device of IPSW",
+            "name": "device",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symIpswResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/macho/{uuid}": {
+      "get": {
+        "description": "Get MachO for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "MachO",
+        "operationId": "getMachO",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "machO UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/scan": {
+      "post": {
+        "description": "Scan symbols for a given IPSW.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Scan",
+        "operationId": "postScan",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/successResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/{uuid}": {
+      "get": {
+        "description": "Get symbols for a given uuid.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Symbols",
+        "operationId": "getSymbols",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "file UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/syms/{uuid}/{addr}": {
+      "get": {
+        "description": "Get symbol for a given uuid and address.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Symbol",
+        "operationId": "getSymbol",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "file UUID",
+            "name": "uuid",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "symbol address",
+            "name": "addr",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/symResponse"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -1429,37 +1727,281 @@
     }
   },
   "definitions": {
-    "Address": {
-      "description": "Address is a struct that contains information about a dyld_shared_cache address",
+    "Asset": {
+      "description": "Asset is an OTA asset object",
       "type": "object",
       "properties": {
-        "cache": {
-          "$ref": "#/definitions/address"
+        "ActualMinimumSystemPartition": {
+          "type": "integer",
+          "format": "int64"
         },
-        "files": {
-          "description": "the virtual addresses",
+        "ArchiveDecryptionKey": {
+          "type": "string"
+        },
+        "ArchiveID": {
+          "type": "string"
+        },
+        "AssetFormat": {
+          "type": "string"
+        },
+        "AssetType": {
+          "type": "string"
+        },
+        "AutoUpdate": {
+          "type": "boolean"
+        },
+        "BridgeVersionInfo": {
+          "$ref": "#/definitions/bridgeVersionInfo"
+        },
+        "Build": {
+          "type": "string"
+        },
+        "CryptexSizeInfo": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/address"
-          },
-          "x-go-name": "Files"
-        }
-      },
-      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
-    },
-    "BlobHeader": {
-      "type": "object",
-      "properties": {
-        "length": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "Length"
+            "$ref": "#/definitions/cryptexSize"
+          }
         },
-        "magic": {
-          "$ref": "#/definitions/Magic"
+        "DataTemplateSize": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "DeviceName": {
+          "description": "extras",
+          "type": "string"
+        },
+        "Devices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "DisablePreSoftwareUpdateAssetStaging": {
+          "type": "boolean"
+        },
+        "EAPFSEnabled": {
+          "type": "boolean"
+        },
+        "FirmwareBundle": {
+          "type": "string"
+        },
+        "FirmwareVersionMajor": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "FirmwareVersionMinor": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "FirmwareVersionRelease": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "InstallationSize": {
+          "type": "string"
+        },
+        "InstallationSize-Snapshot": {
+          "type": "string",
+          "x-go-name": "InstallationSizeSnapshot"
+        },
+        "MinimumSystemPartition": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "OSVersion": {
+          "type": "string"
+        },
+        "PreflightBuildManifest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        },
+        "PreflightGlobalSignatures": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        },
+        "PrerequisiteBuild": {
+          "type": "string"
+        },
+        "PrerequisiteOSVersion": {
+          "type": "string"
+        },
+        "ProductVersionExtra": {
+          "type": "string"
+        },
+        "RSEPDigest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        },
+        "Ramp": {
+          "type": "boolean"
+        },
+        "ReleaseType": {
+          "type": "string"
+        },
+        "RescueMinimumSystemPartition": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "RestoreVersion": {
+          "type": "string"
+        },
+        "RestoreVersionInfo": {
+          "$ref": "#/definitions/restoreVersionInfo"
+        },
+        "SEPDigest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        },
+        "SUConvReqd": {
+          "type": "boolean",
+          "x-go-name": "ConvReqd"
+        },
+        "SUDocumentationID": {
+          "type": "string",
+          "x-go-name": "DocumentationID"
+        },
+        "SUInstallTonightEnabled": {
+          "type": "boolean",
+          "x-go-name": "InstallTonightEnabled"
+        },
+        "SUMultiPassEnabled": {
+          "type": "boolean",
+          "x-go-name": "MultiPassEnabled"
+        },
+        "SUProductSystemName": {
+          "type": "string",
+          "x-go-name": "ProductSystemName"
+        },
+        "SUPublisher": {
+          "type": "string",
+          "x-go-name": "Publisher"
+        },
+        "SplatOnly": {
+          "type": "boolean"
+        },
+        "SupportedDeviceModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "SupportedDevices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "SystemPartitionPadding": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "SystemVolumeSealingOverhead": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "TargetUpdateBridgeVersion": {
+          "type": "string"
+        },
+        "TrainName": {
+          "type": "string"
+        },
+        "_AssetReceipt": {
+          "$ref": "#/definitions/assetReceipt"
+        },
+        "_CompressionAlgorithm": {
+          "type": "string",
+          "x-go-name": "CompressionAlgorithm"
+        },
+        "_DownloadSize": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "DownloadSize"
+        },
+        "_EventRecordingServiceURL": {
+          "type": "string",
+          "x-go-name": "EventRecordingServiceURL"
+        },
+        "_IsEncrypted": {
+          "type": "boolean",
+          "x-go-name": "IsEncrypted"
+        },
+        "_IsZipStreamable": {
+          "type": "boolean",
+          "x-go-name": "IsZipStreamable"
+        },
+        "_MasteredVersion": {
+          "type": "string",
+          "x-go-name": "MasteredVersion"
+        },
+        "_Measurement": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "Hash"
+        },
+        "_MeasurementAlgorithm": {
+          "type": "string",
+          "x-go-name": "HashAlgorithm"
+        },
+        "_UnarchivedSize": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "UnarchivedSize"
+        },
+        "__AssetDefaultGarbageCollectionBehavior": {
+          "type": "string",
+          "x-go-name": "AssetDefaultGarbageCollectionBehavior"
+        },
+        "__BaseURL": {
+          "type": "string",
+          "x-go-name": "BaseURL"
+        },
+        "__CanUseLocalCacheServer": {
+          "type": "boolean",
+          "x-go-name": "CanUseLocalCacheServer"
+        },
+        "__HideInstallAlert": {
+          "type": "boolean",
+          "x-go-name": "HideInstallAlert"
+        },
+        "__QueuingServiceURL": {
+          "type": "string",
+          "x-go-name": "QueuingServiceURL"
+        },
+        "__RelativePath": {
+          "type": "string",
+          "x-go-name": "RelativePath"
         }
       },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+      "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
+    },
+    "ByteOrder": {
+      "description": "It is implemented by [LittleEndian], [BigEndian], and [NativeEndian].",
+      "type": "object",
+      "title": "A ByteOrder specifies how to convert byte slices into\n16-, 32-, or 64-bit unsigned integers.",
+      "properties": {
+        "String": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "encoding/binary"
     },
     "CDFlag": {
       "type": "integer",
@@ -1624,45 +2166,16 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
-    "CacheMappingAndSlideInfo": {
-      "type": "object",
-      "properties": {
-        "address": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "Address"
-        },
-        "file_offset": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "FileOffset"
-        },
-        "flags": {
-          "$ref": "#/definitions/CacheMappingFlag"
-        },
-        "init_prot": {
-          "$ref": "#/definitions/VmProtection"
-        },
-        "max_prot": {
-          "$ref": "#/definitions/VmProtection"
-        },
-        "size": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "Size"
-        },
-        "slide_info_offset": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "SlideInfoOffset"
-        },
-        "slide_info_size": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "SlideInfoSize"
-        }
-      },
-      "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
+    "CPU": {
+      "type": "integer",
+      "format": "uint32",
+      "title": "A CPU is a Mach-O cpu type.",
+      "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "CPUSubtype": {
+      "type": "integer",
+      "format": "uint32",
+      "x-go-package": "github.com/blacktop/go-macho/types"
     },
     "CacheMappingFlag": {
       "type": "integer",
@@ -1720,159 +2233,15 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
     },
-    "CdCodeLimit64": {
+    "CacheSlidePointer": {
       "type": "object",
       "properties": {
-        "code_limit_64": {
+        "Raw": {
           "type": "integer",
-          "format": "uint64",
-          "x-go-name": "CodeLimit64"
+          "format": "uint64"
         }
       },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdEarliest": {
-      "type": "object",
-      "properties": {
-        "code_limit": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "CodeLimit"
-        },
-        "flags": {
-          "$ref": "#/definitions/CDFlag"
-        },
-        "hash_offset": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "HashOffset"
-        },
-        "hash_size": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "HashSize"
-        },
-        "hash_type": {
-          "$ref": "#/definitions/hashType"
-        },
-        "ident_offset": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "IdentOffset"
-        },
-        "n_code_slots": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "NCodeSlots"
-        },
-        "n_special_slots": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "NSpecialSlots"
-        },
-        "page_size": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "PageSize"
-        },
-        "platform": {
-          "$ref": "#/definitions/cdPlatform"
-        },
-        "version": {
-          "$ref": "#/definitions/cdVersion"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdExecSeg": {
-      "type": "object",
-      "properties": {
-        "exec_seg_base": {
-          "description": "Version 0x20400 */",
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "ExecSegBase"
-        },
-        "exec_seg_flags": {
-          "$ref": "#/definitions/execSegFlag"
-        },
-        "exec_seg_limit": {
-          "type": "integer",
-          "format": "uint64",
-          "x-go-name": "ExecSegLimit"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdLinkage": {
-      "type": "object",
-      "properties": {
-        "linkage_application_sub_type": {
-          "type": "integer",
-          "format": "uint16",
-          "x-go-name": "LinkageApplicationSubType"
-        },
-        "linkage_application_type": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageApplicationType"
-        },
-        "linkage_hash_type": {
-          "description": "Version 0x20600 */",
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageHashType"
-        },
-        "linkage_offset": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "LinkageOffset"
-        },
-        "linkage_size": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "LinkageSize"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdRuntime": {
-      "type": "object",
-      "properties": {
-        "pre_encrypt_offset": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "PreEncryptOffset"
-        },
-        "runtime": {
-          "$ref": "#/definitions/Version"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdScatter": {
-      "type": "object",
-      "properties": {
-        "scatter_offset": {
-          "description": "Version 0x20100 */",
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "ScatterOffset"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "CdTeamID": {
-      "type": "object",
-      "properties": {
-        "team_offset": {
-          "description": "Version 0x20200 */",
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "TeamOffset"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+      "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
     },
     "CodeDirectory": {
       "description": "CodeDirectory object",
@@ -2176,6 +2545,9 @@
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
     },
+    "DeletedAt": {
+      "$ref": "#/definitions/NullTime"
+    },
     "Device": {
       "description": "Device object",
       "type": "object",
@@ -2263,6 +2635,14 @@
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/xcode"
+    },
+    "DeviceTree": {
+      "description": "DeviceTree object",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Properties"
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/devicetree"
     },
     "DeviceValues": {
       "type": "object",
@@ -2721,6 +3101,40 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/usb/lockdownd"
     },
+    "DyldSharedCache": {
+      "type": "object",
+      "title": "DyldSharedCache is the model for a dyld_shared_cache.",
+      "properties": {
+        "CreatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "UpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "Images"
+        },
+        "shared_region_start": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "SharedRegionStart"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "Dylib": {
       "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
       "type": "object",
@@ -2750,25 +3164,263 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
-    "File": {
+    "Dysymtab": {
       "type": "object",
+      "title": "A Dysymtab represents a Mach-O LC_DYSYMTAB command.",
       "properties": {
-        "ModTime": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "Mode": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Size": {
+        "Extrefsymoff": {
+          "description": "To support dynamic module binding the module structure for each module\nindicates the external references (defined and undefined) each module\nmakes.  For each module there is an offset and a count into the\nreference symbol table for the symbols that the module references.\nThis exists only in a dynamically linked shared library file.  For\nexecutable and object modules the defined external symbols and the\nundefined external symbols indicates the external references.",
           "type": "integer",
-          "format": "int64"
+          "format": "uint32"
+        },
+        "Extreloff": {
+          "description": "To support relocating an individual module in a library file quickly the\nexternal relocation entries for each module in the library need to be\naccessed efficiently.  Since the relocation entries can't be accessed\nthrough the section headers for a library file they are separated into\ngroups of local and external entries further grouped by module.  In this\ncase the presents of this load command who's extreloff, nextrel,\nlocreloff and nlocrel fields are non-zero indicates that the relocation\nentries of non-merged sections are not referenced through the section\nstructures (and the reloff and nreloc fields in the section headers are\nset to zero).\n\nSince the relocation entries are not accessed through the section headers\nthis requires the r_address field to be something other than a section\noffset to identify the item to be relocated.  In this case r_address is\nset to the offset from the vmaddr of the first LC_SEGMENT command.\nFor MH_SPLIT_SEGS images r_address is set to the the offset from the\nvmaddr of the first read-write LC_SEGMENT command.\n\nThe relocation entries are grouped by module and the module table\nentries have indexes and counts into them for the group of external\nrelocation entries for that the module.\n\nFor sections that are merged across modules there must not be any\nremaining external relocation entries for them (for merged sections\nremaining relocation entries must be local).",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Iextdefsym": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Ilocalsym": {
+          "description": "The symbols indicated by symoff and nsyms of the LC_SYMTAB load command\nare grouped into the following three groups:\nlocal symbols (further grouped by the module they are from)\ndefined external symbols (further grouped by the module they are from)\nundefined symbols\n\nThe local symbols are used only for debugging.  The dynamic binding\nprocess may have to use them to indicate to the debugger the local\nsymbols for a module that is being bound.\n\nThe last two groups are used by the dynamic binding process to do the\nbinding (indirectly through the module table and the reference symbol\ntable when this is a dynamically linked shared library file).",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "IndirectSyms": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32"
+          }
+        },
+        "Indirectsymoff": {
+          "description": "The sections that contain \"symbol pointers\" and \"routine stubs\" have\nindexes and (implied counts based on the size of the section and fixed\nsize of the entry) into the \"indirect symbol\" table for each pointer\nand stub.  For every section of these two types the index into the\nindirect symbol table is stored in the section header in the field\nreserved1.  An indirect symbol table entry is simply a 32bit index into\nthe symbol table to the symbol that the pointer or stub is referring to.\nThe indirect symbol table is ordered to match the entries in the section.",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Iundefsym": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Len": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Locreloff": {
+          "description": "All the local relocation entries are grouped together (they are not\ngrouped by their module since they are only used if the object is moved\nfrom it staticly link edited address).",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Modtaboff": {
+          "description": "To support dynamic binding of \"modules\" (whole object files) the symbol\ntable must reflect the modules that the file was created from.  This is\ndone by having a module table that has indexes and counts into the merged\ntables for each module.  The module structure that these two entries\nrefer to is described below.  This exists only in a dynamically linked\nshared library file.  For executable and object modules the file only\ncontains one module so everything in the file belongs to the module.",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nextdefsym": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nextrefsyms": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nextrel": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nindirectsyms": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nlocalsym": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nlocrel": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nmodtab": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Ntoc": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nundefsym": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Tocoffset": {
+          "description": "For the for the dynamic binding process to find which module a symbol\nis defined in the table of contents is used (analogous to the ranlib\nstructure in an archive) which maps defined external symbols to modules\nthey are defined in.  This exists only in a dynamically linked shared\nlibrary file.  For executable and object modules the defined external\nsymbols are sorted by name and is use as the table of contents.",
+          "type": "integer",
+          "format": "uint32"
         }
       },
-      "x-go-package": "github.com/blacktop/ipsw/api/server/routes/ipsw"
+      "x-go-package": "github.com/blacktop/go-macho"
+    },
+    "File": {
+      "type": "object",
+      "title": "A File represents an open Mach-O file.",
+      "properties": {
+        "ByteOrder": {
+          "$ref": "#/definitions/ByteOrder"
+        },
+        "CPU": {
+          "$ref": "#/definitions/CPU"
+        },
+        "Dysymtab": {
+          "$ref": "#/definitions/Dysymtab"
+        },
+        "Flags": {
+          "$ref": "#/definitions/HeaderFlag"
+        },
+        "Loads": {
+          "$ref": "#/definitions/loads"
+        },
+        "Magic": {
+          "$ref": "#/definitions/Magic"
+        },
+        "NCommands": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Reserved": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Section"
+          }
+        },
+        "SizeCommands": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "SubCPU": {
+          "$ref": "#/definitions/CPUSubtype"
+        },
+        "Symtab": {
+          "$ref": "#/definitions/Symtab"
+        },
+        "Type": {
+          "$ref": "#/definitions/HeaderFileType"
+        }
+      },
+      "x-go-package": "github.com/blacktop/go-macho"
+    },
+    "HeaderFileType": {
+      "type": "integer",
+      "format": "uint32",
+      "title": "A HeaderFileType is the Mach-O file type, e.g. an object file, executable, or dynamic library.",
+      "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "HeaderFlag": {
+      "type": "integer",
+      "format": "uint32",
+      "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "IdentityInfo": {
+      "type": "object",
+      "properties": {
+        "build_number": {
+          "type": "string",
+          "x-go-name": "BuildNumber"
+        },
+        "code_name": {
+          "type": "string",
+          "x-go-name": "CodeName"
+        },
+        "device_class": {
+          "type": "string",
+          "x-go-name": "DeviceClass"
+        },
+        "fdr_support": {
+          "type": "boolean",
+          "x-go-name": "FDRSupport"
+        },
+        "minimum_system_partition": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinimumSystemPartition"
+        },
+        "mobile_device_min_version": {
+          "type": "string",
+          "x-go-name": "MobileDeviceMinVersion"
+        },
+        "os_var_content_size": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "OSVarContentSize"
+        },
+        "restore_behavior": {
+          "type": "string",
+          "x-go-name": "RestoreBehavior"
+        },
+        "system_partition_padding": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "x-go-name": "SystemPartitionPadding"
+        },
+        "variant": {
+          "type": "string",
+          "x-go-name": "Variant"
+        },
+        "variant_contents": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "VariantContents"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
+    },
+    "IdentityManifest": {
+      "type": "object",
+      "properties": {
+        "build_string": {
+          "type": "string",
+          "x-go-name": "BuildString"
+        },
+        "digest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "Digest"
+        },
+        "epro": {
+          "type": "boolean",
+          "x-go-name": "EPRO"
+        },
+        "esec": {
+          "type": "boolean",
+          "x-go-name": "ESEC"
+        },
+        "info": {
+          "type": "object",
+          "additionalProperties": {},
+          "x-go-name": "Info"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "trusted": {
+          "type": "boolean",
+          "x-go-name": "Trusted"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
     },
     "ImportedBy": {
       "description": "ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib",
@@ -2792,104 +3444,122 @@
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
     "Info": {
-      "description": "Info is a struct that contains information about a dyld_shared_cache file",
+      "description": "Info in the info object",
       "type": "object",
       "properties": {
-        "code_signature": {
+        "DeviceTrees": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/CodeSignature"
-          },
-          "x-go-name": "CodeSignature"
+            "$ref": "#/definitions/DeviceTree"
+          }
         },
-        "dylibs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Dylib"
-          },
-          "x-go-name": "Dylibs"
-        },
-        "magic": {
-          "type": "string",
-          "x-go-name": "Magic"
-        },
-        "mappings": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "$ref": "#/definitions/CacheMappingWithSlideInfo"
-            }
-          },
-          "x-go-name": "Mappings"
-        },
-        "max_slide": {
-          "type": "integer",
-          "format": "int64",
-          "x-go-name": "MaxSlide"
-        },
-        "num_sub_caches": {
-          "type": "integer",
-          "format": "int64",
-          "x-go-name": "SubCacheArrayCount"
-        },
-        "platform": {
-          "type": "string",
-          "x-go-name": "Platform"
-        },
-        "sub_cache_group_id": {
-          "type": "integer",
-          "format": "int64",
-          "x-go-name": "SubCacheGroupID"
-        },
-        "sym_sub_cache_uuid": {
-          "type": "string",
-          "x-go-name": "SymSubCacheUUID"
-        },
-        "uuid": {
-          "type": "string",
-          "x-go-name": "UUID"
+        "Plists": {
+          "$ref": "#/definitions/Plists"
         }
       },
-      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+      "x-go-package": "github.com/blacktop/ipsw/pkg/info"
     },
-    "KernelVersion": {
+    "Ipsw": {
       "type": "object",
-      "title": "KernelVersion represents the kernel version.",
+      "title": "Ipsw is the model for an Ipsw file.",
       "properties": {
-        "arch": {
-          "description": "The kernel architecture",
+        "CreatedAt": {
           "type": "string",
-          "x-go-name": "Arch"
+          "format": "date-time"
         },
-        "cpu": {
-          "description": "The kernel CPU",
-          "type": "string",
-          "x-go-name": "CPU"
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
         },
-        "darwin": {
-          "description": "The darwin version",
+        "UpdatedAt": {
           "type": "string",
-          "x-go-name": "Darwin"
+          "format": "date-time"
+        },
+        "buildid": {
+          "type": "string",
+          "x-go-name": "BuildID"
         },
         "date": {
-          "description": "The build date",
           "type": "string",
           "format": "date-time",
           "x-go-name": "Date"
         },
-        "type": {
-          "description": "The kernel type",
-          "type": "string",
-          "x-go-name": "Type"
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Device"
+          },
+          "x-go-name": "Devices"
         },
-        "xnu": {
-          "description": "The xnu version",
+        "dscs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DyldSharedCache"
+          },
+          "x-go-name": "DSCs"
+        },
+        "file_system": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "FileSystem"
+        },
+        "id": {
           "type": "string",
-          "x-go-name": "XNU"
+          "x-go-name": "ID"
+        },
+        "kernels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Kernelcache"
+          },
+          "x-go-name": "Kernels"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "version": {
+          "type": "string",
+          "x-go-name": "Version"
         }
       },
-      "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
+    "Kernelcache": {
+      "type": "object",
+      "title": "Kernelcache is the model for a kernelcache.",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "CreatedAt"
+        },
+        "deleted_at": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "kexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Macho"
+          },
+          "x-go-name": "Kexts"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "UpdatedAt"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        },
+        "version": {
+          "type": "string",
+          "x-go-name": "Version"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
     },
     "LLVMVersion": {
       "type": "object",
@@ -2916,23 +3586,327 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
+    "Load": {
+      "type": "object",
+      "title": "A Load represents any Mach-O load command.",
+      "properties": {
+        "Command": {
+          "$ref": "#/definitions/LoadCmd"
+        },
+        "LoadSize": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Raw": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        },
+        "String": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "github.com/blacktop/go-macho"
+    },
+    "LoadCmd": {
+      "type": "integer",
+      "format": "uint32",
+      "title": "A LoadCmd is a Mach-O load command.",
+      "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "Macho": {
+      "type": "object",
+      "properties": {
+        "CreatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletedAt": {
+          "$ref": "#/definitions/DeletedAt"
+        },
+        "Symbols": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Symbol"
+          }
+        },
+        "UpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "text_end": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "TextEnd"
+        },
+        "text_start": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "TextStart"
+        },
+        "uuid": {
+          "type": "string",
+          "x-go-name": "UUID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "Magic": {
       "type": "integer",
       "format": "uint32",
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+      "x-go-package": "github.com/blacktop/go-macho/types"
     },
-    "Offset": {
-      "description": "Offset is a struct that contains information about a dyld_shared_cache offset",
+    "NullTime": {
+      "description": "NullTime implements the [Scanner] interface so\nit can be used as a scan destination, similar to [NullString].",
       "type": "object",
+      "title": "NullTime represents a [time.Time] that may be null.",
       "properties": {
-        "cache": {
-          "$ref": "#/definitions/offset"
+        "Time": {
+          "type": "string",
+          "format": "date-time"
         },
-        "file": {
-          "$ref": "#/definitions/offset"
+        "Valid": {
+          "type": "boolean"
         }
       },
-      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+      "x-go-package": "database/sql"
+    },
+    "Plists": {
+      "description": "Plists IPSW/OTA plists object",
+      "type": "object",
+      "properties": {
+        "DeviceMap": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/restoreDeviceMap"
+          }
+        },
+        "ProductBuildVersion": {
+          "type": "string"
+        },
+        "ProductVersion": {
+          "type": "string"
+        },
+        "SupportedProductTypeIDs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        },
+        "SupportedProductTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "SystemRestoreImageFileSystems": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "actual_minimum_system_partition": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ActualMinimumSystemPartition"
+        },
+        "build": {
+          "type": "string",
+          "x-go-name": "Build"
+        },
+        "build_id": {
+          "type": "string",
+          "x-go-name": "BuildID"
+        },
+        "build_identities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/buildIdentity"
+          },
+          "x-go-name": "BuildIdentities"
+        },
+        "cf_bundle_identifier": {
+          "type": "string",
+          "x-go-name": "CFBundleIdentifier"
+        },
+        "cf_bundle_info_dictionary_version": {
+          "type": "string",
+          "x-go-name": "CFBundleInfoDictionaryVersion"
+        },
+        "cf_bundle_name": {
+          "type": "string",
+          "x-go-name": "CFBundleName"
+        },
+        "cf_bundle_short_version_string": {
+          "type": "string",
+          "x-go-name": "CFBundleShortVersionString"
+        },
+        "cf_bundle_version": {
+          "type": "string",
+          "x-go-name": "CFBundleVersion"
+        },
+        "device_class": {
+          "type": "string",
+          "x-go-name": "DeviceClass"
+        },
+        "hardware_model": {
+          "type": "string",
+          "x-go-name": "HardwareModel"
+        },
+        "manifest_version": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ManifestVersion"
+        },
+        "minimum_system_partition": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinimumSystemPartition"
+        },
+        "mobile_asset_properties": {
+          "$ref": "#/definitions/Asset"
+        },
+        "package_version": {
+          "type": "string",
+          "x-go-name": "PackageVersion"
+        },
+        "product_build_version": {
+          "type": "string",
+          "x-go-name": "ProductBuildVersion"
+        },
+        "product_copyright": {
+          "type": "string",
+          "x-go-name": "ProductCopyright"
+        },
+        "product_name": {
+          "type": "string",
+          "x-go-name": "ProductName"
+        },
+        "product_type": {
+          "type": "string",
+          "x-go-name": "ProductType"
+        },
+        "product_version": {
+          "type": "string",
+          "x-go-name": "ProductVersion"
+        },
+        "release_type": {
+          "type": "string",
+          "x-go-name": "ReleaseType"
+        },
+        "required_space": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "RequiredSpace"
+        },
+        "reserve_file_aware": {
+          "type": "boolean",
+          "x-go-name": "ReserveFileAware"
+        },
+        "rsep_digest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "RSEPDigest"
+        },
+        "rseptbm_digests": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "RSEPTBMDigests"
+        },
+        "sep_digest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "SEPDigest"
+        },
+        "septbm_digests": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "SEPTBMDigests"
+        },
+        "size_archive_root": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "SizeArchiveRoot"
+        },
+        "size_patched_binaries": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "SizePatchedBinaries"
+        },
+        "size_patched_binaries_snapshot": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "SizePatchedBinariesSnapshot"
+        },
+        "supported_product_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "SupportedProductTypes"
+        },
+        "system_image_id": {
+          "type": "string",
+          "x-go-name": "SystemImageID"
+        },
+        "system_partition_padding": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "x-go-name": "SystemPartitionPadding"
+        },
+        "system_update_path_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "SystemUpdatePathMap"
+        },
+        "system_volume_sealing_overhead": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "SystemVolumeSealingOverhead"
+        },
+        "target_update": {
+          "type": "string",
+          "x-go-name": "TargetUpdate"
+        },
+        "type": {
+          "type": "string",
+          "x-go-name": "Type"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
+    },
+    "Properties": {
+      "description": "Properties object",
+      "type": "object",
+      "additionalProperties": {},
+      "x-go-package": "github.com/blacktop/ipsw/pkg/devicetree"
     },
     "Rebase": {
       "type": "object",
@@ -2948,7 +3922,7 @@
           "x-go-name": "CacheVMAddress"
         },
         "pointer": {
-          "x-go-name": "Pointer"
+          "$ref": "#/definitions/CacheSlidePointer"
         },
         "symbol": {
           "type": "string",
@@ -2961,6 +3935,39 @@
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
+    },
+    "Reloc": {
+      "type": "object",
+      "title": "A Reloc represents a Mach-O relocation.",
+      "properties": {
+        "Addr": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Extern": {
+          "type": "boolean"
+        },
+        "Len": {
+          "type": "integer",
+          "format": "uint8"
+        },
+        "Pcrel": {
+          "type": "boolean"
+        },
+        "Scattered": {
+          "type": "boolean"
+        },
+        "Type": {
+          "description": "when Scattered == false \u0026\u0026 Extern == true, Value is the symbol number.\nwhen Scattered == false \u0026\u0026 Extern == false, Value is the section number.\nwhen Scattered == true, Value is the value that this reloc refers to.",
+          "type": "integer",
+          "format": "uint8"
+        },
+        "Value": {
+          "type": "integer",
+          "format": "uint32"
+        }
+      },
+      "x-go-package": "github.com/blacktop/go-macho/types"
     },
     "Requirement": {
       "description": "Requirement object",
@@ -2999,41 +4006,6 @@
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
     },
-    "Requirements": {
-      "description": "Requirements object",
-      "type": "object",
-      "properties": {
-        "offset": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "Offset"
-        },
-        "type": {
-          "$ref": "#/definitions/RequirementType"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
-    "RequirementsBlob": {
-      "description": "RequirementsBlob object",
-      "type": "object",
-      "properties": {
-        "data": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "Data"
-        },
-        "length": {
-          "type": "integer",
-          "format": "uint32",
-          "x-go-name": "Length"
-        },
-        "magic": {
-          "$ref": "#/definitions/Magic"
-        }
-      },
-      "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
-    },
     "Scatter": {
       "description": "Scatter object",
       "type": "object",
@@ -3055,6 +4027,72 @@
         }
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "Addr": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "Align": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Flags": {
+          "$ref": "#/definitions/SectionFlag"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Nreloc": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Offset": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Relocs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Reloc"
+          }
+        },
+        "Reloff": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Reserved1": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Reserved2": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Reserved3": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Seg": {
+          "type": "string"
+        },
+        "Size": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "Type": {
+          "type": "integer",
+          "format": "uint8"
+        }
+      },
+      "x-go-package": "github.com/blacktop/go-macho/types"
+    },
+    "SectionFlag": {
+      "type": "integer",
+      "format": "uint32",
+      "x-go-package": "github.com/blacktop/go-macho/types"
     },
     "SpecialSlot": {
       "type": "object",
@@ -3092,6 +4130,15 @@
           "type": "string",
           "x-go-name": "Image"
         },
+        "mapping": {
+          "type": "string",
+          "x-go-name": "Mapping"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "Offset"
+        },
         "string": {
           "type": "string",
           "x-go-name": "String"
@@ -3100,40 +4147,27 @@
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
     "Symbol": {
-      "description": "Symbol is a struct that contains information about a dyld_shared_cache symbol",
       "type": "object",
       "required": [
         "pattern"
       ],
       "properties": {
-        "address": {
-          "description": "The address of the symbol",
+        "end": {
           "type": "integer",
           "format": "uint64",
-          "x-go-name": "Address"
+          "x-go-name": "End"
         },
-        "image": {
-          "description": "The image that contains the symbol",
-          "type": "string",
-          "x-go-name": "Image"
+        "start": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "Start"
         },
-        "name": {
-          "description": "The name of the symbol",
+        "symbol": {
           "type": "string",
-          "x-go-name": "Name"
-        },
-        "pattern": {
-          "description": "The lookup pattern used to find the symbol",
-          "type": "string",
-          "x-go-name": "Pattern"
-        },
-        "type": {
-          "description": "The type of the symbol",
-          "type": "string",
-          "x-go-name": "Type"
+          "x-go-name": "Symbol"
         }
       },
-      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
     },
     "SymbolLookup": {
       "description": "SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup",
@@ -3192,6 +4226,39 @@
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "Symtab": {
+      "type": "object",
+      "title": "A Symtab represents a Mach-O LC_SYMTAB command.",
+      "properties": {
+        "Len": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Nsyms": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Stroff": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Strsize": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Symoff": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Syms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Symbol"
+          }
+        }
+      },
+      "x-go-package": "github.com/blacktop/go-macho"
     },
     "Sysent": {
       "type": "object",
@@ -3255,9 +4322,89 @@
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
     "Version": {
-      "type": "integer",
-      "format": "uint32",
-      "x-go-package": "github.com/blacktop/go-macho/types"
+      "type": "object",
+      "title": "Version represents the kernel version and LLVM version.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/LLVMVersion"
+        },
+        {
+          "type": "object",
+          "title": "Version represents the kernel version and LLVM version.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LLVMVersion"
+            }
+          ],
+          "properties": {
+            "arch": {
+              "description": "The kernel architecture",
+              "type": "string",
+              "x-go-name": "Arch"
+            },
+            "cpu": {
+              "description": "The kernel CPU",
+              "type": "string",
+              "x-go-name": "CPU"
+            },
+            "darwin": {
+              "description": "The darwin version",
+              "type": "string",
+              "x-go-name": "Darwin"
+            },
+            "date": {
+              "description": "The build date",
+              "type": "string",
+              "format": "date-time",
+              "x-go-name": "Date"
+            },
+            "type": {
+              "description": "The kernel type",
+              "type": "string",
+              "x-go-name": "Type"
+            },
+            "xnu": {
+              "description": "The xnu version",
+              "type": "string",
+              "x-go-name": "XNU"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "arch": {
+          "description": "The kernel architecture",
+          "type": "string",
+          "x-go-name": "Arch"
+        },
+        "cpu": {
+          "description": "The kernel CPU",
+          "type": "string",
+          "x-go-name": "CPU"
+        },
+        "darwin": {
+          "description": "The darwin version",
+          "type": "string",
+          "x-go-name": "Darwin"
+        },
+        "date": {
+          "description": "The build date",
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "Date"
+        },
+        "type": {
+          "description": "The kernel type",
+          "type": "string",
+          "x-go-name": "Type"
+        },
+        "xnu": {
+          "description": "The xnu version",
+          "type": "string",
+          "x-go-name": "XNU"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
     "VmProtection": {
       "type": "integer",
@@ -3279,6 +4426,132 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
+    "assetReceipt": {
+      "type": "object",
+      "properties": {
+        "AssetReceipt": {
+          "type": "string"
+        },
+        "AssetSignature": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
+    },
+    "bridgeVersionInfo": {
+      "type": "object",
+      "properties": {
+        "BridgeBuildGroup": {
+          "type": "string"
+        },
+        "BridgeProductBuildVersion": {
+          "type": "string"
+        },
+        "BridgeVersion": {
+          "type": "string"
+        },
+        "CatalogURL": {
+          "type": "string"
+        },
+        "IsSeed": {
+          "type": "string"
+        },
+        "SEPEpoch": {
+          "type": "object",
+          "properties": {
+            "Major": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "Minor": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
+    },
+    "buildIdentity": {
+      "type": "object",
+      "properties": {
+        "ap_board_id": {
+          "type": "string",
+          "x-go-name": "ApBoardID"
+        },
+        "ap_chip_id": {
+          "type": "string",
+          "x-go-name": "ApChipID"
+        },
+        "ap_os_long_version": {
+          "type": "string",
+          "x-go-name": "ApOSLongVersion"
+        },
+        "ap_security_domain": {
+          "type": "string",
+          "x-go-name": "ApSecurityDomain"
+        },
+        "bb_activation_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbActivationManifestKeyHash"
+        },
+        "bb_chip_id": {
+          "type": "string",
+          "x-go-name": "BbChipID"
+        },
+        "bb_fdr_security_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbFDRSecurityKeyHash"
+        },
+        "bb_provisioning_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbProvisioningManifestKeyHash"
+        },
+        "info": {
+          "$ref": "#/definitions/IdentityInfo"
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/IdentityManifest"
+          },
+          "x-go-name": "Manifest"
+        },
+        "pearl_certification_root_pub": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "PearlCertificationRootPub"
+        },
+        "product_marketing_version": {
+          "type": "string",
+          "x-go-name": "ProductMarketingVersion"
+        },
+        "unique_build_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "UniqueBuildID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
+    },
     "cdPlatform": {
       "type": "integer",
       "format": "uint8",
@@ -3289,6 +4562,19 @@
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
     },
+    "cryptexSize": {
+      "type": "object",
+      "properties": {
+        "CryptexSize": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "CryptexTag": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
+    },
     "execSegFlag": {
       "type": "integer",
       "format": "uint64",
@@ -3298,6 +4584,13 @@
       "type": "integer",
       "format": "uint8",
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+    },
+    "loads": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Load"
+      },
+      "x-go-package": "github.com/blacktop/go-macho"
     },
     "offset": {
       "type": "object",
@@ -3313,6 +4606,52 @@
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "restoreDeviceMap": {
+      "type": "object",
+      "properties": {
+        "BDID": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "BoardConfig": {
+          "type": "string"
+        },
+        "CPID": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "Platform": {
+          "type": "string"
+        },
+        "SCEP": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "SDOM": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
+    },
+    "restoreVersionInfo": {
+      "type": "object",
+      "properties": {
+        "IsSeed": {
+          "type": "boolean"
+        },
+        "RestoreBuildGroup": {
+          "type": "string"
+        },
+        "RestoreLongVersion": {
+          "type": "string"
+        },
+        "RestoreVersion": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
     },
     "returnType": {
       "type": "integer",
@@ -3361,6 +4700,16 @@
     }
   },
   "responses": {
+    "aeaPemResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "uint8"
+        }
+      }
+    },
     "deviceListResponse": {
       "description": "",
       "headers": {
@@ -3784,6 +5133,39 @@
       "headers": {
         "success": {
           "type": "boolean"
+        }
+      }
+    },
+    "symDscResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/DyldSharedCache"
+      }
+    },
+    "symIpswResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Ipsw"
+      }
+    },
+    "symMachoResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Macho"
+      }
+    },
+    "symResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Symbol"
+      }
+    },
+    "symsResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/Symbol"
         }
       }
     },

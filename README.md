@@ -69,8 +69,8 @@ Available Commands:
   dyld            Parse dyld_shared_cache
   ent             Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
   extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
+  fw              Firmware commands
   help            Help about any command
-  iboot           Dump firmwares
   idev            USB connected device commands
   img4            Parse Img4
   info            Display IPSW/OTA Info
@@ -81,11 +81,9 @@ Available Commands:
   ota             Parse OTAs
   plist           Dump plist as JSON
   pongo           PongoOS Terminal
-  sepfw           Dump MachOs
   ssh             SSH into a jailbroken device
   swift-dump      🚧 Swift class-dump a dylib from a DSC or MachO
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
-  update          Download an ipsw update if one exists
   version         Print the version number of ipsw
   watch           Watch Github Commits
 
@@ -111,6 +109,11 @@ C --> D[Dump]
 D --> E[Search]
 E --> F[Symbolicate]
 ```
+
+## `ipsw` Diffs
+
+A collection of `ipsw` diffs can be found here: 
+- <https://github.com/blacktop/ipsw-diffs>
 
 ## Community
 

@@ -38,11 +38,9 @@ import (
 func init() {
 	DyldCmd.AddCommand(TbdCmd)
 	TbdCmd.Flags().BoolP("generic", "g", false, "Generate for ALL targets")
-	TbdCmd.Flags().BoolP("private", "p", false, "Add private symbols")
 	TbdCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs (default: CWD)")
 	TbdCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.tbd.generic", TbdCmd.Flags().Lookup("generic"))
-	viper.BindPFlag("dyld.tbd.private", TbdCmd.Flags().Lookup("private"))
 	viper.BindPFlag("dyld.tbd.output", TbdCmd.Flags().Lookup("output"))
 }
 
@@ -68,7 +66,6 @@ var TbdCmd = &cobra.Command{
 
 		// flags
 		generic := viper.GetBool("dyld.tbd.generic")
-		private := viper.GetBool("dyld.tbd.private")
 		output := viper.GetString("dyld.tbd.output")
 
 		if generic {
@@ -83,7 +80,7 @@ var TbdCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		outTBD, err := dsc.GetTBD(f, args[1], private, generic)
+		outTBD, err := dsc.GetTBD(f, args[1], generic)
 		if err != nil {
 			return fmt.Errorf("failed to generate .tbd file for %s: %v", args[1], err)
 		}

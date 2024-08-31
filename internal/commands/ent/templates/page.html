@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entitlement Search</title>
+    <link href="/static/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/nord.min.css">
+    <link rel="stylesheet" href="/static/hack.css">
+    <style>
+        /* Custom Nord Theme */
+        body {
+            background-color: #2E3440;
+            /* Polar Night */
+            color: #D8DEE9;
+            /* Snow Storm */
+        }
+
+        .input,
+        .bg-nord {
+            background-color: #3B4252;
+            /* Polar Night */
+            color: #D8DEE9;
+            /* Snow Storm */
+        }
+
+        .input::placeholder {
+            color: #4C566A;
+            /* Polar Night */
+        }
+
+        .bg-nord-light {
+            background-color: #4C566A;
+            /* Polar Night */
+        }
+
+        .text-nord-frost {
+            color: #8FBCBB;
+            /* Frost */
+        }
+
+        .text-nord-aurora {
+            color: #D08770;
+            /* Aurora */
+        }
+
+        .hover-bg-nord-light:hover {
+            background-color: #434C5E;
+            /* Polar Night */
+        }
+
+        .border-nord {
+            border-color: #4C566A;
+            /* Polar Night */
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            padding: 0;
+            /* Remove padding from here */
+        }
+
+        .accordion-content.show {
+            padding: 0;
+            /* Remove padding from here */
+        }
+
+        .accordion-inner {
+            padding: 1rem;
+            /* Add padding to the inner content */
+        }
+
+        pre,
+        code {
+            background-color: #2E3440;
+            /* Polar Night */
+            font-family: 'Hack', monospace;
+            /* Apply Hack font */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+
+        .highlight {
+            background-color: #d08770;
+            /* Aurora highlight */
+            color: #2e3440;
+            /* Polar Night text */
+        }
+    </style>
+</head>
+
+<body class="font-sans leading-normal tracking-normal">
+    <div id="app" class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-6 text-center text-nord-frost">Entitlement Database {{ .Version }}</h1>
+        <div class="mb-4">
+            <input id="search" type="text" placeholder="Search for an entitlement..."
+                class="input w-full p-2 border border-nord rounded">
+        </div>
+
+        <div id="entitlement-list" class="flex flex-col gap-4">
+            <!-- Entitlement items will be populated here -->
+        </div>
+    </div>
+
+    <script src="/static/highlight.min.js"></script>
+    <script src="/static/xml.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const entitlements = {
+            {{ range $key, $value := .DB }}
+            "{{ $key }}": `{{ $value }}`,
+            {{ end }}
+            };
+
+        const searchInput = document.getElementById('search');
+        const entitlementList = document.getElementById('entitlement-list');
+
+            const debounce = (func, delay) => {
+                let timeout;
+                return function (...args) {
+                    const context = this;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(context, args), delay);
+                };
+            };
+
+            const highlightMatches = (text, searchTerm) => {
+                if (!searchTerm) return text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                return text.replace(regex, '<span class="highlight">$1</span>');
+            };
+
+            const renderEntitlements = (filteredEntitlements, searchTerm) => {
+            entitlementList.innerHTML = '';
+            for (const [key, value] of Object.entries(filteredEntitlements)) {
+                const entitlementItem = document.createElement('div');
+                entitlementItem.className = 'bg-nord-light rounded shadow-md';
+
+                    const highlightedKey = highlightMatches(key, searchTerm);
+
+                const entitlementButton = document.createElement('button');
+                entitlementButton.className = 'p-4 w-full text-left hover-bg-nord-light';
+                    entitlementButton.innerHTML = highlightedKey;
+                    entitlementButton.addEventListener('click', () => toggleDetails(entitlementItem, value, searchTerm));
+                entitlementItem.appendChild(entitlementButton);
+
+                const entitlementDetails = document.createElement('div');
+                entitlementDetails.className = 'accordion-content bg-nord';
+                    entitlementDetails.innerHTML = `<div class="accordion-inner"><pre><code class="language-xml"></code></pre></div>`;
+                entitlementItem.appendChild(entitlementDetails);
+
+                entitlementList.appendChild(entitlementItem);
+            }
+        };
+
+            const toggleDetails = (entitlementItem, value, searchTerm) => {
+            const details = entitlementItem.querySelector('.accordion-content');
+            if (details.classList.contains('show')) {
+                details.style.maxHeight = null;
+                details.classList.remove('show');
+            } else {
+                document.querySelectorAll('.accordion-content').forEach(content => {
+                    content.style.maxHeight = null;
+                    content.classList.remove('show');
+                });
+                details.classList.add('show');
+                    details.querySelector('code').textContent = value;
+                    hljs.highlightBlock(details.querySelector('code'));
+                    details.querySelector('code').innerHTML = highlightMatches(details.querySelector('code').innerHTML, searchTerm);
+                details.style.maxHeight = "none";  // Allow the content to expand fully
+                const scrollHeight = details.scrollHeight;  // Get the full height of the content
+                details.style.maxHeight = `${scrollHeight}px`;  // Set max-height to the full height of the content
+            }
+        };
+
+            const performSearch = () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredEntitlements = Object.fromEntries(
+                Object.entries(entitlements).filter(([key, value]) =>
+                    key.toLowerCase().includes(searchTerm) || value.toLowerCase().includes(searchTerm)
+                )
+            );
+
+            if (Object.keys(filteredEntitlements).length === 0) {
+                entitlementList.innerHTML = '<p class="text-center w-full text-nord-aurora">No entitlements found.</p>';
+            } else {
+                    renderEntitlements(filteredEntitlements, searchTerm);
+            }
+            };
+
+            const debouncedSearch = debounce(performSearch, 300);
+
+            searchInput.addEventListener('input', debouncedSearch);
+
+            renderEntitlements(entitlements, '');
+        });
+    </script>
+</body>
+
+</html>

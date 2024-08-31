@@ -17,7 +17,8 @@ ipsw ota [flags]
 ### Options
 
 ```
-  -h, --help   help for ota
+  -h, --help             help for ota
+      --key-val string   Base64 encoded symmetric encryption key
 ```
 
 ### Options inherited from parent commands
@@ -36,4 +37,5 @@ ipsw ota [flags]
 * [ipsw ota info](/docs/cli/ipsw/ota/info)	 - Display OTA metadata
 * [ipsw ota ls](/docs/cli/ipsw/ota/ls)	 - List OTA files
 * [ipsw ota patch](/docs/cli/ipsw/ota/patch)	 - Patch OTAs
+* [ipsw ota payload](/docs/cli/ipsw/ota/payload)	 - List contents of a payloadv2 file
 

@@ -26,7 +26,7 @@ import (
 
 var ErrNoCryptex = errors.New("cryptex-system-arm64e NOT found in remote zip")
 
-func GetDscPathsInMount(mountPoint string, driverKit bool) ([]string, error) {
+func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
 	var matches []string
 	var re *regexp.Regexp
 
@@ -36,6 +36,8 @@ func GetDscPathsInMount(mountPoint string, driverKit bool) ([]string, error) {
 
 	if driverKit {
 		re = regexp.MustCompile(filepath.Join(mountPoint, DriverKitCacheRegex))
+	} else if all {
+		re = regexp.MustCompile(filepath.Join(mountPoint, CacheUberRegex))
 	} else {
 		re = regexp.MustCompile(filepath.Join(mountPoint, CacheRegex))
 	}
@@ -59,7 +61,7 @@ func GetDscPathsInMount(mountPoint string, driverKit bool) ([]string, error) {
 	return matches, nil
 }
 
-func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, driverkit bool) ([]string, error) {
+func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, driverkit, all bool) ([]string, error) {
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	var alreadyMounted bool
@@ -96,7 +98,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, dri
 		}
 	}
 
-	matches, err := GetDscPathsInMount(mountPoint, driverkit)
+	matches, err := GetDscPathsInMount(mountPoint, driverkit, all)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +154,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, dri
 }
 
 // Extract extracts dyld_shared_cache from IPSW
-func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, error) {
+func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
 
 	if runtime.GOOS == "windows" {
 		return nil, fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
@@ -186,20 +188,25 @@ func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, 
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  dmgPath,
+			Output: filepath.Dir(dmgPath),
+			PemDB:  pemDB,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
+		defer os.Remove(dmgPath)
 	}
 
-	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit)
+	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit, all)
 }
 
 // ExtractFromRemoteCryptex extracts the dyld_shared_cache from the cryptex-system-arm64e file in the given zip.Reader.
 // It creates a temp file for the cryptex-system-arm64e file, patches it, and extracts the dyld_shared_cache from the decrypted file.
 // The extracted dyld_shared_cache is saved to the given destPath.
 // The function returns a slice of artifacts extracted from the dyld_shared_cache and an error if any.
-func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit bool) ([]string, error) {
+func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit, all bool) ([]string, error) {
 	re := regexp.MustCompile(`cryptex-system-arm64?e$`)
 
 	for _, zf := range zr.File {
@@ -260,7 +267,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, 
 				return nil, fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
 			}
 
-			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit)
+			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit, all)
 			if err != nil {
 				return nil, fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}

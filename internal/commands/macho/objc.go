@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -806,7 +807,7 @@ func (o *ObjC) XCFramework() error {
 			reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
 		}
 	}
-	t, err := tbd.NewTBD(image, reexports, false, false)
+	t, err := tbd.NewTBD(image, reexports, false)
 	if err != nil {
 		return fmt.Errorf("failed to create tbd: %w", err)
 	}
@@ -924,7 +925,16 @@ func writeHeader(hdr *headerInfo) error {
 	}
 	log.Infof("Creating %s", hdr.FileName)
 	if err := os.WriteFile(hdr.FileName, []byte(out), 0644); err != nil {
-		return fmt.Errorf("failed to write header %s: %v", hdr.FileName, err)
+		if pe, ok := err.(*os.PathError); ok {
+			if pe.Err == syscall.ENAMETOOLONG {
+				base := filepath.Base(strings.TrimSuffix(hdr.FileName, filepath.Ext(hdr.FileName)))
+				hdr.FileName = filepath.Join(filepath.Dir(hdr.FileName), base[:50]+".h")
+				log.Warnf("Filename too long; truncating to '%s'", hdr.FileName)
+				if err := os.WriteFile(hdr.FileName, []byte(out), 0644); err != nil {
+					return fmt.Errorf("failed to write header %s: %v", hdr.FileName, err)
+				}
+			}
+		}
 	}
 
 	return nil

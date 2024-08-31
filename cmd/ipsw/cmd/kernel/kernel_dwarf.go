@@ -342,7 +342,7 @@ var dwarfCmd = &cobra.Command{
 					log.WithField("file", file).Info(viper.GetString("kernel.dwarf.name"))
 				}
 			}
-			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
+			fmt.Printf("%#x: %s", n.LowPC, utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
 		}
 
 		if viper.GetBool("kernel.dwarf.all") {

@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/apex/log"
@@ -90,7 +91,7 @@ var idevImgMountCmd = &cobra.Command{
 		} else if xcode == "" && (dmgPath == "" && trustcachePath == "" && manifestPath == "") {
 			return fmt.Errorf("must specify either --xcode OR ('--ddi-img' AND '--trustcache' AND '--manifest')")
 		}
-		if !utils.StrSliceContains([]string{"Developer", "Cryptex", "Personalized"}, imageType) {
+		if !slices.Contains([]string{"Developer", "Cryptex", "Personalized"}, imageType) {
 			return fmt.Errorf("invalid --image-type: %s (must be Developer, Cryptex or Personalized)", imageType)
 		}
 		if imageType == "Developer" && (len(trustcachePath) > 0 || len(manifestPath) > 0) {

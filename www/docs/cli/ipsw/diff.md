@@ -14,18 +14,36 @@ Diff IPSWs
 ipsw diff <IPSW> <IPSW> [flags]
 ```
 
+### Examples
+
+```bash
+# Diff two IPSWs
+❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
+# Diff two IPSWs with KDKs
+❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
+	--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
+	--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031
+# Use a previously saved .idiff file
+❯ ipsw diff --in <path/to/.idiff> --output <output/folder> --markdown
+```
+
 ### Options
 
 ```
-  -f, --filter strings    Filter MachO sections to diff (e.g. __TEXT.__text)
-      --fw                Diff other firmwares
-  -h, --help              help for diff
-      --html              Save diff as HTML file
-      --json              Save diff as JSON file
-  -k, --kdk stringArray   Path to KDKs to diff
-      --launchd           Diff launchd configs
-  -o, --output string     Folder to save diff output
-  -t, --title string      Title of the diff
+      --allow-list strings   Filter MachO sections to diff (e.g. __TEXT.__text)
+      --block-list strings   Remove MachO sections to diff (e.g. __TEXT.__info_plist)
+      --feat                 Diff feature flags
+      --fw                   Diff other firmwares
+  -h, --help                 help for diff
+      --html                 Save diff as HTML file
+  -i, --in string            Path to IPSW .idiff file
+      --json                 Save diff as JSON file
+  -k, --kdk stringArray      Path to KDKs to diff
+      --launchd              Diff launchd configs
+  -m, --markdown             Save diff as Markdown file
+  -o, --output string        Folder to save diff output
+      --strs                 Diff MachO cstrings
+  -t, --title string         Title of the diff
 ```
 
 ### Options inherited from parent commands

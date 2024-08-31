@@ -40,90 +40,110 @@ type getFsFilesResponse struct {
 	Files []File `json:"files"`
 }
 
-func getFsFiles(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
-
-	i, err := info.Parse(ipswPath)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
-	}
-	dmgPath, err := i.GetFileSystemOsDmg()
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
-	}
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		// extract filesystem DMG
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to extract %s from IPSW: %v", dmgPath, err)})
+func getFsFiles(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
 		}
-		if len(dmgs) == 0 {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to find %s in IPSW", dmgPath)})
-		}
-		defer os.Remove(filepath.Clean(dmgs[0]))
-	} else {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
-	}
-
-	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(dmgPath, filepath.Dir(dmgPath), nil)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
-		}
-	}
-
-	// mount filesystem DMG
-	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
-	if err != nil {
-		if !errors.Is(err, utils.ErrMountResourceBusy) {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
-		}
-	}
-	if alreadyMounted {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
-	} else {
-		defer func() {
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
-			}); err != nil {
-				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
 			}
-		}()
-	}
-
-	var files []File
-	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
 		}
-		if info.IsDir() {
+
+		i, err := info.Parse(ipswPath)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		dmgPath, err := i.GetFileSystemOsDmg()
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			// extract filesystem DMG
+			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+			})
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to extract %s from IPSW: %v", dmgPath, err)})
+			}
+			if len(dmgs) == 0 {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to find %s in IPSW", dmgPath)})
+			}
+			defer os.Remove(filepath.Clean(dmgs[0]))
+		} else {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+		}
+
+		if filepath.Ext(dmgPath) == ".aea" {
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:  dmgPath,
+				Output: filepath.Dir(dmgPath),
+				PemDB:  pemDbPath,
+			})
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
+			}
+			defer os.Remove(dmgPath)
+		}
+
+		// mount filesystem DMG
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
+		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+		if err != nil {
+			if !errors.Is(err, utils.ErrMountResourceBusy) {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
+			}
+		}
+		if alreadyMounted {
+			utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+		} else {
+			defer func() {
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+				if err := utils.Retry(3, 2*time.Second, func() error {
+					return utils.Unmount(mountPoint, false)
+				}); err != nil {
+					log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
+				}
+			}()
+		}
+
+		var files []File
+		if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
+			}
+			if info.IsDir() {
+				return nil
+				// return filepath.SkipDir
+			}
+			fpath, err := filepath.Rel(mountPoint, path)
+			if err != nil {
+				return fmt.Errorf("failed to get relative path for %s: %v", path, err)
+			}
+			files = append(files, File{
+				Name:    fpath,
+				Size:    info.Size(),
+				Mode:    info.Mode().String(),
+				ModTime: info.ModTime(),
+			})
 			return nil
-			// return filepath.SkipDir
+		}); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
 		}
-		fpath, err := filepath.Rel(mountPoint, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path for %s: %v", path, err)
-		}
-		files = append(files, File{
-			Name:    fpath,
-			Size:    info.Size(),
-			Mode:    info.Mode().String(),
-			ModTime: info.ModTime(),
-		})
-		return nil
-	}); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
-	}
 
-	c.IndentedJSON(http.StatusOK, getFsFilesResponse{Path: ipswPath, Files: files})
+		c.IndentedJSON(http.StatusOK, getFsFilesResponse{Path: ipswPath, Files: files})
+	}
 }
 
 // swagger:response
@@ -132,27 +152,42 @@ type getFsEntitlementsResponse struct {
 	Entitlements map[string]map[string]any `json:"entitlements"`
 }
 
-func getFsEntitlements(c *gin.Context) {
-	ipswPath := c.Query("path")
-	ipswPath = filepath.Clean(ipswPath)
-
-	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath})
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
-	}
-
-	entDB := make(map[string]map[string]any)
-
-	for f, ent := range ents {
-		ents := make(map[string]any)
-		if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to decode entitlements plist for %s: %v", f, err)})
+func getFsEntitlements(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
 		}
-		entDB[f] = ents
-	}
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
+			}
+		}
 
-	c.IndentedJSON(http.StatusOK, getFsEntitlementsResponse{Path: ipswPath, Entitlements: entDB})
+		ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath})
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+
+		entDB := make(map[string]map[string]any)
+
+		for f, ent := range ents {
+			ents := make(map[string]any)
+			if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to decode entitlements plist for %s: %v", f, err)})
+			}
+			entDB[f] = ents
+		}
+
+		c.IndentedJSON(http.StatusOK, getFsEntitlementsResponse{Path: ipswPath, Entitlements: entDB})
+	}
 }
 
 // swagger:response
@@ -161,14 +196,30 @@ type getFsLaunchdConfigResponse struct {
 	LaunchdConfig string `json:"launchd_config"`
 }
 
-func getFsLaunchdConfig(c *gin.Context) {
-	ipswPath := c.Query("path")
+func getFsLaunchdConfig(pemDB string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
+		}
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
+			}
+		}
 
-	ldconf, err := extract.LaunchdConfig(ipswPath)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
+		ldconf, err := extract.LaunchdConfig(ipswPath, pemDbPath)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, getFsLaunchdConfigResponse{Path: ipswPath, LaunchdConfig: ldconf})
 	}
-
-	c.IndentedJSON(http.StatusOK, getFsLaunchdConfigResponse{Path: ipswPath, LaunchdConfig: ldconf})
 }

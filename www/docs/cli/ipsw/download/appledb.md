@@ -31,6 +31,7 @@ ipsw download appledb [flags]
   -a, --api                   Use Github API
       --api-token string      Github API Token
       --beta                  Download beta IPSWs
+      --deltas                Download all OTA deltas
       --dyld                  Extract dyld_shared_cache(s) from remote OTA
       --fcs-keys              Download AEA1 DMG fcs-key pem files
       --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
@@ -43,6 +44,9 @@ ipsw download appledb [flags]
   -o, --output string         Folder to download files to
       --pattern string        Download remote files that match regex
   -p, --prereq-build string   OTA prerequisite build
+      --rc                    Download RC (release candidate) IPSWs
+      --release               Download release IPSWs
+      --show-latest           Show latest version/build
       --type string           FW type to download (ipsw, ota, rsr) (default "ipsw")
   -u, --urls                  Dump URLs only
       --usb                   Download IPSWs for USB attached iDevices

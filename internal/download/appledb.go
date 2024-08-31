@@ -108,6 +108,8 @@ type AppleDbOsFile struct {
 	Build     string         `json:"build"`
 	Released  ReleasedDate   `json:"released"`
 	Beta      bool           `json:"beta"`
+	RC        bool           `json:"rc"`
+	Internal  bool           `json:"internal"`
 	DeviceMap []string       `json:"deviceMap"`
 	Sources   []OsFileSource `json:"sources"`
 }
@@ -126,6 +128,35 @@ func (fs OsFiles) Swap(i, j int) {
 	fs[i], fs[j] = fs[j], fs[i]
 }
 
+func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
+	var tmpFS OsFiles
+	for _, f := range fs {
+		if len(query.OSes) > 0 {
+			for _, os := range query.OSes {
+				if f.OS == os {
+					continue
+				}
+			}
+		}
+		if query.IsBeta && !f.Beta {
+			continue
+		} else if query.IsRC && !f.RC {
+			continue
+		} else if query.IsRelease && (f.Beta || f.RC) {
+			continue
+		}
+		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
+			continue
+		}
+		tmpFS = append(tmpFS, f)
+	}
+	if len(tmpFS) == 0 {
+		return nil
+	}
+	sort.Sort(tmpFS)
+	return &tmpFS[0]
+}
+
 // Query returns a list of OsFileSource objects that match the query
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 	var tmpFS OsFiles
@@ -141,8 +172,12 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		}
 		if query.IsBeta && !f.Beta {
 			continue
+		} else if query.IsRC && !f.RC {
+			continue
+		} else if query.IsRelease && (f.Beta || f.RC) {
+			continue
 		}
-		if len(query.Version) > 0 && f.Version != query.Version {
+		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
 			continue
 		}
 		if len(query.Build) > 0 && f.Build != query.Build {
@@ -195,13 +230,16 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			}
 			sources = tmpSources
 		} else {
-			var tmpSources []OsFileSource
-			for _, source := range sources {
-				if len(source.PrerequisiteBuild.Builds) == 0 {
-					tmpSources = append(tmpSources, source)
+			// if deltas are NOT requested, filter out sources that have prerequisite builds (only take full OTAs)
+			if !query.Deltas {
+				var tmpSources []OsFileSource
+				for _, source := range sources {
+					if len(source.PrerequisiteBuild.Builds) == 0 {
+						tmpSources = append(tmpSources, source)
+					}
 				}
+				sources = tmpSources
 			}
-			sources = tmpSources
 		}
 	}
 
@@ -214,8 +252,11 @@ type ADBQuery struct {
 	Version           string
 	Build             string
 	PrerequisiteBuild string
+	Deltas            bool
 	Device            string
+	IsRelease         bool
 	IsBeta            bool
+	IsRC              bool
 	Latest            bool
 	Proxy             string
 	Insecure          bool
@@ -223,7 +264,7 @@ type ADBQuery struct {
 	ConfigDir         string
 }
 
-func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 	var osfiles OsFiles
 
 	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
@@ -282,6 +323,9 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 						osfile.Sources[i].Type = "rsr"
 					}
 				}
+				if osfile.Internal {
+					return nil // skip internal metadata
+				}
 
 				osfiles = append(osfiles, osfile)
 			}
@@ -291,6 +335,22 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 		}
 	}
 
+	return osfiles, nil
+}
+
+func LocalAppleDBLatest(q *ADBQuery) (*AppleDbOsFile, error) {
+	osfiles, err := getLocalOsfiles(q)
+	if err != nil {
+		return nil, err
+	}
+	return osfiles.Latest(q), nil
+}
+
+func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+	osfiles, err := getLocalOsfiles(q)
+	if err != nil {
+		return nil, err
+	}
 	return osfiles.Query(q), nil
 }
 

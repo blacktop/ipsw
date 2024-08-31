@@ -34,7 +34,10 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/api/server/routes"
+	"github.com/blacktop/ipsw/api/server/routes/aea"
+	"github.com/blacktop/ipsw/api/server/routes/syms"
 	"github.com/blacktop/ipsw/api/types"
+	"github.com/blacktop/ipsw/internal/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,6 +48,8 @@ type Config struct {
 	Socket  string
 	Debug   bool
 	LogFile string
+	PemDB   string
+	SigsDir string
 }
 
 // Server is the main server struct
@@ -63,7 +68,11 @@ func NewServer(conf *Config) *Server {
 }
 
 // Start starts the server
-func (s *Server) Start() error {
+func (s *Server) Start(db db.Database) error {
+	if s.conf.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -85,7 +94,15 @@ func (s *Server) Start() error {
 
 	rg := s.router.Group("/v" + api.DefaultVersion)
 
-	routes.Add(rg)
+	routes.Add(rg, s.conf.PemDB)
+
+	if db != nil {
+		syms.AddRoutes(rg, db, s.conf.PemDB, s.conf.SigsDir)
+	}
+
+	if s.conf.PemDB != "" {
+		aea.AddRoutes(rg, s.conf.PemDB)
+	}
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.conf.Port),

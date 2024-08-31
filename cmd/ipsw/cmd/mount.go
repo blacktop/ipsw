@@ -38,6 +38,8 @@ var mountCmdSubCmds = []string{"fs", "sys", "app", "exc"}
 
 func init() {
 	rootCmd.AddCommand(mountCmd)
+
+	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 }
 
 // mountCmd represents the mount command
@@ -60,7 +62,9 @@ var mountCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		mctx, err := mount.DmgInIPSW(args[1], args[0])
+		pemDB, _ := cmd.Flags().GetString("pem-db")
+
+		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB)
 		if err != nil {
 			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}

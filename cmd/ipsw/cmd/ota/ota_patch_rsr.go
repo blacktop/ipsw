@@ -41,17 +41,17 @@ import (
 )
 
 func init() {
-	otaPatchCmd.AddCommand(otaRsrCmd)
+	otaPatchCmd.AddCommand(otaPatchRsrCmd)
 
-	otaRsrCmd.Flags().StringP("input", "i", "", "Input folder")
-	otaRsrCmd.Flags().StringP("output", "o", "", "Output folder")
-	otaRsrCmd.MarkFlagDirname("input")
-	viper.BindPFlag("ota.patch.input", otaRsrCmd.Flags().Lookup("input"))
-	viper.BindPFlag("ota.patch.output", otaRsrCmd.Flags().Lookup("output"))
+	otaPatchRsrCmd.Flags().StringP("input", "i", "", "Input folder")
+	otaPatchRsrCmd.Flags().StringP("output", "o", "", "Output folder")
+	otaPatchRsrCmd.MarkFlagDirname("input")
+	viper.BindPFlag("ota.patch.input", otaPatchRsrCmd.Flags().Lookup("input"))
+	viper.BindPFlag("ota.patch.output", otaPatchRsrCmd.Flags().Lookup("output"))
 }
 
-// otaRsrCmd represents the rsr command
-var otaRsrCmd = &cobra.Command{
+// otaPatchRsrCmd represents the rsr command
+var otaPatchRsrCmd = &cobra.Command{
 	Use:           "rsr",
 	Aliases:       []string{"r"},
 	Short:         "Patch RSR OTAs",

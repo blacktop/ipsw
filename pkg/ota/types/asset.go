@@ -154,6 +154,8 @@ func (a Asset) MarshalJSON() ([]byte, error) {
 		Type          string   `json:"type,omitempty"`
 		Hash          string   `json:"hash,omitempty"`
 		HashAlgorithm string   `json:"hash_algorithm,omitempty"`
+		IsEncrypted   bool     `json:"encrypted,omitempty"`
+		Key           string   `json:"key,omitempty"`
 	}{
 		URL:           a.BaseURL + a.RelativePath,
 		Description:   a.DocumentationID,
@@ -165,5 +167,7 @@ func (a Asset) MarshalJSON() ([]byte, error) {
 		Type:          a.ReleaseType,
 		Hash:          hex.EncodeToString(a.Hash),
 		HashAlgorithm: a.HashAlgorithm,
+		IsEncrypted:   a.IsEncrypted,
+		Key:           a.ArchiveDecryptionKey,
 	})
 }

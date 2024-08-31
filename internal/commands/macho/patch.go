@@ -432,15 +432,15 @@ func PatchMachoMod(m *macho.File, machoPath, loadCommand string, args []string) 
 		}
 		platform, err := types.GetPlatformByName(args[2])
 		if err != nil {
-			return fmt.Errorf("failed to parse platform name %s: %v", args[2], err)
+			return fmt.Errorf("failed to parse platform name '%s': %v", args[2], err)
 		}
 		var minos types.Version
 		if err := minos.Set(args[3]); err != nil {
-			return fmt.Errorf("failed to parse min OS versionc: %v", args[3], err)
+			return fmt.Errorf("failed to parse min OS version '%s': %v", args[3], err)
 		}
 		var sdk types.Version
 		if err := sdk.Set(args[4]); err != nil {
-			return fmt.Errorf("failed to parse SDK version: %v", args[4], err)
+			return fmt.Errorf("failed to parse SDK version '%s': %v", args[4], err)
 		}
 		var tools []types.BuildVersionTool
 		if len(args) > 5 {

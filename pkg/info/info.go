@@ -7,6 +7,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -74,6 +76,33 @@ type processors struct {
 	Memory        string
 	Introduced    string
 	Devices       []string
+}
+
+type ProcessorDB []processors
+
+func GetProcessorDB() (*ProcessorDB, error) {
+	var ps ProcessorDB
+
+	zr, err := gzip.NewReader(bytes.NewReader(procsData))
+	if err != nil {
+		return nil, err
+	}
+	defer zr.Close()
+
+	if err := json.NewDecoder(zr).Decode(&ps); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling procs.gz data: %w", err)
+	}
+
+	return &ps, nil
+}
+
+func (p *ProcessorDB) GetProcessor(cpuid string) (*processors, error) {
+	for _, proc := range *p {
+		if strings.EqualFold(proc.CPUID, cpuid) {
+			return &proc, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find processor for '%s'", cpuid)
 }
 
 // getProcessors reads the processors from embedded JSON
@@ -406,6 +435,7 @@ func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
 	}
 	return nil, fmt.Errorf("no RestoreRamDisk DMG found")
 }
+
 func (i *Info) GetExclaveOSDmg() (string, error) {
 	var dmgs []string
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
@@ -424,6 +454,15 @@ func (i *Info) GetExclaveOSDmg() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no BuildManifest.plist found")
+}
+
+func (i *Info) IsMacOS() bool {
+	for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
+		if strings.Contains(dev, "Mac") {
+			return true
+		}
+	}
+	return false
 }
 
 // GetOsDmg returns the name of the OS dmg
@@ -484,11 +523,11 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 			}
 		}
 
-		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
+		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevListFolder(devs)), nil
 	}
 
 	sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
-	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
+	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevListFolder(i.Plists.BuildManifest.SupportedProductTypes)), nil
 }
 
 // GetFolders returns a list of the IPSW name folders
@@ -616,6 +655,32 @@ func getAbbreviatedDevList(devices []string) string {
 		return ""
 	} else if len(devices) == 1 {
 		return devices[0]
+	}
+
+	currentDev := devices[0]
+	devPrefix := strings.Split(currentDev, ",")[0]
+	devList += currentDev
+
+	for _, dev := range devices[1:] {
+		if strings.HasPrefix(dev, devPrefix) {
+			devList += fmt.Sprintf("_%s", strings.Split(dev, ",")[1])
+		} else {
+			currentDev = dev
+			devPrefix = strings.Split(currentDev, ",")[0]
+			devList += "_" + currentDev
+		}
+	}
+
+	return devList
+}
+
+func getAbbreviatedDevListFolder(devices []string) string {
+	var devList string
+
+	if len(devices) == 0 {
+		return ""
+	} else if len(devices) == 1 {
+		return devices[0]
 	} else if strings.Contains(devices[0], "Mac") {
 		return "MacOS"
 	}
@@ -675,6 +740,42 @@ func ParseZipFiles(files []*zip.File) (*Info, error) {
 			log.Error(err.Error())
 		} else {
 			log.Errorf("failed to parse devicetree: %v", err)
+		}
+	}
+
+	return i, nil
+}
+
+func ParseOTAFiles(files []fs.File) (*Info, error) {
+	var err error
+
+	i := &Info{}
+
+	i.DeviceTrees = make(map[string]*devicetree.DeviceTree)
+
+	i.Plists, err = plist.ParsePlistFiles(files)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse plists: %v", err)
+	}
+	for _, f := range files {
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get file info: %v", err)
+		}
+		if filepath.Ext(fi.Name()) == ".im4p" {
+			dat, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read file: %v", err)
+			}
+			dt, err := devicetree.ParseImg4Data(dat)
+			if err != nil {
+				if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
+					log.Error(err.Error())
+				} else {
+					log.Errorf("failed to parse devicetree: %v", err)
+				}
+			}
+			i.DeviceTrees[fi.Name()] = dt
 		}
 	}
 

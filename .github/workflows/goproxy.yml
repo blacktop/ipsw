@@ -1,0 +1,35 @@
+name: Go Proxy
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Proxy
+        run: |
+          GOPROXY=${{ secrets.GOPROXY }} go mod download all
+          GOPROXY=${{ secrets.GOPROXY }} go mod tidy
+
+      - name: Actions Status Discord
+        uses: sarisia/actions-status-discord@v1.14.7
+        if: always()
+        with:
+          webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          content: "🥃 <@193791870285905920>"
+          title: "GOPROXY"
+          description: "`ipsw` GOPROXY Github Action"
+          url: "https://github.com/blacktop/ipsw/actions/workflows/goproxy.yml"
+          username: GitHub Actions
+          avatar_url: ${{ secrets.GOPROXY_AVATAR_URL }}
