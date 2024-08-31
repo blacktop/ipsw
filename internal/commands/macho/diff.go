@@ -145,10 +145,6 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 	diff.New = utils.Difference(slices.Collect(maps.Keys(next)), slices.Collect(maps.Keys(prev)))
 	diff.Removed = utils.Difference(slices.Collect(maps.Keys(prev)), slices.Collect(maps.Keys(next)))
 
-	if len(diff.New) > 0 || len(diff.Removed) > 0 {
-		println("WHAT")
-	}
-
 	var err error
 	for _, f2 := range slices.Sorted(maps.Keys(next)) {
 		dat2 := next[f2]
