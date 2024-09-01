@@ -103,6 +103,9 @@ func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, er
 	if !f.SupportsProgramTrie() {
 		return nil, ErrProgramTrieNotSupported
 	}
+	if !f.SupportsDylibPrebuiltLoader() {
+		return nil, ErrPrebuiltLoaderSetNotSupported
+	}
 
 	var psetOffset uint64
 
@@ -271,7 +274,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		}
 		pset.SelectorTable = &o
 	}
-	if pset.ObjcClassHashTableOffset > 0 {
+	if pset.ObjcClassHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
 		sr.Seek(int64(pset.ObjcClassHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
@@ -305,7 +308,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		}
 		pset.ClassTable = &o
 	}
-	if pset.ObjcProtocolHashTableOffset > 0 {
+	if pset.ObjcProtocolHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
 		sr.Seek(int64(pset.ObjcProtocolHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
