@@ -291,11 +291,11 @@ func (f *File) GetExportedSymbols(ctx context.Context, symbolName string) (<-cha
 				if err != nil {
 					return fmt.Errorf("failed to get prebuilt loader for %s: %s", image.Name, err)
 				}
-				uuid, off, err := f.GetOffset(image.LoadAddress + pbl.ExportsTrieLoaderOffset)
+				uuid, off, err := f.GetOffset(image.LoadAddress + pbl.Header.ExportsTrieLoader.Offset)
 				if err != nil {
 					return fmt.Errorf("failed to get ExportsTrie offset for %s: %s", image.Name, err)
 				}
-				data, err := f.ReadBytesForUUID(uuid, int64(off), uint64(pbl.ExportsTrieLoaderSize))
+				data, err := f.ReadBytesForUUID(uuid, int64(off), uint64(pbl.Header.ExportsTrieLoader.Size))
 				if err != nil {
 					return fmt.Errorf("failed to read ExportsTrie data for %s: %s", image.Name, err)
 				}

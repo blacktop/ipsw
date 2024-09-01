@@ -961,14 +961,7 @@ func (f *File) GetDylibsImageArray() error {
 	var size uint64
 
 	if f.Headers[f.UUID].DylibsImageArrayAddr == 0 {
-		if f.Headers[f.UUID].DylibsPblSetAddr > 0 {
-			return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
-		}
 		return fmt.Errorf("cache does not contain dylibs image array info")
-		// } else {
-		// 	addr = f.Headers[f.UUID].DylibsPblSetAddr
-		// 	size = f.Headers[f.UUID].ProgramsPblSetPoolAddr - f.Headers[f.UUID].DylibsPblSetAddr
-		// }
 	} else {
 		addr = f.Headers[f.UUID].DylibsImageArrayAddr
 		size = f.Headers[f.UUID].DylibsImageArraySize

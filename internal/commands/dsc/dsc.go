@@ -412,7 +412,7 @@ func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
 		}
 	}
 
-	if f.SupportsPrebuiltLoaderSet() {
+	if f.SupportsProgramTrie() {
 		if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
 			for _, loader := range pset.Loaders {
 				for _, dep := range loader.Dependents {
