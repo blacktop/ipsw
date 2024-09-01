@@ -104,7 +104,9 @@ var ImageCmd = &cobra.Command{
 				if pbl, err := f.GetDylibPrebuiltLoader(image.Name); err == nil {
 					fmt.Println(pbl.String(f))
 				} else {
-					if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					if errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+						log.Warn("prebuilt loader sets not supported for this version of dyld_shared_cache")
+					} else {
 						return fmt.Errorf("failed parsing launch loader sets: %v", err)
 					}
 					// try to parse the dylib closures using the old iOS14.x method
@@ -154,7 +156,9 @@ var ImageCmd = &cobra.Command{
 			if err := f.ForEachLaunchLoaderSetPath(func(execPath string) {
 				fmt.Println(execPath)
 			}); err != nil {
-				if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+				if errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					log.Warn("prebuilt loader sets not supported for this version of dyld_shared_cache")
+				} else {
 					return fmt.Errorf("failed parsing launch loader sets: %v", err)
 				}
 				// try to parse the image array using the old iOS14.x method

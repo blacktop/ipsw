@@ -13,12 +13,8 @@ import (
 	"github.com/blacktop/go-macho/types"
 )
 
-func (f *File) SupportsPrebuiltLoaderSet() bool {
+func (f *File) SupportsProgramTrie() bool {
 	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
-		return false
-	}
-	// FIXME: REMOVE once I have added iOS 18.x support
-	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].TPROMappingOffset)) {
 		return false
 	}
 	if f.Headers[f.UUID].ProgramTrieAddr == 0 {
@@ -28,8 +24,8 @@ func (f *File) SupportsPrebuiltLoaderSet() bool {
 }
 
 func (f *File) ForEachLaunchLoaderSet(handler func(execPath string, pset *PrebuiltLoaderSet)) error {
-	if !f.SupportsPrebuiltLoaderSet() {
-		return ErrPrebuiltLoaderSetNotSupported
+	if !f.SupportsProgramTrie() {
+		return ErrProgramTrieNotSupported
 	}
 
 	uuid, off, err := f.GetOffset(f.Headers[f.UUID].ProgramTrieAddr)
@@ -74,8 +70,8 @@ func (f *File) ForEachLaunchLoaderSet(handler func(execPath string, pset *Prebui
 }
 
 func (f *File) ForEachLaunchLoaderSetPath(handler func(execPath string)) error {
-	if !f.SupportsPrebuiltLoaderSet() {
-		return ErrPrebuiltLoaderSetNotSupported
+	if !f.SupportsProgramTrie() {
+		return ErrProgramTrieNotSupported
 	}
 
 	uuid, off, err := f.GetOffset(f.Headers[f.UUID].ProgramTrieAddr)
@@ -104,8 +100,8 @@ func (f *File) ForEachLaunchLoaderSetPath(handler func(execPath string)) error {
 
 // GetLaunchLoaderSet returns the PrebuiltLoaderSet for the given executable app path.
 func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, error) {
-	if !f.SupportsPrebuiltLoaderSet() {
-		return nil, ErrPrebuiltLoaderSetNotSupported
+	if !f.SupportsProgramTrie() {
+		return nil, ErrProgramTrieNotSupported
 	}
 
 	var psetOffset uint64

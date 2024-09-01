@@ -16,6 +16,7 @@ const (
 )
 
 var ErrPrebuiltLoaderSetNotSupported = fmt.Errorf("dyld_shared_cache has no launch prebuilt loader set info")
+var ErrProgramTrieNotSupported = fmt.Errorf("dyld_shared_cache has no program trie info")
 
 type LoaderRef uint16
 
