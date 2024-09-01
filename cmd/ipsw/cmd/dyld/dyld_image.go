@@ -91,14 +91,6 @@ var ImageCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		// if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
-		// 	fmt.Println(pset.String(f))
-		// }); err != nil {
-		// 	if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
-		// 		log.Errorf("failed parsing launch loader sets: %v", err)
-		// 	}
-		// }
-
 		if len(args) > 1 {
 			if image, err := f.Image(args[1]); err == nil {
 				if pbl, err := f.GetDylibPrebuiltLoader(image.Name); err == nil {
