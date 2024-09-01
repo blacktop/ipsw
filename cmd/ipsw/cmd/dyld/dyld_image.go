@@ -51,6 +51,7 @@ var ImageCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
+	SilenceUsage:  true,
 	Example: `  # List all the apps
   ❯ ipsw dyld image DSC
   # Dump the closure info for a in-cache dylib
@@ -103,7 +104,9 @@ var ImageCmd = &cobra.Command{
 				if pbl, err := f.GetDylibPrebuiltLoader(image.Name); err == nil {
 					fmt.Println(pbl.String(f))
 				} else {
-					if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					if errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+						log.Warn("prebuilt loader sets not supported for this version of dyld_shared_cache")
+					} else {
 						return fmt.Errorf("failed parsing launch loader sets: %v", err)
 					}
 					// try to parse the dylib closures using the old iOS14.x method
@@ -122,7 +125,9 @@ var ImageCmd = &cobra.Command{
 				if pset, err := f.GetLaunchLoaderSet(args[1]); err == nil {
 					fmt.Println(pset.String(f))
 				} else {
-					if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					if errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+						log.Warn("prebuilt loader sets not supported for this version of dyld_shared_cache")
+					} else {
 						return fmt.Errorf("failed parsing launch loader sets: %v", err)
 					}
 					// try to parse the app closures using the old iOS14.x method
@@ -134,6 +139,7 @@ var ImageCmd = &cobra.Command{
 						fmt.Println(ci.String(f, viper.GetBool("verbose")))
 						return nil
 					} else {
+						log.Warn("failed to find app in 'other' image arrays: attempting to find in program launch closures")
 						for _, clos := range f.Closures {
 							for _, img := range clos.Images {
 								if img.Name == args[1] {
@@ -150,7 +156,9 @@ var ImageCmd = &cobra.Command{
 			if err := f.ForEachLaunchLoaderSetPath(func(execPath string) {
 				fmt.Println(execPath)
 			}); err != nil {
-				if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+				if errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					log.Warn("prebuilt loader sets not supported for this version of dyld_shared_cache")
+				} else {
 					return fmt.Errorf("failed parsing launch loader sets: %v", err)
 				}
 				// try to parse the image array using the old iOS14.x method
