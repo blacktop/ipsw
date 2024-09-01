@@ -311,6 +311,11 @@ type CodeSignatureInFile struct {
 	Size       uint32
 }
 
+type ExportsTrieLoaderInFile struct {
+	Offset uint64
+	Size   uint32
+}
+
 func deserializeAbsoluteValue(value uint64) uint64 {
 	// sign extend
 	if (value & 0x4000000000000000) != 0 {
@@ -325,7 +330,6 @@ type dependent struct {
 }
 
 type prebuiltLoaderHeader struct {
-	Loader
 	PathOffset                     uint16
 	DependentLoaderRefsArrayOffset uint16 // offset to array of LoaderRef
 	DependentKindArrayOffset       uint16 // zero if all deps normal
@@ -351,56 +355,9 @@ type prebuiltLoaderHeader struct {
 	IndexOfTwin          uint16 // if in dyld cache and part of unzippered twin, then index of the other twin
 	_                    uint16
 
-	ExportsTrieLoaderOffset uint64
-	ExportsTrieLoaderSize   uint32
-	VmSize                  uint32
+	ExportsTrieLoader ExportsTrieLoaderInFile
 
-	CodeSignature CodeSignatureInFile
-
-	PatchTableOffset uint32
-
-	OverrideBindTargetRefsOffset uint32
-	OverrideBindTargetRefsCount  uint32
-
-	// followed by:
-	//  path chars
-	//  dep kind array
-	//  file validation info
-	//  segments
-	//  bind targets
-}
-
-type prebuiltLoaderHeaderV2 struct {
-	Loader
-	Unknown                        [12]uint16
-	PathOffset                     uint16
-	DependentLoaderRefsArrayOffset uint16 // offset to array of LoaderRef
-	DependentKindArrayOffset       uint16 // zero if all deps normal
-	FixupsLoadCommandOffset        uint16
-
-	AltPathOffset        uint16 // if install_name does not match real path
-	FileValidationOffset uint16 // zero or offset to FileValidationInfo
-
-	Info uint16
-	// hasInitializers      :  1,
-	// isOverridable        :  1,      // if in dyld cache, can roots override it
-	// supportsCatalyst     :  1,      // if false, this cannot be used in catalyst process
-	// isCatalystOverride   :  1,      // catalyst side of unzippered twin
-	// regionsCount         : 12
-	RegionsOffset uint16 // offset to Region array
-
-	DepCount             uint16
-	BindTargetRefsOffset uint16
-	BindTargetRefsCount  uint32 // bind targets can be large, so it is last
-	// After this point, all offsets in to the PrebuiltLoader need to be 32-bits as the bind targets can be large
-
-	ObjcBinaryInfoOffset uint32 // zero or offset to ObjCBinaryInfo
-	IndexOfTwin          uint16 // if in dyld cache and part of unzippered twin, then index of the other twin
-	_                    uint16
-
-	ExportsTrieLoaderOffset uint64
-	ExportsTrieLoaderSize   uint32
-	VmSize                  uint32
+	VmSize uint32
 
 	CodeSignature CodeSignatureInFile
 
@@ -504,7 +461,8 @@ func (o ObjCBinaryInfo) String() string {
 }
 
 type PrebuiltLoader struct {
-	prebuiltLoaderHeader
+	Loader
+	Header                      prebuiltLoaderHeader
 	Path                        string
 	AltPath                     string
 	Twin                        string
@@ -572,9 +530,9 @@ func (pl PrebuiltLoader) String(f *File) string {
 	if pl.Twin != "" {
 		out += fmt.Sprintf("Twin:    %s\n", pl.Twin)
 	}
-	out += fmt.Sprintf("VM Size:       %#x\n", pl.VmSize)
-	if pl.CodeSignature.Size > 0 {
-		out += fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.CodeSignature.FileOffset, pl.CodeSignature.Size)
+	out += fmt.Sprintf("VM Size:       %#x\n", pl.Header.VmSize)
+	if pl.Header.CodeSignature.Size > 0 {
+		out += fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.Header.CodeSignature.FileOffset, pl.Header.CodeSignature.Size)
 	}
 	if pl.FileValidation != nil {
 		if pl.FileValidation.CheckCDHash {
@@ -596,11 +554,11 @@ func (pl PrebuiltLoader) String(f *File) string {
 	if len(pl.GetInfo()) > 0 {
 		out += fmt.Sprintf("Info:          %s\n", pl.GetInfo())
 	}
-	if pl.ExportsTrieLoaderSize > 0 {
-		out += fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.ExportsTrieLoaderOffset), pl.ExportsTrieLoaderSize)
+	if pl.Header.ExportsTrieLoader.Size > 0 {
+		out += fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.Header.ExportsTrieLoader.Offset), pl.Header.ExportsTrieLoader.Size)
 	}
-	if pl.FixupsLoadCommandOffset > 0 {
-		out += fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.FixupsLoadCommandOffset)
+	if pl.Header.FixupsLoadCommandOffset > 0 {
+		out += fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.Header.FixupsLoadCommandOffset)
 	}
 	if len(pl.Regions) > 0 {
 		out += "\nRegions:\n"
