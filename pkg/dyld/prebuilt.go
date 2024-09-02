@@ -146,9 +146,9 @@ func (f *File) SupportsDylibPrebuiltLoader() bool {
 		return false
 	}
 	// FIXME: REMOVE once I have added iOS 18.x support
-	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].TPROMappingOffset)) {
-		return false
-	}
+	// if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].TPROMappingOffset)) {
+	// 	return false
+	// }
 	if f.Headers[f.UUID].DylibsPblSetAddr == 0 {
 		return false
 	}
@@ -252,7 +252,8 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			pset.MustBeMissingPaths = append(pset.MustBeMissingPaths, strings.TrimSuffix(s, "\x00"))
 		}
 	}
-	if pset.ObjcSelectorHashTableOffset > 0 {
+	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
+	if pset.ObjcSelectorHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
 		sr.Seek(int64(pset.ObjcSelectorHashTableOffset), io.SeekStart)
 		var o ObjCSelectorOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
@@ -274,6 +275,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		}
 		pset.SelectorTable = &o
 	}
+	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
 	if pset.ObjcClassHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
 		sr.Seek(int64(pset.ObjcClassHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
@@ -308,6 +310,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		}
 		pset.ClassTable = &o
 	}
+	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
 	if pset.ObjcProtocolHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
 		sr.Seek(int64(pset.ObjcProtocolHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
@@ -429,8 +432,12 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	}
 
 	if pbl.Loader.IsVersion2() {
-		// skip unknown data => [12]uint16
-		sr.Seek(24, io.SeekCurrent)
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.UUID); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader uuid: %v", err)
+		}
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.Unknown); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader unknown: %v", err)
+		}
 	}
 
 	if err := binary.Read(sr, binary.LittleEndian, &pbl.Header); err != nil {
@@ -441,14 +448,6 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		return nil, fmt.Errorf("invalid magic for prebuilt loader: expected %x got %x", LoaderMagic, pbl.Loader.Magic)
 	}
 
-	// log.Debug(pbl.Loader.String())
-	// log.Debug(pbl.GetInfo())
-
-	// fmt.Println("Loader Info:")
-	// fmt.Println(utils.Bits(uint64(pbl.Loader.Info)))
-	// fmt.Println("Info:")
-	// fmt.Println(pbl.GetInfo())
-
 	if pbl.Header.PathOffset > 0 {
 		sr.Seek(int64(pbl.Header.PathOffset), io.SeekStart)
 		path, err := bufio.NewReader(sr).ReadString('\x00')
@@ -457,6 +456,23 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		}
 		pbl.Path = strings.TrimSuffix(path, "\x00")
 	}
+
+	// fmt.Println("Loader Info:")
+	// fmt.Println(pbl.Loader.String())
+	// // fmt.Println(utils.Bits(uint64(pbl.Loader.Info)))
+	// fmt.Println("Info:")
+	// fmt.Println(pbl.Header.GetInfo())
+
+	// if pbl.Loader.Unknown1() {
+	// 	log.Debugf("Unknown1: %t", pbl.Loader.Unknown1())
+	// }
+	// if pbl.Loader.Unknown2() {
+	// 	log.Debugf("Unknown2: %t", pbl.Loader.Unknown2())
+	// }
+	// if pbl.Loader.Unknown3() {
+	// 	log.Debugf("Unknown3: %t", pbl.Loader.Unknown3())
+	// }
+
 	if pbl.Header.AltPathOffset > 0 {
 		sr.Seek(int64(pbl.Header.AltPathOffset), io.SeekStart)
 		path, err := bufio.NewReader(sr).ReadString('\x00')
@@ -473,15 +489,12 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		}
 		pbl.FileValidation = &fv
 	}
-	if pbl.RegionsCount() > 0 {
+	if pbl.Header.RegionsCount() > 0 {
 		sr.Seek(int64(pbl.Header.RegionsOffset), io.SeekStart)
-		pbl.Regions = make([]Region, pbl.RegionsCount())
+		pbl.Regions = make([]Region, pbl.Header.RegionsCount())
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader regions: %v", err)
 		}
-		// for i, r := range pbl.Regions {
-		// 	fmt.Printf("Region %d) %s\n", i, r)
-		// }
 	}
 	if pbl.Header.DependentLoaderRefsArrayOffset > 0 {
 		sr.Seek(int64(pbl.Header.DependentLoaderRefsArrayOffset), io.SeekStart)
