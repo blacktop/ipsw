@@ -593,7 +593,7 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 					defer func() {
 						utils.Indent(log.Debug, 4)(fmt.Sprintf("Unmounting %s", dcf.Name()))
 						if err := utils.Retry(3, 2*time.Second, func() error {
-							return utils.Unmount(mountPoint, false)
+							return utils.Unmount(mountPoint, true)
 						}); err != nil {
 							log.Errorf("failed to unmount DMG %s at %s: %v", dcf.Name(), mountPoint, err)
 						}
