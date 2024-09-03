@@ -116,6 +116,7 @@ update_fcs_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating fcs-keys.json"
 	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
 	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
 	@hack/make/json_mini
 
 .PHONY: update_keys
