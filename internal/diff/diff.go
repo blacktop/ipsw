@@ -356,13 +356,13 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 func (d *Diff) unmountSystemOsDMGs() error {
 	utils.Indent(log.Info, 2)("Unmounting 'Old' SystemOS DMG")
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.Old.MountPath, false)
+		return utils.Unmount(d.Old.MountPath, true)
 	}); err != nil {
 		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'Old' SystemOS DMG: %v", err))
 	}
 	utils.Indent(log.Info, 2)("Unmounting 'New' SystemOS DMG")
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.New.MountPath, false)
+		return utils.Unmount(d.New.MountPath, true)
 	}); err != nil {
 		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'New' SystemOS DMG: %v", err))
 	}

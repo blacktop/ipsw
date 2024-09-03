@@ -33,7 +33,7 @@ func (c Context) Unmount() error {
 		}
 	}
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(c.MountPoint, false)
+		return utils.Unmount(c.MountPoint, true)
 	}); err != nil {
 		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
 	}

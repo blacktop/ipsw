@@ -60,7 +60,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
+				return utils.Unmount(mountPoint, true)
 			}); err != nil {
 				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 			}

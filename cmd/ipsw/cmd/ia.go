@@ -81,7 +81,7 @@ var iaCmd = &cobra.Command{
 			defer func() {
 				log.Debugf("Unmounting %s", dmgPath)
 				if err := utils.Retry(3, 2*time.Second, func() error {
-					return utils.Unmount(mountPoint, false)
+					return utils.Unmount(mountPoint, true)
 				}); err != nil {
 					utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err))
 				}
