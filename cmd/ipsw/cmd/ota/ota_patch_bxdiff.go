@@ -28,10 +28,11 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/ota/bxdiff50"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota/bxdiff50"
 )
 
 func init() {

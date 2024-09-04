@@ -4,9 +4,10 @@ import (
 	"net/http"
 
 	"github.com/blacktop/go-macho"
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:response kernelKextsResponse

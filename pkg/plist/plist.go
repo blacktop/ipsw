@@ -11,10 +11,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/ota/types"
 )
 
 // Plists IPSW/OTA plists object

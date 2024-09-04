@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"

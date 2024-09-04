@@ -29,9 +29,10 @@ import (
 	"syscall"
 
 	"github.com/apex/log"
+	"github.com/spf13/cobra"
+
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/spf13/cobra"
 )
 
 var mountCmdSubCmds = []string{"fs", "sys", "app", "exc"}

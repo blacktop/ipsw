@@ -15,6 +15,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 )

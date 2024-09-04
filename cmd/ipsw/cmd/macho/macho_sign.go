@@ -33,6 +33,10 @@ import (
 	"github.com/apex/log"
 	mcs "github.com/blacktop/go-macho/pkg/codesign"
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/internal/codesign"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/codesign/resources"
@@ -40,9 +44,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {

@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/gin-gonic/gin"
 )
 
 // The extract response message

@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/blacktop/ipsw/internal/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/blacktop/ipsw/internal/model"
 )
 
 // Sqlite is a database that stores data in a sqlite database.

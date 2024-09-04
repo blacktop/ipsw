@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+
 	"github.com/blacktop/ipsw/internal/commands/img4"
 )
 

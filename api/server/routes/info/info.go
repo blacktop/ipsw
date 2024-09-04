@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:response

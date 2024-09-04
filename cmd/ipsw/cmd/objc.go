@@ -28,8 +28,9 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/objc"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/internal/objc"
 )
 
 func init() {

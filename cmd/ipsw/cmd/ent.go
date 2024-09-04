@@ -38,13 +38,14 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/commands/ent"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/commands/ent"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 )
 
 var colorBin = color.New(color.Bold, color.FgHiMagenta).SprintFunc()

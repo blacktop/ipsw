@@ -28,12 +28,13 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/blacktop/ipsw/pkg/usb/screenshot"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/blacktop/ipsw/pkg/usb/screenshot"
 )
 
 func init() {

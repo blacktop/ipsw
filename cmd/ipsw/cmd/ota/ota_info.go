@@ -26,10 +26,11 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/pkg/ota"
 )
 
 func init() {

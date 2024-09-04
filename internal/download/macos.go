@@ -17,10 +17,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dustin/go-humanize"
 	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // CREDIT: https://github.com/munki/macadmin-scripts

@@ -5,6 +5,7 @@ import (
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 )
 

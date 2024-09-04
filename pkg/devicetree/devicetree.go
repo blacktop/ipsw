@@ -6,19 +6,19 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"slices"
-	"time"
-
 	"fmt"
 	"io"
 	"math"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 

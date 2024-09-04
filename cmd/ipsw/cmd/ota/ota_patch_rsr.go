@@ -32,12 +32,13 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 )
 
 func init() {

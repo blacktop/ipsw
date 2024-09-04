@@ -14,13 +14,14 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:model

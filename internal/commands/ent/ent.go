@@ -17,10 +17,11 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/fatih/color"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/fatih/color"
 )
 
 // Entitlements is a map of entitlements

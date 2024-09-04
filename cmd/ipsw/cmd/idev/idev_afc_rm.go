@@ -26,11 +26,12 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/afc"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/usb/afc"
 )
 
 func init() {

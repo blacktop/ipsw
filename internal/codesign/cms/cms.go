@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/blacktop/go-plist"
+
 	"github.com/blacktop/ipsw/internal/codesign/cms/oid"
 )
 

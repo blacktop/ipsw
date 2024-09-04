@@ -13,9 +13,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/google/uuid"
+
 	"github.com/blacktop/ipsw/internal/commands/docker"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/google/uuid"
 )
 
 const (

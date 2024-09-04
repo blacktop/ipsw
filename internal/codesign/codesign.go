@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blacktop/ipsw/internal/codesign/cms"
 	"golang.org/x/crypto/pkcs12"
+
+	"github.com/blacktop/ipsw/internal/codesign/cms"
 )
 
 type CMSConfig struct {

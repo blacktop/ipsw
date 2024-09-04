@@ -13,8 +13,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/lzfse-cgo"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // NOTE: https://www.blackhat.com/docs/us-16/materials/us-16-Mandt-Demystifying-The-Secure-Enclave-Processor.pdf

@@ -31,13 +31,14 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/internal/commands/ida"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/commands/ida"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (

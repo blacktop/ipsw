@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/aymanbagabas/go-udiff"
-	"github.com/blacktop/ipsw/api/types"
 	"github.com/gin-gonic/gin"
+
+	"github.com/blacktop/ipsw/api/types"
 )
 
 // swagger:parameters postDiffFiles postDiffBlobs

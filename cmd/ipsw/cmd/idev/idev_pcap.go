@@ -32,13 +32,14 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/blacktop/ipsw/pkg/usb/pcap"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/blacktop/ipsw/pkg/usb/pcap"
 )
 
 func init() {

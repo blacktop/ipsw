@@ -21,6 +21,8 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/fatih/color"
+
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/demangle"
@@ -29,7 +31,6 @@ import (
 	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/signature"
-	"github.com/fatih/color"
 )
 
 // REFERENCES:

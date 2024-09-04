@@ -28,10 +28,11 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/download"
 )
 
 func init() {

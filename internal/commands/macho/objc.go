@@ -18,6 +18,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/go-plist"
+
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/tbd"

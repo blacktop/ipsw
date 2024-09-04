@@ -16,14 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	// "github.com/gofrs/flock"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
 	"golang.org/x/net/http/httpproxy"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // Download is a downloader object

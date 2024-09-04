@@ -29,16 +29,16 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/apex/log"
-
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 func getImages(dscPath string) []string {

@@ -33,8 +33,9 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func init() {

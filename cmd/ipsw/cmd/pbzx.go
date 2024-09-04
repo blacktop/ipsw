@@ -30,10 +30,11 @@ import (
 	"runtime"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 )
 
 func init() {

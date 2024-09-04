@@ -31,10 +31,11 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/spf13/cobra"
+
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/types"
-	"github.com/spf13/cobra"
 )
 
 func init() {

@@ -26,8 +26,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/internal/download"
 )
 
 // keyListGenCmd represents the key-list-gen command

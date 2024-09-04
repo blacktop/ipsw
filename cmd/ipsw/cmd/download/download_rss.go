@@ -29,12 +29,13 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func init() {

@@ -18,14 +18,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
-
 	"github.com/99designs/keyring"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // CREDIT - https://github.com/majd/ipatool

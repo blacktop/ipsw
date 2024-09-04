@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 

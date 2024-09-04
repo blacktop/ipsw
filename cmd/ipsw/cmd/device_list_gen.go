@@ -24,8 +24,9 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/blacktop/ipsw/pkg/xcode"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/pkg/xcode"
 )
 
 // deviceListGenCmd represents the deviceListGen command

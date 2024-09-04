@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 

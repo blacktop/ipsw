@@ -30,15 +30,16 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/commands/ida"
-	"github.com/blacktop/ipsw/internal/commands/ida/dscu"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/commands/ida"
+	"github.com/blacktop/ipsw/internal/commands/ida/dscu"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 func removeExtension(filename string) string {

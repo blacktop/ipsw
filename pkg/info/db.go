@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/fatih/color"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/fatih/color"
 )
 
 //go:embed data/ipsw_db.gz

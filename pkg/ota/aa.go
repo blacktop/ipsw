@@ -21,6 +21,11 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/dustin/go-humanize"
+	"golang.org/x/exp/maps"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/execabs"
+
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
@@ -29,10 +34,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
-	"github.com/dustin/go-humanize"
-	"golang.org/x/exp/maps"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/execabs"
 )
 
 type File struct {

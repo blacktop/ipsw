@@ -35,8 +35,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 var xcodePaths = []string{

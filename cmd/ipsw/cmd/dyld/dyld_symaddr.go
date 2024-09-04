@@ -29,13 +29,14 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 func init() {

@@ -5,8 +5,9 @@ import (
 	"os"
 	"slices"
 
-	"github.com/blacktop/ipsw/internal/model"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/model"
 )
 
 // Memory is a database that stores data in memory.

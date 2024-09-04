@@ -10,8 +10,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dominikbraun/graph"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string, error) {

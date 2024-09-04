@@ -29,9 +29,10 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/pkg/bom"
 )
 
 func init() {

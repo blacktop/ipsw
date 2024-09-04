@@ -29,6 +29,9 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/appstore"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
@@ -41,8 +44,6 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ota"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/sb"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ssh"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (

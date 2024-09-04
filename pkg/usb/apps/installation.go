@@ -5,10 +5,11 @@ import (
 	"os"
 	"path"
 
+	"github.com/mitchellh/mapstructure"
+
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/afc"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/mitchellh/mapstructure"
 )
 
 const (

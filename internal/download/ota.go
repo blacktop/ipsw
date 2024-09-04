@@ -20,14 +20,15 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/ota/types"
-	ilist "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/hashicorp/go-version"
 	semver "github.com/hashicorp/go-version"
 	"github.com/ulikunitz/xz"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota/types"
+	ilist "github.com/blacktop/ipsw/pkg/plist"
 )
 
 const (

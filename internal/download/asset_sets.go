@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const assetSetListURL = "https://gdmf.apple.com/v2/pmv"

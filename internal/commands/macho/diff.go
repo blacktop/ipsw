@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/blacktop/go-macho"
+
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 )

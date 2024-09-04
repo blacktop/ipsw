@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:response

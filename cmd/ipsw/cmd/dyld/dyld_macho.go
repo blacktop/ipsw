@@ -34,14 +34,15 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
-	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/demangle"
-	swift "github.com/blacktop/ipsw/internal/swift"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/demangle"
+	swift "github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 const (

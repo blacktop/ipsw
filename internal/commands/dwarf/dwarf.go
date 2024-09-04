@@ -7,6 +7,7 @@ import (
 
 	dwf "github.com/blacktop/go-dwarf"
 	"github.com/blacktop/go-macho"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 

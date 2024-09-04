@@ -22,9 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/blacktop/ipsw/internal/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/daemon"
 )
 
 func init() {

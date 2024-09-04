@@ -30,12 +30,13 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // NOTE:

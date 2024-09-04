@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/api/types"
 	"github.com/gin-gonic/gin"
+
+	"github.com/blacktop/ipsw/api/types"
 )
 
 // Info is the struct for the macho info route parameters

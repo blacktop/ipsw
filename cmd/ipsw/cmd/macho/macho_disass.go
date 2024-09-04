@@ -33,13 +33,14 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/disass"
 )
 
 func init() {

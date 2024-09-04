@@ -15,15 +15,15 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/lzss"
+	"github.com/pkg/errors"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/blacktop/lzss"
-	"github.com/pkg/errors"
 )
 
 // Im4p Kernelcache object

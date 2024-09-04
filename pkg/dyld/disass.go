@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
+
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/disass"

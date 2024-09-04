@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/amfi"
 	"github.com/blacktop/ipsw/pkg/usb/heartbeat"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:response idevInfoResponse

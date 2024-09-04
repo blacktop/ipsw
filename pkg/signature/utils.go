@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	semver "github.com/hashicorp/go-version"
+
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
 func checkVersion(kv *kernelcache.Version, sigs Symbolicator) (bool, error) {

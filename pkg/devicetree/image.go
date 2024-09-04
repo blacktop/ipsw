@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 
-	// lzfse "github.com/blacktop/go-lzfse"
-
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/lzfse"

@@ -16,10 +16,11 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // ErrNoLocals is the error for a shared cache that has no LocalSymbolsOffset

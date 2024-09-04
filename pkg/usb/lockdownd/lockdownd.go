@@ -3,8 +3,9 @@ package lockdownd
 import (
 	"fmt"
 
-	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/fatih/color"
+
+	"github.com/blacktop/ipsw/pkg/usb"
 )
 
 const lockdownPort = 62078

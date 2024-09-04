@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/blacktop/go-plist"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
