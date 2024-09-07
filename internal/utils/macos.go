@@ -17,9 +17,10 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	semver "github.com/hashicorp/go-version"
+
 	"github.com/blacktop/ipsw/internal/utils/lsof"
 	"github.com/blacktop/ipsw/pkg/aea"
-	semver "github.com/hashicorp/go-version"
 )
 
 // Cp copies a file from src to dest

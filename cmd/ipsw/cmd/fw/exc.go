@@ -26,11 +26,12 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // NOTE:

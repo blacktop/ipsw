@@ -26,9 +26,10 @@ import (
 	"os"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/car"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/pkg/car"
 )
 
 func init() {

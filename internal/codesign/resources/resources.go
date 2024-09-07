@@ -14,6 +14,7 @@ import (
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
+
 	pl "github.com/blacktop/ipsw/pkg/plist"
 )
 

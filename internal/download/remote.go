@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // RemoteConfig is the remote reader config

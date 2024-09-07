@@ -31,15 +31,16 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/commands/extract"
-	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/commands/extract"
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 var otaDlCmdPlatforms = []string{

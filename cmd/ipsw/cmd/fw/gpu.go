@@ -26,11 +26,12 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {

@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:response

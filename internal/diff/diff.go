@@ -17,6 +17,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"golang.org/x/exp/maps"
+
 	dcmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
@@ -29,7 +31,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"golang.org/x/exp/maps"
 )
 
 type kernel struct {

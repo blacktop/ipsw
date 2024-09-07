@@ -9,8 +9,9 @@ import (
 	"reflect"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
+
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 const (

@@ -24,10 +24,11 @@ package dyld
 import (
 	"path/filepath"
 
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 var symAddrColor = color.New(color.Faint).SprintfFunc()

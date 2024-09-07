@@ -2,6 +2,8 @@
 package routes
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/server/routes/daemon"
 	"github.com/blacktop/ipsw/api/server/routes/devicelist"
 	"github.com/blacktop/ipsw/api/server/routes/diff"
@@ -14,7 +16,6 @@ import (
 	"github.com/blacktop/ipsw/api/server/routes/kernel"
 	"github.com/blacktop/ipsw/api/server/routes/macho"
 	"github.com/blacktop/ipsw/api/server/routes/mount"
-	"github.com/gin-gonic/gin"
 )
 
 // Add adds the command routes to the router

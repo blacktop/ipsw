@@ -14,10 +14,11 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	semver "github.com/hashicorp/go-version"
+
 	"github.com/blacktop/ipsw/internal/sm"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	semver "github.com/hashicorp/go-version"
 )
 
 const (

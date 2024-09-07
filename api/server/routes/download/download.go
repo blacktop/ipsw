@@ -3,9 +3,10 @@ package download
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/download/ipsw"
-	"github.com/gin-gonic/gin"
 )
 
 func downloadIPSW(c *gin.Context) {

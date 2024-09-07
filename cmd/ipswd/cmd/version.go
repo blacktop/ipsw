@@ -25,8 +25,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blacktop/ipsw/api/types"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/api/types"
 )
 
 func init() {

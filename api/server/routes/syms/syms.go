@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/gin-gonic/gin"
+	"github.com/spf13/cast"
+
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/syms"
-	"github.com/gin-gonic/gin"
-	"github.com/spf13/cast"
 )
 
 // swagger:response

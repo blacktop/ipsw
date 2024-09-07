@@ -9,9 +9,10 @@ import (
 	"fmt"
 
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cast"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 func (e *Emulation) SetFirstArg(data interface{}) error {

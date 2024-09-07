@@ -35,14 +35,15 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/usb/pongo"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {

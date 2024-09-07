@@ -27,17 +27,15 @@ import (
 	"fmt"
 	"os"
 
-	// "sort"
-
 	"github.com/apex/log"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/pkg/errors"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {

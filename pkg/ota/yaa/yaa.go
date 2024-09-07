@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/dustin/go-humanize"
+
+	"github.com/blacktop/ipsw/pkg/bom"
 )
 
 const (

@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
 	"time"
 
 	"github.com/99designs/keyring"
@@ -30,8 +29,9 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 /*

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/blacktop/go-plist"
+
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )

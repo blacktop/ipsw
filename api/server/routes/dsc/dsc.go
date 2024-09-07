@@ -11,12 +11,13 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/types"
 	cmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/gin-gonic/gin"
 )
 
 // swagger:parameters postDscAddrToOff

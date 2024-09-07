@@ -9,8 +9,9 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 )
 
 const (

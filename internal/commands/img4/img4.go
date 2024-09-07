@@ -11,11 +11,12 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/pkg/errors"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/pkg/errors"
 )
 
 func DecryptPayload(path, output string, iv, key []byte) error {

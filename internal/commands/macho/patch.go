@@ -8,6 +8,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+
 	"github.com/blacktop/ipsw/internal/utils"
 )
 

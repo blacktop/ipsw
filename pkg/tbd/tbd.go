@@ -9,9 +9,10 @@ import (
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/pkg/errors"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 )
 
 var macOs32bitTargets = []string{"i386-macos"}

@@ -43,6 +43,13 @@ import (
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	"github.com/fatih/color"
+	"github.com/fullsailor/pkcs7"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
+
 	"github.com/blacktop/ipsw/internal/certs"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
@@ -50,12 +57,6 @@ import (
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/fatih/color"
-	"github.com/fullsailor/pkcs7"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 )
 
 var symAddrColor = color.New(color.Faint).SprintfFunc()

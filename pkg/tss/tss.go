@@ -13,10 +13,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/download"
-	info "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/blacktop/ipsw/internal/download"
+	info "github.com/blacktop/ipsw/pkg/plist"
 )
 
 // NOTES:

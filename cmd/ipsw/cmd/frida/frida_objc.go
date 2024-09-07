@@ -35,14 +35,15 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida/types"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida/types"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 var (

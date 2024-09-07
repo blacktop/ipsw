@@ -27,9 +27,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blacktop/ipsw/pkg/xcode"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/pkg/xcode"
 )
 
 func init() {

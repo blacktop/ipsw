@@ -31,15 +31,16 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/fatih/color"
+	semver "github.com/hashicorp/go-version"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
-	semver "github.com/hashicorp/go-version"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {

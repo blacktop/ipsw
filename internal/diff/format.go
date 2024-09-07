@@ -11,10 +11,11 @@ import (
 	"strconv"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/gomarkdown/markdown/html"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // {{ range $index, $element := .Ents }}

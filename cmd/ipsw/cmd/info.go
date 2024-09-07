@@ -31,11 +31,12 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/pkg/info"
 )
 
 func init() {

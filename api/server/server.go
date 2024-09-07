@@ -32,13 +32,14 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/api/server/routes"
 	"github.com/blacktop/ipsw/api/server/routes/aea"
 	"github.com/blacktop/ipsw/api/server/routes/syms"
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/db"
-	"github.com/gin-gonic/gin"
 )
 
 // Config is the server config

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/blacktop/go-macho"
+
 	"github.com/blacktop/ipsw/pkg/disass"
 )
 

@@ -15,11 +15,12 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/pkg/errors"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/pkg/errors"
 )
 
 var (

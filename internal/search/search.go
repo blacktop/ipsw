@@ -12,6 +12,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/magic"

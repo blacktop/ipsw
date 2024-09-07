@@ -12,15 +12,14 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/bom"
-	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 	"github.com/ulikunitz/xz"
 	"golang.org/x/sys/execabs"
-	// "github.com/blacktop/xz"
-	// "github.com/therootcompany/xz"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/ota/yaa"
 )
 
 const (

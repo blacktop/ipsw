@@ -8,6 +8,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 )

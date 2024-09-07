@@ -34,14 +34,15 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/ota"
-	"github.com/blacktop/ipsw/pkg/ota/pbzx"
-	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
+	"github.com/blacktop/ipsw/pkg/ota/yaa"
 )
 
 func init() {

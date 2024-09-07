@@ -31,12 +31,12 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	// lzfse "github.com/blacktop/go-lzfse"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
 func init() {

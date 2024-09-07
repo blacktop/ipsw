@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
+
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )

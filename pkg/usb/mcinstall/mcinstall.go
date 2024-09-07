@@ -5,9 +5,10 @@ import (
 	"os"
 
 	"github.com/blacktop/go-plist"
+	"github.com/fatih/color"
+
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 )
 
 const (

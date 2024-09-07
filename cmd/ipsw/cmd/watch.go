@@ -30,11 +30,12 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/commands/watch"
-	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/commands/watch"
+	"github.com/blacktop/ipsw/internal/download"
 )
 
 var colorHeader = color.New(color.Bold, color.FgHiBlue).SprintFunc()

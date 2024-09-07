@@ -30,13 +30,14 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types/objc"
-	swift "github.com/blacktop/ipsw/internal/swift"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	swift "github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, string, int) {

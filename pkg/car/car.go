@@ -15,6 +15,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
 )

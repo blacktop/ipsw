@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/api/types"
-	"github.com/gin-gonic/gin"
 )
 
 // AddRoutes adds the download routes to the router

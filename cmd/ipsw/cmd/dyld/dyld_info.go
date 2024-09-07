@@ -35,14 +35,15 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 func init() {
@@ -352,7 +353,7 @@ var dyldInfoCmd = &cobra.Command{
 					out, err := utils.GitDiff(
 						strings.Join(dout1, "\n")+"\n",
 						strings.Join(dout2, "\n")+"\n",
-						&utils.GitDiffConfig{Color:viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+						&utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
 					if err != nil {
 						return err
 					}

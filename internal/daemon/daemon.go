@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
+	"github.com/gin-gonic/gin"
+
 	"github.com/blacktop/ipsw/api/server"
 	"github.com/blacktop/ipsw/internal/config"
 	"github.com/blacktop/ipsw/internal/db"
-	"github.com/gin-gonic/gin"
 )
 
 // Daemon is the interface that describes an ipsw daemon.

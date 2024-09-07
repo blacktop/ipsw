@@ -32,13 +32,14 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/types/objc"
-	"github.com/blacktop/ipsw/internal/search"
-	swift "github.com/blacktop/ipsw/internal/swift"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/search"
+	swift "github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 var colorAddr = color.New(color.Faint).SprintfFunc()

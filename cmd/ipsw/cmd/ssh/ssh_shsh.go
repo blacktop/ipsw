@@ -26,11 +26,12 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/ssh"
-	"github.com/blacktop/ipsw/pkg/shsh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/ssh"
+	"github.com/blacktop/ipsw/pkg/shsh"
 )
 
 func init() {

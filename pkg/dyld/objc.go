@@ -14,9 +14,10 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
+	"github.com/pkg/errors"
+
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
-	"github.com/pkg/errors"
 )
 
 const (

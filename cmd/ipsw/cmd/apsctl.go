@@ -26,8 +26,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/blacktop/ipsw/internal/apsd"
 	"github.com/spf13/cobra"
+
+	"github.com/blacktop/ipsw/internal/apsd"
 )
 
 func init() {

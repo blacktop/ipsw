@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/blacktop/ipsw/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+
+	"github.com/blacktop/ipsw/internal/model"
 )
 
 // Postgres is a database that stores data in a Postgres database.

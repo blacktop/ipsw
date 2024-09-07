@@ -37,10 +37,10 @@ import (
 	"github.com/apex/log"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
-
-	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/blacktop/ipsw/internal/download"
 )
 
 func init() {

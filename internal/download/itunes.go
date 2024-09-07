@@ -9,9 +9,10 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (

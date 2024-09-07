@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/gocolly/colly/v2"
 	"github.com/pkg/errors"
+
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 )
 
 const (

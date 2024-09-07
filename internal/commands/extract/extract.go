@@ -20,6 +20,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/magic"
