@@ -361,17 +361,41 @@ func (d *Diff) Markdown() error {
 		out.WriteString("### Feature Flags\n\n")
 		if len(d.Features.New) > 0 {
 			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Features.New)))
-			if len(d.Features.New) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View NEW</i></summary>\n\n")
+			out.WriteString("<details>\n" +
+				"  <summary><i>View New</i></summary>\n\n")
+			if len(d.Features.New) < 20 {
+				for k, v := range d.Features.New {
+					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
+					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
+					out.WriteString(fmt.Sprintf("```xml\n%s\n```\n", v))
+				}
+			} else {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
+					return err
+				}
+				keys := make([]string, 0, len(d.Features.New))
+				for k := range d.Features.New {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+					if _, err := os.Stat(fname); os.IsExist(err) {
+						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+					}
+					log.Debugf("Creating diff feature Markdown file: %s", fname)
+					f, err := os.Create(fname)
+					if err != nil {
+						return fmt.Errorf("failed to create diff file: %w", err)
+					}
+					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
+					fmt.Fprintf(f, "> `%s`\n\n", k)
+					fmt.Fprintf(f, d.Features.New[k])
+					f.Close()
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
+				}
 			}
-			for _, k := range d.Features.New {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Features.New) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
+			out.WriteString("\n</details>\n\n")
 		}
 		if len(d.Features.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Features.Removed)))
@@ -411,7 +435,7 @@ func (d *Diff) Markdown() error {
 					if _, err := os.Stat(fname); os.IsExist(err) {
 						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
 					}
-					log.Debugf("Creating diff dylib Markdown file: %s", fname)
+					log.Debugf("Creating diff feature Markdown file: %s", fname)
 					f, err := os.Create(fname)
 					if err != nil {
 						return fmt.Errorf("failed to create diff file: %w", err)
