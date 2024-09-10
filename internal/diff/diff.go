@@ -45,7 +45,7 @@ type mount struct {
 }
 
 type PlistDiff struct {
-	New     []string          `json:"new,omitempty"`
+	New     map[string]string `json:"new,omitempty"`
 	Removed []string          `json:"removed,omitempty"`
 	Updated map[string]string `json:"changed,omitempty"`
 }
@@ -637,6 +637,7 @@ func (d *Diff) parseFirmwares() (err error) {
 
 func (d *Diff) parseFeatureFlags() (err error) {
 	d.Features = &PlistDiff{
+		New:     make(map[string]string),
 		Updated: make(map[string]string),
 	}
 	conf := &mcmd.DiffConfig{
@@ -674,10 +675,13 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	slices.Sort(nextFiles)
 
 	/* DIFF IPSW */
-	d.Features.New = utils.Difference(nextFiles, prevFiles)
+	newFiles := utils.Difference(nextFiles, prevFiles)
 	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
 
 	for _, f2 := range nextFiles {
+		if slices.Contains(newFiles, f2) {
+			d.Features.New[f2] = newPlists[f2]
+		}
 		dat2 := newPlists[f2]
 		if dat1, ok := oldPlists[f2]; ok {
 			if strings.EqualFold(dat2, dat1) {
