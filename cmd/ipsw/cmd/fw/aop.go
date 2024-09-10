@@ -40,6 +40,7 @@ import (
 
 // NOTE:
 //   Firmware/AOP/aopfw-iphone16aop.RELEASE.im4p
+//   Firmware/AOP2/aop2fw-iphone17aop2.RELEASE.im4p
 
 func init() {
 	FwCmd.AddCommand(aopCmd)
