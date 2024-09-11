@@ -187,7 +187,10 @@ var idevImgMountCmd = &cobra.Command{
 			if len(dmgPath) == 0 {
 				ddiDMG := filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
 				if _, err := os.Stat(ddiDMG); errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+					ddiDMG = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
+					if _, err := os.Stat(ddiDMG); errors.Is(err, os.ErrNotExist) {
+						return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+					}
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiDMG))
 				mountPoint, alreadyMounted, err := utils.MountDMG(ddiDMG)
