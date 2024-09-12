@@ -147,7 +147,7 @@ func CodeSignAdHoc(filePath string) error {
 
 func CodesignVerify(path string) (string, error) {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("codesign", "--verify", "--deep", "--strict", "--verbose=4", path)
+		cmd := exec.Command("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=4", path)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("%v: %s", err, out)
@@ -159,7 +159,7 @@ func CodesignVerify(path string) (string, error) {
 
 func CodesignShow(path string) (string, error) {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("codesign", "-d", "--verbose=4", path)
+		cmd := exec.Command("/usr/bin/codesign", "-d", "--verbose=4", path)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("%v: %s", err, out)
@@ -173,7 +173,7 @@ func CodesignShow(path string) (string, error) {
 func CreateSparseDiskImage(volumeName, diskPath string) (string, error) {
 	if runtime.GOOS == "darwin" {
 
-		cmd := exec.Command("hdiutil", "create", "-size", "16g", "-fs", "HFS+", "-volname", volumeName, "-type", "SPARSE", "-plist", diskPath)
+		cmd := exec.Command("usr/bin/hdiutil", "create", "-size", "16g", "-fs", "HFS+", "-volname", volumeName, "-type", "SPARSE", "-plist", diskPath)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -372,12 +372,50 @@ func GetBuildInfo() (*BuildInfo, error) {
 
 func GetXCodePath() (string, error) {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("xcode-select", "-p")
+		cmd := exec.Command("/usr/bin/xcode-select", "-p")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("%v: %s", err, out)
 		}
 		return strings.TrimSpace(string(out)), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
+type xcodeVersionPlist struct {
+	BuildVersion               string `json:"BuildVersion"`
+	CFBundleShortVersionString string `json:"CFBundleShortVersionString"`
+	CFBundleVersion            string `json:"CFBundleVersion"`
+	ProductBuildVersion        string `json:"ProductBuildVersion"`
+	ProjectName                string `json:"ProjectName"`
+	SourceVersion              string `json:"SourceVersion"`
+}
+
+func GetXCodeVersion(path ...string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		if len(path) == 0 {
+			cmd := exec.Command("/usr/bin/xcodebuild", "-version")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				return "", fmt.Errorf("%v: %s", err, out)
+			}
+			version, _, ok := strings.Cut(strings.TrimSpace(string(out)), "\n")
+			if !ok {
+				return "", fmt.Errorf("failed to parse xcodebuild version: %s", out)
+			}
+			return strings.TrimPrefix(version, "Xcode "), nil
+		} else {
+			f, err := os.Open(filepath.Join(path[0], "Contents", "version.plist"))
+			if err != nil {
+				return "", fmt.Errorf("failed to open Xcode version.plist: %v", err)
+			}
+			defer f.Close()
+			var version xcodeVersionPlist
+			if err := plist.NewDecoder(f).Decode(&version); err != nil {
+				return "", fmt.Errorf("failed to decode Xcode version.plist: %v", err)
+			}
+			return version.CFBundleShortVersionString, nil
+		}
 	}
 	return "", fmt.Errorf("only supported on macOS")
 }

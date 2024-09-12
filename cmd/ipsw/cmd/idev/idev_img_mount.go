@@ -185,6 +185,26 @@ var idevImgMountCmd = &cobra.Command{
 			imageType = "Personalized"
 
 			if len(dmgPath) == 0 {
+				xcodeVersion, err := utils.GetXCodeVersion(xcode)
+				if err != nil {
+					return fmt.Errorf("failed to get Xcode version: %w", err)
+				}
+				xcver, err := semver.NewVersion(xcodeVersion) // check
+				if err != nil {
+					return fmt.Errorf("failed to convert version into semver object")
+				}
+				var ddiPath string
+				if xcver.LessThan(semver.Must(semver.NewVersion("16.0"))) {
+					ddiPath = filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
+					if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
+						return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", ddiPath)
+					}
+				} else {
+					ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
+					if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
+						return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (run `%s -runFirstLaunch` and try again)", ddiPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
+					}
+				}
 				ddiDMG := filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
 				if _, err := os.Stat(ddiDMG); errors.Is(err, os.ErrNotExist) {
 					ddiDMG = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
