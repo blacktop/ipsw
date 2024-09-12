@@ -200,6 +200,7 @@ var idevImgMountCmd = &cobra.Command{
 						return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", ddiPath)
 					}
 				} else {
+					// NOTE: XCode 16+ now installs the DDI from Xcode.app/Contents/Resources/Packages/XcodeSystemResources.pkg
 					ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
 					if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
 						return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (run `%s -runFirstLaunch` and try again)", ddiPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
