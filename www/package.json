@@ -24,11 +24,11 @@
     "@docusaurus/theme-search-algolia": "^3.5.2",
     "@mdx-js/react": "^3.0.1",
     "clsx": "^2.1.1",
-    "prism-react-renderer": "^2.3.1",
+    "prism-react-renderer": "^2.4.0",
     "prism-themes": "^1.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "redocusaurus": "^2.1.1"
+    "redocusaurus": "^2.1.2"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.5.2",
