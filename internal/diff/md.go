@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -59,6 +60,7 @@ func (d *Diff) Markdown() error {
 		out.WriteString("### Kexts\n\n")
 		if len(d.Kexts.New) > 0 {
 			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Kexts.New)))
+			slices.Sort(d.Kexts.New)
 			for _, k := range d.Kexts.New {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
 			}
@@ -66,6 +68,7 @@ func (d *Diff) Markdown() error {
 		}
 		if len(d.Kexts.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Kexts.Removed)))
+			slices.Sort(d.Kexts.Removed)
 			for _, k := range d.Kexts.Removed {
 				out.WriteString(fmt.Sprintf("- `%s`\n", k))
 			}
@@ -110,6 +113,7 @@ func (d *Diff) Markdown() error {
 		out.WriteString("## MachO\n\n")
 		if len(d.Machos.New) > 0 {
 			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Machos.New)))
+			slices.Sort(d.Machos.New)
 			if len(d.Machos.New) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View NEW</i></summary>\n\n")
@@ -124,6 +128,7 @@ func (d *Diff) Markdown() error {
 		}
 		if len(d.Machos.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Machos.Removed)))
+			slices.Sort(d.Machos.Removed)
 			if len(d.Machos.Removed) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View Removed</i></summary>\n\n")
@@ -195,6 +200,7 @@ func (d *Diff) Markdown() error {
 		out.WriteString("## Firmware\n\n")
 		if len(d.Firmwares.New) > 0 {
 			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Firmwares.New)))
+			slices.Sort(d.Firmwares.New)
 			if len(d.Firmwares.New) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View NEW</i></summary>\n\n")
@@ -209,6 +215,7 @@ func (d *Diff) Markdown() error {
 		}
 		if len(d.Firmwares.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Firmwares.Removed)))
+			slices.Sort(d.Firmwares.Removed)
 			if len(d.Firmwares.Removed) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View Removed</i></summary>\n\n")
@@ -290,6 +297,7 @@ func (d *Diff) Markdown() error {
 		out.WriteString("### Dylibs\n\n")
 		if len(d.Dylibs.New) > 0 {
 			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Dylibs.New)))
+			slices.Sort(d.Dylibs.New)
 			if len(d.Dylibs.New) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View NEW</i></summary>\n\n")
@@ -304,6 +312,7 @@ func (d *Diff) Markdown() error {
 		}
 		if len(d.Dylibs.Removed) > 0 {
 			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Dylibs.Removed)))
+			slices.Sort(d.Dylibs.Removed)
 			if len(d.Dylibs.Removed) > 30 {
 				out.WriteString("<details>\n" +
 					"  <summary><i>View Removed</i></summary>\n\n")

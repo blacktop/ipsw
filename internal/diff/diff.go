@@ -409,6 +409,12 @@ func (d *Diff) parseKernelcache() error {
 			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
 			break // just use first kernelcache for now
 		}
+		// for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
+		// 	d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(d.Old.Info.Plists.GetKernelCaches()[kmodel][0]))
+		// }
+		// for kmodel := range d.New.Info.Plists.GetKernelCaches() {
+		// 	d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(d.New.Info.Plists.GetKernelCaches()[kmodel][0]))
+		// }
 	}
 
 	m1, err := macho.Open(d.Old.Kernel.Path)
