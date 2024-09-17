@@ -286,6 +286,19 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 					m.Close()
 				}
 			}
+		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4p) {
+			out, err := fwcmd.Extract(im4p, os.TempDir())
+			if err != nil {
+				return fmt.Errorf("failed to split exclave apps FW: %v", err)
+			}
+			for _, f := range out {
+				if m, err := macho.Open(f); err == nil {
+					if err := handler("exclave_"+filepath.Base(f), m); err != nil {
+						return fmt.Errorf("failed to handle macho %s: %v", f, err)
+					}
+					m.Close()
+				}
+			}
 		} else {
 			if m, err := macho.Open(im4p); err == nil {
 				if err := handler(filepath.Base(im4p), m); err != nil {

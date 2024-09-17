@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sort"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
@@ -175,7 +176,9 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 
 			/* DIFF Symbols */
 			newSyms := utils.Difference(dat2.Symbols, dat1.Symbols)
+			sort.Strings(newSyms)
 			rmSyms := utils.Difference(dat1.Symbols, dat2.Symbols)
+			sort.Strings(rmSyms)
 			if len(newSyms) > 0 || len(rmSyms) > 0 {
 				diff.Updated[f2] += "Symbols:\n"
 				for _, s := range newSyms {
@@ -189,7 +192,9 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 			/* DIFF CStrings */
 			if conf.CStrings {
 				newStrs := utils.Difference(dat2.CStrings, dat1.CStrings)
+				sort.Strings(newStrs)
 				rmStrs := utils.Difference(dat1.CStrings, dat2.CStrings)
+				sort.Strings(rmStrs)
 				if len(newStrs) > 0 || len(rmStrs) > 0 {
 					diff.Updated[f2] += "CStrings:\n"
 					for _, s := range newStrs {
