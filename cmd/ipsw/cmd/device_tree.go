@@ -22,10 +22,12 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	// "sort"
 
@@ -34,7 +36,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -82,34 +83,51 @@ var deviceTreeCmd = &cobra.Command{
 			}
 			dtrees, err = devicetree.ParseZipFiles(zr.File)
 			if err != nil {
-				return errors.Wrap(err, "failed to extract DeviceTree")
+				return fmt.Errorf("failed to extract DeviceTree: %v", err)
 			}
 		} else {
 			var dtree *devicetree.DeviceTree
 
-			content, err := os.ReadFile(args[0])
-			if err != nil {
-				return errors.Wrap(err, "failed to read DeviceTree")
-			}
-
-			if ok, _ := magic.IsImg3(args[0]); ok {
+			if ok, _ := magic.IsZip(filepath.Clean(args[0])); ok {
+				zr, err := zip.OpenReader(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to open zip: %v", err)
+				}
+				dtrees, err = devicetree.ParseZipFiles(zr.File)
+				if err != nil {
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
+				}
+			} else if ok, _ := magic.IsImg3(args[0]); ok {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseImg3Data(content)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			} else if ok, _ := magic.IsIm4p(args[0]); ok {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseImg4Data(content)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			} else {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseData(bytes.NewReader(content))
 				if err != nil {
 					return fmt.Errorf("failed to parse DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			}
-
-			dtrees[args[0]] = dtree
 		}
 
 		for name, dtree := range dtrees {
