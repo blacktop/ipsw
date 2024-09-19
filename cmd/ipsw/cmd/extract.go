@@ -24,9 +24,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,6 +66,7 @@ func init() {
 			"app\tAppOS",
 			"sys\tSystemOS",
 			"fs\tFileSystem",
+			"exc\tExclave",
 		}, cobra.ShellCompDirectiveDefault
 	})
 
@@ -123,8 +126,8 @@ var extractCmd = &cobra.Command{
 				}
 			}
 		} else if viper.GetString("extract.dmg") != "" {
-			if !utils.StrSliceHas([]string{"app", "sys", "fs"}, viper.GetString("extract.dmg")) {
-				return fmt.Errorf("invalid DMG type '%s' (must be: app, sys or fs)", viper.GetString("extract.dmg"))
+			if !utils.StrSliceHas(mount.DmgTypes, viper.GetString("extract.dmg")) {
+				return fmt.Errorf("invalid DMG type '%s' (must one of: %s)", viper.GetString("extract.dmg"), strings.Join(mount.DmgTypes, ", "))
 			}
 		} else if viper.GetBool("extract.files") && len(viper.GetString("extract.pattern")) == 0 {
 			return fmt.Errorf("--pattern or -p must be used with --files or -f")

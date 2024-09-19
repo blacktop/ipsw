@@ -34,8 +34,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var mountCmdSubCmds = []string{"fs", "sys", "app", "exc"}
-
 func init() {
 	rootCmd.AddCommand(mountCmd)
 
@@ -52,7 +50,7 @@ var mountCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return mountCmdSubCmds, cobra.ShellCompDirectiveNoFileComp
+			return mount.DmgTypes, cobra.ShellCompDirectiveNoFileComp
 		}
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	},
