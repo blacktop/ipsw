@@ -154,7 +154,7 @@ daemon:
   sigs-dir: /path/to/blacktop/symbolicator/kernel
 ```
 
-> For more information see the blog [Kernel Symbolication](https://blacktop.github.io/ipsw/blog/kernel-symbolication)
+> For more information see [Kernel Symbolication](https://blacktop.github.io/ipsw/blog/kernel-symbolication)
 
 :::
 
