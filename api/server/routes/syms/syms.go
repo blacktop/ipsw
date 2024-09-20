@@ -63,6 +63,11 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: sig_dir
+	//         in: query
+	//         description: path to symbolication signatures directory
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       200: successResponse
 	//       409: genericError
@@ -83,7 +88,15 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-		if err := syms.Scan(ipswPath, pemDbPath, sigsDir, db); err != nil {
+		signaturesDir, ok := c.GetQuery("sig_dir")
+		if ok {
+			signaturesDir = filepath.Clean(signaturesDir)
+		} else {
+			if sigsDir != "" {
+				signaturesDir = filepath.Clean(sigsDir)
+			}
+		}
+		if err := syms.Scan(ipswPath, pemDbPath, signaturesDir, db); err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				c.AbortWithStatusJSON(http.StatusConflict, types.GenericError{Error: err.Error()})
 				return
