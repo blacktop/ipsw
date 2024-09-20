@@ -2,11 +2,13 @@ package db
 
 import (
 	"encoding/gob"
+	"fmt"
 	"os"
 	"slices"
 
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 )
 
 // Memory is a database that stores data in memory.
@@ -40,9 +42,13 @@ func (m *Memory) Connect() error {
 // It returns ErrAlreadyExists if the key already exists.
 func (m *Memory) Create(value any) error {
 	if ipsw, ok := value.(*model.Ipsw); ok {
+		if _, exists := m.IPSWs[ipsw.ID]; exists {
+			return gorm.ErrDuplicatedKey
+		}
 		m.IPSWs[ipsw.ID] = ipsw
+		return nil
 	}
-	return nil
+	return fmt.Errorf("invalid type: %T", value)
 }
 
 // Get returns the IPSW for the given key.

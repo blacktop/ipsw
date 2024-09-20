@@ -35,6 +35,7 @@ func (s *Sqlite) Connect() (err error) {
 	s.db, err = gorm.Open(sqlite.Open(s.URL), &gorm.Config{
 		CreateBatchSize:        s.BatchSize,
 		SkipDefaultTransaction: true,
+		TranslateError:         true,
 		Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -54,7 +55,7 @@ func (s *Sqlite) Connect() (err error) {
 // It returns ErrAlreadyExists if the key already exists.
 func (s *Sqlite) Create(value any) error {
 	// if result := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(value); result.Error != nil {
-	if result := s.db.FirstOrCreate(value); result.Error != nil {
+	if result := s.db.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil

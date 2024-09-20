@@ -11,7 +11,7 @@ type Database interface {
 	Connect() error
 
 	// Create creates a new entry in the database.
-	// It returns ErrAlreadyExists if the key already exists.
+	// It returns gorm.ErrDuplicatedKey if the key already exists.
 	Create(value any) error
 
 	// Get returns the value for the given key.

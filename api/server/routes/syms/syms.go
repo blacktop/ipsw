@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/ipsw/internal/syms"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
+	"gorm.io/gorm"
 )
 
 // swagger:response
@@ -64,6 +65,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         type: string
 	//     Responses:
 	//       200: successResponse
+	//       409: genericError
 	//       500: genericError
 	rg.POST("/syms/scan", func(c *gin.Context) {
 		ipswPath, ok := c.GetQuery("path")
@@ -82,6 +84,10 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 			}
 		}
 		if err := syms.Scan(ipswPath, pemDbPath, sigsDir, db); err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				c.AbortWithStatusJSON(http.StatusConflict, types.GenericError{Error: err.Error()})
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
