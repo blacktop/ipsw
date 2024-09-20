@@ -1582,6 +1582,12 @@
             "description": "path to AEA pem DB JSON file",
             "name": "pem_db",
             "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "path to symbolication signatures directory",
+            "name": "sig_dir",
+            "in": "query"
           }
         ],
         "responses": {
