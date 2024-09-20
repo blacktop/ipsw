@@ -46,6 +46,7 @@ func (p *Postgres) Connect() (err error) {
 	)), &gorm.Config{
 		CreateBatchSize:        p.BatchSize,
 		SkipDefaultTransaction: true,
+		TranslateError:         true,
 		// Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -64,7 +65,7 @@ func (p *Postgres) Connect() (err error) {
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {
-	if result := p.db.FirstOrCreate(value); result.Error != nil {
+	if result := p.db.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
