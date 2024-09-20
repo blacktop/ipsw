@@ -1588,6 +1588,9 @@
           "200": {
             "$ref": "#/responses/successResponse"
           },
+          "409": {
+            "$ref": "#/responses/genericError"
+          },
           "500": {
             "$ref": "#/responses/genericError"
           }
@@ -4641,9 +4644,7 @@
         "IsSeed": {
           "type": "boolean"
         },
-        "RestoreBuildGroup": {
-          "type": "string"
-        },
+        "RestoreBuildGroup": {},
         "RestoreLongVersion": {
           "type": "string"
         },
