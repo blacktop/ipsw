@@ -139,7 +139,7 @@ database:
 ```
 
 :::info
-To add kernel symbolication
+### To add kernel symbolication
 
 Get the signatures
 
