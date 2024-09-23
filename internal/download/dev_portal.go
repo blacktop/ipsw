@@ -1206,9 +1206,11 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 			}
 
 			for _, df := range dfiles {
+				log.Debugf("Downloading: %s", ipsws[version][df].URL)
 				dp.Download(ipsws[version][df].URL, folder)
 			}
 		} else {
+			log.Debugf("Downloading: %s", ipsws[version][0].URL)
 			dp.Download(ipsws[version][0].URL, folder)
 		}
 	case "profile":
