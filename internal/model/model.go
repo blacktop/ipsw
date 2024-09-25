@@ -2,7 +2,6 @@
 package model
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -58,12 +57,14 @@ type DyldSharedCache struct {
 }
 
 type Path struct {
+	// swagger:ignore
 	ID   uint   `gorm:"primaryKey"`
 	Path string `gorm:"uniqueIndex" json:"name,omitempty"`
 }
 
 type Macho struct {
-	UUID      string `gorm:"primaryKey" json:"uuid"`
+	UUID string `gorm:"primaryKey" json:"uuid"`
+	// swagger:ignore
 	PathID    uint
 	Path      Path      `gorm:"foreignKey:PathID"`
 	TextStart uint64    `gorm:"type:bigint" json:"text_start,omitempty"`
@@ -76,6 +77,7 @@ func (m Macho) GetPath() string {
 }
 
 type Name struct {
+	// swagger:ignore
 	ID   uint   `gorm:"primaryKey"`
 	Name string `gorm:"uniqueIndex" json:"name,omitempty"`
 }
@@ -83,7 +85,8 @@ type Name struct {
 // swagger:model
 type Symbol struct {
 	// swagger:ignore
-	ID     uint `gorm:"primaryKey"`
+	ID uint `gorm:"primaryKey"`
+	// swagger:ignore
 	NameID uint
 	Name   Name   `gorm:"foreignKey:NameID"`
 	Start  uint64 `gorm:"type:bigint" json:"start"`
@@ -96,16 +99,4 @@ func (s Symbol) GetName() string {
 
 func (s Symbol) String() string {
 	return fmt.Sprintf("%#x: %s", s.Start, s.Name.Name)
-}
-
-func (s Symbol) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Symbol string `json:"symbol"`
-		Start  uint64 `json:"start"`
-		End    uint64 `json:"end"`
-	}{
-		Symbol: s.Name.Name,
-		Start:  s.Start,
-		End:    s.End,
-	})
 }
