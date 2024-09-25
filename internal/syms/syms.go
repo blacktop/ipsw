@@ -306,6 +306,67 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	return db.Save(ipsw)
 }
 
+// Rescan re-scans the IPSW file and extracts information about the kernels, DSCs, and file system.
+func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
+	/* IPSW */
+	sha1, err := utils.Sha1(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to calculate sha1: %w", err)
+	}
+	ipsw, err := db.Get(sha1)
+	if err != nil {
+		return fmt.Errorf("failed to get IPSW from database: %w", err)
+	}
+	/* KERNEL */
+	if ipsw.Kernels, err = scanKernels(ipswPath, sigsDir); err != nil {
+		return fmt.Errorf("failed to scan kernels: %w", err)
+	}
+	/* DSC */
+	if ipsw.DSCs, err = scanDSCs(ipswPath, pemDB); err != nil {
+		return fmt.Errorf("failed to scan DSCs: %w", err)
+	}
+	/* FileSystem */
+	if err := search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
+		if m.UUID() != nil {
+			mm := &model.Macho{
+				UUID: m.UUID().String(),
+				Path: model.Path{Path: path},
+			}
+			if text := m.Segment("__TEXT"); text != nil {
+				mm.TextStart = text.Addr
+				mm.TextEnd = text.Addr + text.Filesz
+			}
+			for _, fn := range m.GetFunctions() {
+				var msym *model.Symbol
+				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+					for _, sym := range syms {
+						fn.Name = sym.Name
+					}
+					msym = &model.Symbol{
+						Name:  model.Name{Name: fn.Name},
+						Start: fn.StartAddr,
+						End:   fn.EndAddr,
+					}
+				} else {
+					msym = &model.Symbol{
+						Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+						Start: fn.StartAddr,
+						End:   fn.EndAddr,
+					}
+				}
+				mm.Symbols = append(mm.Symbols, msym)
+			}
+			ipsw.FileSystem = append(ipsw.FileSystem, mm)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
+	}
+
+	log.Debug("Saving IPSW with FileSystem")
+	return db.Save(ipsw)
+}
+
 func GetIPSW(version, build, device string, db db.Database) (*model.Ipsw, error) {
 	return db.GetIPSW(version, build, device)
 }
