@@ -68,7 +68,7 @@ func (p *Postgres) Connect() (err error) {
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {
-	if result := p.db.FirstOrCreate(value); result.Error != nil {
+	if result := p.db.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
@@ -124,6 +124,7 @@ func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error
 	var macho model.Macho
 	if err := p.db.Joins("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
 		Joins("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
+		Joins("Path").
 		Where("dyld_shared_caches.uuid = ? AND machos.text_start <= ? AND ? < machos.text_end", uuid, address, address).
 		First(&macho).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -136,7 +137,7 @@ func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error
 
 func (p *Postgres) GetMachO(uuid string) (*model.Macho, error) {
 	var macho model.Macho
-	if err := p.db.Where("uuid = ?", uuid).First(&macho).Error; err != nil {
+	if err := p.db.Preload("Path").Where("uuid = ?", uuid).First(&macho).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, model.ErrNotFound
 		}
@@ -149,6 +150,7 @@ func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error)
 	var symbol model.Symbol
 	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
 		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Joins("Name").
 		Where("machos.uuid = ? AND symbols.start <= ? AND ? < symbols.end", uuid, address, address).
 		First(&symbol).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -163,6 +165,7 @@ func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	var syms []*model.Symbol
 	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
 		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Joins("Name").
 		Where("machos.uuid = ?", uuid).
 		Select("symbol", "start", "end").
 		Find(&syms).Error; err != nil {
@@ -177,6 +180,7 @@ func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
 // Save sets the value for the given key.
 // It overwrites any previous value for that key.
 func (p *Postgres) Save(value any) error {
+	// TODO: add rollback on error
 	if ipsw, ok := value.(*model.Ipsw); ok {
 		// Start transaction
 		return p.db.Transaction(func(tx *gorm.DB) error {

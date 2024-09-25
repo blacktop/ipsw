@@ -3487,11 +3487,6 @@
           "type": "string",
           "x-go-name": "BuildID"
         },
-        "date": {
-          "type": "string",
-          "format": "date-time",
-          "x-go-name": "Date"
-        },
         "devices": {
           "type": "array",
           "items": {
@@ -3628,26 +3623,14 @@
     "Macho": {
       "type": "object",
       "properties": {
-        "CreatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "DeletedAt": {
-          "$ref": "#/definitions/DeletedAt"
+        "Path": {
+          "$ref": "#/definitions/Path"
         },
         "Symbols": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Symbol"
           }
-        },
-        "UpdatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "name": {
-          "type": "string",
-          "x-go-name": "Name"
         },
         "text_end": {
           "type": "integer",
@@ -3671,6 +3654,16 @@
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/types"
     },
+    "Name": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "NullTime": {
       "description": "NullTime implements the [Scanner] interface so\nit can be used as a scan destination, similar to [NullString].",
       "type": "object",
@@ -3685,6 +3678,16 @@
         }
       },
       "x-go-package": "database/sql"
+    },
+    "Path": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Path"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
     },
     "Plists": {
       "description": "Plists IPSW/OTA plists object",
@@ -4161,6 +4164,9 @@
         "pattern"
       ],
       "properties": {
+        "Name": {
+          "$ref": "#/definitions/Name"
+        },
         "end": {
           "type": "integer",
           "format": "uint64",
@@ -4170,10 +4176,6 @@
           "type": "integer",
           "format": "uint64",
           "x-go-name": "Start"
-        },
-        "symbol": {
-          "type": "string",
-          "x-go-name": "Symbol"
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/model"
