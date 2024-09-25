@@ -1134,8 +1134,8 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 	for idx, img := range i.Payload.BinaryImages {
 		if m, err := db.GetMachO(strings.ToUpper(img.UUID)); err == nil {
 			if i.Payload.BinaryImages[idx].Name != "kernelcache" {
-				i.Payload.BinaryImages[idx].Path = m.Name
-				i.Payload.BinaryImages[idx].Name = m.Name
+				i.Payload.BinaryImages[idx].Path = m.GetPath()
+				i.Payload.BinaryImages[idx].Name = m.GetPath()
 				i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.TextStart
 			}
 			total--
@@ -1179,9 +1179,9 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 					}
 					// lookup symbol in DSC dylib
 					if img, err := db.GetDSCImage(dsc.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.Name)
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.GetPath())
 						if sym, err := db.GetSymbol(img.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.Symbol)
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.GetName())
 							if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-sym.Start != 0 {
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - sym.Start
 							}
@@ -1202,7 +1202,7 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-
 							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide,
 					); err == nil {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.Symbol)
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.GetName())
 						if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-sym.Start != 0 {
 							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation =
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset -
@@ -1246,7 +1246,7 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 					); err == nil {
 						sym.Start |= uint64(1 << 63)
 						sym.End |= uint64(1 << 63)
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.Symbol)
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.GetName())
 						if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-sym.Start != 0 {
 							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation =
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - sym.Start

@@ -1,0 +1,47 @@
+# ipsw files
+*.ipsw
+*.zip
+*.im4p
+*.img4
+*_Restore
+usr
+*.xz
+*.bin
+*.s
+.DS_Store
+*.dmg
+*.aea
+*.signature
+
+# Repo
+*.bu
+dist/
+test-caches/
+completions/
+manpages/
+*.txt
+*.swift
+*.prof
+*.download
+checksums.txt.sha1
+mg.*
+btm.go
+
+# Docs
+public
+site/
+www/docs/static/releases*.json
+
+# Other
+*.unstripped
+*.bndb
+*.lock
+internal/commands/ida/dscu/data/dscu.py
+venv/
+
+# Unicorn EMU
+unicorn2/
+
+.vscode/
+test-caches/
+dist/
