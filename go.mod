@@ -21,11 +21,11 @@ require (
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/cloudflare/circl v1.4.0
-	github.com/docker/docker v27.2.1+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.17.0
-	github.com/frida/frida-go v0.10.2
+	github.com/frida/frida-go v0.11.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20240516210008-9c006672e7f4
@@ -51,7 +51,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
-	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
+	github.com/unicorn-engine/unicorn v0.0.0-20240921161403-f164769a9a97
 	github.com/vbauerster/mpb/v8 v8.8.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.27.0
@@ -87,14 +87,14 @@ require (
 	github.com/antchfx/xpath v1.3.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/bytedance/sonic v1.12.2 // indirect
+	github.com/bytedance/sonic v1.12.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/creack/pty v1.1.23 // indirect
-	github.com/cyphar/filepath-securejoin v0.3.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.3.2 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
@@ -156,7 +156,7 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -187,7 +187,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
-	modernc.org/libc v1.60.1 // indirect
+	modernc.org/libc v1.61.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.33.1 // indirect
