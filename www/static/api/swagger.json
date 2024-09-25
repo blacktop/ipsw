@@ -1558,6 +1558,48 @@
         }
       }
     },
+    "/syms/rescan": {
+      "post": {
+        "description": "Rescan symbols for a given IPSW.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Rescan",
+        "operationId": "postRescan",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "path to symbolication signatures directory",
+            "name": "sig_dir",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/successResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/syms/scan": {
       "post": {
         "description": "Scan symbols for a given IPSW.",
