@@ -106,7 +106,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 		}
 		c.JSON(http.StatusOK, successResponse{Success: true})
 	})
-	// swagger:route POST /syms/rescan Syms postRescan
+	// swagger:route PUT /syms/rescan Syms putRescan
 	//
 	// Rescan
 	//
@@ -134,7 +134,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//     Responses:
 	//       200: successResponse
 	//       500: genericError
-	rg.POST("/syms/rescan", func(c *gin.Context) {
+	rg.PUT("/syms/rescan", func(c *gin.Context) {
 		ipswPath, ok := c.GetQuery("path")
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})

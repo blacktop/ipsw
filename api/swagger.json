@@ -1559,7 +1559,7 @@
       }
     },
     "/syms/rescan": {
-      "post": {
+      "put": {
         "description": "Rescan symbols for a given IPSW.",
         "produces": [
           "application/json"
@@ -1568,7 +1568,7 @@
           "Syms"
         ],
         "summary": "Rescan",
-        "operationId": "postRescan",
+        "operationId": "putRescan",
         "parameters": [
           {
             "type": "string",
