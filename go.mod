@@ -12,7 +12,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.10
-	github.com/blacktop/go-macho v1.1.232
+	github.com/blacktop/go-macho v1.1.233
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
@@ -51,7 +51,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
-	github.com/unicorn-engine/unicorn v0.0.0-20240921161403-f164769a9a97
+	github.com/unicorn-engine/unicorn v0.0.0-20240926111503-d568885d64c8
 	github.com/vbauerster/mpb/v8 v8.8.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.27.0
@@ -77,6 +77,7 @@ replace github.com/spf13/cast => github.com/blacktop/cast v1.5.2
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
+	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
@@ -183,6 +184,9 @@ require (
 	golang.org/x/arch v0.10.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240924160255-9d4c2d233b61 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240924160255-9d4c2d233b61 // indirect
+	google.golang.org/grpc v1.67.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
