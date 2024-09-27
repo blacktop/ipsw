@@ -227,7 +227,9 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 			})
-			log.Warnf("--json flag is set; other flag(s) [ %s ] not currently supported (if needed create an Github issue)", "--"+strings.Join(setFlags, ", --"))
+			if asJSON && len(setFlags) > 0 {
+				log.Warnf("--json flag is set; other flag(s) [ %s ] not currently supported (if needed create an Github issue)", "--"+strings.Join(setFlags, ", --"))
+			}
 		}
 
 		machoPath := filepath.Clean(args[0])
