@@ -253,7 +253,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		}
 	}
 	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	if pset.ObjcSelectorHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
+	if pset.ObjcSelectorHashTableOffset > 0 && !pset.Loaders[0].Loader.HasUUIDLoadCommand() {
 		sr.Seek(int64(pset.ObjcSelectorHashTableOffset), io.SeekStart)
 		var o ObjCSelectorOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
@@ -276,7 +276,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		pset.SelectorTable = &o
 	}
 	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	if pset.ObjcClassHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
+	if pset.ObjcClassHashTableOffset > 0 && !pset.Loaders[0].Loader.HasUUIDLoadCommand() {
 		sr.Seek(int64(pset.ObjcClassHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
@@ -311,7 +311,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		pset.ClassTable = &o
 	}
 	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	if pset.ObjcProtocolHashTableOffset > 0 && !pset.Loaders[0].Loader.IsVersion2() {
+	if pset.ObjcProtocolHashTableOffset > 0 && !pset.Loaders[0].Loader.HasUUIDLoadCommand() {
 		sr.Seek(int64(pset.ObjcProtocolHashTableOffset), io.SeekStart)
 		var o ObjCClassOpt
 		if err := binary.Read(sr, f.ByteOrder, &o.objCStringTable); err != nil {
@@ -431,7 +431,7 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		return nil, fmt.Errorf("failed to read prebuilt loader: %v", err)
 	}
 
-	if pbl.Loader.IsVersion2() {
+	if pbl.Loader.HasUUIDLoadCommand() {
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.UUID); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader uuid: %v", err)
 		}
