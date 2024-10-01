@@ -63,11 +63,11 @@ type Loader struct {
 	// hasReadOnlyObjC    :  1,  // Has __DATA_CONST,__objc_selrefs section
 	// pre2022Binary      :  1,
 	// isPremapped        :  1,  // mapped by exclave core
-	// isVersion2         :  1,  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	// unknown1           :  1,  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	// unknown2           :  1,  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	// unknown3           :  1,  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	// padding            :  6;
+	// hasUUIDLoadCommand :  1,
+	// hasWeakDefs        :  1,
+	// hasTLVs            :  1,
+	// belowLibSystem     :  1,
+	// padding            :  2;
 	Ref LoaderRef
 	// Unk [12]uint16
 }
@@ -102,16 +102,16 @@ func (l Loader) Pre2022Binary() bool {
 func (l Loader) IsPremapped() bool {
 	return types.ExtractBits(uint64(l.Info), 9, 1) != 0
 }
-func (l Loader) IsVersion2() bool {
+func (l Loader) HasUUIDLoadCommand() bool {
 	return types.ExtractBits(uint64(l.Info), 10, 1) != 0
 }
-func (l Loader) Unknown1() bool {
+func (l Loader) HasWeakDefs() bool {
 	return types.ExtractBits(uint64(l.Info), 11, 1) != 0
 }
-func (l Loader) Unknown2() bool {
+func (l Loader) HasTLVs() bool {
 	return types.ExtractBits(uint64(l.Info), 12, 1) != 0
 }
-func (l Loader) Unknown3() bool {
+func (l Loader) BelowLibSystem() bool {
 	return types.ExtractBits(uint64(l.Info), 13, 1) != 0
 }
 func (l Loader) Padding() uint8 {
@@ -152,17 +152,17 @@ func (l Loader) String() string {
 	if l.IsPremapped() {
 		out = append(out, "premapped")
 	}
-	if l.IsVersion2() {
-		out = append(out, "v2")
+	if l.HasUUIDLoadCommand() {
+		out = append(out, "uuid-load-cmd")
 	}
-	if l.Unknown1() {
-		out = append(out, "unk1")
+	if l.HasWeakDefs() {
+		out = append(out, "weak-defs")
 	}
-	if l.Unknown2() {
-		out = append(out, "unk2")
+	if l.HasTLVs() {
+		out = append(out, "tlvs")
 	}
-	if l.Unknown3() {
-		out = append(out, "unk3")
+	if l.BelowLibSystem() {
+		out = append(out, "below-libsystem")
 	}
 	return fmt.Sprintf("%s, ref: %s", strings.Join(out, "|"), l.Ref)
 }
@@ -312,13 +312,15 @@ func (k RSKind) String() string {
 }
 
 type ResolvedSymbol struct {
-	TargetLoader        *Loader
-	TargetSymbolName    string
-	TargetRuntimeOffset uint64
-	Kind                RSKind
-	IsCode              bool
-	IsWeakDef           bool
-	IsMissingFlatLazy   bool
+	TargetLoader          *Loader
+	TargetSymbolName      string
+	TargetRuntimeOffset   uint64
+	TargetAddressForDlsym uint64
+	Kind                  RSKind
+	IsCode                bool
+	IsWeakDef             bool
+	IsMissingFlatLazy     bool
+	IsMaterializing       bool
 }
 
 type BindTarget struct {
@@ -573,7 +575,8 @@ func (o ObjCBinaryInfo) String() string {
 type PrebuiltLoader struct {
 	Loader
 	UUID                        types.UUID
-	Unknown                     [2]uint32 // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
+	CpuSubtype                  uint32
+	Unused                      uint32
 	Header                      prebuiltLoaderHeader
 	Path                        string
 	AltPath                     string
@@ -710,6 +713,13 @@ func (pl PrebuiltLoader) String(f *File) string {
 	return out
 }
 
+type objCFlags uint32
+
+const (
+	NoObjCFlags         objCFlags = 0
+	HasDuplicateClasses objCFlags = 1 << 0
+)
+
 // PrebuiltLoaderSet is an mmap()ed read-only data structure which holds a set of PrebuiltLoader objects;
 // The contained PrebuiltLoader objects can be found be index O(1) or path O(n).
 type prebuiltLoaderSetHeader struct {
@@ -727,7 +737,7 @@ type prebuiltLoaderSetHeader struct {
 	ObjcSelectorHashTableOffset  uint32
 	ObjcClassHashTableOffset     uint32
 	ObjcProtocolHashTableOffset  uint32
-	Reserved                     uint32
+	ObjcFlags                    objCFlags
 	ObjcProtocolClassCacheOffset uint64
 	// Swift prebuilt data
 	SwiftTypeConformanceTableOffset        uint32

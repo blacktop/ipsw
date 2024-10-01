@@ -191,8 +191,8 @@ type CacheHeader struct {
 	CacheAtlasSize                uint64         // size of embedded cache atlas
 	DynamicDataOffset             uint64         // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
 	DynamicDataMaxSize            uint64         // maximum size of space reserved from dynamic data
-	TPROMappingOffset             uint32         // file offset to TPRO mappings  NEW in iOS 18.0 beta1 (hi mrmacete :P)
-	TPROMappingCount              uint32         // TPRO mappings count           NEW in iOS 18.0 beta1 (is 1 for now; protects OBJC_RO)
+	TPROMappingsOffset            uint32         // file offset to first dyld_cache_tpro_mapping_info
+	TPROMappingsCount             uint32         // number of dyld_cache_tpro_mapping_info entries
 }
 
 type CacheMappingInfo struct {
@@ -206,14 +206,14 @@ type CacheMappingInfo struct {
 type CacheMappingFlag uint64
 
 const (
-	DYLD_CACHE_MAPPING_NONE        CacheMappingFlag = 0
-	DYLD_CACHE_MAPPING_AUTH_DATA   CacheMappingFlag = 1 << 0
-	DYLD_CACHE_MAPPING_DIRTY_DATA  CacheMappingFlag = 1 << 1
-	DYLD_CACHE_MAPPING_CONST_DATA  CacheMappingFlag = 1 << 2
-	DYLD_CACHE_MAPPING_TEXT_STUBS  CacheMappingFlag = 1 << 3
-	DYLD_CACHE_DYNAMIC_CONFIG_DATA CacheMappingFlag = 1 << 4
-	DYLD_CACHE_MAPPING_UNKNOWN     CacheMappingFlag = 1 << 5
-	DYLD_CACHE_MAPPING_TPRO        CacheMappingFlag = 1 << 6
+	DYLD_CACHE_MAPPING_NONE            CacheMappingFlag = 0
+	DYLD_CACHE_MAPPING_AUTH_DATA       CacheMappingFlag = 1 << 0
+	DYLD_CACHE_MAPPING_DIRTY_DATA      CacheMappingFlag = 1 << 1
+	DYLD_CACHE_MAPPING_CONST_DATA      CacheMappingFlag = 1 << 2
+	DYLD_CACHE_MAPPING_TEXT_STUBS      CacheMappingFlag = 1 << 3
+	DYLD_CACHE_DYNAMIC_CONFIG_DATA     CacheMappingFlag = 1 << 4
+	DYLD_CACHE_READ_ONLY_DATA          CacheMappingFlag = 1 << 5
+	DYLD_CACHE_MAPPING_CONST_TPRO_DATA CacheMappingFlag = 1 << 6
 )
 
 func (f CacheMappingFlag) IsNone() bool {
@@ -234,11 +234,11 @@ func (f CacheMappingFlag) IsTextStubs() bool {
 func (f CacheMappingFlag) IsConfigData() bool {
 	return (f & DYLD_CACHE_DYNAMIC_CONFIG_DATA) != 0
 }
-func (f CacheMappingFlag) IsUnknown() bool {
-	return (f & DYLD_CACHE_MAPPING_UNKNOWN) != 0
+func (f CacheMappingFlag) IsReadOnlyData() bool {
+	return (f & DYLD_CACHE_READ_ONLY_DATA) != 0
 }
 func (f CacheMappingFlag) IsTPRO() bool {
-	return (f & DYLD_CACHE_MAPPING_TPRO) != 0
+	return (f & DYLD_CACHE_MAPPING_CONST_TPRO_DATA) != 0
 }
 func (f CacheMappingFlag) String() string {
 	var fStr []string
@@ -249,7 +249,7 @@ func (f CacheMappingFlag) String() string {
 		fStr = append(fStr, "DIRTY_DATA")
 	}
 	if f.IsTPRO() {
-		fStr = append(fStr, "TPRO")
+		fStr = append(fStr, "CONST_TPRO_DATA")
 	}
 	if f.IsConstData() {
 		fStr = append(fStr, "CONST_DATA")
@@ -260,8 +260,8 @@ func (f CacheMappingFlag) String() string {
 	if f.IsConfigData() {
 		fStr = append(fStr, "CONFIG_DATA")
 	}
-	if f.IsUnknown() {
-		fStr = append(fStr, "UNKNOWN")
+	if f.IsReadOnlyData() {
+		fStr = append(fStr, "READ_ONLY_DATA")
 	}
 	if len(fStr) > 0 {
 		return strings.Join(fStr, " | ")
