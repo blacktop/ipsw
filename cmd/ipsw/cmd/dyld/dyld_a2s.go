@@ -25,9 +25,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/demangle"
+	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
@@ -40,11 +43,13 @@ func init() {
 	AddrToSymCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	AddrToSymCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
 	AddrToSymCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
+	AddrToSymCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.a2s.slide", AddrToSymCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.a2s.image", AddrToSymCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.a2s.mapping", AddrToSymCmd.Flags().Lookup("mapping"))
+	viper.BindPFlag("dyld.a2s.demangle", AddrToSymCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
 }
 
@@ -71,6 +76,7 @@ var AddrToSymCmd = &cobra.Command{
 		slide := viper.GetUint64("dyld.a2s.slide")
 		showImage := viper.GetBool("dyld.a2s.image")
 		showMapping := viper.GetBool("dyld.a2s.mapping")
+		doDemangle := viper.GetBool("dyld.a2s.demangle")
 		cacheFile := viper.GetString("dyld.a2s.cache")
 
 		addr, err := utils.ConvertStrToInt(args[1])
@@ -145,7 +151,13 @@ var AddrToSymCmd = &cobra.Command{
 				log.WithFields(log.Fields{"dylib": sym.Image, "segment": sym.Segment}).Info("Address location")
 			}
 		}
-
+		if doDemangle {
+			if strings.HasPrefix(sym.Symbol, "_$s") || strings.HasPrefix(sym.Symbol, "$s") {
+				sym.Symbol, _ = swift.Demangle(sym.Symbol)
+			} else if strings.HasPrefix(sym.Symbol, "__Z") || strings.HasPrefix(sym.Symbol, "_Z") {
+				sym.Symbol = demangle.Do(sym.Symbol, false, false)
+			}
+		}
 		fmt.Printf("%#x: %s\n", unslidAddr, sym.Symbol)
 
 		return nil
