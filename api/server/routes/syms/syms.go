@@ -21,6 +21,11 @@ type successResponse struct {
 }
 
 // swagger:response
+type createdResponse struct {
+	Created bool `json:"created,omitempty"`
+}
+
+// swagger:response
 type symIpswResponse *model.Ipsw
 
 // swagger:response
@@ -132,7 +137,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         required: false
 	//         type: string
 	//     Responses:
-	//       200: successResponse
+	//       201: createdResponse
 	//       500: genericError
 	rg.PUT("/syms/rescan", func(c *gin.Context) {
 		ipswPath, ok := c.GetQuery("path")
@@ -162,7 +167,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, successResponse{Success: true})
+		c.JSON(http.StatusCreated, createdResponse{Created: true})
 	})
 	// swagger:route GET /syms/ipsw Syms getIPSW
 	//
