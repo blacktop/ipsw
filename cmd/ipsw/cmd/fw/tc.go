@@ -22,7 +22,14 @@ THE SOFTWARE.
 package fw
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
+	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,20 +48,58 @@ func init() {
 
 // tcCmd represents the tc command
 var tcCmd = &cobra.Command{
-	Use:    "tc",
-	Short:  "🚧 Dump TrustCache",
-	Args:   cobra.ExactArgs(1),
-	Hidden: true,
+	Use:   "tc <IM4P|IPSW>",
+	Short: "🚧 Dump TrustCache",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// flags
-		// output := viper.GetString("fw.tc.output")
-
-		panic("not implemented")
+		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Search(&extract.Config{
+				IPSW:    filepath.Clean(args[0]),
+				Pattern: ".trustcache$",
+				Output:  viper.GetString("fw.tc.output"),
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				if ok, _ := magic.IsIm4p(f); ok {
+					log.WithField("file", f).Info("Processing IM4P file")
+					im4p, err := img4.OpenIm4p(f)
+					if err != nil {
+						return err
+					}
+					tc, err := fwcmd.ParseTrustCache(im4p.Data)
+					if err != nil {
+						return fmt.Errorf("failed to parse trust cache: %v", err)
+					}
+					fmt.Println(tc)
+				} else {
+					return fmt.Errorf("unsupported file type: expected IM4P")
+				}
+			}
+		} else {
+			if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
+				log.WithField("file", filepath.Clean(args[0])).Info("Processing IM4P file")
+				im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+				if err != nil {
+					return err
+				}
+				tc, err := fwcmd.ParseTrustCache(im4p.Data)
+				if err != nil {
+					return fmt.Errorf("failed to parse trust cache: %v", err)
+				}
+				fmt.Println(tc)
+			} else {
+				return fmt.Errorf("unsupported file type: expected IM4P")
+			}
+		}
 
 		return nil
 	},
