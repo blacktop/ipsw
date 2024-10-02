@@ -225,6 +225,10 @@ func (p *Postgres) processPaths(tx *gorm.DB, ipsw *model.Ipsw) error {
 		uniquePaths[fs.Path.Path] = struct{}{}
 	}
 
+	if len(uniquePaths) == 0 {
+		return nil
+	}
+
 	// Process paths in batches
 	paths := make([]string, 0, len(uniquePaths))
 	for path := range uniquePaths {
@@ -309,6 +313,10 @@ func (p *Postgres) processNames(tx *gorm.DB, ipsw *model.Ipsw) error {
 		for _, sym := range fs.Symbols {
 			uniqueNames[sym.GetName()] = struct{}{}
 		}
+	}
+
+	if len(uniqueNames) == 0 {
+		return nil
 	}
 
 	// Process names in batches
