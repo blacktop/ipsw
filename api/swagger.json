@@ -1591,8 +1591,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "$ref": "#/responses/successResponse"
+          "201": {
+            "$ref": "#/responses/createdResponse"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -4758,6 +4758,14 @@
         "items": {
           "type": "integer",
           "format": "uint8"
+        }
+      }
+    },
+    "createdResponse": {
+      "description": "",
+      "headers": {
+        "created": {
+          "type": "boolean"
         }
       }
     },
