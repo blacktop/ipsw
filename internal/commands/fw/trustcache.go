@@ -53,8 +53,8 @@ func (c hashType) String() string {
 type tcFlags uint8
 
 const (
-	CS_TRUST_CACHE_AMFID tcFlags = 1
-	CS_TRUST_CACHE_ANE   tcFlags = 2
+	CS_TRUST_CACHE_AMFID tcFlags = 1 // valid cdhash for amfid
+	CS_TRUST_CACHE_ANE   tcFlags = 2 // ANE model hash
 )
 
 func (c tcFlags) String() string {
@@ -135,7 +135,8 @@ type TrustCacheEntryV2 struct {
 	CDHash             CDHash
 	HashType           hashType
 	Flags              tcFlags
-	ConstraintCategory uint16
+	ConstraintCategory uint8
+	_                  uint8
 }
 
 func (tc TrustCacheEntryV2) String() string {
