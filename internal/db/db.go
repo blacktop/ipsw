@@ -39,7 +39,7 @@ type Database interface {
 	GetSymbol(uuid string, addr uint64) (*model.Symbol, error)
 
 	// GetSymbols returns all symbols for the given UUID.
-	GetSymbols(uuid string) ([]*model.Symbol, error)
+	GetSymbols(uuid string) ([]model.Symbol, error)
 
 	// Save updates the IPSW.
 	// It overwrites any previous value for that IPSW.

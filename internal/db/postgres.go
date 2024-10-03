@@ -1,11 +1,19 @@
 package db
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"database/sql"
+
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/model"
-	"gorm.io/driver/postgres"
+	"github.com/jackc/pgerrcode"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bundebug"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -21,7 +29,7 @@ type Postgres struct {
 	// Config
 	BatchSize int
 
-	db *gorm.DB
+	db *bun.DB
 }
 
 // NewPostgres creates a new Postgres database.
@@ -41,67 +49,129 @@ func NewPostgres(host, port, user, password, database string, batchSize int) (Da
 
 // Connect connects to the database.
 func (p *Postgres) Connect() (err error) {
-	p.db, err = gorm.Open(postgres.Open(fmt.Sprintf(
-		"host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
-		p.Host, p.Port, p.User, p.Database, p.Password,
-	)), &gorm.Config{
-		CreateBatchSize:        p.BatchSize,
-		SkipDefaultTransaction: true,
-		TranslateError:         true,
-		// Logger:                 logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to connect postgres database: %w", err)
-	}
-	return p.db.AutoMigrate(
-		&model.Ipsw{},
-		&model.Device{},
-		&model.Kernelcache{},
-		&model.DyldSharedCache{},
-		&model.Macho{},
-		&model.Path{},
-		&model.Symbol{},
-		&model.Name{},
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		p.User, p.Password, p.Host, p.Port, p.Database)
+
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+
+	p.db = bun.NewDB(sqldb, pgdialect.New())
+
+	p.db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
+	// Set batch size
+	// p.db.WithOption(bun.WithBatchSize(p.BatchSize))
+
+	p.db.RegisterModel(
+		(*model.IpswToDevice)(nil),
+		(*model.IpswToKernelcache)(nil),
+		(*model.IpswToDyldSharedCache)(nil),
+		(*model.IpswToMacho)(nil),
+		(*model.KernelcacheToMacho)(nil),
+		(*model.DyldSharedCacheToMacho)(nil),
+		(*model.MachoToSymbol)(nil),
 	)
+
+	models := []interface{}{
+		(*model.IpswToDevice)(nil),
+		(*model.IpswToKernelcache)(nil),
+		(*model.IpswToDyldSharedCache)(nil),
+		(*model.IpswToMacho)(nil),
+		(*model.KernelcacheToMacho)(nil),
+		(*model.DyldSharedCacheToMacho)(nil),
+		(*model.MachoToSymbol)(nil),
+		(*model.Ipsw)(nil),
+		(*model.Device)(nil),
+		(*model.Kernelcache)(nil),
+		(*model.DyldSharedCache)(nil),
+		(*model.Macho)(nil),
+		(*model.Path)(nil),
+		(*model.Symbol)(nil),
+		(*model.Name)(nil),
+	}
+	for _, model := range models {
+		if _, err := p.db.NewCreateTable().Model(model).Exec(context.Background()); err != nil {
+			if err, ok := err.(pgdriver.Error); ok && err.Field('C') == pgerrcode.DuplicateTable {
+				continue
+			}
+			log.WithError(err).Error("shut the fuck up")
+		}
+	}
+
+	p.db.ResetModel(context.Background(),
+		(*model.IpswToDevice)(nil),
+		(*model.IpswToKernelcache)(nil),
+		(*model.IpswToDyldSharedCache)(nil),
+		(*model.IpswToMacho)(nil),
+		(*model.KernelcacheToMacho)(nil),
+		(*model.DyldSharedCacheToMacho)(nil),
+		(*model.MachoToSymbol)(nil),
+		(*model.Ipsw)(nil),
+		(*model.Device)(nil),
+		(*model.Kernelcache)(nil),
+		(*model.DyldSharedCache)(nil),
+		(*model.Macho)(nil),
+		(*model.Path)(nil),
+		(*model.Symbol)(nil),
+		(*model.Name)(nil),
+	)
+	return nil
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {
-	if result := p.db.Create(value); result.Error != nil {
-		return result.Error
+	if _, err := p.db.NewInsert().Model(value).Exec(context.Background()); err != nil {
+		if err, ok := err.(pgdriver.Error); ok && err.IntegrityViolation() {
+			return model.ErrAlreadyExists
+		} else if err.Field('C') == pgerrcode.InvalidTransactionState {
+			return model.ErrInvalidTransactionState
+		} else {
+			return err
+		}
 	}
 	return nil
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
-func (p *Postgres) Get(key string) (*model.Ipsw, error) {
-	i := &model.Ipsw{}
-	p.db.First(&i, key)
-	return i, nil
+func (p *Postgres) Get(sha256 string) (*model.Ipsw, error) {
+	var ipsw model.Ipsw
+	if err := p.db.NewSelect().
+		Model(&ipsw).
+		Where("sha256 = ?", sha256).
+		Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &ipsw, nil
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
 func (p *Postgres) GetIpswByName(name string) (*model.Ipsw, error) {
-	i := &model.Ipsw{Name: name}
-	if result := p.db.First(&i); result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
+	var ipsw model.Ipsw
+	if err := p.db.NewSelect().
+		Model(&ipsw).
+		Where("name = ?", name).
+		Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
-		return nil, result.Error
+		return nil, err
 	}
-	return i, nil
+	return &ipsw, nil
 }
 
 func (p *Postgres) GetIPSW(version, build, device string) (*model.Ipsw, error) {
 	var ipsw model.Ipsw
-	if err := p.db.Joins("JOIN ipsw_devices ON ipsw_devices.ipsw_id = ipsws.id").
-		Joins("JOIN devices ON devices.name = ipsw_devices.device_name").
+	if err := p.db.NewSelect().
+		Model(&ipsw).
+		Join("JOIN ipsw_devices ON ipsw_devices.ipsw_id = ipsws.id").
+		Join("JOIN devices ON devices.name = ipsw_devices.device_name").
 		Where("ipsws.version = ? AND ipsws.build_id = ? AND devices.name = ?", version, build, device).
-		First(&ipsw).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -111,8 +181,11 @@ func (p *Postgres) GetIPSW(version, build, device string) (*model.Ipsw, error) {
 
 func (p *Postgres) GetDSC(uuid string) (*model.DyldSharedCache, error) {
 	var dsc model.DyldSharedCache
-	if err := p.db.Where("uuid = ?", uuid).First(&dsc).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := p.db.NewSelect().
+		Model(&dsc).
+		Where("uuid = ?", uuid).
+		Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -122,12 +195,14 @@ func (p *Postgres) GetDSC(uuid string) (*model.DyldSharedCache, error) {
 
 func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error) {
 	var macho model.Macho
-	if err := p.db.Joins("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
-		Joins("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
-		Joins("Path").
+	if err := p.db.NewSelect().
+		Model(&macho).
+		Join("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
+		Join("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
+		Join("JOIN paths ON paths.id = machos.path_id").
 		Where("dyld_shared_caches.uuid = ? AND machos.text_start <= ? AND ? < machos.text_end", uuid, address, address).
-		First(&macho).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -137,8 +212,8 @@ func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error
 
 func (p *Postgres) GetMachO(uuid string) (*model.Macho, error) {
 	var macho model.Macho
-	if err := p.db.Preload("Path").Where("uuid = ?", uuid).First(&macho).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := p.db.NewSelect().Model(&macho).Relation("Path").Where("uuid = ?", uuid).Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -148,12 +223,8 @@ func (p *Postgres) GetMachO(uuid string) (*model.Macho, error) {
 
 func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {
 	var symbol model.Symbol
-	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
-		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
-		Joins("Name").
-		Where("machos.uuid = ? AND symbols.start <= ? AND ? < symbols.end", uuid, address, address).
-		First(&symbol).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := p.db.NewSelect().Model(&symbol).Relation("Name").Where("uuid = ? AND address = ?", uuid, address).Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -161,15 +232,10 @@ func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error)
 	return &symbol, nil
 }
 
-func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
-	var syms []*model.Symbol
-	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
-		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
-		Joins("Name").
-		Where("machos.uuid = ?", uuid).
-		Select("symbol", "start", "end").
-		Find(&syms).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+func (p *Postgres) GetSymbols(uuid string) ([]model.Symbol, error) {
+	var syms []model.Symbol
+	if err := p.db.NewSelect().Model(&syms).Relation("Name").Where("uuid = ?", uuid).Scan(context.Background()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrNotFound
 		}
 		return nil, err
@@ -182,27 +248,13 @@ func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
 func (p *Postgres) Save(value any) error {
 	// TODO: add rollback on error
 	if ipsw, ok := value.(*model.Ipsw); ok {
-		// Start transaction
-		return p.db.Transaction(func(tx *gorm.DB) error {
-			// Defer foreign key checks
-			// if err := tx.Exec("SET CONSTRAINTS ALL DEFERRED").Error; err != nil {
-			// 	return err
-			// }
-			// Process Paths
-			if err := p.processPaths(tx, ipsw); err != nil {
-				return err
-			}
-			// Process Names
-			if err := p.processNames(tx, ipsw); err != nil {
-				return err
-			}
-			// Save the main IPSW entry
-			if err := tx.Save(ipsw).Error; err != nil {
-				return fmt.Errorf("failed to save IPSW: %w", err)
-			}
-
-			return nil
-		})
+		if _, err := p.db.NewUpdate().
+			Model(ipsw).
+			WherePK().
+			Exec(context.Background()); err != nil {
+			return fmt.Errorf("failed to save IPSW: %w", err)
+		}
+		return nil
 	}
 	return fmt.Errorf("invalid value type: %T", value)
 }
@@ -406,16 +458,14 @@ func convertToNames(names []string) []model.Name {
 // Delete removes the given key.
 // It returns ErrNotFound if the key does not exist.
 func (p *Postgres) Delete(key string) error {
-	p.db.Delete(&model.Ipsw{}, key)
+	if _, err := p.db.NewDelete().Model(&model.Ipsw{}).Where("id = ?", key).Exec(context.Background()); err != nil {
+		return fmt.Errorf("failed to delete IPSW: %w", err)
+	}
 	return nil
 }
 
 // Close closes the database.
 // It returns ErrClosed if the database is already closed.
 func (p *Postgres) Close() error {
-	db, err := p.db.DB()
-	if err != nil {
-		return err
-	}
-	return db.Close()
+	return p.db.Close()
 }

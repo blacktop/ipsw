@@ -42,10 +42,10 @@ func (m *Memory) Connect() error {
 // It returns ErrAlreadyExists if the key already exists.
 func (m *Memory) Create(value any) error {
 	if ipsw, ok := value.(*model.Ipsw); ok {
-		if _, exists := m.IPSWs[ipsw.ID]; exists {
+		if _, exists := m.IPSWs[ipsw.SHA256]; exists {
 			return gorm.ErrDuplicatedKey
 		}
-		m.IPSWs[ipsw.ID] = ipsw
+		m.IPSWs[ipsw.SHA256] = ipsw
 		return nil
 	}
 	return fmt.Errorf("invalid type: %T", value)
@@ -92,8 +92,8 @@ func (m *Memory) GetIPSW(version, build, device string) (*model.Ipsw, error) {
 func (m *Memory) GetDSC(uuid string) (*model.DyldSharedCache, error) {
 	for _, ipsw := range m.IPSWs {
 		for _, dyld := range ipsw.DSCs {
-			if dyld.UUID == uuid {
-				return dyld, nil
+			if dyld.UUID.String() == uuid {
+				return &dyld, nil
 			}
 		}
 	}
@@ -103,10 +103,10 @@ func (m *Memory) GetDSC(uuid string) (*model.DyldSharedCache, error) {
 func (m *Memory) GetDSCImage(uuid string, addr uint64) (*model.Macho, error) {
 	for _, ipsw := range m.IPSWs {
 		for _, dyld := range ipsw.DSCs {
-			if dyld.UUID == uuid {
+			if dyld.UUID.String() == uuid {
 				for _, img := range dyld.Images {
 					if addr >= img.TextStart && addr < img.TextEnd {
-						return img, nil
+						return &img, nil
 					}
 				}
 			}
@@ -119,20 +119,20 @@ func (m *Memory) GetMachO(uuid string) (*model.Macho, error) {
 	for _, ipsw := range m.IPSWs {
 		for _, dyld := range ipsw.DSCs {
 			for _, img := range dyld.Images {
-				if img.UUID == uuid {
-					return img, nil
+				if img.UUID.String() == uuid {
+					return &img, nil
 				}
 			}
 		}
 		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
-				return fs, nil
+			if fs.UUID.String() == uuid {
+				return &fs, nil
 			}
 		}
 		for _, fs := range ipsw.Kernels {
 			for _, kext := range fs.Kexts {
-				if kext.UUID == uuid {
-					return kext, nil
+				if kext.UUID.String() == uuid {
+					return &kext, nil
 				}
 			}
 		}
@@ -144,30 +144,30 @@ func (m *Memory) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
 	for _, ipsw := range m.IPSWs {
 		for _, dyld := range ipsw.DSCs {
 			for _, img := range dyld.Images {
-				if img.UUID == uuid {
+				if img.UUID.String() == uuid {
 					for _, sym := range img.Symbols {
 						if addr >= sym.Start && addr < sym.End {
-							return sym, nil
+							return &sym, nil
 						}
 					}
 				}
 			}
 		}
 		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
+			if fs.UUID.String() == uuid {
 				for _, sym := range fs.Symbols {
 					if addr >= sym.Start && addr < sym.End {
-						return sym, nil
+						return &sym, nil
 					}
 				}
 			}
 		}
 		for _, fs := range ipsw.Kernels {
 			for _, kext := range fs.Kexts {
-				if fs.UUID == uuid {
+				if fs.UUID.String() == uuid {
 					for _, sym := range kext.Symbols {
 						if addr >= sym.Start && addr < sym.End {
-							return sym, nil
+							return &sym, nil
 						}
 					}
 				}
@@ -177,23 +177,23 @@ func (m *Memory) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
 	return nil, model.ErrNotFound
 }
 
-func (m *Memory) GetSymbols(uuid string) ([]*model.Symbol, error) {
+func (m *Memory) GetSymbols(uuid string) ([]model.Symbol, error) {
 	for _, ipsw := range m.IPSWs {
 		for _, dyld := range ipsw.DSCs {
 			for _, img := range dyld.Images {
-				if img.UUID == uuid {
+				if img.UUID.String() == uuid {
 					return img.Symbols, nil
 				}
 			}
 		}
 		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
+			if fs.UUID.String() == uuid {
 				return fs.Symbols, nil
 			}
 		}
 		for _, fs := range ipsw.Kernels {
 			for _, kext := range fs.Kexts {
-				if fs.UUID == uuid {
+				if fs.UUID.String() == uuid {
 					return kext.Symbols, nil
 				}
 			}
@@ -206,7 +206,7 @@ func (m *Memory) GetSymbols(uuid string) ([]*model.Symbol, error) {
 // It overwrites any previous value for that key.
 func (m *Memory) Save(value any) error {
 	if ipsw, ok := value.(*model.Ipsw); ok {
-		m.IPSWs[ipsw.ID] = ipsw
+		m.IPSWs[ipsw.SHA256] = ipsw
 	}
 	return nil
 }
