@@ -1178,9 +1178,9 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Base - dsc.SharedRegionStart
 					}
 					// lookup symbol in DSC dylib
-					if img, err := db.GetDSCImage(dsc.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+					if img, err := db.GetDSCImage(dsc.UUID.String(), i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageName = filepath.Base(img.GetPath())
-						if sym, err := db.GetSymbol(img.UUID, i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
+						if sym, err := db.GetSymbol(img.UUID.String(), i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
 							i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym.GetName())
 							if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-sym.Start != 0 {
 								i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - sym.Start

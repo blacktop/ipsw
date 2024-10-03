@@ -38,7 +38,7 @@ type symDscResponse *model.DyldSharedCache
 type symResponse *model.Symbol
 
 // swagger:response
-type symsResponse []*model.Symbol
+type symsResponse []model.Symbol
 
 type IpswParams struct {
 	Version string `form:"version" json:"version" binding:"required"`

@@ -146,8 +146,8 @@ func (s *Sqlite) GetSymbol(uuid string, address uint64) (*model.Symbol, error) {
 	return &symbol, nil
 }
 
-func (s *Sqlite) GetSymbols(uuid string) ([]*model.Symbol, error) {
-	var syms []*model.Symbol
+func (s *Sqlite) GetSymbols(uuid string) ([]model.Symbol, error) {
+	var syms []model.Symbol
 	if err := s.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
 		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
 		Where("machos.uuid = ?", uuid).

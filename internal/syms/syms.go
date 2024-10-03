@@ -24,8 +24,8 @@ const (
 	isKernelMask   uint64 = 1 << 62
 )
 
-func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
-	var kcs []*model.Kernelcache
+func scanKernels(ipswPath, sigDir string) ([]model.Kernelcache, error) {
+	var kcs []model.Kernelcache
 
 	out, err := extract.Kernelcache(&extract.Config{
 		IPSW:   ipswPath,
@@ -62,8 +62,8 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 		if err != nil {
 			return nil, err
 		}
-		kc := &model.Kernelcache{
-			UUID:    m.UUID().String(),
+		kc := model.Kernelcache{
+			UUID:    m.UUID().UUID,
 			Version: kv.String(),
 		}
 		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
@@ -76,9 +76,9 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 				}
-				kext := &model.Macho{
+				kext := model.Macho{
 					Path: model.Path{Path: fe.EntryID},
-					UUID: mfe.UUID().String(),
+					UUID: mfe.UUID().UUID,
 				}
 				if text := mfe.Segment("__TEXT"); text != nil {
 					kext.TextStart = text.Addr & highestBitMask
@@ -97,27 +97,26 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 						}
 					} else {
 						if sym, ok := smap[fn.StartAddr]; ok {
-							kext.Symbols = append(kext.Symbols, &model.Symbol{
+							kext.Symbols = append(kext.Symbols, model.Symbol{
 								Name:  model.Name{Name: sym},
 								Start: fn.StartAddr & highestBitMask,
 								End:   fn.EndAddr & highestBitMask,
 							})
 						} else {
 							msym = model.Symbol{
-								Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
 								Start: fn.StartAddr & highestBitMask,
 								End:   fn.EndAddr & highestBitMask,
 							}
 						}
 					}
-					kext.Symbols = append(kext.Symbols, &msym)
+					kext.Symbols = append(kext.Symbols, msym)
 				}
 				kc.Kexts = append(kc.Kexts, kext)
 			}
 		} else {
-			kext := &model.Macho{
+			kext := model.Macho{
 				Path: model.Path{Path: filepath.Base(k)},
-				UUID: m.UUID().String(),
+				UUID: m.UUID().UUID,
 			}
 			if text := m.Segment("__TEXT"); text != nil {
 				kext.TextStart = text.Addr & highestBitMask
@@ -137,7 +136,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 				} else {
 					found := false
 					if sym, ok := smap[fn.StartAddr]; ok {
-						kext.Symbols = append(kext.Symbols, &model.Symbol{
+						kext.Symbols = append(kext.Symbols, model.Symbol{
 							Name:  model.Name{Name: sym},
 							Start: fn.StartAddr & highestBitMask,
 							End:   fn.EndAddr & highestBitMask,
@@ -146,13 +145,12 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 					}
 					if !found {
 						msym = model.Symbol{
-							Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
 							Start: fn.StartAddr & highestBitMask,
 							End:   fn.EndAddr & highestBitMask,
 						}
 					}
 				}
-				kext.Symbols = append(kext.Symbols, &msym)
+				kext.Symbols = append(kext.Symbols, msym)
 			}
 			kc.Kexts = append(kc.Kexts, kext)
 		}
@@ -162,7 +160,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 	return kcs, nil
 }
 
-func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
+func scanDSCs(ipswPath, pemDB string) ([]model.DyldSharedCache, error) {
 	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, pemDB, false, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DSC from IPSW: %w", err)
@@ -174,11 +172,11 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 		ctx.Unmount()
 	}()
 
-	var dscs []*model.DyldSharedCache
+	var dscs []model.DyldSharedCache
 
 	for _, f := range fs {
-		dsc := &model.DyldSharedCache{
-			UUID:              f.UUID.String(),
+		dsc := model.DyldSharedCache{
+			UUID:              f.UUID,
 			SharedRegionStart: f.Headers[f.UUID].SharedRegionStart,
 		}
 
@@ -194,8 +192,8 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 				return nil, fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
 			}
 			defer m.Close()
-			dylib := &model.Macho{
-				UUID: m.UUID().String(),
+			dylib := model.Macho{
+				UUID: m.UUID().UUID,
 				Path: model.Path{Path: img.Name},
 			}
 			if text := m.Segment("__TEXT"); text != nil {
@@ -203,16 +201,15 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 				dylib.TextEnd = text.Addr + text.Filesz
 			}
 			for _, fn := range m.GetFunctions() {
-				var msym *model.Symbol
+				var msym model.Symbol
 				if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-					msym = &model.Symbol{
+					msym = model.Symbol{
 						Name:  model.Name{Name: sym},
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
 				} else {
-					msym = &model.Symbol{
-						Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+					msym = model.Symbol{
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
@@ -230,16 +227,16 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 // Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
 func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* IPSW */
-	sha1, err := utils.Sha1(ipswPath)
+	sha256, err := utils.Sha256(ipswPath)
 	if err != nil {
-		return fmt.Errorf("failed to calculate sha1: %w", err)
+		return fmt.Errorf("failed to calculate sha256: %w", err)
 	}
 	inf, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW info: %w", err)
 	}
 	ipsw := &model.Ipsw{
-		ID:      sha1,
+		SHA256:  sha256,
 		Name:    filepath.Base(ipswPath),
 		BuildID: inf.Plists.BuildManifest.ProductBuildVersion,
 		Version: inf.Plists.BuildManifest.ProductVersion,
@@ -248,14 +245,13 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 		return fmt.Errorf("failed to create IPSW in database: %w", err)
 	}
 	for _, dev := range inf.Plists.BuildManifest.SupportedProductTypes {
-		ipsw.Devices = append(ipsw.Devices, &model.Device{
+		ipsw.Devices = append(ipsw.Devices, model.Device{
 			Name: dev,
 		})
 	}
 	if err := db.Save(ipsw); err != nil {
-		return fmt.Errorf("failed to save IPSW to database: %w", err)
+		return fmt.Errorf("failed to save IPSW in database: %w", err)
 	}
-
 	/* KERNEL */
 	if ipsw.Kernels, err = scanKernels(ipswPath, sigsDir); err != nil {
 		return fmt.Errorf("failed to scan kernels: %w", err)
@@ -267,8 +263,8 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* FileSystem */
 	if err := search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
 		if m.UUID() != nil {
-			mm := &model.Macho{
-				UUID: m.UUID().String(),
+			mm := model.Macho{
+				UUID: m.UUID().UUID,
 				Path: model.Path{Path: path},
 			}
 			if text := m.Segment("__TEXT"); text != nil {
@@ -276,19 +272,18 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 				mm.TextEnd = text.Addr + text.Filesz
 			}
 			for _, fn := range m.GetFunctions() {
-				var msym *model.Symbol
+				var msym model.Symbol
 				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
 					for _, sym := range syms {
 						fn.Name = sym.Name
 					}
-					msym = &model.Symbol{
+					msym = model.Symbol{
 						Name:  model.Name{Name: fn.Name},
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
 				} else {
-					msym = &model.Symbol{
-						Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+					msym = model.Symbol{
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
@@ -302,18 +297,18 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
 	}
 
-	log.Debug("Saving IPSW with FileSystem")
+	log.Debug("Saving IPSW")
 	return db.Save(ipsw)
 }
 
 // Rescan re-scans the IPSW file and extracts information about the kernels, DSCs, and file system.
 func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* IPSW */
-	sha1, err := utils.Sha1(ipswPath)
+	sha256, err := utils.Sha256(ipswPath)
 	if err != nil {
-		return fmt.Errorf("failed to calculate sha1: %w", err)
+		return fmt.Errorf("failed to calculate sha256: %w", err)
 	}
-	ipsw, err := db.Get(sha1)
+	ipsw, err := db.Get(sha256)
 	if err != nil {
 		return fmt.Errorf("failed to get IPSW from database: %w", err)
 	}
@@ -328,8 +323,8 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* FileSystem */
 	if err := search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
 		if m.UUID() != nil {
-			mm := &model.Macho{
-				UUID: m.UUID().String(),
+			mm := model.Macho{
+				UUID: m.UUID().UUID,
 				Path: model.Path{Path: path},
 			}
 			if text := m.Segment("__TEXT"); text != nil {
@@ -337,19 +332,18 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 				mm.TextEnd = text.Addr + text.Filesz
 			}
 			for _, fn := range m.GetFunctions() {
-				var msym *model.Symbol
+				var msym model.Symbol
 				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
 					for _, sym := range syms {
 						fn.Name = sym.Name
 					}
-					msym = &model.Symbol{
+					msym = model.Symbol{
 						Name:  model.Name{Name: fn.Name},
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
 				} else {
-					msym = &model.Symbol{
-						Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+					msym = model.Symbol{
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
 					}
@@ -363,7 +357,7 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
 	}
 
-	log.Debug("Saving IPSW with FileSystem")
+	log.Debug("Saving")
 	return db.Save(ipsw)
 }
 
@@ -388,7 +382,7 @@ func GetDSCImage(uuid string, addr uint64, db db.Database) (*model.Macho, error)
 }
 
 // Get retrieves the symbols associated with the given UUID from the database.
-func Get(uuid string, db db.Database) ([]*model.Symbol, error) {
+func Get(uuid string, db db.Database) ([]model.Symbol, error) {
 	return db.GetSymbols(uuid)
 }
 
