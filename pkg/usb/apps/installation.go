@@ -144,7 +144,7 @@ func (c *Client) InstalledApps() ([]AppInfo, error) {
 		return nil, err
 	}
 
-	result := make([]AppInfo, len(apps))
+	result := make([]AppInfo, 0, len(apps))
 
 	var app AppInfo
 	if err := mapstructure.Decode(apps, &app); err != nil {
