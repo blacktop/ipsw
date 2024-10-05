@@ -96,6 +96,27 @@ type Asn1Header struct {
 	Name string `asn1:"ia5"` // IM4P
 }
 
+func IsImg4(filePath string) (bool, error) {
+	if filepath.Ext(filePath) == ".img4" {
+		return true, nil
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	var hdr Asn1Header
+	if _, err := asn1.Unmarshal(data, &hdr); err != nil {
+		return false, fmt.Errorf("failed to ASN.1 parse header: %v", err)
+	}
+
+	if hdr.Name == "IMG4" {
+		return true, nil
+	}
+	return false, nil
+}
+
 func IsIm4p(filePath string) (bool, error) {
 	if filepath.Ext(filePath) == ".im4p" {
 		return true, nil

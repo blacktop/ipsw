@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -68,18 +69,32 @@ func (c tcFlags) String() string {
 	if len(flags) == 0 {
 		return ""
 	}
-	return fmt.Sprintf(" flags=%s", strings.Join(flags, "|"))
+	return strings.Join(flags, "|")
 }
 
 type TrustCache struct {
 	TCHeader
-	Entries []any
+	Entries []any `json:"entries,omitempty"`
+}
+
+func (tc TrustCache) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Version    uint32 `json:"version,omitempty"`
+		UUID       string `json:"uuid,omitempty"`
+		NumEntries uint32 `json:"num_entries,omitempty"`
+		Entries    []any  `json:"entries,omitempty"`
+	}{
+		Version:    tc.Version,
+		UUID:       tc.UUID.String(),
+		NumEntries: tc.NumEntries,
+		Entries:    tc.Entries,
+	})
 }
 
 type TCHeader struct {
-	Version    uint32
-	UUID       types.UUID
-	NumEntries uint32
+	Version    uint32     `json:"version,omitempty"`
+	UUID       types.UUID `json:"uuid,omitempty"`
+	NumEntries uint32     `json:"num_entries,omitempty"`
 }
 
 type CDHash [CDHASH_LEN]byte
@@ -89,13 +104,29 @@ func (c CDHash) String() string {
 }
 
 type TrustCacheEntryV1 struct {
-	CDHash   CDHash
-	HashType hashType
-	Flags    tcFlags
+	CDHash   CDHash   `json:"cdhash,omitempty"`
+	HashType hashType `json:"hash_type,omitempty"`
+	Flags    tcFlags  `json:"flags,omitempty"`
 }
 
 func (tc TrustCacheEntryV1) String() string {
-	return fmt.Sprintf("%s %s%s", tc.CDHash, tc.HashType, tc.Flags)
+	var flags string
+	if tc.Flags != 0 {
+		flags = fmt.Sprintf(" flags=%s", tc.Flags)
+	}
+	return fmt.Sprintf("%s %s%s", tc.CDHash, tc.HashType, flags)
+}
+
+func (tc TrustCacheEntryV1) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		CDHash   string `json:"cdhash,omitempty"`
+		HashType string `json:"hash_type,omitempty"`
+		Flags    string `json:"flags,omitempty"`
+	}{
+		CDHash:   tc.CDHash.String(),
+		HashType: tc.HashType.String(),
+		Flags:    tc.Flags.String(),
+	})
 }
 
 /*
@@ -132,10 +163,10 @@ Constraint Categories (from TrustCache, new in version 2):
 	    Self Constraint: validation-category == 1
 */
 type TrustCacheEntryV2 struct {
-	CDHash             CDHash
-	HashType           hashType
-	Flags              tcFlags
-	ConstraintCategory uint8
+	CDHash             CDHash   `json:"cdhash,omitempty"`
+	HashType           hashType `json:"hash_type,omitempty"`
+	Flags              tcFlags  `json:"flags,omitempty"`
+	ConstraintCategory uint8    `json:"constraint_category,omitempty"`
 	_                  uint8
 }
 
@@ -144,7 +175,25 @@ func (tc TrustCacheEntryV2) String() string {
 	if tc.ConstraintCategory != 0 {
 		cat = fmt.Sprintf(" category=%d", tc.ConstraintCategory)
 	}
-	return fmt.Sprintf("%s %s%s%s", tc.CDHash, tc.HashType, cat, tc.Flags)
+	var flags string
+	if tc.Flags != 0 {
+		flags = fmt.Sprintf(" flags=%s", tc.Flags)
+	}
+	return fmt.Sprintf("%s %s%s%s", tc.CDHash, tc.HashType, cat, flags)
+}
+
+func (tc TrustCacheEntryV2) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		CDHash             string `json:"cdhash,omitempty"`
+		HashType           string `json:"hash_type,omitempty"`
+		Flags              string `json:"flags,omitempty"`
+		ConstraintCategory uint8  `json:"constraint_category,omitempty"`
+	}{
+		CDHash:             tc.CDHash.String(),
+		HashType:           tc.HashType.String(),
+		Flags:              tc.Flags.String(),
+		ConstraintCategory: tc.ConstraintCategory,
+	})
 }
 
 func (tc TrustCache) String() string {
