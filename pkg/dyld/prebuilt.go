@@ -435,8 +435,11 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.UUID); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader uuid: %v", err)
 		}
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.Unknown); err != nil {
-			return nil, fmt.Errorf("failed to read prebuilt loader unknown: %v", err)
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.CpuSubtype); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader cpu subtype: %v", err)
+		}
+		if err := binary.Read(sr, binary.LittleEndian, &pbl.Unused); err != nil {
+			return nil, fmt.Errorf("failed to read prebuilt loader unused: %v", err)
 		}
 	}
 
