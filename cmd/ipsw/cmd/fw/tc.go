@@ -54,7 +54,7 @@ func init() {
 // tcCmd represents the tc command
 var tcCmd = &cobra.Command{
 	Use:   "tc <IM4P|IPSW>",
-	Short: "🚧 Dump TrustCache",
+	Short: "Dump TrustCache",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 

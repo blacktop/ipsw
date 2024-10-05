@@ -4,11 +4,11 @@ title: tc
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: tc
-description: 🚧 Dump TrustCache
+description: Dump TrustCache
 ---
 ## ipsw fw tc
 
-🚧 Dump TrustCache
+Dump TrustCache
 
 ```
 ipsw fw tc <IM4P|IPSW> [flags]
@@ -18,6 +18,7 @@ ipsw fw tc <IM4P|IPSW> [flags]
 
 ```
   -h, --help            help for tc
+  -j, --json            Output in JSON format
   -o, --output string   Folder to extract files to
 ```
 
