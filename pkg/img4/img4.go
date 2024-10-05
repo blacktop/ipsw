@@ -433,6 +433,15 @@ func ParseIm4p(r io.Reader) (*Im4p, error) {
 	return &i, nil
 }
 
+func OpenImg4(path string) (*img4, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ParseImg4(f)
+}
+
 func ParseImg4(r io.Reader) (*img4, error) {
 
 	data := new(bytes.Buffer)

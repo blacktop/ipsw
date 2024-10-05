@@ -22,8 +22,11 @@ THE SOFTWARE.
 package fw
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -41,8 +44,10 @@ import (
 func init() {
 	FwCmd.AddCommand(tcCmd)
 
+	tcCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
 	tcCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	tcCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.tc.json", tcCmd.Flags().Lookup("json"))
 	viper.BindPFlag("fw.tc.output", tcCmd.Flags().Lookup("output"))
 }
 
@@ -57,20 +62,33 @@ var tcCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		tcs := make(map[string]*fwcmd.TrustCache)
+
 		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
 		} else if isZip {
 			out, err := extract.Search(&extract.Config{
 				IPSW:    filepath.Clean(args[0]),
 				Pattern: ".trustcache$",
-				Output:  viper.GetString("fw.tc.output"),
+				Output:  os.TempDir(),
 			})
 			if err != nil {
 				return err
 			}
 			for _, f := range out {
-				if ok, _ := magic.IsIm4p(f); ok {
-					log.WithField("file", f).Info("Processing IM4P file")
+				if ok, _ := magic.IsImg4(f); ok {
+					log.WithField("file", f).Debug("Processing IMG4 file")
+					img4, err := img4.OpenImg4(f)
+					if err != nil {
+						return fmt.Errorf("failed to open img4: %v", err)
+					}
+					tc, err := fwcmd.ParseTrustCache(img4.IM4P.Data)
+					if err != nil {
+						return fmt.Errorf("failed to parse trust cache: %v", err)
+					}
+					tcs[f] = tc
+				} else if ok, _ := magic.IsIm4p(f); ok {
+					log.WithField("file", f).Debug("Processing IM4P file")
 					im4p, err := img4.OpenIm4p(f)
 					if err != nil {
 						return err
@@ -79,14 +97,18 @@ var tcCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to parse trust cache: %v", err)
 					}
-					fmt.Println(tc)
+					tcs[strings.TrimPrefix(f, os.TempDir())] = tc
 				} else {
-					return fmt.Errorf("unsupported file type: expected IM4P")
+					return fmt.Errorf("unsupported file type: expected IMG4/IM4P: %s", f)
 				}
+			}
+			// cleanup
+			for _, f := range out {
+				os.Remove(f)
 			}
 		} else {
 			if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
-				log.WithField("file", filepath.Clean(args[0])).Info("Processing IM4P file")
+				log.WithField("file", filepath.Clean(args[0])).Debug("Processing IM4P file")
 				im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
 				if err != nil {
 					return err
@@ -95,9 +117,31 @@ var tcCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to parse trust cache: %v", err)
 				}
-				fmt.Println(tc)
+				tcs[filepath.Clean(args[0])] = tc
 			} else {
 				return fmt.Errorf("unsupported file type: expected IM4P")
+			}
+		}
+
+		if viper.GetBool("fw.tc.json") {
+			dat, err := json.Marshal(tcs)
+			if err != nil {
+				return err
+			}
+			if viper.IsSet("fw.tc.output") {
+				dat, err := json.Marshal(tcs)
+				if err != nil {
+					return err
+				}
+				log.Info("Creating JSON trustcache info file: " + filepath.Join(viper.GetString("fw.tc.output"), "trustcache.json"))
+				os.WriteFile(filepath.Join(viper.GetString("fw.tc.output"), "trustcache.json"), dat, 0644)
+			} else {
+				fmt.Println(string(dat))
+			}
+		} else {
+			for file, tc := range tcs {
+				log.Info(file)
+				fmt.Println(tc)
 			}
 		}
 
