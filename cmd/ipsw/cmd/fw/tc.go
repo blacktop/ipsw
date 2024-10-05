@@ -107,7 +107,18 @@ var tcCmd = &cobra.Command{
 				os.Remove(f)
 			}
 		} else {
-			if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
+			if ok, _ := magic.IsImg4(filepath.Clean(args[0])); ok {
+				log.WithField("file", filepath.Clean(args[0])).Debug("Processing IMG4 file")
+				img4, err := img4.OpenImg4(filepath.Clean(args[0]))
+				if err != nil {
+					return fmt.Errorf("failed to open img4: %v", err)
+				}
+				tc, err := fwcmd.ParseTrustCache(img4.IM4P.Data)
+				if err != nil {
+					return fmt.Errorf("failed to parse trust cache: %v", err)
+				}
+				tcs[filepath.Clean(args[0])] = tc
+			} else if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
 				log.WithField("file", filepath.Clean(args[0])).Debug("Processing IM4P file")
 				im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
 				if err != nil {
