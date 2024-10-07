@@ -126,8 +126,12 @@ var entCmd = &cobra.Command{
 		// check flags
 		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
-		} else if showUI && doDiff || len(ipsws) > 1 {
-			return fmt.Errorf("cannot use --ui with --diff OR multiple IPSWs")
+		} else if showUI && doDiff {
+			return fmt.Errorf("cannot use --ui and --diff together")
+		} else if showUI && (len(ipsws) != 1 && len(inputs) != 1) {
+			return fmt.Errorf("must supply only one --ipsw or --input with --ui")
+		} else if doDiff && (len(ipsws) != 2 && len(inputs) != 2) {
+			return fmt.Errorf("must supply two --ipsw or --input with --diff")
 		}
 		color.NoColor = viper.GetBool("no-color") || onlyFiles
 
