@@ -15,12 +15,16 @@ import (
 	iswift "github.com/blacktop/ipsw/internal/swift"
 )
 
+const MAX_PRESPECIALIZED_METADATA_TABLES = 8
+
 type SwiftOptimizationHeader struct {
-	Version                                    uint32
-	Padding                                    uint32
-	TypeConformanceHashTableCacheOffset        uint64
-	MetadataConformanceHashTableCacheOffset    uint64
-	ForeignTypeConformanceHashTableCacheOffset uint64
+	Version                                     uint32
+	Padding                                     uint32
+	TypeConformanceHashTableCacheOffset         uint64
+	MetadataConformanceHashTableCacheOffset     uint64
+	ForeignTypeConformanceHashTableCacheOffset  uint64
+	PrespecializationDataCacheOffset            uint64
+	PrespecializedMetadataHashTableCacheOffsets [MAX_PRESPECIALIZED_METADATA_TABLES]uint64
 }
 
 type SwiftProtocolConformance struct {
@@ -223,7 +227,7 @@ func (f *File) getSwiftTypeHashTable() (*SwiftHashTable, error) {
 			return nil, fmt.Errorf("failed to read %T: %v", h, err)
 		}
 
-		if h.Version != 1 {
+		if h.Version > 3 {
 			return nil, fmt.Errorf("unsupported Swift optimization version: %d", h.Version)
 		}
 
@@ -259,7 +263,7 @@ func (f *File) getSwiftMetadataTable() (*SwiftHashTable, error) {
 			return nil, fmt.Errorf("failed to read %T: %v", h, err)
 		}
 
-		if h.Version != 1 {
+		if h.Version > 3 {
 			return nil, fmt.Errorf("unsupported Swift optimization version: %d", h.Version)
 		}
 
@@ -295,7 +299,7 @@ func (f *File) getSwiftForeignTypeHashTable() (*SwiftHashTable, error) {
 			return nil, fmt.Errorf("failed to read %T: %v", h, err)
 		}
 
-		if h.Version != 1 {
+		if h.Version > 3 {
 			return nil, fmt.Errorf("unsupported Swift optimization version: %d", h.Version)
 		}
 
