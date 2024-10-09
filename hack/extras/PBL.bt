@@ -55,10 +55,10 @@ typedef struct
 	uint16 hasReadOnlyObjC    : 1;  // Has __DATA_CONST,__objc_selrefs section
 	uint16 pre2022Binary      : 1;
 	uint16 isPremapped        : 1;  // mapped by exclave core
-	uint16 isVersion2         : 1;  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	uint16 unknown1           : 1;  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	uint16 unknown2           : 1;  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
-	uint16 unknown3           : 1;  // FIXME: when dyld src is out for iOS 18.0/macOS 15.0
+	uint16 hasUUIDLoadCommand : 1;
+	uint16 hasWeakDefs        : 1;
+	uint16 hasTLVs            : 1;
+	uint16 belowLibSystem     : 1;
 	uint16 padding            : 2;
   LoaderRef ref;
 } PBLLoader;

@@ -166,8 +166,8 @@ typedef struct
     uint64 cacheAtlasSize;       // size of embedded cache atlas
     uint64 dynamicDataOffset;    // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
     uint64 dynamicDataMaxSize;   // maximum size of space reserved from dynamic dataz
-    uint32 tProMappingOffset;    // file offset to TPRO mappings  NEW in iOS 18.0 beta1 (hi mrmacete :P)
-    uint32 tProMappingCount;     // TPRO mappings count           NEW in iOS 18.0 beta1 (is 1 for now)
+    uint32 tProMappingOffset;    // file offset to first dyld_cache_tpro_mapping_info
+    uint32 tProMappingCount;     // number of dyld_cache_tpro_mapping_info entries
 } dyld_cache_header;
 
 typedef struct
