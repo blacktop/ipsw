@@ -1374,6 +1374,45 @@
         }
       }
     },
+    "/macho/info/strings": {
+      "get": {
+        "description": "Get MachO strings.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "MachO"
+        ],
+        "summary": "Strings",
+        "operationId": "getMachoInfoStrings",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to MachO",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "architecture to get info for in universal MachO",
+            "name": "arch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/machoStringsResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/mount/{type}": {
       "post": {
         "description": "Mount a DMG inside a given IPSW.",
@@ -5171,6 +5210,28 @@
         "path": {
           "type": "string"
         }
+      }
+    },
+    "machoStringsResponse": {
+      "description": "",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "headers": {
+        "arch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "strings": {}
       }
     },
     "mountReponse": {
