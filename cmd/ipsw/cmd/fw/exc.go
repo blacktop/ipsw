@@ -26,7 +26,9 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/spf13/cobra"
@@ -75,13 +77,28 @@ var excCmd = &cobra.Command{
 
 			fmt.Println(bn)
 		} else {
-			log.Info("Extracting Exclave Bundle")
-			out, err := fwcmd.Extract(filepath.Clean(args[0]), output)
-			if err != nil {
-				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
-			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
+				return fmt.Errorf("failed to determine if file is a zip: %v", err)
+			} else if isZip {
+				out, err := extract.Exclave(&extract.Config{
+					IPSW:   filepath.Clean(args[0]),
+					Output: viper.GetString("fw.exclave.output"),
+				})
+				if err != nil {
+					return err
+				}
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
+			} else {
+				log.Info("Extracting Exclave Bundle")
+				out, err := fwcmd.Extract(filepath.Clean(args[0]), output)
+				if err != nil {
+					return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
+				}
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 

@@ -32,6 +32,8 @@ func Extract(input, output string) ([]string, error) {
 	}
 	defer f.Close()
 
+	assetIndex := 0
+
 	for idx, bf := range bn.Files {
 		fname := filepath.Join(output, bf.Type, bf.Name)
 		if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
@@ -48,37 +50,36 @@ func Extract(input, output string) ([]string, error) {
 			continue
 		}
 
-		if entry := bn.Config.TOC[idx].GetEntry(); entry != nil && entry.Type == 1 { // roottask (APP)
-			fname := filepath.Join(output, bf.Type, string(entry.Name.Bytes))
-			attr, err := os.Create(fname)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create file %s: %v", fname, err)
+		entry := bn.Config.TOC[idx].GetEntry()
+
+		switch {
+		case entry == nil: // APP (MachO)
+			text := bf.Segment("TEXT")
+			if text == nil {
+				text = bf.Segment("HEADER")
+				if text == nil {
+					return nil, fmt.Errorf("failed to find TEXT segment")
+				}
 			}
-			defer attr.Close()
-			if _, err := f.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[idx].Offset, err)
+			if _, err := f.Seek(int64(text.Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", text.Offset, err)
 			}
-			adata := make([]byte, bn.Config.Assets[idx].Size) // brkr_artifact
-			if err := binary.Read(f, binary.LittleEndian, &adata); err != nil {
+			tdata := make([]byte, text.Size)
+			if err := binary.Read(f, binary.LittleEndian, &tdata); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
-			// var brkr dict
-			// _, err := asn1.Unmarshal(adata, &brkr)
-			// if err != nil {
-			// 	return nil, fmt.Errorf("failed to unmarshal data from file %s: %v", fname, err)
-			// }
-			if _, err := attr.Write(adata); err != nil {
-				return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
+			m, err = macho.NewFile(bytes.NewReader(tdata), macho.FileConfig{
+				LoadIncluding: []types.LoadCmd{types.LC_SEGMENT_64},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse MachO file: %v", err)
 			}
-			outfiles = append(outfiles, fname)
-		}
-
-		// Get MachO header
-		if entry := bn.Config.TOC[idx].GetEntry(); entry != nil && entry.Type == 2 { // kernel (SYSTEM)
-			if _, err := f.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[idx].Offset, err)
+			defer m.Close()
+		case bf.Type == "SYSTEM": // ASSET (SYSTEM kernel)
+			if _, err := f.Seek(int64(bn.Config.Assets[assetIndex].Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[assetIndex].Offset, err)
 			}
-			mHdrData := make([]byte, bn.Config.Assets[idx].Size) // __MACHOHEADERLC
+			mHdrData := make([]byte, bn.Config.Assets[assetIndex].Size) // __MACHOHEADERLC
 			if err := binary.Read(f, binary.LittleEndian, &mHdrData); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
@@ -93,44 +94,51 @@ func Extract(input, output string) ([]string, error) {
 			if _, err := of.Write(mHdrData); err != nil {
 				return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
 			}
-		} else {
-			if text := bf.Segment("TEXT"); text == nil {
-				return nil, fmt.Errorf("failed to find TEXT segment")
-			} else {
-				if _, err := f.Seek(int64(text.Offset), io.SeekStart); err != nil {
-					return nil, fmt.Errorf("failed to seek to offset %d: %v", text.Offset, err)
-				}
-				tdata := make([]byte, text.Size)
-				if err := binary.Read(f, binary.LittleEndian, &tdata); err != nil {
-					return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
-				}
-				m, err = macho.NewFile(bytes.NewReader(tdata), macho.FileConfig{
-					LoadIncluding: []types.LoadCmd{types.LC_SEGMENT_64},
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse MachO file: %v", err)
-				}
-				defer m.Close()
+			assetIndex++
+		default: // ASSET (APP non-MachO)
+			fname := filepath.Join(output, bf.Type, string(entry.Name.Bytes))
+			attr, err := os.Create(fname)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create file %s: %v", fname, err)
 			}
+			defer attr.Close()
+			if _, err := f.Seek(int64(bn.Config.Assets[assetIndex].Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[assetIndex].Offset, err)
+			}
+			adata := make([]byte, bn.Config.Assets[assetIndex].Size) // brkr_artifact
+			if err := binary.Read(f, binary.LittleEndian, &adata); err != nil {
+				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
+			}
+			// TODO: parse 'brkr_artifact' which is a map[string]any or a plist essentially
+			// var brkr map[string]any
+			// if _, err := asn1.Unmarshal(adata, &brkr); err != nil {
+			// 	return nil, fmt.Errorf("failed to unmarshal data from file %s: %v", fname, err)
+			// }
+			// os.WriteFile(filepath.Join(output, bf.Type, "data.json"), adata, 0o644)
+			if _, err := attr.Write(adata); err != nil {
+				return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+			assetIndex++
+			continue
 		}
 
-		for _, seg := range bf.Segments {
-			if _, err := f.Seek(int64(seg.Offset), io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek to offset %d: %v", seg.Offset, err)
+		for _, sec := range bf.Sections {
+			if _, err := f.Seek(int64(sec.Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", sec.Offset, err)
 			}
-			data := make([]byte, seg.Size)
+			data := make([]byte, sec.Size)
 			if err := binary.Read(f, binary.LittleEndian, &data); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
-			if s := m.Segment("__" + seg.Name); s == nil { // lookup segment in MachO header
-				return nil, fmt.Errorf("failed to find segment %s", seg.Name)
+			if s := m.Segment("__" + sec.Name); s == nil { // lookup segment in MachO header
+				return nil, fmt.Errorf("failed to find segment %s", sec.Name)
 			} else {
 				if _, err := of.WriteAt(data, int64(s.Offset)); err != nil {
 					return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
 				}
 			}
 		}
-
 		outfiles = append(outfiles, fname)
 	}
 
