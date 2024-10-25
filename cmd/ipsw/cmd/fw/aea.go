@@ -102,6 +102,7 @@ var aeaCmd = &cobra.Command{
 		}
 
 		var bold = color.New(color.Bold).SprintFunc()
+		var info = color.New(color.FgHiGreen).SprintFunc()
 
 		if output == "" {
 			output = filepath.Dir(args[0])
@@ -120,7 +121,9 @@ var aeaCmd = &cobra.Command{
 			}
 			log.Info("AEA Info")
 			for k, v := range metadata {
-				if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(string(v)); err == nil {
+				if k == "encryption_key" {
+					fmt.Printf("%s:\n%s\n\n", bold("["+k+"]"), info(string(v)))
+				} else if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(string(v)); err == nil {
 					fmt.Printf("%s:\n%s\n", bold("["+k+"]"), utils.HexDump(b64data, 0))
 				} else {
 					if viper.GetBool("color") && !viper.GetBool("no-color") {
