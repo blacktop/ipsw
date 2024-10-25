@@ -24,7 +24,9 @@ THE SOFTWARE.
 package download
 
 import (
+	"fmt"
 	"path"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -111,6 +113,11 @@ var xcodeCmd = &cobra.Command{
 				if d.Name == choice {
 					dl = d
 				}
+			}
+
+			if dl.Source == "" {
+				dl.Source = fmt.Sprintf("https://download.developer.apple.com/Developer_Tools/%s/%s.dmg", strings.ReplaceAll(dl.Name, " ", "_"), strings.ReplaceAll(dl.Name, " ", "_"))
+				dl.Authentication = "virtual"
 			}
 
 			if dl.Authentication == "" {
