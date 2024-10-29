@@ -22,8 +22,12 @@ THE SOFTWARE.
 package download
 
 import (
+	"encoding/hex"
 	"fmt"
+	"sort"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -34,7 +38,9 @@ import (
 func init() {
 	DownloadCmd.AddCommand(pccCmd)
 
+	pccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
 	pccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
+	viper.BindPFlag("download.pcc.info", pccCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.pcc.output", pccCmd.Flags().Lookup("output"))
 
 	pccCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
@@ -83,9 +89,39 @@ var pccCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		sort.Sort(download.ByPccIndex(releases))
 
-		for _, release := range releases {
-			fmt.Println(release)
+		if len(releases) == 0 {
+			return fmt.Errorf("no PCC Releases found")
+		}
+
+		if viper.GetBool("download.pcc.info") {
+			log.Infof("Found %d PCC Releases", len(releases))
+			for _, release := range releases {
+				fmt.Println(release)
+			}
+		} else {
+			var choices []string
+			for _, r := range releases {
+				choices = append(choices, fmt.Sprintf("%04d: %s  [created: %s]",
+					r.Index,
+					hex.EncodeToString(r.GetReleaseHash()),
+					r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"),
+				))
+			}
+
+			choice := 0
+			prompt := &survey.Select{
+				Message:  "PCC Release to download:",
+				Options:  choices,
+				PageSize: 15,
+			}
+			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				return nil
+			}
+
+			return releases[choice].Download(viper.GetString("download.pcc.output"))
 		}
 
 		return nil
