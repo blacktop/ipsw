@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download/pcc"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -71,24 +71,29 @@ type PCCRelease struct {
 	*ATLeaf
 }
 
+type ByPccIndex []PCCRelease
+
+func (a ByPccIndex) Len() int           { return len(a) }
+func (a ByPccIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByPccIndex) Less(i, j int) bool { return a[i].Index > a[j].Index }
+
 func (r PCCRelease) String() string {
 	var out string
-	out += fmt.Sprintf("Index:     %d\n", r.Index)
+	out += fmt.Sprintf("%d) %s\n", r.Index, hex.EncodeToString(r.GetReleaseHash()))
 	out += fmt.Sprintf("Type:      %s\n", pcc.ATLogDataType(r.Type).String())
-	out += fmt.Sprintf("Timestamp: %s\n", time.Time(r.GetTimestamp().AsTime()).Format(time.RFC3339))
-	out += fmt.Sprintf("Expires:   %s\n", time.UnixMilli(r.ExpiryMS).Format(time.RFC3339))
-	out += fmt.Sprintf("Hash:      %s\n", hex.EncodeToString(r.GetReleaseHash()))
 	out += "Assets:\n"
 	for _, asset := range r.GetAssets() {
-		out += fmt.Sprintf("  Type:    %s\n", asset.GetType().String())
-		out += fmt.Sprintf("    Variant: %s\n", asset.GetVariant())
-		out += fmt.Sprintf("    Digest:  (%s) %s\n", strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_"), hex.EncodeToString(asset.Digest.GetValue()))
-		out += fmt.Sprintf("    URL:     %s\n", asset.GetUrl())
+		out += fmt.Sprintf("    [%s]\n", strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"))
+		out += fmt.Sprintf("        Variant: %s\n", asset.GetVariant())
+		out += fmt.Sprintf("        Digest:  (%s) %s\n", strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_"), hex.EncodeToString(asset.Digest.GetValue()))
+		out += fmt.Sprintf("        URL:     %s\n", asset.GetUrl())
 	}
 	out += "Tickets:\n"
 	hash := sha256.New()
 	hash.Write(r.Ticket.ApTicket.Bytes)
-	out += fmt.Sprintf("  ApTicket: %s\n", hex.EncodeToString(hash.Sum(nil)))
+	out += fmt.Sprintf("    OS: %s\n", hex.EncodeToString(hash.Sum(nil)))
+	out += fmt.Sprintf("        [expires: %s]\n", time.UnixMilli(r.ExpiryMS).Format("2006-01-02 15:04:05"))
+	out += fmt.Sprintf("        [created: %s]\n", r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"))
 	out += "  Cryptexes:\n"
 	for i, ct := range r.Ticket.CryptexTickets {
 		hash.Reset()
@@ -99,6 +104,12 @@ func (r PCCRelease) String() string {
 	dat, _ := json.MarshalIndent(r.DarwinInit.AsMap(), "", "  ")
 	out += string(dat)
 	return out
+}
+
+func (r PCCRelease) Download(output string) error {
+	log.Infof("Downloading PCC Release for %d", r.Index)
+	log.Warn("Download not implemented")
+	return nil
 }
 
 func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
@@ -165,8 +176,6 @@ func GetPCCReleases(proxy string) ([]PCCRelease, error) {
 		return nil, err
 	}
 	res.Body.Close()
-
-	os.WriteFile("bag.plist", body, 0644)
 
 	var bag BagResponse
 	if _, err := plist.Unmarshal(body, &bag); err != nil {
