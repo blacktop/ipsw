@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// "sort"
 
@@ -45,16 +46,20 @@ func init() {
 	rootCmd.AddCommand(deviceTreeCmd)
 	deviceTreeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	deviceTreeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	deviceTreeCmd.Flags().BoolP("summary", "s", false, "Output summary only")
 	deviceTreeCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
 	deviceTreeCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	deviceTreeCmd.Flags().StringP("filter", "f", "", "Filter DeviceTree to parse (if multiple i.e. macOS)")
 	deviceTreeCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*im4p")
 	deviceTreeCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"im4p"}, cobra.ShellCompDirectiveFilterFileExt
 	}
 	viper.BindPFlag("dtree.proxy", deviceTreeCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("dtree.insecure", deviceTreeCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("dtree.summary", deviceTreeCmd.Flags().Lookup("summary"))
 	viper.BindPFlag("dtree.json", deviceTreeCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dtree.remote", deviceTreeCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("dtree.filter", deviceTreeCmd.Flags().Lookup("filter"))
 }
 
 // deviceTreeCmd represents the deviceTree command
@@ -131,6 +136,11 @@ var deviceTreeCmd = &cobra.Command{
 		}
 
 		for name, dtree := range dtrees {
+			if viper.IsSet("dtree.filter") {
+				if !strings.Contains(strings.ToLower(name), strings.ToLower(viper.GetString("dtree.filter"))) {
+					continue
+				}
+			}
 			log.Infof("DeviceTree: %s", name)
 			if viper.GetBool("dtree.json") {
 				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
@@ -146,6 +156,16 @@ var deviceTreeCmd = &cobra.Command{
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+					if len(s.SocName) > 0 {
+						var deviceType string
+						if len(s.DeviceType) > 0 {
+							deviceType = fmt.Sprintf(" (%s)", s.DeviceType)
+						}
+						utils.Indent(log.Info, 2)(fmt.Sprintf("SoC Name: %s%s", s.SocName, deviceType))
+					}
+					if viper.GetBool("dtree.summary") {
+						continue
+					}
 				}
 				fmt.Println(dtree.String())
 			}
