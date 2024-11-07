@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -107,8 +109,30 @@ func (r PCCRelease) String() string {
 }
 
 func (r PCCRelease) Download(output string) error {
-	log.Infof("Downloading PCC Release for %d", r.Index)
-	log.Warn("Download not implemented")
+	if err := os.MkdirAll(output, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %v", err)
+	}
+	for _, asset := range r.GetAssets() {
+		assetURL := asset.GetUrl()
+		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"))
+		log.WithFields(log.Fields{
+			"digest":  hex.EncodeToString(asset.Digest.GetValue()),
+			"variant": asset.GetVariant(),
+		}).Info("Downloading Asset")
+		downloader := NewDownload("", false, false, false, false, false, false)
+		downloader.URL = assetURL
+		downloader.DestName = filePath
+		if err := downloader.Do(); err != nil {
+			return err
+		}
+	}
+	dat, err := json.MarshalIndent(r.DarwinInit.AsMap(), "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal darwin-init.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(output, "darwin-init.json"), dat, 0644); err != nil {
+		return fmt.Errorf("failed to write darwin-init.json: %v", err)
+	}
 	return nil
 }
 
