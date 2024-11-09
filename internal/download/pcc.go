@@ -16,10 +16,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download/pcc"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 )
@@ -66,6 +68,13 @@ type Ticket struct {
 	CryptexTickets []asn1.RawValue `asn1:"set"`
 }
 
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorTypeField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorHash = color.New(color.Faint).SprintfFunc()
+var colorName = color.New(color.Bold).SprintfFunc()
+var colorCreateTime = color.New(color.Faint, color.FgGreen).SprintFunc()
+var colorExpireTime = color.New(color.Faint, color.FgRed).SprintFunc()
+
 type PCCRelease struct {
 	Index uint64
 	pcc.ReleaseMetadata
@@ -81,30 +90,39 @@ func (a ByPccIndex) Less(i, j int) bool { return a[i].Index > a[j].Index }
 
 func (r PCCRelease) String() string {
 	var out string
-	out += fmt.Sprintf("%d) %s\n", r.Index, hex.EncodeToString(r.GetReleaseHash()))
-	out += fmt.Sprintf("Type:      %s\n", pcc.ATLogDataType(r.Type).String())
-	out += "Assets:\n"
+	out += fmt.Sprintf("%d) %s\n", r.Index, colorHash(hex.EncodeToString(r.GetReleaseHash())))
+	out += fmt.Sprintf(colorField("Type")+":      %s\n", pcc.ATLogDataType(r.Type).String())
+	out += colorField("Assets:\n")
 	for _, asset := range r.GetAssets() {
-		out += fmt.Sprintf("    [%s]\n", strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"))
-		out += fmt.Sprintf("        Variant: %s\n", asset.GetVariant())
-		out += fmt.Sprintf("        Digest:  (%s) %s\n", strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_"), hex.EncodeToString(asset.Digest.GetValue()))
-		out += fmt.Sprintf("        URL:     %s\n", asset.GetUrl())
+		out += fmt.Sprintf("    [%s]\n", colorTypeField(strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")))
+		out += fmt.Sprintf(colorField("        Variant")+": %s\n", colorName(asset.GetVariant()))
+		out += fmt.Sprintf(colorField("        Digest")+":  %s (%s)\n", colorHash(hex.EncodeToString(asset.Digest.GetValue())), strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_"))
+		out += fmt.Sprintf(colorField("        URL")+":     %s\n", asset.GetUrl())
 	}
-	out += "Tickets:\n"
+	out += colorField("Tickets:\n")
 	hash := sha256.New()
 	hash.Write(r.Ticket.ApTicket.Bytes)
-	out += fmt.Sprintf("    OS: %s\n", hex.EncodeToString(hash.Sum(nil)))
-	out += fmt.Sprintf("        [expires: %s]\n", time.UnixMilli(r.ExpiryMS).Format("2006-01-02 15:04:05"))
-	out += fmt.Sprintf("        [created: %s]\n", r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"))
-	out += "  Cryptexes:\n"
+	out += fmt.Sprintf(colorField("    OS")+": %s\n", colorHash(hex.EncodeToString(hash.Sum(nil))))
+	out += fmt.Sprintf("        [%s: %s]\n", colorCreateTime("created"), r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"))
+	out += fmt.Sprintf("        [%s: %s]\n", colorExpireTime("expires"), time.UnixMilli(r.ExpiryMS).Format("2006-01-02 15:04:05"))
+	out += colorField("    Cryptexes:\n")
 	for i, ct := range r.Ticket.CryptexTickets {
 		hash.Reset()
 		hash.Write(ct.Bytes)
-		out += fmt.Sprintf("    %d) %s\n", i, hex.EncodeToString(hash.Sum(nil)))
+		out += fmt.Sprintf("        %d) %s\n", i, colorHash(hex.EncodeToString(hash.Sum(nil))))
 	}
-	out += "DarwinInit:\n"
+	out += colorField("DarwinInit:\n")
 	dat, _ := json.MarshalIndent(r.DarwinInit.AsMap(), "", "  ")
-	out += string(dat)
+	if color.NoColor {
+		out += string(dat)
+	} else {
+		var buf strings.Builder
+		if err := quick.Highlight(&buf, string(dat)+"\n", "json", "terminal256", "nord"); err != nil {
+			out += string(dat)
+		} else {
+			out += buf.String()
+		}
+	}
 	return out
 }
 
