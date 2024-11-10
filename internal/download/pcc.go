@@ -43,6 +43,19 @@ type BagResponse struct {
 	TtrEnabled                    int    `plist:"ttr-enabled,omitempty"`
 }
 
+type pccInstance struct {
+	HttpService struct {
+		Enabled bool `plist:"enabled,omitempty"`
+	} `plist:"httpService,omitempty"`
+	Name          string `plist:"name,omitempty"`
+	ReleaseAssets []struct {
+		File    string `plist:"file,omitempty"`
+		Type    string `plist:"type,omitempty"`
+		Variant string `plist:"variant,omitempty"`
+	} `plist:"releaseAssets,omitempty"`
+	ReleaseID string `plist:"releaseID,omitempty"`
+}
+
 type TransparencyExtension struct {
 	Type uint32
 	Size uint16
@@ -91,21 +104,22 @@ func (a ByPccIndex) Less(i, j int) bool { return a[i].Index > a[j].Index }
 func (r PCCRelease) String() string {
 	var out string
 	out += fmt.Sprintf("%d) %s\n", r.Index, colorHash(hex.EncodeToString(r.GetReleaseHash())))
-	out += fmt.Sprintf(colorField("Type")+":      %s\n", pcc.ATLogDataType(r.Type).String())
-	out += colorField("Assets:\n")
+	out += fmt.Sprintf(colorField("Type")+":   %s\n", pcc.ATLogDataType(r.Type).String())
+	out += fmt.Sprintf(colorField("Schema")+": %s\n", string(r.SchemaVersion.String()))
+	out += colorField("Assets\n")
 	for _, asset := range r.GetAssets() {
 		out += fmt.Sprintf("    [%s]\n", colorTypeField(strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")))
 		out += fmt.Sprintf(colorField("        Variant")+": %s\n", colorName(asset.GetVariant()))
 		out += fmt.Sprintf(colorField("        Digest")+":  %s (%s)\n", colorHash(hex.EncodeToString(asset.Digest.GetValue())), strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_"))
 		out += fmt.Sprintf(colorField("        URL")+":     %s\n", asset.GetUrl())
 	}
-	out += colorField("Tickets:\n")
+	out += colorField("Tickets\n")
 	hash := sha256.New()
 	hash.Write(r.Ticket.ApTicket.Bytes)
 	out += fmt.Sprintf(colorField("    OS")+": %s\n", colorHash(hex.EncodeToString(hash.Sum(nil))))
 	out += fmt.Sprintf("        [%s: %s]\n", colorCreateTime("created"), r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"))
 	out += fmt.Sprintf("        [%s: %s]\n", colorExpireTime("expires"), time.UnixMilli(r.ExpiryMS).Format("2006-01-02 15:04:05"))
-	out += colorField("    Cryptexes:\n")
+	out += colorField("    Cryptexes\n")
 	for i, ct := range r.Ticket.CryptexTickets {
 		hash.Reset()
 		hash.Write(ct.Bytes)
@@ -130,9 +144,25 @@ func (r PCCRelease) Download(output string) error {
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
+	pinst := pccInstance{
+		HttpService: struct {
+			Enabled bool `plist:"enabled,omitempty"`
+		}{Enabled: true},
+		Name:      hex.EncodeToString(r.GetReleaseHash())[:7],
+		ReleaseID: hex.EncodeToString(r.GetReleaseHash()),
+	}
 	for _, asset := range r.GetAssets() {
 		assetURL := asset.GetUrl()
-		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"))
+		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")+assetTypeExt(asset.GetType()))
+		pinst.ReleaseAssets = append(pinst.ReleaseAssets, struct {
+			File    string `plist:"file,omitempty"`
+			Type    string `plist:"type,omitempty"`
+			Variant string `plist:"variant,omitempty"`
+		}{
+			File:    filepath.Base(filePath),
+			Type:    asset.GetType().String(),
+			Variant: asset.GetVariant(),
+		})
 		log.WithFields(log.Fields{
 			"digest":  hex.EncodeToString(asset.Digest.GetValue()),
 			"variant": asset.GetVariant(),
@@ -151,7 +181,27 @@ func (r PCCRelease) Download(output string) error {
 	if err := os.WriteFile(filepath.Join(output, "darwin-init.json"), dat, 0644); err != nil {
 		return fmt.Errorf("failed to write darwin-init.json: %v", err)
 	}
+	pdat, err := plist.MarshalIndent(pinst, plist.XMLFormat, "\t")
+	if err != nil {
+		return fmt.Errorf("failed to marshal instance.plist: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(output, "instance.plist"), pdat, 0644); err != nil {
+		return fmt.Errorf("failed to write instance.plist: %v", err)
+	}
 	return nil
+}
+
+func assetTypeExt(typ pcc.ReleaseMetadata_AssetType) string {
+	switch typ {
+	case pcc.ReleaseMetadata_ASSET_TYPE_OS:
+		return ".ipsw"
+	case pcc.ReleaseMetadata_ASSET_TYPE_PCS, pcc.ReleaseMetadata_ASSET_TYPE_MODEL, pcc.ReleaseMetadata_ASSET_TYPE_DEBUG_SHELL:
+		return ".aar"
+	case pcc.ReleaseMetadata_ASSET_TYPE_HOST_TOOLS:
+		return ".dmg"
+	default: // ReleaseMetadata_ASSET_TYPE_UNSPECIFIED
+		return ""
+	}
 }
 
 func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
