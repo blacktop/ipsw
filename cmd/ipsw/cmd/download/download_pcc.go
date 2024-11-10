@@ -61,7 +61,7 @@ func init() {
 // pccCmd represents the pcc command
 var pccCmd = &cobra.Command{
 	Use:           "pcc",
-	Aliases:       []string{"p", "vre"},
+	Aliases:       []string{"p", "vre", "pccvre"},
 	Short:         "🚧 Download PCC VM files",
 	SilenceUsage:  false,
 	SilenceErrors: true,
