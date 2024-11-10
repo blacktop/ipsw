@@ -39,6 +39,7 @@ func init() {
 	DownloadCmd.AddCommand(pccCmd)
 
 	pccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
+	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/' to create a PCC VM w/o needing to set the csrutil first
 	pccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
 	viper.BindPFlag("download.pcc.info", pccCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.pcc.output", pccCmd.Flags().Lookup("output"))
