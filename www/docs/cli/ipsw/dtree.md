@@ -17,11 +17,13 @@ ipsw dtree <DeviceTree> [flags]
 ### Options
 
 ```
-  -h, --help           help for dtree
-      --insecure       do not verify ssl certs
-  -j, --json           Output to stdout as JSON
-      --proxy string   HTTP/HTTPS proxy
-  -r, --remote         Extract from URL
+  -f, --filter string   Filter DeviceTree to parse (if multiple i.e. macOS)
+  -h, --help            help for dtree
+      --insecure        do not verify ssl certs
+  -j, --json            Output to stdout as JSON
+      --proxy string    HTTP/HTTPS proxy
+  -r, --remote          Extract from URL
+  -s, --summary         Output summary only
 ```
 
 ### Options inherited from parent commands
