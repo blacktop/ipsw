@@ -40,11 +40,13 @@ import (
 func init() {
 	KernelKmutilCmd.AddCommand(inspectCmd)
 
+	inspectCmd.Flags().BoolP("kernel", "k", false, "Print system kernel path")
 	inspectCmd.Flags().StringP("filter", "f", "", "Fitler by bundle ID")
 	inspectCmd.Flags().BoolP("explicit-only", "x", false, "Format output to be used as -x arg to kmutil create")
 	inspectCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	inspectCmd.Flags().StringP("output", "o", "", "Output folder")
 	inspectCmd.MarkFlagDirname("output")
+	viper.BindPFlag("kernel.kmutil.inspect.kernel", inspectCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("kernel.kmutil.inspect.filter", inspectCmd.Flags().Lookup("filter"))
 	viper.BindPFlag("kernel.kmutil.inspect.explicit-only", inspectCmd.Flags().Lookup("explicit-only"))
 	viper.BindPFlag("kernel.kmutil.inspect.json", inspectCmd.Flags().Lookup("json"))
@@ -67,6 +69,7 @@ var inspectCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
+		showKernPath := viper.GetBool("kernel.kmutil.inspect.kernel")
 		filter := viper.GetString("kernel.kmutil.inspect.filter")
 		explicitOnly := viper.GetBool("kernel.kmutil.inspect.explicit-only")
 		asJSON := viper.GetBool("kernel.kmutil.inspect.json")
@@ -90,6 +93,10 @@ var inspectCmd = &cobra.Command{
 				return fmt.Errorf("could not find system kernelcache: %v (Please specify path to kernelcache)", err)
 			}
 			kcpath = systemKernelCache
+			if showKernPath {
+				fmt.Println(kcpath)
+				return nil
+			}
 		} else {
 			kcpath = filepath.Clean(args[1])
 		}
