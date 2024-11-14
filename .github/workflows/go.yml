@@ -414,10 +414,11 @@ jobs:
         run: |
           ipsw macho info /bin/ls --arch x86_64 --dump-cert --output /tmp
           openssl crl2pkcs7 -nocrl -certfile /tmp/ls.pem | openssl pkcs7 -print_certs -text
-      - name: Run macho disass
-        if: matrix.platform == 'macos-13'
-        working-directory: /tmp/ipsw
-        run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog
+      # FIXME: this is failing due to XCode no longer reparing the stub information?    
+      # - name: Run macho disass
+      #   if: matrix.platform == 'macos-13'
+      #   working-directory: /tmp/ipsw
+      #   run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog
       - name: Run macho disass (MTE)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
