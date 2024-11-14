@@ -134,7 +134,7 @@ var machoDisassCmd = &cobra.Command{
 		machoPath := filepath.Clean(args[0])
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return fmt.Errorf("failed to detect file type: %v", err)
 		}
 
 		fat, err := macho.OpenFat(machoPath)
