@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -82,9 +83,12 @@ func (d *Diff) Markdown() error {
 						"  <summary><i>View Updated</i></summary>\n\n",
 					len(d.Kexts.Updated)))
 
-			for k, v := range d.Kexts.Updated {
+			keys := slices.Collect(maps.Keys(d.Kexts.Updated))
+			slices.Sort(keys)
+
+			for _, k := range keys {
 				out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-				out.WriteString(fmt.Sprintf("%s\n", v))
+				out.WriteString(fmt.Sprintf("%s\n", d.Kexts.Updated[k]))
 			}
 			out.WriteString("</details>\n\n")
 		}
@@ -145,21 +149,20 @@ func (d *Diff) Markdown() error {
 			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Machos.Updated)))
 			out.WriteString("<details>\n" +
 				"  <summary><i>View Updated</i></summary>\n\n")
+
+			keys := slices.Collect(maps.Keys(d.Machos.Updated))
+			slices.Sort(keys)
+
 			if len(d.Machos.Updated) < 20 {
-				for k, v := range d.Machos.Updated {
+				for _, k := range keys {
 					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
 					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", v))
+					out.WriteString(fmt.Sprintf("%s\n", d.Machos.Updated[k]))
 				}
 			} else {
 				if err := os.MkdirAll(filepath.Join(d.conf.Output, "MACHOS"), 0o750); err != nil {
 					return err
 				}
-				keys := make([]string, 0, len(d.Machos.Updated))
-				for k := range d.Machos.Updated {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
 				for _, k := range keys {
 					fname := filepath.Join(d.conf.Output, "MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
 					if _, err := os.Stat(fname); os.IsExist(err) {
@@ -172,7 +175,7 @@ func (d *Diff) Markdown() error {
 					}
 					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
 					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, d.Machos.Updated[k])
+					fmt.Fprintf(f, "%s", d.Machos.Updated[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
@@ -232,11 +235,10 @@ func (d *Diff) Markdown() error {
 			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Firmwares.Updated)))
 			out.WriteString("<details>\n" +
 				"  <summary><i>View Updated</i></summary>\n\n")
-			keys := make([]string, 0, len(d.Firmwares.Updated))
-			for k := range d.Firmwares.Updated {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
+
+			keys := slices.Collect(maps.Keys(d.Firmwares.Updated))
+			slices.Sort(keys)
+
 			if len(d.Firmwares.Updated) < 20 {
 				for _, k := range keys {
 					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
@@ -259,7 +261,7 @@ func (d *Diff) Markdown() error {
 					}
 					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
 					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, d.Firmwares.Updated[k])
+					fmt.Fprintf(f, "%s", d.Firmwares.Updated[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FIRMWARE", filepath.Base(k)+".md")))
 				}
@@ -329,21 +331,20 @@ func (d *Diff) Markdown() error {
 			out.WriteString(fmt.Sprintf("#### ⬆️ Updated (%d)\n\n", len(d.Dylibs.Updated)))
 			out.WriteString("<details>\n" +
 				"  <summary><i>View Updated</i></summary>\n\n")
+
+			keys := slices.Collect(maps.Keys(d.Dylibs.Updated))
+			slices.Sort(keys)
+
 			if len(d.Dylibs.Updated) < 20 {
-				for k, v := range d.Dylibs.Updated {
+				for _, k := range keys {
 					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
 					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", v))
+					out.WriteString(fmt.Sprintf("%s\n", d.Dylibs.Updated[k]))
 				}
 			} else {
 				if err := os.MkdirAll(filepath.Join(d.conf.Output, "DYLIBS"), 0o750); err != nil {
 					return err
 				}
-				keys := make([]string, 0, len(d.Dylibs.Updated))
-				for k := range d.Dylibs.Updated {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
 				for _, k := range keys {
 					fname := filepath.Join(d.conf.Output, "DYLIBS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
 					if _, err := os.Stat(fname); os.IsExist(err) {
@@ -356,7 +357,7 @@ func (d *Diff) Markdown() error {
 					}
 					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
 					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, d.Dylibs.Updated[k])
+					fmt.Fprintf(f, "%s", d.Dylibs.Updated[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("DYLIBS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
@@ -424,21 +425,20 @@ func (d *Diff) Markdown() error {
 			out.WriteString(fmt.Sprintf("#### ⬆️ Updated (%d)\n\n", len(d.Features.Updated)))
 			out.WriteString("<details>\n" +
 				"  <summary><i>View Updated</i></summary>\n\n")
+
+			keys := slices.Collect(maps.Keys(d.Features.Updated))
+			slices.Sort(keys)
+
 			if len(d.Features.Updated) < 20 {
-				for k, v := range d.Features.Updated {
+				for _, k := range keys {
 					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
 					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", v))
+					out.WriteString(fmt.Sprintf("%s\n", d.Features.Updated[k]))
 				}
 			} else {
 				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
 					return err
 				}
-				keys := make([]string, 0, len(d.Features.Updated))
-				for k := range d.Features.Updated {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
 				for _, k := range keys {
 					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
 					if _, err := os.Stat(fname); os.IsExist(err) {
@@ -451,7 +451,7 @@ func (d *Diff) Markdown() error {
 					}
 					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
 					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, d.Features.Updated[k])
+					fmt.Fprintf(f, "%s", d.Features.Updated[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
