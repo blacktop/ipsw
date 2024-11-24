@@ -81,12 +81,12 @@ var pccCmd = &cobra.Command{
 
 		// settings
 		proxy := viper.GetString("download.proxy")
-		// insecure := viper.GetBool("download.insecure")
+		insecure := viper.GetBool("download.insecure")
 		// skipAll := viper.GetBool("download.skip-all")
 		// resumeAll := viper.GetBool("download.resume-all")
 		// restartAll := viper.GetBool("download.restart-all")
 
-		releases, err := download.GetPCCReleases(proxy)
+		releases, err := download.GetPCCReleases(proxy, insecure)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ var pccCmd = &cobra.Command{
 				return nil
 			}
 			log.Infof("Downloading PCC Release for %d", releases[choice].Index)
-			return releases[choice].Download(viper.GetString("download.pcc.output"))
+			return releases[choice].Download(viper.GetString("download.pcc.output"), proxy, insecure)
 		}
 
 		return nil
