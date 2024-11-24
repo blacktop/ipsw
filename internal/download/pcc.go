@@ -140,7 +140,7 @@ func (r PCCRelease) String() string {
 	return out
 }
 
-func (r PCCRelease) Download(output string) error {
+func (r PCCRelease) Download(output, proxy string, insecure bool) error {
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
@@ -167,7 +167,7 @@ func (r PCCRelease) Download(output string) error {
 			"digest":  hex.EncodeToString(asset.Digest.GetValue()),
 			"variant": asset.GetVariant(),
 		}).Info("Downloading Asset")
-		downloader := NewDownload("", false, false, false, false, false, false)
+		downloader := NewDownload(proxy, insecure, false, false, false, false, false)
 		downloader.URL = assetURL
 		downloader.DestName = filePath
 		if err := downloader.Do(); err != nil {
@@ -250,17 +250,29 @@ func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
 	return &leaf, nil
 }
 
-func GetPCCReleases(proxy string) ([]PCCRelease, error) {
+func GetPCCReleases(proxy string, insecure bool) ([]PCCRelease, error) {
 	var releases []PCCRelease
 
-	res, err := http.Get(bagURL)
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	req, err := http.NewRequest("GET", bagURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to GET bag: %v", err)
+		return nil, fmt.Errorf("cannot create http POST request: %v", err)
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to GET pcc atresearch bag: %v", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bag GET returned status: %s", res.Status)
+		return nil, fmt.Errorf("pcc atresearch bag GET returned status: %s", res.Status)
 	}
 
 	body, err := io.ReadAll(res.Body)
@@ -284,20 +296,13 @@ func GetPCCReleases(proxy string) ([]PCCRelease, error) {
 		return nil, fmt.Errorf("cannot marshal ListTreesRequest: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", bag.AtResearcherListTrees, bytes.NewReader(data))
+	req, err = http.NewRequest("POST", bag.AtResearcherListTrees, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http POST request: %v", err)
 	}
 	req.Header.Set("X-Apple-Request-UUID", uuid)
 	req.Header.Set("Content-Type", "application/protobuf")
 	req.Header.Add("User-Agent", utils.RandomAgent())
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 
 	res, err = client.Do(req)
 	if err != nil {
