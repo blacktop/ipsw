@@ -417,13 +417,13 @@ func (as *AppStore) signIn(username, password, code string, attempt int, itspod 
 	}
 	defer res.Body.Close()
 
-	if pod := res.Header.Get("pod"); pod != "" {
-		pod, err := strconv.Atoi(pod)
+	if res.StatusCode == http.StatusFound {
+		itspod, err := strconv.Atoi(res.Header.Get("pod"))
 		if err != nil {
 			return err
 		}
 
-		itspod = pod
+		return as.signIn(username, password, "", attempt+1, itspod)
 	}
 
 	body, err := io.ReadAll(res.Body)
@@ -444,7 +444,7 @@ func (as *AppStore) signIn(username, password, code string, attempt int, itspod 
 		return as.signIn(username, password, "", attempt+1, itspod)
 	}
 
-	if res.StatusCode == http.StatusFound || login.CustomerMessage == ErrLoginRequires2fa {
+	if res.StatusCode == http.StatusNotFound || login.CustomerMessage == ErrLoginRequires2fa {
 		if len(code) == 0 {
 			prompt := &survey.Password{
 				Message: "Please type your verification code:",
