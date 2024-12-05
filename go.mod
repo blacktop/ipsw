@@ -54,13 +54,13 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20240926111503-d568885d64c8
 	github.com/vbauerster/mpb/v8 v8.8.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.29.0
+	golang.org/x/crypto v0.30.0
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
-	golang.org/x/net v0.31.0
+	golang.org/x/net v0.32.0
 	golang.org/x/oauth2 v0.24.0
-	golang.org/x/sync v0.9.0
-	golang.org/x/sys v0.27.0
-	golang.org/x/term v0.26.0
+	golang.org/x/sync v0.10.0
+	golang.org/x/sys v0.28.0
+	golang.org/x/term v0.27.0
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.10
@@ -183,7 +183,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.12.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
