@@ -63,7 +63,11 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	}
 	t, err := time.Parse("2006-01-02T15:04:05.000+00:00", s)
 	if err != nil {
-		return err
+		// If that fails, try parsing without milliseconds
+		t, err = time.Parse("2006-01-02T15:04:05-07:00", s)
+		if err != nil {
+			return err
+		}
 	}
 	*d = Date(t)
 	return nil
