@@ -27,14 +27,17 @@ import (
 	"github.com/apex/log"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	// "github.com/blacktop/ipsw/internal/utils"
-	// "github.com/blacktop/ipsw/pkg/appstore"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/appstore"
 
 	"github.com/spf13/viper"
 )
 
 func init() {
 	ASReviewCmd.AddCommand(ASReviewListCmd)
+
+	ASReviewListCmd.Flags().String("id", "", "App ID")
+	viper.BindPFlag("appstore.review.ls.id", ASReviewListCmd.Flags().Lookup("id"))
 }
 
 // ASReviewListCmd represents the appstore review ls command
@@ -56,24 +59,32 @@ var ASReviewListCmd = &cobra.Command{
 		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
 		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
 		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
+		// flags
+		id := viper.GetString("appstore.review.ls.id")
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
-			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
+				return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
+		}
+		if id == "" {
+				return fmt.Errorf("you must provide --id")
 		}
 
-		// as := appstore.NewAppStore(
-		// 	viper.GetString("appstore.p8"),
-		// 	viper.GetString("appstore.iss"),
-		// 	viper.GetString("appstore.kid"),
-		// 	viper.GetString("appstore.jwt"),
-		// )
+		as := appstore.NewAppStore(
+			viper.GetString("appstore.p8"),
+			viper.GetString("appstore.iss"),
+			viper.GetString("appstore.kid"),
+			viper.GetString("appstore.jwt"),
+		)
 
-		// profs, err := as.GetReviews()
-		// if err != nil {
-		// 	return err
-		// }
+		reviews, err := as.GetReviews(id)
+		if err != nil {
+			return err
+		}
 
-		// log.Info("Provisioning Reviews:")
+		log.Info("Reviews:")
+		for _, review := range reviews {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("%s: %s", review.ID, review.Type))
+		}
 		// for _, prof := range profs {
 		// 	if prof.IsExpired() || prof.IsInvalid() {
 		// 		utils.Indent(log.Error, 2)(fmt.Sprintf("%s: %s (%s), Expires: %s", prof.ID, prof.Attributes.Name, prof.Attributes.ReviewState, prof.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
