@@ -79,6 +79,9 @@ func (d Date) Format(s string) string {
 	t := time.Time(d)
 	return t.Format(s)
 }
+func (d Date) Before(d2 Date) bool {
+	return time.Time(d).Before(time.Time(d2))
+}
 
 type AppStore struct {
 	P8    string

@@ -23,12 +23,13 @@ package appstore
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/appstore"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/appstore"
 
 	"github.com/spf13/viper"
 )
@@ -81,37 +82,22 @@ var ASReviewListCmd = &cobra.Command{
 			return err
 		}
 
-		log.Info("Reviews:")
+		// sort reviews by Created descending
+		sort.Slice(reviews, func(i, j int) bool {
+			return reviews[j].Attributes.Created.Before(reviews[i].Attributes.Created)
+		})
+
+		fmt.Printf("Reviews\n")
 		for _, review := range reviews {
-			utils.Indent(log.Info, 2)(fmt.Sprintf("%s: %s", review.ID, review.Type))
+			date := review.Attributes.Created.Format("Jan _2 2006")
+			stars := strings.Repeat("★", review.Attributes.Rating)
+			hrule := strings.Repeat("-", 16)
+			fmt.Printf("\n%s\n%s [%-5s] by %s\n", hrule, date, stars, review.Attributes.Reviewer)
+			fmt.Printf("%s\n\n", review.Attributes.Title)
+			fmt.Printf("    %s\n", review.Attributes.Body)
 		}
-		// for _, prof := range profs {
-		// 	if prof.IsExpired() || prof.IsInvalid() {
-		// 		utils.Indent(log.Error, 2)(fmt.Sprintf("%s: %s (%s), Expires: %s", prof.ID, prof.Attributes.Name, prof.Attributes.ReviewState, prof.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
-		// 	} else {
-		// 		utils.Indent(log.Info, 2)(fmt.Sprintf("%s: %s (%s), Expires: %s", prof.ID, prof.Attributes.Name, prof.Attributes.ReviewState, prof.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
-		// 	}
-		// 	certs, err := as.GetReviewCerts(prof.ID)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if len(certs) > 0 {
-		// 		utils.Indent(log.Info, 3)("Certificates:")
-		// 	}
-		// 	for _, cert := range certs {
-		// 		utils.Indent(log.Info, 4)(fmt.Sprintf("%s: %s (%s), Expires: %s", cert.ID, cert.Attributes.Name, cert.Attributes.CertificateType, cert.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
-		// 	}
-		// 	devs, err := as.GetReviewDevices(prof.ID)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if len(devs) > 0 {
-		// 		utils.Indent(log.Info, 3)("Devices:")
-		// 	}
-		// 	for _, dev := range devs {
-		// 		utils.Indent(log.Info, 4)(fmt.Sprintf("%s: %s (%s)", dev.ID, dev.Attributes.Name, dev.Attributes.DeviceClass))
-		// 	}
-		// }
+		ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
+		fmt.Printf("\nTo respond, visit %s", ratingsUrl)
 
 		return nil
 	},
