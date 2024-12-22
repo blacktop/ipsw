@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 blacktop
+Copyright © 2024 Kenneth H. Cox
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,8 @@ package appstore
 
 import (
 	"fmt"
-	"sort"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/appstore"
@@ -38,7 +38,9 @@ func init() {
 	ASReviewCmd.AddCommand(ASReviewListCmd)
 
 	ASReviewListCmd.Flags().String("id", "", "App ID")
+	ASReviewListCmd.Flags().String("after", "", "Only show responses on or after date, e.g. 2024-12-22")
 	viper.BindPFlag("appstore.review.ls.id", ASReviewListCmd.Flags().Lookup("id"))
+	viper.BindPFlag("appstore.review.ls.after", ASReviewListCmd.Flags().Lookup("after"))
 }
 
 // ASReviewListCmd represents the appstore review ls command
@@ -62,6 +64,7 @@ var ASReviewListCmd = &cobra.Command{
 		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		id := viper.GetString("appstore.review.ls.id")
+		after := viper.GetString("appstore.review.ls.after")
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
 			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
@@ -69,7 +72,11 @@ var ASReviewListCmd = &cobra.Command{
 		if id == "" {
 			return fmt.Errorf("you must provide --id")
 		}
-
+		afterDate, err := time.Parse("2006-01-02", after)
+		if after != "" && err != nil {
+			return err
+		}
+	
 		as := appstore.NewAppStore(
 			viper.GetString("appstore.p8"),
 			viper.GetString("appstore.iss"),
@@ -88,31 +95,44 @@ var ASReviewListCmd = &cobra.Command{
 			responsesById[response.ID] = response
 		}
 
-		// sort reviews by Created descending
-		reviews := reviewsResponse.Reviews
-		sort.Slice(reviews, func(i, j int) bool {
-			return reviews[j].Attributes.Created.Before(reviews[i].Attributes.Created)
-		})
-
 		// display reviews in a format useful for customer service
-		fmt.Printf("Reviews\n")
-		fmt.Printf("%d reviews\n", len(reviews))
-		fmt.Printf("%d responses\n", len(responsesById))
-		for idx, review := range reviews {
+		reviewCount := 0
+		responseCount := 0
+		for _, review := range reviewsResponse.Reviews {
+			if time.Time(review.Attributes.Created).Before(afterDate) {
+				break
+			}
+
+			// print summary
+			reviewCount += 1
 			date := review.Attributes.Created.Format("Jan _2 2006")
 			stars := strings.Repeat("★", review.Attributes.Rating)
-			hrule := strings.Repeat("-", 16)
-			fmt.Printf("\n%s\n[%3d]\n%s [%-5s] by %s\n", hrule, idx, date, stars, review.Attributes.Reviewer)
-			fmt.Printf("%s\n\n", review.Attributes.Title)
+			hrule := strings.Repeat("-", 19)
+			fmt.Printf("\n%s\n%s [%-5s] by %s\n", hrule, date, stars, review.Attributes.Reviewer)
+			fmt.Printf("%s\n", review.Attributes.Title)
 
+			// print review body only if we haven't responded
 			responseData := review.Relationships.Response.Data
 			if responseData != nil {
-				fmt.Printf("    (responded)\n")
-				// fmt.Printf("    response: %v\n", responseId)
+				responseCount += 1
+				response, exists := responsesById[responseData.ID]
+				if exists {
+					fmt.Printf("    (responded %s)\n", response.Attributes.LastModified.Format("Jan _2 2006"))
+				} else {
+					fmt.Printf("    (responded)\n")
+				}
 			} else {
 				fmt.Printf("    %s\n", review.Attributes.Body)
 			}
 		}
+
+		// print summary
+		if after != "" {
+			fmt.Printf("\n%d reviews since %s\n", reviewCount, after)
+		} else {
+			fmt.Printf("\n%d reviews\n", reviewCount)
+		}
+		fmt.Printf("%d responses\n", responseCount)
 		ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
 		fmt.Printf("\nTo respond, visit %s", ratingsUrl)
 

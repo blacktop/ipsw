@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	//"io"
+
 	"net/http"
 	"net/url"
 	"strings"
@@ -71,6 +71,8 @@ func (as *AppStore) GetReviews(appID string) (ReviewsListResponse, error) {
 
 	queryParams := url.Values{}
 	queryParams.Add("include", "response")
+	queryParams.Add("sort", "-createdDate")
+	//queryParams.Add("exists[publishedResponse]", "false")
 	url := fmt.Sprintf("https://api.appstoreconnect.apple.com/v1/apps/%s/customerReviews?%s", appID, queryParams.Encode())
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
