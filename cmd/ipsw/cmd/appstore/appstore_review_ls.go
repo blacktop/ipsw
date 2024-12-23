@@ -23,6 +23,7 @@ package appstore
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -38,9 +39,11 @@ func init() {
 	ASReviewCmd.AddCommand(ASReviewListCmd)
 
 	ASReviewListCmd.Flags().String("id", "", "App ID")
-	ASReviewListCmd.Flags().String("after", "", "Only show responses on or after date, e.g. 2024-12-22")
+	ASReviewListCmd.Flags().String("after", "", "Only show responses on or after date, e.g. \"2024-12-22\"")
+	ASReviewListCmd.Flags().String("since", "", "Only show responses within duration, e.g. \"36h\"")
 	viper.BindPFlag("appstore.review.ls.id", ASReviewListCmd.Flags().Lookup("id"))
 	viper.BindPFlag("appstore.review.ls.after", ASReviewListCmd.Flags().Lookup("after"))
+	viper.BindPFlag("appstore.review.ls.since", ASReviewListCmd.Flags().Lookup("since"))
 }
 
 // ASReviewListCmd represents the appstore review ls command
@@ -65,6 +68,7 @@ var ASReviewListCmd = &cobra.Command{
 		// flags
 		id := viper.GetString("appstore.review.ls.id")
 		after := viper.GetString("appstore.review.ls.after")
+		since := viper.GetString("appstore.review.ls.since")
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
 			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
@@ -72,10 +76,21 @@ var ASReviewListCmd = &cobra.Command{
 		if id == "" {
 			return fmt.Errorf("you must provide --id")
 		}
+		if after != "" && since != "" {
+			return fmt.Errorf("you cannot specify both `--after` and `--since`")
+		}
 		afterDate, err := time.Parse("2006-01-02", after)
 		if after != "" && err != nil {
 			return err
 		}
+		if since != "" {
+			sinceDuration, err := time.ParseDuration(since)
+			if err != nil {
+				return err
+			}
+			afterDate = time.Now().Add(-sinceDuration)
+		}
+		afterOrSinceFlag := after != "" || since != ""
 	
 		as := appstore.NewAppStore(
 			viper.GetString("appstore.p8"),
@@ -127,14 +142,19 @@ var ASReviewListCmd = &cobra.Command{
 		}
 
 		// print summary
-		if after != "" {
-			fmt.Printf("\n%d reviews since %s\n", reviewCount, after)
+		if afterOrSinceFlag {
+			fmt.Printf("\n%d reviews since %s\n", reviewCount, afterDate.Format("Jan _2 2006 15:04:05"))
 		} else {
 			fmt.Printf("\n%d reviews\n", reviewCount)
 		}
 		fmt.Printf("%d responses\n", responseCount)
 		ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
 		fmt.Printf("\nTo respond, visit %s", ratingsUrl)
+
+		// exit 2 if no new reviews, this will aid scripting
+		if reviewCount == 0 {
+			os.Exit(2)
+		}
 
 		return nil
 	},
