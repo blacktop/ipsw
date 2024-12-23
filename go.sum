@@ -62,8 +62,8 @@ github.com/aymanbagabas/go-udiff v0.2.0 h1:TK0fH4MteXUDspT88n8CKzvK0X9O2xu9yQjWp
 github.com/aymanbagabas/go-udiff v0.2.0/go.mod h1:RE4Ex0qsGkTAJoQdQQCA0uG+nAzJO/pI/QwceO5fgrA=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
-github.com/blacktop/arm64-cgo v1.0.57 h1:YfscrZKKsRpj0JzWBBqrzeajUS4k5R5Ls4DH04TW/XQ=
-github.com/blacktop/arm64-cgo v1.0.57/go.mod h1:0bYGPdVi0U403SdaCYpXVzFshJfd7QkX+PftEpVjP9g=
+github.com/blacktop/arm64-cgo v1.0.58 h1:ANTB5JUcLzFfsKxNsp0obn/lyvLMIBa1tKiNCAc0iMw=
+github.com/blacktop/arm64-cgo v1.0.58/go.mod h1:3QC9E3mn9o8Xxf8fILONjGOC9Ss/OgutkYnmNnsu+X4=
 github.com/blacktop/cast v1.5.2 h1:xyly5tHI2Eyr6bYx5tnANMwr274RYeDBRglysZ2ECe8=
 github.com/blacktop/cast v1.5.2/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/blacktop/go-dwarf v1.0.10 h1:i9zYgcIROETsNZ6V+zZn3uDH21FCG5BLLZ837GitxS0=
