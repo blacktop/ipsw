@@ -354,7 +354,7 @@ func DSC(c *Config) ([]string, error) {
 		}
 		if i.Plists.Type == "OTA" {
 			if runtime.GOOS == "darwin" {
-				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
+				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 				if err != nil {
 					if errors.Is(err, dyld.ErrNoCryptex) {
 						c.Pattern = `^` + dyld.CacheRegex
@@ -404,7 +404,7 @@ func DSC(c *Config) ([]string, error) {
 		if _, err := utils.SearchZip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, c.Flatten, true); err != nil {
 			return nil, fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 		}
-		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
+		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
