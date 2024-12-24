@@ -264,7 +264,7 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		prev[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
 	/* NEXT IPSW */
@@ -275,7 +275,7 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
 	if err := diff.Generate(prev, next, conf); err != nil {
