@@ -14,14 +14,14 @@
     "write-heading-ids": "docusaurus write-heading-ids"
   },
   "dependencies": {
-    "@docusaurus/core": "^3.6.3",
-    "@docusaurus/plugin-google-gtag": "^3.6.3",
-    "@docusaurus/plugin-sitemap": "^3.6.3",
-    "@docusaurus/preset-classic": "^3.6.3",
-    "@docusaurus/theme-classic": "^3.6.3",
-    "@docusaurus/theme-common": "^3.6.3",
-    "@docusaurus/theme-mermaid": "^3.6.3",
-    "@docusaurus/theme-search-algolia": "^3.6.3",
+    "@docusaurus/core": "^3.7.0",
+    "@docusaurus/plugin-google-gtag": "^3.7.0",
+    "@docusaurus/plugin-sitemap": "^3.7.0",
+    "@docusaurus/preset-classic": "^3.7.0",
+    "@docusaurus/theme-classic": "^3.7.0",
+    "@docusaurus/theme-common": "^3.7.0",
+    "@docusaurus/theme-mermaid": "^3.7.0",
+    "@docusaurus/theme-search-algolia": "^3.7.0",
     "@mdx-js/react": "^3.0.1",
     "clsx": "^2.1.1",
     "prism-react-renderer": "^2.4.0",
@@ -31,9 +31,9 @@
     "redocusaurus": "^2.2.0"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "^3.6.3",
-    "@docusaurus/tsconfig": "^3.6.3",
-    "@docusaurus/types": "^3.6.3"
+    "@docusaurus/module-type-aliases": "^3.7.0",
+    "@docusaurus/tsconfig": "^3.7.0",
+    "@docusaurus/types": "^3.7.0"
   },
   "browserslist": {
     "production": [
