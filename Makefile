@@ -111,28 +111,34 @@ update_devs: ## Parse XCode database for new devices
 	@echo " > Updating device_traits.json"
 	go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
 
+FSC_FLAGS ?=
+
 .PHONY: update_fcs_keys
 update_fcs_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating fcs-keys.json"
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --beta --latest --fcs-keys-json --output pkg/aea/data/ --confirm
+	CGO_ENABLED=1 go run ./cmd/ipsw/main.go dl appledb --os iOS $(FSC_FLAGS) --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go dl appledb --os macOS $(FSC_FLAGS) --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go dl appledb --os visionOS $(FSC_FLAGS) --fcs-keys-json --output pkg/aea/data/ --confirm
 	@hack/make/json_mini
 
 .PHONY: update_fcs_keys_rc
-update_fcs_keys_rc: ## Scrape the iPhoneWiki for AES keys
-	@echo " > Updating fcs-keys.json"
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --rc --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --rc --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --rc --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@hack/make/json_mini
+update_fcs_keys_rc: FSC_FLAGS=--rc --latest ## Scrape the iPhoneWiki for AES keys
+update_fcs_keys_rc: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
+
+.PHONY: update_fcs_keys_beta
+update_fcs_keys_beta: FSC_FLAGS=--beta --latest ## Scrape the iPhoneWiki for AES keys
+update_fcs_keys_beta: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
+
+FCS_IOS_BUILD ?=
+FCS_MOS_BUILD ?=
+FCS_VOS_BUILD ?=
 
 .PHONY: update_fcs_keys_release
 update_fcs_keys_release: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating fcs-keys.json"
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --latest --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --latest --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --build $(FCS_IOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --build $(FCS_MOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --build $(FCS_VOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
 	@hack/make/json_mini
 
 .PHONY: update_keys
