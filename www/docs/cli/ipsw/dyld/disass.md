@@ -39,6 +39,7 @@ ipsw dyld disass <DSC> [flags]
       --cache string          Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint            Number of instructions to disassemble
   -d, --demangle              Demangle symbol names
+      --force                 Continue to disassemble even if there are analysis errors
   -h, --help                  help for disass
   -i, --image strings         Dylib(s) to disassemble
       --input string          Input function JSON file

@@ -48,6 +48,7 @@ func init() {
 	DisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	DisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	DisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	DisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
 	DisassCmd.Flags().String("input", "", "Input function JSON file")
 	DisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	DisassCmd.MarkFlagsMutuallyExclusive("symbol", "vaddr", "input", "image")
@@ -60,6 +61,7 @@ func init() {
 	viper.BindPFlag("dyld.disass.demangle", DisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.disass.json", DisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.disass.quiet", DisassCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("dyld.disass.force", DisassCmd.Flags().Lookup("force"))
 	viper.BindPFlag("dyld.disass.color", DisassCmd.Flags().Lookup("color"))
 	viper.BindPFlag("dyld.disass.input", DisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("dyld.disass.cache", DisassCmd.Flags().Lookup("cache"))
@@ -205,14 +207,18 @@ var DisassCmd = &cobra.Command{
 						//* First pass ANALYSIS *
 						//***********************
 						if err := image.Analyze(); err != nil {
-							return err
+							if !viper.GetBool("dyld.disass.force") {
+								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+							}
 						}
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
 						for _, img := range engine.Dylibs() {
 							if err := img.Analyze(); err != nil {
-								return err
+								if !viper.GetBool("dyld.disass.force") {
+									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+								}
 							}
 						}
 					} else {
@@ -295,14 +301,18 @@ var DisassCmd = &cobra.Command{
 							return err
 						}
 						if err := image.Analyze(); err != nil {
-							return err
+							if !viper.GetBool("dyld.disass.force") {
+								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+							}
 						}
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
 						for _, img := range engine.Dylibs() {
 							if err := img.Analyze(); err != nil {
-								return err
+								if !viper.GetBool("dyld.disass.force") {
+									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+								}
 							}
 						}
 					} else {
@@ -336,7 +346,9 @@ var DisassCmd = &cobra.Command{
 				} else {
 					if image, err = f.GetImageContainingVMAddr(startAddr); err == nil {
 						if err := image.Analyze(); err != nil {
-							return err
+							if !viper.GetBool("dyld.disass.force") {
+								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+							}
 						}
 						m, err := image.GetMacho()
 						if err != nil {
@@ -408,7 +420,9 @@ var DisassCmd = &cobra.Command{
 					}
 					for _, img := range engine.Dylibs() {
 						if err := img.Analyze(); err != nil {
-							return err
+							if !viper.GetBool("dyld.disass.force") {
+								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+							}
 						}
 					}
 				} else {
