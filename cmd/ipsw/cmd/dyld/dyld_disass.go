@@ -120,7 +120,7 @@ var DisassCmd = &cobra.Command{
 		cacheFile := viper.GetString("dyld.disass.cache")
 		// validate flags
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
-			return fmt.Errorf("you must supply a --symbol with --symbol-image")
+			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -163,7 +163,7 @@ var DisassCmd = &cobra.Command{
 			}
 		}
 
-		if len(symbolImageName) == 0 && startAddr == 0 && len(funcFile) == 0 { /* DEFAULT: disassemble image(s) */
+		if len(symbolName) == 0 && startAddr == 0 && len(funcFile) == 0 { /* DEFAULT: disassemble image(s) */
 
 			if len(imageNames) == 0 {
 				images = f.Images // disassemble ALL images
@@ -257,8 +257,8 @@ var DisassCmd = &cobra.Command{
 					if err != nil {
 						return err
 					}
+					log.Infof("Found symbol in %s", filepath.Base(image.Name))
 				}
-				log.Infof("Found symbol in %s", filepath.Base(image.Name))
 			}
 
 			if len(funcFile) > 0 { // INPUT FUNC FILE
