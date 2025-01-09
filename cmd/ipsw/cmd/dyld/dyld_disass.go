@@ -154,7 +154,7 @@ var DisassCmd = &cobra.Command{
 			return nil
 		}
 
-		if !quiet || len(symbolName) > 0 {
+		if !quiet && len(symbolName) > 0 {
 			if len(cacheFile) == 0 {
 				cacheFile = dscPath + ".a2s"
 			}
@@ -345,9 +345,11 @@ var DisassCmd = &cobra.Command{
 					}
 				} else {
 					if image, err = f.GetImageContainingVMAddr(startAddr); err == nil {
-						if err := image.Analyze(); err != nil {
-							if !viper.GetBool("dyld.disass.force") {
-								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+						if !quiet {
+							if err := image.Analyze(); err != nil {
+								if !viper.GetBool("dyld.disass.force") {
+									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+								}
 							}
 						}
 						m, err := image.GetMacho()
