@@ -295,7 +295,7 @@ var machoDisassCmd = &cobra.Command{
 							if len(symbolMap) == 0 {
 								if err := engine.Analyze(); err != nil {
 									if !viper.GetBool("macho.disass.force") {
-										return fmt.Errorf("MachO analysis failed: %v", err)
+										return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
 									}
 								}
 							}
@@ -394,7 +394,7 @@ var machoDisassCmd = &cobra.Command{
 						}
 						if err := engine.Analyze(); err != nil {
 							if !viper.GetBool("macho.disass.force") {
-								return fmt.Errorf("MachO analysis failed: %v", err)
+								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
 							}
 						}
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {

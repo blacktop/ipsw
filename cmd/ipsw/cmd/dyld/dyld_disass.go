@@ -208,7 +208,7 @@ var DisassCmd = &cobra.Command{
 						//***********************
 						if err := image.Analyze(); err != nil {
 							if !viper.GetBool("dyld.disass.force") {
-								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+								return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(image.Name), err)
 							}
 						}
 						if err := engine.Triage(); err != nil {
@@ -217,7 +217,7 @@ var DisassCmd = &cobra.Command{
 						for _, img := range engine.Dylibs() {
 							if err := img.Analyze(); err != nil {
 								if !viper.GetBool("dyld.disass.force") {
-									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
 								}
 							}
 						}
@@ -302,7 +302,7 @@ var DisassCmd = &cobra.Command{
 						}
 						if err := image.Analyze(); err != nil {
 							if !viper.GetBool("dyld.disass.force") {
-								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+								return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(image.Name), err)
 							}
 						}
 						if err := engine.Triage(); err != nil {
@@ -311,7 +311,7 @@ var DisassCmd = &cobra.Command{
 						for _, img := range engine.Dylibs() {
 							if err := img.Analyze(); err != nil {
 								if !viper.GetBool("dyld.disass.force") {
-									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
 								}
 							}
 						}
@@ -416,12 +416,12 @@ var DisassCmd = &cobra.Command{
 					//* First pass ANALYSIS *
 					//***********************
 					if err := engine.Triage(); err != nil {
-						return fmt.Errorf("first pass triage failed: %v", err)
+						return fmt.Errorf("first pass triage failed: %v (use --force to continue anyway)", err)
 					}
 					for _, img := range engine.Dylibs() {
 						if err := img.Analyze(); err != nil {
 							if !viper.GetBool("dyld.disass.force") {
-								return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(img.Name), err)
+								return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
 							}
 						}
 					}
