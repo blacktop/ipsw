@@ -97,7 +97,7 @@ var watchCmd = &cobra.Command{
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes with the pattern '254930' for the last 30 days
 		❯ ipsw watch --pattern '254930' --days 30 WebKit/WebKit --branch main --timeout 5m
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and announce to Discord
-		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 10 WebKit/WebKit
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and run a command on new commits
 		# NOTE: the command will have access to the following environment variables:
 		#   - IPSW_WATCH_OID
