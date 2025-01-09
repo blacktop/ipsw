@@ -20,6 +20,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils/lsof"
 	"github.com/blacktop/ipsw/pkg/aea"
 	semver "github.com/hashicorp/go-version"
+	"golang.org/x/sys/execabs"
 )
 
 // Cp copies a file from src to dest
@@ -474,7 +475,11 @@ func Mount(image, mountPoint string) error {
 			return fmt.Errorf("%v: %s", err, out)
 		}
 	} else {
-		out, err := exec.Command("apfs-fuse", image, mountPoint).CombinedOutput()
+		apfsFusePath, err := execabs.LookPath("apfs-fuse")
+		if err != nil {
+			return fmt.Errorf("failed to find apfs-fuse in $PATH: %v", err)
+		}
+		out, err := exec.Command(apfsFusePath, image, mountPoint).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to mount '%s' via apfs-fuse: %v: cmd output - '%s'", image, err, out)
 		}
