@@ -23,6 +23,7 @@ ipsw macho disass <MACHO> [flags]
   -c, --count uint             Number of instructions to disassemble
   -d, --demangle               Demangle symbol names
   -t, --fileset-entry string   Which fileset entry to analyze
+      --force                  Continue to disassemble even if there are analysis errors
   -h, --help                   help for disass
   -j, --json                   Output as JSON
   -o, --off uint               File offset to start disassembling
