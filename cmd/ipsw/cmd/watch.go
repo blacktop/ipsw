@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/watch"
 	"github.com/blacktop/ipsw/internal/download"
@@ -68,6 +69,7 @@ func init() {
 	watchCmd.Flags().StringP("api", "a", "", "Github API Token")
 	watchCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
+	watchCmd.Flags().StringP("command", "c", "", "Command to run on new commit")
 	watchCmd.Flags().String("discord-id", "", "Discord Webhook ID")
 	watchCmd.Flags().String("discord-token", "", "Discord Webhook Token")
 	watchCmd.Flags().String("discord-icon", "", "Discord Post Icon URL")
@@ -79,6 +81,7 @@ func init() {
 	viper.BindPFlag("watch.api", watchCmd.Flags().Lookup("api"))
 	viper.BindPFlag("watch.json", watchCmd.Flags().Lookup("json"))
 	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
+	viper.BindPFlag("watch.command", watchCmd.Flags().Lookup("command"))
 	viper.BindPFlag("watch.discord-id", watchCmd.Flags().Lookup("discord-id"))
 	viper.BindPFlag("watch.discord-token", watchCmd.Flags().Lookup("discord-token"))
 	viper.BindPFlag("watch.discord-icon", watchCmd.Flags().Lookup("discord-icon"))
@@ -88,8 +91,21 @@ func init() {
 
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
-	Use:           "watch <ORG/REPO>",
-	Short:         "Watch Github Commits",
+	Use:   "watch <ORG/REPO>",
+	Short: "Watch Github Commits",
+	Example: heredoc.Doc(`
+		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes with the pattern '254930' for the last 30 days
+		❯ ipsw watch --pattern '254930' --days 30 WebKit/WebKit --branch main --timeout 5m
+		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and announce to Discord
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 10 WebKit/WebKit
+		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and run a command on new commits
+		# NOTE: the command will have access to the following environment variables:
+		#   - IPSW_WATCH_OID
+		#   - IPSW_WATCH_URL
+		#   - IPSW_WATCH_AUTHOR
+		#   - IPSW_WATCH_DATE
+		#   - IPSW_WATCH_MESSAGE
+		❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -101,6 +117,7 @@ var watchCmd = &cobra.Command{
 
 		apiToken := viper.GetString("watch.api")
 		asJSON := viper.GetBool("watch.json")
+		postCommand := viper.GetString("watch.command")
 		annouce := false
 
 		if viper.GetString("watch.discord-id") != "" && viper.GetString("watch.discord-token") != "" {
@@ -145,7 +162,7 @@ var watchCmd = &cobra.Command{
 				return err
 			}
 
-			if annouce {
+			if annouce && !viper.IsSet("watch.command") {
 				iconURL := viper.GetString("watch.discord-icon")
 				if iconURL == "" {
 					iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
@@ -170,6 +187,17 @@ var watchCmd = &cobra.Command{
 						continue
 					}
 					json.NewEncoder(os.Stdout).Encode(commit)
+				}
+			} else if postCommand != "" {
+				for _, commit := range commits {
+					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
+						seenCommitOIDs[string(commit.OID)] = true
+					} else {
+						continue
+					}
+					if err := watch.RunCommand(postCommand, commit); err != nil {
+						return fmt.Errorf("post command failed: %v", err)
+					}
 				}
 			} else {
 				for idx, commit := range commits {
