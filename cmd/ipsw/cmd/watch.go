@@ -61,7 +61,7 @@ func highlightHeader(re *regexp.Regexp, input string) string {
 func init() {
 	rootCmd.AddCommand(watchCmd)
 
-	// watchCmd.Flags().StringP("tags", "g", "main", "Watch for new tags")
+	watchCmd.Flags().BoolP("tags", "g", false, "Watch for new tags")
 	watchCmd.Flags().StringP("branch", "b", "main", "Repo branch to watch")
 	watchCmd.Flags().StringP("file", "f", "", "Commit file path to watch")
 	watchCmd.Flags().StringP("pattern", "p", "", "Commit message pattern to match")
@@ -70,10 +70,12 @@ func init() {
 	watchCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
 	watchCmd.Flags().StringP("command", "c", "", "Command to run on new commit")
+	watchCmd.Flags().Bool("post", false, "Create social media post for NEW tags")
 	watchCmd.Flags().String("discord-id", "", "Discord Webhook ID")
 	watchCmd.Flags().String("discord-token", "", "Discord Webhook Token")
 	watchCmd.Flags().String("discord-icon", "", "Discord Post Icon URL")
-	// viper.BindPFlag("watch.tags", watchCmd.Flags().Lookup("tags"))
+	watchCmd.Flags().String("cache", "", "Cache file to store seen commits/tags")
+	viper.BindPFlag("watch.tags", watchCmd.Flags().Lookup("tags"))
 	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
@@ -82,9 +84,11 @@ func init() {
 	viper.BindPFlag("watch.json", watchCmd.Flags().Lookup("json"))
 	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
 	viper.BindPFlag("watch.command", watchCmd.Flags().Lookup("command"))
+	viper.BindPFlag("watch.post", watchCmd.Flags().Lookup("post"))
 	viper.BindPFlag("watch.discord-id", watchCmd.Flags().Lookup("discord-id"))
 	viper.BindPFlag("watch.discord-token", watchCmd.Flags().Lookup("discord-token"))
 	viper.BindPFlag("watch.discord-icon", watchCmd.Flags().Lookup("discord-icon"))
+	viper.BindPFlag("watch.cache", watchCmd.Flags().Lookup("cache"))
 }
 
 // TODO: add support for watching local repos so that we can leverage `git log -L :func:file` to watch a single function
@@ -105,20 +109,52 @@ var watchCmd = &cobra.Command{
 		#   - IPSW_WATCH_AUTHOR
 		#   - IPSW_WATCH_DATE
 		#   - IPSW_WATCH_MESSAGE
-		❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'`),
+		❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
+		# Watch WebKit/WebKit for new tags every 5 minutes and announce to Discord
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		var cache watch.WatchCache
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
 		apiToken := viper.GetString("watch.api")
 		asJSON := viper.GetBool("watch.json")
 		postCommand := viper.GetString("watch.command")
 		annouce := false
+		// validate flags
+		if viper.GetBool("watch.tags") {
+			if viper.IsSet("watch.branch") {
+				return fmt.Errorf("--tags watching is not supported with --branch")
+			}
+			if viper.IsSet("watch.file") {
+				return fmt.Errorf("--tags watching is not supported with --file")
+			}
+			if viper.IsSet("watch.pattern") {
+				return fmt.Errorf("--tags watching is not supported with --pattern")
+			}
+			if viper.IsSet("watch.days") {
+				return fmt.Errorf("--tags watching is not supported with --days")
+			}
+			if viper.IsSet("watch.json") {
+				return fmt.Errorf("--tags watching is not supported with --json")
+			}
+			if viper.IsSet("watch.command") {
+				return fmt.Errorf("--tags watching is not supported with --command")
+			}
+		} else {
+			if viper.IsSet("watch.post") {
+				return fmt.Errorf("commit watching is not supported with --post")
+			}
+			if viper.IsSet("watch.cache") {
+				return fmt.Errorf("commit watching is not supported with local file --cache")
+			}
+		}
 
 		if viper.GetString("watch.discord-id") != "" && viper.GetString("watch.discord-token") != "" {
 			annouce = true
@@ -134,12 +170,22 @@ var watchCmd = &cobra.Command{
 			}
 		}
 
+		if viper.IsSet("watch.cache") {
+			cache, err = watch.NewFileCache(viper.GetString("watch.cache"))
+			if err != nil {
+				return err
+			}
+		} else {
+			cache, err = watch.NewMemoryCache(100)
+			if err != nil {
+				return err
+			}
+		}
+
 		parts := strings.Split(args[0], "/")
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid repo: %s (should be in the form 'org/repo')", args[0])
 		}
-
-		seenCommitOIDs := make(map[string]bool) // TODO: this can grow unbounded, need to limit it or switch to a LRU cache
 
 		shouldStop := false
 
@@ -148,81 +194,106 @@ var watchCmd = &cobra.Command{
 		}
 
 		for {
-			commits, err := download.GetGithubCommits(
-				parts[0], // org
-				parts[1], // repo
-				viper.GetString("watch.branch"),
-				viper.GetString("watch.file"),
-				viper.GetString("watch.pattern"),
-				viper.GetInt("watch.days"),
-				"",
-				false,
-				apiToken)
-			if err != nil {
-				return err
-			}
+			if viper.GetBool("watch.tags") {
+				var post string
 
-			if annouce && !viper.IsSet("watch.command") {
-				iconURL := viper.GetString("watch.discord-icon")
-				if iconURL == "" {
-					iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
+				tags, err := download.GetLatestTagsV2(parts[0], parts[1], 2, "", false, apiToken)
+				if err != nil {
+					return fmt.Errorf("failed to get %s tags: %v", args[0], err)
 				}
+				if _, ok := cache.Get(tags[0]); !ok {
+					cache.Add(tags[0], tags[1])
 
-				for _, commit := range commits {
-					if err := watch.DiscordAnnounce(string(commit.Message), &watch.Config{
-						DiscordWebhookID:    viper.GetString("watch.discord-id"),
-						DiscordWebhookToken: viper.GetString("watch.discord-token"),
-						DiscordColor:        "4535172",
-						DiscordAuthor:       string(commit.Author.Name),
-						DiscordIconURL:      iconURL,
-					}); err != nil {
-						return fmt.Errorf("discord announce failed: %v", err)
+					if viper.GetBool("watch.post") {
+						post, err = watch.Post(tags[1], tags[0])
+						if err != nil {
+							return err
+						}
 					}
-				}
-			} else if asJSON {
-				for _, commit := range commits {
-					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
-						seenCommitOIDs[string(commit.OID)] = true
+
+					if annouce {
+						iconURL := viper.GetString("watch.discord-icon")
+						if iconURL == "" {
+							iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
+						}
+						if post == "" {
+							post = fmt.Sprintf("%s/%s\n\t - [%s](https://github.com/%s/%s/releases/tag/%s)", parts[0], parts[1], tags[0], parts[0], parts[1], tags[0])
+						}
+						if err := watch.DiscordAnnounce(post, &watch.Config{
+							DiscordWebhookID:    viper.GetString("watch.discord-id"),
+							DiscordWebhookToken: viper.GetString("watch.discord-token"),
+							DiscordColor:        "4535172",
+							DiscordAuthor:       "🆕 TAG",
+							DiscordIconURL:      iconURL,
+						}); err != nil {
+							return fmt.Errorf("discord announce failed: %v", err)
+						}
 					} else {
-						continue
-					}
-					json.NewEncoder(os.Stdout).Encode(commit)
-				}
-			} else if postCommand != "" {
-				for _, commit := range commits {
-					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
-						seenCommitOIDs[string(commit.OID)] = true
-					} else {
-						continue
-					}
-					if err := watch.RunCommand(postCommand, commit); err != nil {
-						return fmt.Errorf("post command failed: %v", err)
+						if post == "" {
+							fmt.Println(tags[0])
+						} else {
+							fmt.Println(post)
+						}
 					}
 				}
 			} else {
+				commits, err := download.GetGithubCommits(
+					parts[0], // org
+					parts[1], // repo
+					viper.GetString("watch.branch"),
+					viper.GetString("watch.file"),
+					viper.GetString("watch.pattern"),
+					viper.GetInt("watch.days"),
+					"",
+					false,
+					apiToken)
+				if err != nil {
+					return fmt.Errorf("failed to get %s commits: %v", args[0], err)
+				}
+
 				for idx, commit := range commits {
-					// check if we've seen this commit before and skip if we have
-					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
-						seenCommitOIDs[string(commit.OID)] = true
-					} else {
-						continue
-					}
-					re := regexp.MustCompile(viper.GetString("watch.pattern"))
-					fmt.Println(highlightHeader(re, string(commit.MsgHeadline)))
-					fmt.Printf("\n%s\n\n", colorSeparator(
-						fmt.Sprintf("commit: %s (author: %s, date: %s)",
-							commit.OID,
-							commit.Author.Name,
-							commit.Author.Date.Format("02Jan2006 15:04:05")),
-					))
-					body := re.ReplaceAllStringFunc(string(commit.MsgBody), func(s string) string {
-						return colorHighlight(s)
-					})
-					fmt.Println(body)
-					if idx < len(commits)-1 {
-						println()
-						fmt.Println(colorSeparator("---"))
-						println()
+					if _, ok := cache.Get(string(commit.OID)); !ok {
+						cache.Add(string(commit.OID), commit)
+
+						if annouce && !viper.IsSet("watch.command") {
+							iconURL := viper.GetString("watch.discord-icon")
+							if iconURL == "" {
+								iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
+							}
+							if err := watch.DiscordAnnounce(string(commit.Message), &watch.Config{
+								DiscordWebhookID:    viper.GetString("watch.discord-id"),
+								DiscordWebhookToken: viper.GetString("watch.discord-token"),
+								DiscordColor:        "4535172",
+								DiscordAuthor:       string(commit.Author.Name),
+								DiscordIconURL:      iconURL,
+							}); err != nil {
+								return fmt.Errorf("discord announce failed: %v", err)
+							}
+						} else if asJSON {
+							json.NewEncoder(os.Stdout).Encode(commit)
+						} else if postCommand != "" {
+							if err := watch.RunCommand(postCommand, commit); err != nil {
+								return fmt.Errorf("post command failed: %v", err)
+							}
+						} else {
+							re := regexp.MustCompile(viper.GetString("watch.pattern"))
+							fmt.Println(highlightHeader(re, string(commit.MsgHeadline)))
+							fmt.Printf("\n%s\n\n", colorSeparator(
+								fmt.Sprintf("commit: %s (author: %s, date: %s)",
+									commit.OID,
+									commit.Author.Name,
+									commit.Author.Date.Format("02Jan2006 15:04:05")),
+							))
+							body := re.ReplaceAllStringFunc(string(commit.MsgBody), func(s string) string {
+								return colorHighlight(s)
+							})
+							fmt.Println(body)
+							if idx < len(commits)-1 {
+								println()
+								fmt.Println(colorSeparator("---"))
+								println()
+							}
+						}
 					}
 				}
 			}
