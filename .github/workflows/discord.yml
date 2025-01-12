@@ -21,4 +21,4 @@ jobs:
       - name: Run ipsw watch WebKit/WebKit
         run: |
           /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache watch-cache --api ${{ secrets.GITHUB_TOKEN }} --discord --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --cache watch-cache --api ${{ secrets.GITHUB_TOKEN }} --discord --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --cache watch-cache --api ${{ secrets.GITHUB_TOKEN }} --discord --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://avatars.githubusercontent.com/u/91919287" --mastodon --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
