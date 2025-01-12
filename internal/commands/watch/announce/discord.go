@@ -1,4 +1,4 @@
-package watch
+package announce
 
 import (
 	"bytes"
@@ -13,8 +13,8 @@ import (
 
 const discordURL = "https://discord.com/api"
 
-// Config for discord
-type Config struct {
+// DiscordConfig for discord
+type DiscordConfig struct {
 	DiscordWebhookID    string `json:"discord_webhook_id"`
 	DiscordWebhookToken string `json:"discord_webhook_token"`
 	DiscordColor        string `json:"discord_color"`
@@ -37,8 +37,8 @@ type embedAuthor struct {
 	IconURL string `json:"icon_url,omitempty"`
 }
 
-// DiscordAnnounce posts a message to a discord webhook
-func DiscordAnnounce(msg string, cfg *Config) error {
+// Discord posts a message to a discord webhook
+func Discord(msg string, cfg *DiscordConfig) error {
 	log.Infof("posting to discord:\n%s", msg)
 
 	color, err := strconv.Atoi(cfg.DiscordColor)
