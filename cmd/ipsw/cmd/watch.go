@@ -151,9 +151,6 @@ var watchCmd = &cobra.Command{
 			if viper.IsSet("watch.post") {
 				return fmt.Errorf("commit watching is not supported with --post")
 			}
-			if viper.IsSet("watch.cache") {
-				return fmt.Errorf("commit watching is not supported with local file --cache")
-			}
 		}
 
 		if viper.GetString("watch.discord-id") != "" && viper.GetString("watch.discord-token") != "" {

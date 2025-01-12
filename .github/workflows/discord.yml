@@ -2,7 +2,7 @@ name: "Discord"
 
 on:
   schedule:
-    - cron: "00 01,13 * * *"
+    - cron: "0 */1 * * *" # every 1 hour
     # - cron: "0 0 * * *"
 
 jobs:
@@ -13,12 +13,12 @@ jobs:
         id: cache-tags
         uses: actions/cache@v4
         with:
-          path: tags
-          key: ${{ runner.os }}-tags    
+          path: watch-cache
+          key: ${{ runner.os }}-watch-cache
       - name: Package Installer
         run: |
           sudo snap install ipsw
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch --pattern '(?i)Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png" WebKit/WebKit
-          /snap/bin/ipsw watch --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/distribution-macOS --tags --cache tags --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache watch-cache --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --cache watch-cache --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://avatars.githubusercontent.com/u/91919287"
