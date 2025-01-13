@@ -18,6 +18,9 @@ jobs:
       - name: Package Installer
         run: |
           sudo snap install ipsw
+      - name: Check Cache
+        run: |
+          cat watch-cache || echo "No cache found"
       - name: Run ipsw watch WebKit/WebKit
         run: |
           /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache watch-cache \
