@@ -39,5 +39,5 @@ jobs:
           --discord-icon "https://avatars.githubusercontent.com/u/91919287" \
           --mastodon \
           --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
-          -mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
+          --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
           --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
