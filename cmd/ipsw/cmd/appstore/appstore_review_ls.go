@@ -118,7 +118,7 @@ var ASReviewListCmd = &cobra.Command{
 				break
 			}
 
-			// print summary
+			// print review summary
 			reviewCount += 1
 			date := review.Attributes.Created.Format("Jan _2 2006")
 			stars := strings.Repeat("★", review.Attributes.Rating)
@@ -141,15 +141,17 @@ var ASReviewListCmd = &cobra.Command{
 			}
 		}
 
-		// print summary
-		if afterOrSinceFlag {
-			fmt.Printf("\n%d reviews since %s\n", reviewCount, afterDate.Format("Jan _2 2006 15:04:05"))
-		} else {
-			fmt.Printf("\n%d reviews\n", reviewCount)
+		// print summary, if any reviews were found, or if --verbose was specified
+		if reviewCount > 0 || viper.GetBool("verbose") {
+			if afterOrSinceFlag {
+				fmt.Printf("\n%d reviews since %s\n", reviewCount, afterDate.Format("Jan _2 2006 15:04:05"))
+			} else {
+				fmt.Printf("\n%d reviews\n", reviewCount)
+			}
+			fmt.Printf("%d responses\n", responseCount)
+			ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
+			fmt.Printf("\nTo respond, visit %s", ratingsUrl)
 		}
-		fmt.Printf("%d responses\n", responseCount)
-		ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
-		fmt.Printf("\nTo respond, visit %s", ratingsUrl)
 
 		// exit 2 if no new reviews, this will aid scripting
 		if reviewCount == 0 {
