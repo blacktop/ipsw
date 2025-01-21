@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -59,6 +60,9 @@ func init() {
 	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
 	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
+	extractCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return dyld.DscArches, cobra.ShellCompDirectiveDefault
+	})
 	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
 	extractCmd.Flags().String("device", "", "Device to extract kernel for (e.g. iPhone10,6)")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -121,8 +125,10 @@ var extractCmd = &cobra.Command{
 			return fmt.Errorf("--dyld-arch or -a can only be used with --dyld or -d")
 		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 {
 			for _, arch := range viper.GetStringSlice("extract.dyld-arch") {
-				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
-					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
+				if !utils.StrSliceHas(dyld.DscArches, arch) {
+					return fmt.Errorf("invalid --dyld-arch: '%s' (must be one of %s)",
+						arch,
+						strings.Join(dyld.DscArches, ", "))
 				}
 			}
 		} else if viper.GetString("extract.dmg") != "" {

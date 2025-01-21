@@ -114,7 +114,7 @@ var iaCmd = &cobra.Command{
 			}).Info, 2)("OTA")
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Run:\n\tipsw ota ls %s | grep \"dyld\\|cryptex-system-arm64e\"", zips[0]))
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Run:\n\tipsw ota ls %s | grep \"dyld\\|cryptex-system\"", zips[0]))
 
 		// block until user hits ctrl-c
 		done := make(chan os.Signal, 1)

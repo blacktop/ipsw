@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -53,15 +54,18 @@ func init() {
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	ipswCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote IPSW")
 	ipswCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
+	ipswCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return dyld.DscArches, cobra.ShellCompDirectiveDefault
+	})
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	ipswCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	ipswCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	ipswCmd.Flags().Bool("decrypt", false, "Attempt to decrypt the partial files if keys are available")
-	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	ipswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	ipswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
+	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.MarkFlagDirname("output")
 
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
@@ -155,8 +159,10 @@ var ipswCmd = &cobra.Command{
 		}
 		if len(dyldArches) > 0 {
 			for _, arch := range dyldArches {
-				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
-					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
+				if !utils.StrSliceHas(dyld.DscArches, arch) {
+					return fmt.Errorf("invalid --dyld-arch: '%s' (must be one of %s)",
+						arch,
+						strings.Join(dyld.DscArches, ", "))
 				}
 			}
 		}

@@ -553,7 +553,7 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 	}
 	defer os.RemoveAll(tmpdir)
 
-	for _, cryptex := range []string{"cryptex-system-arm64?e$", "cryptex-app$"} {
+	for _, cryptex := range []string{"cryptex-system-(arm64e?|x86_64h?)$"} {
 		re := regexp.MustCompile(cryptex)
 		for _, file := range r.Files() {
 			if re.MatchString(file.Name()) {

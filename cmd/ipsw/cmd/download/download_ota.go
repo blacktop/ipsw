@@ -34,6 +34,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
@@ -57,6 +58,9 @@ func init() {
 	DownloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
+	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
+	})
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
 	otaDLCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	otaDLCmd.Flags().Bool("delta", false, "Download Delta OTAs")
@@ -66,13 +70,18 @@ func init() {
 	otaDLCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	otaDLCmd.Flags().BoolP("json", "j", false, "Dump URLs as JSON only")
 	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
+	otaDLCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return dyld.DscArches, cobra.ShellCompDirectiveDefault
+	})
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	otaDLCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	otaDLCmd.MarkFlagDirname("output")
 	otaDLCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
+	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ota.latest", otaDLCmd.Flags().Lookup("latest"))
@@ -90,12 +99,6 @@ func init() {
 	viper.BindPFlag("download.ota.output", otaDLCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ota.show-latest-version", otaDLCmd.Flags().Lookup("show-latest-version"))
 	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
-
-	otaDLCmd.MarkFlagDirname("output")
-	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
-	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
-	})
 }
 
 // otaDLCmd represents the ota download command
@@ -172,8 +175,10 @@ var otaDLCmd = &cobra.Command{
 		}
 		if len(dyldArches) > 0 {
 			for _, arch := range dyldArches {
-				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
-					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
+				if !utils.StrSliceHas(dyld.DscArches, arch) {
+					return fmt.Errorf("invalid --dyld-arch: '%s' (must be one of %s)",
+						arch,
+						strings.Join(dyld.DscArches, ", "))
 				}
 			}
 		}
