@@ -357,6 +357,11 @@ func DSC(c *Config) ([]string, error) {
 				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 				if err != nil {
 					if errors.Is(err, dyld.ErrNoCryptex) {
+						if len(c.Arches) == 0 {
+							log.Warnf("%v; trying to extract dyld_shared_cache from payload files", err)
+						} else {
+							log.Warnf("%v for the specified arch(es): %s; trying to extract dyld_shared_cache from payload files (older OTAs didn't use cryptexes)", err, strings.Join(c.Arches, ", "))
+						}
 						c.Pattern = `^` + dyld.CacheRegex
 						rfiles, err := ota.RemoteList(zr)
 						if err != nil {
@@ -391,10 +396,10 @@ func DSC(c *Config) ([]string, error) {
 		}
 		sysDMG, err := i.GetSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
 		}
 		if len(sysDMG) == 0 {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
+			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: no SystemOS DMG found in remote zip metadata")
 		}
 		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
 		if err != nil {
