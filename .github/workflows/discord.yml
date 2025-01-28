@@ -16,21 +16,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Cache Tags
-        id: cache-tags
-        uses: actions/cache@v4
+      - name: Download Cache
+        uses: actions/download-artifact@v4
         with:
-          path: watch-cache
-          key: ${{ runner.os }}-watch-cache
+          name: metadata
+          path: metadata
+      - name: Check Cache
+        run: |
+          cat metadata || echo "No cache found"
       - name: Package Installer
         run: |
           sudo snap install ipsw
-      - name: Check Cache
-        run: |
-          cat watch-cache || echo "No cache found"
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache watch-cache \
+          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache metadata \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
@@ -39,7 +38,7 @@ jobs:
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS
         if: ${{ !inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache watch-cache \
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache metadata \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
@@ -49,3 +48,21 @@ jobs:
         # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
+      - name: Run ipsw watch apple-oss-distributions/distribution-macOS (SKIP MASTODON)
+        if: ${{ inputs.skip_post }}
+        run: |
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache metadata \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+        # --mastodon \
+        # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
+        # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
+        # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
+      - name: Upload metadata
+        uses: actions/upload-artifact@v3
+        with:
+          name: metadata
+          path: metadata
