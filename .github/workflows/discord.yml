@@ -16,11 +16,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Cache
-        uses: actions/download-artifact@v4
-        with:
-          name: metadata
-          path: metadata
+      # - name: Download Cache
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: metadata
+      #     path: metadata
       - name: Check Cache
         run: |
           cat metadata || echo "No cache found"
@@ -62,7 +62,7 @@ jobs:
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
       - name: Upload metadata
-        uses: actions/upload-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: metadata
           path: metadata
