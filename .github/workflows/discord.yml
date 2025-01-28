@@ -16,11 +16,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # - name: Download Cache
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: metadata
-      #     path: metadata
+      - name: Download Cache
+        uses: actions/download-artifact@v4
+        with:
+          name: metadata
+          path: metadata
       - name: Check Cache
         run: |
           cat metadata || echo "No cache found"
