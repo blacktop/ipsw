@@ -2,7 +2,8 @@ name: "Discord"
 
 on:
   schedule:
-    - cron: "0 */1 * * *" # every 1 hour
+    # - cron: "0 */1 * * *" # every 1 hour
+    - cron: "*/30 * * * *" # every 30 minutes
     # - cron: "0 0 * * *"
 
 jobs:
@@ -31,7 +32,7 @@ jobs:
           --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --cache watch-cache \
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache watch-cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
