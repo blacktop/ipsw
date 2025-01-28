@@ -16,20 +16,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Cache
-        uses: actions/download-artifact@v4
-        with:
-          name: metadata
-          path: metadata
       - name: Check Cache
         run: |
-          cat metadata || echo "No cache found"
+          cat hack/.watch_cache || echo "No cache found"
       - name: Package Installer
         run: |
           sudo snap install ipsw
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 --cache metadata \
+          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
+          --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
@@ -38,7 +34,8 @@ jobs:
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS
         if: ${{ !inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache metadata \
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
@@ -51,7 +48,8 @@ jobs:
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS (SKIP MASTODON)
         if: ${{ inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache metadata \
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          --cache hack/.watch_cache \          
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
@@ -61,10 +59,12 @@ jobs:
         # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
-      - name: Upload metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: metadata
-          path: metadata
-          overwrite: true
-          retention-days: 90
+      - name: Commit Cache Changes
+        run:
+          if [[ -n $(git status --porcelain) ]]; then
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git config --global user.name "github-actions[bot]"
+            git add hack/.watch_cache
+            git commit -m "Update .watch_cache"
+            git push
+          fi
