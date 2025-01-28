@@ -63,12 +63,15 @@ jobs:
         # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
-      - name: Commit Cache Changes
-        run:
-          if [[ -n $(git status --porcelain) ]]; then
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git config --global user.name "github-actions[bot]"
-            git add hack/.watch_cache
-            git commit -m "Update .watch_cache"
-            git push
-          fi
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update .watch_cache
+      # - name: Commit Cache Changes
+      #   run:
+      #     if [[ -n $(git status --porcelain) ]]; then
+      #       git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      #       git config --global user.name "github-actions[bot]"
+      #       git add hack/.watch_cache
+      #       git commit -m "Update .watch_cache"
+      #       git push
+      #     fi
