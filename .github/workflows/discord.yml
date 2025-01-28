@@ -62,7 +62,9 @@ jobs:
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
       - name: Upload metadata
-        uses: actions/download-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: metadata
           path: metadata
+          overwrite: true
+          retention-days: 90
