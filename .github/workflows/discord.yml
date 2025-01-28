@@ -1,6 +1,12 @@
 name: "Discord"
 
 on:
+  workflow_dispatch:  
+    inputs:  
+      skip_post:
+        description: 'Skip posting to Social Media'
+        required: false
+        type: boolean  
   schedule:
     # - cron: "0 */1 * * *" # every 1 hour
     - cron: "*/30 * * * *" # every 30 minutes
@@ -31,14 +37,15 @@ jobs:
           --discord-token ${{ secrets.DISCORD_TOKEN }} \
           --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS
+        if: ${{ !inputs.skip_post }}
         run: |
           /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post --cache watch-cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
           --discord-id ${{ secrets.DISCORD_ID }} \
           --discord-token ${{ secrets.DISCORD_TOKEN }} \
-          --discord-icon "https://avatars.githubusercontent.com/u/91919287" \
-          --mastodon \
-          --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
-          --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
-          --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
+          --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+        # --mastodon \
+        # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
+        # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
+        # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
