@@ -32,34 +32,35 @@ const (
 )
 
 var ProfileTypes = []string{
-	"IOS_APP_DEVELOPMENT",
-	"IOS_APP_STORE",
-	"IOS_APP_ADHOC",
-	"IOS_APP_INHOUSE",
-	"MAC_APP_DEVELOPMENT",
-	"MAC_APP_STORE",
-	"MAC_APP_DIRECT",
-	"TVOS_APP_DEVELOPMENT",
-	"TVOS_APP_STORE",
-	"TVOS_APP_ADHOC",
-	"TVOS_APP_INHOUSE",
-	"MAC_CATALYST_APP_DEVELOPMENT",
-	"MAC_CATALYST_APP_STORE",
-	"MAC_CATALYST_APP_DIRECT",
+	string(IOS_APP_DEVELOPMENT),
+	string(IOS_APP_STORE),
+	string(IOS_APP_ADHOC),
+	string(IOS_APP_INHOUSE),
+	string(MAC_APP_DEVELOPMENT),
+	string(MAC_APP_STORE),
+	string(MAC_APP_DIRECT),
+	string(TVOS_APP_DEVELOPMENT),
+	string(TVOS_APP_STORE),
+	string(TVOS_APP_ADHOC),
+	string(TVOS_APP_INHOUSE),
+	string(MAC_CATALYST_APP_DEVELOPMENT),
+	string(MAC_CATALYST_APP_STORE),
+	string(MAC_CATALYST_APP_DIRECT),
 }
 
 type Profile struct {
 	ID         string      `json:"id"`
 	Type       ProfileType `json:"type"` // profiles
 	Attributes struct {
-		ProfileState   string `json:"profileState"`
-		CreatedDate    Date   `json:"createdDate"`
-		ProfileType    string `json:"profileType"`
-		Name           string `json:"name"`
-		ProfileContent []byte `json:"profileContent"`
-		UUID           string `json:"uuid"`
-		Platform       string `json:"platform"`
-		ExpirationDate Date   `json:"expirationDate"`
+		Name           string      `json:"name"`
+		CreatedDate    Date        `json:"createdDate"`
+		ExpirationDate Date        `json:"expirationDate"`
+		ProfileContent []byte      `json:"profileContent"`
+		ProfileState   string      `json:"profileState"`
+		ProfileType    ProfileType `json:"profileType"`
+		UUID           string      `json:"uuid"`
+		Platform       string      `json:"platform"`
+		OfflineProfile bool        `json:"isOfflineProfile"`
 	} `json:"attributes"`
 	Relationships struct {
 		BundleID struct {
@@ -116,16 +117,18 @@ func (p Profile) IsExpired() bool {
 }
 
 type Data struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Type string `json:"type,omitempty"`
 }
 
 type ProfileCreateRequest struct {
 	Data struct {
 		Type       string `json:"type"` // profiles
 		Attributes struct {
-			Name        string `json:"name"`
-			ProfileType string `json:"profileType"`
+			Name           string      `json:"name"`
+			ProfileType    ProfileType `json:"profileType"`
+			TemplateName   string      `json:"templateName,omitempty"`
+			OfflineProfile bool        `json:"isOfflineProfile,omitempty"`
 		} `json:"attributes"`
 		Relationships struct {
 			BundleID struct {
@@ -378,15 +381,16 @@ func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
 }
 
 // CreateProfile creates a new profile
-func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, cerIDs, devicesIDs []string) (*ProfileResponse, error) {
+func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, cerIDs, devicesIDs []string, offline bool) (*ProfileResponse, error) {
 	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
 	var profileCreateRequest ProfileCreateRequest
 	profileCreateRequest.Data.Type = "profiles"
-	profileCreateRequest.Data.Attributes.ProfileType = ptype
 	profileCreateRequest.Data.Attributes.Name = name
+	profileCreateRequest.Data.Attributes.ProfileType = ProfileType(ptype)
+	profileCreateRequest.Data.Attributes.OfflineProfile = offline
 	profileCreateRequest.Data.Relationships.BundleID.Data.Type = "bundleIds"
 	profileCreateRequest.Data.Relationships.BundleID.Data.ID = bundleID
 	for _, cerID := range cerIDs {

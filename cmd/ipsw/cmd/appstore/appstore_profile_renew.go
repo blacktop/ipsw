@@ -158,6 +158,9 @@ var ASProfileRenewCmd = &cobra.Command{
 			certs = append(certs, cert.ID)
 		}
 		pDevs, err := as.GetProfileDevices(profile.ID)
+		if err != nil {
+			return err
+		}
 		for _, dev := range pDevs {
 			devices = append(devices, dev.ID)
 		}
@@ -173,7 +176,7 @@ var ASProfileRenewCmd = &cobra.Command{
 			"devices":   devices,
 		}).Debug("Creating profile")
 
-		resp, err := as.CreateProfile(profile.Attributes.Name, profile.Attributes.ProfileType, bid, certs, devices)
+		resp, err := as.CreateProfile(profile.Attributes.Name, string(profile.Attributes.ProfileType), bid, certs, devices, profile.Attributes.OfflineProfile)
 		if err != nil {
 			return fmt.Errorf("failed to create profile: %v", err)
 		}
