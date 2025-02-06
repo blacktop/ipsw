@@ -81,7 +81,7 @@ var iaCmd = &cobra.Command{
 			defer func() {
 				log.Debugf("Unmounting %s", dmgPath)
 				if err := utils.Retry(3, 2*time.Second, func() error {
-					return utils.Unmount(mountPoint, false)
+					return utils.Unmount(mountPoint, true)
 				}); err != nil {
 					utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err))
 				}
@@ -114,7 +114,7 @@ var iaCmd = &cobra.Command{
 			}).Info, 2)("OTA")
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Run:\n\tipsw ota ls %s | grep \"dyld\\|cryptex-system-arm64e\"", zips[0]))
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Run:\n\tipsw ota ls %s | grep \"dyld\\|cryptex-system\"", zips[0]))
 
 		// block until user hits ctrl-c
 		done := make(chan os.Signal, 1)

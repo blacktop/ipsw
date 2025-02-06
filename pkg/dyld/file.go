@@ -662,10 +662,10 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	if f.Headers[uuid].MappingOffset >= 0x208 {
 		// read TPRO mapping info
-		sr.Seek(int64(f.Headers[uuid].TPROMappingOffset), io.SeekStart)
-		f.TPROMappings = make([]TPROMapping, f.Headers[uuid].TPROMappingCount)
+		sr.Seek(int64(f.Headers[uuid].TPROMappingsOffset), io.SeekStart)
+		f.TPROMappings = make([]TPROMapping, f.Headers[uuid].TPROMappingsCount)
 		if err := binary.Read(sr, f.ByteOrder, f.TPROMappings); err != nil {
-			return fmt.Errorf("failed to read DSC TPRO mappings (new in iOS18.0beta1): %v", err)
+			return fmt.Errorf("failed to read DSC TPRO mappings (new in iOS18.0): %v", err)
 		}
 	}
 

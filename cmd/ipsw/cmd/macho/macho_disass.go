@@ -53,6 +53,7 @@ func init() {
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	machoDisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
 	// machoDisassCmd.Flags().StringP("input", "i", "", "Input function JSON file")
 	machoDisassCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoDisassCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
@@ -68,6 +69,7 @@ func init() {
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("macho.disass.force", machoDisassCmd.Flags().Lookup("force"))
 	// viper.BindPFlag("macho.disass.input", machoDisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("macho.disass.fileset-entry", machoDisassCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.disass.all-fileset-entries", machoDisassCmd.Flags().Lookup("all-fileset-entries"))
@@ -134,7 +136,7 @@ var machoDisassCmd = &cobra.Command{
 		machoPath := filepath.Clean(args[0])
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return fmt.Errorf("failed to detect file type: %v", err)
 		}
 
 		fat, err := macho.OpenFat(machoPath)
@@ -292,7 +294,9 @@ var machoDisassCmd = &cobra.Command{
 							}
 							if len(symbolMap) == 0 {
 								if err := engine.Analyze(); err != nil {
-									return fmt.Errorf("MachO analysis failed: %v", err)
+									if !viper.GetBool("macho.disass.force") {
+										return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
+									}
 								}
 							}
 							if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
@@ -389,7 +393,9 @@ var machoDisassCmd = &cobra.Command{
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
 						if err := engine.Analyze(); err != nil {
-							return fmt.Errorf("MachO analysis failed: %v", err)
+							if !viper.GetBool("macho.disass.force") {
+								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
+							}
 						}
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 							log.Errorf("failed to save symbol map: %v", err)

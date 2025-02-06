@@ -34,4 +34,5 @@ ipsw fw [flags]
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw fw aea](/docs/cli/ipsw/fw/aea)	 - Parse AEA1 DMGs
 * [ipsw fw iboot](/docs/cli/ipsw/fw/iboot)	 - Dump firmwares
+* [ipsw fw tc](/docs/cli/ipsw/fw/tc)	 - Dump TrustCache
 

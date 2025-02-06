@@ -45,7 +45,7 @@ func (b Bundle) String() string {
 		s += fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2)
 		s += "    Assets:\n"
 		for i, h := range b.Config.Assets {
-			s += fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), h)
+			s += fmt.Sprintf("      %3s) %-20s\n", fmt.Sprintf("%d", i+1), h)
 		}
 		s += "    TOC:\n"
 		for _, t := range b.Config.TOC {
@@ -82,6 +82,7 @@ type File struct {
 	Segments  []Segment
 	Sections  []Section
 	Endpoints []Endpoint
+	Extra     map[string]any
 }
 
 func (f File) Segment(name string) *Segment {
@@ -99,20 +100,26 @@ func (f File) String() string {
 		if seg.Size == 0 {
 			continue
 		}
-		s += fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name)
-		for _, sec := range f.Sections {
-			if sec.Size == 0 {
-				continue
-			}
-			if strings.HasPrefix(sec.Name, seg.Name) && !strings.EqualFold(sec.Name, seg.Name) {
-				s += fmt.Sprintf("      sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name)
-			}
+		if seg.Name == "HEADER" {
+			s += fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name)
 		}
+	}
+	for _, sec := range f.Sections {
+		if sec.Size == 0 {
+			continue
+		}
+		s += fmt.Sprintf("      sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name)
 	}
 	if len(f.Endpoints) > 0 {
 		s += "    endpoints:\n"
 		for i, ep := range f.Endpoints {
 			s += fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), ep)
+		}
+	}
+	if len(f.Extra) > 0 {
+		s += "    extra:\n"
+		for k, v := range f.Extra {
+			s += fmt.Sprintf("      %s: %v\n", k, v)
 		}
 	}
 	return s
@@ -343,6 +350,7 @@ func (b *Bundle) ParseFiles() error {
 		var sec Section
 		var seg Segment
 		entpoints := make(map[int]Endpoint, 0)
+		f.Extra = make(map[string]any)
 		for _, md := range bf.Metadata {
 			val, err := md.ParseValue()
 			if err != nil {
@@ -388,6 +396,8 @@ func (b *Bundle) ParseFiles() error {
 				} else {
 					return fmt.Errorf("failed to parse bundle file endpoint index: %v", err)
 				}
+			} else {
+				f.Extra[string(md.Key.Bytes)] = string(md.Value.Bytes)
 			}
 		}
 		sort.Slice(f.Sections, func(i, j int) bool {

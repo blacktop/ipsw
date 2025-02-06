@@ -356,7 +356,7 @@ jobs:
       - name: Run dyld disass
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld disass ./*__iPhone16,1/dyld_shared_cache_arm64e --demangle --symbol _NSLog
+        run: ipsw dyld disass ./*__iPhone16,1/dyld_shared_cache_arm64e --demangle --symbol _NSLog --symbol-image Foundation
       - name: Run dyld objc sel --image
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
@@ -417,7 +417,7 @@ jobs:
       - name: Run macho disass
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog
+        run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog --force
       - name: Run macho disass (MTE)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw

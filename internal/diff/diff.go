@@ -45,7 +45,7 @@ type mount struct {
 }
 
 type PlistDiff struct {
-	New     []string          `json:"new,omitempty"`
+	New     map[string]string `json:"new,omitempty"`
 	Removed []string          `json:"removed,omitempty"`
 	Updated map[string]string `json:"changed,omitempty"`
 }
@@ -356,13 +356,13 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 func (d *Diff) unmountSystemOsDMGs() error {
 	utils.Indent(log.Info, 2)("Unmounting 'Old' SystemOS DMG")
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.Old.MountPath, false)
+		return utils.Unmount(d.Old.MountPath, true)
 	}); err != nil {
 		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'Old' SystemOS DMG: %v", err))
 	}
 	utils.Indent(log.Info, 2)("Unmounting 'New' SystemOS DMG")
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.New.MountPath, false)
+		return utils.Unmount(d.New.MountPath, true)
 	}); err != nil {
 		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'New' SystemOS DMG: %v", err))
 	}
@@ -409,6 +409,12 @@ func (d *Diff) parseKernelcache() error {
 			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
 			break // just use first kernelcache for now
 		}
+		// for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
+		// 	d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(d.Old.Info.Plists.GetKernelCaches()[kmodel][0]))
+		// }
+		// for kmodel := range d.New.Info.Plists.GetKernelCaches() {
+		// 	d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(d.New.Info.Plists.GetKernelCaches()[kmodel][0]))
+		// }
 	}
 
 	m1, err := macho.Open(d.Old.Kernel.Path)
@@ -637,6 +643,7 @@ func (d *Diff) parseFirmwares() (err error) {
 
 func (d *Diff) parseFeatureFlags() (err error) {
 	d.Features = &PlistDiff{
+		New:     make(map[string]string),
 		Updated: make(map[string]string),
 	}
 	conf := &mcmd.DiffConfig{
@@ -674,10 +681,13 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	slices.Sort(nextFiles)
 
 	/* DIFF IPSW */
-	d.Features.New = utils.Difference(nextFiles, prevFiles)
+	newFiles := utils.Difference(nextFiles, prevFiles)
 	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
 
 	for _, f2 := range nextFiles {
+		if slices.Contains(newFiles, f2) {
+			d.Features.New[f2] = newPlists[f2]
+		}
 		dat2 := newPlists[f2]
 		if dat1, ok := oldPlists[f2]; ok {
 			if strings.EqualFold(dat2, dat1) {

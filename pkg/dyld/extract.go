@@ -24,7 +24,11 @@ import (
 	"github.com/vbauerster/mpb/v8/decor"
 )
 
-var ErrNoCryptex = errors.New("cryptex-system-arm64e NOT found in remote zip")
+var ErrNoCryptex = errors.New("cryptex-system NOT found in remote zip")
+
+var DscArches = []string{
+	"arm64", "arm64e", "x86_64", "x86_64h", "aot",
+}
 
 func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
 	var matches []string
@@ -61,7 +65,20 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 	return matches, nil
 }
 
-func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, driverkit, all bool) ([]string, error) {
+func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+
+	if filepath.Ext(dmgPath) == ".aea" {
+		var err error
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:  dmgPath,
+			Output: filepath.Dir(dmgPath),
+			PemDB:  pemDB,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
+		defer os.Remove(dmgPath)
+	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	var alreadyMounted bool
@@ -75,7 +92,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, dri
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
+				return utils.Unmount(mountPoint, true)
 			}); err != nil {
 				log.Errorf("failed to unmount DMG %s at %s: %v", dmgPath, mountPoint, err)
 			}
@@ -187,33 +204,31 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		defer os.Remove(dmgs[0])
 	}
 
-	if filepath.Ext(dmgPath) == ".aea" {
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:  dmgPath,
-			Output: filepath.Dir(dmgPath),
-			PemDB:  pemDB,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
-		}
-		defer os.Remove(dmgPath)
-	}
-
-	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit, all)
+	return ExtractFromDMG(i, dmgPath, destPath, pemDB, arches, driverkit, all)
 }
 
-// ExtractFromRemoteCryptex extracts the dyld_shared_cache from the cryptex-system-arm64e file in the given zip.Reader.
-// It creates a temp file for the cryptex-system-arm64e file, patches it, and extracts the dyld_shared_cache from the decrypted file.
+// ExtractFromRemoteCryptex extracts the dyld_shared_cache from the cryptex-system file in the given zip.Reader.
+// It creates a temp file for the cryptex-system file, patches it, and extracts the dyld_shared_cache from the decrypted file.
 // The extracted dyld_shared_cache is saved to the given destPath.
 // The function returns a slice of artifacts extracted from the dyld_shared_cache and an error if any.
-func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit, all bool) ([]string, error) {
-	re := regexp.MustCompile(`cryptex-system-arm64?e$`)
-
+func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+	re := regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+	if len(arches) > 0 {
+		var parts []string
+		for _, arch := range arches {
+			if arch == "arm64" || arch == "arm64e" {
+				parts = append(parts, "arm64e?")
+			} else {
+				parts = append(parts, "x86_64h?")
+			}
+		}
+		re = regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(parts, "|")))
+	}
 	for _, zf := range zr.File {
 		if re.MatchString(zf.Name) {
 			rc, err := zf.Open()
 			if err != nil {
-				return nil, fmt.Errorf("failed to open cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to open %s: %v", zf.Name, err)
 			}
 			defer rc.Close()
 			// setup progress bar
@@ -237,39 +252,45 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, 
 			proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
 			defer proxyReader.Close()
 
-			in, err := os.CreateTemp("", "cryptex-system-arm64e")
+			in, err := os.CreateTemp("", "cryptex-system")
 			if err != nil {
-				return nil, fmt.Errorf("failed to create temp file for cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to create temp file for %s: %v", zf.Name, err)
 			}
 			defer os.Remove(in.Name())
 
-			log.Info("Extracting cryptex-system-arm64e from remote OTA")
+			log.Infof("Extracting %s from remote OTA", filepath.Base(zf.Name))
 			io.Copy(in, proxyReader)
 			// wait for our bar to complete and flush and close remote zip and temp file
 			p.Wait()
 			in.Close()
 
-			out, err := os.CreateTemp("", "cryptex-system-arm64e.decrypted.*.dmg")
+			out, err := os.CreateTemp("", "cryptex-system.decrypted.*.dmg")
 			if err != nil {
-				return nil, fmt.Errorf("failed to create temp file for cryptex-system-arm64e.decrypted: %v", err)
+				return nil, fmt.Errorf("failed to create temp file for %s: %v", in.Name(), err)
 			}
 			defer os.Remove(out.Name())
 			out.Close()
 
-			log.Infof("Patching cryptex-system-arm64e to %s", out.Name())
+			log.Infof("Patching %s to %s", zf.Name, out.Name())
 			if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
-				return nil, fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to patch %s: %v", zf.Name, err)
 
 			}
 
 			i, err := info.ParseZipFiles(zr.File)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to parse info from %s: %v", zf.Name, err)
 			}
 
-			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit, all)
+			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, pemDB, arches, driverkit, all)
 			if err != nil {
-				return nil, fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
+				tmpcopy := filepath.Join(os.TempDir(), filepath.Base(out.Name()))
+				tcerr := utils.Copy(out.Name(), tmpcopy)
+				exterr := fmt.Errorf("failed to extract 'dyld_shared_cache' from %s: %v", zf.Name, err)
+				if tcerr != nil {
+					return nil, fmt.Errorf("%v: attempted to copy downloaded file: failed to copy '%s' to '%s': %v", out.Name(), exterr, tmpcopy, tcerr)
+				}
+				return nil, fmt.Errorf("%v (copied downloaded file to '%s')", exterr, tmpcopy)
 			}
 
 			return artifacts, nil

@@ -16,7 +16,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-var dmgTypes = []string{"fs", "sys", "app", "exc"}
+var DmgTypes = []string{"fs", "sys", "app", "exc"}
 
 // Context is the mount context
 type Context struct {
@@ -33,7 +33,7 @@ func (c Context) Unmount() error {
 		}
 	}
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(c.MountPoint, false)
+		return utils.Unmount(c.MountPoint, true)
 	}); err != nil {
 		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
 	}
@@ -82,7 +82,7 @@ func DmgInIPSW(path, typ, pemDbPath string) (*Context, error) {
 			return nil, fmt.Errorf("failed to get ExclaveOS DMG: %v", err)
 		}
 	default:
-		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(dmgTypes, "', '"))
+		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
 	}
 
 	extractedDMG := filepath.Join(os.TempDir(), dmgPath)

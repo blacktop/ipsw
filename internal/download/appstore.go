@@ -31,11 +31,8 @@ import (
 // CREDIT - https://github.com/majd/ipatool
 
 const (
-	urlPrefex           = "https://p25-"
-	url2faPrefex        = "https://p71-"
-	appStoreAuthURL     = urlPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-	appStoreAuth2faURL  = url2faPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-	appStoreDownloadURL = urlPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	appStoreAuthURL     = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+	appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZBuy.woa/wa/buyProduct"
 	appStoreSearchURL   = "https://itunes.apple.com/search"
 	appStoreLookupURL   = "https://itunes.apple.com/lookup"
@@ -49,6 +46,7 @@ const (
 	FailureTypePasswordTokenExpired   = "2034"
 	FailureTypeLicenseNotFound        = "9610"
 	FailureTypeTemporarilyUnavailable = "2059"
+	FailureTypeSignInToTheItunesStore = "2042"
 )
 
 type AppStoreConfig struct {
@@ -183,9 +181,11 @@ type purchaseResponse struct {
 }
 
 type downloadRequest struct {
-	CreditDisplay string `plist:"creditDisplay,omitempty"`
-	GuID          string `plist:"guid,omitempty"`
-	SalableAdamID int    `plist:"salableAdamId,omitempty"`
+	GUID              string `plist:"guid,omitempty"`
+	Price             string `plist:"price,omitempty"`
+	PricingParameters string `plist:"pricingParameters,omitempty"`
+	ProductType       string `plist:"productType,omitempty"`
+	SalableAdamId     string `plist:"salableAdamId,omitempty"`
 }
 
 type downloadResponse struct {
@@ -249,6 +249,12 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 
 	as := AppStore{
 		Client: &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if req.Referer() == appStoreAuthURL {
+					return http.ErrUseLastResponse
+				}
+				return nil
+			},
 			Jar: jar,
 			Transport: &http.Transport{
 				Proxy:           GetProxy(config.Proxy),
@@ -356,56 +362,76 @@ func (as *AppStore) Login(username, password string) error {
 	}
 
 	if err := as.loadSession(); err != nil { // load previous session (if error, login)
-		return as.signIn(username, password, "", 0)
+		return as.signIn(username, password, "", 1, 0)
 	}
 
 	return nil
 }
 
-func (as *AppStore) signIn(username, password, code string, attempt int) error {
-	buf := new(bytes.Buffer)
+func (as *AppStore) signIn(username, password, code string, attempt int, itspod int) error {
+	if attempt > 4 {
+		return errors.New("too many authentication attempts")
+	}
 
 	mac, err := getMacAddress()
 	if err != nil {
 		return fmt.Errorf("failed to get mac address: %v", err)
 	}
 
-	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	var buf bytes.Buffer
+	encoder := plist.NewEncoderForFormat(&buf, plist.XMLFormat)
 
-	plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&loginRequest{
-		AppleID:       username,
-		Password:      fmt.Sprintf("%s%s", password, code),
-		Attempt:       "4",
-		CreateSession: "true",
-		GuID:          guid,
-		Rmp:           "0",
-		Why:           "signIn",
-	})
+	lr := loginRequest{
+		AppleID:  username,
+		Attempt:  strconv.Itoa(attempt),
+		GuID:     strings.ReplaceAll(strings.ToUpper(mac), ":", ""),
+		Password: password + code,
+		Rmp:      "0",
+		Why:      "signIn",
+	}
+	if err := encoder.Encode(lr); err != nil {
+		return err
+	}
 
-	req, err := http.NewRequest("POST", appStoreAuthURL, buf)
+	req, err := http.NewRequest("POST", appStoreAuthURL, &buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
 
-	q := url.Values{}
-	q.Add("guid", guid)
-	req.URL.RawQuery = q.Encode()
-
-	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("User-Agent", userAgent)
 
-	response, err := as.Client.Do(req)
+	if itspod != 0 {
+		itspod := strconv.Itoa(itspod)
+
+		query := req.URL.Query()
+		query.Set("PRH", itspod)
+		query.Set("Pod", itspod)
+
+		req.URL.RawQuery = query.Encode()
+	}
+
+	res, err := as.Client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer res.Body.Close()
 
-	body, err := io.ReadAll(response.Body)
+	if res.StatusCode == http.StatusFound {
+		itspod, err := strconv.Atoi(res.Header.Get("pod"))
+		if err != nil {
+			return err
+		}
+
+		return as.signIn(username, password, "", attempt+1, itspod)
+	}
+
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("POST Login: (%d):\n%s\n", response.StatusCode, string(body))
+	log.Debugf("POST Login: (%d):\n%s\n", res.StatusCode, string(body))
 
 	// os.WriteFile("login.xml", body, 0644)
 
@@ -414,11 +440,11 @@ func (as *AppStore) signIn(username, password, code string, attempt int) error {
 		return fmt.Errorf("failed to decode login response: %v", err)
 	}
 
-	if attempt == 0 && login.FailureType == FailureTypeInvalidCredentials {
-		return as.signIn(username, password, "", attempt+1)
+	if attempt == 1 && login.FailureType == FailureTypeInvalidCredentials {
+		return as.signIn(username, password, "", attempt+1, itspod)
 	}
 
-	if login.CustomerMessage == ErrLoginRequires2fa {
+	if res.StatusCode == http.StatusNotFound || login.CustomerMessage == ErrLoginRequires2fa {
 		if len(code) == 0 {
 			prompt := &survey.Password{
 				Message: "Please type your verification code:",
@@ -431,7 +457,7 @@ func (as *AppStore) signIn(username, password, code string, attempt int) error {
 				return err
 			}
 		}
-		return as.signIn(username, password, code, 0)
+		return as.signIn(username, password, code, attempt+1, itspod)
 	}
 
 	as.username = username
@@ -457,7 +483,7 @@ func (as *AppStore) storeSession(resp loginResponse) error {
 	auth.Credentials.DsPersonID = resp.DsPersonID
 
 	auth.AppStoreSession = session{
-		Cookies: as.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "p25-buy.itunes.apple.com"}),
+		Cookies: as.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "buy.itunes.apple.com"}),
 	}
 
 	// save dev auth to vault
@@ -499,7 +525,7 @@ func (as *AppStore) loadSession() error {
 		return fmt.Errorf("vault is missing required credential data")
 	}
 
-	as.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "p25-buy.itunes.apple.com"}, auth.AppStoreSession.Cookies)
+	as.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "buy.itunes.apple.com"}, auth.AppStoreSession.Cookies)
 
 	// clear dev auth mem
 	auth = AppleAccountAuth{}
@@ -682,7 +708,7 @@ func (as *AppStore) Purchase(bundleID string) error {
 		if err := json.Unmarshal(key.Data, &auth); err != nil {
 			return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 		}
-		if err := as.signIn(auth.Credentials.Username, auth.Credentials.Password, "", 0); err != nil {
+		if err := as.signIn(auth.Credentials.Username, auth.Credentials.Password, "", 1, 0); err != nil {
 			return fmt.Errorf("failed to re-signin: %v", err)
 		}
 		auth = AppleAccountAuth{}
@@ -718,9 +744,11 @@ func (as *AppStore) Download(bundleID, output string) error {
 	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 
 	plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
-		CreditDisplay: "",
-		GuID:          guid,
-		SalableAdamID: app.ID,
+		GUID:              guid,
+		Price:             "0",
+		PricingParameters: "STDRDL",
+		ProductType:       "C",
+		SalableAdamId:     strconv.Itoa(app.ID),
 	})
 
 	req, err := http.NewRequest("POST", appStoreDownloadURL, buf)
@@ -728,13 +756,8 @@ func (as *AppStore) Download(bundleID, output string) error {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
 
-	q := url.Values{}
-	q.Add("guid", guid)
-	req.URL.RawQuery = q.Encode()
-
-	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Content-Type", "application/x-apple-plist")
-	req.Header.Set("iCloud-DSID", as.dsid)
+	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("X-Dsid", as.dsid)
 
 	response, err := as.Client.Do(req)
@@ -755,6 +778,24 @@ func (as *AppStore) Download(bundleID, output string) error {
 	var dl downloadResponse
 	if err := plist.NewDecoder(bytes.NewReader(body)).Decode(&dl); err != nil {
 		return fmt.Errorf("failed to decode download response: %v", err)
+	}
+
+	if dl.FailureType == FailureTypeSignInToTheItunesStore {
+		key, err := as.Vault.Get(VaultName)
+		if err != nil {
+			return fmt.Errorf("failed to get dev auth from vault: %v", err)
+		}
+
+		var auth AppleAccountAuth
+		if err := json.Unmarshal(key.Data, &auth); err != nil {
+			return fmt.Errorf("failed to unmarshal dev auth: %v", err)
+		}
+		if err := as.signIn(auth.Credentials.Username, auth.Credentials.Password, "", 1, 0); err != nil {
+			return fmt.Errorf("failed to re-signin: %v", err)
+		}
+		auth = AppleAccountAuth{}
+
+		return as.Download(bundleID, output)
 	}
 
 	if dl.FailureType == FailureTypeLicenseNotFound {

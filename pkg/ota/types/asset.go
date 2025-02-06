@@ -24,7 +24,7 @@ type bridgeVersionInfo struct {
 
 type restoreVersionInfo struct {
 	IsSeed             bool   `json:"IsSeed,omitempty"`
-	RestoreBuildGroup  string `json:"RestoreBuildGroup,omitempty"`
+	RestoreBuildGroup  any    `json:"RestoreBuildGroup,omitempty"`
 	RestoreLongVersion string `json:"RestoreLongVersion,omitempty"`
 	RestoreVersion     string `json:"RestoreVersion,omitempty"`
 }

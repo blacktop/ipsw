@@ -1374,6 +1374,45 @@
         }
       }
     },
+    "/macho/info/strings": {
+      "get": {
+        "description": "Get MachO strings.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "MachO"
+        ],
+        "summary": "Strings",
+        "operationId": "getMachoInfoStrings",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to MachO",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "architecture to get info for in universal MachO",
+            "name": "arch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/machoStringsResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/mount/{type}": {
       "post": {
         "description": "Mount a DMG inside a given IPSW.",
@@ -1558,6 +1597,48 @@
         }
       }
     },
+    "/syms/rescan": {
+      "put": {
+        "description": "Rescan symbols for a given IPSW.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Syms"
+        ],
+        "summary": "Rescan",
+        "operationId": "putRescan",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to AEA pem DB JSON file",
+            "name": "pem_db",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "path to symbolication signatures directory",
+            "name": "sig_dir",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "201": {
+            "$ref": "#/responses/createdResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/syms/scan": {
       "post": {
         "description": "Scan symbols for a given IPSW.",
@@ -1582,11 +1663,20 @@
             "description": "path to AEA pem DB JSON file",
             "name": "pem_db",
             "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "path to symbolication signatures directory",
+            "name": "sig_dir",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
             "$ref": "#/responses/successResponse"
+          },
+          "409": {
+            "$ref": "#/responses/genericError"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -3478,11 +3568,6 @@
           "type": "string",
           "x-go-name": "BuildID"
         },
-        "date": {
-          "type": "string",
-          "format": "date-time",
-          "x-go-name": "Date"
-        },
         "devices": {
           "type": "array",
           "items": {
@@ -3619,26 +3704,14 @@
     "Macho": {
       "type": "object",
       "properties": {
-        "CreatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "DeletedAt": {
-          "$ref": "#/definitions/DeletedAt"
+        "Path": {
+          "$ref": "#/definitions/Path"
         },
         "Symbols": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Symbol"
           }
-        },
-        "UpdatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "name": {
-          "type": "string",
-          "x-go-name": "Name"
         },
         "text_end": {
           "type": "integer",
@@ -3662,6 +3735,16 @@
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/types"
     },
+    "Name": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "NullTime": {
       "description": "NullTime implements the [Scanner] interface so\nit can be used as a scan destination, similar to [NullString].",
       "type": "object",
@@ -3676,6 +3759,16 @@
         }
       },
       "x-go-package": "database/sql"
+    },
+    "Path": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Path"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
     },
     "Plists": {
       "description": "Plists IPSW/OTA plists object",
@@ -4152,6 +4245,9 @@
         "pattern"
       ],
       "properties": {
+        "Name": {
+          "$ref": "#/definitions/Name"
+        },
         "end": {
           "type": "integer",
           "format": "uint64",
@@ -4161,10 +4257,6 @@
           "type": "integer",
           "format": "uint64",
           "x-go-name": "Start"
-        },
-        "symbol": {
-          "type": "string",
-          "x-go-name": "Symbol"
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/model"
@@ -4641,9 +4733,7 @@
         "IsSeed": {
           "type": "boolean"
         },
-        "RestoreBuildGroup": {
-          "type": "string"
-        },
+        "RestoreBuildGroup": {},
         "RestoreLongVersion": {
           "type": "string"
         },
@@ -4707,6 +4797,14 @@
         "items": {
           "type": "integer",
           "format": "uint8"
+        }
+      }
+    },
+    "createdResponse": {
+      "description": "",
+      "headers": {
+        "created": {
+          "type": "boolean"
         }
       }
     },
@@ -5112,6 +5210,28 @@
         "path": {
           "type": "string"
         }
+      }
+    },
+    "machoStringsResponse": {
+      "description": "",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "headers": {
+        "arch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "strings": {}
       }
     },
     "mountReponse": {

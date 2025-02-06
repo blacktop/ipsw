@@ -136,7 +136,27 @@ database:
   host: localhost
   port: 5432
   user: blacktop
-```  
+```
+
+:::info
+### To add kernel symbolication
+
+Get the signatures
+
+```bash
+git clone https://github.com/blacktop/symbolicator.git
+```
+
+Add them to your `~/.config/ipsw/config.yml`
+
+```yaml
+daemon:
+  sigs-dir: /path/to/blacktop/symbolicator/kernel
+```
+
+> For more information see [Kernel Symbolication](https://blacktop.github.io/ipsw/blog/kernel-symbolication)
+
+:::
 
 ### Start `ipswd`
 

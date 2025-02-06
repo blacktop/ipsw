@@ -1,0 +1,224 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: PBL.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose:
+//  Category: Executable
+// File Mask:
+//  ID Bytes: 64 34 70 73
+//   History:
+//------------------------------------------------
+
+
+typedef struct
+{
+  char magic[4]<bgcolor = cLtBlue>; // "d4ps"  
+  uint32    versionHash<format = hex>;   // PREBUILTLOADER_VERSION
+  uint32    length;
+  uint32    loadersArrayCount;
+  uint32    loadersArrayOffset;
+  uint32    cachePatchCount;
+  uint32    cachePatchOffset;
+  uint32    dyldCacheUUIDOffset;
+  uint32    mustBeMissingPathsCount;
+  uint32    mustBeMissingPathsOffset;
+  // ObjC prebuilt data
+  uint32    objcSelectorHashTableOffset;
+  uint32    objcClassHashTableOffset;
+  uint32    objcProtocolHashTableOffset;
+  uint32    reserved;
+  uint64    objcProtocolClassCacheOffset;
+  // Swift prebuilt data
+  uint32    swiftTypeConformanceTableOffset;
+  uint32    swiftMetadataConformanceTableOffset;
+  uint32    swiftForeignTypeConformanceTableOffset;
+} PBLSetHeader;
+
+typedef struct
+{
+  uint16 index : 15;   // index into PrebuiltLoaderSet
+  uint16 app   :  1;   // app vs dyld cache PrebuiltLoaderSet
+} LoaderRef;
+
+typedef struct
+{
+  char magic[4]<bgcolor = cLtBlue>; // "dy4l"
+	uint16 isPrebuilt         : 1;  // PrebuiltLoader vs JustInTimeLoader
+	uint16 dylibInDyldCache   : 1;
+	uint16 hasObjC            : 1;
+	uint16 mayHavePlusLoad    : 1;
+	uint16 hasReadOnlyData    : 1;  // __DATA_CONST.  Don't use directly.  Use hasConstantSegmentsToProtect()
+	uint16 neverUnload        : 1;  // part of launch or has non-unloadable data (e.g. objc, tlv)
+	uint16 leaveMapped        : 1;  // RTLD_NODELETE
+	uint16 hasReadOnlyObjC    : 1;  // Has __DATA_CONST,__objc_selrefs section
+	uint16 pre2022Binary      : 1;
+	uint16 isPremapped        : 1;  // mapped by exclave core
+	uint16 hasUUIDLoadCommand : 1;
+	uint16 hasWeakDefs        : 1;
+	uint16 hasTLVs            : 1;
+	uint16 belowLibSystem     : 1;
+	uint16 padding            : 2;
+  LoaderRef ref;
+} PBLLoader;
+
+typedef struct
+{ 
+  uint32   fileOffset;
+  uint32   size;
+} CodeSignatureInFile;
+
+typedef enum<uint>
+{
+    // TEXT:
+    _dyld_section_location_text_swift5_protos                  = 0x0,
+    _dyld_section_location_text_swift5_proto,
+    _dyld_section_location_text_swift5_types,
+    _dyld_section_location_text_swift5_replace,
+    _dyld_section_location_text_swift5_replace2,
+    _dyld_section_location_text_swift5_ac_funcs,
+
+    // DATA*:
+    _dyld_section_location_objc_image_info,
+    _dyld_section_location_data_sel_refs,
+    _dyld_section_location_data_msg_refs,
+    _dyld_section_location_data_class_refs,
+    _dyld_section_location_data_super_refs,
+    _dyld_section_location_data_protocol_refs,
+    _dyld_section_location_data_class_list,
+    _dyld_section_location_data_non_lazy_class_list,
+    _dyld_section_location_data_stub_list,
+    _dyld_section_location_data_category_list,
+    _dyld_section_location_data_category_list2,
+    _dyld_section_location_data_non_lazy_category_list,
+    _dyld_section_location_data_protocol_list,
+    _dyld_section_location_data_objc_fork_ok,
+    _dyld_section_location_data_raw_isa,
+
+    // Note, always add new entries before this
+    _dyld_section_location_count,
+} _dyld_section_location_kind;
+
+typedef struct
+{ 
+    uint32 version; // = 1;
+    uint32 flags; // = 0;
+
+    uint64 offsets[_dyld_section_location_count]<format = hex>;
+    uint64 sizes[_dyld_section_location_count]<format = hex>;
+} SectionLocations;
+
+typedef struct
+{
+    uint16            pathOffset;
+    uint16            dependentLoaderRefsArrayOffset; // offset to array of LoaderRef
+    uint16            dependentKindArrayOffset;       // zero if all deps normal
+    uint16            fixupsLoadCommandOffset;
+
+    uint16            altPathOffset;                  // if install_name does not match real path
+    uint16            fileValidationOffset;           // zero or offset to FileValidationInfo
+
+    uint16            hasInitializers      :  1,
+                        isOverridable      :  1,      // if in dyld cache, can roots override it
+                        supportsCatalyst   :  1,      // if false, this cannot be used in catalyst process
+                        isCatalystOverride :  1,      // catalyst side of unzippered twin
+                        regionsCount       : 12;
+    uint16            regionsOffset;                  // offset to Region array
+
+    uint16            depCount;
+    uint16            bindTargetRefsOffset;
+    uint32            bindTargetRefsCount;            // bind targets can be large, so it is last
+    // After this point, all offsets in to the PrebuiltLoader need to be 32-bits as the bind targets can be large
+
+    uint32            objcBinaryInfoOffset;           // zero or offset to ObjCBinaryInfo
+    uint16            indexOfTwin<format = hex>;      // if in dyld cache and part of unzippered twin, then index of the other twin
+    uint16            reserved1;
+
+    uint64            exportsTrieLoaderOffset<format = hex>;
+    uint32            exportsTrieLoaderSize;
+    uint32            vmSpace<format = hex>;
+
+    CodeSignatureInFile codeSignature;
+
+    uint32            patchTableOffset;
+
+    uint32            overrideBindTargetRefsOffset;
+    uint32            overrideBindTargetRefsCount;
+    
+    uint32 NEW_FIELD_OR_PADDING; // 🆕
+
+    SectionLocations    sectionLocations;
+} PBLHeader<read = readimagename>;
+
+typedef ubyte Uuid[16]<read = readUUID, format = hex>;
+
+string readimagename(PBLHeader &hdr)
+{
+   local uint32 off;
+   off = startof(hdr) - sizeof(PBLLoader); // VERSION_1
+  //  off = startof(hdr) - sizeof(PBLLoader) - sizeof(Uuid) - 8;  // VERSION_2
+    return ReadString( off + hdr.pathOffset );
+}
+
+string readUUID(Uuid uuid)
+{
+    local string ret, tmp;
+    local int i;
+
+    for (i = 0; i < 4; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 4]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 6]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 8]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 6; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 10]);
+        ret += tmp;
+    }
+    return ret;
+}
+
+typedef struct (uint32 offset)
+{
+  FSeek(offset);
+  PBLLoader loader;
+  if (loader.isVersion2) {
+    Uuid uuid<bgcolor = cLtPurple>;
+    uint32 unknown[2]<format = hex, bgcolor = cPurple>;
+  }
+  PBLHeader header;
+} PBL;
+
+LittleEndian();
+
+PBLSetHeader hdr;
+FSeek(hdr.loadersArrayOffset);
+uint32 loaderOffsets[hdr.loadersArrayCount]<bgcolor = cBlue>;
+local int i;
+for (i = 0; i < hdr.loadersArrayCount; i++) {
+  PBL pbls(loaderOffsets[i]);
+}

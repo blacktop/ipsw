@@ -44,7 +44,7 @@ func init() {
 
 	kernelSymbolicateCmd.Flags().BoolP("flat", "f", false, "Output results in flat file '.syms' format")
 	kernelSymbolicateCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
-	kernelSymbolicateCmd.Flags().BoolP("quiet", "q", false, "Don't display logging")
+	kernelSymbolicateCmd.Flags().BoolP("quiet", "q", false, "Do NOT display logging")
 	kernelSymbolicateCmd.Flags().Bool("test", false, "Test symbol matches")
 	kernelSymbolicateCmd.Flags().MarkHidden("test")
 	kernelSymbolicateCmd.Flags().Bool("schema", false, "Generate JSON schema")
@@ -71,7 +71,6 @@ var kernelSymbolicateCmd = &cobra.Command{
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {

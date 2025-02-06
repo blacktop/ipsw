@@ -461,7 +461,13 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		return "", fmt.Errorf("failed to parse AEA: %v", err)
 	}
 
-	if c.B64SymKey == "" {
+	if encKey, ok := metadata["encryption_key"]; ok {
+		c.symEncKey, err = hex.DecodeString(string(encKey))
+		if err != nil {
+			return "", fmt.Errorf("failed to decode hex sym key: %v", err)
+		}
+		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
+	} else if c.B64SymKey == "" {
 		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB)
 		if err != nil {
 			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
@@ -489,6 +495,9 @@ func Decrypt(c *DecryptConfig) (string, error) {
 
 func aea(in, out, key string) (string, error) {
 	if runtime.GOOS == "darwin" {
+		if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
+			return "", fmt.Errorf("failed to create output directory '%s': %v", filepath.Dir(out), err)
+		}
 		cmd := exec.Command(aeaBinPath, "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
 		cout, err := cmd.CombinedOutput()
 		if err != nil {

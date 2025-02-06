@@ -12,7 +12,10 @@ before:
     - ./hack/make/py_mini
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
+# gomod:
+#   proxy: true
 
 report_sizes: true
 
@@ -905,3 +908,7 @@ announce:
     enabled: false
     message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
     server: https://mastodon.social
+  bluesky:
+    enabled: true
+    message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
+    username: "ipsw-tool.bsky.social"

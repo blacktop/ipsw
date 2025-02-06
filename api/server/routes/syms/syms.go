@@ -12,11 +12,17 @@ import (
 	"github.com/blacktop/ipsw/internal/syms"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
+	"gorm.io/gorm"
 )
 
 // swagger:response
 type successResponse struct {
 	Success bool `json:"success,omitempty"`
+}
+
+// swagger:response
+type createdResponse struct {
+	Created bool `json:"created,omitempty"`
 }
 
 // swagger:response
@@ -62,8 +68,14 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: sig_dir
+	//         in: query
+	//         description: path to symbolication signatures directory
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       200: successResponse
+	//       409: genericError
 	//       500: genericError
 	rg.POST("/syms/scan", func(c *gin.Context) {
 		ipswPath, ok := c.GetQuery("path")
@@ -81,11 +93,81 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-		if err := syms.Scan(ipswPath, pemDbPath, sigsDir, db); err != nil {
+		signaturesDir, ok := c.GetQuery("sig_dir")
+		if ok {
+			signaturesDir = filepath.Clean(signaturesDir)
+		} else {
+			if sigsDir != "" {
+				signaturesDir = filepath.Clean(sigsDir)
+			}
+		}
+		if err := syms.Scan(ipswPath, pemDbPath, signaturesDir, db); err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				c.AbortWithStatusJSON(http.StatusConflict, types.GenericError{Error: err.Error()})
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, successResponse{Success: true})
+	})
+	// swagger:route PUT /syms/rescan Syms putRescan
+	//
+	// Rescan
+	//
+	// Rescan symbols for a given IPSW.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: path
+	//         in: query
+	//         description: path to IPSW
+	//         required: true
+	//         type: string
+	//       + name: pem_db
+	//         in: query
+	//         description: path to AEA pem DB JSON file
+	//         required: false
+	//         type: string
+	//       + name: sig_dir
+	//         in: query
+	//         description: path to symbolication signatures directory
+	//         required: false
+	//         type: string
+	//     Responses:
+	//       201: createdResponse
+	//       500: genericError
+	rg.PUT("/syms/rescan", func(c *gin.Context) {
+		ipswPath, ok := c.GetQuery("path")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "missing path query parameter"})
+			return
+		} else {
+			ipswPath = filepath.Clean(ipswPath)
+		}
+		pemDbPath, ok := c.GetQuery("pem_db")
+		if ok {
+			pemDbPath = filepath.Clean(pemDbPath)
+		} else {
+			if pemDB != "" {
+				pemDbPath = filepath.Clean(pemDB)
+			}
+		}
+		signaturesDir, ok := c.GetQuery("sig_dir")
+		if ok {
+			signaturesDir = filepath.Clean(signaturesDir)
+		} else {
+			if sigsDir != "" {
+				signaturesDir = filepath.Clean(sigsDir)
+			}
+		}
+		if err := syms.Rescan(ipswPath, pemDbPath, signaturesDir, db); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, createdResponse{Created: true})
 	})
 	// swagger:route GET /syms/ipsw Syms getIPSW
 	//

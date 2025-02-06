@@ -14,11 +14,29 @@ Watch Github Commits
 ipsw watch <ORG/REPO> [flags]
 ```
 
+### Examples
+
+```bash
+# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes with the pattern '254930' for the last 30 days
+❯ ipsw watch --pattern '254930' --days 30 WebKit/WebKit --branch main --timeout 5m
+# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and announce to Discord
+❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
+# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and run a command on new commits
+# NOTE: the command will have access to the following environment variables:
+#   - IPSW_WATCH_OID
+#   - IPSW_WATCH_URL
+#   - IPSW_WATCH_AUTHOR
+#   - IPSW_WATCH_DATE
+#   - IPSW_WATCH_MESSAGE
+❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
+```
+
 ### Options
 
 ```
   -a, --api string             Github API Token
   -b, --branch string          Repo branch to watch (default "main")
+  -c, --command string         Command to run on new commit
   -d, --days int               Days back to search for commits (default 1)
       --discord-icon string    Discord Post Icon URL
       --discord-id string      Discord Webhook ID

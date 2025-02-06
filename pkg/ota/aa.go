@@ -553,7 +553,7 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 	}
 	defer os.RemoveAll(tmpdir)
 
-	for _, cryptex := range []string{"cryptex-system-arm64?e$", "cryptex-app$"} {
+	for _, cryptex := range []string{"cryptex-system-(arm64e?|x86_64h?)$"} {
 		re := regexp.MustCompile(cryptex)
 		for _, file := range r.Files() {
 			if re.MatchString(file.Name()) {
@@ -593,7 +593,7 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 					defer func() {
 						utils.Indent(log.Debug, 4)(fmt.Sprintf("Unmounting %s", dcf.Name()))
 						if err := utils.Retry(3, 2*time.Second, func() error {
-							return utils.Unmount(mountPoint, false)
+							return utils.Unmount(mountPoint, true)
 						}); err != nil {
 							log.Errorf("failed to unmount DMG %s at %s: %v", dcf.Name(), mountPoint, err)
 						}

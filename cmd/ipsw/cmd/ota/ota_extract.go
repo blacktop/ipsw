@@ -99,7 +99,7 @@ var otaExtractCmd = &cobra.Command{
 			output = filepath.Join(viper.GetString("ota.extract.output"), output)
 		}
 
-		if viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") {
+		if viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.IsSet("ota.extract.pattern") {
 			cwd, _ := os.Getwd()
 			/* DYLD_SHARED_CACHE */
 			if viper.GetBool("ota.extract.dyld") {
@@ -156,6 +156,65 @@ var otaExtractCmd = &cobra.Command{
 					}
 				}
 			}
+			/* PATTERN */
+			if viper.IsSet("ota.extract.pattern") {
+				re, err := regexp.Compile(viper.GetString("ota.extract.pattern"))
+				if err != nil {
+					return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
+				}
+				log.WithField("pattern", re.String()).Info("Extracting Files Matching Pattern")
+				for _, f := range o.Files() { // search in OTA asset files
+					if f.IsDir() {
+						continue
+					}
+					if re.MatchString(f.Path()) {
+						ff, err := o.Open(f.Path(), decomp)
+						if err != nil {
+							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+						}
+						fname := filepath.Join(output, f.Path())
+						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+							return fmt.Errorf("failed to create output directory: %v", err)
+						}
+						out, err := os.Create(fname)
+						if err != nil {
+							return fmt.Errorf("failed to create file: %v", err)
+						}
+						defer out.Close()
+						utils.Indent(log.Info, 2)(fname)
+						if _, err := io.Copy(out, ff); err != nil {
+							return fmt.Errorf("failed to write file: %v", err)
+						}
+					}
+				}
+				bomFound := false
+				for _, f := range o.PostFiles() { // search in OTA post.bom files
+					if f.IsDir() {
+						continue
+					}
+					if re.MatchString(f.Name()) {
+						utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", f.Name()))
+						bomFound = true
+					}
+				}
+				if bomFound {
+					cont := true
+					if !viper.GetBool("ota.extract.confirm") {
+						cont = false
+						prompt := &survey.Confirm{
+							Message: fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()),
+						}
+						survey.AskOne(prompt, &cont)
+					}
+					if cont {
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
+						return o.GetPayloadFiles(
+							viper.GetString("ota.extract.pattern"),
+							viper.GetString("ota.extract.range"),
+							output)
+					}
+				}
+			}
 			return nil
 		}
 
@@ -206,64 +265,6 @@ var otaExtractCmd = &cobra.Command{
 			log.Infof("Extracting to '%s'", out.Name())
 			if _, err := io.Copy(out, f); err != nil {
 				return fmt.Errorf("failed to write file: %v", err)
-			}
-			/* PATTERN */
-		} else if viper.IsSet("ota.extract.pattern") {
-			re, err := regexp.Compile(viper.GetString("ota.extract.pattern"))
-			if err != nil {
-				return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
-			}
-			log.WithField("pattern", re.String()).Info("Extracting Files Matching Pattern")
-			for _, f := range o.Files() { // search in OTA asset files
-				if f.IsDir() {
-					continue
-				}
-				if re.MatchString(f.Path()) {
-					ff, err := o.Open(f.Path(), decomp)
-					if err != nil {
-						return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
-					}
-					fname := filepath.Join(output, f.Path())
-					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-						return fmt.Errorf("failed to create output directory: %v", err)
-					}
-					out, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create file: %v", err)
-					}
-					defer out.Close()
-					utils.Indent(log.Info, 2)(fname)
-					if _, err := io.Copy(out, ff); err != nil {
-						return fmt.Errorf("failed to write file: %v", err)
-					}
-				}
-			}
-			bomFound := false
-			for _, f := range o.PostFiles() { // search in OTA post.bom files
-				if f.IsDir() {
-					continue
-				}
-				if re.MatchString(f.Name()) {
-					utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", f.Name()))
-					bomFound = true
-				}
-			}
-			if bomFound {
-				cont := true
-				if !viper.GetBool("ota.extract.confirm") {
-					cont = false
-					prompt := &survey.Confirm{
-						Message: fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()),
-					}
-					survey.AskOne(prompt, &cont)
-				}
-				if cont {
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
-					return o.GetPayloadFiles(
-						viper.GetString("ota.extract.pattern"),
-						viper.GetString("ota.extract.range"),
-						output)
-				}
 			}
 		}
 

@@ -2,12 +2,13 @@ package macho
 
 import (
 	"fmt"
+	"maps"
 	"slices"
+	"sort"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
-	"golang.org/x/exp/maps"
 )
 
 type DiffConfig struct {
@@ -78,7 +79,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig) *DiffInfo {
 	if conf.CStrings {
 		if cs, err := m.GetCStrings(); err == nil {
 			for _, val := range cs {
-				str2addr := maps.Keys(val)
+				str2addr := slices.Collect(maps.Keys(val))
 				strs = append(strs, str2addr...)
 			}
 			slices.Sort(strs)
@@ -141,24 +142,12 @@ func (i *DiffInfo) String() string {
 
 func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfig) error {
 
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
 	/* DIFF IPSW */
-	diff.New = utils.Difference(nextFiles, prevFiles)
-	diff.Removed = utils.Difference(prevFiles, nextFiles)
+	diff.New = utils.Difference(slices.Collect(maps.Keys(next)), slices.Collect(maps.Keys(prev)))
+	diff.Removed = utils.Difference(slices.Collect(maps.Keys(prev)), slices.Collect(maps.Keys(next)))
 
 	var err error
-	for _, f2 := range nextFiles {
+	for _, f2 := range slices.Sorted(maps.Keys(next)) {
 		dat2 := next[f2]
 		if dat1, ok := prev[f2]; ok {
 			if dat2.Equal(*dat1) {
@@ -187,7 +176,9 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 
 			/* DIFF Symbols */
 			newSyms := utils.Difference(dat2.Symbols, dat1.Symbols)
+			sort.Strings(newSyms)
 			rmSyms := utils.Difference(dat1.Symbols, dat2.Symbols)
+			sort.Strings(rmSyms)
 			if len(newSyms) > 0 || len(rmSyms) > 0 {
 				diff.Updated[f2] += "Symbols:\n"
 				for _, s := range newSyms {
@@ -201,7 +192,9 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 			/* DIFF CStrings */
 			if conf.CStrings {
 				newStrs := utils.Difference(dat2.CStrings, dat1.CStrings)
+				sort.Strings(newStrs)
 				rmStrs := utils.Difference(dat1.CStrings, dat2.CStrings)
+				sort.Strings(rmStrs)
 				if len(newStrs) > 0 || len(rmStrs) > 0 {
 					diff.Updated[f2] += "CStrings:\n"
 					for _, s := range newStrs {
@@ -271,7 +264,7 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		prev[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
 	/* NEXT IPSW */
@@ -282,7 +275,7 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
 	if err := diff.Generate(prev, next, conf); err != nil {

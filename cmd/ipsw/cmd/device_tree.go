@@ -22,10 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	// "sort"
 
@@ -34,7 +37,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -44,16 +46,20 @@ func init() {
 	rootCmd.AddCommand(deviceTreeCmd)
 	deviceTreeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	deviceTreeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	deviceTreeCmd.Flags().BoolP("summary", "s", false, "Output summary only")
 	deviceTreeCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
 	deviceTreeCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	deviceTreeCmd.Flags().StringP("filter", "f", "", "Filter DeviceTree to parse (if multiple i.e. macOS)")
 	deviceTreeCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*im4p")
 	deviceTreeCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"im4p"}, cobra.ShellCompDirectiveFilterFileExt
 	}
 	viper.BindPFlag("dtree.proxy", deviceTreeCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("dtree.insecure", deviceTreeCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("dtree.summary", deviceTreeCmd.Flags().Lookup("summary"))
 	viper.BindPFlag("dtree.json", deviceTreeCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dtree.remote", deviceTreeCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("dtree.filter", deviceTreeCmd.Flags().Lookup("filter"))
 }
 
 // deviceTreeCmd represents the deviceTree command
@@ -82,37 +88,59 @@ var deviceTreeCmd = &cobra.Command{
 			}
 			dtrees, err = devicetree.ParseZipFiles(zr.File)
 			if err != nil {
-				return errors.Wrap(err, "failed to extract DeviceTree")
+				return fmt.Errorf("failed to extract DeviceTree: %v", err)
 			}
 		} else {
 			var dtree *devicetree.DeviceTree
 
-			content, err := os.ReadFile(args[0])
-			if err != nil {
-				return errors.Wrap(err, "failed to read DeviceTree")
-			}
-
-			if ok, _ := magic.IsImg3(args[0]); ok {
+			if ok, _ := magic.IsZip(filepath.Clean(args[0])); ok {
+				zr, err := zip.OpenReader(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to open zip: %v", err)
+				}
+				dtrees, err = devicetree.ParseZipFiles(zr.File)
+				if err != nil {
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
+				}
+			} else if ok, _ := magic.IsImg3(args[0]); ok {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseImg3Data(content)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			} else if ok, _ := magic.IsIm4p(args[0]); ok {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseImg4Data(content)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					return fmt.Errorf("failed to extract DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			} else {
+				content, err := os.ReadFile(args[0])
+				if err != nil {
+					return fmt.Errorf("failed to read DeviceTree: %v", err)
+				}
 				dtree, err = devicetree.ParseData(bytes.NewReader(content))
 				if err != nil {
 					return fmt.Errorf("failed to parse DeviceTree: %v", err)
 				}
+				dtrees[args[0]] = dtree
 			}
-
-			dtrees[args[0]] = dtree
 		}
 
 		for name, dtree := range dtrees {
+			if viper.IsSet("dtree.filter") {
+				if !strings.Contains(strings.ToLower(name), strings.ToLower(viper.GetString("dtree.filter"))) {
+					continue
+				}
+			}
 			log.Infof("DeviceTree: %s", name)
 			if viper.GetBool("dtree.json") {
 				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
@@ -128,6 +156,16 @@ var deviceTreeCmd = &cobra.Command{
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+					if len(s.SocName) > 0 {
+						var deviceType string
+						if len(s.DeviceType) > 0 {
+							deviceType = fmt.Sprintf(" (%s)", s.DeviceType)
+						}
+						utils.Indent(log.Info, 2)(fmt.Sprintf("SoC Name: %s%s", s.SocName, deviceType))
+					}
+					if viper.GetBool("dtree.summary") {
+						continue
+					}
 				}
 				fmt.Println(dtree.String())
 			}

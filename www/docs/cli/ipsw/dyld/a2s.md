@@ -18,6 +18,7 @@ ipsw dyld a2s <DSC> <ADDR> [flags]
 
 ```
       --cache string   Path to .a2s addr to sym cache file (speeds up analysis)
+  -d, --demangle       Demangle symbol names
   -h, --help           help for a2s
   -i, --image          Only lookup address's dyld_shared_cache mapping
   -m, --mapping        Only lookup address's image segment/section

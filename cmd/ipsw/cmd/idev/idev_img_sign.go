@@ -34,6 +34,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/fatih/color"
+	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -134,24 +135,40 @@ var idevImgSignCmd = &cobra.Command{
 		}
 
 		if xcode != "" {
-			dmgPath := filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
-			if _, err := os.Stat(dmgPath); errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+			xcodeVersion, err := utils.GetXCodeVersion(xcode)
+			if err != nil {
+				return fmt.Errorf("failed to get Xcode version: %w", err)
 			}
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-			mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+			xcver, err := semver.NewVersion(xcodeVersion) // check
+			if err != nil {
+				return fmt.Errorf("failed to convert version into semver object")
+			}
+			var ddiPath string
+			if xcver.LessThan(semver.Must(semver.NewVersion("16.0"))) {
+				ddiPath = filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
+				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+				}
+			} else {
+				ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
+				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (run `%s -runFirstLaunch` and try again)", ddiPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
+				}
+			}
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiPath))
+			mountPoint, alreadyMounted, err := utils.MountDMG(ddiPath)
 			if err != nil {
 				return fmt.Errorf("failed to mount iOS_DDI.dmg: %w", err)
 			}
 			if alreadyMounted {
-				utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+				utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ddiPath))
 			} else {
 				defer func() {
-					utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", ddiPath))
 					if err := utils.Retry(3, 2*time.Second, func() error {
 						return utils.Unmount(mountPoint, false)
 					}); err != nil {
-						log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
+						log.Errorf("failed to unmount %s at %s: %v", ddiPath, mountPoint, err)
 					}
 				}()
 			}

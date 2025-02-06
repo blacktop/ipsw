@@ -80,7 +80,8 @@ func init() {
 	viper.BindPFlag("ent.ui", entCmd.Flags().Lookup("ui"))
 	viper.BindPFlag("ent.ui-host", entCmd.Flags().Lookup("ui-host"))
 	viper.BindPFlag("ent.ui-port", entCmd.Flags().Lookup("ui-port"))
-	entCmd.MarkFlagsMutuallyExclusive("key", "val", "ui")
+	entCmd.MarkFlagsMutuallyExclusive("key", "val", "ui", "diff")
+	entCmd.MarkFlagsMutuallyExclusive("ipsw", "input")
 }
 
 // entCmd represents the ent command
@@ -101,7 +102,10 @@ var entCmd = &cobra.Command{
 		❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
 
 		# Diff two IPSWs
-		❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp`),
+		❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+
+		# Launch Web UI (http://localhost:3993)
+		❯ ipsw ent --ui --ipsw <IPSW>`),
 	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -126,8 +130,12 @@ var entCmd = &cobra.Command{
 		// check flags
 		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
-		} else if showUI && doDiff || len(ipsws) > 1 {
-			return fmt.Errorf("cannot use --ui with --diff OR multiple IPSWs")
+		} else if showUI && doDiff {
+			return fmt.Errorf("cannot use --ui and --diff together")
+		} else if showUI && (len(ipsws) != 1 && len(inputs) != 1) {
+			return fmt.Errorf("must supply only one --ipsw or --input with --ui")
+		} else if doDiff && (len(ipsws) != 2 && len(inputs) != 2) {
+			return fmt.Errorf("must supply two --ipsw or --input with --diff")
 		}
 		color.NoColor = viper.GetBool("no-color") || onlyFiles
 

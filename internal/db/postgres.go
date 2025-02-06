@@ -7,6 +7,7 @@ import (
 	"github.com/blacktop/ipsw/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Postgres is a database that stores data in a Postgres database.
@@ -46,6 +47,7 @@ func (p *Postgres) Connect() (err error) {
 	)), &gorm.Config{
 		CreateBatchSize:        p.BatchSize,
 		SkipDefaultTransaction: true,
+		TranslateError:         true,
 		// Logger:                 logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -57,14 +59,16 @@ func (p *Postgres) Connect() (err error) {
 		&model.Kernelcache{},
 		&model.DyldSharedCache{},
 		&model.Macho{},
+		&model.Path{},
 		&model.Symbol{},
+		&model.Name{},
 	)
 }
 
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p *Postgres) Create(value any) error {
-	if result := p.db.FirstOrCreate(value); result.Error != nil {
+	if result := p.db.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
@@ -120,6 +124,7 @@ func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error
 	var macho model.Macho
 	if err := p.db.Joins("JOIN dsc_images ON dsc_images.macho_uuid = machos.uuid").
 		Joins("JOIN dyld_shared_caches ON dyld_shared_caches.uuid = dsc_images.dyld_shared_cache_uuid").
+		Joins("Path").
 		Where("dyld_shared_caches.uuid = ? AND machos.text_start <= ? AND ? < machos.text_end", uuid, address, address).
 		First(&macho).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -132,7 +137,7 @@ func (p *Postgres) GetDSCImage(uuid string, address uint64) (*model.Macho, error
 
 func (p *Postgres) GetMachO(uuid string) (*model.Macho, error) {
 	var macho model.Macho
-	if err := p.db.Where("uuid = ?", uuid).First(&macho).Error; err != nil {
+	if err := p.db.Preload("Path").Where("uuid = ?", uuid).First(&macho).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, model.ErrNotFound
 		}
@@ -145,6 +150,7 @@ func (p *Postgres) GetSymbol(uuid string, address uint64) (*model.Symbol, error)
 	var symbol model.Symbol
 	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
 		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Joins("Name").
 		Where("machos.uuid = ? AND symbols.start <= ? AND ? < symbols.end", uuid, address, address).
 		First(&symbol).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -159,6 +165,7 @@ func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	var syms []*model.Symbol
 	if err := p.db.Joins("JOIN macho_syms ON macho_syms.symbol_id = symbols.id").
 		Joins("JOIN machos ON machos.uuid = macho_syms.macho_uuid").
+		Joins("Name").
 		Where("machos.uuid = ?", uuid).
 		Select("symbol", "start", "end").
 		Find(&syms).Error; err != nil {
@@ -170,13 +177,230 @@ func (p *Postgres) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	return syms, nil
 }
 
-// Set sets the value for the given key.
+// Save sets the value for the given key.
 // It overwrites any previous value for that key.
 func (p *Postgres) Save(value any) error {
-	if result := p.db.Save(value); result.Error != nil {
-		return result.Error
+	// TODO: add rollback on error
+	if ipsw, ok := value.(*model.Ipsw); ok {
+		// Start transaction
+		return p.db.Transaction(func(tx *gorm.DB) error {
+			// Defer foreign key checks
+			// if err := tx.Exec("SET CONSTRAINTS ALL DEFERRED").Error; err != nil {
+			// 	return err
+			// }
+			// Process Paths
+			if err := p.processPaths(tx, ipsw); err != nil {
+				return err
+			}
+			// Process Names
+			if err := p.processNames(tx, ipsw); err != nil {
+				return err
+			}
+			// Save the main IPSW entry
+			if err := tx.Save(ipsw).Error; err != nil {
+				return fmt.Errorf("failed to save IPSW: %w", err)
+			}
+
+			return nil
+		})
 	}
+	return fmt.Errorf("invalid value type: %T", value)
+}
+
+func (p *Postgres) processPaths(tx *gorm.DB, ipsw *model.Ipsw) error {
+	uniquePaths := make(map[string]struct{})
+
+	// Collect unique paths
+	for _, kernel := range ipsw.Kernels {
+		for _, kext := range kernel.Kexts {
+			uniquePaths[kext.Path.Path] = struct{}{}
+		}
+	}
+	for _, dsc := range ipsw.DSCs {
+		for _, img := range dsc.Images {
+			uniquePaths[img.Path.Path] = struct{}{}
+		}
+	}
+	for _, fs := range ipsw.FileSystem {
+		uniquePaths[fs.Path.Path] = struct{}{}
+	}
+
+	if len(uniquePaths) == 0 {
+		return nil
+	}
+
+	// Process paths in batches
+	paths := make([]string, 0, len(uniquePaths))
+	for path := range uniquePaths {
+		paths = append(paths, path)
+	}
+
+	for i := 0; i < len(paths); i += p.BatchSize {
+		end := i + p.BatchSize
+		if end > len(paths) {
+			end = len(paths)
+		}
+		batch := paths[i:end]
+
+		// Bulk create or get Paths
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "path"}},
+			DoNothing: true,
+		}).Create(convertToPaths(batch)).Error; err != nil {
+			return fmt.Errorf("failed to create paths: %w", err)
+		}
+	}
+
+	// Fetch all created/existing Paths in batches
+	var allPaths []model.Path
+	for i := 0; i < len(paths); i += p.BatchSize {
+		end := i + p.BatchSize
+		if end > len(paths) {
+			end = len(paths)
+		}
+		batch := paths[i:end]
+
+		var batchPaths []model.Path
+		if err := tx.Where("path IN ?", batch).Find(&batchPaths).Error; err != nil {
+			return fmt.Errorf("failed to fetch paths: %w", err)
+		}
+		allPaths = append(allPaths, batchPaths...)
+	}
+
+	// Create a map for quick Path lookup
+	pathMap := make(map[string]*model.Path)
+	for i := range allPaths {
+		pathMap[allPaths[i].Path] = &allPaths[i]
+	}
+
+	// Update Path IDs
+	for _, kernel := range ipsw.Kernels {
+		for _, kext := range kernel.Kexts {
+			kext.Path.ID = pathMap[kext.GetPath()].ID
+		}
+	}
+	for _, dsc := range ipsw.DSCs {
+		for _, img := range dsc.Images {
+			img.Path.ID = pathMap[img.GetPath()].ID
+		}
+	}
+	for _, fs := range ipsw.FileSystem {
+		fs.Path.ID = pathMap[fs.GetPath()].ID
+	}
+
 	return nil
+}
+
+func (p *Postgres) processNames(tx *gorm.DB, ipsw *model.Ipsw) error {
+	uniqueNames := make(map[string]struct{})
+
+	// Collect unique names
+	for _, kernel := range ipsw.Kernels {
+		for _, kext := range kernel.Kexts {
+			for _, sym := range kext.Symbols {
+				uniqueNames[sym.GetName()] = struct{}{}
+			}
+		}
+	}
+	for _, dsc := range ipsw.DSCs {
+		for _, img := range dsc.Images {
+			for _, sym := range img.Symbols {
+				uniqueNames[sym.GetName()] = struct{}{}
+			}
+		}
+	}
+	for _, fs := range ipsw.FileSystem {
+		for _, sym := range fs.Symbols {
+			uniqueNames[sym.GetName()] = struct{}{}
+		}
+	}
+
+	if len(uniqueNames) == 0 {
+		return nil
+	}
+
+	// Process names in batches
+	names := make([]string, 0, len(uniqueNames))
+	for name := range uniqueNames {
+		names = append(names, name)
+	}
+
+	for i := 0; i < len(names); i += p.BatchSize {
+		end := i + p.BatchSize
+		if end > len(names) {
+			end = len(names)
+		}
+		batch := names[i:end]
+
+		// Bulk create or get Names
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "name"}},
+			DoNothing: true,
+		}).Create(convertToNames(batch)).Error; err != nil {
+			return fmt.Errorf("failed to create names: %w", err)
+		}
+	}
+
+	// Fetch all created/existing Names in batches
+	var allNames []model.Name
+	for i := 0; i < len(names); i += p.BatchSize {
+		end := i + p.BatchSize
+		if end > len(names) {
+			end = len(names)
+		}
+		batch := names[i:end]
+
+		var batchNames []model.Name
+		if err := tx.Where("name IN ?", batch).Find(&batchNames).Error; err != nil {
+			return fmt.Errorf("failed to fetch names: %w", err)
+		}
+		allNames = append(allNames, batchNames...)
+	}
+
+	// Create a map for quick Name lookup
+	nameMap := make(map[string]*model.Name)
+	for i := range allNames {
+		nameMap[allNames[i].Name] = &allNames[i]
+	}
+
+	// Update Symbols with Name IDs
+	for _, kernel := range ipsw.Kernels {
+		for _, kext := range kernel.Kexts {
+			for _, sym := range kext.Symbols {
+				sym.Name.ID = nameMap[sym.GetName()].ID
+			}
+		}
+	}
+	for _, dsc := range ipsw.DSCs {
+		for _, img := range dsc.Images {
+			for _, sym := range img.Symbols {
+				sym.Name.ID = nameMap[sym.GetName()].ID
+			}
+		}
+	}
+	for _, fs := range ipsw.FileSystem {
+		for _, sym := range fs.Symbols {
+			sym.Name.ID = nameMap[sym.GetName()].ID
+		}
+	}
+
+	return nil
+}
+
+func convertToPaths(paths []string) []model.Path {
+	result := make([]model.Path, len(paths))
+	for i, path := range paths {
+		result[i] = model.Path{Path: path}
+	}
+	return result
+}
+
+func convertToNames(names []string) []model.Name {
+	result := make([]model.Name, len(names))
+	for i, name := range names {
+		result[i] = model.Name{Name: name}
+	}
+	return result
 }
 
 // Delete removes the given key.

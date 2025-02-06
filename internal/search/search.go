@@ -60,7 +60,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
+				return utils.Unmount(mountPoint, true)
 			}); err != nil {
 				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 			}
@@ -281,6 +281,19 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			for _, f := range out {
 				if m, err := macho.Open(f); err == nil {
 					if err := handler("agx_"+filepath.Base(f), m); err != nil {
+						return fmt.Errorf("failed to handle macho %s: %v", f, err)
+					}
+					m.Close()
+				}
+			}
+		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4p) {
+			out, err := fwcmd.Extract(im4p, os.TempDir())
+			if err != nil {
+				return fmt.Errorf("failed to split exclave apps FW: %v", err)
+			}
+			for _, f := range out {
+				if m, err := macho.Open(f); err == nil {
+					if err := handler("exclave_"+filepath.Base(f), m); err != nil {
 						return fmt.Errorf("failed to handle macho %s: %v", f, err)
 					}
 					m.Close()

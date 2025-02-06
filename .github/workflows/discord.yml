@@ -1,20 +1,77 @@
 name: "Discord"
 
 on:
+  workflow_dispatch:
+    inputs:
+      skip_post:
+        description: 'Skip posting to Social Media'
+        required: false
+        type: boolean
   schedule:
-    - cron: "00 01,13 * * *"
+    # - cron: "0 */1 * * *" # every 1 hour
+    - cron: "*/30 * * * *" # every 30 minutes
     # - cron: "0 0 * * *"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Cache
+        run: |
+          cat hack/.watch_cache || echo "No cache found"
       - name: Package Installer
         run: |
           sudo snap install ipsw
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch --pattern '(?i)Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png" WebKit/WebKit
-          /snap/bin/ipsw watch --pattern '.*' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/distribution-macOS --discord-icon "https://avatars.githubusercontent.com/u/91919287"
-          /snap/bin/ipsw watch --pattern '.*' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/xnu --branch 'rel/macOS-14' --discord-icon "https://avatars.githubusercontent.com/u/91919287"
-          /snap/bin/ipsw watch --pattern '.*' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} apple-oss-distributions/xnu --branch 'rel/macOS-15' --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
+      - name: Run ipsw watch apple-oss-distributions/distribution-macOS
+        if: ${{ !inputs.skip_post }}
+        run: |
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+        # --mastodon \
+        # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
+        # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
+        # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
+      - name: Run ipsw watch apple-oss-distributions/distribution-macOS (SKIP MASTODON)
+        if: ${{ inputs.skip_post }}
+        run: |
+          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://avatars.githubusercontent.com/u/91919287"
+        # --mastodon \
+        # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
+        # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
+        # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update .watch_cache
+      # - name: Commit Cache Changes
+      #   run:
+      #     if [[ -n $(git status --porcelain) ]]; then
+      #       git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      #       git config --global user.name "github-actions[bot]"
+      #       git add hack/.watch_cache
+      #       git commit -m "Update .watch_cache"
+      #       git push
+      #     fi

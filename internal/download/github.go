@@ -586,6 +586,78 @@ type Repo struct {
 	Name string
 }
 
+func GetLatestTagsV2(owner, repo string, limit int, proxy string, insecure bool, apikey string) ([]string, error) {
+	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: apikey},
+	))
+
+	client := githubv4.NewClient(httpClient)
+
+	var q struct {
+		Repository struct {
+			Refs struct {
+				Edges []struct {
+					Node struct {
+						Name string
+					}
+				}
+			} `graphql:"refs(refPrefix: \"refs/tags/\", first: $limit, orderBy: { field: TAG_COMMIT_DATE, direction: DESC })"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+		RateLimit struct {
+			Cost      githubv4.Int
+			Limit     githubv4.Int
+			Remaining githubv4.Int
+			ResetAt   githubv4.DateTime
+		}
+	}
+
+	if limit == 0 {
+		limit = 1
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(owner),
+		"name":  githubv4.String(repo),
+		"limit": githubv4.Int(limit),
+	}
+
+	for {
+		if err := client.Query(context.Background(), &q, variables); err != nil {
+			if strings.Contains(err.Error(), "API rate limit exceeded") ||
+				strings.Contains(err.Error(), "was submitted too quickly") {
+				// Handle rate limit error
+				var rateLimitQuery struct {
+					RateLimit struct {
+						Cost      githubv4.Int
+						Limit     githubv4.Int
+						Remaining githubv4.Int
+						ResetAt   githubv4.DateTime
+					}
+				}
+				if err := client.Query(context.Background(), &rateLimitQuery, nil); err != nil {
+					return nil, fmt.Errorf("failed to query GraphQL API for rate limit: %w", err)
+				}
+				resetTime := rateLimitQuery.RateLimit.ResetAt.Time
+				log.Warnf("rate limit exceeded, waiting for %s", time.Until(resetTime))
+				time.Sleep(time.Until(resetTime) + 1*time.Second)
+				continue
+			}
+			return nil, err
+		}
+		break
+	}
+
+	if len(q.Repository.Refs.Edges) > 0 {
+		var tags []string
+		for _, edge := range q.Repository.Refs.Edges {
+			tags = append(tags, edge.Node.Name)
+		}
+		return tags, nil
+	}
+
+	return nil, fmt.Errorf("no tags found for repository %s", repo)
+}
+
 // AppleOssGraphQLTags returns a list of apple-oss-distributions tags from the Github GraphQL API
 func AppleOssGraphQLTags(repo string, limit int, proxy string, insecure bool, apikey string) (map[string][]GithubTag, error) {
 	tags := make(map[string][]GithubTag)

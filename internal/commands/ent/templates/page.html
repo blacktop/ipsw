@@ -90,15 +90,94 @@
             color: #2e3440;
             /* Polar Night text */
         }
+
+        .entitlement-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 1rem;
+        }
+
+        .entitlement-text {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 1rem;
+            text-align: left;  /* Add this line to left-justify the text */
+        }
+
+        .copy-btn {
+            flex-shrink: 0;
+        }
+
+        /* Toggle switch styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4C566A;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #D8DEE9;
+            transition: .4s;
+        }
+
+        input:checked + .slider {
+            background-color: #88C0D0;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
     </style>
 </head>
 
 <body class="font-sans leading-normal tracking-normal">
     <div id="app" class="container mx-auto p-4">
         <h1 class="text-3xl font-bold mb-6 text-center text-nord-frost">Entitlement Database {{ .Version }}</h1>
-        <div class="mb-4">
-            <input id="search" type="text" placeholder="Search for an entitlement..."
-                class="input w-full p-2 border border-nord rounded">
+        <div class="flex items-center mb-4">
+            <input type="text" id="search" placeholder="Search entitlements..." class="input p-2 rounded flex-grow mr-2">
+            <div class="flex items-center">
+                <span class="mr-2 text-sm">Regex</span>
+                <label class="switch">
+                    <input type="checkbox" id="regex-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
         </div>
 
         <div id="entitlement-list" class="flex flex-col gap-4">
@@ -116,8 +195,9 @@
             {{ end }}
             };
 
-        const searchInput = document.getElementById('search');
-        const entitlementList = document.getElementById('entitlement-list');
+            const searchInput = document.getElementById('search');
+            const regexToggle = document.getElementById('regex-toggle');
+            const entitlementList = document.getElementById('entitlement-list');
 
             const debounce = (func, delay) => {
                 let timeout;
@@ -128,75 +208,130 @@
                 };
             };
 
-            const highlightMatches = (text, searchTerm) => {
-                if (!searchTerm) return text;
-                const regex = new RegExp(`(${searchTerm})`, 'gi');
-                return text.replace(regex, '<span class="highlight">$1</span>');
+            const escapeRegExp = (string) => {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             };
 
-            const renderEntitlements = (filteredEntitlements, searchTerm) => {
-            entitlementList.innerHTML = '';
-            for (const [key, value] of Object.entries(filteredEntitlements)) {
-                const entitlementItem = document.createElement('div');
-                entitlementItem.className = 'bg-nord-light rounded shadow-md';
-
-                    const highlightedKey = highlightMatches(key, searchTerm);
-
-                const entitlementButton = document.createElement('button');
-                entitlementButton.className = 'p-4 w-full text-left hover-bg-nord-light';
-                    entitlementButton.innerHTML = highlightedKey;
-                    entitlementButton.addEventListener('click', () => toggleDetails(entitlementItem, value, searchTerm));
-                entitlementItem.appendChild(entitlementButton);
-
-                const entitlementDetails = document.createElement('div');
-                entitlementDetails.className = 'accordion-content bg-nord';
-                    entitlementDetails.innerHTML = `<div class="accordion-inner"><pre><code class="language-xml"></code></pre></div>`;
-                entitlementItem.appendChild(entitlementDetails);
-
-                entitlementList.appendChild(entitlementItem);
-            }
-        };
-
-            const toggleDetails = (entitlementItem, value, searchTerm) => {
-            const details = entitlementItem.querySelector('.accordion-content');
-            if (details.classList.contains('show')) {
-                details.style.maxHeight = null;
-                details.classList.remove('show');
-            } else {
-                document.querySelectorAll('.accordion-content').forEach(content => {
-                    content.style.maxHeight = null;
-                    content.classList.remove('show');
-                });
-                details.classList.add('show');
-                    details.querySelector('code').textContent = value;
-                    hljs.highlightBlock(details.querySelector('code'));
-                    details.querySelector('code').innerHTML = highlightMatches(details.querySelector('code').innerHTML, searchTerm);
-                details.style.maxHeight = "none";  // Allow the content to expand fully
-                const scrollHeight = details.scrollHeight;  // Get the full height of the content
-                details.style.maxHeight = `${scrollHeight}px`;  // Set max-height to the full height of the content
-            }
-        };
-
             const performSearch = () => {
-            const searchTerm = searchInput.value.toLowerCase();
-            const filteredEntitlements = Object.fromEntries(
-                Object.entries(entitlements).filter(([key, value]) =>
-                    key.toLowerCase().includes(searchTerm) || value.toLowerCase().includes(searchTerm)
-                )
-            );
+                const searchTerm = searchInput.value;
+                const isRegex = regexToggle.checked;
+                let regex;
 
-            if (Object.keys(filteredEntitlements).length === 0) {
-                entitlementList.innerHTML = '<p class="text-center w-full text-nord-aurora">No entitlements found.</p>';
-            } else {
-                    renderEntitlements(filteredEntitlements, searchTerm);
-            }
+                try {
+                    regex = isRegex ? new RegExp(searchTerm, 'i') : new RegExp(escapeRegExp(searchTerm), 'i');
+                } catch (e) {
+                    console.error('Invalid regex:', e);
+                    entitlementList.innerHTML = '<p class="text-center w-full text-nord-aurora">Invalid regex pattern.</p>';
+                    return;
+                }
+
+                const filteredEntitlements = Object.fromEntries(
+                    Object.entries(entitlements).filter(([key, value]) =>
+                        regex.test(key) || regex.test(value)
+                    )
+                );
+
+                if (Object.keys(filteredEntitlements).length === 0) {
+                    entitlementList.innerHTML = '<p class="text-center w-full text-nord-aurora">No entitlements found.</p>';
+                } else {
+                    renderEntitlements(filteredEntitlements, searchTerm, isRegex);
+                }
             };
 
             const debouncedSearch = debounce(performSearch, 300);
 
             searchInput.addEventListener('input', debouncedSearch);
+            regexToggle.addEventListener('change', performSearch);
 
-            renderEntitlements(entitlements, '');
+            const highlightMatches = (text, searchTerm, isRegex) => {
+                if (!searchTerm) return text;
+                try {
+                    const regex = isRegex ? new RegExp(`(${searchTerm})`, 'gi') : new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+                    return text.replace(regex, '<span class="highlight">$1</span>');
+                } catch (e) {
+                    console.error('Invalid regex:', e);
+                    return text;
+                }
+            };
+
+            const renderEntitlements = (filteredEntitlements, searchTerm, isRegex) => {
+                entitlementList.innerHTML = '';
+                for (const [key, value] of Object.entries(filteredEntitlements)) {
+                    const entitlementItem = document.createElement('div');
+                    entitlementItem.className = 'bg-nord-light rounded shadow-md';
+
+                    const entitlementButton = document.createElement('button');
+                    entitlementButton.className = 'entitlement-button hover-bg-nord-light';
+                    entitlementButton.innerHTML = `
+                        <span class="entitlement-text" title="${key}">${highlightMatches(key, searchTerm, isRegex)}</span>
+                        <button class="copy-btn bg-nord-frost text-nord p-1 rounded ml-2" data-clipboard="${key}" title="Copy to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                            </svg>
+                        </button>
+                    `;
+                    entitlementItem.appendChild(entitlementButton);
+
+                    const entitlementDetails = document.createElement('div');
+                    entitlementDetails.className = 'accordion-content bg-nord';
+                    entitlementDetails.innerHTML = `<div class="accordion-inner"><pre><code class="language-xml"></code></pre></div>`;
+                    entitlementItem.appendChild(entitlementDetails);
+
+                    entitlementList.appendChild(entitlementItem);
+
+                    entitlementButton.addEventListener('click', (e) => {
+                        if (!e.target.closest('.copy-btn')) {
+                            toggleDetails(entitlementItem, value, searchTerm, isRegex);
+                        }
+                    });
+                }
+
+                // Add event listeners for copy buttons
+                document.querySelectorAll('.copy-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const textToCopy = btn.getAttribute('data-clipboard');
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            const originalHTML = btn.innerHTML;
+                            btn.innerHTML = `
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                                </svg>
+                            `;
+                            btn.classList.add('bg-green-500');
+                            setTimeout(() => {
+                                btn.innerHTML = originalHTML;
+                                btn.classList.remove('bg-green-500');
+                            }, 2000);
+                        }).catch(err => {
+                            console.error('Failed to copy text: ', err);
+                        });
+                    });
+                });
+            };
+
+            const toggleDetails = (entitlementItem, value, searchTerm, isRegex) => {
+                const details = entitlementItem.querySelector('.accordion-content');
+                if (details.classList.contains('show')) {
+                    details.style.maxHeight = null;
+                    details.classList.remove('show');
+                } else {
+                    document.querySelectorAll('.accordion-content').forEach(content => {
+                        content.style.maxHeight = null;
+                        content.classList.remove('show');
+                    });
+                    details.classList.add('show');
+                    details.querySelector('code').textContent = value;
+                    hljs.highlightBlock(details.querySelector('code'));
+                    details.querySelector('code').innerHTML = highlightMatches(details.querySelector('code').innerHTML, searchTerm, isRegex);
+                    details.style.maxHeight = "none";  // Allow the content to expand fully
+                    const scrollHeight = details.scrollHeight;  // Get the full height of the content
+                    details.style.maxHeight = `${scrollHeight}px`;  // Set max-height to the full height of the content
+                }
+            };
+
+            renderEntitlements(entitlements, '', false);
         });
     </script>
 </body>

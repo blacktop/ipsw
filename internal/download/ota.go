@@ -168,14 +168,13 @@ func (a AssetAudienceIDs) LatestVersion(platform string) string {
 
 // AssetAudienceID is an OTA asset audience ID
 type AssetAudienceID struct {
-	Release  string `json:"release"`
-	Generic  string `json:"generic"`
-	Versions map[string]struct {
-		DeveloperBeta   string `json:"developer-beta,omitempty"`
-		AppleSeedBeta   string `json:"appleseed-beta,omitempty"`
-		DeveloperBetaAI string `json:"developer-beta-ai,omitempty"`
-		AppleSeedBetaAI string `json:"appleseed-beta-a,omitempty"`
-		PublicBeta      string `json:"public-beta,omitempty"`
+	Release   string `json:"release"`
+	Generic   string `json:"generic"`
+	Alternate string `json:"alternate,omitempty"`
+	Versions  map[string]struct {
+		DeveloperBeta string `json:"developer-beta,omitempty"`
+		AppleSeedBeta string `json:"appleseed-beta,omitempty"`
+		PublicBeta    string `json:"public-beta,omitempty"`
 	}
 }
 
@@ -327,89 +326,103 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 
 	switch o.Config.Platform {
 	case "accessory", "recovery", "macos":
-		if o.Config.Beta {
-			if o.Config.Version != nil {
-				segs := o.Config.Version.Segments()
-				if len(segs) == 0 {
-					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
-				}
-				if segs[0] == 0 { // empty version
-					latest := assetAudienceDB.LatestVersion("macos")
-					return []string{
-						assetAudienceDB["macos"].Versions[latest].DeveloperBeta,
-						assetAudienceDB["macos"].Versions[latest].AppleSeedBeta,
-						assetAudienceDB["macos"].Versions[latest].DeveloperBetaAI,
-						assetAudienceDB["macos"].Versions[latest].AppleSeedBetaAI,
-						assetAudienceDB["macos"].Versions[latest].PublicBeta,
-						assetAudienceDB["macos"].Generic}, nil
-				}
-				if o.Config.Platform == "accessory" {
-					// looup major version in DB
-					if v, ok := assetAudienceDB["ios"].Versions[strconv.Itoa(segs[0])]; ok {
-						return []string{
-							v.DeveloperBeta,
-							v.AppleSeedBeta,
-							v.DeveloperBetaAI,
-							v.AppleSeedBetaAI,
-							v.PublicBeta}, nil
-					}
-				} else {
-					// looup major version in DB
-					if v, ok := assetAudienceDB["macos"].Versions[strconv.Itoa(segs[0])]; ok {
-						return []string{
-							v.DeveloperBeta,
-							v.AppleSeedBeta,
-							v.DeveloperBetaAI,
-							v.AppleSeedBetaAI,
-							v.PublicBeta}, nil
-					}
-				}
-
-				return nil, fmt.Errorf(
-					"invalid version %s (must be one of %s)",
-					o.Config.Version,
-					strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions("macos"), ".x"), ", "))
+		if o.Config.Version != nil {
+			segs := o.Config.Version.Segments()
+			if len(segs) == 0 {
+				return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 			}
-		} else {
-			return []string{assetAudienceDB["macos"].Release, assetAudienceDB["macos"].Generic}, nil
-		}
-	default:
-		if o.Config.Beta {
-			if o.Config.Version != nil {
-				segs := o.Config.Version.Segments()
-				if len(segs) == 0 {
-					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
-				}
-				if segs[0] == 0 { // empty version
-					latest := assetAudienceDB.LatestVersion(o.Config.Platform)
-					if latest == "" {
-						return []string{
-							assetAudienceDB[o.Config.Platform].Release,
-							assetAudienceDB[o.Config.Platform].Generic}, nil
-					}
-					return []string{
-						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
-						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
-						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBetaAI,
-						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBetaAI,
-						assetAudienceDB[o.Config.Platform].Versions[latest].PublicBeta,
-						assetAudienceDB[o.Config.Platform].Generic}, nil
-				}
+			if segs[0] == 0 { // empty version
+				latest := assetAudienceDB.LatestVersion("macos")
+				return []string{
+					assetAudienceDB["macos"].Versions[latest].DeveloperBeta,
+					assetAudienceDB["macos"].Versions[latest].AppleSeedBeta,
+					assetAudienceDB["macos"].Versions[latest].PublicBeta,
+					assetAudienceDB["macos"].Release,
+					assetAudienceDB["macos"].Alternate,
+					assetAudienceDB["macos"].Generic,
+				}, nil
+			}
+			if o.Config.Platform == "accessory" {
 				// looup major version in DB
-				if v, ok := assetAudienceDB[o.Config.Platform].Versions[strconv.Itoa(segs[0])]; ok {
+				if v, ok := assetAudienceDB["ios"].Versions[strconv.Itoa(segs[0])]; ok {
 					return []string{
 						v.DeveloperBeta,
 						v.AppleSeedBeta,
-						v.PublicBeta}, nil
+						v.PublicBeta,
+					}, nil
+				}
+			} else {
+				// looup major version in DB
+				assetAudiences := []string{
+					assetAudienceDB[o.Config.Platform].Release,
+					assetAudienceDB[o.Config.Platform].Alternate,
+					assetAudienceDB[o.Config.Platform].Generic,
+				}
+				if v, ok := assetAudienceDB[o.Config.Platform].Versions[fmt.Sprintf("%d.%d", segs[0], segs[1])]; ok {
+					assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
+				} else if v, ok := assetAudienceDB[o.Config.Platform].Versions[strconv.Itoa(segs[0])]; ok {
+					assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
 				} else {
 					return nil, fmt.Errorf(
 						"invalid version %s (must be one of %s)",
 						o.Config.Version,
-						strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions(o.Config.Platform), ".x"), ", "))
+						strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions("macos"), ".x"), ", "))
 				}
+				return assetAudiences, nil
 			}
 		} else {
-			return []string{assetAudienceDB[o.Config.Platform].Release, assetAudienceDB[o.Config.Platform].Generic}, nil
+			return []string{
+				assetAudienceDB["macos"].Release,
+				assetAudienceDB["macos"].Generic,
+			}, nil
+		}
+	default:
+		if o.Config.Version != nil {
+			segs := o.Config.Version.Segments()
+			if len(segs) == 0 {
+				return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
+			}
+			if segs[0] == 0 { // empty version
+				latest := assetAudienceDB.LatestVersion(o.Config.Platform)
+				if latest == "" {
+					return []string{
+						assetAudienceDB[o.Config.Platform].Release,
+						assetAudienceDB[o.Config.Platform].Alternate,
+						assetAudienceDB[o.Config.Platform].Generic,
+					}, nil
+				}
+				return []string{
+					assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
+					assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
+					assetAudienceDB[o.Config.Platform].Versions[latest].PublicBeta,
+					assetAudienceDB[o.Config.Platform].Generic,
+					assetAudienceDB[o.Config.Platform].Release,
+					assetAudienceDB[o.Config.Platform].Alternate,
+				}, nil
+			}
+			// looup major version in DB
+			assetAudiences := []string{
+				assetAudienceDB[o.Config.Platform].Release,
+				assetAudienceDB[o.Config.Platform].Alternate,
+				assetAudienceDB[o.Config.Platform].Generic,
+			}
+			if v, ok := assetAudienceDB[o.Config.Platform].Versions[fmt.Sprintf("%d.%d", segs[0], segs[1])]; ok {
+				assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
+			} else if v, ok := assetAudienceDB[o.Config.Platform].Versions[strconv.Itoa(segs[0])]; ok {
+				assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
+			} else {
+				return nil, fmt.Errorf(
+					"invalid version %s (must be one of %s)",
+					o.Config.Version,
+					strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions(o.Config.Platform), ".x"), ", "))
+			}
+			return assetAudiences, nil
+		} else {
+			return []string{
+				assetAudienceDB[o.Config.Platform].Release,
+				assetAudienceDB[o.Config.Platform].Alternate,
+				assetAudienceDB[o.Config.Platform].Generic,
+			}, nil
 		}
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)

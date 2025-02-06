@@ -5,8 +5,10 @@ package download
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/sha1"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -30,6 +32,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/srp"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -53,13 +56,16 @@ const (
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
 	adcDownloadURL         = "https://developerservices2.apple.com/services/download?path="
 
-	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
+	authURL       = "https://idmsa.apple.com/appleauth/auth"
+	loginURL      = authURL + "/signin"
+	initURL       = loginURL + "/init"
+	completeURL   = loginURL + "/complete?isRememberMeEnabled=false"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
 
 	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
-	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
+	userAgent = "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6"
 
 	hashcashVersion        = 1
 	hashcashHeader         = "X-APPLE-HC"
@@ -174,8 +180,13 @@ type authService struct {
 type auth struct {
 	AccountName string   `json:"accountName,omitempty"`
 	Password    string   `json:"password,omitempty"`
-	RememberMe  bool     `json:"rememberMe,omitempty"`
+	RememberMe  bool     `json:"rememberMe"`
 	TrustTokens []string `json:"trust_tokens,omitempty"`
+	A           string   `json:"a,omitempty"`
+	Protocols   []string `json:"protocols,omitempty"`
+	M1          string   `json:"m1,omitempty"`
+	C           string   `json:"c,omitempty"`
+	M2          string   `json:"m2,omitempty"`
 }
 
 type trustedPhoneNumber struct {
@@ -561,6 +572,138 @@ func (dp *DevPortal) getHashcachHeaders() error {
 	return nil
 }
 
+type srpInitResponse struct {
+	Iteration int    `json:"iteration,omitempty"`
+	Salt      string `json:"salt,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	B         string `json:"b,omitempty"`
+	C         string `json:"c,omitempty"`
+}
+
+type srpCompleteResponse struct {
+	AccountName           string         `json:"accountName,omitempty"`
+	RememberMe            bool           `json:"rememberMe,omitempty"`
+	Skip2Fa               bool           `json:"skip2FA,omitempty"`
+	Pause2Fa              bool           `json:"pause2FA,omitempty"`
+	DomainAutoFill        bool           `json:"domainAutoFill,omitempty"`
+	M1                    string         `json:"m1,omitempty"`
+	C                     string         `json:"c,omitempty"`
+	M2                    string         `json:"m2,omitempty"`
+	ParseRememberMeTokens bool           `json:"parseRememberMeTokens,omitempty"`
+	ServiceErrors         []serviceError `json:"serviceErrors,omitempty"`
+}
+
+func (dp *DevPortal) generateSRP(username, password string) (*http.Response, error) {
+	s, err := srp.NewWithHash(crypto.SHA256, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+
+	json.NewEncoder(buf).Encode(&auth{
+		AccountName: username,
+		A:           base64.StdEncoding.EncodeToString(s.A.Bytes()),
+		Protocols:   []string{"s2k", "s2k_fo"},
+	})
+
+	req, err := http.NewRequest("POST", initURL, buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http POST request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
+	req.Header.Add("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json, text/javascript")
+
+	initResponse, err := dp.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer initResponse.Body.Close()
+
+	body, err := io.ReadAll(initResponse.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("SRP INIT: (%d):\n%s\n", initResponse.StatusCode, string(body))
+
+	var srpInit srpInitResponse
+	if err := json.Unmarshal(body, &srpInit); err != nil {
+		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	saltBytes, err := base64.StdEncoding.DecodeString(srpInit.Salt)
+	if err != nil {
+		return nil, err
+	}
+
+	bBytes, err := base64.StdEncoding.DecodeString(srpInit.B)
+	if err != nil {
+		return nil, err
+	}
+
+	cli, err := s.NewClient([]byte(username), []byte(password), saltBytes, srpInit.Iteration)
+	if err != nil {
+		return nil, err
+	}
+
+	m1, m2, err := cli.Generate(saltBytes, bBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	buf.Reset()
+
+	json.NewEncoder(buf).Encode(&auth{
+		AccountName: username,
+		C:           srpInit.C,
+		M1:          base64.StdEncoding.EncodeToString(m1),
+		M2:          base64.StdEncoding.EncodeToString(m2),
+		RememberMe:  false,
+	})
+
+	req, err = http.NewRequest("POST", completeURL, buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http POST request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
+	req.Header.Add("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json, text/javascript")
+
+	completeResponse, err := dp.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer completeResponse.Body.Close()
+
+	body, err = io.ReadAll(completeResponse.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("SRP COMPLETE: (%d):\n%s\n", completeResponse.StatusCode, string(body))
+
+	var srpComp srpCompleteResponse
+	if err := json.Unmarshal(body, &srpComp); err != nil {
+		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	if len(srpComp.ServiceErrors) > 0 {
+		return nil, fmt.Errorf("failed to complete SRP: %s", srpComp.ServiceErrors[0].Message)
+	}
+
+	return completeResponse, nil
+}
+
 func (dp *DevPortal) signIn(username, password string) error {
 
 	if err := dp.getHashcachHeaders(); err != nil {
@@ -599,6 +742,13 @@ func (dp *DevPortal) signIn(username, password string) error {
 	}
 
 	log.Debugf("POST Login: (%d):\n%s\n", response.StatusCode, string(body))
+
+	if response.StatusCode == 503 { // try NEW SRP login
+		response, err = dp.generateSRP(username, password)
+		if err != nil {
+			return err
+		}
+	}
 
 	if response.StatusCode == 409 {
 		dp.xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Account-Country")
@@ -1206,9 +1356,11 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 			}
 
 			for _, df := range dfiles {
+				log.Debugf("Downloading: %s", ipsws[version][df].URL)
 				dp.Download(ipsws[version][df].URL, folder)
 			}
 		} else {
+			log.Debugf("Downloading: %s", ipsws[version][0].URL)
 			dp.Download(ipsws[version][0].URL, folder)
 		}
 	case "profile":

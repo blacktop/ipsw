@@ -25,12 +25,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
@@ -439,45 +437,12 @@ var MachoCmd = &cobra.Command{
 						fmt.Println("STRINGS")
 						fmt.Println("=======")
 					}
-					// TODO: add option to dump all strings - https://github.com/robpike/strings/blob/master/strings.go
-					for _, sec := range m.Sections {
-						if sec.Flags.IsCstringLiterals() || sec.Name == "__os_log" || (sec.Seg == "__TEXT" && sec.Name == "__const") {
-							uuid, off, err := f.GetOffset(sec.Addr)
-							if err != nil {
-								return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
-							}
-							dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
-							if err != nil {
-								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
-							}
-
-							fmt.Printf("\n[%s.%s]\n", sec.Seg, sec.Name)
-
-							csr := bytes.NewBuffer(dat)
-
-							for {
-								pos := sec.Addr + uint64(csr.Cap()-csr.Len())
-
-								s, err := csr.ReadString('\x00')
-								if err != nil {
-									if err == io.EOF {
-										break
-									}
-									return fmt.Errorf("failed to read string: %v", err)
-								}
-
-								s = strings.Trim(s, "\x00")
-
-								if len(s) > 0 {
-									for _, r := range s {
-										if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-											continue // skip non-ascii strings
-										}
-									}
-									fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
-								}
-							}
-						}
+					strs, err := mcmd.GetStrings(m)
+					if err != nil {
+						return fmt.Errorf("failed to get strings: %v", err)
+					}
+					for pos, s := range strs {
+						fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
 					}
 
 					if cfstrs, err := m.GetCFStrings(); err == nil {

@@ -2,7 +2,7 @@
 description: All the MANY ways and types of files you can download.
 ---
 
-# Download All Teh Things
+# Download All The Things
 
 :::caution NOTICE
 Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.

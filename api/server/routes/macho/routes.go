@@ -38,6 +38,31 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       400: genericError
 	//       500: genericError
 	m.GET("/info", machoInfo)
+	// swagger:route GET /macho/info/strings MachO getMachoInfoStrings
+	//
+	// Strings
+	//
+	// Get MachO strings.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: path
+	//         in: query
+	//         description: path to MachO
+	//         required: true
+	//         type: string
+	//	    + name: arch
+	//         in: query
+	//         description: architecture to get info for in universal MachO
+	//         required: false
+	//         type: string
+	//     Responses:
+	//       200: machoStringsResponse
+	//       400: genericError
+	//       500: genericError
+	m.GET("/info/strings", machoStrings)
 
 	// m.GET("/lipo", handler)   // TODO: implement this
 	// m.GET("/o2a", handler)    // TODO: implement this

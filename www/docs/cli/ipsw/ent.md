@@ -31,6 +31,9 @@ ipsw ent [flags]
 
 # Diff two IPSWs
 ❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+
+# Launch Web UI (http://localhost:3993)
+❯ ipsw ent --ui --ipsw <IPSW>
 ```
 
 ### Options

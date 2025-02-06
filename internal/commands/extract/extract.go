@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/download"
@@ -353,9 +354,14 @@ func DSC(c *Config) ([]string, error) {
 		}
 		if i.Plists.Type == "OTA" {
 			if runtime.GOOS == "darwin" {
-				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
+				out, err := dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 				if err != nil {
 					if errors.Is(err, dyld.ErrNoCryptex) {
+						if len(c.Arches) == 0 {
+							log.Warnf("%v; trying to extract dyld_shared_cache from payload files", err)
+						} else {
+							log.Warnf("%v for the specified arch(es): %s; trying to extract dyld_shared_cache from payload files (older OTAs didn't use cryptexes)", err, strings.Join(c.Arches, ", "))
+						}
 						c.Pattern = `^` + dyld.CacheRegex
 						rfiles, err := ota.RemoteList(zr)
 						if err != nil {
@@ -390,10 +396,10 @@ func DSC(c *Config) ([]string, error) {
 		}
 		sysDMG, err := i.GetSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
 		}
 		if len(sysDMG) == 0 {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
+			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: no SystemOS DMG found in remote zip metadata")
 		}
 		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
 		if err != nil {
@@ -403,7 +409,7 @@ func DSC(c *Config) ([]string, error) {
 		if _, err := utils.SearchZip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, c.Flatten, true); err != nil {
 			return nil, fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 		}
-		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit, c.AllDSCs)
+		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
@@ -574,71 +580,70 @@ func FcsKeys(c *Config) ([]string, error) {
 		}
 	}
 
-	var dmgPaths []string
 	dmgPath, err := i.GetSystemOsDmg()
 	if err != nil {
-		return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %v", err)
+		if errors.Is(err, info.ErrorCryptexNotFound) {
+			log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
+			dmgPath, err = i.GetFileSystemOsDmg()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to get SystemOS DMG: %v", err)
+		}
 	}
-	dmgPaths = append(dmgPaths, dmgPath)
-	dmgPath, err = i.GetFileSystemOsDmg()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
-	}
-	dmgPaths = append(dmgPaths, dmgPath)
 
 	kmap := make(map[string]aea.PrivateKey)
 
-	for _, dmgPath := range dmgPaths {
-		if filepath.Ext(dmgPath) != ".aea" {
-			return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmgPath))
-		}
+	if filepath.Ext(dmgPath) != ".aea" {
+		return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmgPath))
+	}
 
-		out, err := utils.SearchPartialZip(zr.File, regexp.MustCompile(dmgPath+`$`), os.TempDir(), 0x1000, false, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract fcs-keys from DMG: %v", err)
-		}
-		defer func() {
-			for _, f := range out {
-				os.Remove(f)
-			}
-		}()
-
+	out, err := utils.SearchPartialZip(zr.File, regexp.MustCompile(dmgPath+`$`), os.TempDir(), 0x1000, false, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract fcs-keys from DMG: %v", err)
+	}
+	defer func() {
 		for _, f := range out {
-			metadata, err := aea.Info(filepath.Clean(f))
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
-			}
-			pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true)
-			if err != nil {
-				return nil, err
-			}
+			os.Remove(f)
+		}
+	}()
 
-			if c.JSON {
-				// check if json file exists
-				if _, err := os.Stat(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")); !os.IsNotExist(err) {
-					data, err := os.ReadFile(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json"))
-					if err != nil {
-						return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
-					}
-					if err := json.Unmarshal(data, &kmap); err != nil {
-						return nil, fmt.Errorf("failed to unmarshal fcs-keys: %v", err)
-					}
+	for _, f := range out {
+		metadata, err := aea.Info(filepath.Clean(f))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
+		}
+		pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true)
+		if err != nil {
+			return nil, err
+		}
+
+		if c.JSON {
+			// check if json file exists
+			if _, err := os.Stat(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")); !os.IsNotExist(err) {
+				data, err := os.ReadFile(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
 				}
-				maps.Copy(kmap, pkmap)
-			} else {
-				for _, pk := range pkmap {
-					fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
-
-					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-						return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
-					}
-
-					if err := os.WriteFile(fname, pk, 0o644); err != nil {
-						return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
-					}
-
-					artifacts = append(artifacts, fname)
+				if err := json.Unmarshal(data, &kmap); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal fcs-keys: %v", err)
 				}
+			}
+			maps.Copy(kmap, pkmap)
+		} else {
+			for _, pk := range pkmap {
+				fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
+
+				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+					return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+				}
+
+				if err := os.WriteFile(fname, pk, 0o644); err != nil {
+					return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
+				}
+
+				artifacts = append(artifacts, fname)
 			}
 		}
 	}

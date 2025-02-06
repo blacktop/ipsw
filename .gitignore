@@ -56,7 +56,9 @@ www/docs/static/releases*.json
 *.unstripped
 *.bndb
 *.lock
+*.mobileprovision
 internal/commands/ida/dscu/data/dscu.py
+internal/download/data/proto
 venv/
 
 # Unicorn EMU

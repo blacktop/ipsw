@@ -1,9 +1,12 @@
 package dyld
 
+//go:generate stringer -type=dyld_section_location_kind -trimprefix=dyld_section_location_ -output prebuilt_string.go
+
 import (
 	"crypto/sha1"
 	"fmt"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/blacktop/go-macho/types"
 	"github.com/olekukonko/tablewriter"
@@ -16,6 +19,7 @@ const (
 )
 
 var ErrPrebuiltLoaderSetNotSupported = fmt.Errorf("dyld_shared_cache has no launch prebuilt loader set info")
+var ErrProgramTrieNotSupported = fmt.Errorf("dyld_shared_cache has no program trie info")
 
 type LoaderRef uint16
 
@@ -39,11 +43,11 @@ func (l LoaderRef) String() string {
 	if l.IsApp() {
 		typ = ", type: app"
 	}
-	mssing_weak_image := ""
+	missing_weak_image := ""
 	if l.IsMissingWeakImage() {
-		mssing_weak_image = " (missing weak image)"
+		missing_weak_image = " (missing weak image)"
 	}
-	return fmt.Sprintf("index: %d%s%s", l.Index(), typ, mssing_weak_image)
+	return fmt.Sprintf("index: %d%s%s", l.Index(), typ, missing_weak_image)
 }
 
 type Loader struct {
@@ -59,8 +63,13 @@ type Loader struct {
 	// hasReadOnlyObjC    :  1,  // Has __DATA_CONST,__objc_selrefs section
 	// pre2022Binary      :  1,
 	// isPremapped        :  1,  // mapped by exclave core
-	// padding            :  6;
+	// hasUUIDLoadCommand :  1,
+	// hasWeakDefs        :  1,
+	// hasTLVs            :  1,
+	// belowLibSystem     :  1,
+	// padding            :  2;
 	Ref LoaderRef
+	// Unk [12]uint16
 }
 
 func (l Loader) IsPrebuilt() bool {
@@ -92,6 +101,21 @@ func (l Loader) Pre2022Binary() bool {
 }
 func (l Loader) IsPremapped() bool {
 	return types.ExtractBits(uint64(l.Info), 9, 1) != 0
+}
+func (l Loader) HasUUIDLoadCommand() bool {
+	return types.ExtractBits(uint64(l.Info), 10, 1) != 0
+}
+func (l Loader) HasWeakDefs() bool {
+	return types.ExtractBits(uint64(l.Info), 11, 1) != 0
+}
+func (l Loader) HasTLVs() bool {
+	return types.ExtractBits(uint64(l.Info), 12, 1) != 0
+}
+func (l Loader) BelowLibSystem() bool {
+	return types.ExtractBits(uint64(l.Info), 13, 1) != 0
+}
+func (l Loader) Padding() uint8 {
+	return uint8(types.ExtractBits(uint64(l.Info), 14, 2))
 }
 
 func (l Loader) String() string {
@@ -128,6 +152,18 @@ func (l Loader) String() string {
 	if l.IsPremapped() {
 		out = append(out, "premapped")
 	}
+	if l.HasUUIDLoadCommand() {
+		out = append(out, "uuid-load-cmd")
+	}
+	if l.HasWeakDefs() {
+		out = append(out, "weak-defs")
+	}
+	if l.HasTLVs() {
+		out = append(out, "tlvs")
+	}
+	if l.BelowLibSystem() {
+		out = append(out, "below-libsystem")
+	}
 	return fmt.Sprintf("%s, ref: %s", strings.Join(out, "|"), l.Ref)
 }
 
@@ -137,7 +173,8 @@ const (
 	KindNormal   DependentKind = 0
 	KindWeakLink DependentKind = 1
 	KindReexport DependentKind = 2
-	KindUpward   DependentKind = 3
+	KindUpward   DependentKind = 4
+	KindDelayed  DependentKind = 8
 )
 
 func (k DependentKind) String() string {
@@ -145,11 +182,13 @@ func (k DependentKind) String() string {
 	case KindNormal:
 		return "regular"
 	case KindWeakLink:
-		return "weak link"
+		return "weak-link"
 	case KindReexport:
-		return "reexport"
+		return "re-export"
 	case KindUpward:
 		return "upward"
+	case KindDelayed:
+		return "delay-init"
 	default:
 		return fmt.Sprintf("unknown %d", k)
 	}
@@ -273,13 +312,15 @@ func (k RSKind) String() string {
 }
 
 type ResolvedSymbol struct {
-	TargetLoader        *Loader
-	TargetSymbolName    string
-	TargetRuntimeOffset uint64
-	Kind                RSKind
-	IsCode              bool
-	IsWeakDef           bool
-	IsMissingFlatLazy   bool
+	TargetLoader          *Loader
+	TargetSymbolName      string
+	TargetRuntimeOffset   uint64
+	TargetAddressForDlsym uint64
+	Kind                  RSKind
+	IsCode                bool
+	IsWeakDef             bool
+	IsMissingFlatLazy     bool
+	IsMaterializing       bool
 }
 
 type BindTarget struct {
@@ -303,6 +344,11 @@ type CodeSignatureInFile struct {
 	Size       uint32
 }
 
+type ExportsTrieLoaderInFile struct {
+	Offset uint64
+	Size   uint32
+}
+
 func deserializeAbsoluteValue(value uint64) uint64 {
 	// sign extend
 	if (value & 0x4000000000000000) != 0 {
@@ -316,8 +362,47 @@ type dependent struct {
 	Kind DependentKind
 }
 
+type dyld_section_location_kind uint32
+
+const (
+	// TEXT:
+	dyld_section_location_text_swift5_protos dyld_section_location_kind = iota
+	dyld_section_location_text_swift5_proto
+	dyld_section_location_text_swift5_types
+	dyld_section_location_text_swift5_replace
+	dyld_section_location_text_swift5_replace2
+	dyld_section_location_text_swift5_ac_funcs
+
+	// DATA*:
+	dyld_section_location_objc_image_info
+	dyld_section_location_data_sel_refs
+	dyld_section_location_data_msg_refs
+	dyld_section_location_data_class_refs
+	dyld_section_location_data_super_refs
+	dyld_section_location_data_protocol_refs
+	dyld_section_location_data_class_list
+	dyld_section_location_data_non_lazy_class_list
+	dyld_section_location_data_stub_list
+	dyld_section_location_data_category_list
+	dyld_section_location_data_category_list2
+	dyld_section_location_data_non_lazy_category_list
+	dyld_section_location_data_protocol_list
+	dyld_section_location_data_objc_fork_ok
+	dyld_section_location_data_raw_isa
+
+	// Note, always add new entries before this
+	dyld_section_location_count
+)
+
+type SectionLocations struct {
+	Version uint32 // = 1;
+	Flags   uint32 // = 0;
+
+	Offsets [dyld_section_location_count]uint64
+	Sizes   [dyld_section_location_count]uint64
+}
+
 type prebuiltLoaderHeader struct {
-	Loader
 	PathOffset                     uint16
 	DependentLoaderRefsArrayOffset uint16 // offset to array of LoaderRef
 	DependentKindArrayOffset       uint16 // zero if all deps normal
@@ -343,9 +428,9 @@ type prebuiltLoaderHeader struct {
 	IndexOfTwin          uint16 // if in dyld cache and part of unzippered twin, then index of the other twin
 	_                    uint16
 
-	ExportsTrieLoaderOffset uint64
-	ExportsTrieLoaderSize   uint32
-	VmSize                  uint32
+	ExportsTrieLoader ExportsTrieLoaderInFile
+
+	VmSize uint32
 
 	CodeSignature CodeSignatureInFile
 
@@ -354,12 +439,51 @@ type prebuiltLoaderHeader struct {
 	OverrideBindTargetRefsOffset uint32
 	OverrideBindTargetRefsCount  uint32
 
+	_ uint32 // padding
+
+	Sections SectionLocations
+
 	// followed by:
 	//  path chars
 	//  dep kind array
 	//  file validation info
 	//  segments
 	//  bind targets
+}
+
+func (hdr prebuiltLoaderHeader) HasInitializers() bool {
+	return types.ExtractBits(uint64(hdr.Info), 0, 1) != 0
+}
+func (hdr prebuiltLoaderHeader) IsOverridable() bool {
+	return types.ExtractBits(uint64(hdr.Info), 1, 1) != 0
+}
+func (hdr prebuiltLoaderHeader) SupportsCatalyst() bool {
+	return types.ExtractBits(uint64(hdr.Info), 2, 1) != 0
+}
+func (hdr prebuiltLoaderHeader) IsCatalystOverride() bool {
+	return types.ExtractBits(uint64(hdr.Info), 3, 1) != 0
+}
+func (hdr prebuiltLoaderHeader) RegionsCount() uint16 {
+	return uint16(types.ExtractBits(uint64(hdr.Info), 4, 12))
+}
+func (hdr prebuiltLoaderHeader) GetInfo() string {
+	var out []string
+	if hdr.HasInitializers() {
+		out = append(out, "initializers")
+	}
+	if hdr.IsOverridable() {
+		out = append(out, "overridable")
+	}
+	if hdr.SupportsCatalyst() {
+		out = append(out, "catalyst")
+	}
+	if hdr.IsCatalystOverride() {
+		out = append(out, "catalyst_override")
+	}
+	if hdr.RegionsCount() > 0 {
+		out = append(out, fmt.Sprintf("regions=%d", hdr.RegionsCount()))
+	}
+	return strings.Join(out, "|")
 }
 
 // ObjCBinaryInfo stores information about the layout of the objc sections in a binary,
@@ -449,7 +573,11 @@ func (o ObjCBinaryInfo) String() string {
 }
 
 type PrebuiltLoader struct {
-	prebuiltLoaderHeader
+	Loader
+	UUID                        types.UUID
+	CpuSubtype                  uint32
+	Unused                      uint32
+	Header                      prebuiltLoaderHeader
 	Path                        string
 	AltPath                     string
 	Twin                        string
@@ -464,37 +592,6 @@ type PrebuiltLoader struct {
 	ObjcSelectorFixups          []BindTargetRef
 }
 
-func (pl PrebuiltLoader) HasInitializers() bool {
-	return types.ExtractBits(uint64(pl.Info), 0, 1) != 0
-}
-func (pl PrebuiltLoader) IsOverridable() bool {
-	return types.ExtractBits(uint64(pl.Info), 1, 1) != 0
-}
-func (pl PrebuiltLoader) SupportsCatalyst() bool {
-	return types.ExtractBits(uint64(pl.Info), 2, 1) != 0
-}
-func (pl PrebuiltLoader) IsCatalystOverride() bool {
-	return types.ExtractBits(uint64(pl.Info), 3, 1) != 0
-}
-func (pl PrebuiltLoader) RegionsCount() uint16 {
-	return uint16(types.ExtractBits(uint64(pl.Info), 4, 12))
-}
-func (pl PrebuiltLoader) GetInfo() string {
-	var out []string
-	if pl.HasInitializers() {
-		out = append(out, "initializers")
-	}
-	if pl.IsOverridable() {
-		out = append(out, "overridable")
-	}
-	if pl.SupportsCatalyst() {
-		out = append(out, "catalyst")
-	}
-	if pl.IsCatalystOverride() {
-		out = append(out, "catalyst_override")
-	}
-	return strings.Join(out, "|")
-}
 func (pl PrebuiltLoader) GetFileOffset(vmoffset uint64) uint64 {
 	for _, region := range pl.Regions {
 		if vmoffset >= region.VMOffset() && vmoffset < region.VMOffset()+uint64(region.FileSize) {
@@ -514,9 +611,9 @@ func (pl PrebuiltLoader) String(f *File) string {
 	if pl.Twin != "" {
 		out += fmt.Sprintf("Twin:    %s\n", pl.Twin)
 	}
-	out += fmt.Sprintf("VM Size:       %#x\n", pl.VmSize)
-	if pl.CodeSignature.Size > 0 {
-		out += fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.CodeSignature.FileOffset, pl.CodeSignature.Size)
+	out += fmt.Sprintf("VM Size:       %#x\n", pl.Header.VmSize)
+	if pl.Header.CodeSignature.Size > 0 {
+		out += fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.Header.CodeSignature.FileOffset, pl.Header.CodeSignature.Size)
 	}
 	if pl.FileValidation != nil {
 		if pl.FileValidation.CheckCDHash {
@@ -535,17 +632,17 @@ func (pl PrebuiltLoader) String(f *File) string {
 		// }
 	}
 	out += fmt.Sprintf("Loader:        %s\n", pl.Loader)
-	if len(pl.GetInfo()) > 0 {
-		out += fmt.Sprintf("Info:          %s\n", pl.GetInfo())
+	if len(pl.Header.GetInfo()) > 0 {
+		out += fmt.Sprintf("Info:          %s\n", pl.Header.GetInfo())
 	}
-	if pl.ExportsTrieLoaderSize > 0 {
-		out += fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.ExportsTrieLoaderOffset), pl.ExportsTrieLoaderSize)
+	if pl.Header.ExportsTrieLoader.Size > 0 {
+		out += fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.Header.ExportsTrieLoader.Offset), pl.Header.ExportsTrieLoader.Size)
 	}
-	if pl.FixupsLoadCommandOffset > 0 {
-		out += fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.FixupsLoadCommandOffset)
+	if pl.Header.FixupsLoadCommandOffset > 0 {
+		out += fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.Header.FixupsLoadCommandOffset)
 	}
 	if len(pl.Regions) > 0 {
-		out += "\nRegions:\n"
+		out += "\nRegions:\n\n"
 		tableString := &strings.Builder{}
 		rdata := [][]string{}
 		for _, rg := range pl.Regions {
@@ -567,22 +664,33 @@ func (pl PrebuiltLoader) String(f *File) string {
 		table.Render()
 		out += tableString.String()
 	}
+	out += "\nSections:\n"
+	buf := &strings.Builder{}
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	for idx, off := range pl.Header.Sections.Offsets {
+		if off == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "    %s:\toff=%#x\tsz=%d\n", dyld_section_location_kind(idx), off, pl.Header.Sections.Sizes[idx])
+	}
+	w.Flush()
+	out += buf.String()
 	if len(pl.Dependents) > 0 {
 		out += "\nDependents:\n"
 		for _, dp := range pl.Dependents {
-			out += fmt.Sprintf("\t%-10s) %s\n", dp.Kind, dp.Name)
+			out += fmt.Sprintf("    %-10s) %s\n", dp.Kind, dp.Name)
 		}
 	}
 	if len(pl.BindTargets) > 0 {
 		out += "\nBindTargets:\n"
 		for _, bt := range pl.BindTargets {
-			out += fmt.Sprintf("  %s\n", bt.String(f))
+			out += fmt.Sprintf("    %s\n", bt.String(f))
 		}
 	}
 	if len(pl.OverrideBindTargets) > 0 {
 		out += "\nOverride BindTargets:\n"
 		for _, bt := range pl.OverrideBindTargets {
-			out += fmt.Sprintf("  %s\n", bt.String(f))
+			out += fmt.Sprintf("    %s\n", bt.String(f))
 		}
 	}
 	if pl.ObjcFixupInfo != nil {
@@ -592,18 +700,25 @@ func (pl PrebuiltLoader) String(f *File) string {
 	if len(pl.ObjcCanonicalProtocolFixups) > 0 {
 		out += "ObjC Canonical ProtocolFixups:\n"
 		for _, fixup := range pl.ObjcCanonicalProtocolFixups {
-			out += fmt.Sprintf("  %t\n", fixup)
+			out += fmt.Sprintf("    %t\n", fixup)
 		}
 	}
 	if len(pl.ObjcSelectorFixups) > 0 {
 		out += "\nObjC SelectorFixups:\n"
 		for _, bt := range pl.ObjcSelectorFixups {
-			out += fmt.Sprintf("  %s\n", bt.String(f))
+			out += fmt.Sprintf("    %s\n", bt.String(f))
 		}
 	}
 
 	return out
 }
+
+type objCFlags uint32
+
+const (
+	NoObjCFlags         objCFlags = 0
+	HasDuplicateClasses objCFlags = 1 << 0
+)
 
 // PrebuiltLoaderSet is an mmap()ed read-only data structure which holds a set of PrebuiltLoader objects;
 // The contained PrebuiltLoader objects can be found be index O(1) or path O(n).
@@ -622,7 +737,7 @@ type prebuiltLoaderSetHeader struct {
 	ObjcSelectorHashTableOffset  uint32
 	ObjcClassHashTableOffset     uint32
 	ObjcProtocolHashTableOffset  uint32
-	Reserved                     uint32
+	ObjcFlags                    objCFlags
 	ObjcProtocolClassCacheOffset uint64
 	// Swift prebuilt data
 	SwiftTypeConformanceTableOffset        uint32

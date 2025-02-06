@@ -15,45 +15,49 @@ import (
 type certificateType string
 
 const (
-	CT_IOS_DEVELOPMENT            certificateType = "IOS_DEVELOPMENT"
-	CT_IOS_DISTRIBUTION           certificateType = "IOS_DISTRIBUTION"
-	CT_MAC_APP_DISTRIBUTION       certificateType = "MAC_APP_DISTRIBUTION"
-	CT_MAC_INSTALLER_DISTRIBUTION certificateType = "MAC_INSTALLER_DISTRIBUTION"
-	CT_MAC_APP_DEVELOPMENT        certificateType = "MAC_APP_DEVELOPMENT"
-	CT_DEVELOPER_ID_KEXT          certificateType = "DEVELOPER_ID_KEXT"
-	CT_DEVELOPER_ID_APPLICATION   certificateType = "DEVELOPER_ID_APPLICATION"
-	CT_DEVELOPMENT                certificateType = "DEVELOPMENT"
-	CT_DISTRIBUTION               certificateType = "DISTRIBUTION"
-	CT_PASS_TYPE_ID               certificateType = "PASS_TYPE_ID"
-	CT_PASS_TYPE_ID_WITH_NFC      certificateType = "PASS_TYPE_ID_WITH_NFC"
+	CT_IOS_DEVELOPMENT             certificateType = "IOS_DEVELOPMENT"
+	CT_IOS_DISTRIBUTION            certificateType = "IOS_DISTRIBUTION"
+	CT_MAC_APP_DISTRIBUTION        certificateType = "MAC_APP_DISTRIBUTION"
+	CT_MAC_INSTALLER_DISTRIBUTION  certificateType = "MAC_INSTALLER_DISTRIBUTION"
+	CT_MAC_APP_DEVELOPMENT         certificateType = "MAC_APP_DEVELOPMENT"
+	CT_DEVELOPER_ID_KEXT           certificateType = "DEVELOPER_ID_KEXT"
+	CT_DEVELOPER_ID_KEXT_G2        certificateType = "DEVELOPER_ID_KEXT_G2"
+	CT_DEVELOPER_ID_APPLICATION    certificateType = "DEVELOPER_ID_APPLICATION"
+	CT_DEVELOPER_ID_APPLICATION_G2 certificateType = "DEVELOPER_ID_APPLICATION_G2"
+	CT_DEVELOPMENT                 certificateType = "DEVELOPMENT"
+	CT_DISTRIBUTION                certificateType = "DISTRIBUTION"
+	CT_PASS_TYPE_ID                certificateType = "PASS_TYPE_ID"
+	CT_PASS_TYPE_ID_WITH_NFC       certificateType = "PASS_TYPE_ID_WITH_NFC"
 )
 
 var CertTypes = []string{
-	"IOS_DEVELOPMENT",
-	"IOS_DISTRIBUTION",
-	"MAC_APP_DISTRIBUTION",
-	"MAC_INSTALLER_DISTRIBUTION",
-	"MAC_APP_DEVELOPMENT",
-	"DEVELOPER_ID_KEXT",
-	"DEVELOPER_ID_APPLICATION",
-	"DEVELOPMENT",
-	"DISTRIBUTION",
-	"PASS_TYPE_ID",
-	"PASS_TYPE_ID_WITH_NFC",
+	string(CT_IOS_DEVELOPMENT),
+	string(CT_IOS_DISTRIBUTION),
+	string(CT_MAC_APP_DISTRIBUTION),
+	string(CT_MAC_INSTALLER_DISTRIBUTION),
+	string(CT_MAC_APP_DEVELOPMENT),
+	string(CT_DEVELOPER_ID_KEXT),
+	string(CT_DEVELOPER_ID_KEXT_G2),
+	string(CT_DEVELOPER_ID_APPLICATION),
+	string(CT_DEVELOPER_ID_APPLICATION_G2),
+	string(CT_DEVELOPMENT),
+	string(CT_DISTRIBUTION),
+	string(CT_PASS_TYPE_ID),
+	string(CT_PASS_TYPE_ID_WITH_NFC),
 }
 
 type Certificate struct {
-	Type       string `json:"type"`
 	ID         string `json:"id"`
+	Type       string `json:"type"`
 	Attributes struct {
-		SerialNumber       string `json:"serialNumber"`
-		CertificateContent []byte `json:"certificateContent"`
-		DisplayName        string `json:"displayName"`
-		Name               string `json:"name"`
-		CsrContent         any    `json:"csrContent"`
-		Platform           string `json:"platform"`
-		ExpirationDate     Date   `json:"expirationDate"`
-		CertificateType    string `json:"certificateType"`
+		CertificateContent []byte          `json:"certificateContent"`
+		DisplayName        string          `json:"displayName"`
+		ExpirationDate     Date            `json:"expirationDate"`
+		Name               string          `json:"name"`
+		Platform           string          `json:"platform"`
+		SerialNumber       string          `json:"serialNumber"`
+		CertificateType    certificateType `json:"certificateType"`
+		CsrContent         any             `json:"csrContent"`
 	} `json:"attributes"`
 	Links Links `json:"links"`
 }
@@ -128,10 +132,7 @@ func (as *AppStore) GetCertificates() ([]Certificate, error) {
 
 	certificateDataList := make([]Certificate, 0)
 	for _, v := range certsResp.Data {
-		if v.Type == "certificates" &&
-			(v.Attributes.CertificateType == "IOS_DEVELOPMENT" ||
-				v.Attributes.CertificateType == "MAC_APP_DEVELOPMENT" ||
-				v.Attributes.CertificateType == "DEVELOPMENT") {
+		if v.Type == "certificates" {
 			certificateDataList = append(certificateDataList, v)
 		}
 	}

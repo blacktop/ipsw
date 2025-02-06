@@ -492,7 +492,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 	}
 
 	if _, err := os.Stat(sparseDiskimageMount); os.IsExist(err) {
-		if err := utils.Unmount(sparseDiskimageMount, false); err != nil {
+		if err := utils.Unmount(sparseDiskimageMount, true); err != nil {
 			return err
 		}
 	}

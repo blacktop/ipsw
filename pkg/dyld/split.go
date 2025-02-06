@@ -74,7 +74,7 @@ func GetHandle(libs []string) (*LibHandle, error) {
 			return h, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to open a handle to the library")
+	return nil, fmt.Errorf("unable to open a handle to the XCode library (use --xcode-path to specify the path to Xcode)")
 }
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
