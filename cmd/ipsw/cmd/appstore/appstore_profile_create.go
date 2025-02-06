@@ -47,12 +47,14 @@ func init() {
 	ASProfileCreateCmd.Flags().StringP("bundle-id", "b", "", "Board ID")
 	ASProfileCreateCmd.Flags().StringSliceP("certs", "c", []string{}, "Certificate IDs")
 	ASProfileCreateCmd.Flags().StringSliceP("devices", "d", []string{}, "Device IDs")
+	ASProfileCreateCmd.Flags().Bool("offline", false, "Enable profile with 'Offline Support' (7 day validity)")
 	ASProfileCreateCmd.Flags().StringP("output", "o", "", "Folder to download profile to")
 	ASProfileCreateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.profile.create.type", ASProfileCreateCmd.Flags().Lookup("type"))
 	viper.BindPFlag("appstore.profile.create.bundle-id", ASProfileCreateCmd.Flags().Lookup("bundle-id"))
 	viper.BindPFlag("appstore.profile.create.certs", ASProfileCreateCmd.Flags().Lookup("certs"))
 	viper.BindPFlag("appstore.profile.create.devices", ASProfileCreateCmd.Flags().Lookup("devices"))
+	viper.BindPFlag("appstore.profile.create.offline", ASProfileCreateCmd.Flags().Lookup("offline"))
 	viper.BindPFlag("appstore.profile.create.output", ASProfileCreateCmd.Flags().Lookup("output"))
 }
 
@@ -80,6 +82,7 @@ var ASProfileCreateCmd = &cobra.Command{
 		bid := viper.GetString("appstore.profile.create.bundle-id")
 		certs := viper.GetStringSlice("appstore.profile.create.certs")
 		devices := viper.GetStringSlice("appstore.profile.create.devices")
+		offline := viper.GetBool("appstore.profile.create.offline")
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
 			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
@@ -126,6 +129,9 @@ var ASProfileCreateCmd = &cobra.Command{
 			cs, err := as.GetCertificates()
 			if err != nil {
 				return err
+			}
+			if len(cs) == 0 {
+				return fmt.Errorf("no certificates found")
 			}
 
 			var choices []string
@@ -182,7 +188,7 @@ var ASProfileCreateCmd = &cobra.Command{
 			"devices":   devices,
 		}).Debug("Creating profile")
 
-		resp, err := as.CreateProfile(args[0], viper.GetString("appstore.profile.create.type"), bid, certs, devices)
+		resp, err := as.CreateProfile(args[0], viper.GetString("appstore.profile.create.type"), bid, certs, devices, offline)
 		if err != nil {
 			return fmt.Errorf("failed to create profile: %v", err)
 		}
