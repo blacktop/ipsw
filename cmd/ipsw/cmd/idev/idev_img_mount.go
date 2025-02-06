@@ -78,7 +78,7 @@ var idevImgMountCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 		// flags
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 		xcode := viper.GetString("idev.img.mount.xcode")
 		dmgPath := viper.GetString("idev.img.mount.ddi-img")
 		trustcachePath := viper.GetString("idev.img.mount.trustcache")
