@@ -33,7 +33,6 @@ import (
 	"github.com/apex/log"
 	"github.com/spf13/cobra"
 
-	"github.com/blacktop/go-apfs/pkg/disk/dmg"
 	"github.com/blacktop/go-macho/pkg/cpio"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -72,14 +71,15 @@ var pkgCmd = &cobra.Command{
 		}
 
 		if isDMG {
-			d, err := dmg.Open(infile, nil)
-			if err != nil {
-				return err
-			}
-			defer d.Close()
-			if err := d.Load(); err != nil {
-				return err
-			}
+			log.Fatal("DMG files are not supported yet")
+			// d, err := dmg.Open(infile, nil)
+			// if err != nil {
+			// 	return err
+			// }
+			// defer d.Close()
+			// if err := d.Load(); err != nil {
+			// 	return err
+			// }
 		} else { // PKG/XAR
 			pkg, err := xar.OpenReader(infile)
 			if err != nil {

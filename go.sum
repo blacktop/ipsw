@@ -456,6 +456,8 @@ github.com/ulikunitz/xz v0.6.0-alpha.3 h1:7IGVhjpaTpgeNBUPQcbtooPhFXDgeGxzhFki5B
 github.com/ulikunitz/xz v0.6.0-alpha.3/go.mod h1:ndJU5gy7q0Ffe1saQwmPKbMhIhJbwdu4+3t8eTxRF5U=
 github.com/unicorn-engine/unicorn v0.0.0-20240926111503-d568885d64c8 h1:fEkcOPX+BLPy00VWa3XCR5KFfTkb8bWn58xHsEp217c=
 github.com/unicorn-engine/unicorn v0.0.0-20240926111503-d568885d64c8/go.mod h1:mcHBrigWSHlMZYol9QOFnK7sbltIt/OaKP5CQBZsC+4=
+github.com/vbauerster/mpb/v7 v7.5.3 h1:BkGfmb6nMrrBQDFECR/Q7RkKCw7ylMetCb4079CGs4w=
+github.com/vbauerster/mpb/v7 v7.5.3/go.mod h1:i+h4QY6lmLvBNK2ah1fSreiw3ajskRlBp9AhY/PnuOE=
 github.com/vbauerster/mpb/v8 v8.9.2 h1:kb91+D643Qg040bbICYtzpjgZ9ypVO/+sjv4Jcm6si4=
 github.com/vbauerster/mpb/v8 v8.9.2/go.mod h1:hxS8Hz4C6ijnppDSIX6LjG8FYJSoPo9iIOcE53Zik0c=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
