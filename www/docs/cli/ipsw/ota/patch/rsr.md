@@ -17,9 +17,10 @@ ipsw ota patch rsr [flags]
 ### Options
 
 ```
-  -h, --help            help for rsr
-  -i, --input string    Input folder
-  -o, --output string   Output folder
+  -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
+  -h, --help                    help for rsr
+  -i, --input string            Input folder
+  -o, --output string           Output folder
 ```
 
 ### Options inherited from parent commands

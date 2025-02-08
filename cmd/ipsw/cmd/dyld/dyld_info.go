@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2024 blacktop
+Copyright © 2018-2025 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -352,7 +352,7 @@ var dyldInfoCmd = &cobra.Command{
 					out, err := utils.GitDiff(
 						strings.Join(dout1, "\n")+"\n",
 						strings.Join(dout2, "\n")+"\n",
-						&utils.GitDiffConfig{Color:viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+						&utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
 					if err != nil {
 						return err
 					}

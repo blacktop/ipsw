@@ -21,6 +21,7 @@ ipsw appstore profile create <NAME> [flags]
   -c, --certs strings      Certificate IDs
   -d, --devices strings    Device IDs
   -h, --help               help for create
+      --offline            Enable profile with 'Offline Support' (7 day validity)
   -o, --output string      Folder to download profile to
   -t, --type string        Profile type (default "IOS_APP_DEVELOPMENT")
 ```
