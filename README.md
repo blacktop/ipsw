@@ -79,8 +79,8 @@ Available Commands:
   mdevs           List all MobileDevices in IPSW
   mount           Mount DMG from IPSW
   ota             Parse OTAs
+  pkg             List contents of a DMG/PKG file
   plist           Dump plist as JSON
-  pongo           PongoOS Terminal
   ssh             SSH into a jailbroken device
   swift-dump      🚧 Swift class-dump a dylib from a DSC or MachO
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
@@ -141,4 +141,4 @@ Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
 
 ## License
 
-MIT Copyright (c) 2018-2024 **blacktop**
+MIT Copyright (c) 2018-2025 **blacktop**

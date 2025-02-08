@@ -40,6 +40,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw mdevs](/docs/cli/ipsw/mdevs)	 - List all MobileDevices in IPSW
 * [ipsw mount](/docs/cli/ipsw/mount)	 - Mount DMG from IPSW
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
+* [ipsw pkg](/docs/cli/ipsw/pkg)	 - List contents of a DMG/PKG file
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
 * [ipsw pongo](/docs/cli/ipsw/pongo)	 - PongoOS Terminal
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
