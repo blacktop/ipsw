@@ -44,7 +44,6 @@ var pkgCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
