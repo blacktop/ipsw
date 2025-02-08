@@ -1,0 +1,613 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: HFS.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: HFS Binary Template for analysis
+//  Category: Drives
+// File Mask: 
+//  ID Bytes: [+1024] 48 2B,[+1024] 48 58
+//   History: 
+//   1.0   2025-02-08 Inital version based on modified SweetScape Software version
+//------------------------------------------------
+typedef char   SInt8;
+typedef uchar  UInt8;
+typedef int16  SInt16;
+typedef uint16 UInt16;
+typedef int32  SInt32;
+typedef uint32 UInt32;
+typedef int64  SInt64;
+typedef uint64 UInt64;
+
+local int NumDrives = 0;
+local int   DriveNum   = NumDrives++; // keep track of the index of this drive
+// local BYTE DriveBytesPerSectorShift = BytesPerSectorShift; // BUGBUG -- validate 4k sector support, then enable parameterization of NTFS_DRIVE
+local int64 DriveStart = FTell();
+
+// HFS block of data in a file
+struct HFS_ExtentDescriptor 
+{
+    UInt32                  startBlock;
+    UInt32                  blockCount;
+};
+
+// HFS describes the location of file data
+struct HFS_ForkData 
+{
+    UInt64                  logicalSize;
+    UInt32                  clumpSize;
+    UInt32                  totalBlocks;
+    HFS_ExtentDescriptor    extents[8];
+};
+
+// HFS_Time - 32-bit integer, number of seconds since 01/01/1904 00:00:00
+typedef uint HFS_Time <read=HFSTimeRead, write=HFSTimeWrite>;
+string HFSTimeRead( HFS_Time t )
+{   
+    // Convert to FILETIME
+    if( t == 0 )
+    {
+        return "-";
+    }
+    else
+    {
+        return FileTimeToString( t*10000000L + 95616288000000000L );
+    }
+}
+int HFSTimeWrite( HFS_Time &t, string value )
+{
+    // Convert from FILETIME
+    FILETIME ft;
+    int result = StringToFileTime( value, ft );
+    t = (int)(((uint64)ft - 95616288000000000L)/10000000L);
+    return result;
+}
+
+// HFS Catalog Node ID number
+typedef enum <UInt32> {
+    kHFSRootParentID            = 1,
+    kHFSRootFolderID            = 2,
+    kHFSExtentsFileID           = 3,
+    kHFSCatalogFileID           = 4,
+    kHFSBadBlockFileID          = 5,
+    kHFSAllocationFileID        = 6,
+    kHFSStartupFileID           = 7,
+    kHFSAttributesFileID        = 8,
+    kHFSRepairCatalogFileID     = 14,
+    kHFSBogusExtentFileID       = 15,
+    kHFSFirstUserCatalogNodeID  = 16
+} HFS_CatalogNodeID;
+
+// HFS Record type
+typedef enum <SInt16> {
+    kHFSFolderRecord        = 0x0001,
+    kHFSFileRecord          = 0x0002,
+    kHFSFolderThreadRecord  = 0x0003,
+    kHFSFileThreadRecord    = 0x0004
+} HFS_RecordType;
+
+
+struct HFS_VolumeHeader 
+{
+    uchar               reserved[1024]; // TODO: replace with HFS_BOOTSECTOR
+    char                signature[2]; // 0x4244
+    UInt16              version;
+    UInt32              attributes;
+    char                lastMountedVersion[4];
+    UInt32              journalInfoBlock;
+    HFS_Time            createDate;
+    HFS_Time            modifyDate;
+    HFS_Time            backupDate;
+    HFS_Time            checkedDate;
+    UInt32              fileCount;
+    UInt32              folderCount;
+    UInt32              blockSize;
+    UInt32              totalBlocks;
+    UInt32              freeBlocks;
+    UInt32              nextAllocation;
+    UInt32              rsrcClumpSize;
+    UInt32              dataClumpSize;
+    HFS_CatalogNodeID   nextCatalogID;
+    UInt32              writeCount;
+    UInt64              encodingsBitmap;
+    UInt32              finderInfo[8];
+    HFS_ForkData        allocationFile;
+    HFS_ForkData        extentsFile;
+    HFS_ForkData        catalogFile;
+    HFS_ForkData        attributesFile;
+    HFS_ForkData        startupFile;
+    uchar              reserved2[512];
+};
+// boolean IsValidHfsBootSector(int64 pos) {
+//     // For details on the HFS boot sector, see:
+//     // https://developer.apple.com/library/archive/documentation/mac/Files/Files-101.html#HEADING101-0
+//     if( (ReadString( pos + 1024, 2 ) != "H+") &&
+//         (ReadString( pos + 1024, 2 ) != "HX") ) {
+//         return false;
+//     }
+//     return true;
+// }
+
+
+// HFS Unicode string
+struct HFS_UniStr255 
+{
+    UInt16  length;
+    if( length > 0 )
+    {
+        wchar_t unicode[length];
+    }
+};
+
+// HFS Unix style permissions
+struct HFS_BSDInfo 
+{
+    UInt32  ownerID;
+    UInt32  groupID;
+    UInt8   adminFlags;
+    UInt8   ownerFlags;
+    UInt16  fileMode <format=octal>;
+    union {
+        UInt32  iNodeNum;
+        UInt32  linkCount;
+        UInt32  rawDevice;
+    } special;
+};
+
+// HFS 2d point
+struct HFS_Point 
+{
+    SInt16          v;
+    SInt16          h;
+};
+
+typedef char HFS_OSType[4];
+
+// HFS File information
+struct HFS_FileInfo 
+{
+    HFS_OSType      fileType;           // The type of the file
+    HFS_OSType      fileCreator;        // The file's creator
+    UInt16          finderFlags;
+    HFS_Point       location;           // File's location in the folder.
+    UInt16          reservedField;
+};
+
+// HFS Extended file information
+struct HFS_ExtendedFileInfo 
+{
+    SInt16    reserved1[4];
+    UInt16    extendedFinderFlags;
+    SInt16    reserved2;
+    SInt32    putAwayFolderID;
+};
+
+// HFS rectangle
+struct HFS_Rect 
+{
+    SInt16    top;
+    SInt16    left;
+    SInt16    bottom;
+    SInt16    right;
+};
+
+// HFS Folder information
+struct HFS_FolderInfo 
+{
+    HFS_Rect  windowBounds;       // The position and dimension of the folder's window
+    UInt16    finderFlags;
+    HFS_Point location;           // Folder's location in the parent
+                                  // folder. If set to {0, 0}, the Finder
+                                  // will place the item automatically
+    UInt16    reservedField;
+};
+
+// HFS Extended folder information
+struct HFS_ExtendedFolderInfo 
+{
+    HFS_Point scrollPosition;     // Scroll position (for icon views)
+    SInt32    reserved1;
+    UInt16    extendedFinderFlags;
+    SInt16    reserved2;
+    SInt32    putAwayFolderID;
+};
+
+// HFS - Key information for a node stored in the catalog btree
+typedef struct 
+{
+    UInt16              keyLength;
+    HFS_CatalogNodeID   parentID;
+    HFS_UniStr255       nodeName;
+} HFS_CatalogKey <read=ReadHFSCatalogKey>;
+
+wstring ReadHFSCatalogKey( HFS_CatalogKey &key )
+{
+    if( key.nodeName.length > 0 )
+        return key.nodeName.unicode;
+    return "";
+}
+
+// HFS - Folder information stored in the catalog
+typedef struct
+{
+    HFS_RecordType          recordType;
+    UInt16                  flags;
+    UInt32                  valence;
+    HFS_CatalogNodeID       folderID;
+    HFS_Time                createDate;
+    HFS_Time                contentModDate;
+    HFS_Time                attributeModDate;
+    HFS_Time                accessDate;
+    HFS_Time                backupDate;
+    HFS_BSDInfo             permissions;
+    HFS_FolderInfo          userInfo;
+    HFS_ExtendedFolderInfo  finderInfo;
+    UInt32                  textEncoding;
+    UInt32                  reserved;
+} HFS_CatalogFolder;
+
+// Forward definitions
+struct HFS_BTNode;
+struct HFS_Folder;
+struct HFS_File;
+
+// HFS - Function to iterate through the btree and list all folders and 
+//  files with the given parent id
+void HFS_ListFilesInNode( HFS_BTNode &node, uint folderID )
+{
+    local int i <hidden=true>, type <hidden=true>;
+    local int64 pos <hidden=true>;
+    local uint  nextID <hidden=true>;
+    local int   count <hidden=true> = node.descriptor.numRecords;
+
+    if( node.descriptor.kind == kBTIndexNode )
+    {
+        // Traverse down the index nodes looking for the proper parent id
+        for( i = 0; i < count; i++ )
+        {
+            if( i < count-1 )
+                nextID = node.record[i+1].key.parentID;
+            else
+                nextID = 0xffffffff;
+            if( (node.record[i].key.parentID <= folderID) && (folderID <= nextID) )
+            {
+                // Traverse down this node
+                if( exists( node.record[i].childNode ) )
+                    HFS_ListFilesInNode( node.record[i].childNode, folderID );
+            }
+            else if( node.record[i].key.parentID > folderID )
+                break;
+        }
+    }
+    else if( node.descriptor.kind == kBTLeafNode )
+    {
+        // Create a copy of all folders and files for the directory structure
+        for( i = 0; i < node.descriptor.numRecords; i++ )
+        {
+            if( exists( node.record[i] ) )
+            {
+                if( node.record[i].key.parentID == folderID )
+                {
+                    pos = startof( node.record[i] );
+                    FSeek( pos );
+                    BigEndian();
+                    type = ReadUShort( pos + ReadUShort( pos+6 )*2 + 8 );
+                    if( type == kHFSFolderRecord )
+                        HFS_Folder folder;
+                    else if( type == kHFSFileRecord )
+                        HFS_File file;
+                    LittleEndian();
+                }    
+            }
+        }
+    }
+}
+void HFS_ListFiles( int DriveNum, uint folderID )
+{
+    HFS_ListFilesInNode( btree.rootNode, folderID );
+}
+
+// HFS List of files and subfolders inside a folder
+typedef struct
+{
+    local int DriveNum <hidden=true> = parentof(this).DriveNum;
+    local int64 pos <hidden=true> = FTell();
+
+    BigEndian();
+    HFS_ListFiles( parentof(this).DriveNum, parentof(this).folderInfo.folderID );
+    FSeek( pos+4 );
+    LittleEndian();
+} HFS_FolderList <size=4, optimize=false>; //use on-demand - size unknown
+
+// HFS - Folder stored in the catalog
+typedef struct
+{
+    local int DriveNum <hidden=true> = parentof(this).DriveNum;
+
+    HFS_CatalogKey      key;
+    HFS_CatalogFolder   folderInfo;
+
+    // Store link to all files in this folder
+    local int64 pos <hidden=true> = FTell();
+    HFS_FolderList  subDir;
+    FSeek( pos );
+} HFS_Folder <read=ReadHFSFolder,optimize=false>;
+
+wstring ReadHFSFolder( HFS_Folder &rec )
+{
+    if( rec.key.nodeName.length > 0 )
+    {
+        return "/" + rec.key.nodeName.unicode;
+    }
+    return "";
+}
+
+// HFS - File information stored in the catalog
+typedef struct
+{
+    HFS_RecordType          recordType;
+    UInt16                  flags;
+    UInt32                  reserved1;
+    HFS_CatalogNodeID       fileID;
+    HFS_Time                createDate;
+    HFS_Time                contentModDate;
+    HFS_Time                attributeModDate;
+    HFS_Time                accessDate;
+    HFS_Time                backupDate;
+    HFS_BSDInfo             permissions;
+    HFS_FileInfo            userInfo;
+    HFS_ExtendedFileInfo    finderInfo;
+    UInt32                  textEncoding;
+    UInt32                  reserved2;
+    HFS_ForkData            dataFork;
+    HFS_ForkData            resourceFork;
+} HFS_CatalogFile <optimize=false>;
+
+// HFS - Block of data in a file
+typedef struct (int size, uint64 lengthLeft)
+{
+    if( lengthLeft >= size )
+    {
+        UBYTE data[ size ];
+    }
+    else
+    {
+        UBYTE data[ lengthLeft ];
+        UBYTE slack[ size - lengthLeft ];
+    }
+} HFS_FileBlock;
+
+// HFS File Data - list as a series of blocks
+typedef struct
+{
+    local int DriveNum <hidden=true> = parentof(this).DriveNum;
+    local int LengthLeft <hidden=true> = parentof(this).fileInfo.dataFork.logicalSize;
+    local int blockSize <hidden=true> = header.blockSize;
+    local int i <hidden=true>, size <hidden=true>;
+    local int64 pos <hidden=true> = FTell();
+
+    BigEndian();
+    for( i = 0; i < 8; i++ )
+    {
+        // Create a block at this extents
+        size = parentof(this).fileInfo.dataFork.extents[i].blockCount * blockSize;
+        if( size == 0 )
+            break;
+        FSeek( HFS_BlockToAddress( DriveNum, parentof(this).fileInfo.dataFork.extents[i].startBlock ) );
+        HFS_FileBlock block( size, LengthLeft );
+        LengthLeft -= size;
+        if( LengthLeft <= 0 )
+            break;
+    }
+
+    // NOTE: In the future we could read from the extents overflow file for
+    //  data files that have more than 8 extents
+
+    // BUGBUG-4kn -- magic required here to support 4k sectors on HFS
+    FSeek( pos + blockSize );
+    LittleEndian();
+} HFS_FileData <size=512, optimize=false>; //use on-demand - size unknown
+
+// HFS - File stored in the catalog
+typedef struct
+{
+    local int DriveNum <hidden=true> = parentof(this).DriveNum;
+
+    HFS_CatalogKey          key;
+    HFS_CatalogFile         fileInfo;
+
+    // Store the file data is a set of blocks
+    if( fileInfo.dataFork.logicalSize > 0 )
+    {
+        local int64 pos <hidden=true> = FTell();
+        FSeek( HFS_BlockToAddress( DriveNum, fileInfo.dataFork.extents[0].startBlock ) );
+        HFS_FileData  fileData;
+        FSeek( pos );
+    }
+} HFS_File <read=ReadHFSFile, optimize=false>;
+
+wstring ReadHFSFile( HFS_File &rec )
+{
+    if( rec.key.nodeName.length > 0 )
+    {
+        return rec.key.nodeName.unicode;
+    }
+    return "";
+}
+
+// HFS - Index record in the catalog
+typedef struct 
+{
+    local int DriveNum <hidden=true> = parentof(this).DriveNum;
+
+    HFS_CatalogKey      key;
+    UInt32              link;
+
+    // Store on-demand child node
+    local int64 pos <hidden=true> = FTell();
+    if( HFS_JumpToCatalogNode( DriveNum, link ) )
+        HFS_BTNode          childNode;
+    FSeek( pos );
+} HFS_CatalogRecord <read=ReadHFSCatalogRecord, optimize=false>;
+
+wstring ReadHFSCatalogRecord( HFS_CatalogRecord &rec )
+{
+    if( rec.key.nodeName.length > 0 )
+        return rec.key.nodeName.unicode;
+    return "";
+}
+
+// HFS Node kind
+typedef enum <SInt8> {
+    kBTLeafNode       = -1,
+    kBTIndexNode      =  0,
+    kBTHeaderNode     =  1,
+    kBTMapNode        =  2
+} HFS_NodeKind;
+
+// HFS Descriptor for each node of the btree
+struct HFS_BTNodeDescriptor 
+{
+    UInt32        fLink;
+    UInt32        bLink;
+    HFS_NodeKind  kind;
+    UInt8         height;
+    UInt16        numRecords;
+    UInt16        reserved;
+};
+
+// HFS Main information for the btree header node
+struct HFS_BTHeaderRec 
+{
+    UInt16    treeDepth;
+    UInt32    rootNode;
+    UInt32    leafRecords;
+    UInt32    firstLeafNode;
+    UInt32    lastLeafNode;
+    UInt16    nodeSize;
+    UInt16    maxKeyLength;
+    UInt32    totalNodes;
+    UInt32    freeNodes;
+    UInt16    reserved1;
+    UInt32    clumpSize;      // misaligned
+    UInt8     btreeType;
+    UInt8     keyCompareType;
+    UInt32    attributes;     // long aligned again
+    UInt32    reserved3[16];
+};
+
+// HFS Header node of the btree
+struct HFS_BTHeaderNode 
+{
+    HFS_BTNodeDescriptor descriptor;
+    HFS_BTHeaderRec      header;
+    UInt8                userDataRecord[128];
+    UInt8                map[ header.nodeSize - 256 ];
+    UInt16               offsets[4];
+};
+
+// HFS Node of the btree
+typedef struct 
+{
+    local int j <hidden=true>;
+    local int64 startPos <hidden=true> = FTell();
+    local SInt16 recordType <hidden=true>;
+
+    // Node descriptor
+    BigEndian();
+    HFS_BTNodeDescriptor  descriptor;
+    local int DriveNum <hidden=true> = parentof(parentof(descriptor)).DriveNum;  // BUGBUG/HACKHACK -- is this a way to handle optimized array?
+    local int NodeSize <hidden=true> = btree.headerNode.header.nodeSize;
+
+    // Create each record of the node
+    for( j = 0; j < descriptor.numRecords; j++ )
+    {
+        FSeek( startPos + ReadUShort(startPos + NodeSize - 2 - j*2) );
+        if( descriptor.kind == kBTIndexNode )
+        {
+            // Create index nodes
+            HFS_CatalogRecord record;
+        }
+        else if( descriptor.kind == kBTLeafNode )
+        {
+            // Create leaf nodes - either file or folder
+            recordType = ReadUShort( FTell() + ReadUShort( FTell()+6 )*2 + 8 );
+            if( recordType == kHFSFolderRecord )
+            {
+                HFS_Folder record;
+            }
+            else if( recordType == kHFSFileRecord )
+            {
+                HFS_File record;
+            }
+        }
+    }
+    LittleEndian();
+} HFS_BTNode <size=8192, optimize=false>; // use on-demand structure
+
+// HFS - Function to convert from a local block number to a drive block number using the extents
+int64 HFS_LocalToDriveBlock( HFS_ForkData &fork, int64 localBlock )
+{
+    // Search through the extents to find where this block is
+    local int   i <hidden=true>;
+    for( i = 0; i < 8; i++ )
+    {
+        if( localBlock < fork.extents[i].blockCount )
+        {
+            return fork.extents[i].startBlock + localBlock;
+        }
+        else
+        {
+            localBlock -= fork.extents[i].blockCount;
+        }
+    }
+
+    // Not found - could look in the extents overflow in the future
+    return -1;
+}
+
+// HFS - Function to seek to a particular catalog node - return true if successful
+int HFS_JumpToCatalogNode( int DriveNum, int NodeNum )
+{
+    local int blockSize <hidden=true>    = header.blockSize;
+    local int nodeSize <hidden=true>     = btree.headerNode.header.nodeSize;
+    local int64 pos <hidden=true>        = (int64)nodeSize * NodeNum;
+    local int64 localBlock <hidden=true> = pos / blockSize;
+    local int64 driveBlock <hidden=true> = HFS_LocalToDriveBlock( header.catalogFile, localBlock );
+    if( driveBlock < 0 ) {
+        return false;
+    }
+    FSeek( DriveStart + driveBlock*blockSize );
+    return true;
+}
+
+// HFS - Function to convert from a block to an address
+int64 HFS_BlockToAddress( int DriveNum, int64 block )
+{
+    return DriveStart + block*header.blockSize;
+}
+
+// HFS Catalog - stored as a btree
+typedef struct
+{
+    // local int   DriveNum <hidden=true> = parentof(this).DriveNum; // keep track of which drive this belongs to
+    local int64 startPos <hidden=true> = FTell();
+
+    // Define the header node
+    HFS_BTHeaderNode headerNode;
+
+    // Define the root node
+    // if( HFS_JumpToCatalogNode( DriveNum, headerNode.header.rootNode ) )
+    // {
+        HFS_BTNode rootNode;
+    // }
+} HFS_Catalog <optimize=false>;
+
+// Define the drive header
+BigEndian();
+HFS_VolumeHeader header <bgcolor=cLtPurple>;
+
+// Define the file catalog - stored as a btree
+FSeek( DriveStart + header.catalogFile.extents[0].startBlock * header.blockSize );
+HFS_Catalog btree;

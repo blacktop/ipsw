@@ -22,16 +22,15 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"io"
-	"os"
+	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/spf13/cobra"
 
-	xar "github.com/CyberhavenInc/goxar"
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
+	"github.com/blacktop/go-macho/pkg/xar"
+	"github.com/blacktop/ipsw/internal/magic"
 )
 
 func init() {
@@ -52,49 +51,41 @@ var pkgCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		dmgPath := filepath.Clean(args[0])
+		infile := filepath.Clean(args[0])
 
-		zr, er := xar.OpenReader(dmgPath)
-		if er == nil {
-			defer zr.Close()
-			log.Infof("Contents of %s:", dmgPath)
-			for _, f := range zr.File {
-				log.Infof("  %s", f.Name)
-				if strings.HasSuffix(f.Name, "Bom") {
-					os.MkdirAll(filepath.Dir(f.Name), os.ModePerm)
-					out, err := os.Create(f.Name)
-					if err != nil {
-						return err
-					}
-					defer out.Close()
-					rc, err := f.Open()
-					if err != nil {
-						return err
-					}
-					defer rc.Close()
-					_, err = io.Copy(out, rc)
-					if err != nil {
-						return err
-					}
-				}
+		isDMG, err := magic.IsDMG(infile)
+		if err != nil {
+			return err
+		}
+		if !isDMG {
+			if isXar, err := magic.IsXar(infile); err != nil {
+				return err
+			} else if !isXar {
+				return fmt.Errorf("file is not a dmg OR pkg file")
 			}
-			return nil
 		}
 
-		f, err := os.Open(dmgPath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		d, err := dmg.NewDMG(f)
-		if err != nil {
-			return err
-		}
-		defer d.Close()
-
-		if err := d.Load(); err != nil {
-			return err
+		if isDMG {
+			d, err := dmg.Open(infile, nil)
+			if err != nil {
+				return err
+			}
+			defer d.Close()
+			if err := d.Load(); err != nil {
+				return err
+			}
+		} else { // PKG/XAR
+			xar, err := xar.OpenReader(infile)
+			if err != nil {
+				return err
+			}
+			// FIXME defer xar.Close()
+			if !xar.ValidSignature() {
+				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
+			}
+			for _, file := range xar.File {
+				log.Info(file.Name)
+			}
 		}
 
 		return nil

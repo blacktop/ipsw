@@ -5,7 +5,6 @@ go 1.23
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/CyberhavenInc/goxar v0.0.0-20200219180102-a9c8b0d1510b
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.10.1
 	github.com/alecthomas/chroma/v2 v2.15.0
@@ -14,7 +13,7 @@ require (
 	github.com/blacktop/arm64-cgo v1.0.58
 	github.com/blacktop/go-apfs v1.0.18
 	github.com/blacktop/go-dwarf v1.0.10
-	github.com/blacktop/go-macho v1.1.234
+	github.com/blacktop/go-macho v1.1.235
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
