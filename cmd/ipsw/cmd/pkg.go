@@ -22,15 +22,22 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
+	"sort"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/spf13/cobra"
 
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
+	"github.com/blacktop/go-macho/pkg/cpio"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 )
 
 func init() {
@@ -74,16 +81,49 @@ var pkgCmd = &cobra.Command{
 				return err
 			}
 		} else { // PKG/XAR
-			xar, err := xar.OpenReader(infile)
+			pkg, err := xar.OpenReader(infile)
 			if err != nil {
 				return err
 			}
 			// FIXME defer xar.Close()
-			if !xar.ValidSignature() {
+			if !pkg.ValidSignature() {
 				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 			}
-			for _, file := range xar.File {
-				log.Info(file.Name)
+			var names []string
+			var payload *xar.File
+			for _, file := range pkg.File {
+				names = append(names, file.Name)
+				if strings.Contains(file.Name, "Payload") {
+					payload = file
+				}
+			}
+			sort.StringSlice(names).Sort()
+			for _, name := range names {
+				fmt.Println(name)
+			}
+			if payload != nil {
+				f, err := payload.Open()
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				log.Infof("Parsing %s...", payload.Name)
+				var pbuf bytes.Buffer
+				if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+					return err
+				}
+				cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+				if err != nil {
+					return err
+				}
+				var cnames []string
+				for _, file := range cr.Files {
+					cnames = append(cnames, file.Name)
+				}
+				sort.StringSlice(cnames).Sort()
+				for _, name := range cnames {
+					fmt.Println(name)
+				}
 			}
 		}
 
