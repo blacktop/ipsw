@@ -388,7 +388,7 @@ var machoInfoCmd = &cobra.Command{
 				return fmt.Errorf("failed to create folder %s: %v", folder, err)
 			}
 			toc := xr.TOC()
-			for idx, xf := range xr.File {
+			for idx, xf := range xr.Files {
 				f, err := xf.Open()
 				if err != nil {
 					return fmt.Errorf("failed to open xar file: %v", err)

@@ -81,17 +81,17 @@ var pkgCmd = &cobra.Command{
 			// 	return err
 			// }
 		} else { // PKG/XAR
-			pkg, err := xar.OpenReader(infile)
+			pkg, err := xar.Open(infile)
 			if err != nil {
 				return err
 			}
-			// FIXME defer xar.Close()
+			defer pkg.Close()
 			if !pkg.ValidSignature() {
 				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 			}
 			var names []string
 			var payload *xar.File
-			for _, file := range pkg.File {
+			for _, file := range pkg.Files {
 				names = append(names, file.Name)
 				if strings.Contains(file.Name, "Payload") {
 					payload = file
