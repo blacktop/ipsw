@@ -305,7 +305,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: zip
     builds_info:
       group: root
       owner: root
@@ -369,7 +369,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: zip
     builds_info:
       group: root
       owner: root
