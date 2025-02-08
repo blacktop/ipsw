@@ -22,21 +22,20 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
-	"context"
 	"fmt"
+	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 
+	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
-	"github.com/spf13/cobra"
-
-	"github.com/blacktop/go-macho/pkg/cpio"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/ota/pbzx"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/pkg/distrib"
+	"github.com/blacktop/ipsw/pkg/pkg/pkg_info"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -90,39 +89,68 @@ var pkgCmd = &cobra.Command{
 				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 			}
 			var names []string
-			var payload *xar.File
+			var packageInfo *xar.File
+			var distribution *xar.File
 			for _, file := range pkg.Files {
 				names = append(names, file.Name)
-				if strings.Contains(file.Name, "Payload") {
-					payload = file
+				if strings.Contains(file.Name, "PackageInfo") {
+					packageInfo = file
+				}
+				if strings.Contains(file.Name, "Distribution") {
+					distribution = file
 				}
 			}
 			sort.StringSlice(names).Sort()
 			for _, name := range names {
 				fmt.Println(name)
 			}
-			if payload != nil {
-				f, err := payload.Open()
+			if packageInfo != nil {
+				log.Infof("Parsing %s...", packageInfo.Name)
+				f, err := packageInfo.Open()
 				if err != nil {
 					return err
 				}
 				defer f.Close()
-				log.Infof("Parsing %s...", payload.Name)
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
-					return err
-				}
-				cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+				pkgInfo, err := pkg_info.Read(f)
 				if err != nil {
 					return err
 				}
-				var cnames []string
-				for _, file := range cr.Files {
-					cnames = append(cnames, file.Name)
+				for _, file := range pkgInfo.Files() {
+					fmt.Println(file)
 				}
-				sort.StringSlice(cnames).Sort()
-				for _, name := range cnames {
-					fmt.Println(name)
+				// var pbuf bytes.Buffer
+				// if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+				// 	return err
+				// }
+				// cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+				// if err != nil {
+				// 	return err
+				// }
+				// var cnames []string
+				// for _, file := range cr.Files {
+				// 	cnames = append(cnames, file.Name)
+				// }
+				// sort.StringSlice(cnames).Sort()
+				// for _, name := range cnames {
+				// 	fmt.Println(name)
+				// }
+			}
+			if distribution != nil {
+				log.Infof("Parsing %s...", distribution.Name)
+				f, err := distribution.Open()
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				dist, err := distrib.Read(f)
+				if err != nil {
+					return err
+				}
+				utils.Indent(log.Info, 2)("Distribution Scripts")
+				if main, ok := dist.GetScripts()["main"]; ok {
+					for _, script := range main {
+						quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
+					}
 				}
 			}
 		}
