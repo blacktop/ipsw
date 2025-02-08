@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/blacktop/go-apfs/pkg/disk/dmg"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -203,6 +204,41 @@ func IsZipData(r io.Reader) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func IsDMG(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	if _, err := f.Seek(int64(-binary.Size(dmg.UDIFResourceFile{})), io.SeekEnd); err != nil {
+		return false, fmt.Errorf("failed to seek to DMG footer: %v", err)
+	}
+	var footer dmg.UDIFResourceFile
+	if err := binary.Read(f, binary.BigEndian, &footer); err != nil {
+		return false, fmt.Errorf("failed to read DMG footer: %v", err)
+	}
+	if footer.Signature.String() != "koly" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func IsXar(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	magic := make([]byte, 4)
+	if _, err := f.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	if string(magic) == "xar!" {
+		return true, nil
+	}
+	return false, nil
 }
 
 func IsPBZX(filePath string) (bool, error) {

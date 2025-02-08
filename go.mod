@@ -11,8 +11,9 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
+	github.com/blacktop/go-apfs v1.0.18
 	github.com/blacktop/go-dwarf v1.0.10
-	github.com/blacktop/go-macho v1.1.234
+	github.com/blacktop/go-macho v1.1.235
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
@@ -174,6 +175,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ulikunitz/lz v0.4.0 // indirect
+	github.com/vbauerster/mpb/v7 v7.5.3 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

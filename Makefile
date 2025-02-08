@@ -163,6 +163,12 @@ work-macho: ## Work on go-macho package
 	@go work init
 	@go work use . ../go-macho
 
+.PHONY: work-apfs
+work-apfs: ## Work on go-apfs package
+	@echo " > Working on go-apfs package"
+	@go work init
+	@go work use . ../go-apfs
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
