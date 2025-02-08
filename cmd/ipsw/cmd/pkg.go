@@ -22,19 +22,24 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/pkg/distrib"
-	"github.com/blacktop/ipsw/pkg/pkg/pkg_info"
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 )
 
@@ -89,35 +94,53 @@ var pkgCmd = &cobra.Command{
 				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 			}
 			var names []string
-			var packageInfo *xar.File
+			var bomFile *xar.File
 			var distribution *xar.File
 			for _, file := range pkg.Files {
 				names = append(names, file.Name)
-				if strings.Contains(file.Name, "PackageInfo") {
-					packageInfo = file
+				if strings.Contains(file.Name, "Bom") {
+					bomFile = file
 				}
 				if strings.Contains(file.Name, "Distribution") {
 					distribution = file
 				}
 			}
 			sort.StringSlice(names).Sort()
+			log.Info("Package contents")
 			for _, name := range names {
 				fmt.Println(name)
 			}
-			if packageInfo != nil {
-				log.Infof("Parsing %s...", packageInfo.Name)
-				f, err := packageInfo.Open()
+			if bomFile != nil {
+				log.Infof("Parsing %s...", bomFile.Name)
+				f, err := bomFile.Open()
 				if err != nil {
 					return err
 				}
 				defer f.Close()
-				pkgInfo, err := pkg_info.Read(f)
+
+				data, err := io.ReadAll(f)
 				if err != nil {
 					return err
 				}
-				for _, file := range pkgInfo.Files() {
-					fmt.Println(file)
+				bm, err := bom.New(bytes.NewReader(data))
+				if err != nil {
+					return err
 				}
+				files, err := bm.GetPaths()
+				if err != nil {
+					return err
+				}
+
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+				for _, f := range files {
+					if f.IsDir() {
+						// fmt.Fprintf(w, "%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), f.Name())
+					} else {
+						fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+					}
+				}
+				w.Flush()
+
 				// var pbuf bytes.Buffer
 				// if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
 				// 	return err
