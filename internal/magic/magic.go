@@ -220,7 +220,7 @@ func IsDMG(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to read DMG footer: %v", err)
 	}
 	if footer.Signature.String() != "koly" {
-		return false, fmt.Errorf("found unexpected DMG signature: %s, expected: koly", footer.Signature.String())
+		return false, nil
 	}
 	return true, nil
 }
