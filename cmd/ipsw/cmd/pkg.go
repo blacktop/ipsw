@@ -134,6 +134,7 @@ var pkgCmd = &cobra.Command{
 				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 			}
 			if pattern != "" {
+				found := false
 				re, err := regexp.Compile(pattern)
 				if err != nil {
 					return fmt.Errorf("invalid regex pattern: '%s'", pattern)
@@ -144,6 +145,7 @@ var pkgCmd = &cobra.Command{
 						payload = file
 					}
 					if re.MatchString(file.Name) {
+						found = true
 						fname := filepath.Join(output, file.Name)
 						if flat {
 							fname = filepath.Join(output, filepath.Base(file.Name))
@@ -186,6 +188,7 @@ var pkgCmd = &cobra.Command{
 					}
 					for _, file := range cr.Files {
 						if re.MatchString(file.Name) {
+							found = true
 							fname := filepath.Join(output, file.Name)
 							if flat {
 								fname = filepath.Join(output, filepath.Base(file.Name))
@@ -210,6 +213,9 @@ var pkgCmd = &cobra.Command{
 								return err
 							}
 						}
+					}
+					if !found {
+						log.Warnf("No files found that match pattern '%s'", pattern)
 					}
 				}
 			} else {
