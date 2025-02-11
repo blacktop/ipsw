@@ -33,7 +33,7 @@ import (
 const (
 	appStoreAuthURL     = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
 	appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
-	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZBuy.woa/wa/buyProduct"
+	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/buyProduct"
 	appStoreSearchURL   = "https://itunes.apple.com/search"
 	appStoreLookupURL   = "https://itunes.apple.com/lookup"
 
