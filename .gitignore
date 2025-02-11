@@ -18,6 +18,10 @@
 debug
 __debug_*
 
+# Go Work
+*.work
+*.work.sum
+
 # ipsw files
 *.ipsw
 *.zip
@@ -57,6 +61,7 @@ www/docs/static/releases*.json
 *.bndb
 *.lock
 *.mobileprovision
+*.img
 internal/commands/ida/dscu/data/dscu.py
 internal/download/data/proto
 venv/
