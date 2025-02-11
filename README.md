@@ -32,8 +32,16 @@
 
 ### macOS
 
+Use my tap *(includes `extras` version)*
+
 ```bash
 brew install blacktop/tap/ipsw
+```
+
+OR use the **official** formula
+
+```bash
+brew install ipsw
 ```
 
 ### Linux
