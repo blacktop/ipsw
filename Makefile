@@ -11,7 +11,7 @@ build-deps: ## Install the build dependencies
 	brew install gh go git goreleaser zig unicorn libusb
 
 .PHONY: dev-deps
-dev-deps: download
+dev-deps: ## Install the dev dependencies
 	@echo " > Installing Go dev tools"
 	@go mod download
 	@go install github.com/caarlos0/svu@v1.4.1
