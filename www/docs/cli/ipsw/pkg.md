@@ -4,11 +4,11 @@ title: pkg
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: pkg
-description: List contents of a DMG/PKG file
+description: 🚧 List contents of a DMG/PKG file
 ---
 ## ipsw pkg
 
-List contents of a DMG/PKG file
+🚧 List contents of a DMG/PKG file
 
 ```
 ipsw pkg [DMG|PKG] [flags]
