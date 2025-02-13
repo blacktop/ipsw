@@ -62,6 +62,7 @@ www/docs/static/releases*.json
 *.lock
 *.mobileprovision
 *.img
+*.pkg
 internal/commands/ida/dscu/data/dscu.py
 internal/download/data/proto
 venv/
