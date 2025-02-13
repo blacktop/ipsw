@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -37,6 +38,8 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
+	"github.com/blacktop/go-apfs/pkg/disk/dmg"
+	"github.com/blacktop/go-apfs/pkg/disk/hfsplus"
 	"github.com/blacktop/go-macho/pkg/cpio"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -72,13 +75,11 @@ func init() {
 // pkgCmd represents the pkg command
 var pkgCmd = &cobra.Command{
 	Use:           "pkg [DMG|PKG]",
-	Short:         "List contents of a DMG/PKG file",
+	Short:         "🚧 List contents of a DMG/PKG file",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		var cwd string
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -92,6 +93,7 @@ var pkgCmd = &cobra.Command{
 		flat := viper.GetBool("pkg.flat")
 		output := viper.GetString("pkg.output")
 
+		var cwd string
 		if len(output) == 0 {
 			cwd, err = os.Getwd()
 			if err != nil {
@@ -115,15 +117,57 @@ var pkgCmd = &cobra.Command{
 		}
 
 		if isDMG {
-			log.Fatal("DMG files are not supported yet")
-			// d, err := dmg.Open(infile, nil)
-			// if err != nil {
-			// 	return err
+			d, err := dmg.Open(infile, nil)
+			if err != nil {
+				return err
+			}
+			defer d.Close()
+			diskImg, err := d.Partition("disk image")
+			if err != nil {
+				return fmt.Errorf("failed to open partition: %w", err)
+			}
+			o, err := os.Create(filepath.Join(output, "disk.img"))
+			if err != nil {
+				return err
+			}
+			defer o.Close()
+			// if _, err := io.Copy(o, diskImg); err != nil {
+			// 	return fmt.Errorf("failed to copy disk image: %w", err)
 			// }
-			// defer d.Close()
-			// if err := d.Load(); err != nil {
-			// 	return err
-			// }
+
+			w := bufio.NewWriter(o)
+			if err := diskImg.Write(w); err != nil {
+				return fmt.Errorf("failed to write disk image: %w", err)
+			}
+			if err := w.Flush(); err != nil {
+				return fmt.Errorf("failed to flush buffer: %w", err)
+			}
+			log.Infof("Extracted disk image to %s", strings.TrimPrefix(filepath.Join(output, "disk.img"), cwd+"/"))
+
+			///////////////////////////////////////
+
+			log.Info("Parsing disk.img as HFS+...")
+			hfs, err := hfsplus.Open(filepath.Join(output, "disk.img"))
+			if err != nil {
+				return fmt.Errorf("failed to open HFS+: %w", err)
+			}
+			defer hfs.Close()
+			files, err := hfs.Files()
+			if err != nil {
+				return fmt.Errorf("failed to get files: %w", err)
+			}
+			for _, hf := range files {
+				ff, err := os.Create(filepath.Join(output, hf.Key.NodeName.String()))
+				if err != nil {
+					return fmt.Errorf("failed to create file: %w", err)
+				}
+				defer ff.Close()
+				if _, err := io.Copy(ff, hf.Reader()); err != nil {
+					return fmt.Errorf("failed to copy file: %w", err)
+				}
+				log.Infof("Extracted %s", strings.TrimPrefix(filepath.Join(output, hf.Key.NodeName.String()), cwd+"/"))
+				log.Warnf("NOW try running `ipsw pkg %s`", strings.TrimPrefix(filepath.Join(output, hf.Key.NodeName.String()), cwd+"/"))
+			}
 		} else { // PKG/XAR
 			pkg, err := xar.Open(infile)
 			if err != nil {
