@@ -30,6 +30,7 @@ import (
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/appstore"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/disk"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida"
@@ -97,6 +98,7 @@ func init() {
 	viper.BindEnv("no-color", "NO_COLOR")
 	// Add subcommand groups
 	rootCmd.AddCommand(appstore.AppstoreCmd)
+	rootCmd.AddCommand(disk.DiskCmd)
 	rootCmd.AddCommand(download.DownloadCmd)
 	rootCmd.AddCommand(dyld.DyldCmd)
 	rootCmd.AddCommand(frida.FridaCmd)
