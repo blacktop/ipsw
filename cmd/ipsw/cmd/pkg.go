@@ -275,11 +275,16 @@ var pkgCmd = &cobra.Command{
 						distribution = file
 					}
 				}
+
 				sort.StringSlice(names).Sort()
-				log.Info("Package contents")
-				for _, name := range names {
-					fmt.Println(name)
+
+				if showAll || (!showBom && !showDistribution) {
+					log.Info("Package contents")
+					for _, name := range names {
+						fmt.Println(name)
+					}
 				}
+
 				if bomFile != nil && (showBom || showAll) {
 					log.Infof("Parsing %s...", bomFile.Name)
 					f, err := bomFile.Open()
@@ -311,6 +316,7 @@ var pkgCmd = &cobra.Command{
 					}
 					w.Flush()
 				}
+
 				if distribution != nil && (showDistribution || showAll) {
 					log.Infof("Parsing %s...", distribution.Name)
 					f, err := distribution.Open()
