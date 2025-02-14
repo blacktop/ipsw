@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
+	"github.com/blacktop/go-apfs/pkg/disk/hfsplus"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -223,6 +224,25 @@ func IsDMG(filePath string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func IsHFSPlus(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	if _, err := f.Seek(1024, io.SeekStart); err != nil {
+		return false, fmt.Errorf("failed to seek to HFS+ magic: %w", err)
+	}
+	var magic uint16
+	if err := binary.Read(f, binary.BigEndian, &magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	if magic == uint16(hfsplus.HFSPlusSigWord) {
+		return true, nil
+	}
+	return false, nil
 }
 
 func IsXar(filePath string) (bool, error) {
