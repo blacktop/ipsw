@@ -143,6 +143,7 @@ var pkgCmd = &cobra.Command{
 				return fmt.Errorf("failed to flush buffer: %w", err)
 			}
 			log.Infof("Extracted disk image to %s", strings.TrimPrefix(filepath.Join(output, "disk.img"), cwd+"/"))
+			defer os.Remove(filepath.Join(output, "disk.img"))
 
 			///////////////////////////////////////
 
