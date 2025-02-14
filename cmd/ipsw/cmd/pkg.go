@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -38,8 +37,6 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
-	"github.com/blacktop/go-apfs/pkg/disk/dmg"
-	"github.com/blacktop/go-apfs/pkg/disk/hfsplus"
 	"github.com/blacktop/go-macho/pkg/cpio"
 	"github.com/blacktop/go-macho/pkg/xar"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -74,7 +71,7 @@ func init() {
 
 // pkgCmd represents the pkg command
 var pkgCmd = &cobra.Command{
-	Use:           "pkg [DMG|PKG]",
+	Use:           "pkg PKG",
 	Short:         "🚧 List contents of a DMG/PKG file",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
@@ -104,91 +101,74 @@ var pkgCmd = &cobra.Command{
 
 		infile := filepath.Clean(args[0])
 
-		isDMG, err := magic.IsDMG(infile)
+		if isXar, err := magic.IsXar(infile); err != nil {
+			return err
+		} else if !isXar {
+			return fmt.Errorf("file is not a dmg OR pkg file")
+		}
+
+		pkg, err := xar.Open(infile)
 		if err != nil {
 			return err
 		}
-		if !isDMG {
-			if isXar, err := magic.IsXar(infile); err != nil {
-				return err
-			} else if !isXar {
-				return fmt.Errorf("file is not a dmg OR pkg file")
-			}
+		defer pkg.Close()
+		if !pkg.ValidSignature() {
+			log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
 		}
-
-		if isDMG {
-			d, err := dmg.Open(infile, nil)
+		if pattern != "" {
+			found := false
+			re, err := regexp.Compile(pattern)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid regex pattern: '%s'", pattern)
 			}
-			defer d.Close()
-			diskImg, err := d.Partition("disk image")
-			if err != nil {
-				return fmt.Errorf("failed to open partition: %w", err)
-			}
-			o, err := os.Create(filepath.Join(output, "disk.img"))
-			if err != nil {
-				return err
-			}
-			defer o.Close()
-			// if _, err := io.Copy(o, diskImg); err != nil {
-			// 	return fmt.Errorf("failed to copy disk image: %w", err)
-			// }
-
-			w := bufio.NewWriter(o)
-			if err := diskImg.Write(w); err != nil {
-				return fmt.Errorf("failed to write disk image: %w", err)
-			}
-			if err := w.Flush(); err != nil {
-				return fmt.Errorf("failed to flush buffer: %w", err)
-			}
-			log.Infof("Extracted disk image to %s", strings.TrimPrefix(filepath.Join(output, "disk.img"), cwd+"/"))
-			defer os.Remove(filepath.Join(output, "disk.img"))
-
-			///////////////////////////////////////
-
-			log.Info("Parsing disk.img as HFS+...")
-			hfs, err := hfsplus.Open(filepath.Join(output, "disk.img"))
-			if err != nil {
-				return fmt.Errorf("failed to open HFS+: %w", err)
-			}
-			defer hfs.Close()
-			files, err := hfs.Files()
-			if err != nil {
-				return fmt.Errorf("failed to get files: %w", err)
-			}
-			for _, hf := range files {
-				ff, err := os.Create(filepath.Join(output, hf.Key.NodeName.String()))
-				if err != nil {
-					return fmt.Errorf("failed to create file: %w", err)
+			var payload *xar.File
+			for _, file := range pkg.Files {
+				if strings.HasSuffix(file.Name, "Payload") {
+					payload = file
 				}
-				defer ff.Close()
-				if _, err := io.Copy(ff, hf.Reader()); err != nil {
-					return fmt.Errorf("failed to copy file: %w", err)
-				}
-				log.Infof("Extracted %s", strings.TrimPrefix(filepath.Join(output, hf.Key.NodeName.String()), cwd+"/"))
-				log.Warnf("NOW try running `ipsw pkg %s`", strings.TrimPrefix(filepath.Join(output, hf.Key.NodeName.String()), cwd+"/"))
-			}
-		} else { // PKG/XAR
-			pkg, err := xar.Open(infile)
-			if err != nil {
-				return err
-			}
-			defer pkg.Close()
-			if !pkg.ValidSignature() {
-				log.Warn("PKG/XAR file signature is invalid, this may be a corrupted file")
-			}
-			if pattern != "" {
-				found := false
-				re, err := regexp.Compile(pattern)
-				if err != nil {
-					return fmt.Errorf("invalid regex pattern: '%s'", pattern)
-				}
-				var payload *xar.File
-				for _, file := range pkg.Files {
-					if strings.HasSuffix(file.Name, "Payload") {
-						payload = file
+				if re.MatchString(file.Name) {
+					found = true
+					fname := filepath.Join(output, file.Name)
+					if flat {
+						fname = filepath.Join(output, filepath.Base(file.Name))
+						utils.Indent(log.Info, 2)("Extracting " + strings.TrimPrefix(fname, cwd+"/"))
+					} else {
+						utils.Indent(log.Info, 2)("Extracting " + fname)
 					}
+					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+						return err
+					}
+					in, err := file.Open()
+					if err != nil {
+						return err
+					}
+					defer in.Close()
+					out, err := os.Create(fname)
+					if err != nil {
+						return err
+					}
+					defer out.Close()
+					if _, err := io.Copy(out, in); err != nil {
+						return err
+					}
+				}
+			}
+			if payload != nil {
+				log.Infof("Checking for files in %s...", payload.Name)
+				f, err := payload.Open()
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				var pbuf bytes.Buffer
+				if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+					return err
+				}
+				cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+				if err != nil {
+					return err
+				}
+				for _, file := range cr.Files {
 					if re.MatchString(file.Name) {
 						found = true
 						fname := filepath.Join(output, file.Name)
@@ -216,124 +196,80 @@ var pkgCmd = &cobra.Command{
 						}
 					}
 				}
-				if payload != nil {
-					log.Infof("Checking for files in %s...", payload.Name)
-					f, err := payload.Open()
-					if err != nil {
-						return err
-					}
-					defer f.Close()
-					var pbuf bytes.Buffer
-					if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
-						return err
-					}
-					cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
-					if err != nil {
-						return err
-					}
-					for _, file := range cr.Files {
-						if re.MatchString(file.Name) {
-							found = true
-							fname := filepath.Join(output, file.Name)
-							if flat {
-								fname = filepath.Join(output, filepath.Base(file.Name))
-								utils.Indent(log.Info, 2)("Extracting " + strings.TrimPrefix(fname, cwd+"/"))
-							} else {
-								utils.Indent(log.Info, 2)("Extracting " + fname)
-							}
-							if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-								return err
-							}
-							in, err := file.Open()
-							if err != nil {
-								return err
-							}
-							defer in.Close()
-							out, err := os.Create(fname)
-							if err != nil {
-								return err
-							}
-							defer out.Close()
-							if _, err := io.Copy(out, in); err != nil {
-								return err
-							}
-						}
-					}
-					if !found {
-						log.Warnf("No files found that match pattern '%s'", pattern)
-					}
+				if !found {
+					log.Warnf("No files found that match pattern '%s'", pattern)
 				}
-			} else {
-				var names []string
-				var bomFile *xar.File
-				var distribution *xar.File
-				for _, file := range pkg.Files {
-					names = append(names, file.Name)
-					if strings.Contains(file.Name, "Bom") {
-						bomFile = file
-					}
-					if strings.Contains(file.Name, "Distribution") {
-						distribution = file
-					}
+			}
+		} else {
+			var names []string
+			var bomFile *xar.File
+			var distribution *xar.File
+			for _, file := range pkg.Files {
+				names = append(names, file.Name)
+				if strings.Contains(file.Name, "Bom") {
+					bomFile = file
+				}
+				if strings.Contains(file.Name, "Distribution") {
+					distribution = file
+				}
+			}
+
+			sort.StringSlice(names).Sort()
+
+			if showAll || (!showBom && !showDistribution) {
+				log.Info("Package contents")
+				for _, name := range names {
+					fmt.Println(name)
+				}
+			}
+
+			if bomFile != nil && (showBom || showAll) {
+				log.Infof("Parsing %s...", bomFile.Name)
+				f, err := bomFile.Open()
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+
+				data, err := io.ReadAll(f)
+				if err != nil {
+					return err
+				}
+				bm, err := bom.New(bytes.NewReader(data))
+				if err != nil {
+					return err
+				}
+				files, err := bm.GetPaths()
+				if err != nil {
+					return err
 				}
 
-				sort.StringSlice(names).Sort()
-
-				if showAll || (!showBom && !showDistribution) {
-					log.Info("Package contents")
-					for _, name := range names {
-						fmt.Println(name)
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+				for _, f := range files {
+					if f.IsDir() {
+						// fmt.Fprintf(w, "%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), f.Name())
+					} else {
+						fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
 					}
 				}
+				w.Flush()
+			}
 
-				if bomFile != nil && (showBom || showAll) {
-					log.Infof("Parsing %s...", bomFile.Name)
-					f, err := bomFile.Open()
-					if err != nil {
-						return err
-					}
-					defer f.Close()
-
-					data, err := io.ReadAll(f)
-					if err != nil {
-						return err
-					}
-					bm, err := bom.New(bytes.NewReader(data))
-					if err != nil {
-						return err
-					}
-					files, err := bm.GetPaths()
-					if err != nil {
-						return err
-					}
-
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					for _, f := range files {
-						if f.IsDir() {
-							// fmt.Fprintf(w, "%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), f.Name())
-						} else {
-							fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
-						}
-					}
-					w.Flush()
+			if distribution != nil && (showDistribution || showAll) {
+				log.Infof("Parsing %s...", distribution.Name)
+				f, err := distribution.Open()
+				if err != nil {
+					return err
 				}
-
-				if distribution != nil && (showDistribution || showAll) {
-					log.Infof("Parsing %s...", distribution.Name)
-					f, err := distribution.Open()
-					if err != nil {
-						return err
-					}
-					defer f.Close()
-					dist, err := distrib.Read(f)
-					if err != nil {
-						return err
-					}
-					utils.Indent(log.Info, 2)("Distribution Scripts")
-					if main, ok := dist.GetScripts()["main"]; ok {
-						for _, script := range main {
-							quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
-						}
+				defer f.Close()
+				dist, err := distrib.Read(f)
+				if err != nil {
+					return err
+				}
+				utils.Indent(log.Info, 2)("Distribution Scripts")
+				if main, ok := dist.GetScripts()["main"]; ok {
+					for _, script := range main {
+						quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
 					}
 				}
 			}
