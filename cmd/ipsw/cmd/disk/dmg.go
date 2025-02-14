@@ -85,6 +85,10 @@ var dmgCmd = &cobra.Command{
 		}
 		defer d.Close()
 
+		if len(d.Partitions) == 0 {
+			return fmt.Errorf("no partitions found in DMG")
+		}
+
 		var p *dmg.Partition
 
 		if len(args) == 1 {
@@ -94,8 +98,8 @@ var dmgCmd = &cobra.Command{
 			return nil
 		} else {
 			if viper.IsSet("dmg.partition") {
-				if partition >= len(d.Partitions) || partition < 1 {
-					return fmt.Errorf("partition number out of range")
+				if partition > len(d.Partitions)-1 || partition < 0 {
+					return fmt.Errorf("partition number out of range (there are %d partitions)", len(d.Partitions))
 				}
 				p = &d.Partitions[partition]
 			} else if viper.IsSet("dmg.re") {
