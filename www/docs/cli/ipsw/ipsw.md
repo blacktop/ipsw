@@ -26,6 +26,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or MachO
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
+* [ipsw disk](/docs/cli/ipsw/disk)	 - Disk commands
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache

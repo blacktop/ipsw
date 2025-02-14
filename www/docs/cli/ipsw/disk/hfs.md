@@ -1,27 +1,24 @@
 ---
-id: pkg
-title: pkg
+id: hfs
+title: hfs
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: pkg
-description: 🚧 List contents of a DMG/PKG file
+sidebar_label: hfs
+description: 🚧 List/Extract HFS+ files
 ---
-## ipsw pkg
+## ipsw disk hfs
 
-🚧 List contents of a DMG/PKG file
+🚧 List/Extract HFS+ files
 
 ```
-ipsw pkg PKG [flags]
+ipsw disk hfs [flags]
 ```
 
 ### Options
 
 ```
-  -a, --all              Show all contents
-  -b, --bom              Show BOM
-  -d, --distribution     Show distribution
   -f, --flat             Do NOT preserve directory structure when extracting with --pattern
-  -h, --help             help for pkg
+  -h, --help             help for hfs
   -o, --output string    Output folder
   -p, --pattern string   Extract files that match regex
 ```
@@ -37,5 +34,5 @@ ipsw pkg PKG [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw disk](/docs/cli/ipsw/disk)	 - Disk commands
 
