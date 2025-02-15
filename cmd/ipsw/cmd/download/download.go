@@ -178,7 +178,7 @@ func filterIPSWs(cmd *cobra.Command, macos bool) ([]download.IPSW, error) {
 	}
 
 	unique := make(map[string]bool, len(filteredIPSWs))
-	uniqueIPSWs := make([]download.IPSW, 0, len(unique))
+	uniqueIPSWs := make([]download.IPSW, len(unique))
 	for _, i := range filteredIPSWs {
 		if len(i.URL) != 0 {
 			if !unique[i.URL] {
