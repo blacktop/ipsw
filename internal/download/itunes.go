@@ -64,7 +64,7 @@ type ITunesVersionMaster struct {
 
 // UniqueBuilds returns a slice with Builds with unique FirmwareURLs
 func UniqueBuilds(b []Build) []Build {
-	unique := make(map[string]bool, 0, len(b))
+	unique := make(map[string]bool, len(b))
 	bs := make([]Build, len(unique))
 	for _, elem := range b {
 		if len(elem.URL) != 0 {
