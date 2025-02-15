@@ -575,7 +575,8 @@ func (i *CacheImage) Analyze() error {
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
-						return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
+						// FIXME: return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
+						log.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
 					if symName, ok := i.cache.AddressToSymbol[target]; ok {
 						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
