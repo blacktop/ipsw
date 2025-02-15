@@ -11,7 +11,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
-	github.com/blacktop/go-apfs v1.0.23
+	github.com/blacktop/go-apfs v1.0.24
 	github.com/blacktop/go-dwarf v1.0.10
 	github.com/blacktop/go-macho v1.1.238
 	github.com/blacktop/go-plist v1.0.2
@@ -49,16 +49,16 @@ require (
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/spf13/cast v1.7.1
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.0
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
-	github.com/unicorn-engine/unicorn v0.0.0-20250214170430-d03c0922e6c8
+	github.com/unicorn-engine/unicorn v0.0.0-20250215125020-bf5e335269f2
 	github.com/vbauerster/mpb/v8 v8.9.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.33.0
-	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac
+	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
 	golang.org/x/net v0.35.0
 	golang.org/x/oauth2 v0.26.0
 	golang.org/x/sync v0.11.0

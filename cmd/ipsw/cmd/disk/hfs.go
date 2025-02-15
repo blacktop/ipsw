@@ -63,7 +63,7 @@ var diskHfsCmd = &cobra.Command{
 
 		// flags
 		pattern := viper.GetString("disk.hfs.pattern")
-		// flat := viper.GetBool("disk.hfs.flat")
+		flat := viper.GetBool("disk.hfs.flat")
 		output := viper.GetString("disk.hfs.output")
 
 		var cwd string
@@ -100,8 +100,15 @@ var diskHfsCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to compile regex: %w", err)
 				}
-				if re.MatchString(hf.Key.NodeName.String()) {
-					ff, err := os.Create(filepath.Join(output, hf.Key.NodeName.String()))
+				if re.MatchString(hf.Path()) {
+					fname := filepath.Join(output, hf.Path())
+					if flat {
+						fname = filepath.Join(output, filepath.Base(hf.Path()))
+					}
+					if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
+						return fmt.Errorf("failed to create directory: %w", err)
+					}
+					ff, err := os.Create(fname)
 					if err != nil {
 						return fmt.Errorf("failed to create file: %w", err)
 					}
@@ -109,10 +116,10 @@ var diskHfsCmd = &cobra.Command{
 					if _, err := io.Copy(ff, hf.Reader()); err != nil {
 						return fmt.Errorf("failed to copy file: %w", err)
 					}
-					log.Infof("Extracted %s", strings.TrimPrefix(filepath.Join(output, hf.Key.NodeName.String()), cwd+"/"))
+					log.Infof("Extracted %s", strings.TrimPrefix(fname, cwd+"/"))
 				}
 			} else {
-				log.Infof("%s", hf.Key.NodeName.String())
+				fmt.Println(hf.Path())
 			}
 		}
 
