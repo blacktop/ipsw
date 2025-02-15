@@ -662,7 +662,7 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 
 func uniqueOTAs(otas []types.Asset) []types.Asset {
 	unique := make(map[string]bool, len(otas))
-	os := make([]types.Asset, len(unique))
+	os := make([]types.Asset, 0, len(unique))
 	for _, elem := range otas {
 		if len(elem.BaseURL+elem.RelativePath) != 0 {
 			if !unique[elem.BaseURL+elem.RelativePath] {
