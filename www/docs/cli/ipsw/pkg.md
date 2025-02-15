@@ -19,11 +19,12 @@ ipsw pkg PKG [flags]
 ```
   -a, --all              Show all contents
   -b, --bom              Show BOM
-  -d, --distribution     Show distribution
+  -d, --dist             Show distribution
   -f, --flat             Do NOT preserve directory structure when extracting with --pattern
   -h, --help             help for pkg
   -o, --output string    Output folder
   -p, --pattern string   Extract files that match regex
+  -s, --scripts          Show scripts
 ```
 
 ### Options inherited from parent commands
