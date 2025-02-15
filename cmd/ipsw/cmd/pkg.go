@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -54,7 +55,8 @@ func init() {
 
 	// pkgCmd.Flags().BoolP("scripts", "s", false, "Show scripts")
 	pkgCmd.Flags().BoolP("bom", "b", false, "Show BOM")
-	pkgCmd.Flags().BoolP("distribution", "d", false, "Show distribution")
+	pkgCmd.Flags().BoolP("dist", "d", false, "Show distribution")
+	pkgCmd.Flags().BoolP("scripts", "s", false, "Show scripts")
 	pkgCmd.Flags().BoolP("all", "a", false, "Show all contents")
 	pkgCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	pkgCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting with --pattern")
@@ -62,7 +64,8 @@ func init() {
 	pkgCmd.MarkFlagDirname("output")
 	// viper.BindPFlag("pkg.scripts", pkgCmd.Flags().Lookup("scripts"))
 	viper.BindPFlag("pkg.bom", pkgCmd.Flags().Lookup("bom"))
-	viper.BindPFlag("pkg.distribution", pkgCmd.Flags().Lookup("distribution"))
+	viper.BindPFlag("pkg.dist", pkgCmd.Flags().Lookup("dist"))
+	viper.BindPFlag("pkg.scripts", pkgCmd.Flags().Lookup("scripts"))
 	viper.BindPFlag("pkg.all", pkgCmd.Flags().Lookup("all"))
 	viper.BindPFlag("pkg.pattern", pkgCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("pkg.flat", pkgCmd.Flags().Lookup("flat"))
@@ -84,7 +87,8 @@ var pkgCmd = &cobra.Command{
 
 		// flags
 		showBom := viper.GetBool("pkg.bom")
-		showDistribution := viper.GetBool("pkg.distribution")
+		showDistribution := viper.GetBool("pkg.dist")
+		showScripts := viper.GetBool("pkg.scripts")
 		showAll := viper.GetBool("pkg.all")
 		pattern := viper.GetString("pkg.pattern")
 		flat := viper.GetBool("pkg.flat")
@@ -203,6 +207,7 @@ var pkgCmd = &cobra.Command{
 		} else {
 			var names []string
 			var bomFile *xar.File
+			var scripts *xar.File
 			var distribution *xar.File
 			for _, file := range pkg.Files {
 				names = append(names, file.Name)
@@ -211,6 +216,9 @@ var pkgCmd = &cobra.Command{
 				}
 				if strings.Contains(file.Name, "Distribution") {
 					distribution = file
+				}
+				if strings.Contains(file.Name, "Scripts") {
+					scripts = file
 				}
 			}
 
@@ -271,6 +279,67 @@ var pkgCmd = &cobra.Command{
 					for _, script := range main {
 						quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
 					}
+				}
+			}
+
+			if scripts != nil && (showScripts || showAll) {
+				log.Infof("Checking for scripts in %s...", scripts.Name)
+				sf, err := scripts.Open()
+				if err != nil {
+					return err
+				}
+				defer sf.Close()
+				gzr, err := gzip.NewReader(sf)
+				if err != nil {
+					return fmt.Errorf("failed to create gzip reader: %v", err)
+				}
+				defer gzr.Close()
+				var buf bytes.Buffer
+				if _, err := io.Copy(&buf, gzr); err != nil {
+					return fmt.Errorf("failed to read gzip data: %v", err)
+				}
+				cr, err := cpio.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+				if err != nil {
+					return err
+				}
+				for _, file := range cr.Files {
+					utils.Indent(log.Info, 2)(file.Name)
+					openedFile, err := file.Open()
+					if err != nil {
+						return fmt.Errorf("failed to open file %s: %v", file.Name, err)
+					}
+					defer openedFile.Close()
+					data, err := io.ReadAll(openedFile)
+					if err != nil {
+						return fmt.Errorf("failed to read file %s: %v", file.Name, err)
+					}
+					var lexerName string
+					for line := range strings.Lines(string(data)) {
+						switch {
+						case strings.Contains(line, "perl"):
+							lexerName = "perl"
+						case strings.Contains(line, "python"):
+							lexerName = "python"
+						case strings.Contains(line, "bash"):
+							lexerName = "bash"
+						case strings.Contains(line, "sh"):
+							lexerName = "sh"
+						case strings.Contains(line, "zsh"):
+							lexerName = "zsh"
+						case strings.Contains(line, "fish"):
+							lexerName = "fish"
+						case strings.Contains(line, "ruby"):
+							lexerName = "ruby"
+						case strings.Contains(line, "php"):
+							lexerName = "php"
+						case strings.Contains(line, "lua"):
+							lexerName = "lua"
+						default:
+							lexerName = "sh"
+						}
+						break
+					}
+					quick.Highlight(os.Stdout, string(data), lexerName, "terminal256", "nord")
 				}
 			}
 		}
