@@ -226,6 +226,25 @@ func IsDMG(filePath string) (bool, error) {
 	return true, nil
 }
 
+func IsAPFS(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	if _, err := f.Seek(0x20, io.SeekStart); err != nil {
+		return false, fmt.Errorf("failed to seek to APFS magic: %w", err)
+	}
+	magic := make([]byte, 4)
+	if err := binary.Read(f, binary.BigEndian, &magic); err != nil {
+		return false, fmt.Errorf("failed to read APFS magic: %w", err)
+	}
+	if string(magic) == "NXSB" {
+		return true, nil
+	}
+	return false, nil
+}
+
 func IsHFSPlus(filePath string) (bool, error) {
 	f, err := os.Open(filePath)
 	if err != nil {

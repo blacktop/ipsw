@@ -1,6 +1,6 @@
 module github.com/blacktop/ipsw
 
-go 1.23
+go 1.24
 
 require (
 	github.com/99designs/keyring v1.2.2
@@ -11,7 +11,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
-	github.com/blacktop/go-apfs v1.0.22
+	github.com/blacktop/go-apfs v1.0.23
 	github.com/blacktop/go-dwarf v1.0.10
 	github.com/blacktop/go-macho v1.1.238
 	github.com/blacktop/go-plist v1.0.2
