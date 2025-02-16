@@ -29,6 +29,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/ida"
 	"github.com/blacktop/ipsw/internal/commands/ida/dscu"
@@ -63,6 +65,7 @@ func init() {
 	idaCmd.Flags().String("slide", "", "dyld_shared_cache image ASLR slide value (hexadecimal)")
 	idaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
 	idaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")
+	idaCmd.Flags().String("docker-entry", "/ida/idat64", "IDA Pro docker entrypoint")
 	idaCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.ida.ida-path", idaCmd.Flags().Lookup("ida-path"))
 	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
@@ -79,6 +82,7 @@ func init() {
 	viper.BindPFlag("dyld.ida.slide", idaCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.ida.docker", idaCmd.Flags().Lookup("docker"))
 	viper.BindPFlag("dyld.ida.docker-image", idaCmd.Flags().Lookup("docker-image"))
+	viper.BindPFlag("dyld.ida.docker-entry", idaCmd.Flags().Lookup("docker-entry"))
 }
 
 // idaCmd represents the ida command
@@ -106,6 +110,7 @@ var idaCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
+		idaProPath := viper.GetString("dyld.ida.ida-path")
 		scriptFile := viper.GetString("dyld.ida.script")
 		logFile := viper.GetString("dyld.ida.log-file")
 		output := viper.GetString("dyld.ida.output")
@@ -124,6 +129,42 @@ var idaCmd = &cobra.Command{
 
 		if viper.GetString("dyld.ida.slide") != "" {
 			env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
+		}
+
+		if !viper.IsSet("dyld.ida.ida-path") {
+			switch runtime.GOOS {
+			case "darwin":
+				matches, err := filepath.Glob(ida.DarwinPathGlob)
+				if err != nil {
+					return fmt.Errorf("failed to search for IDA Pro: %w", err)
+				}
+				if len(matches) == 0 {
+					return fmt.Errorf("IDA Pro not found: supply IDA Pro path via '--ida-path' (e.g. /Applications/IDA\\ Pro\\ 8.2/ida64.app/Contents/MacOS)")
+				}
+				if len(matches) == 1 {
+					idaProPath = matches[0]
+				} else { // len(matches) > 1
+					prompt := &survey.Select{
+						Message: "Multiple IDA Pro Versions Found:",
+						Options: matches,
+					}
+					if err := survey.AskOne(prompt, &idaProPath); err != nil {
+						if err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							os.Exit(0)
+						}
+						return fmt.Errorf("failed to select IDA Pro version: %w", err)
+					}
+				}
+			case "linux":
+				// path = linuxPath
+				return fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. /opt/ida-7.0/)")
+			case "windows":
+				// path = windowsPath
+				return fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. C:\\Program Files\\IDA 7.0)")
+			default:
+				return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+			}
 		}
 
 		dscPath, err := filepath.Abs(filepath.Clean(args[0]))
@@ -187,14 +228,17 @@ var idaCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("dyld.ida.all") { // analyze all dylibs
-			fileType = fmt.Sprintf("Apple DYLD cache for %s (complete image)", strings.TrimSpace(magic))
+			fileType = fmt.Sprintf(ida.IDAProCompleteImage, strings.TrimSpace(magic))
 			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s.i64", f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		} else { // analyze single or more dylibs
 			if len(args) < 2 {
 				return fmt.Errorf("must specify at least one dylib to analyze")
 			}
-
-			fileType = fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic))
+			if strings.Contains(idaProPath, "IDA Professional 9") {
+				fileType = fmt.Sprintf(ida.IDPro9SingleModule, strings.TrimSpace(magic))
+			} else { // IDA Pro 8 or below
+				fileType = fmt.Sprintf(ida.IDAPro8SingleModule, strings.TrimSpace(magic))
+			}
 
 			var defaultframeworks = []string{
 				"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
@@ -307,7 +351,7 @@ var idaCmd = &cobra.Command{
 		defer cancel()
 
 		cli, err := ida.NewClient(ctx, &ida.Config{
-			IdaPath:      viper.GetString("dyld.ida.ida-path"),
+			IdaPath:      idaProPath,
 			InputFile:    dscPath,
 			Frameworks:   defaultframeworks,
 			LogFile:      logFile,
@@ -330,6 +374,7 @@ var idaCmd = &cobra.Command{
 			Verbose:     viper.GetBool("verbose"),
 			RunInDocker: viper.GetBool("dyld.ida.docker"),
 			DockerImage: viper.GetString("dyld.ida.docker-image"),
+			DockerEntry: viper.GetString("dyld.ida.docker-entry"),
 		})
 		if err != nil {
 			return err

@@ -8,8 +8,11 @@ import (
 	"text/template"
 )
 
-//go:embed data/dscu.gz
-var dscuScriptData []byte
+//go:embed data/objc.gz
+var objcScriptData []byte
+
+//go:embed data/swift.gz
+var swiftScriptData []byte
 
 const idaDscuPyScriptTemplate = `
 # https://hex-rays.com/products/ida/news/7_2/the_mac_rundown/
@@ -26,6 +29,8 @@ def dscu_load_region(ea):
 	node.altset(3, ea)
 	load_and_run_plugin("dscu", 2)
 
+IDA_VERSION = ida_kernwin.get_kernel_version().split('.')
+
 # load some commonly used system dylibs
 {{- range $framework := .Frameworks }}
 print("[ipsw] loading {{ $framework }}")
@@ -41,7 +46,8 @@ load_and_run_plugin("objc", 4)
 # in dyldcache modules it is common that IDA will think a function doesn't return,
 # but in reality it just branches to an address outside of the current module.
 # this can break the analysis at times.
-idaapi.cvar.inf.af &= ~AF_ANORET
+if IDA_VERSION[0] == 8 and IDA_VERSION[1] <= 2:
+	idaapi.cvar.inf.af &= ~AF_ANORET # This errors with: 'NoneType' object has no attribute 'af' on IDA Pro 9.x
 
 print("[ipsw] perform auto-analysis...")
 auto_mark_range(0, BADADDR, AU_FINAL);
@@ -54,12 +60,19 @@ load_and_run_plugin("objc", 5)
 qexit(0)
 {{- end }}
 
-ida_version = ida_kernwin.get_kernel_version().split('.')
-if ida_version[0] == 8 and ida_version[1] <= 2:
+if IDA_VERSION[0] == 8 and IDA_VERSION[1] <= 2:
 	print("[ipsw] running objc_stubs.py ...")
 	fix_objc_stubs()
+	print("[ipsw] running fix outlined functions")
+	fix_outlined_functions()
 else:
 	print("[ipsw] skipping objc fixups ...")	
+
+
+print("[ipsw] running swift fixups")
+#fix_proto_conf_desc()
+#fix_assocty()
+swift()
 
 print("[ipsw] applying objc hotkeys...")
 set_hotkeys()
@@ -86,7 +99,7 @@ func GenerateScript(frameworks []string, closeIDA bool) (string, error) {
 
 // ExpandScript expands the embedded gzipped IDAPython script
 func ExpandScript() (string, error) {
-	zr, err := gzip.NewReader(bytes.NewReader(dscuScriptData))
+	zr, err := gzip.NewReader(bytes.NewReader(objcScriptData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create gzip reader: %v", err)
 	}
@@ -95,7 +108,16 @@ func ExpandScript() (string, error) {
 	if _, err := buf.ReadFrom(zr); err != nil {
 		return "", fmt.Errorf("failed to read from gzip reader: %v", err)
 	}
-	defer zr.Close()
+	zr.Close()
+
+	zr, err = gzip.NewReader(bytes.NewReader(swiftScriptData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+	if _, err := buf.ReadFrom(zr); err != nil {
+		return "", fmt.Errorf("failed to read from gzip reader: %v", err)
+	}
+	zr.Close()
 
 	return buf.String(), nil
 }
