@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 // REFERENCES:
@@ -548,6 +549,48 @@ type Termination struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+type PostSampleVMStats struct {
+	Faults                             int `json:"faults,omitempty"`
+	ActiveCount                        int `json:"active_count,omitempty"`
+	CompressorPageCount                int `json:"compressorPageCount,omitempty"`
+	TotalUncompressedPagesInCompressor int `json:"total_uncompressed_pages_in_compressor,omitempty"`
+	Hits                               int `json:"hits,omitempty"`
+	Decompressions                     int `json:"decompressions,omitempty"`
+	Swapouts                           int `json:"swapouts,omitempty"`
+	WireCount                          int `json:"wire_count,omitempty"`
+	Lookups                            int `json:"lookups,omitempty"`
+	Purges                             int `json:"purges,omitempty"`
+	Pageouts                           int `json:"pageouts,omitempty"`
+	Pageins                            int `json:"pageins,omitempty"`
+	ExternalPageCount                  int `json:"external_page_count,omitempty"`
+	ZeroFillCount                      int `json:"zero_fill_count,omitempty"`
+	FreeCount                          int `json:"free_count,omitempty"`
+	CowFaults                          int `json:"cow_faults,omitempty"`
+	SpeculativeCount                   int `json:"speculative_count,omitempty"`
+	Swapins                            int `json:"swapins,omitempty"`
+	Compressions                       int `json:"compressions,omitempty"`
+	Reactivations                      int `json:"reactivations,omitempty"`
+	InactiveCount                      int `json:"inactive_count,omitempty"`
+	ThrottledCount                     int `json:"throttled_count,omitempty"`
+	PurgeableCount                     int `json:"purgeable_count,omitempty"`
+	InternalPageCount                  int `json:"internal_page_count,omitempty"`
+}
+
+type AdditionalDetails struct {
+	StackshotDurationOuterNsec int `json:"stackshot_duration_outer_nsec,omitempty"`
+	StackshotInFlags           int `json:"stackshot_in_flags,omitempty"`
+	StackshotThreadsCount      int `json:"stackshot_threads_count,omitempty"`
+	StackshotDurationPriorNsec int `json:"stackshot_duration_prior_nsec,omitempty"`
+	StackshotSizeEstimateAdj   int `json:"stackshot_size_estimate_adj,omitempty"`
+	StackshotOutFlags          int `json:"stackshot_out_flags,omitempty"`
+	StackshotTasksCount        int `json:"stackshot_tasks_count,omitempty"`
+	StackshotInPid             int `json:"stackshot_in_pid,omitempty"`
+	StackshotSizeEstimate      int `json:"stackshot_size_estimate,omitempty"`
+	StackshotTries             int `json:"stackshot_tries,omitempty"`
+	StackshotDurationNsec      int `json:"stackshot_duration_nsec,omitempty"`
+	SystemStateFlags           int `json:"system_state_flags,omitempty"`
+}
+
 type IPSPayload struct {
 	/* Kernelspace Fields */
 	Build            string          `json:"build,omitempty"`
@@ -610,7 +653,7 @@ type IPSPayload struct {
 	CodeSigningMonitor            int          `json:"codeSigningMonitor,omitempty"`
 	ThrottleTimeout               int64        `json:"throttleTimeout,omitempty"`
 	BasebandVersion               string       `json:"basebandVersion,omitempty"`
-	Exception                     Exception    `json:"exception,omitempty"`
+	Exception                     any          `json:"exception,omitempty"`
 	LastExceptionBacktrace        []Frame      `json:"lastExceptionBacktrace,omitempty"`
 	FaultingThread                int          `json:"faultingThread,omitempty"`
 	Threads                       []UserThread `json:"threads,omitempty"`
@@ -651,6 +694,10 @@ type IPSPayload struct {
 	VMSummary            string      `json:"vmSummary,omitempty"`
 	VmRegionInfo         string      `json:"vmregioninfo,omitempty"`
 	Termination          Termination `json:"termination,omitempty"`
+
+	AbsoluteTime      int               `json:"absoluteTime,omitempty"`
+	PostSampleVMStats PostSampleVMStats `json:"postSampleVMStats,omitempty"`
+	AdditionalDetails AdditionalDetails `json:"additionalDetails,omitempty"`
 
 	panic210 *Panic210
 }
@@ -1302,7 +1349,7 @@ func (i *Ips) String() string {
 	var out string
 
 	switch i.Header.BugType {
-	case "Panic", "210":
+	case "Panic", "210", "288":
 		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
 		if i.Payload.panic210 == nil {
 			var err error
@@ -1312,11 +1359,15 @@ func (i *Ips) String() string {
 			}
 		}
 		if i.Config.Verbose {
-			out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
+			if len(i.Payload.PanicString) > 0 {
+				out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
+			}
 		} else {
 			out += i.Payload.panic210.String()
 		}
-		out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
+		if len(i.Payload.PanicFlags) > 0 {
+			out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
+		}
 		out += "\n" + i.Payload.MemoryStatus.String()
 		out += i.Payload.OtherString + "\n"
 		var pids []int
@@ -1471,9 +1522,14 @@ func (i *Ips) String() string {
 		if i.Payload.SharedCache.Size > 0 {
 			out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
 		}
-		out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), colorBold(i.Payload.Exception.Type), i.Payload.Exception.Signal, i.Payload.Exception.Message)
-		if len(i.Payload.Exception.Subtype) > 0 {
-			out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", i.Payload.Exception.Subtype)
+		var exception Exception
+		if err := mapstructure.Decode(i.Payload.Exception, &exception); err == nil {
+			out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), colorBold(exception.Type), exception.Signal, exception.Message)
+			if len(exception.Subtype) > 0 {
+				out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", exception.Subtype)
+			}
+		} else {
+			out += fmt.Sprintf(colorField("Exception")+": %s\n", i.Payload.Exception)
 		}
 		if len(i.Payload.VmRegionInfo) > 0 {
 			out += fmt.Sprintf(colorField("VM Region Info")+": %s\n", i.Payload.VmRegionInfo)
