@@ -438,7 +438,7 @@ func parsePanicString210(in string) (*Panic210, error) {
 		log.WithError(err).Debug("failed to get compressor info")
 	}
 	if err := crash.getPanickedTask(); err != nil {
-		return nil, fmt.Errorf("failed to get panicked task: %v", err)
+		log.WithError(err).Error("failed to get panicked task")
 	}
 	if err := crash.getPanickedThread(); err != nil {
 		log.WithError(err).Error("failed to get panicked thread")

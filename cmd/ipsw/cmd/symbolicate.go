@@ -119,7 +119,7 @@ var symbolicateCmd = &cobra.Command{
 		}
 
 		switch hdr.BugType {
-		case "210", "309": // NEW JSON STYLE CRASHLOG
+		case "210", "288", "309": // NEW JSON STYLE CRASHLOG
 			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
 				All:           all || Verbose,
 				Running:       running,
@@ -136,7 +136,7 @@ var symbolicateCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse IPS file: %v", err)
 			}
 
-			if len(args) < 2 && hdr.BugType == "210" {
+			if len(args) < 2 && (hdr.BugType == "210" || hdr.BugType == "288") {
 				if viper.IsSet("symbolicate.server") {
 					u, err := url.ParseRequestURI(viper.GetString("symbolicate.server"))
 					if err != nil {
@@ -154,7 +154,7 @@ var symbolicateCmd = &cobra.Command{
 				}
 			} else {
 				// TODO: use IPSW to populate symbol server if both are supplied
-				if hdr.BugType == "210" {
+				if hdr.BugType == "210" || hdr.BugType == "288" {
 					/* validate IPSW */
 					i, err := info.Parse(args[1])
 					if err != nil {
