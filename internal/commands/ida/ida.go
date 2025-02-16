@@ -6,12 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/docker"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -19,9 +16,12 @@ import (
 )
 
 const (
-	darwinPath  = "/Applications/IDA\\ Pro\\ */ida64.app/Contents/MacOS"
-	linuxPath   = ""
-	windowsPath = ""
+	DarwinPathGlob      = "/Applications/IDA\\ Pro\\ */ida64.app/Contents/MacOS"
+	LinuxPath           = ""
+	WindowsPath         = ""
+	IDAProCompleteImage = "Apple DYLD cache for %s (complete image)"
+	IDAPro8SingleModule = "Apple DYLD cache for %s (single module)"
+	IDPro9SingleModule  = "Apple DYLD cache for %s (select module(s))"
 )
 
 type Config struct {
@@ -51,6 +51,7 @@ type Config struct {
 	Verbose      bool
 	RunInDocker  bool
 	DockerImage  string
+	DockerEntry  string
 }
 
 type Client struct {
@@ -60,51 +61,20 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, conf *Config) (*Client, error) {
-	var path string
-
 	cli := &Client{ctx: ctx, conf: conf}
 
-	if conf.IdaPath == "" {
-		switch runtime.GOOS {
-		case "darwin":
-			matches, err := filepath.Glob(darwinPath)
-			if err != nil {
-				return nil, err
-			}
-			if len(matches) == 0 {
-				return nil, fmt.Errorf("IDA Pro not found: supply IDA Pro path via '--ida-path' (e.g. /Applications/IDA\\ Pro\\ 8.2/ida64.app/Contents/MacOS)")
-			}
-			if len(matches) == 1 {
-				path = matches[0]
-			} else { // len(matches) > 1
-				prompt := &survey.Select{
-					Message: "Multiple IDA Pro Versions Found:",
-					Options: matches,
-				}
-				if err := survey.AskOne(prompt, &path); err != nil {
-					if err == terminal.InterruptErr {
-						log.Warn("Exiting...")
-						os.Exit(0)
-					}
-					return nil, err
-				}
-			}
-		case "linux":
-			// path = linuxPath
-			return nil, fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. /opt/ida-7.0/)")
-		case "windows":
-			// path = windowsPath
-			return nil, fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. C:\\Program Files\\IDA 7.0)")
-		default:
-			return nil, fmt.Errorf("unsupported OS: %s", runtime.GOOS)
-		}
-	} else {
-		path = conf.IdaPath
+	executable := filepath.Join(conf.IdaPath, "idat64")
+	if _, err := os.Stat(executable); os.IsNotExist(err) {
+		executable = filepath.Join(conf.IdaPath, "idat")
 	}
-
-	executable := filepath.Join(path, "idat64")
 	if conf.EnableGUI {
-		executable = filepath.Join(path, "ida64")
+		executable = filepath.Join(conf.IdaPath, "ida64")
+		if _, err := os.Stat(executable); os.IsNotExist(err) {
+			executable = filepath.Join(conf.IdaPath, "ida")
+		}
+	}
+	if _, err := os.Stat(executable); os.IsNotExist(err) {
+		return nil, fmt.Errorf("IDA Pro binary not found: %s", executable)
 	}
 
 	if conf.RunInDocker {
@@ -219,11 +189,11 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 func (c *Client) Run() error {
 	if c.conf.RunInDocker {
 		cli := docker.NewClient(
-			uuid.New().String(),     // ID
-			c.conf.DockerImage,      // Image
-			[]string{"/ida/idat64"}, // Entrypoint
-			c.cmd.Args[1:],          // Args
-			c.conf.Env,              // Env
+			uuid.New().String(),          // ID
+			c.conf.DockerImage,           // Image
+			[]string{c.conf.DockerEntry}, // Entrypoint
+			c.cmd.Args[1:],               // Args
+			c.conf.Env,                   // Env
 			[]docker.HostMounts{ // Mounts
 				{
 					Source:   filepath.Dir(c.conf.Output),
