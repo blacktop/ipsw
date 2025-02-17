@@ -37,13 +37,13 @@ func init() {
 	DiskCmd.AddCommand(apfsCmd)
 
 	apfsCmd.Flags().StringP("path", "p", "", "Path to list inside APFS")
-	apfsCmd.Flags().StringP("search", "r", "", "Extract files that match regex")
-	apfsCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting with --pattern")
+	// apfsCmd.Flags().StringP("search", "r", "", "Extract files that match regex")
+	// apfsCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting with --search")
 	apfsCmd.Flags().StringP("output", "o", "", "Output folder")
 	apfsCmd.MarkFlagDirname("output")
 	viper.BindPFlag("disk.apfs.path", apfsCmd.Flags().Lookup("path"))
-	viper.BindPFlag("disk.apfs.search", apfsCmd.Flags().Lookup("search"))
-	viper.BindPFlag("disk.apfs.flat", apfsCmd.Flags().Lookup("flat"))
+	// viper.BindPFlag("disk.apfs.search", apfsCmd.Flags().Lookup("search"))
+	// viper.BindPFlag("disk.apfs.flat", apfsCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("disk.apfs.output", apfsCmd.Flags().Lookup("output"))
 }
 
@@ -62,7 +62,7 @@ var apfsCmd = &cobra.Command{
 		}
 
 		// flags
-		// pattern := viper.GetString("disk.hfs.pattern")
+		// pattern := viper.GetString("disk.hfs.search")
 		// flat := viper.GetBool("disk.hfs.flat")
 		root := viper.GetString("disk.apfs.path")
 		output := viper.GetString("disk.hfs.output")
