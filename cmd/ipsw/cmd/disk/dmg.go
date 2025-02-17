@@ -23,6 +23,7 @@ package disk
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,8 +41,10 @@ func init() {
 
 	dmgCmd.Flags().StringP("re", "r", "", "Extract partition that matches regex")
 	dmgCmd.Flags().IntP("partition", "p", -1, "Extract a specific partition by number")
+	dmgCmd.Flags().StringP("password", "w", "", "Encrypted DMG password")
 	viper.BindPFlag("dmg.re", dmgCmd.Flags().Lookup("re"))
 	viper.BindPFlag("dmg.partition", dmgCmd.Flags().Lookup("partition"))
+	viper.BindPFlag("dmg.password", dmgCmd.Flags().Lookup("password"))
 }
 
 // dmgCmd represents the dmg command
@@ -60,6 +63,7 @@ var dmgCmd = &cobra.Command{
 		// flags
 		pattern := viper.GetString("dmg.re")
 		partition := viper.GetInt("dmg.partition")
+		password := viper.GetString("dmg.password")
 		// validate args
 		if viper.IsSet("dmg.partition") && viper.IsSet("dmg.re") {
 			return fmt.Errorf("cannot specify both --partition and --re")
@@ -79,9 +83,12 @@ var dmgCmd = &cobra.Command{
 			return fmt.Errorf("file is not a DMG file")
 		}
 
-		d, err := dmg.Open(infile, nil)
+		d, err := dmg.Open(infile, &dmg.Config{Password: password})
 		if err != nil {
-			return err
+			if errors.Is(err, dmg.ErrEncrypted) {
+				return fmt.Errorf("DMG is encrypted. Use --password to specify password")
+			}
+			return fmt.Errorf("failed to open DMG: %w", err)
 		}
 		defer d.Close()
 

@@ -213,6 +213,13 @@ func IsDMG(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 	defer f.Close()
+	var encHdr dmg.EncryptionHeader
+	if err := binary.Read(f, binary.BigEndian, &encHdr); err != nil {
+		return false, fmt.Errorf("failed to read DMG encryption header: %v", err)
+	}
+	if string(encHdr.Magic[:]) == dmg.EncryptedMagic {
+		return true, nil
+	}
 	if _, err := f.Seek(int64(-binary.Size(dmg.UDIFResourceFile{})), io.SeekEnd); err != nil {
 		return false, fmt.Errorf("failed to seek to DMG footer: %v", err)
 	}
