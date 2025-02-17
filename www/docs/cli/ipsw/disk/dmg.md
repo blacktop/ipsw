@@ -17,9 +17,10 @@ ipsw disk dmg DMG [OUTPUT] [flags]
 ### Options
 
 ```
-  -h, --help            help for dmg
-  -p, --partition int   Extract a specific partition by number (default -1)
-  -r, --re string       Extract partition that matches regex
+  -h, --help              help for dmg
+  -p, --partition int     Extract a specific partition by number (default -1)
+  -w, --password string   Encrypted DMG password
+  -r, --re string         Extract partition that matches regex
 ```
 
 ### Options inherited from parent commands

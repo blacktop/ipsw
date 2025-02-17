@@ -22,6 +22,7 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
   -d, --dependancies          Analyze module dependencies
       --diaphora-db string    Path to Diaphora database
   -k, --docker                Run IDA Pro in a docker container
+      --docker-entry string   IDA Pro docker entrypoint (default "/ida/idat64")
       --docker-image string   IDA Pro docker image (default "blacktop/idapro:8.2-pro")
   -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)
   -e, --extra-args strings    IDA Pro CLI extra arguments
