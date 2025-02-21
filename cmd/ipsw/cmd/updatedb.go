@@ -41,6 +41,7 @@ func init() {
 	rootCmd.AddCommand(updateDBCmd)
 	updateDBCmd.Flags().StringP("urls", "u", "", "Path to file containing list of URLs to scan (one per line)")
 	updateDBCmd.Flags().StringP("remote", "r", "", "Remote IPSW/OTA URL to parse")
+	updateDBCmd.Flags().StringP("path", "p", "", "Path to map")
 	updateDBCmd.Flags().StringP("db", "d", "", "Path to ipsw device DB JSON")
 }
 
@@ -60,6 +61,7 @@ var updateDBCmd = &cobra.Command{
 
 		urlList, _ := cmd.Flags().GetString("urls")
 		remoteURL, _ := cmd.Flags().GetString("remote")
+		mapPath, _ := cmd.Flags().GetString("path")
 		dbPath, _ := cmd.Flags().GetString("db")
 
 		mut := "Creating"
@@ -108,6 +110,19 @@ var updateDBCmd = &cobra.Command{
 				if err := i.GetDevices(&devices); err != nil {
 					log.WithError(err).Fatal("failed to get devices")
 				}
+			}
+		} else if len(mapPath) > 0 {
+			data, err := os.ReadFile(mapPath)
+			if err != nil {
+				log.WithError(err).Fatal("failed to read device map file")
+			}
+			dmap, err := types.ParseDeviceMap(data)
+			if err != nil {
+				log.WithError(err).Fatal("failed to parse device map")
+			}
+			i := &info.Info{}
+			if err := i.GetDevicesFromMap(dmap, &devices); err != nil {
+				log.WithError(err).Fatal("failed to get devices")
 			}
 		} else if len(remoteURL) > 0 {
 			zr, err := download.NewRemoteZipReader(remoteURL, &download.RemoteConfig{})
