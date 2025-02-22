@@ -1,7 +1,7 @@
 ####################################################
 # GOLANG BUILDER
 ####################################################
-FROM golang:1.24 as builder
+FROM golang:1.24 AS builder
 
 ARG VERSION
 ARG COMMIT
@@ -20,7 +20,7 @@ RUN CGO_ENABLED=1 go build \
 ####################################################
 FROM ubuntu:22.04
 
-LABEL maintainer "https://github.com/blacktop"
+LABEL maintainer="https://github.com/blacktop"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
