@@ -2,8 +2,8 @@ REPO=blacktop
 NAME=ipsw
 CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
 CUR_COMMIT=$(shell git rev-parse --short HEAD)
-LOCAL_VERSION=$(shell svu current)
-NEXT_VERSION=$(shell svu patch)
+LOCAL_VERSION=$(shell go tool svu --tag.pattern 'v3.1.*' current)
+NEXT_VERSION=$(shell go tool svu --tag.pattern 'v3.1.*' patch)
 
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
@@ -14,12 +14,8 @@ build-deps: ## Install the build dependencies
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing Go dev tools"
 	@go mod download
-	@go install github.com/caarlos0/svu@v1.4.1
-	@go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	@go install github.com/goreleaser/goreleaser@latest
-	@go install github.com/spf13/cobra-cli@latest
 	@go install golang.org/x/perf/cmd/benchstat@latest
-	@go install golang.org/x/tools/cmd/stringer@latest
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
@@ -51,8 +47,8 @@ release: ## Create a new release from the NEXT_VERSION
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
-	@echo " > Creating Release $(shell svu minor)"
-	@hack/make/release $(shell svu minor)
+	@echo " > Creating Release $(shell go tool svu --tag.pattern 'v3.1.*' minor)"
+	@hack/make/release $(shell go tool svu --tag.pattern 'v3.1.*' minor)
 	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip=validate
 
 .PHONY: destroy
