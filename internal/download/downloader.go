@@ -350,7 +350,9 @@ func (d *Download) Do() error {
 
 		// close file
 		dest.Sync()
-		dest.Close()
+		if err := dest.Close(); err != nil {
+			return fmt.Errorf("failed to close %s: %v", d.DestName+".download", err)
+		}
 
 		if len(d.Sha1) > 0 && !d.ignoreSha1 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
@@ -377,7 +379,9 @@ func (d *Download) Do() error {
 
 		// close file
 		dest.Sync()
-		dest.Close()
+		if err := dest.Close(); err != nil {
+			return fmt.Errorf("failed to close %s: %v", d.DestName+".download", err)
+		}
 
 		if len(d.Sha1) > 0 && !d.ignoreSha1 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
@@ -397,7 +401,11 @@ func (d *Download) Do() error {
 	}
 
 	if err := os.Rename(d.DestName+".download", d.DestName); err != nil {
-		return fmt.Errorf("failed to rename %s to %s: %v", d.DestName+".download", d.DestName, err)
+		if linkErr, ok := err.(*os.LinkError); ok {
+			return fmt.Errorf("failed to rename %s to %s: link error: %v", d.DestName+".download", d.DestName, linkErr.Err)
+		} else {
+			return fmt.Errorf("failed to rename %s to %s: %v", d.DestName+".download", d.DestName, err)
+		}
 	}
 
 	return nil
