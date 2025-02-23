@@ -45,6 +45,7 @@ import (
 func init() {
 	otaPatchCmd.AddCommand(otaPatchRsrCmd)
 
+	otaPatchRsrCmd.Flags().StringP("cryptex", "c", "", "Cryptex file from OTA")
 	otaPatchRsrCmd.Flags().StringP("input", "i", "", "Input folder")
 	otaPatchRsrCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaPatchRsrCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
@@ -53,6 +54,7 @@ func init() {
 	})
 	otaPatchRsrCmd.MarkFlagDirname("input")
 	otaPatchRsrCmd.MarkFlagDirname("output")
+	viper.BindPFlag("ota.patch.cryptex", otaPatchRsrCmd.Flags().Lookup("cryptex"))
 	viper.BindPFlag("ota.patch.input", otaPatchRsrCmd.Flags().Lookup("input"))
 	viper.BindPFlag("ota.patch.output", otaPatchRsrCmd.Flags().Lookup("output"))
 	viper.BindPFlag("ota.patch.dyld-arch", otaPatchRsrCmd.Flags().Lookup("dyld-arch"))
@@ -60,10 +62,10 @@ func init() {
 
 // otaPatchRsrCmd represents the rsr command
 var otaPatchRsrCmd = &cobra.Command{
-	Use:           "rsr",
-	Aliases:       []string{"r"},
-	Short:         "Patch RSR OTAs",
-	Args:          cobra.MinimumNArgs(1),
+	Use:     "rsr",
+	Aliases: []string{"r"},
+	Short:   "Patch RSR OTAs",
+	// Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -75,6 +77,7 @@ var otaPatchRsrCmd = &cobra.Command{
 		}
 
 		// flags
+		cryptex := viper.GetString("ota.patch.cryptex")
 		inFolder := viper.GetString("ota.patch.input")
 		outFolder := viper.GetString("ota.patch.output")
 		dyldArches := viper.GetStringSlice("ota.patch.dyld-arch")
@@ -104,6 +107,17 @@ var otaPatchRsrCmd = &cobra.Command{
 		}
 		if curVer.LessThan(reqVer) {
 			return fmt.Errorf("patching OTA only supported on macOS 13+/iOS 16+ (if you are trying to run on iOS let author know as macOS is currently the only supported darwin platform)")
+		}
+
+		if len(cryptex) > 0 {
+			log.Infof("Patching cryptex to %s", cryptex+".dmg")
+			if _, err := os.Create(cryptex + ".dmg"); err != nil {
+				return fmt.Errorf("failed to create empty cryptex dmg: %v", err)
+			}
+			if err := ridiff.RawImagePatch("", cryptex, cryptex+".dmg", patchVerbose); err != nil {
+				return fmt.Errorf("failed to patch %s: %v", cryptex, err)
+			}
+			return nil
 		}
 
 		otaPath := filepath.Clean(args[0])
