@@ -20,7 +20,7 @@ require (
 	github.com/blacktop/arm64-cgo v1.0.58
 	github.com/blacktop/go-apfs v1.0.25
 	github.com/blacktop/go-dwarf v1.0.10
-	github.com/blacktop/go-macho v1.1.239
+	github.com/blacktop/go-macho v1.1.240
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
