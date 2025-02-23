@@ -354,7 +354,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 func decrypt(in, out string, symmetricKey []byte) (string, error) {
 	f, err := os.Open(in)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("decrypt: failed to open AEA file: %v", err)
 	}
 	defer f.Close()
 
@@ -458,7 +458,7 @@ type DecryptConfig struct {
 func Decrypt(c *DecryptConfig) (string, error) {
 	metadata, err := Info(c.Input)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse AEA: %v", err)
+		return "", fmt.Errorf("failed to Decrypt AEA: %v", err)
 	}
 
 	if encKey, ok := metadata["encryption_key"]; ok {
