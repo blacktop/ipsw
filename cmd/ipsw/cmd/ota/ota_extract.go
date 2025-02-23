@@ -46,7 +46,7 @@ var validCryptexes = []string{"app", "system"}
 func init() {
 	OtaCmd.AddCommand(otaExtractCmd)
 
-	otaExtractCmd.Flags().StringP("cryptex", "c", "", "Extract cryptex as DMG (app or system)")
+	otaExtractCmd.Flags().StringP("cryptex", "c", "", "Extract cryptex as DMG (requires full OTA)")
 	otaExtractCmd.RegisterFlagCompletionFunc("cryptex", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return validCryptexes, cobra.ShellCompDirectiveDefault
 	})
