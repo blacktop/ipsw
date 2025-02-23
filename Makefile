@@ -156,13 +156,13 @@ update_proxy: ## Update the proxy pkgs
 .PHONY: work-macho
 work-macho: ## Work on go-macho package
 	@echo " > Working on go-macho package"
-	@go work init
+	@go work init || true
 	@go work use . ../go-macho
 
 .PHONY: work-apfs
 work-apfs: ## Work on go-apfs package
 	@echo " > Working on go-apfs package"
-	@go work init
+	@go work init || true
 	@go work use . ../go-apfs
 
 .PHONY: docker
