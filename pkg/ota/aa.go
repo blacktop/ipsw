@@ -539,6 +539,56 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 	return nil
 }
 
+func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
+	var re *regexp.Regexp
+	switch cryptex {
+	case "system":
+		re = regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+	case "app":
+		re = regexp.MustCompile(`cryptex-app$`)
+	default:
+		return "", fmt.Errorf("unknown cryptex type '%s'", cryptex)
+	}
+
+	tmpdir, err := os.MkdirTemp("", "ota_extract_cryptexes")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	for _, file := range r.Files() {
+		if re.MatchString(file.Name()) {
+			cryptexFile, err := r.Open(file.Path(), false)
+			if err != nil {
+				return "", fmt.Errorf("failed to open cryptex file: %v", err)
+			}
+			defer cryptexFile.Close()
+			// create a temp file to hold the OTA cryptex
+			cf, err := os.Create(filepath.Join(tmpdir, file.Name()))
+			if err != nil {
+				return "", fmt.Errorf("failed to create file: %v", err)
+			}
+			// create a temp file to hold the PATCHED OTA cryptex DMG
+			dcf, err := os.Create(filepath.Join(output, file.Name()+".dmg"))
+			if err != nil {
+				return "", fmt.Errorf("failed to create file: %v", err)
+			}
+			dcf.Close()
+			if _, err := io.Copy(cf, cryptexFile); err != nil {
+				return "", fmt.Errorf("failed to write file: %v", err)
+			}
+			cf.Close()
+			// patch the cryptex
+			if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
+				return "", fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Path()), err)
+			}
+			return dcf.Name(), nil
+		}
+	}
+
+	return "", fmt.Errorf("cryptex '%s' not found", cryptex)
+}
+
 func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) {
 	var out []string
 

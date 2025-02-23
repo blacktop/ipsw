@@ -27,6 +27,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -39,9 +41,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+var validCryptexes = []string{"app", "system"}
+
 func init() {
 	OtaCmd.AddCommand(otaExtractCmd)
 
+	otaExtractCmd.Flags().StringP("cryptex", "c", "", "Extract cryptex as DMG (app or system)")
+	otaExtractCmd.RegisterFlagCompletionFunc("cryptex", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return validCryptexes, cobra.ShellCompDirectiveDefault
+	})
 	otaExtractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache files")
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
@@ -50,6 +58,7 @@ func init() {
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaExtractCmd.MarkFlagDirname("output")
+	viper.BindPFlag("ota.extract.cryptex", otaExtractCmd.Flags().Lookup("cryptex"))
 	viper.BindPFlag("ota.extract.dyld", otaExtractCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("ota.extract.kernel", otaExtractCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("ota.extract.pattern", otaExtractCmd.Flags().Lookup("pattern"))
@@ -76,9 +85,13 @@ var otaExtractCmd = &cobra.Command{
 
 		// flags
 		decomp := viper.GetBool("ota.extract.decomp")
+		cryptex := viper.GetString("ota.extract.cryptex")
 		// validate flags
 		if len(args) > 1 && viper.IsSet("ota.extract.pattern") {
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
+		}
+		if viper.IsSet("ota.extract.cryptex") && !slices.Contains(validCryptexes, cryptex) {
+			return fmt.Errorf("invalid --cryptex: '%s' (must be one of: %s)", cryptex, strings.Join(validCryptexes, ", "))
 		}
 
 		o, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
@@ -97,10 +110,26 @@ var otaExtractCmd = &cobra.Command{
 
 		if viper.IsSet("ota.extract.output") {
 			output = filepath.Join(viper.GetString("ota.extract.output"), output)
+			if err := os.MkdirAll(output, 0o755); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
 		}
 
-		if viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.IsSet("ota.extract.pattern") {
+		if viper.IsSet("ota.extract.cryptex") || viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.IsSet("ota.extract.pattern") {
 			cwd, _ := os.Getwd()
+			/* CRYPTEX */
+			if viper.IsSet("ota.extract.cryptex") {
+				log.Infof("Extracting %s Cryptex", cryptex)
+				out, err := o.ExtractCryptex(cryptex, output)
+				if err != nil {
+					return fmt.Errorf("failed to extract %s cryptex: %v", cryptex, err)
+				}
+				if rel, err := filepath.Rel(cwd, out); err != nil {
+					utils.Indent(log.Info, 2)(out)
+				} else {
+					utils.Indent(log.Info, 2)(rel)
+				}
+			}
 			/* DYLD_SHARED_CACHE */
 			if viper.GetBool("ota.extract.dyld") {
 				log.Info("Extracting dyld_shared_cache Files")
