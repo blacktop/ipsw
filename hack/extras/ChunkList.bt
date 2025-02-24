@@ -1,0 +1,38 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+typedef struct 
+{
+  char magic[4];        //
+  uint hdr_size;        //
+  char version;  // 
+  char chunk_method;     // 
+  char signature_method;     // 
+  char padding;
+  uint64 chunk_count;
+  uint64 chunk_offset;
+  uint64 signature_offset;
+} ChunkList;
+
+typedef struct 
+{
+  uint size;
+  char hash[32]; // assuming SHA-256 (signature_method = 2)
+} Chunk;
+
+LittleEndian();
+
+ChunkList header;
+FSeek(header.chunk_offset);
+Chunk chunks[header.chunk_count];
+FSeek(header.signature_offset);
+char signature[32];
