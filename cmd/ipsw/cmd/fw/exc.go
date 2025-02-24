@@ -66,10 +66,11 @@ var excCmd = &cobra.Command{
 		output := viper.GetString("fw.exclave.output")
 
 		if showInfo {
-			bn, err := bundle.Parse(filepath.Clean(args[0]))
+			bn, err := bundle.Open(filepath.Clean(args[0]))
 			if err != nil {
 				return fmt.Errorf("failed to parse bundle: %v", err)
 			}
+			defer bn.Close()
 
 			if bn.Type != 3 {
 				return fmt.Errorf("bundle is not an exclave bundle")

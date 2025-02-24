@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/pkg/devicetree"
 )
 
 const Magic = "BUND"
@@ -33,6 +33,9 @@ type Bundle struct {
 	TypeHeader any
 	Config     Config
 	Files      []File
+
+	r      io.ReadSeeker
+	closer any
 }
 
 func (b Bundle) String() string {
@@ -419,16 +422,59 @@ func (b *Bundle) ParseFiles() error {
 	return nil
 }
 
-func Parse(in string) (*Bundle, error) {
-	var bn Bundle
+func (b *Bundle) DumpFiles(output string) error {
+	if b.Type == 4 {
+		for _, rng := range b.TypeHeader.(Type4).Ranges {
+			slices.Reverse(rng.Name[:])
+			if rng.Size > 0 {
+				if _, err := b.r.Seek(int64(rng.Offset), io.SeekStart); err != nil {
+					return fmt.Errorf("failed to seek to bundle config data: %v", err)
+				}
+				data := make([]byte, rng.Size)
+				if _, err := b.r.Read(data); err != nil {
+					return fmt.Errorf("failed to read bundle data: %v", err)
+				}
+				fname := filepath.Join(output, string(rng.Name[:])+".bin")
+				log.WithField("name", fname).Info("Creating")
+				if err := os.WriteFile(fname, data, 0o644); err != nil {
+					return fmt.Errorf("failed to write bundle data to file: %v", err)
+				}
+			}
+		}
+	} else {
+		return fmt.Errorf("unsupported bundle type: %d", b.Type)
+	}
+	return nil
+}
 
-	f, err := os.Open(in)
+func Open(filename string) (*Bundle, error) {
+	f, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
-	defer f.Close()
+	bundle, err := Parse(f)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	bundle.closer = f
+	return bundle, nil
+}
 
-	if err := binary.Read(f, binary.LittleEndian, &bn.Header); err != nil {
+func (b *Bundle) Close() error {
+	if b.closer != nil {
+		err := b.closer.(io.Closer).Close()
+		b.closer = nil
+		return err
+	}
+	return nil
+}
+
+func Parse(r io.ReadSeeker) (*Bundle, error) {
+	var bn Bundle
+	bn.r = r
+
+	if err := binary.Read(r, binary.LittleEndian, &bn.Header); err != nil {
 		return nil, fmt.Errorf("failed to read bundle header: %v", err)
 	}
 	slices.Reverse(bn.Magic[:])
@@ -440,21 +486,21 @@ func Parse(in string) (*Bundle, error) {
 	switch bn.Type {
 	case 3: // ExclaveCore
 		var t3 Type3
-		if err := binary.Read(f, binary.LittleEndian, &t3); err != nil {
+		if err := binary.Read(r, binary.LittleEndian, &t3); err != nil {
 			return nil, fmt.Errorf("failed to read bundle type 3: %v", err)
 		}
 		bn.TypeHeader = t3
 		// parse footer/config
-		if _, err := f.Seek(-int64(t3.FooterOffset), io.SeekEnd); err != nil {
+		if _, err := r.Seek(-int64(t3.FooterOffset), io.SeekEnd); err != nil {
 			return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
 		}
 
 		fdata := make([]byte, t3.FooterSz)
-		if _, err := f.Read(fdata); err != nil {
+		if _, err := r.Read(fdata); err != nil {
 			return nil, fmt.Errorf("failed to read bundle data: %v", err)
 		}
 
-		if _, err = asn1.Unmarshal(fdata, &bn.Config); err != nil {
+		if _, err := asn1.Unmarshal(fdata, &bn.Config); err != nil {
 			return nil, fmt.Errorf("failed to ASN.1 parse bundle config: %v", err)
 		}
 
@@ -463,26 +509,33 @@ func Parse(in string) (*Bundle, error) {
 		}
 	case 4: // AOP/DCP
 		var t4 Type4
-		if err := binary.Read(f, binary.LittleEndian, &t4); err != nil {
+		if err := binary.Read(r, binary.LittleEndian, &t4); err != nil {
 			return nil, fmt.Errorf("failed to read bundle type 4: %v", err)
 		}
 		bn.TypeHeader = t4
-		// parse device tree/config
-		dtreeRange := t4.Ranges[9]
-		if _, err := f.Seek(int64(dtreeRange.Offset), io.SeekStart); err != nil {
-			return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
+		for _, rng := range t4.Ranges {
+			slices.Reverse(rng.Name[:])
+			switch string(rng.Name[:]) {
+			// case "uedt":
+			// 	// parse device tree/config
+			// 	log.WithField("name", string(rng.Name[:])).Debug("Device Tree")
+			// 	if _, err := r.Seek(int64(rng.Offset), io.SeekStart); err != nil {
+			// 		return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
+			// 	}
+			// 	dtdata := make([]byte, rng.Size)
+			// 	if _, err := r.Read(dtdata); err != nil {
+			// 		return nil, fmt.Errorf("failed to read bundle data: %v", err)
+			// 	}
+			// 	dt, err := devicetree.ParseData(bytes.NewReader(dtdata))
+			// 	if err != nil {
+			// 		os.WriteFile("uedt.bin", dtdata, 0o644)
+			// 		return nil, fmt.Errorf("failed to parse device tree: %v", err)
+			// 	}
+			// 	log.Debug(dt.String())
+			default:
+				log.WithField("name", string(rng.Name[:])).Debug("unsupported")
+			}
 		}
-		dtdata := make([]byte, dtreeRange.Size)
-		if _, err := f.Read(dtdata); err != nil {
-			return nil, fmt.Errorf("failed to read bundle data: %v", err)
-		}
-		dt, err := devicetree.ParseData(bytes.NewReader(dtdata))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse device tree: %v", err)
-		}
-		slices.Reverse(dtreeRange.Name[:])
-		log.WithField("name", string(dtreeRange.Name[:])).Debug("Device Tree")
-		log.Debug(dt.String())
 	default:
 		return nil, fmt.Errorf("unknown bundle type: %d", bn.Type)
 	}
