@@ -3,6 +3,8 @@ package download
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -51,29 +53,35 @@ type seedCatalog struct {
 }
 
 type Package struct {
-	Digest            string `plist:"Digest,omitempty"`
-	Size              int    `plist:"Size,omitempty"`
-	IntegrityDataURL  string `plist:"IntegrityDataURL,omitempty"`
-	MetadataURL       string `plist:"MetadataURL,omitempty"`
 	URL               string `plist:"URL,omitempty"`
+	Size              int    `plist:"Size,omitempty"`
+	Digest            string `plist:"Digest,omitempty"`
+	MetadataURL       string `plist:"MetadataURL,omitempty"`
+	IntegrityDataURL  string `plist:"IntegrityDataURL,omitempty"`
 	IntegrityDataSize int    `plist:"IntegrityDataSize,omitempty"`
 }
 
 type ExtendedMetaInfo struct {
-	InstallAssistantPackageIdentifiers map[string]string
+	AutoUpdate                                     string `json:"AutoUpdate,omitempty"`
+	ProductType                                    string `json:"ProductType,omitempty"`
+	ProductVersion                                 string `json:"ProductVersion,omitempty"`
+	BridgeOSPredicateProductOrdering               string `json:"BridgeOSPredicateProductOrdering,omitempty"`
+	BridgeOSSoftwareUpdateEventRecordingServiceURL string `json:"BridgeOSSoftwareUpdateEventRecordingServiceURL,omitempty"`
+	InstallAssistantPackageIdentifiers             map[string]string
 }
 
 type Product struct {
-	ServerMetadataURL string
-	Packages          []Package
-	PostDate          time.Time
-	Distributions     map[string]string
-	ExtendedMetaInfo  ExtendedMetaInfo `plist:"ExtendedMetaInfo,omitempty"`
+	DeferredSUEnablementDate time.Time `json:"DeferredSUEnablementDate,omitempty"`
+	Distributions            map[string]string
+	Packages                 []Package
+	PostDate                 time.Time
+	ExtendedMetaInfo         ExtendedMetaInfo `plist:"ExtendedMetaInfo,omitempty"`
+	ServerMetadataURL        string
 }
 
 type Catalog struct {
-	CatalogVersion int
 	ApplePostURL   string
+	CatalogVersion int
 	IndexDate      time.Time
 	Products       map[string]Product
 }
@@ -90,26 +98,53 @@ type ServerMetadata struct {
 	Platforms                  map[string][]string     `plist:"platforms,omitempty"`
 }
 
+type Options struct {
+	VisibleOnlyForPredicate string `xml:"visibleOnlyForPredicate,attr"`
+	Customize               string `xml:"customize,attr"`
+	RootVolumeOnly          string `xml:"rootVolumeOnly,attr"`
+	MajorOSUpdate           string `xml:"major-os-update,attr"`
+	RequireScripts          string `xml:"require-scripts,attr"`
+}
+
 type auxInfo struct {
 	XMLName xml.Name `xml:"auxinfo"`
 	Keys    []string `xml:"dict>key"`
 	Values  []string `xml:"dict>string"`
 }
 
+type PkgRef struct {
+	ID                string `xml:"id,attr"`
+	PackageIdentifier string `xml:"packageIdentifier,attr"`
+	Auth              string `xml:"auth,attr,omitempty"`
+	InstallKBytes     string `xml:"installKBytes,attr,omitempty"`
+	Version           string `xml:"version,attr,omitempty"`
+	Content           string `xml:",chardata"`
+}
+
+type Script struct {
+	For  string `xml:"for,attr"`
+	Data string `xml:",innerxml"`
+}
+
 type distribution struct {
-	XMLName xml.Name `xml:"installer-gui-script"`
-	Version string   `xml:"minSpecVersion,attr"`
-	Title   string   `xml:"title"`
-	AuxInfo auxInfo  `xml:"auxinfo"`
+	XMLName  xml.Name `xml:"installer-gui-script"`
+	Version  string   `xml:"minSpecVersion,attr"`
+	Title    string   `xml:"title"`
+	Options  Options  `xml:"options"`
+	AuxInfo  auxInfo  `xml:"auxinfo"`
+	Tags     []string `xml:"tags>tag"`
+	Packages []PkgRef `xml:"pkg-ref"`
+	Scripts  []Script `xml:"script"`
 }
 
 type ProductInfo struct {
-	ProductID string
-	Version   string
-	Build     string
-	PostDate  time.Time
-	Title     string
-	Product   Product
+	ProductID    string
+	Version      string
+	Build        string
+	PostDate     time.Time
+	Title        string
+	Product      Product
+	Distribution distribution
 
 	distributionData []byte
 }
@@ -341,17 +376,18 @@ func GetProductInfo() (ProductInfos, error) {
 			return nil, fmt.Errorf("failed to read distribution data: %v", err)
 		}
 
-		dist := distribution{}
-		if err := xml.Unmarshal(pInfo.distributionData, &dist); err != nil {
-			return nil, fmt.Errorf("failed decode distribution XML data: %v", err)
+		// os.WriteFile("dist.xml", pInfo.distributionData, 0660)
+
+		if err := xml.Unmarshal(pInfo.distributionData, &pInfo.Distribution); err != nil {
+			return nil, fmt.Errorf("failed to decode distribution XML data: %v", err)
 		}
 
-		if !strings.EqualFold(dist.Title, "SU_TITLE") {
-			pInfo.Title = dist.Title
+		if !strings.EqualFold(pInfo.Distribution.Title, "SU_TITLE") {
+			pInfo.Title = pInfo.Distribution.Title
 		}
 
-		if len(dist.AuxInfo.Keys) > 0 {
-			info, err := zipArrays(dist.AuxInfo.Keys, dist.AuxInfo.Values)
+		if len(pInfo.Distribution.AuxInfo.Keys) > 0 {
+			info, err := zipArrays(pInfo.Distribution.AuxInfo.Keys, pInfo.Distribution.AuxInfo.Values)
 			if err != nil {
 				return nil, fmt.Errorf("failed to zip distribution auxinfo: %v", err)
 			}
@@ -369,9 +405,9 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll, ignoreSha1, assistantOnly bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll, assistantOnly bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, true)
+	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true, true)
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
@@ -391,17 +427,58 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 				}).Info("Getting Package")
 				// download file
 				downloader.URL = pkg.URL
-				downloader.Sha1 = pkg.Digest
 				downloader.DestName = filepath.Join(folder, destName)
-				err = downloader.Do()
-				if err != nil {
+				if err = downloader.Do(); err != nil {
 					return errors.Wrap(err, "failed to download file")
 				}
-
+				if len(pkg.IntegrityDataURL) > 0 {
+					utils.Indent(log.Info, 2)("Verifying Package")
+					resp, err := http.Get(pkg.IntegrityDataURL)
+					if err != nil {
+						return fmt.Errorf("failed to download the integrity data %s: %v", pkg.IntegrityDataURL, err)
+					}
+					integrityData, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return fmt.Errorf("failed to read integrity data: %v", err)
+					}
+					resp.Body.Close()
+					r := bytes.NewReader(integrityData)
+					var chklist Chunklist
+					if err := binary.Read(r, binary.LittleEndian, &chklist); err != nil {
+						return fmt.Errorf("failed to read integrity chunklist: %v", err)
+					}
+					if chklist.SignatureMethod == ChunkSignatureMethodSHA256 {
+						chunks := make([]Chunk, chklist.ChunkCount)
+						if err := binary.Read(r, binary.LittleEndian, chunks); err != nil {
+							return fmt.Errorf("failed to read integrity chunks: %v", err)
+						}
+						signature := make([]byte, len(integrityData)-int(chklist.SignatureOffset))
+						if err := binary.Read(r, binary.BigEndian, &signature); err != nil {
+							return fmt.Errorf("failed to read signature: %v", err)
+						}
+						f, err := os.Open(filepath.Join(folder, destName))
+						if err != nil {
+							return fmt.Errorf("failed to open package: %v", err)
+						}
+						defer f.Close()
+						// verify integrity
+						for idx, chunk := range chunks {
+							chunkData := make([]byte, chunk.Size)
+							if _, err := f.Read(chunkData); err != nil {
+								return fmt.Errorf("failed to read chunk data: %v", err)
+							}
+							// verify chunk
+							sha256 := sha256.New()
+							sha256.Write(chunkData)
+							if !bytes.Equal(sha256.Sum(nil), chunk.Hash[:]) {
+								return fmt.Errorf("failed to validate %s: chunk #%d integrity check failed", destName, idx)
+							}
+						}
+					}
+				}
 			} else {
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
-
 		} else if len(pkg.MetadataURL) > 0 {
 			if assistantOnly && !strings.HasSuffix(pkg.MetadataURL, "InstallAssistant.pkg") {
 				continue
@@ -417,11 +494,9 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 				downloader.Sha1 = pkg.Digest
 				downloader.DestName = filepath.Join(folder, destName)
 
-				err = downloader.Do()
-				if err != nil {
-					return errors.Wrap(err, "failed to download file")
+				if err := downloader.Do(); err != nil {
+					return errors.Wrap(err, "failed to download metadata file")
 				}
-
 			} else {
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
@@ -439,7 +514,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 		log.Info("Creating empty sparseimage")
 		sparseDiskimagePath, err = utils.CreateSparseDiskImage(volumeName, sparseDiskimagePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create sparse disk image: %v", err)
 		}
 		defer os.Remove(sparseDiskimagePath)
 	}
@@ -448,27 +523,26 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 	if _, err := os.Stat(sparseDiskimageMount); os.IsNotExist(err) {
 		log.Infof("Mounting %s", sparseDiskimageMount)
 		if err := utils.Mount(sparseDiskimagePath, sparseDiskimageMount); err != nil {
-			return err
+			return fmt.Errorf("failed to mount sparse disk image: %v", err)
 		}
 	}
 
 	distPath := filepath.Join(folder, getDestName(i.Product.Distributions["English"], false))
-	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
+	if _, err := os.Stat(distPath); os.IsNotExist(err) {
 		if err := os.WriteFile(distPath, i.distributionData, 0660); err != nil {
-			return err
+			return fmt.Errorf("failed to write distribution data: %v", err)
 		}
 	}
 
 	log.Infof("Creating installer from distribution %s", distPath)
 	if err := utils.CreateInstaller(distPath, sparseDiskimageMount); err != nil {
-		// return err
-		log.Error(err.Error())
+		return fmt.Errorf("failed to create installer: %v", err)
 	}
 
 	var appPath string
 	filepath.Walk(sparseDiskimageMount, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to walk sparse disk image mount: %v", err)
 		}
 		if filepath.Ext(info.Name()) == ".app" {
 			appPath = path
@@ -498,4 +572,33 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 	}
 
 	return nil
+}
+
+const ChunklistMagic = 0x4C4B4E43 // 'CNKL'
+
+type Chunk struct {
+	Size uint32
+	Hash [32]byte
+}
+
+type ChunkSignatureMethod uint8
+
+const (
+	ChunkSignatureMethodNone ChunkSignatureMethod = iota
+	ChunkSignatureMethodSHA1
+	ChunkSignatureMethodSHA256
+)
+
+type Chunklist struct {
+	Magic           uint32
+	HdrSize         uint32
+	Version         uint8
+	ChunkMethod     uint8
+	SignatureMethod ChunkSignatureMethod
+	Padding         uint8
+	ChunkCount      uint64
+	ChunkOffset     uint64
+	SignatureOffset uint64
+	// Chunks          []Chunk
+	// Signature       []byte
 }
