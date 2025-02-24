@@ -17,10 +17,11 @@ func Extract(input, output string) ([]string, error) {
 	var m *macho.File
 	var outfiles []string
 
-	bn, err := bundle.Parse(input)
+	bn, err := bundle.Open(input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse bundle: %v", err)
+		return nil, fmt.Errorf("failed to open bundle: %v", err)
 	}
+	defer bn.Close()
 
 	if bn.Type != 3 {
 		return nil, fmt.Errorf("bundle is not an exclave bundle")

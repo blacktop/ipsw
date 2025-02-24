@@ -54,7 +54,7 @@ func IsMachOData(dat []byte) (bool, error) {
 	case Magic32, Magic64, MagicFatBE, MagicFatLE:
 		return true, nil
 	default:
-		return false, fmt.Errorf("not a macho file")
+		return false, nil
 	}
 }
 

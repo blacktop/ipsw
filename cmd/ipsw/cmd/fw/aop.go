@@ -30,6 +30,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
@@ -54,7 +55,7 @@ func init() {
 
 // aopCmd represents the aop command
 var aopCmd = &cobra.Command{
-	Use:    "aop",
+	Use:    "aop <IPSW|IM4P|BUNDLE>",
 	Short:  "🚧 Dump MachOs",
 	Args:   cobra.ExactArgs(1),
 	Hidden: true,
@@ -67,36 +68,131 @@ var aopCmd = &cobra.Command{
 		showInfo := viper.GetBool("fw.aop.info")
 		output := viper.GetString("fw.aop.output")
 
-		if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
+		infile := filepath.Clean(args[0])
+
+		if isZip, err := magic.IsZip(infile); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Search(&extract.Config{
+				IPSW:    infile,
+				Pattern: "aop.*fw.*\\.im4p$",
+				Output:  viper.GetString("fw.aop.output"),
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				if ok, _ := magic.IsIm4p(f); ok {
+					log.Info("Processing IM4P file")
+					im4p, err := img4.OpenIm4p(f)
+					if err != nil {
+						return err
+					}
+					if showInfo {
+						if isMacho, err := magic.IsMachOData(im4p.Data); err != nil {
+							return err
+						} else if isMacho {
+							m, err := macho.NewFile(bytes.NewReader(im4p.Data))
+							if err != nil {
+								return err
+							}
+							fmt.Println(m.FileTOC.String())
+						} else {
+							bund, err := bundle.Parse(bytes.NewReader(im4p.Data))
+							if err != nil {
+								return err
+							}
+							fmt.Println(bund)
+						}
+					} else {
+						if isMacho, err := magic.IsMachOData(im4p.Data); err != nil {
+							return err
+						} else if isMacho {
+							fname := strings.TrimSuffix(f, filepath.Ext(f))
+							if output != "" {
+								fname = filepath.Join(output, filepath.Base(fname))
+							}
+							utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
+							if err := os.WriteFile(fname, im4p.Data, 0o644); err != nil {
+								return fmt.Errorf("failed to write file %s: %v", fname, err)
+							}
+						} else {
+							// FIXME: extract files
+							// return fmt.Errorf("extraction not yet supported for this file type")
+							bn, err := bundle.Parse(bytes.NewReader(im4p.Data))
+							if err != nil {
+								return err
+							}
+							if bn.Type == 4 {
+								return bn.DumpFiles(output)
+							}
+							return fmt.Errorf("extraction not yet supported for this bundle type: %v", bn.Type)
+						}
+					}
+				}
+			}
+			return nil
+		} else if ok, _ := magic.IsIm4p(infile); ok {
 			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+			im4p, err := img4.OpenIm4p(infile)
 			if err != nil {
 				return err
 			}
 			if showInfo {
-				m, err := macho.NewFile(bytes.NewReader(im4p.Data))
-				if err != nil {
+				if isMacho, err := magic.IsMachOData(im4p.Data); err != nil {
 					return err
+				} else if isMacho {
+					m, err := macho.NewFile(bytes.NewReader(im4p.Data))
+					if err != nil {
+						return err
+					}
+					fmt.Println(m.FileTOC.String())
+				} else {
+					bund, err := bundle.Parse(bytes.NewReader(im4p.Data))
+					if err != nil {
+						return err
+					}
+					fmt.Println(bund)
 				}
-				fmt.Println(m.FileTOC.String())
 				return nil
 			} else {
-				fname := strings.TrimSuffix(filepath.Clean(args[0]), filepath.Ext(filepath.Clean(args[0])))
-				if output != "" {
-					fname = filepath.Join(output, filepath.Base(fname))
+				if isMacho, err := magic.IsMachOData(im4p.Data); err != nil {
+					return err
+				} else if isMacho {
+					fname := strings.TrimSuffix(infile, filepath.Ext(infile))
+					if output != "" {
+						fname = filepath.Join(output, filepath.Base(fname))
+					}
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
+					if err := os.WriteFile(fname, im4p.Data, 0o644); err != nil {
+						return fmt.Errorf("failed to write file %s: %v", fname, err)
+					}
+				} else {
+					// FIXME: extract files
+					// return fmt.Errorf("extraction not yet supported for this file type")
+					bn, err := bundle.Parse(bytes.NewReader(im4p.Data))
+					if err != nil {
+						return err
+					}
+					if bn.Type == 4 {
+						return bn.DumpFiles(output)
+					}
+					return fmt.Errorf("extraction not yet supported for this bundle type: %v", bn.Type)
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
-				return os.WriteFile(fname, im4p.Data, 0o644)
 			}
 		} else {
+			bn, err := bundle.Open(infile)
+			if err != nil {
+				return fmt.Errorf("failed to open bundle: %v", err)
+			}
+			defer bn.Close()
 			if showInfo {
-				bn, err := bundle.Parse(filepath.Clean(args[0]))
-				if err != nil {
-					return err
-				}
 				fmt.Println(bn)
 			} else {
-				return fmt.Errorf("extraction not yet supported for this file type")
+				if bn.Type == 4 {
+					return bn.DumpFiles(output)
+				}
+				return fmt.Errorf("extraction not yet supported for this bundle type: %v", bn.Type)
 			}
 		}
 

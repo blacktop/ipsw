@@ -92,10 +92,11 @@ var dcpCmd = &cobra.Command{
 			}
 		} else {
 			if showInfo {
-				bn, err := bundle.Parse(filepath.Clean(args[0]))
+				bn, err := bundle.Open(filepath.Clean(args[0]))
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to open bundle: %v", err)
 				}
+				defer bn.Close()
 				fmt.Println(bn)
 			} else {
 				return fmt.Errorf("extraction not yet supported for this file type")
