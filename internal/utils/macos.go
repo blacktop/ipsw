@@ -174,7 +174,7 @@ func CodesignShow(path string) (string, error) {
 func CreateSparseDiskImage(volumeName, diskPath string) (string, error) {
 	if runtime.GOOS == "darwin" {
 
-		cmd := exec.Command("usr/bin/hdiutil", "create", "-size", "16g", "-fs", "HFS+", "-volname", volumeName, "-type", "SPARSE", "-plist", diskPath)
+		cmd := exec.Command("/usr/bin/hdiutil", "create", "-size", "16g", "-fs", "HFS+", "-volname", volumeName, "-type", "SPARSE", "-plist", diskPath)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -681,17 +681,22 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 			return nil // keep going
 		}
 		if info.IsDir() {
-			return nil
+			return nil // skip directories
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil // skip symlinks
 		}
 		if pattern.MatchString(strings.TrimPrefix(path, mountPoint)) {
 			fname := strings.TrimPrefix(path, mountPoint)
 			fname = filepath.Join(destPath, fname)
-			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
 			}
-			Indent(log.Info, 3)(fmt.Sprintf("Extracting to %s", fname))
+			Indent(log.Debug, 3)(fmt.Sprintf("Extracting to %s", fname))
 			if err := Copy(path, fname); err != nil {
-				return fmt.Errorf("failed to extract %s: %v", fname, err)
+				// return fmt.Errorf("failed to extract %s: %v", fname, err)
+				log.WithError(err).Errorf("failed to copy %s to %s", path, fname)
+				return nil // keep going
 			}
 			artifacts = append(artifacts, fname)
 		}
