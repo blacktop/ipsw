@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -55,6 +56,7 @@ func init() {
 
 	// pkgCmd.Flags().BoolP("scripts", "s", false, "Show scripts")
 	pkgCmd.Flags().BoolP("bom", "b", false, "Show BOM")
+	pkgCmd.Flags().BoolP("pay", "l", false, "Show Payload")
 	pkgCmd.Flags().BoolP("dist", "d", false, "Show distribution")
 	pkgCmd.Flags().BoolP("scripts", "s", false, "Show scripts")
 	pkgCmd.Flags().BoolP("all", "a", false, "Show all contents")
@@ -64,6 +66,7 @@ func init() {
 	pkgCmd.MarkFlagDirname("output")
 	// viper.BindPFlag("pkg.scripts", pkgCmd.Flags().Lookup("scripts"))
 	viper.BindPFlag("pkg.bom", pkgCmd.Flags().Lookup("bom"))
+	viper.BindPFlag("pkg.pay", pkgCmd.Flags().Lookup("pay"))
 	viper.BindPFlag("pkg.dist", pkgCmd.Flags().Lookup("dist"))
 	viper.BindPFlag("pkg.scripts", pkgCmd.Flags().Lookup("scripts"))
 	viper.BindPFlag("pkg.all", pkgCmd.Flags().Lookup("all"))
@@ -86,6 +89,7 @@ var pkgCmd = &cobra.Command{
 		}
 
 		// flags
+		showPayload := viper.GetBool("pkg.pay")
 		showBom := viper.GetBool("pkg.bom")
 		showDistribution := viper.GetBool("pkg.dist")
 		showScripts := viper.GetBool("pkg.scripts")
@@ -106,7 +110,7 @@ var pkgCmd = &cobra.Command{
 		infile := filepath.Clean(args[0])
 
 		if isXar, err := magic.IsXar(infile); err != nil {
-			return err
+			return fmt.Errorf("failed to check if file is a xar/pkg file: %w", err)
 		} else if !isXar {
 			return fmt.Errorf("file is not a dmg OR pkg file")
 		}
@@ -163,16 +167,47 @@ var pkgCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				defer f.Close()
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
-					return err
-				}
-				cr, err := cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
-				if err != nil {
-					return err
+				var cr *cpio.Reader
+				if IsPBZX, err := magic.IsPBZXData(f); err != nil {
+					return fmt.Errorf("failed to check if %s file is a pbzx file: %w", payload.Name, err)
+				} else if IsPBZX {
+					f.Close() // dumb hack to reset the file pointer
+					f, err = payload.Open()
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					var pbuf bytes.Buffer
+					if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+						return err
+					}
+					cr, err = cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+					if err != nil {
+						return err
+					}
+				} else {
+					f.Close() // dumb hack to reset the file pointer
+					f, err = payload.Open()
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					gzr, err := gzip.NewReader(f)
+					if err != nil {
+						return err
+					}
+					defer gzr.Close()
+					data, err := io.ReadAll(gzr)
+					if err != nil {
+						return err
+					}
+					cr, err = cpio.NewReader(bytes.NewReader(data), int64(len(data)))
+					if err != nil {
+						return fmt.Errorf("failed to create cpio reader from %s: %w", payload.Name, err)
+					}
 				}
 				for _, file := range cr.Files {
+					log.Debug(file.Name)
 					if re.MatchString(file.Name) {
 						found = true
 						fname := filepath.Join(output, file.Name)
@@ -206,11 +241,16 @@ var pkgCmd = &cobra.Command{
 			}
 		} else {
 			var names []string
+			var payload *xar.File
 			var bomFile *xar.File
 			var scripts *xar.File
 			var distribution *xar.File
+
 			for _, file := range pkg.Files {
 				names = append(names, file.Name)
+				if strings.HasSuffix(file.Name, "Payload") {
+					payload = file
+				}
 				if strings.Contains(file.Name, "Bom") {
 					bomFile = file
 				}
@@ -229,6 +269,68 @@ var pkgCmd = &cobra.Command{
 				for _, name := range names {
 					fmt.Println(name)
 				}
+			}
+
+			if payload != nil && (showPayload || showAll) {
+				log.Infof("Parsing %s...", payload.Name)
+				f, err := payload.Open()
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				var cr *cpio.Reader
+				if IsPBZX, err := magic.IsPBZXData(f); err != nil {
+					return fmt.Errorf("failed to check if %s file is a pbzx file: %w", payload.Name, err)
+				} else if IsPBZX {
+					f.Close() // dumb hack to reset the file pointer
+					f, err = payload.Open()
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					var pbuf bytes.Buffer
+					if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+						return err
+					}
+					cr, err = cpio.NewReader(bytes.NewReader(pbuf.Bytes()), int64(pbuf.Len()))
+					if err != nil {
+						return err
+					}
+				} else {
+					f.Close() // dumb hack to reset the file pointer
+					f, err = payload.Open()
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					gzr, err := gzip.NewReader(f)
+					if err != nil {
+						return err
+					}
+					defer gzr.Close()
+					data, err := io.ReadAll(gzr)
+					if err != nil {
+						return err
+					}
+					cr, err = cpio.NewReader(bytes.NewReader(data), int64(len(data)))
+					if err != nil {
+						return fmt.Errorf("failed to create cpio reader from %s: %w", payload.Name, err)
+					}
+				}
+				var keys []string
+				for key := range maps.Keys(cr.Files) {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+				for _, key := range keys {
+					if cr.Files[key].Info.Mode.IsDir() {
+						// fmt.Fprintf(w, "%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), f.Name())
+					} else {
+						fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", cr.Files[key].Info.Mode, cr.Files[key].Info.Mtime.Format(time.RFC3339), humanize.Bytes(uint64(cr.Files[key].Size)), cr.Files[key].Name)
+					}
+				}
+				w.Flush()
 			}
 
 			if bomFile != nil && (showBom || showAll) {
