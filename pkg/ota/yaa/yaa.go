@@ -1,6 +1,6 @@
 package yaa
 
-//go:generate stringer -type=entryType,patchType -trimprefix=Patch_ -output yaa_string.go
+//go:generate go tool stringer -type=entryType,patchType -trimprefix=Patch_ -output yaa_string.go
 
 import (
 	"bytes"

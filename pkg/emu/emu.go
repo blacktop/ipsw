@@ -2,7 +2,7 @@
 
 package emu
 
-//go:generate stringer -type=interrupt,branchType,pstateMode -tags=unicorn -output emu_string.go
+//go:generate go tool stringer -type=interrupt,branchType,pstateMode -tags=unicorn -output emu_string.go
 
 import (
 	"fmt"

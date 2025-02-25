@@ -1,6 +1,6 @@
 package springboard
 
-//go:generate stringer -type=Orientation -output springboard_string.go
+//go:generate go tool stringer -type=Orientation -output springboard_string.go
 
 import (
 	"github.com/blacktop/ipsw/pkg/usb"
