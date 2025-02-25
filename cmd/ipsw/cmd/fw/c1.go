@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ftab"
+	"github.com/blacktop/ipsw/pkg/ftab/rcpi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -88,6 +89,17 @@ var c1Cmd = &cobra.Command{
 				defer ftab.Close()
 				if info {
 					fmt.Println(ftab)
+					if entry := ftab.GetEntryByName("rcpi"); entry != nil {
+						if err != nil {
+							return err
+						}
+						rc, err := rcpi.Parse(entry)
+						if err != nil {
+							return err
+						}
+						fmt.Println("RCPI:")
+						fmt.Println(rc)
+					}
 				} else {
 					for _, entry := range ftab.Entries {
 						fname := filepath.Join(filepath.Dir(f), "extracted", string(entry.Tag[:])+".bin")
