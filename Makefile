@@ -158,6 +158,7 @@ work-macho: ## Work on go-macho package
 	@echo " > Working on go-macho package"
 	@go work init || true
 	@go work use . ../go-macho
+	@go work use . ../go-dwarf
 
 .PHONY: work-apfs
 work-apfs: ## Work on go-apfs package
