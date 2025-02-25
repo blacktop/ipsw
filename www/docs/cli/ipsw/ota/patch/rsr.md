@@ -17,6 +17,7 @@ ipsw ota patch rsr [flags]
 ### Options
 
 ```
+  -c, --cryptex string          Cryptex file from OTA
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
   -h, --help                    help for rsr
   -i, --input string            Input folder

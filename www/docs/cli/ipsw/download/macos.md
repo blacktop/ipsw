@@ -19,7 +19,6 @@ ipsw download macos [flags]
 ```
   -a, --assistant         Only download the InstallAssistant.pkg
   -h, --help              help for macos
-      --ignore            Do NOT verify pkg digests
       --latest            Download latest macOS installer
   -l, --list              Show latest macOS installers
   -w, --work-dir string   macOS installer creator working directory

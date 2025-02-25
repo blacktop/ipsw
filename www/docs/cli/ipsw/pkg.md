@@ -24,6 +24,7 @@ ipsw pkg PKG [flags]
   -h, --help             help for pkg
   -o, --output string    Output folder
   -p, --pattern string   Extract files that match regex
+  -l, --pay              Show Payload
   -s, --scripts          Show scripts
 ```
 
