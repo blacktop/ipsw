@@ -1,0 +1,42 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: FTAB.bt
+//   Authors: blacktop
+//   Version: 0.1.0
+//   Purpose: Parse rkosftab files
+//  Category: Firmware
+// File Mask: ftab.bin
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+typedef struct {
+    uint32  unknown[8];
+    char    magic[8];
+    uint32  numEntries;
+    uint32  version;
+} Header<bgcolor = cLtPurple>;
+
+typedef struct {
+    char    tag[4];
+    uint32  offset;
+    uint32  size;
+    uint32  reserved;
+} Entry<read = readEntryName, bgcolor = cLtBlue>;
+
+string readEntryName(Entry &entry) {
+    local string ret;
+    SPrintf(ret, "%s", entry.tag);
+    return ret;
+}
+
+LittleEndian();
+
+Header header;
+
+if(header.magic != "rkosftab") {
+    Warning("Invalid FTAB magic. Expected 'rkosftab'.");
+    return 1;
+}
+
+Entry entries[header.numEntries] <optimize=false>;
