@@ -174,14 +174,10 @@ func (f *Ftab) String() string {
 	buf.WriteString("FTAB Header:\n")
 	buf.WriteString(fmt.Sprintf("  Magic:   %#x (%s)\n", f.Header.Magic, "rkosftab"))
 	buf.WriteString(fmt.Sprintf("  Version: %d\n", f.Header.Version))
-	buf.WriteString(fmt.Sprintf("  Entries: %d\n\n", f.Header.NumEntries))
-
+	buf.WriteString(fmt.Sprintf("  Entries: %d\n", f.Header.NumEntries))
 	buf.WriteString("FTAB Entries:\n")
-	for i, entry := range f.Entries {
-		buf.WriteString(fmt.Sprintf("  %d)\n", i))
-		buf.WriteString(fmt.Sprintf("    Tag:    %s\n", entry.Tag))
-		buf.WriteString(fmt.Sprintf("    Offset: %#x\n", entry.Offset))
-		buf.WriteString(fmt.Sprintf("    Size:   %#x (%s)\n", entry.Size, humanize.Bytes(uint64(entry.Size))))
+	for _, entry := range f.Entries {
+		buf.WriteString(fmt.Sprintf("  %s: %#08x-%#08x (%s)\n", entry.Tag, entry.Offset, entry.Offset+entry.Size, humanize.Bytes(uint64(entry.Size))))
 	}
 	return buf.String()
 }
