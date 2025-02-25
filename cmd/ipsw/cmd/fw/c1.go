@@ -44,15 +44,17 @@ func init() {
 	FwCmd.AddCommand(c1Cmd)
 
 	c1Cmd.Flags().BoolP("info", "i", false, "Print info")
+	c1Cmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	c1Cmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	c1Cmd.MarkFlagDirname("output")
 	viper.BindPFlag("fw.c1.info", c1Cmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.c1.remote", c1Cmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.c1.output", c1Cmd.Flags().Lookup("output"))
 }
 
 // c1Cmd represents the bb command
 var c1Cmd = &cobra.Command{
-	Use:     "c1 <IPSW>",
+	Use:     "c1 <IPSW|FTAB|URL>",
 	Aliases: []string{"bb", "baseband"},
 	Short:   "🚧 Dump C1 Baseband Firmware",
 	Args:    cobra.ExactArgs(1),
@@ -69,7 +71,72 @@ var c1Cmd = &cobra.Command{
 
 		infile := filepath.Clean(args[0])
 
-		if isZip, err := magic.IsZip(infile); err != nil {
+		dowork := func(ftab *ftab.Ftab, output string) error {
+			if info {
+				fmt.Println(ftab)
+				if entry := ftab.GetEntryByName("rcpi"); entry != nil {
+					rc, err := rcpi.Parse(entry)
+					if err != nil {
+						return err
+					}
+					fmt.Println("RCPI:")
+					fmt.Println(rc)
+				}
+			} else {
+				for _, entry := range ftab.Entries {
+					fname := filepath.Join(output, "extracted", string(entry.Tag[:])+".bin")
+					if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
+						return fmt.Errorf("failed to create directory: %v", err)
+					}
+					if cmp, ok := entry.IsCompressed(); ok {
+						log.WithField("entry", fname).Info("Creating (decompressed)")
+						data, err := entry.Decompress()
+						if err != nil {
+							return err
+						}
+						if len(data) != int(cmp.OriginalSize) {
+							utils.Indent(log.Warn, 2)(fmt.Sprintf("decompressed size mismatch: %d != %d", len(data), cmp.OriginalSize))
+							log.Warnf("decompressed size mismatch: %d != %d", len(data), cmp.OriginalSize)
+						}
+						if err := os.WriteFile(fname, data, 0o644); err != nil {
+							return err
+						}
+					} else {
+						log.WithField("entry", fname).Info("Creating")
+						data, err := io.ReadAll(entry)
+						if err != nil {
+							return err
+						}
+						if err := os.WriteFile(fname, data, 0o644); err != nil {
+							return err
+						}
+					}
+				}
+			}
+			return nil
+		}
+
+		if viper.GetBool("fw.c1.remote") {
+			out, err := extract.Search(&extract.Config{
+				URL:     args[0],
+				Pattern: "c40.*\\/ftab.bin$",
+				Output:  output,
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				log.Infof("Parsing %s", f)
+				ftab, err := ftab.Open(f)
+				if err != nil {
+					return err
+				}
+				defer ftab.Close()
+				if err := dowork(ftab, filepath.Dir(f)); err != nil {
+					return err
+				}
+			}
+		} else if isZip, err := magic.IsZip(infile); err != nil {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
 		} else if isZip {
 			out, err := extract.Search(&extract.Config{
@@ -87,50 +154,20 @@ var c1Cmd = &cobra.Command{
 					return err
 				}
 				defer ftab.Close()
-				if info {
-					fmt.Println(ftab)
-					if entry := ftab.GetEntryByName("rcpi"); entry != nil {
-						if err != nil {
-							return err
-						}
-						rc, err := rcpi.Parse(entry)
-						if err != nil {
-							return err
-						}
-						fmt.Println("RCPI:")
-						fmt.Println(rc)
-					}
-				} else {
-					for _, entry := range ftab.Entries {
-						fname := filepath.Join(filepath.Dir(f), "extracted", string(entry.Tag[:])+".bin")
-						if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-							return fmt.Errorf("failed to create directory: %v", err)
-						}
-						if cmp, ok := entry.IsCompressed(); ok {
-							log.WithField("entry", fname).Info("Creating (decompressed)")
-							data, err := entry.Decompress()
-							if err != nil {
-								return err
-							}
-							if len(data) != int(cmp.OriginalSize) {
-								utils.Indent(log.Warn, 2)(fmt.Sprintf("decompressed size mismatch: %d != %d", len(data), cmp.OriginalSize))
-								log.Warnf("decompressed size mismatch: %d != %d", len(data), cmp.OriginalSize)
-							}
-							if err := os.WriteFile(fname, data, 0o644); err != nil {
-								return err
-							}
-						} else {
-							log.WithField("entry", fname).Info("Creating")
-							data, err := io.ReadAll(entry)
-							if err != nil {
-								return err
-							}
-							if err := os.WriteFile(fname, data, 0o644); err != nil {
-								return err
-							}
-						}
-					}
+				if err := dowork(ftab, filepath.Dir(f)); err != nil {
+					return err
 				}
+			}
+		} else if isFTAB, err := magic.IsFTAB(infile); err != nil {
+			return fmt.Errorf("failed to determine if file is a FTAB: %v", err)
+		} else if isFTAB {
+			ftab, err := ftab.Open(infile)
+			if err != nil {
+				return fmt.Errorf("failed to open FTAB: %v", err)
+			}
+			defer ftab.Close()
+			if err := dowork(ftab, output); err != nil {
+				return err
 			}
 		} else {
 			return fmt.Errorf("unsupported file type: %s", infile)

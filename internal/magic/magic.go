@@ -14,6 +14,7 @@ import (
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
 	"github.com/blacktop/go-apfs/pkg/disk/hfsplus"
 	"github.com/blacktop/ipsw/pkg/bundle"
+	"github.com/blacktop/ipsw/pkg/ftab"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
 )
@@ -316,6 +317,25 @@ func IsPBZXData(r io.Reader) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func IsFTAB(filename string) (bool, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filename, err)
+	}
+	defer f.Close()
+	if _, err := f.Seek(32, io.SeekStart); err != nil {
+		return false, fmt.Errorf("failed to seek to FTAB magic: %w", err)
+	}
+	var magic uint64
+	if err := binary.Read(f, binary.LittleEndian, &magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	if magic == ftab.FtabMagic {
+		return true, nil
+	}
+	return false, nil
 }
 
 func IsAA(filePath string) (bool, error) {
