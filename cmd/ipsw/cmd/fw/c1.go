@@ -54,11 +54,12 @@ func init() {
 
 // c1Cmd represents the bb command
 var c1Cmd = &cobra.Command{
-	Use:     "c1 <IPSW|FTAB|URL>",
-	Aliases: []string{"bb", "baseband"},
-	Short:   "🚧 Dump C1 Baseband Firmware",
-	Args:    cobra.ExactArgs(1),
-	Hidden:  true,
+	Use:           "c1 <IPSW|FTAB|URL>",
+	Aliases:       []string{"bb", "baseband"},
+	Short:         "🚧 Dump C1 Baseband Firmware",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
