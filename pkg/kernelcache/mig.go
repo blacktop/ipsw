@@ -1,6 +1,6 @@
 package kernelcache
 
-//go:generate stringer -type=SubsystemStart -output mig_string.go
+//go:generate go tool stringer -type=SubsystemStart -output mig_string.go
 
 import (
 	"bytes"

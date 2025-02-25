@@ -1,6 +1,6 @@
 package aea
 
-//go:generate stringer -type=compressionType -output aea_string.go
+//go:generate go tool stringer -type=compressionType -output aea_string.go
 
 import (
 	"bytes"

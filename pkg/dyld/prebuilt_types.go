@@ -1,6 +1,6 @@
 package dyld
 
-//go:generate stringer -type=dyld_section_location_kind -trimprefix=dyld_section_location_ -output prebuilt_string.go
+//go:generate go tool stringer -type=dyld_section_location_kind -trimprefix=dyld_section_location_ -output prebuilt_string.go
 
 import (
 	"crypto/sha1"

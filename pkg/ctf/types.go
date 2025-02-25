@@ -1,6 +1,6 @@
 package ctf
 
-//go:generate stringer -type=kind,floatEncoding -output types_string.go
+//go:generate go tool stringer -type=kind,floatEncoding -output types_string.go
 
 import (
 	"encoding/json"

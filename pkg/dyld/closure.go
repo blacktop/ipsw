@@ -14,7 +14,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-//go:generate stringer -type=closureType,linkKind -output closure_string.go
+//go:generate go tool stringer -type=closureType,linkKind -output closure_string.go
 
 type closureType uint32
 
