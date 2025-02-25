@@ -18,7 +18,7 @@ RUN CGO_ENABLED=1 go build \
 ####################################################
 # APFS-FUSE BUILDER
 ####################################################
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 LABEL maintainer="https://github.com/blacktop"
 
@@ -42,7 +42,7 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"
+ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
 ENV IPSW_IN_DOCKER=1
 
 COPY --from=builder /bin/ipsw /bin/ipsw
