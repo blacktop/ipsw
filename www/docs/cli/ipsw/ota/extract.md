@@ -18,6 +18,7 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
 
 ```
   -y, --confirm          Confirm searching for pattern in payloadv2 files
+  -c, --cryptex string   Extract cryptex as DMG (requires full OTA)
   -x, --decomp           Decompress pbzx files
   -d, --dyld             Extract dyld_shared_cache files
   -h, --help             help for extract
