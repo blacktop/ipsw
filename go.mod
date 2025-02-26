@@ -62,7 +62,7 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
 	github.com/unicorn-engine/unicorn v0.0.0-20250221133911-76d97f89269f
-	github.com/vbauerster/mpb/v8 v8.9.2
+	github.com/vbauerster/mpb/v8 v8.9.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
