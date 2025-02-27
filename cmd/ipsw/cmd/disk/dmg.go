@@ -25,6 +25,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -42,9 +43,15 @@ func init() {
 	dmgCmd.Flags().StringP("re", "r", "", "Extract partition that matches regex")
 	dmgCmd.Flags().IntP("partition", "p", -1, "Extract a specific partition by number")
 	dmgCmd.Flags().StringP("password", "w", "", "Encrypted DMG password")
+	dmgCmd.Flags().StringP("key", "k", "", "Encrypted DMG key")
+	dmgCmd.Flags().BoolP("decrypt", "d", false, "Decrypt DMG")
+	dmgCmd.Flags().StringP("output", "o", "", "Output file")
 	viper.BindPFlag("dmg.re", dmgCmd.Flags().Lookup("re"))
 	viper.BindPFlag("dmg.partition", dmgCmd.Flags().Lookup("partition"))
 	viper.BindPFlag("dmg.password", dmgCmd.Flags().Lookup("password"))
+	viper.BindPFlag("dmg.key", dmgCmd.Flags().Lookup("key"))
+	viper.BindPFlag("dmg.decrypt", dmgCmd.Flags().Lookup("decrypt"))
+	viper.BindPFlag("dmg.output", dmgCmd.Flags().Lookup("output"))
 }
 
 // dmgCmd represents the dmg command
@@ -63,7 +70,6 @@ var dmgCmd = &cobra.Command{
 		// flags
 		pattern := viper.GetString("dmg.re")
 		partition := viper.GetInt("dmg.partition")
-		password := viper.GetString("dmg.password")
 		// validate args
 		if viper.IsSet("dmg.partition") && viper.IsSet("dmg.re") {
 			return fmt.Errorf("cannot specify both --partition and --re")
@@ -74,6 +80,9 @@ var dmgCmd = &cobra.Command{
 		if len(args) == 1 && (viper.IsSet("dmg.partition") || viper.IsSet("dmg.re")) {
 			return fmt.Errorf("no output file specified")
 		}
+		if viper.IsSet("dmg.password") && viper.IsSet("dmg.key") {
+			return fmt.Errorf("cannot specify both --password and --key")
+		}
 
 		infile := filepath.Clean(args[0])
 
@@ -83,14 +92,48 @@ var dmgCmd = &cobra.Command{
 			return fmt.Errorf("file is not a DMG file")
 		}
 
-		d, err := dmg.Open(infile, &dmg.Config{Password: password})
+		d, err := dmg.Open(infile, &dmg.Config{Password: viper.GetString("dmg.password"), Key: viper.GetString("dmg.key")})
 		if err != nil {
 			if errors.Is(err, dmg.ErrEncrypted) {
-				return fmt.Errorf("DMG is encrypted. Use --password to specify password")
+				return fmt.Errorf("DMG is encrypted. Use --password OR --key to decrypt")
 			}
 			return fmt.Errorf("failed to open DMG: %w", err)
 		}
 		defer d.Close()
+
+		if viper.GetBool("dmg.decrypt") || viper.IsSet("dmg.output") {
+			// If only c.Decrypt is set, overwrite the input file
+			if viper.GetBool("dmg.decrypt") && !viper.IsSet("dmg.output") {
+				log.Info("Decrypting DMG in-place..")
+				// Replace the original file with the decrypted content
+				if err := os.Rename(d.DecryptedTemp(), infile); err != nil {
+					return fmt.Errorf("failed to rename temporary decrypted DMG: %w", err)
+				}
+			} else if viper.IsSet("dmg.output") {
+				log.Infof("Decrypting DMG to %s...", viper.GetString("dmg.output"))
+				// Create a new file with the decrypted content
+				out, err := os.Create(viper.GetString("dmg.output"))
+				if err != nil {
+					return fmt.Errorf("failed to create output file: %w", err)
+				}
+				defer out.Close()
+				in, err := os.Open(d.DecryptedTemp())
+				if err != nil {
+					return fmt.Errorf("failed to open decrypted file: %w", err)
+				}
+				defer in.Close()
+				// Copy decrypted content to the output file
+				if _, err := io.Copy(out, in); err != nil {
+					return fmt.Errorf("failed to copy decrypted content to %s: %w", viper.GetString("dmg.output"), err)
+				}
+				if err := in.Close(); err != nil {
+					return fmt.Errorf("failed to close input file: %w", err)
+				}
+				if err := out.Close(); err != nil {
+					return fmt.Errorf("failed to close output file: %w", err)
+				}
+			}
+		}
 
 		if len(d.Partitions) == 0 {
 			return fmt.Errorf("no partitions found in DMG")

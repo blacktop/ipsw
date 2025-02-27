@@ -234,6 +234,22 @@ func IsDMG(filePath string) (bool, error) {
 	return true, nil
 }
 
+func IsEncryptedDMG(filePath string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+	magic := make([]byte, 8)
+	if _, err := f.Read(magic); err != nil {
+		return false, fmt.Errorf("failed to read magic: %w", err)
+	}
+	if string(magic) == dmg.EncryptedMagic {
+		return true, nil
+	}
+	return false, nil
+}
+
 func IsAPFS(filePath string) (bool, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
