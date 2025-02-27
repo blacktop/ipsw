@@ -485,7 +485,7 @@ brews:
       error_log_path var/"log/ipswd.err.log"
       sockets "tcp://127.0.0.1:3993"
     test: |
-      system "#{bin}/ipswd --version"
+      system "#{bin}/ipswd version"
 
 checksum:
   name_template: "checksums.txt"
