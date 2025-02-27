@@ -26,10 +26,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"syscall"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/mount"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -37,6 +40,8 @@ import (
 func init() {
 	rootCmd.AddCommand(mountCmd)
 
+	mountCmd.Flags().StringP("key", "k", "", "DMG key")
+	mountCmd.Flags().Bool("lookup", false, "Lookup DMG keys on theapplewiki.com")
 	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 }
 
@@ -54,15 +59,60 @@ var mountCmd = &cobra.Command{
 		}
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		// set log level
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
+		key, _ := cmd.Flags().GetString("key")
+		lookupKeys, _ := cmd.Flags().GetBool("lookup")
 		pemDB, _ := cmd.Flags().GetString("pem-db")
+		// validate flags
+		if len(key) > 0 && lookupKeys {
+			return fmt.Errorf("cannot use --key AND --lookup flags together")
+		}
 
-		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB)
+		var keys any
+		if lookupKeys {
+			var (
+				device  string
+				version string
+				build   string
+			)
+			re := regexp.MustCompile(`^.*/(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
+			if re.MatchString(args[1]) {
+				matches := re.FindStringSubmatch(args[1])
+				if len(matches) < 4 {
+					return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
+				}
+				device = matches[1]
+				version = matches[2]
+				build = matches[3]
+			} else {
+				return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
+			}
+			if device == "" || build == "" {
+				return fmt.Errorf("device or build information is missing from IPSW filename (required for key lookup)")
+			}
+			log.Info("Downloading Keys...")
+			wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+				Keys:    true,
+				Device:  strings.Replace(device, "ip", "iP", 1),
+				Version: version,
+				Build:   strings.ToUpper(build),
+				// Beta:    viper.GetBool("download.key.beta"),
+			}, "", false)
+			if err != nil {
+				return fmt.Errorf("failed querying theapplewiki.com: %v", err)
+			}
+			keys = wikiKeys
+		} else if len(key) > 0 {
+			keys = key
+		}
+
+		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB, keys)
 		if err != nil {
 			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}
