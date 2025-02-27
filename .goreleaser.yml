@@ -410,7 +410,7 @@ brews:
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
-      system "#{bin}/ipsw --version"
+      system "#{bin}/ipsw version"
   - name: ipsw-frida
     repository:
       owner: blacktop
@@ -438,7 +438,7 @@ brews:
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
-      system "#{bin}/ipsw --version"
+      system "#{bin}/ipsw version"
   - name: ipswd
     repository:
       owner: blacktop
