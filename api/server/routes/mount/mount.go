@@ -74,7 +74,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
 			return
 		}
-		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath)
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath, nil)
 		if err != nil {
 			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
 				c.AbortWithError(http.StatusNotFound, err)

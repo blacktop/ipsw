@@ -488,6 +488,22 @@ func Mount(image, mountPoint string) error {
 	return nil
 }
 
+func MountEncrypted(image, mountPoint, password string) error {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, "-stdinpass", image)
+		cmd.Stdin = strings.NewReader(password)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
+				return ErrMountResourceBusy
+			}
+			return fmt.Errorf("%v: %s", err, out)
+		}
+		return nil
+	}
+	return fmt.Errorf("only supported on macOS")
+}
+
 func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 	if runtime.GOOS == "darwin" {
 		info, err := MountInfo()
