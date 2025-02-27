@@ -2,6 +2,7 @@ package download
 
 import (
 	"bufio"
+	"compress/gzip"
 	"container/list"
 	"crypto/tls"
 	"encoding/json"
@@ -197,6 +198,10 @@ func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	// req.Header.Add("User-Agent", utils.RandomAgent())
+	req.Header.Add("User-Agent", "HTTPie/3.2.4")
+	req.Header.Add("Accept-Encoding", "gzip, deflate")
+	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
 	q.Add("format", "json")
@@ -215,7 +220,19 @@ func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, e
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -241,6 +258,9 @@ func getWikiTable(page string, proxy string, insecure bool) (*wikiParseResults, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Add("User-Agent", "HTTPie/3.2.4")
+	req.Header.Add("Accept-Encoding", "gzip, deflate")
+	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
 	q.Add("action", "parse")
@@ -261,7 +281,19 @@ func getWikiTable(page string, proxy string, insecure bool) (*wikiParseResults, 
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -1125,6 +1157,9 @@ func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Add("User-Agent", "HTTPie/3.2.4")
+	req.Header.Add("Accept-Encoding", "gzip, deflate")
+	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
 	q.Add("format", "json")
@@ -1144,7 +1179,19 @@ func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware,
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -1205,6 +1252,9 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Add("User-Agent", "HTTPie/3.2.4")
+	req.Header.Add("Accept-Encoding", "gzip, deflate")
+	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
 	q.Add("format", "json")
@@ -1228,7 +1278,19 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, 
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -1286,6 +1348,10 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	// req.Header.Add("User-Agent", utils.RandomAgent())
+	req.Header.Add("User-Agent", "HTTPie/3.2.4")
+	req.Header.Add("Accept-Encoding", "gzip, deflate")
+	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
 	q.Add("format", "json")
@@ -1305,7 +1371,19 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -1334,6 +1412,10 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 					if err != nil {
 						return nil, fmt.Errorf("failed to create request: %w", err)
 					}
+					// req.Header.Add("User-Agent", utils.RandomAgent())
+					req.Header.Add("User-Agent", "HTTPie/3.2.4")
+					req.Header.Add("Accept-Encoding", "gzip, deflate")
+					req.Header.Add("Accept", "*/*")
 
 					resp, err = client.Do(req)
 					if err != nil {
@@ -1345,7 +1427,19 @@ func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[stri
 						return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 					}
 
-					data, err = io.ReadAll(resp.Body)
+					var reader io.ReadCloser
+					switch resp.Header.Get("Content-Encoding") {
+					case "gzip":
+						reader, err = gzip.NewReader(resp.Body)
+						if err != nil {
+							return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+						}
+						defer reader.Close()
+					default:
+						reader = resp.Body
+					}
+
+					data, err := io.ReadAll(reader)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read response: %w", err)
 					}
