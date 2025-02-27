@@ -18,6 +18,8 @@ ipsw mount [fs|sys|app|exc] IPSW [flags]
 
 ```
   -h, --help            help for mount
+  -k, --key string      DMG key
+      --lookup          Lookup DMG keys on theapplewiki.com
       --pem-db string   AEA pem DB JSON file
 ```
 
