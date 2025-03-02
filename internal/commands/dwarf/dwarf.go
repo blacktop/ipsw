@@ -3,8 +3,10 @@ package dwarf
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 
+	"github.com/apex/log"
 	dwf "github.com/blacktop/go-dwarf"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -118,7 +120,25 @@ func GetName(path, name string) (ft *dwf.FuncType, filename string, err error) {
 
 	off, err := df.LookupName(name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find name %s: %v", name, err)
+		if !errors.Is(err, dwf.ErrHashNotFound) {
+			return nil, "", fmt.Errorf("failed to find name %s: %v", name, err)
+		}
+		offs, err := df.LookupDebugName(name)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to find debug name %s: %v", name, err)
+		}
+		if len(offs) > 1 {
+			log.Warnf("found multiple debug names entries for %s", name)
+		}
+		for _, o := range offs {
+			switch o.Tag {
+			case dwf.TagStructType, dwf.TagEnumerationType, dwf.TagUnionType, dwf.TagTypedef, dwf.TagArrayType, dwf.TagPointerType:
+			default:
+				r.Seek(o.CUOffset)
+				r.Next()
+				off = o.DIEOffset
+			}
+		}
 	}
 
 	r.Seek(off)
@@ -169,9 +189,26 @@ func GetType(path, name string, showOffsets bool) (typeStr string, filename stri
 
 	r := df.Reader()
 
-	off, err := df.LookupType(name)
+	off, err := df.LookupName(name)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to find type %s: %v", name, err)
+		if !errors.Is(err, dwf.ErrHashNotFound) {
+			return "", "", fmt.Errorf("failed to find name %s: %v", name, err)
+		}
+		offs, err := df.LookupDebugName(name)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to find debug name %s: %v", name, err)
+		}
+		if len(offs) > 1 {
+			log.Warnf("found multiple debug names entries for %s", name)
+		}
+		for _, o := range offs {
+			switch o.Tag {
+			case dwf.TagStructType, dwf.TagEnumerationType, dwf.TagUnionType, dwf.TagTypedef, dwf.TagArrayType, dwf.TagPointerType:
+				r.Seek(o.CUOffset)
+				r.Next()
+				off = o.DIEOffset
+			}
+		}
 	}
 
 	r.Seek(off)
@@ -205,8 +242,6 @@ func GetType(path, name string, showOffsets bool) (typeStr string, filename stri
 	case *dwf.ArrayType:
 		return t.String(), filename, nil
 	case *dwf.PtrType:
-		return t.String(), filename, nil
-	case *dwf.FuncType:
 		return t.String(), filename, nil
 	case *dwf.EnumType:
 		return t.String(), filename, nil

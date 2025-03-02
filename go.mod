@@ -18,8 +18,8 @@ require (
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
 	github.com/blacktop/go-apfs v1.0.26
-	github.com/blacktop/go-dwarf v1.0.10
-	github.com/blacktop/go-macho v1.1.240
+	github.com/blacktop/go-dwarf v1.0.11
+	github.com/blacktop/go-macho v1.1.241
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
@@ -65,7 +65,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.9.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.35.0
-	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
+	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
 	golang.org/x/net v0.35.0
 	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sync v0.11.0
@@ -90,7 +90,7 @@ require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/ProtonMail/go-crypto v1.1.5 // indirect
+	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
@@ -99,7 +99,7 @@ require (
 	github.com/antchfx/xpath v1.3.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/bytedance/sonic v1.12.9 // indirect
+	github.com/bytedance/sonic v1.12.10 // indirect
 	github.com/bytedance/sonic/loader v0.2.3 // indirect
 	github.com/caarlos0/go-version v0.2.0 // indirect
 	github.com/caarlos0/svu/v3 v3.1.0 // indirect
@@ -185,7 +185,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/ulikunitz/lz v0.4.0 // indirect
+	github.com/ulikunitz/lz v0.4.1 // indirect
 	github.com/vbauerster/mpb/v7 v7.5.3 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect

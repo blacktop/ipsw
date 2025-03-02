@@ -346,28 +346,34 @@ var dwarfCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("kernel.dwarf.all") {
-			dwarf.DumpAllTypes(filepath.Clean(args[0]), &dwarf.Config{
+			if err := dwarf.DumpAllTypes(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
 				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to dump all: %v", err)
+			}
 		}
 		if viper.GetBool("kernel.dwarf.structs") {
-			dwarf.DumpAllStructs(filepath.Clean(args[0]), &dwarf.Config{
+			if err := dwarf.DumpAllStructs(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
 				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to dump structs: %v", err)
+			}
 		}
 		if viper.GetBool("kernel.dwarf.enums") {
-			dwarf.DumpAllEnums(filepath.Clean(args[0]), &dwarf.Config{
+			if err := dwarf.DumpAllEnums(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
 				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to dump enums: %v", err)
+			}
 		}
 
 		return nil
