@@ -189,7 +189,7 @@ func GetType(path, name string, showOffsets bool) (typeStr string, filename stri
 
 	r := df.Reader()
 
-	off, err := df.LookupName(name)
+	off, err := df.LookupType(name)
 	if err != nil {
 		if !errors.Is(err, dwf.ErrHashNotFound) {
 			return "", "", fmt.Errorf("failed to find name %s: %v", name, err)
