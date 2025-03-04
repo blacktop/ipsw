@@ -82,7 +82,7 @@ var ibootimCmd = &cobra.Command{
 		} else if isZip {
 			out, err := extract.Search(&extract.Config{
 				IPSW:    infile,
-				Pattern: "~iphone.*\\.im4p$",
+				Pattern: "(~iphone|~mac).*\\.im4p$",
 				Flatten: flat,
 				Output:  viper.GetString("fw.ibootim.output"),
 			})
@@ -103,25 +103,20 @@ var ibootimCmd = &cobra.Command{
 					if showInfo {
 						fmt.Println(ibm.String())
 					} else {
-						fname := fmt.Sprintf("%s.png",
-							filepath.Join(
-								filepath.Join(filepath.Dir(f), "extracted"),
-								strings.TrimSuffix(filepath.Base(f), filepath.Ext(filepath.Base(f))),
-							))
-						if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-							return fmt.Errorf("failed to create output directory: %v", err)
+						outs, err := ibm.ToPNG(f, filepath.Dir(f))
+						if err != nil {
+							return fmt.Errorf("failed to extract iBoot Image(s): %v", err)
 						}
-						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(fname, cwd+"/")))
-						if err := ibm.ToPNG(fname); err != nil {
-							return fmt.Errorf("failed to extract iBoot Image from '%s': %v", out, err)
+						for _, out := range outs {
+							utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(out, cwd+"/")))
 						}
 					}
 				}
 			}
 			return nil
-		} else if ok, _ := magic.IsIm4p(filepath.Clean(infile)); ok {
+		} else if ok, _ := magic.IsIm4p(infile); ok {
 			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(filepath.Clean(infile))
+			im4p, err := img4.OpenIm4p(infile)
 			if err != nil {
 				return err
 			}
@@ -132,18 +127,16 @@ var ibootimCmd = &cobra.Command{
 			if showInfo {
 				fmt.Println(ibm.String())
 			} else {
-				fname := fmt.Sprintf("%s.png", strings.TrimSuffix(filepath.Base(infile), filepath.Ext(filepath.Base(infile))))
-				if output != "" {
-					fname = filepath.Join(output, filepath.Base(fname))
+				outs, err := ibm.ToPNG(infile, output)
+				if err != nil {
+					return fmt.Errorf("failed to extract iBoot Image(s): %v", err)
 				}
-				if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-					return fmt.Errorf("failed to create output directory: %v", err)
+				for _, out := range outs {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(out, cwd+"/")))
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(fname, cwd+"/")))
-				return ibm.ToPNG(fname)
 			}
 		} else {
-			ibm, err := ibootim.Open(filepath.Clean(infile))
+			ibm, err := ibootim.Open(infile)
 			if err != nil {
 				return fmt.Errorf("failed to open iBoot Image: %v", err)
 			}
@@ -151,15 +144,13 @@ var ibootimCmd = &cobra.Command{
 			if showInfo {
 				fmt.Println(ibm.String())
 			} else {
-				fname := fmt.Sprintf("%s.png", strings.TrimSuffix(filepath.Base(infile), filepath.Ext(filepath.Base(infile))))
-				if output != "" {
-					fname = filepath.Join(output, filepath.Base(fname))
+				outs, err := ibm.ToPNG(infile, output)
+				if err != nil {
+					return fmt.Errorf("failed to extract iBoot Image(s): %v", err)
 				}
-				if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-					return fmt.Errorf("failed to create output directory: %v", err)
+				for _, out := range outs {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(out, cwd+"/")))
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(fname, cwd+"/")))
-				return ibm.ToPNG(fname)
 			}
 		}
 
