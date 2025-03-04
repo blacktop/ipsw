@@ -171,8 +171,8 @@ func (ibm *IBootIms) ToPNG(baseName, outDir string) ([]string, error) {
 	for _, i := range ibm.Images {
 		baseName = strings.TrimSuffix(filepath.Base(baseName), filepath.Ext(filepath.Base(baseName))) // remove extension
 		fname := filepath.Join(outDir, fmt.Sprintf("%s_%dx%d.png", baseName, i.Width, i.Height))
-		if err := os.MkdirAll(outDir, 0o755); err != nil {
-			return outs, fmt.Errorf("ToPNG: failed to create output directory: %v", err)
+		if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
+			return outs, fmt.Errorf("ToPNG: failed to create output directory '%s': %v", filepath.Dir(fname), err)
 		}
 		f, err := os.Create(fname)
 		if err != nil {
