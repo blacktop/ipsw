@@ -1,0 +1,31 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: iBootIm.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: iBootIm are Apple's iBoot Image files used in iOS OTA updates.
+//  Category: Firmware
+// File Mask:
+//  ID Bytes: 69 42 6F 6F 74 49 6D 00
+//   History:
+//------------------------------------------------
+
+typedef struct
+{
+  char magic[8]<bgcolor = cLtYellow>; // "iBootIm\0"
+	uint adler;
+	uint compressionType;
+	uint colorSpace;
+	ushort width;
+	ushort height;
+	short offsetX;
+	short offsetY;
+	uint compressedSize;
+	uint reserved[8];
+} Header;
+
+LittleEndian();
+
+Header header;
+char compData[header.compressedSize];
