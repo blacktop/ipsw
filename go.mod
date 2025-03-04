@@ -18,8 +18,8 @@ require (
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
 	github.com/blacktop/go-apfs v1.0.26
-	github.com/blacktop/go-dwarf v1.0.11
-	github.com/blacktop/go-macho v1.1.241
+	github.com/blacktop/go-dwarf v1.0.12
+	github.com/blacktop/go-macho v1.1.242
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
