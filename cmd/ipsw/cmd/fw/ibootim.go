@@ -82,7 +82,7 @@ var ibootimCmd = &cobra.Command{
 		} else if isZip {
 			out, err := extract.Search(&extract.Config{
 				IPSW:    infile,
-				Pattern: "(~iphone|~mac).*\\.im4p$",
+				Pattern: "(~iphone|~ipad|~mac|~watch|~appletv|~reality).*\\.im4p$",
 				Flatten: flat,
 				Output:  viper.GetString("fw.ibootim.output"),
 			})
@@ -112,6 +112,7 @@ var ibootimCmd = &cobra.Command{
 						}
 					}
 				}
+				os.Remove(f) // remove the extracted im4p file
 			}
 			return nil
 		} else if ok, _ := magic.IsIm4p(infile); ok {
