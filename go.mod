@@ -66,7 +66,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.36.0
 	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
