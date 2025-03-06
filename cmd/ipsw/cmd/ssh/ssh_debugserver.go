@@ -1,5 +1,3 @@
-//go:build darwin
-
 /*
 Copyright © 2018-2025 blacktop
 
@@ -26,6 +24,7 @@ package ssh
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -100,15 +99,18 @@ var sshDebugserverCmd = &cobra.Command{
 				return fmt.Errorf("failed to copy debugserver to device: %w", err)
 			}
 
-			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserve' on device")
+			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserver' on device")
 			if err := cli.RunCommand("chmod 0755 /usr/libexec/debugserver"); err != nil {
 				return fmt.Errorf("failed to chmod /usr/libexec/debugserver on device: %w", err)
 			}
 		} else if cli.FileExists("/usr/bin/debugserver") || viper.GetBool("ssh.debugserver.force") { // OLD location from DDI mount
+			if runtime.GOOS != "darwin" {
+				return fmt.Errorf("attempting to extract debugserver from DeveloperDiskImage in XCode.app on non-darwin system (not currently supported)")
+			}
 			// Find all the DeveloperDiskImages
 			images, err := filepath.Glob("/Applications/Xcode*.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
 			if err != nil {
-				return fmt.Errorf("failed to glob for DeveloperDiskImage.dmg: %w", err)
+				return fmt.Errorf("failed to glob for DeveloperDiskImage.dmg (in XCode.app): %w", err)
 			}
 
 			imagePath := viper.GetString("ssh.debugserver.image")
@@ -154,7 +156,7 @@ var sshDebugserverCmd = &cobra.Command{
 			if err := cli.CopyToDevice("/tmp/debugserver", "/usr/bin/debugserver"); err != nil {
 				return fmt.Errorf("failed to copy debugserver to device: %w", err)
 			}
-			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserve' on device")
+			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserver' on device")
 			if err := cli.RunCommand("chmod 0755 /usr/bin/debugserver"); err != nil {
 				return fmt.Errorf("failed to chmod /usr/bin/debugserver on device: %w", err)
 			}
