@@ -129,7 +129,7 @@ func (a *AssetSets) latest(platform string) (string, string) {
 		typ = "macOS"
 	}
 
-	v2b := make(map[string]string)
+	v2b := make(map[string][]string)
 
 	for _, asset := range a.PublicAssetSets[typ] {
 		switch platform {
@@ -137,33 +137,33 @@ func (a *AssetSets) latest(platform string) (string, string) {
 			fallthrough
 		case "ios":
 			if utils.StrSliceContains(asset.SupportedDevices, "iP") {
-				v2b[asset.ProductVersion] = asset.Build
+				v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "watchos":
 			if utils.StrSliceContains(asset.SupportedDevices, "Watch") {
-				v2b[asset.ProductVersion] = asset.Build
+				v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "audioos":
 			if utils.StrSliceContains(asset.SupportedDevices, "AudioAccessory") {
-				v2b[asset.ProductVersion] = asset.Build
+				v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "tvos":
 			if utils.StrSliceContains(asset.SupportedDevices, "AppleTV") {
-				v2b[asset.ProductVersion] = asset.Build
+				v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "visionos":
 			if utils.StrSliceContains(asset.SupportedDevices, "Reality") {
-				v2b[asset.ProductVersion] = asset.Build
+				v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "recovery":
 			fallthrough
 		case "macos":
-			v2b[asset.ProductVersion] = asset.Build
+			v2b[asset.ProductVersion] = append(v2b[asset.ProductVersion], asset.Build)
 			versionsRaw = append(versionsRaw, asset.ProductVersion)
 		}
 	}
@@ -180,6 +180,11 @@ func (a *AssetSets) latest(platform string) (string, string) {
 	}
 
 	sort.Sort(version.Collection(versions))
+	if len(v2b[versions[len(versions)-1].Original()]) == 0 {
+		return "failed to get latest", "failed to get latest"
+	}
+	sort.Strings(v2b[versions[len(versions)-1].Original()])
+	latestBuilds := v2b[versions[len(versions)-1].Original()]
 
-	return versions[len(versions)-1].Original(), v2b[versions[len(versions)-1].Original()]
+	return versions[len(versions)-1].Original(), latestBuilds[len(latestBuilds)-1]
 }

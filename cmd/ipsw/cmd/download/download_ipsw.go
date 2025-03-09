@@ -188,7 +188,7 @@ var ipswCmd = &cobra.Command{
 			}
 		}
 
-		if showLatestVersion || showLatestBuild {
+		if (showLatestVersion || showLatestBuild) && device == "" {
 			if ibridge {
 				itunes, err = download.NewIBridgeXML()
 				if err != nil {
@@ -246,6 +246,22 @@ var ipswCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to create itunes API: %v", err)
 				}
+			}
+			if showLatestVersion || showLatestBuild {
+				builds, err = itunes.GetLatestBuilds(device)
+				if err != nil {
+					return fmt.Errorf("failed to get the latest builds: %v", err)
+				}
+				if len(builds) == 0 {
+					return fmt.Errorf("no builds found for device: %s", device)
+				}
+				if showLatestVersion {
+					fmt.Println(builds[0].Version)
+				}
+				if showLatestBuild {
+					fmt.Println(builds[0].BuildID)
+				}
+				return nil
 			}
 		}
 
