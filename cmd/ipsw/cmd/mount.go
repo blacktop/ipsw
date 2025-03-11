@@ -81,13 +81,13 @@ var mountCmd = &cobra.Command{
 				version string
 				build   string
 			)
-			re := regexp.MustCompile(`^.*/(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
+			re := regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
 			if re.MatchString(args[1]) {
 				matches := re.FindStringSubmatch(args[1])
 				if len(matches) < 4 {
 					return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
 				}
-				device = matches[1]
+				device = filepath.Base(matches[1])
 				version = matches[2]
 				build = matches[3]
 			} else {
