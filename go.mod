@@ -18,8 +18,8 @@ require (
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
 	github.com/blacktop/go-apfs v1.0.26
-	github.com/blacktop/go-dwarf v1.0.12
-	github.com/blacktop/go-macho v1.1.242
+	github.com/blacktop/go-dwarf v1.0.13
+	github.com/blacktop/go-macho v1.1.243
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.1
@@ -208,5 +208,5 @@ require (
 	modernc.org/libc v1.61.13 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.8.2 // indirect
-	modernc.org/sqlite v1.36.0 // indirect
+	modernc.org/sqlite v1.36.1 // indirect
 )
