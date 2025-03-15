@@ -53,9 +53,11 @@ func init() {
 
 // tcCmd represents the tc command
 var tcCmd = &cobra.Command{
-	Use:   "tc <IM4P|IPSW>",
-	Short: "Dump TrustCache",
-	Args:  cobra.ExactArgs(1),
+	Use:           "tc <IM4P|IPSW>",
+	Short:         "Dump TrustCache",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

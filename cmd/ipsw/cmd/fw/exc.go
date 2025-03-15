@@ -23,6 +23,7 @@ package fw
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
@@ -30,7 +31,7 @@ import (
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/bundle"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,20 +42,23 @@ import (
 func init() {
 	FwCmd.AddCommand(excCmd)
 
+	excCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	excCmd.Flags().BoolP("info", "i", false, "Print info")
 	excCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	excCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.exclave.remote", excCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.exclave.info", excCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.exclave.output", excCmd.Flags().Lookup("output"))
 }
 
 // excCmd represents the ane command
 var excCmd = &cobra.Command{
-	Use:     "exclave",
-	Aliases: []string{"exc"},
-	Short:   "🚧 Dump MachOs",
-	Args:    cobra.ExactArgs(1),
-	Hidden:  true,
+	Use:           "exclave",
+	Aliases:       []string{"exc"},
+	Short:         "Dump MachOs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
@@ -64,42 +68,74 @@ var excCmd = &cobra.Command{
 		// flags
 		showInfo := viper.GetBool("fw.exclave.info")
 		output := viper.GetString("fw.exclave.output")
+		infile := filepath.Clean(args[0])
 
-		if showInfo {
-			bn, err := bundle.Open(filepath.Clean(args[0]))
+		if viper.GetBool("fw.exclave.remote") {
+			out, err := extract.Exclave(&extract.Config{
+				URL:    args[0],
+				Info:   showInfo,
+				Output: output,
+			})
 			if err != nil {
-				return fmt.Errorf("failed to parse bundle: %v", err)
+				return err
 			}
-			defer bn.Close()
-
-			if bn.Type != 3 {
-				return fmt.Errorf("bundle is not an exclave bundle")
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
-
-			fmt.Println(bn)
+		} else if isZip, err := magic.IsZip(infile); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Exclave(&extract.Config{
+				IPSW:   infile,
+				Info:   showInfo,
+				Output: output,
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
+			}
+		} else if ok, _ := magic.IsIm4p(infile); ok {
+			im4p, err := img4.OpenIm4p(infile)
+			if err != nil {
+				return err
+			}
+			tf, err := os.CreateTemp("", "exclave")
+			if err != nil {
+				return fmt.Errorf("failed to create temp file: %v", err)
+			}
+			defer os.Remove(tf.Name())
+			if _, err := tf.Write(im4p.Data); err != nil {
+				return fmt.Errorf("failed to write temp file: %v", err)
+			}
+			if err := tf.Close(); err != nil {
+				return fmt.Errorf("failed to close temp file: %v", err)
+			}
+			if showInfo {
+				fwcmd.ShowExclaveCores(tf.Name())
+				return nil
+			}
+			log.Info("Extracting Exclave Bundle")
+			out, err := fwcmd.ExtractExclaveCores(tf.Name(), output)
+			if err != nil {
+				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
+			}
 		} else {
-			if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
-				return fmt.Errorf("failed to determine if file is a zip: %v", err)
-			} else if isZip {
-				out, err := extract.Exclave(&extract.Config{
-					IPSW:   filepath.Clean(args[0]),
-					Output: viper.GetString("fw.exclave.output"),
-				})
-				if err != nil {
-					return err
-				}
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
-			} else {
-				log.Info("Extracting Exclave Bundle")
-				out, err := fwcmd.Extract(filepath.Clean(args[0]), output)
-				if err != nil {
-					return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
-				}
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if showInfo {
+				fwcmd.ShowExclaveCores(infile)
+				return nil
+			}
+			log.Info("Extracting Exclave Bundle")
+			out, err := fwcmd.ExtractExclaveCores(infile, output)
+			if err != nil {
+				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 

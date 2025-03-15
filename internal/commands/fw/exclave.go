@@ -13,7 +13,21 @@ import (
 	"github.com/blacktop/ipsw/pkg/bundle"
 )
 
-func Extract(input, output string) ([]string, error) {
+func ShowExclaveCores(input string) {
+	bn, err := bundle.Open(input)
+	if err != nil {
+		fmt.Printf("failed to open bundle: %v\n", err)
+		return
+	}
+	defer bn.Close()
+	if bn.Type != 3 {
+		fmt.Printf("bundle is not an exclave bundle\n")
+		return
+	}
+	fmt.Println(bn)
+}
+
+func ExtractExclaveCores(input, output string) ([]string, error) {
 	var m *macho.File
 	var outfiles []string
 

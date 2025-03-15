@@ -73,6 +73,8 @@ type Config struct {
 	Output string `json:"output,omitempty"`
 	// output as JSON
 	JSON bool `json:"json,omitempty"`
+	// show info
+	Info bool `json:"info,omitempty"`
 
 	info *info.Info
 }
@@ -326,11 +328,22 @@ func Exclave(c *Config) ([]string, error) {
 	}
 
 	for _, exc := range outfiles {
-		out, err := fwcmd.Extract(exc, filepath.Dir(exc))
+		if c.Info {
+			fwcmd.ShowExclaveCores(exc)
+			continue
+		}
+		out, err := fwcmd.ExtractExclaveCores(exc, filepath.Dir(exc))
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 		}
 		outfiles = append(outfiles, out...)
+	}
+
+	if c.Info { // cleanup im4p files/folder
+		if folder, err := c.info.GetFolder(); err == nil {
+			os.RemoveAll(filepath.Join(c.Output, folder))
+		}
+		return nil, nil
 	}
 
 	return outfiles, nil
