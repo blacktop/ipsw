@@ -85,36 +85,28 @@ var gpuCmd = &cobra.Command{
 			return nil
 		}
 
-		if viper.GetBool("fw.gpu.remote") {
-			out, err := extract.Search(&extract.Config{
-				URL:     args[0],
-				Pattern: "armfw_.*.im4p$",
-				Output:  viper.GetString("fw.gpu.output"),
-			})
-			if err != nil {
-				return err
-			}
-			for _, f := range out {
-				log.Infof("Parsing %s", f)
-				ftab, err := ftab.Open(f)
-				if err != nil {
-					return err
-				}
-				defer ftab.Close()
-				if err := dowork(ftab, filepath.Dir(f)); err != nil {
-					return err
-				}
-			}
-		} else if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.gpu.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    infile,
-				Pattern: "armfw_.*.im4p$",
-				Output:  viper.GetString("fw.gpu.output"),
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.gpu.remote") {
+			var out []string
+			if viper.GetBool("fw.gpu.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "armfw_.*.im4p$",
+					Output:  viper.GetString("fw.gpu.output"),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for gpu in remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "armfw_.*.im4p$",
+					Output:  viper.GetString("fw.gpu.output"),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for gpu in local IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				log.Infof("Parsing %s", f)
