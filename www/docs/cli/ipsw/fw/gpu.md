@@ -1,24 +1,23 @@
 ---
-id: tc
-title: tc
+id: gpu
+title: gpu
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: tc
-description: Dump TrustCache
+sidebar_label: gpu
+description: Dump MachOs
 ---
-## ipsw fw tc
+## ipsw fw gpu
 
-Dump TrustCache
+Dump MachOs
 
 ```
-ipsw fw tc <IM4P|IPSW> [flags]
+ipsw fw gpu <IPSW|URL|IM4P|FTAB> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help            help for tc
-  -j, --json            Output in JSON format
+  -h, --help            help for gpu
   -o, --output string   Folder to extract files to
   -r, --remote          Parse remote IPSW URL
 ```

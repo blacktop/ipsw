@@ -21,6 +21,7 @@ ipsw fw ibootim [flags]
   -h, --help            help for ibootim
   -i, --info            Print info
   -o, --output string   Folder to extract files to
+  -r, --remote          Parse remote IPSW URL
 ```
 
 ### Options inherited from parent commands

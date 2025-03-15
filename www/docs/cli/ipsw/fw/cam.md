@@ -1,24 +1,24 @@
 ---
-id: tc
-title: tc
+id: cam
+title: cam
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: tc
-description: Dump TrustCache
+sidebar_label: cam
+description: Dump MachOs
 ---
-## ipsw fw tc
+## ipsw fw cam
 
-Dump TrustCache
+Dump MachOs
 
 ```
-ipsw fw tc <IM4P|IPSW> [flags]
+ipsw fw cam <IPSW|URL|IM4P> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help            help for tc
-  -j, --json            Output in JSON format
+  -h, --help            help for cam
+  -i, --info            Print info
   -o, --output string   Folder to extract files to
   -r, --remote          Parse remote IPSW URL
 ```
