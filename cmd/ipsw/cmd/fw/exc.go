@@ -53,7 +53,7 @@ func init() {
 
 // excCmd represents the ane command
 var excCmd = &cobra.Command{
-	Use:           "exclave",
+	Use:           "exclave <IPSW|URL|IM4P|BUNDLE>",
 	Aliases:       []string{"exc"},
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
