@@ -116,36 +116,28 @@ var c1Cmd = &cobra.Command{
 			return nil
 		}
 
-		if viper.GetBool("fw.c1.remote") {
-			out, err := extract.Search(&extract.Config{
-				URL:     args[0],
-				Pattern: "c40.*\\/ftab.bin$",
-				Output:  output,
-			})
-			if err != nil {
-				return err
-			}
-			for _, f := range out {
-				log.Infof("Parsing %s", f)
-				ftab, err := ftab.Open(f)
-				if err != nil {
-					return err
-				}
-				defer ftab.Close()
-				if err := dowork(ftab, filepath.Dir(f)); err != nil {
-					return err
-				}
-			}
-		} else if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.c1.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    infile,
-				Pattern: "c40.*\\/ftab.bin$",
-				Output:  output,
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.c1.remote") {
+			var out []string
+			if viper.GetBool("fw.c1.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "c40.*\\/ftab.bin$",
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for ftab in remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "c40.*\\/ftab.bin$",
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for ftab in local IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				log.Infof("Parsing %s", f)
