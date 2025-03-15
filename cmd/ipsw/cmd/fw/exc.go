@@ -70,28 +70,28 @@ var excCmd = &cobra.Command{
 		output := viper.GetString("fw.exclave.output")
 		infile := filepath.Clean(args[0])
 
-		if viper.GetBool("fw.exclave.remote") {
-			out, err := extract.Exclave(&extract.Config{
-				URL:    args[0],
-				Info:   showInfo,
-				Output: output,
-			})
-			if err != nil {
-				return err
-			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
-			}
-		} else if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.exclave.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Exclave(&extract.Config{
-				IPSW:   infile,
-				Info:   showInfo,
-				Output: output,
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.exclave.remote") {
+			var out []string
+			if viper.GetBool("fw.exclave.remote") {
+				out, err = extract.Exclave(&extract.Config{
+					URL:    args[0],
+					Info:   showInfo,
+					Output: output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to extract files from exclave bundle from remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Exclave(&extract.Config{
+					IPSW:   infile,
+					Info:   showInfo,
+					Output: output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to extract files from exclave bundle from local IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				utils.Indent(log.Info, 2)("Created " + f)
