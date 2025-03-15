@@ -47,9 +47,11 @@ func init() {
 	FwCmd.AddCommand(aopCmd)
 
 	aopCmd.Flags().BoolP("info", "i", false, "Print info")
+	aopCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	aopCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aopCmd.MarkFlagDirname("output")
 	viper.BindPFlag("fw.aop.info", aopCmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.aop.remote", aopCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.aop.output", aopCmd.Flags().Lookup("output"))
 }
 
@@ -68,23 +70,33 @@ var aopCmd = &cobra.Command{
 
 		showInfo := viper.GetBool("fw.aop.info")
 		output := viper.GetString("fw.aop.output")
-
 		infile := filepath.Clean(args[0])
 
-		if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.aop.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    infile,
-				Pattern: "aop.*fw.*\\.im4p$",
-				Output:  viper.GetString("fw.aop.output"),
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.aop.remote") {
+			var out []string
+			if viper.GetBool("fw.aop.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "aop.*fw.*\\.im4p$",
+					Output:  os.TempDir(),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for aop in remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "aop.*fw.*\\.im4p$",
+					Output:  os.TempDir(),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for aop in local IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				if ok, _ := magic.IsIm4p(f); ok {
-					log.Info("Processing IM4P file")
 					im4p, err := img4.OpenIm4p(f)
 					if err != nil {
 						return err
@@ -134,7 +146,6 @@ var aopCmd = &cobra.Command{
 			}
 			return nil
 		} else if ok, _ := magic.IsIm4p(infile); ok {
-			log.Info("Processing IM4P file")
 			im4p, err := img4.OpenIm4p(infile)
 			if err != nil {
 				return err
