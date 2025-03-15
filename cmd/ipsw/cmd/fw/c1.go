@@ -54,7 +54,7 @@ func init() {
 
 // c1Cmd represents the bb command
 var c1Cmd = &cobra.Command{
-	Use:           "c1 <IPSW|FTAB|URL>",
+	Use:           "c1 <IPSW|URL|FTAB>",
 	Aliases:       []string{"bb", "baseband"},
 	Short:         "Dump C1 Baseband Firmware",
 	Args:          cobra.ExactArgs(1),
@@ -69,7 +69,6 @@ var c1Cmd = &cobra.Command{
 		// flags
 		info := viper.GetBool("fw.c1.info")
 		output := viper.GetString("fw.c1.output")
-
 		infile := filepath.Clean(args[0])
 
 		dowork := func(ftab *ftab.Ftab, output string) error {

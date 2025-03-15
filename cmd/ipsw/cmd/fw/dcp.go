@@ -30,6 +30,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bundle"
@@ -46,19 +47,22 @@ func init() {
 	FwCmd.AddCommand(dcpCmd)
 
 	dcpCmd.Flags().BoolP("info", "i", false, "Print info")
+	dcpCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	dcpCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	dcpCmd.MarkFlagDirname("output")
 	viper.BindPFlag("fw.dcp.info", dcpCmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.dcp.remote", dcpCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.dcp.output", dcpCmd.Flags().Lookup("output"))
 }
 
 // dcpCmd represents the dcp command
 var dcpCmd = &cobra.Command{
-	Use:     "dcp",
-	Aliases: []string{"d"},
-	Short:   "🚧 Dump MachOs",
-	Args:    cobra.ExactArgs(1),
-	Hidden:  true,
+	Use:           "dcp <IPSW|URL|IM4P|BUNDLE>",
+	Aliases:       []string{"d"},
+	Short:         "Dump MachOs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -68,31 +72,67 @@ var dcpCmd = &cobra.Command{
 		// flags
 		showInfo := viper.GetBool("fw.dcp.info")
 		output := viper.GetString("fw.dcp.output")
+		infile := filepath.Clean(args[0])
 
-		if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
-			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+		dowork := func(input, output string) error {
+			im4p, err := img4.OpenIm4p(input)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open im4p: %v", err)
 			}
 			if showInfo {
 				m, err := macho.NewFile(bytes.NewReader(im4p.Data))
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to open macho: %v", err)
 				}
 				fmt.Println(m.FileTOC.String())
-				return nil
 			} else {
-				fname := strings.TrimSuffix(filepath.Clean(args[0]), filepath.Ext(filepath.Clean(args[0])))
+				fname := strings.TrimSuffix(input, filepath.Ext(input))
 				if output != "" {
 					fname = filepath.Join(output, filepath.Base(fname))
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
 				return os.WriteFile(fname, im4p.Data, 0o644)
 			}
+			return nil
+		}
+
+		if viper.GetBool("fw.dcp.remote") {
+			out, err := extract.Search(&extract.Config{
+				URL:     args[0],
+				Pattern: "dcp.*/.im4p$",
+				Output:  output,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract dcp from remote IPSW: %v", err)
+			}
+			for _, f := range out {
+				log.Infof("Parsing %s", f)
+				if err := dowork(f, filepath.Dir(f)); err != nil {
+					return err
+				}
+			}
+		} else if isZip, err := magic.IsZip(infile); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Search(&extract.Config{
+				IPSW:    infile,
+				Pattern: "dcp.*/.im4p$",
+				Output:  output,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract dcp from IPSW: %v", err)
+			}
+			for _, f := range out {
+				log.Infof("Parsing %s", f)
+				if err := dowork(f, filepath.Dir(f)); err != nil {
+					return err
+				}
+			}
+		} else if ok, _ := magic.IsIm4p(infile); ok {
+			return dowork(infile, output)
 		} else {
 			if showInfo {
-				bn, err := bundle.Open(filepath.Clean(args[0]))
+				bn, err := bundle.Open(infile)
 				if err != nil {
 					return fmt.Errorf("failed to open bundle: %v", err)
 				}
