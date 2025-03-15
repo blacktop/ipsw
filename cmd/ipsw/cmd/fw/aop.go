@@ -55,10 +55,11 @@ func init() {
 
 // aopCmd represents the aop command
 var aopCmd = &cobra.Command{
-	Use:    "aop <IPSW|IM4P|BUNDLE>",
-	Short:  "🚧 Dump MachOs",
-	Args:   cobra.ExactArgs(1),
-	Hidden: true,
+	Use:           "aop <IPSW|IM4P|BUNDLE>",
+	Short:         "Dump MachOs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -168,8 +169,6 @@ var aopCmd = &cobra.Command{
 						return fmt.Errorf("failed to write file %s: %v", fname, err)
 					}
 				} else {
-					// FIXME: extract files
-					// return fmt.Errorf("extraction not yet supported for this file type")
 					bn, err := bundle.Parse(bytes.NewReader(im4p.Data))
 					if err != nil {
 						return err
