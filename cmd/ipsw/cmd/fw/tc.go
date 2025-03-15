@@ -44,9 +44,11 @@ import (
 func init() {
 	FwCmd.AddCommand(tcCmd)
 
+	tcCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	tcCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
 	tcCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	tcCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.tc.remote", tcCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.tc.json", tcCmd.Flags().Lookup("json"))
 	viper.BindPFlag("fw.tc.output", tcCmd.Flags().Lookup("output"))
 }
@@ -66,16 +68,28 @@ var tcCmd = &cobra.Command{
 
 		tcs := make(map[string]*fwcmd.TrustCache)
 
-		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
+		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil && !viper.GetBool("fw.tc.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    filepath.Clean(args[0]),
-				Pattern: ".trustcache$",
-				Output:  os.TempDir(),
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.tc.remote") {
+			var out []string
+			if viper.GetBool("fw.tc.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: ".trustcache$",
+					Output:  os.TempDir(),
+				})
+				if err != nil {
+					return err
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    filepath.Clean(args[0]),
+					Pattern: ".trustcache$",
+					Output:  os.TempDir(),
+				})
+				if err != nil {
+					return err
+				}
 			}
 			for _, f := range out {
 				if ok, _ := magic.IsImg4(f); ok {
