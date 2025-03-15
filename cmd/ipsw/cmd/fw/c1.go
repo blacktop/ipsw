@@ -56,7 +56,7 @@ func init() {
 var c1Cmd = &cobra.Command{
 	Use:           "c1 <IPSW|FTAB|URL>",
 	Aliases:       []string{"bb", "baseband"},
-	Short:         "🚧 Dump C1 Baseband Firmware",
+	Short:         "Dump C1 Baseband Firmware",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	SilenceUsage:  true,
