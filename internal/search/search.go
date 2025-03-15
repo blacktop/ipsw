@@ -295,7 +295,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			}
 			ftab.Close()
 		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4p) {
-			out, err := fwcmd.Extract(im4p, os.TempDir())
+			out, err := fwcmd.ExtractExclaveCores(im4p, os.TempDir())
 			if err != nil {
 				return fmt.Errorf("failed to split exclave apps FW: %v", err)
 			}
