@@ -76,55 +76,33 @@ var ibootimCmd = &cobra.Command{
 		flat := viper.GetBool("fw.ibootim.flat")
 		output := viper.GetString("fw.ibootim.output")
 
-		cwd, _ := os.Getwd()
 		infile := filepath.Clean(args[0])
+		cwd, _ := os.Getwd()
 
-		if viper.GetBool("fw.ibootim.remote") {
-			out, err := extract.Search(&extract.Config{
-				URL:     args[0],
-				Pattern: "(~iphone|~ipad|~mac|~watch|~appletv|~reality).*\\.im4p$",
-				Flatten: flat,
-				Output:  output,
-			})
-			if err != nil {
-				return err
-			}
-			for _, f := range out { // TODO: DRY
-				if ok, _ := magic.IsIm4p(f); ok {
-					log.Infof("Processing IM4P file: %s", filepath.Base(f))
-					im4p, err := img4.OpenIm4p(f)
-					if err != nil {
-						return err
-					}
-					ibm, err := ibootim.Parse(bytes.NewReader(im4p.Data))
-					if err != nil {
-						return fmt.Errorf("failed to parse ibootim: %v", err)
-					}
-					if showInfo {
-						fmt.Println(ibm.String())
-					} else {
-						outs, err := ibm.ToPNG(f, filepath.Dir(f))
-						if err != nil {
-							return fmt.Errorf("failed to extract iBoot Image(s): %v", err)
-						}
-						for _, out := range outs {
-							utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting iBoot Image to file %s", strings.TrimPrefix(out, cwd+"/")))
-						}
-					}
-				}
-				os.Remove(f) // remove the extracted im4p file
-			}
-		} else if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.ibootim.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    infile,
-				Pattern: "(~iphone|~ipad|~mac|~watch|~appletv|~reality).*\\.im4p$",
-				Flatten: flat,
-				Output:  output,
-			})
-			if err != nil {
-				return err
+		} else if isZip || viper.GetBool("fw.ibootim.remote") {
+			var out []string
+			if viper.GetBool("fw.ibootim.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "(~iphone|~ipad|~mac|~watch|~appletv|~reality).*\\.im4p$",
+					Flatten: flat,
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for ibootim in remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "(~iphone|~ipad|~mac|~watch|~appletv|~reality).*\\.im4p$",
+					Flatten: flat,
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for ibootim in local IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				if ok, _ := magic.IsIm4p(f); ok {
