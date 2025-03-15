@@ -49,7 +49,7 @@ func init() {
 
 // gpuCmd represents the gpu command
 var gpuCmd = &cobra.Command{
-	Use:           "gpu",
+	Use:           "gpu <IPSW|URL|IM4P|FTAB>",
 	Aliases:       []string{"agx"},
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
