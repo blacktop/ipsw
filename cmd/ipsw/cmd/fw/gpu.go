@@ -22,13 +22,17 @@ THE SOFTWARE.
 package fw
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/pkg/ftab"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,29 +40,54 @@ import (
 func init() {
 	FwCmd.AddCommand(gpuCmd)
 
+	gpuCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	gpuCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	gpuCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.gpu.remote", gpuCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.gpu.output", gpuCmd.Flags().Lookup("output"))
 }
 
 // gpuCmd represents the gpu command
 var gpuCmd = &cobra.Command{
-	Use:     "gpu",
-	Aliases: []string{"agx"},
-	Short:   "Dump MachOs",
-	Args:    cobra.ExactArgs(1),
-	Hidden:  true,
+	Use:           "gpu",
+	Aliases:       []string{"agx"},
+	Short:         "Dump MachOs",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil {
-			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
+		infile := filepath.Clean(args[0])
+
+		dowork := func(ftab *ftab.Ftab, output string) error {
+			for _, entry := range ftab.Entries {
+				fname := filepath.Join(output, "extracted", string(entry.Tag[:])+".bin")
+				if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
+					return fmt.Errorf("failed to create directory: %v", err)
+				}
+				data, err := io.ReadAll(entry)
+				if err != nil {
+					return fmt.Errorf("failed to read ftab entry: %v", err)
+				}
+				log.WithFields(log.Fields{
+					"name":   string(entry.Tag[:]),
+					"size":   fmt.Sprintf("%#x", entry.Size),
+					"offset": fmt.Sprintf("%#x", entry.Offset),
+				}).Info("Extracting")
+				if err := os.WriteFile(fname, data, 0o644); err != nil {
+					return fmt.Errorf("failed to write data to file: %v", err)
+				}
+			}
+			return nil
+		}
+
+		if viper.GetBool("fw.gpu.remote") {
 			out, err := extract.Search(&extract.Config{
-				IPSW:    filepath.Clean(args[0]),
+				URL:     args[0],
 				Pattern: "armfw_.*.im4p$",
 				Output:  viper.GetString("fw.gpu.output"),
 			})
@@ -66,14 +95,62 @@ var gpuCmd = &cobra.Command{
 				return err
 			}
 			for _, f := range out {
-				folder := filepath.Join(filepath.Dir(f), "extracted")
-				if _, err := fwcmd.SplitGpuFW(f, folder); err != nil {
-					return fmt.Errorf("failed to split GPU firmware: %v", err)
+				log.Infof("Parsing %s", f)
+				ftab, err := ftab.Open(f)
+				if err != nil {
+					return err
+				}
+				defer ftab.Close()
+				if err := dowork(ftab, filepath.Dir(f)); err != nil {
+					return err
 				}
 			}
+		} else if isZip, err := magic.IsZip(infile); err != nil {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip {
+			out, err := extract.Search(&extract.Config{
+				IPSW:    infile,
+				Pattern: "armfw_.*.im4p$",
+				Output:  viper.GetString("fw.gpu.output"),
+			})
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				log.Infof("Parsing %s", f)
+				im4p, err := img4.OpenIm4p(f)
+				if err != nil {
+					return err
+				}
+				ftab, err := ftab.Parse(bytes.NewReader(im4p.Data))
+				if err != nil {
+					return fmt.Errorf("failed to parse ftab: %v", err)
+				}
+				if err := dowork(ftab, filepath.Dir(f)); err != nil {
+					return err
+				}
+			}
+		} else if isIm4p, _ := magic.IsIm4p(infile); isIm4p {
+			log.Info("Processing IM4P file")
+			im4p, err := img4.OpenIm4p(infile)
+			if err != nil {
+				return err
+			}
+			ftab, err := ftab.Parse(bytes.NewReader(im4p.Data))
+			if err != nil {
+				return fmt.Errorf("failed to parse ftab: %v", err)
+			}
+			if err := dowork(ftab, viper.GetString("fw.gpu.output")); err != nil {
+				return err
+			}
 		} else {
-			if _, err := fwcmd.SplitGpuFW(filepath.Clean(args[0]), viper.GetString("fw.gpu.output")); err != nil {
-				return fmt.Errorf("failed to split GPU firmware: %v", err)
+			ftab, err := ftab.Open(infile)
+			if err != nil {
+				return fmt.Errorf("failed to parse ftab: %v", err)
+			}
+			defer ftab.Close()
+			if err := dowork(ftab, viper.GetString("fw.gpu.output")); err != nil {
+				return err
 			}
 		}
 
