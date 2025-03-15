@@ -96,31 +96,28 @@ var dcpCmd = &cobra.Command{
 			return nil
 		}
 
-		if viper.GetBool("fw.dcp.remote") {
-			out, err := extract.Search(&extract.Config{
-				URL:     args[0],
-				Pattern: "dcp.*/.im4p$",
-				Output:  output,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to extract dcp from remote IPSW: %v", err)
-			}
-			for _, f := range out {
-				log.Infof("Parsing %s", f)
-				if err := dowork(f, filepath.Dir(f)); err != nil {
-					return err
-				}
-			}
-		} else if isZip, err := magic.IsZip(infile); err != nil {
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.dcp.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
-		} else if isZip {
-			out, err := extract.Search(&extract.Config{
-				IPSW:    infile,
-				Pattern: "dcp.*/.im4p$",
-				Output:  output,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to extract dcp from IPSW: %v", err)
+		} else if isZip || viper.GetBool("fw.dcp.remote") {
+			var out []string
+			if viper.GetBool("fw.dcp.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "dcp.*/.im4p$",
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to extract dcp from remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "dcp.*/.im4p$",
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to extract dcp from IPSW: %v", err)
+				}
 			}
 			for _, f := range out {
 				log.Infof("Parsing %s", f)
