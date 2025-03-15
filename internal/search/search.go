@@ -2,8 +2,10 @@ package search
 
 import (
 	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,6 +19,7 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
+	"github.com/blacktop/ipsw/pkg/ftab"
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
@@ -274,18 +277,23 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			return fmt.Errorf("failed to extract im4p payload: %v", err)
 		}
 		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4p) {
-			out, err := fwcmd.SplitGpuFW(im4p, os.TempDir())
+			ftab, err := ftab.Open(im4p)
 			if err != nil {
-				return fmt.Errorf("failed to split GPU FW: %v", err)
+				return fmt.Errorf("failed to parse ftab: %v", err)
 			}
-			for _, f := range out {
-				if m, err := macho.Open(f); err == nil {
-					if err := handler("agx_"+filepath.Base(f), m); err != nil {
-						return fmt.Errorf("failed to handle macho %s: %v", f, err)
+			for _, entry := range ftab.Entries {
+				data, err := io.ReadAll(entry)
+				if err != nil {
+					return fmt.Errorf("failed to read ftab entry: %v", err)
+				}
+				if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
+					name := "agx_" + filepath.Base(string(entry.Tag[:]))
+					if err := handler(name, m); err != nil {
+						return fmt.Errorf("failed to handle macho %s: %v", name, err)
 					}
-					m.Close()
 				}
 			}
+			ftab.Close()
 		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4p) {
 			out, err := fwcmd.Extract(im4p, os.TempDir())
 			if err != nil {
