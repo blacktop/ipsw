@@ -1,24 +1,24 @@
 ---
-id: tc
-title: tc
+id: dcp
+title: dcp
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: tc
-description: Dump TrustCache
+sidebar_label: dcp
+description: Dump MachOs
 ---
-## ipsw fw tc
+## ipsw fw dcp
 
-Dump TrustCache
+Dump MachOs
 
 ```
-ipsw fw tc <IM4P|IPSW> [flags]
+ipsw fw dcp <IPSW|URL|IM4P|BUNDLE> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help            help for tc
-  -j, --json            Output in JSON format
+  -h, --help            help for dcp
+  -i, --info            Print info
   -o, --output string   Folder to extract files to
   -r, --remote          Parse remote IPSW URL
 ```
