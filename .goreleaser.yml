@@ -288,7 +288,7 @@ universal_binaries:
 
 archives:
   - id: default_archive
-    builds:
+    ids:
       - darwin_build
       - darwin_ios_build
       - darwin_universal
@@ -316,7 +316,7 @@ archives:
       - manpages/*
       - config.example.yml
   - id: extras_archive
-    builds:
+    ids:
       - darwin_extras_build
       # - linux_amd64_extras_build
       # - linux_arm64_extras_build
@@ -336,7 +336,7 @@ archives:
       - manpages/*
       - config.example.yml
   - id: frida_archive
-    builds:
+    ids:
       - darwin_frida_build
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
@@ -354,7 +354,7 @@ archives:
       - manpages/*
       - config.example.yml
   - id: daemon_archive
-    builds:
+    ids:
       - darwin_daemon_build
       - linux_daemon_build
       - windows_daemon_build
@@ -580,7 +580,7 @@ aurs:
 
 nfpms:
   - id: packages
-    builds:
+    ids:
       - linux_build
     homepage: https://github.com/blacktop/ipsw
     description: |-
@@ -633,7 +633,7 @@ nfpms:
         - changelog-file-missing-in-native-package
   - id: daemon
     package_name: ipswd
-    builds:
+    ids:
       - linux_daemon_build
     homepage: https://github.com/blacktop/ipsw
     description: |-
@@ -692,7 +692,7 @@ nfpms:
 
 snapcrafts:
   - id: snaps
-    builds:
+    ids:
       - linux_build
       # - linux_amd64_extras_build
       # - linux_arm64_extras_build
@@ -737,7 +737,7 @@ snapcrafts:
         command: ipsw
         plugs: ["home", "network"]
   - id: snaps-daemon
-    builds:
+    ids:
       - linux_daemon_build
     name: ipswd
     name_template: "ipswd-{{.Version}}-{{.Os}}-{{.Arch}}"
@@ -862,6 +862,7 @@ winget:
 changelog:
   sort: asc
   use: github
+  format: "{{ .SHA }}: {{ .Message }}{{ with .AuthorUsername }} (@{{ . }}){{ end }}"
   groups:
     - title: Dependency updates
       regexp: '^.*?(.+)\(deps\)!?:.+$'
