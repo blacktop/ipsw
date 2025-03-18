@@ -99,28 +99,32 @@ func GetAllEnums(path string) (map[string]*dwf.EnumType, error) {
 	return enums, nil
 }
 
-func GetName(path, name string) (ft *dwf.FuncType, filename string, err error) {
+func GetName(path, name string) (nameMap map[string]*dwf.FuncType, err error) {
+	nameMap = make(map[string]*dwf.FuncType)
+
 	m, err := macho.Open(path)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer m.Close()
 
 	df, err := m.DWARF()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	r := df.Reader()
 
+	var nameOffs []dwf.Offset
+
 	off, err := df.LookupName(name)
 	if err != nil {
 		if !errors.Is(err, dwf.ErrHashNotFound) {
-			return nil, "", fmt.Errorf("failed to find name %s: %v", name, err)
+			return nil, fmt.Errorf("failed to find name %s: %v", name, err)
 		}
 		offs, err := df.LookupDebugName(name)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to find debug name %s: %v", name, err)
+			return nil, fmt.Errorf("failed to find debug name %s: %v", name, err)
 		}
 		if len(offs) > 1 {
 			log.Warnf("found multiple debug names entries for %s", name)
@@ -129,69 +133,88 @@ func GetName(path, name string) (ft *dwf.FuncType, filename string, err error) {
 			switch o.Tag {
 			case dwf.TagStructType, dwf.TagEnumerationType, dwf.TagUnionType, dwf.TagTypedef, dwf.TagArrayType, dwf.TagPointerType:
 			default:
-				r.Seek(o.CUOffset)
-				r.Next()
-				off = o.DIEOffset
+				nameOffs = append(nameOffs, o.DIEOffset)
 			}
 		}
-	}
-
-	r.Seek(off)
-
-	entry, err := r.Next()
-	if err != nil {
-		return nil, "", err
-	}
-
-	fs, err := df.FilesForEntry(entry)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get files for entry: %v", err)
-	}
-	if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
-		if idx < int64(len(fs)) {
-			filename = fs[idx].Name
-		}
-	}
-
-	if entry.Tag == dwf.TagSubprogram || entry.Tag == dwf.TagSubroutineType || entry.Tag == dwf.TagInlinedSubroutine {
-		typ, err := df.Type(entry.Offset)
-		if err != nil {
-			return nil, "", err
-		}
-		ft = typ.(*dwf.FuncType)
 	} else {
-		typ, err := df.Type(entry.Offset)
-		if err != nil {
-			return nil, "", err
-		}
-		return nil, "", fmt.Errorf("did not find tag func type: found %s; %s", entry.Tag, typ.String())
+		nameOffs = append(nameOffs, off)
 	}
 
-	return
+	for _, off := range nameOffs {
+		filename := "<unknown>"
+
+		r.Seek(off)
+
+		entry, err := r.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		fs, err := df.FilesForEntry(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get files for entry: %v", err)
+		}
+		if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
+			if idx < int64(len(fs)) {
+				filename = fs[idx].Name
+			}
+		}
+		if idx, ok := entry.Val(dwf.AttrCallFile).(int64); ok {
+			if idx < int64(len(fs)) {
+				filename = fs[idx].Name
+			}
+		}
+		if line, ok := entry.Val(dwf.AttrDeclLine).(int64); ok {
+			filename += fmt.Sprintf("#L%d", line)
+		}
+		if line, ok := entry.Val(dwf.AttrCallLine).(int64); ok {
+			filename += fmt.Sprintf("#L%d", line)
+		}
+
+		if entry.Tag == dwf.TagSubprogram || entry.Tag == dwf.TagSubroutineType || entry.Tag == dwf.TagInlinedSubroutine {
+			typ, err := df.Type(entry.Offset)
+			if err != nil {
+				return nil, err
+			}
+			nameMap[filename] = typ.(*dwf.FuncType)
+		} else {
+			typ, err := df.Type(entry.Offset)
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("did not find tag func type: found %s; %s", entry.Tag, typ.String())
+		}
+	}
+
+	return nameMap, nil
 }
 
-func GetType(path, name string, showOffsets bool) (typeStr string, filename string, err error) {
+func GetType(path, name string, showOffsets bool) (typeMap map[string]string, err error) {
+	typeMap = make(map[string]string)
+
 	m, err := macho.Open(path)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer m.Close()
 
 	df, err := m.DWARF()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	r := df.Reader()
 
+	var typoffs []dwf.Offset
+
 	off, err := df.LookupType(name)
 	if err != nil {
 		if !errors.Is(err, dwf.ErrHashNotFound) {
-			return "", "", fmt.Errorf("failed to find name %s: %v", name, err)
+			return nil, fmt.Errorf("failed to find name %s: %v", name, err)
 		}
 		offs, err := df.LookupDebugName(name)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to find debug name %s: %v", name, err)
+			return nil, fmt.Errorf("failed to find debug name %s: %v", name, err)
 		}
 		if len(offs) > 1 {
 			log.Warnf("found multiple debug names entries for %s", name)
@@ -199,55 +222,60 @@ func GetType(path, name string, showOffsets bool) (typeStr string, filename stri
 		for _, o := range offs {
 			switch o.Tag {
 			case dwf.TagStructType, dwf.TagEnumerationType, dwf.TagUnionType, dwf.TagTypedef, dwf.TagArrayType, dwf.TagPointerType:
-				r.Seek(o.CUOffset)
-				r.Next()
-				off = o.DIEOffset
+				typoffs = append(typoffs, o.DIEOffset)
 			}
 		}
+	} else {
+		typoffs = append(typoffs, off)
 	}
 
-	r.Seek(off)
+	for _, off := range typoffs {
+		filename := "<unknown>"
 
-	entry, err := r.Next()
-	if err != nil {
-		return "", "", err
-	}
+		r.Seek(off)
 
-	fs, err := df.FilesForEntry(entry)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get files for entry: %v", err)
-	}
-	if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
-		if idx < int64(len(fs)) {
-			filename = fs[idx].Name
+		entry, err := r.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		fs, err := df.FilesForEntry(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get files for entry: %v", err)
+		}
+		if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
+			if idx < int64(len(fs)) {
+				filename = fs[idx].Name
+			}
+		}
+		if line, ok := entry.Val(dwf.AttrDeclLine).(int64); ok {
+			filename += fmt.Sprintf("#L%d", line)
+		}
+
+		typ, err := df.Type(entry.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get type for entry: %v", err)
+		}
+
+		switch t := typ.(type) {
+		case *dwf.StructType:
+			if t.Incomplete {
+				continue
+			}
+			typeMap[filename] = t.Defn(showOffsets)
+		case *dwf.ArrayType, *dwf.PtrType, *dwf.EnumType:
+			typeMap[filename] = t.String()
+		case *dwf.TypedefType:
+			if enum, ok := t.Type.(*dwf.EnumType); ok {
+				typeMap[filename] = fmt.Sprintf("typedef %s %s;", enum.String(), t.Name)
+			}
+			typeMap[filename] = fmt.Sprintf("typedef %s %s;", t.Type.Common().Name, t.Name)
+		default:
+			return nil, fmt.Errorf("did not find supported type: found %s; %s", entry.Tag, typ.String())
 		}
 	}
 
-	typ, err := df.Type(entry.Offset)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get type for entry: %v", err)
-	}
-
-	switch t := typ.(type) {
-	case *dwf.StructType:
-		if t.Incomplete {
-			return "", "", fmt.Errorf("type %s is incomplete", name)
-		}
-		return t.Defn(showOffsets), filename, nil
-	case *dwf.ArrayType:
-		return t.String(), filename, nil
-	case *dwf.PtrType:
-		return t.String(), filename, nil
-	case *dwf.EnumType:
-		return t.String(), filename, nil
-	case *dwf.TypedefType:
-		if enum, ok := t.Type.(*dwf.EnumType); ok {
-			return fmt.Sprintf("typedef %s %s;", enum.String(), t.Name), filename, nil
-		}
-		return fmt.Sprintf("typedef %s %s;", t.Type.Common().Name, t.Name), filename, nil
-	default:
-		return "", "", fmt.Errorf("did not find supported type: found %s; %s", entry.Tag, typ.String())
-	}
+	return typeMap, nil
 }
 
 func DiffStructures(prevMachO, currMachO string, conf *Config) (string, error) {
