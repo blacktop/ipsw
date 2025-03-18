@@ -132,7 +132,7 @@ func GetName(path, name string) (nameMap map[string]*dwf.FuncType, err error) {
 		for _, o := range offs {
 			switch o.Tag {
 			case dwf.TagStructType, dwf.TagEnumerationType, dwf.TagUnionType, dwf.TagTypedef, dwf.TagArrayType, dwf.TagPointerType:
-			default:
+			default: // NOT a type
 				nameOffs = append(nameOffs, o.DIEOffset)
 			}
 		}
