@@ -46,6 +46,7 @@ func init() {
 	MachoCmd.AddCommand(machoDisassCmd)
 	// machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
 	machoDisassCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
+	machoDisassCmd.Flags().BoolP("entry", "e", false, "Disassemble entry point")
 	machoDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	machoDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	machoDisassCmd.Flags().Uint64P("off", "o", 0, "File offset to start disassembling")
@@ -60,8 +61,10 @@ func init() {
 	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	machoDisassCmd.Flags().Bool("replace", false, "Replace .a2s")
+	machoDisassCmd.MarkFlagsMutuallyExclusive("entry", "symbol", "vaddr", "off")
 
 	viper.BindPFlag("macho.disass.arch", machoDisassCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("macho.disass.entry", machoDisassCmd.Flags().Lookup("entry"))
 	viper.BindPFlag("macho.disass.symbol", machoDisassCmd.Flags().Lookup("symbol"))
 	viper.BindPFlag("macho.disass.vaddr", machoDisassCmd.Flags().Lookup("vaddr"))
 	viper.BindPFlag("macho.disass.off", machoDisassCmd.Flags().Lookup("off"))
@@ -102,6 +105,7 @@ var machoDisassCmd = &cobra.Command{
 
 		// flags
 		selectedArch := viper.GetString("macho.info.arch")
+		entryStart := viper.GetBool("macho.disass.entry")
 		symbolName := viper.GetString("macho.disass.symbol")
 		startAddr := viper.GetUint64("macho.disass.vaddr")
 		startOff := viper.GetUint64("macho.disass.off")
@@ -119,13 +123,9 @@ var machoDisassCmd = &cobra.Command{
 		allFuncs := false
 
 		// validate args
-		if len(symbolName) > 0 && (startAddr != 0 || startOff != 0) {
-			return fmt.Errorf("you can only use --symbol OR --vaddr/--off (not both)")
-		} else if len(symbolName) == 0 && startAddr == 0 && startOff == 0 {
+		if len(symbolName) == 0 && startAddr == 0 && startOff == 0 && !entryStart {
 			allFuncs = true
 			// return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
-		} else if startAddr != 0 && startOff != 0 {
-			return fmt.Errorf("you can only use --vaddr OR --off (not both)")
 		}
 		if len(filesetEntry) > 0 && viper.GetBool("macho.disass.all-fileset-entries") {
 			return fmt.Errorf("you can only use --fileset-entry OR --all-fileset-entries (not both)")
@@ -219,6 +219,13 @@ var machoDisassCmd = &cobra.Command{
 
 		if err := ctrlc.Default.Run(context.Background(), func() error {
 			for _, m := range ms {
+				if entryStart {
+					if main := m.GetLoadsByName("LC_MAIN"); len(main) == 0 {
+						return fmt.Errorf("failed to find LC_MAIN in target when using --entry flag")
+					} else {
+						startAddr = main[0].(*macho.EntryPoint).EntryOffset + m.GetBaseAddress()
+					}
+				}
 				if startAddr == 0 && startOff != 0 {
 					if startAddr, err = m.GetVMAddress(startOff); err != nil {
 						return fmt.Errorf("failed to get vmaddr for file offset %#x: %v", startOff, err)
