@@ -172,8 +172,10 @@ var ipswCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			dFlg.Device = dev.ProductType
-			dFlg.Build = dev.BuildVersion
+			device = dev.ProductType
+			if !latest {
+				dFlg.Build = dev.BuildVersion
+			}
 		}
 
 		if len(device) > 0 {

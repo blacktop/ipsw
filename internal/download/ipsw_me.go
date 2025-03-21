@@ -185,7 +185,7 @@ func GetVersion(buildID string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("build did not a version")
+	return "", fmt.Errorf("build did not match a version in the ipsw.me API")
 }
 
 // GetBuildID returns the BuildID for a given version and identifier
