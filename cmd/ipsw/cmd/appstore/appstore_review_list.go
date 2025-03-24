@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Kenneth H. Cox
+Copyright © 2024 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,20 +36,21 @@ import (
 )
 
 func init() {
-	ASReviewCmd.AddCommand(ASReviewListCmd)
+	AppstoreCmd.AddCommand(ASReviewListCmd)
 
 	ASReviewListCmd.Flags().String("id", "", "App ID")
 	ASReviewListCmd.Flags().String("after", "", "Only show responses on or after date, e.g. \"2024-12-22\"")
 	ASReviewListCmd.Flags().String("since", "", "Only show responses within duration, e.g. \"36h\"")
-	viper.BindPFlag("appstore.review.ls.id", ASReviewListCmd.Flags().Lookup("id"))
-	viper.BindPFlag("appstore.review.ls.after", ASReviewListCmd.Flags().Lookup("after"))
-	viper.BindPFlag("appstore.review.ls.since", ASReviewListCmd.Flags().Lookup("since"))
+	viper.BindPFlag("appstore.review-list.id", ASReviewListCmd.Flags().Lookup("id"))
+	viper.BindPFlag("appstore.review-list.after", ASReviewListCmd.Flags().Lookup("after"))
+	viper.BindPFlag("appstore.review-list.since", ASReviewListCmd.Flags().Lookup("since"))
 }
 
-// ASReviewListCmd represents the appstore review ls command
+// ASReviewListCmd represents the appstore review command
 var ASReviewListCmd = &cobra.Command{
-	Use:           "ls",
-	Short:         "List reviews",
+	Use:           "review-list",
+	Aliases:       []string{"r"},
+	Short:         "List app store reviews",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -61,9 +62,9 @@ var ASReviewListCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
-		id := viper.GetString("appstore.review.ls.id")
-		after := viper.GetString("appstore.review.ls.after")
-		since := viper.GetString("appstore.review.ls.since")
+		id := viper.GetString("appstore.review-list.id")
+		after := viper.GetString("appstore.review-list.after")
+		since := viper.GetString("appstore.review-list.since")
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
 			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
@@ -86,7 +87,7 @@ var ASReviewListCmd = &cobra.Command{
 			afterDate = time.Now().Add(-sinceDuration)
 		}
 		afterOrSinceFlag := after != "" || since != ""
-	
+
 		as := appstore.NewAppStore(
 			viper.GetString("appstore.p8"),
 			viper.GetString("appstore.iss"),
