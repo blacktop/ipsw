@@ -146,7 +146,7 @@ var ASReviewListCmd = &cobra.Command{
 			}
 			fmt.Printf("%d responses\n", responseCount)
 			ratingsUrl := fmt.Sprintf("https://appstoreconnect.apple.com/apps/%s/distribution/activity/ios/ratingsResponses", id)
-			fmt.Printf("\nTo respond, visit %s", ratingsUrl)
+			fmt.Printf("\nTo respond, visit %s\n", ratingsUrl)
 		}
 
 		// exit 2 if no new reviews, this will aid scripting
