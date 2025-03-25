@@ -152,27 +152,33 @@ var idevImgSignCmd = &cobra.Command{
 			} else {
 				ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
 				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (run `%s -runFirstLaunch` and try again)", ddiPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
+					utils.Indent(log.Warn, 2)(fmt.Sprintf("DMG not found at '%s': trying NEW folder structure", ddiPath))
+					manifestPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI/Restore/BuildManifest.plist"
+					if _, err := os.Stat(manifestPath); errors.Is(err, os.ErrNotExist) {
+						return fmt.Errorf("failed to find NEW '%s' as well (run `%s -runFirstLaunch` and try again)", manifestPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
+					}
 				}
 			}
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiPath))
-			mountPoint, alreadyMounted, err := utils.MountDMG(ddiPath)
-			if err != nil {
-				return fmt.Errorf("failed to mount iOS_DDI.dmg: %w", err)
+			if manifestPath == "" {
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiPath))
+				mountPoint, alreadyMounted, err := utils.MountDMG(ddiPath)
+				if err != nil {
+					return fmt.Errorf("failed to mount iOS_DDI.dmg: %w", err)
+				}
+				if alreadyMounted {
+					utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ddiPath))
+				} else {
+					defer func() {
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", ddiPath))
+						if err := utils.Retry(3, 2*time.Second, func() error {
+							return utils.Unmount(mountPoint, false)
+						}); err != nil {
+							log.Errorf("failed to unmount %s at %s: %v", ddiPath, mountPoint, err)
+						}
+					}()
+				}
+				manifestPath = filepath.Join(mountPoint, "Restore/BuildManifest.plist")
 			}
-			if alreadyMounted {
-				utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ddiPath))
-			} else {
-				defer func() {
-					utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", ddiPath))
-					if err := utils.Retry(3, 2*time.Second, func() error {
-						return utils.Unmount(mountPoint, false)
-					}); err != nil {
-						log.Errorf("failed to unmount %s at %s: %v", ddiPath, mountPoint, err)
-					}
-				}()
-			}
-			manifestPath = filepath.Join(mountPoint, "Restore/BuildManifest.plist")
 		}
 
 		manifestData, err := os.ReadFile(manifestPath)
