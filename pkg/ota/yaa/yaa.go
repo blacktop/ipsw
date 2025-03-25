@@ -59,7 +59,8 @@ type Entry struct {
 	Mtm       time.Time   // modification time
 	Btm       time.Time   // backup time
 	Ctm       time.Time   // creation time
-	Size      uint32      // file data size
+	Size      uint64      // file data size
+	Data      uint64      // file contents
 	Index     uint64      // entry index in input archive
 	ESize     uint64      // entry size in input archive
 	Aft       uint32
@@ -323,16 +324,24 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			}
 		case "DAT": // file contents
 			switch field[3] {
+			case 'C':
+				var dat uint64
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+					return nil, fmt.Errorf("failed to read DATC field: %w", err)
+				}
+				entry.Data = dat
 			case 'B':
-				if err := binary.Read(r, binary.LittleEndian, &entry.Size); err != nil {
+				var dat uint32
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read DATB field: %w", err)
 				}
+				entry.Data = uint64(dat)
 			case 'A':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read DATA field: %w", err)
 				}
-				entry.Size = uint32(dat)
+				entry.Data = uint64(dat)
 			default:
 				return nil, fmt.Errorf("found unknown DAT field: %s", string(field))
 			}
@@ -407,22 +416,30 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			}
 		case "SIZ": // file data size
 			switch field[3] {
+			case '8':
+				var dat uint64
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+					return nil, fmt.Errorf("failed to read SIZ8 field: %w", err)
+				}
+				entry.Size = dat
 			case '4':
-				if err := binary.Read(r, binary.LittleEndian, &entry.Size); err != nil {
+				var dat uint32
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read SIZ4 field: %w", err)
 				}
+				entry.Size = uint64(dat)
 			case '2':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read SIZ2 field: %w", err)
 				}
-				entry.Size = uint32(dat)
+				entry.Size = uint64(dat)
 			case '1':
 				var dat byte
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read SIZ1 field: %w", err)
 				}
-				entry.Size = uint32(dat)
+				entry.Size = uint64(dat)
 			default:
 				return nil, fmt.Errorf("found unknown SIZ field: %s", string(field))
 			}
@@ -584,7 +601,7 @@ func (y *YAA) FileSize() uint64 {
 	var total uint64
 	for _, ent := range y.Entries {
 		if ent.Type == RegularFile {
-			total += uint64(ent.Size)
+			total += ent.Size
 		}
 	}
 	return total
@@ -626,6 +643,18 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 		ent, err = DecodeEntry(bytes.NewReader(header))
 		if err != nil {
 			return yaa, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
+		}
+
+		if ent.PatchType != 0 && ent.Data > 0 {
+			if ent.PatchType != Patch_Metadata {
+				curr, _ := r.Seek(0, io.SeekCurrent)
+				ent.fileOffset = curr
+				ent.r = &r
+				// skip compressed data ??
+				if _, err := r.Seek(int64(ent.Data), io.SeekCurrent); err != nil {
+					return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+				}
+			}
 		}
 
 		if ent.Type == RegularFile {
