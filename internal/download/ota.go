@@ -32,7 +32,7 @@ import (
 
 const (
 	clientVersion       = 2
-	certIssuanceDay     = "2020-09-29"
+	certIssuanceDay     = "2023-12-10"
 	pallasURL           = "https://gdmf.apple.com/v2/assets"
 	otaPublicURL        = "https://mesu.apple.com/assets/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS13OtaDevBetaURL  = "https://mesu.apple.com/assets/iOS13DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
@@ -65,8 +65,10 @@ const (
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
 	// XCode Simulator
-	iOsSimulatorUpdate     assetType = "com.apple.MobileAsset.iOSSimulatorRuntime"
-	watchOsSimulatorUpdate assetType = "com.apple.MobileAsset.watchOSSimulatorRuntime"
+	iOsSimulatorUpdate      assetType = "com.apple.MobileAsset.iOSSimulatorRuntime"
+	tvOsSimulatorUpdate     assetType = "com.apple.MobileAsset.appleTVOSSimulatorRuntime"
+	watchOsSimulatorUpdate  assetType = "com.apple.MobileAsset.watchOSSimulatorRuntime"
+	visionOaSimulatorUpdate assetType = "com.apple.MobileAsset.xrOSSimulatorRuntime"
 )
 
 // Ota is an OTA object
@@ -431,10 +433,10 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 func (o *Ota) getRequests(atype assetType, audienceID string) (reqs []pallasRequest, err error) {
 
 	req := pallasRequest{
-		ClientVersion: clientVersion,
-		AssetType:     atype,
-		AssetAudience: audienceID,
-		// CertIssuanceDay:      certIssuanceDay,
+		ClientVersion:        clientVersion,
+		AssetType:            atype,
+		AssetAudience:        audienceID,
+		CertIssuanceDay:      certIssuanceDay,
 		ProductVersion:       o.Config.Version.Original(),
 		BuildVersion:         o.Config.Build,
 		ProductType:          o.Config.Device,
