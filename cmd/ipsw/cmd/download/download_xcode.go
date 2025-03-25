@@ -42,6 +42,7 @@ func init() {
 	DownloadCmd.AddCommand(xcodeCmd)
 	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest XCode")
 	xcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
+	xcodeCmd.Flags().StringP("runtime", "r", "", "Name of simulator runtime to download")
 
 	xcodeCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
@@ -85,6 +86,7 @@ var xcodeCmd = &cobra.Command{
 		// flags
 		latest, _ := cmd.Flags().GetBool("latest")
 		dlSim, _ := cmd.Flags().GetBool("sim")
+		runtime, _ := cmd.Flags().GetString("runtime")
 
 		if dlSim {
 			dvt, err := download.GetDVTDownloadableIndex()
@@ -97,24 +99,34 @@ var xcodeCmd = &cobra.Command{
 				choices = append(choices, dl.Name)
 			}
 
-			var choice string
-			prompt := &survey.Select{
-				Message:  "Select what to download:",
-				Options:  choices,
-				PageSize: 10,
-			}
-			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-				log.Warn("Exiting...")
-				return nil
-			}
-
 			var dl download.Downloadable
-			for _, d := range dvt.Downloadables {
-				if d.Name == choice {
-					dl = d
+			if runtime != "" {
+				for _, d := range dvt.Downloadables {
+					if d.Name == runtime {
+						if d.Source == "" {
+							dl = d
+							break
+						}
+					}
+				}
+			} else {
+				var choice string
+				prompt := &survey.Select{
+					Message:  "Select what to download:",
+					Options:  choices,
+					PageSize: 10,
+				}
+				if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					return nil
+				}
+
+				for _, d := range dvt.Downloadables {
+					if d.Name == choice {
+						dl = d
+					}
 				}
 			}
-
 			if dl.Source == "" {
 				dl.Source = fmt.Sprintf("https://download.developer.apple.com/Developer_Tools/%s/%s.dmg", strings.ReplaceAll(dl.Name, " ", "_"), strings.ReplaceAll(dl.Name, " ", "_"))
 				dl.Authentication = "virtual"
