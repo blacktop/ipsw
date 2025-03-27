@@ -126,7 +126,7 @@ type DeviceValues struct {
 		AKeyStatus int    `plist:"AKeyStatus,omitempty" json:"a_key_status,omitempty"`
 		SKeyHash   []byte `plist:"SKeyHash,omitempty" json:"s_key_hash,omitempty"`
 		SKeyStatus int    `plist:"SKeyStatus,omitempty" json:"s_key_status,omitempty"`
-	} `plist:"BasebandKeyHashInformation,omitempty" json:"baseband_key_hash_information,omitempty"`
+	} `plist:"BasebandKeyHashInformation,omitempty" json:"baseband_key_hash_information"`
 	BasebandMasterKeyHash                         string           `plist:"BasebandMasterKeyHash,omitempty" json:"baseband_master_key_hash,omitempty"`
 	BasebandRegionSKU                             []byte           `plist:"BasebandRegionSKU,omitempty" json:"baseband_region_sku,omitempty"`
 	BasebandSerialNumber                          []byte           `plist:"BasebandSerialNumber,omitempty" json:"baseband_serial_number,omitempty"`

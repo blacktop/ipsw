@@ -101,7 +101,7 @@ type preamble struct {
 
 // ctf_header_t
 type header_t struct {
-	Preamble       preamble `json:"preamble,omitempty"`
+	Preamble       preamble `json:"preamble"`
 	ParentLabelRef uint32   `json:"parent_label_ref,omitempty"` /* ref to name of parent lbl uniq'd against */
 	ParentNameRef  uint32   `json:"parent_name_ref,omitempty"`  /* ref to basename of parent */
 	LabelOffset    uint32   `json:"label_offset,omitempty"`     /* offset of label section */

@@ -129,8 +129,8 @@ func decodeV1(out *compressedBlockHeaderV1, in compressedBlockHeaderV2) error {
 		return nil // OK, freq tables were omitted
 	}
 
-	for i := 0; i < (LZFSE_ENCODE_L_SYMBOLS + LZFSE_ENCODE_M_SYMBOLS +
-		LZFSE_ENCODE_D_SYMBOLS + LZFSE_ENCODE_LITERAL_SYMBOLS); i++ {
+	for i := range LZFSE_ENCODE_L_SYMBOLS + LZFSE_ENCODE_M_SYMBOLS +
+		LZFSE_ENCODE_D_SYMBOLS + LZFSE_ENCODE_LITERAL_SYMBOLS {
 		// Refill accum, one byte at a time, until we reach end of header, or accum is full
 		for srcCur < srcEnd && accumNbits+8 <= 32 {
 			accum |= uint32(in.Freq[srcCur]) << accumNbits

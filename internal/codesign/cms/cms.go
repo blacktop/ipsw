@@ -424,7 +424,7 @@ func (sd *SignedData) ToDER() ([]byte, error) {
 	return asn1.Marshal(ci)
 }
 
-func NewAttribute(typ asn1.ObjectIdentifier, val interface{}) (attr Attribute, err error) {
+func NewAttribute(typ asn1.ObjectIdentifier, val any) (attr Attribute, err error) {
 	var der []byte
 	if der, err = asn1.Marshal(val); err != nil {
 		return

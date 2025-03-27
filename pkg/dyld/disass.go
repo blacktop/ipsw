@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
@@ -59,12 +60,7 @@ func (d DyldDisass) Dylibs() []*CacheImage {
 }
 
 func (d DyldDisass) hasDep(img *CacheImage) bool {
-	for _, i := range d.dylibs {
-		if i == img {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(d.dylibs, img)
 }
 
 // Contains returns true if Triage immediates contains a given address and will return the instruction address
@@ -97,10 +93,8 @@ func (d DyldDisass) IsLocation(imm uint64) bool {
 // IsBranchLocation returns if given address is branch to a location instruction
 func (d DyldDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 	for loc, addrs := range d.tr.Locations {
-		for _, a := range addrs {
-			if a == addr {
-				return true, loc
-			}
+		if slices.Contains(addrs, addr) {
+			return true, loc
 		}
 	}
 	return false, 0

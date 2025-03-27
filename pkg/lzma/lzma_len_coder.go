@@ -70,7 +70,7 @@ func (lc *lenCoder) setPrices(prices []uint32, posState, numSymbols, st uint32) 
 	b1 := a1 + getPrice1(lc.choice[1])
 
 	var i uint32
-	for i = 0; i < kNumLowLenSymbols; i++ {
+	for i = range kNumLowLenSymbols {
 		if i >= numSymbols {
 			return
 		}

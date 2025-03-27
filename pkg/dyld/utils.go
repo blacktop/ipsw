@@ -8,7 +8,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 )
 
-func output(show bool, fmtStr string, args ...interface{}) {
+func output(show bool, fmtStr string, args ...any) {
 	if show {
 		fmt.Printf(fmtStr, args...)
 	}

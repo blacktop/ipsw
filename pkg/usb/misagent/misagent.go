@@ -40,11 +40,11 @@ type provisionResponse struct {
 type provisionProfile struct {
 	AppIDName                   string         `plist:"AppIDName,omitempty" json:"appid_name,omitempty"`
 	ApplicationIdentifierPrefix []string       `plist:"ApplicationIdentifierPrefix,omitempty" json:"application_identifier_prefix,omitempty"`
-	CreationDate                time.Time      `plist:"CreationDate,omitempty" json:"creation_date,omitempty"`
+	CreationDate                time.Time      `plist:"CreationDate,omitempty" json:"creation_date"`
 	DerEncodedProfile           []byte         `plist:"DER-Encoded-Profile,omitempty" json:"der_encoded_profile,omitempty"`
 	DeveloperCertificates       [][]byte       `plist:"DeveloperCertificates,omitempty" json:"developer_certificates,omitempty"`
 	Entitlements                map[string]any `plist:"Entitlements,omitempty" json:"entitlements,omitempty"`
-	ExpirationDate              time.Time      `plist:"ExpirationDate,omitempty" json:"expiration_date,omitempty"`
+	ExpirationDate              time.Time      `plist:"ExpirationDate,omitempty" json:"expiration_date"`
 	IsXcodeManaged              bool           `plist:"IsXcodeManaged,omitempty" json:"is_xcode_managed,omitempty"`
 	Name                        string         `plist:"Name,omitempty" json:"name,omitempty"`
 	Platform                    []string       `plist:"Platform,omitempty" json:"platform,omitempty"`

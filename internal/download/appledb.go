@@ -48,7 +48,7 @@ type GithubContentsResponse struct {
 
 type OsFileSource struct {
 	Type              string             `json:"type"`
-	PrerequisiteBuild PrerequisiteBuilds `json:"prerequisiteBuild,omitempty"`
+	PrerequisiteBuild PrerequisiteBuilds `json:"prerequisiteBuild"`
 	DeviceMap         []string           `json:"deviceMap"`
 	Links             []struct {
 		URL    string `json:"url"`

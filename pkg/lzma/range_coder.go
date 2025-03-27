@@ -47,7 +47,7 @@ func newRangeDecoder(r io.Reader) *rangeDecoder {
 	if err != nil {
 		throw(err)
 	}
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		rd.code = rd.code<<8 | uint32(buf[i])
 	}
 	return rd
@@ -154,7 +154,7 @@ func newRangeEncoder(w io.Writer) *rangeEncoder {
 }
 
 func (re *rangeEncoder) flush() {
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		re.shiftLow()
 	}
 	err := re.w.Flush()

@@ -26,7 +26,7 @@ type osError struct {
 // An argumentValueError reports an error encountered while parsing user provided arguments.
 type argumentValueError struct {
 	msg string
-	val interface{}
+	val any
 }
 
 func (e *argumentValueError) Error() string {
@@ -433,10 +433,7 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 		}
 	}
 
-	lenEnd := z.repLens[repMaxIndex]
-	if lenMain > lenEnd {
-		lenEnd = lenMain
-	}
+	lenEnd := max(lenMain, z.repLens[repMaxIndex])
 	if lenEnd < 2 {
 		z.backRes = z.optimum[1].backPrev
 		res = 1
@@ -808,7 +805,7 @@ func (z *encoder) fillDistancesPrices() {
 	for lenToPosState := uint32(0); lenToPosState < kNumLenToPosStates; lenToPosState++ {
 		var posSlot uint32
 		st := lenToPosState << kNumPosSlotBits
-		for posSlot = 0; posSlot < z.distTableSize; posSlot++ {
+		for posSlot = range z.distTableSize {
 			z.posSlotPrices[st+posSlot] = z.posSlotCoders[lenToPosState].getPrice(posSlot)
 		}
 		for posSlot = kEndPosModelIndex; posSlot < z.distTableSize; posSlot++ {
@@ -816,7 +813,7 @@ func (z *encoder) fillDistancesPrices() {
 		}
 		var i uint32
 		st2 := lenToPosState * kNumFullDistances
-		for i = 0; i < kStartPosModelIndex; i++ {
+		for i = range kStartPosModelIndex {
 			z.distancesPrices[st2+i] = z.posSlotPrices[st+i]
 		}
 		for ; i < kNumFullDistances; i++ {
@@ -1044,7 +1041,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	z.mf = newLzBinTree(r, z.cl.dictSize, kNumOpts, z.cl.fastBytes, kMatchMaxLen+1, numHashBytes)
 
 	z.optimum = make([]*optimal, kNumOpts)
-	for i := 0; i < kNumOpts; i++ {
+	for i := range kNumOpts {
 		z.optimum[i] = &optimal{}
 	}
 
@@ -1056,7 +1053,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	z.isRep0Long = initBitModels(kNumStates << kNumPosStatesBitsMax)
 
 	z.posSlotCoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
-	for i := 0; i < kNumLenToPosStates; i++ {
+	for i := range kNumLenToPosStates {
 		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
 
@@ -1090,7 +1087,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	z.prevByte = 0
 
 	z.repDistances = make([]uint32, kNumRepDistances)
-	for i := 0; i < kNumRepDistances; i++ {
+	for i := range kNumRepDistances {
 		z.repDistances[i] = 0
 	}
 

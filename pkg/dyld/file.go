@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"maps"
 	"math/bits"
 	"os"
 	"path/filepath"
@@ -488,7 +489,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 		sr.Seek(int64(f.Headers[uuid].LocalSymbolsOffset+uint64(f.LocalSymInfo.EntriesOffset)), io.SeekStart)
 
-		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+		for i := range int(f.LocalSymInfo.EntriesCount) {
 			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 			// 	return nil, err
 			// }
@@ -757,9 +758,7 @@ func (f *File) ParseStubIslands() error {
 			if err != nil {
 				return err
 			}
-			for k, v := range stubs {
-				f.islandStubs[k] = v
-			}
+			maps.Copy(f.islandStubs, stubs)
 		}
 	}
 	return nil

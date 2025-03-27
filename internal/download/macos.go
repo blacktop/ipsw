@@ -71,7 +71,7 @@ type ExtendedMetaInfo struct {
 }
 
 type Product struct {
-	DeferredSUEnablementDate time.Time `json:"DeferredSUEnablementDate,omitempty"`
+	DeferredSUEnablementDate time.Time `json:"DeferredSUEnablementDate"`
 	Distributions            map[string]string
 	Packages                 []Package
 	PostDate                 time.Time
@@ -231,7 +231,7 @@ func zipArrays(arr1, arr2 []string) (map[string]string, error) {
 		return nil, fmt.Errorf("both arrays are NOT equal in length")
 	}
 	out := make(map[string]string)
-	for i := 0; i < len(arr1); i++ {
+	for i := range arr1 {
 		out[strings.ToLower(arr1[i])] = arr2[i]
 	}
 	return out, nil

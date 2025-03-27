@@ -24,7 +24,7 @@ type Device struct {
 	ProductType              string      `gorm:"column:ProductType" json:"product_type,omitempty"`
 	ProductDescription       string      `gorm:"column:ProductDescription" json:"product_description,omitempty"`
 	CompatibleDeviceFallback string      `gorm:"column:CompatibleDeviceFallback" json:"compatible_device_fallback,omitempty"`
-	DeviceTrait              DeviceTrait `gorm:"foreignkey:DeviceTraitSet" json:"traits,omitempty"`
+	DeviceTrait              DeviceTrait `gorm:"foreignkey:DeviceTraitSet" json:"traits"`
 	DeviceTraitSet           int         `gorm:"column:DeviceTraitSet" json:"-"`
 }
 

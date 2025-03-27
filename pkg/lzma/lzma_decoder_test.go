@@ -32,9 +32,9 @@ func TestDecoder(t *testing.T) {
 }
 
 func BenchmarkDecoder(b *testing.B) {
-	b.StopTimer()
+
 	buf := new(bytes.Buffer)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		buf.Reset()
 		in := bytes.NewBuffer(bench.lzma)
 		b.StartTimer()

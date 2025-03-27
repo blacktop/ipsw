@@ -342,7 +342,7 @@ var crcTable []uint32 = make([]uint32, 256)
 func initCrcTable() {
 	for i := uint32(0); i < 256; i++ {
 		r := i
-		for j := 0; j < 8; j++ {
+		for range 8 {
 			if r&1 != 0 {
 				r = r>>1 ^ 0xEDB88320
 			} else {

@@ -53,7 +53,7 @@ type category struct {
 	Label       string `json:"label,omitempty"`
 	Collapsible bool   `json:"collapsible,omitempty"`
 	Collapsed   bool   `json:"collapsed,omitempty"`
-	Link        link   `json:"link,omitempty"`
+	Link        link   `json:"link"`
 }
 
 func createCategoryJSON(cmd *cobra.Command, dir string) error {

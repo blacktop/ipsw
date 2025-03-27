@@ -81,7 +81,7 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 	switch reflect.TypeOf(children).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(children)
-		for i := 0; i < s.Len(); i++ {
+		for i := range s.Len() {
 			child := s.Index(i)
 			c := child.Interface().(DeviceTree)
 			if product, ok := (c)["product"]["product-name"].(string); ok {
@@ -125,7 +125,7 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 		switch reflect.TypeOf(compatible).Kind() {
 		case reflect.Slice:
 			s := reflect.ValueOf(compatible)
-			for i := 0; i < s.Len(); i++ {
+			for i := range s.Len() {
 				elem := s.Index(i).String()
 				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
 					summary.BoardConfig = elem
@@ -169,7 +169,7 @@ func printNode(out *strings.Builder, node Properties, depth int) {
 			switch reflect.TypeOf(v).Kind() {
 			case reflect.Slice:
 				s := reflect.ValueOf(v)
-				for i := 0; i < s.Len(); i++ {
+				for i := range s.Len() {
 					child := s.Index(i)
 					for kk, vv := range child.Interface().(DeviceTree) {
 						out.WriteString(fmt.Sprintf("%s%s:\n", strings.Repeat(" ", depth+2), kk))
@@ -262,7 +262,7 @@ func (dtree *DeviceTree) GetProductName() (string, error) {
 	switch reflect.TypeOf(children).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(children)
-		for i := 0; i < s.Len(); i++ {
+		for i := range s.Len() {
 			child := s.Index(i)
 			c := child.Interface().(DeviceTree)
 			if product, ok := (c)["product"]["product-name"].(string); ok {
@@ -281,7 +281,7 @@ func (dtree *DeviceTree) GetBoardConfig() (string, error) {
 		switch reflect.TypeOf(compatible).Kind() {
 		case reflect.Slice:
 			s := reflect.ValueOf(compatible)
-			for i := 0; i < s.Len(); i++ {
+			for i := range s.Len() {
 				elem := s.Index(i).String()
 				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
 					return elem, nil
@@ -597,7 +597,7 @@ func getProperties(buffer io.Reader, node Node) (string, DeviceTree, error) {
 	var nodeName string
 	props := Properties{}
 
-	for index := 0; index < int(node.NumProperties); index++ {
+	for range int(node.NumProperties) {
 		key, value, err := parseNodeProperty(buffer, nodeName)
 		if err != nil {
 			return "", DeviceTree{}, err
@@ -625,7 +625,7 @@ func parseProperties(r io.Reader, node Node, parent DeviceTree) (DeviceTree, err
 	}
 
 	children := []DeviceTree{}
-	for index := 0; index < int(node.NumChildren); index++ {
+	for range int(node.NumChildren) {
 		cNode, err := parseNode(r)
 		if err != nil {
 			return DeviceTree{}, err

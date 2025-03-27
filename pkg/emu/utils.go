@@ -14,7 +14,7 @@ import (
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
 )
 
-func (e *Emulation) SetFirstArg(data interface{}) error {
+func (e *Emulation) SetFirstArg(data any) error {
 	if err := e.WriteData(STACK_DATA, data); err != nil {
 		return fmt.Errorf("failed to write data to %#x: %v", STACK_DATA, err)
 	}
@@ -100,7 +100,7 @@ func (e *Emulation) PutPointer(where uint64, ptr uint64, size uint64) error {
 	}
 }
 
-func (e *Emulation) WriteData(addr uint64, data interface{}) error {
+func (e *Emulation) WriteData(addr uint64, data any) error {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, data)
 	return e.mu.MemWrite(addr, buf.Bytes())

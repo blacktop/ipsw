@@ -233,7 +233,7 @@ func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
 	if err := binary.Read(r, binary.BigEndian, &leaf.ExtensionsSize); err != nil {
 		return nil, fmt.Errorf("cannot read extensions size: %v", err)
 	}
-	for i := 0; i < int(leaf.ExtensionsSize); i++ {
+	for range int(leaf.ExtensionsSize) {
 		var ext TransparencyExtension
 		if err := binary.Read(r, binary.BigEndian, &ext.Type); err != nil {
 			return nil, fmt.Errorf("cannot read extension type: %v", err)

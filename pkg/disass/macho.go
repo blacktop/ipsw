@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -283,10 +284,8 @@ func (d MachoDisass) IsLocation(imm uint64) bool {
 // IsBranchLocation returns if given address is branch to a location instruction
 func (d MachoDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 	for loc, addrs := range d.tr.Locations {
-		for _, a := range addrs {
-			if a == addr {
-				return true, loc
-			}
+		if slices.Contains(addrs, addr) {
+			return true, loc
 		}
 	}
 	return false, 0

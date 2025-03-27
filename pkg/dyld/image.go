@@ -836,7 +836,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 				continue
 			}
 
-			for e := 0; e < int(i.cache.Images[idx].NlistCount); e++ {
+			for range int(i.cache.Images[idx].NlistCount) {
 				nlist := types.Nlist64{}
 				if err := binary.Read(sr, i.cache.ByteOrder, &nlist); err != nil {
 					return err

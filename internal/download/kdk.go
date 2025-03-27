@@ -36,12 +36,12 @@ func (r KDKDate) Format(s string) string {
 // KDK is a Kernel Development Kit download object
 type KDK struct {
 	Build          string            `json:"build,omitempty"`
-	Date           KDKDate           `json:"date,omitempty"`
+	Date           KDKDate           `json:"date"`
 	FileSize       int               `json:"fileSize,omitempty"`
 	KernelVersions map[string]string `json:"kernel_versions"`
 	Md5Sum         string            `json:"md5sum,omitempty"`
 	Name           string            `json:"name,omitempty"`
-	Seen           time.Time         `json:"seen,omitempty"`
+	Seen           time.Time         `json:"seen"`
 	Sha256Sum      string            `json:"sha256sum,omitempty"`
 	URL            string            `json:"url,omitempty"`
 	Version        string            `json:"version,omitempty"`

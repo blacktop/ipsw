@@ -52,7 +52,7 @@ func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t *[1024]int32
 
 	nClz := bits.LeadingZeros(uint(nstates))
 
-	for i := 0; i < nsymbols; i++ {
+	for i := range nsymbols {
 		f := int(freq[i])
 		if f == 0 {
 			continue // skip this symbol, no occurrences
@@ -67,7 +67,7 @@ func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t *[1024]int32
 		j0 := ((2 * nstates) >> k) - f
 
 		// Initialize all states S reached by this symbol: OFFSET <= S < OFFSET + F
-		for j := 0; j < f; j++ {
+		for j := range f {
 			var e fseDecoderEntry
 
 			e.symbol = uint8(i)
@@ -91,7 +91,7 @@ func fseInitValueLOrMDecoderTable(nstates, nsymbols int, freq []uint16, symbolVb
 	var dDecoderIdx int
 
 	nClz := bits.LeadingZeros(uint(nstates))
-	for i := 0; i < nsymbols; i++ {
+	for i := range nsymbols {
 		f := int(freq[i])
 
 		if f == 0 {
@@ -105,7 +105,7 @@ func fseInitValueLOrMDecoderTable(nstates, nsymbols int, freq []uint16, symbolVb
 		ei.Vbase = symbolVbase[i]
 
 		// Initialize all states S reached by this symbol: OFFSET <= S < OFFSET + F
-		for j := 0; j < f; j++ {
+		for j := range f {
 			e := ei
 			if j < j0 {
 				e.TotalBits = uint8(k) + e.ValueBits
@@ -125,7 +125,7 @@ func fseInitValueDDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits
 	var dDecoderIdx int
 
 	nClz := bits.LeadingZeros(uint(nstates))
-	for i := 0; i < nsymbols; i++ {
+	for i := range nsymbols {
 		f := int(freq[i])
 
 		if f == 0 {
@@ -139,7 +139,7 @@ func fseInitValueDDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits
 		ei.Vbase = symbolVbase[i]
 
 		// Initialize all states S reached by this symbol: OFFSET <= S < OFFSET + F
-		for j := 0; j < f; j++ {
+		for j := range f {
 			e := ei
 			if j < j0 {
 				e.TotalBits = uint8(k) + e.ValueBits

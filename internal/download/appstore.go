@@ -121,8 +121,8 @@ type loginResponse struct {
 		Address struct {
 			FirstName string `json:"firstName,omitempty" plist:"firstName,omitempty"`
 			LastName  string `json:"lastName,omitempty" plist:"lastName,omitempty"`
-		} `json:"address,omitempty" plist:"address,omitempty"`
-	} `json:"accountInfo,omitempty" plist:"accountInfo,omitempty"`
+		} `json:"address" plist:"address,omitempty"`
+	} `json:"accountInfo" plist:"accountInfo,omitempty"`
 	AltDSID             string `json:"altDsid,omitempty" plist:"altDsid,omitempty"`
 	PasswordToken       string `json:"passwordToken,omitempty" plist:"passwordToken,omitempty"`
 	ClearToken          string `json:"clearToken,omitempty" plist:"clearToken,omitempty"`
@@ -144,17 +144,17 @@ type loginResponse struct {
 		Account struct {
 			IsMinor         bool `json:"isMinor,omitempty" plist:"isMinor,omitempty"`
 			SuspectUnderage bool `json:"suspectUnderage,omitempty" plist:"suspectUnderage,omitempty"`
-		} `json:"account,omitempty" plist:"account,omitempty"`
+		} `json:"account" plist:"account,omitempty"`
 		Family struct {
 			HasFamily bool `json:"hasFamily,omitempty" plist:"hasFamily,omitempty"`
-		} `json:"family,omitempty" plist:"family,omitempty"`
-	} `json:"subscriptionStatus,omitempty" plist:"subscriptionStatus,omitempty"`
+		} `json:"family" plist:"family,omitempty"`
+	} `json:"subscriptionStatus" plist:"subscriptionStatus,omitempty"`
 	AccountFlags      map[string]any `json:"accountFlags,omitempty" plist:"accountFlags,omitempty"`
 	Status            int            `json:"status,omitempty" plist:"status,omitempty"`
 	DownloadQueueInfo struct {
 		DsID                  int  `json:"dsid,omitempty" plist:"dsid,omitempty"`
 		IsAutoDownloadMachine bool `json:"is-auto-download-machine,omitempty" plist:"is-auto-download-machine,omitempty"`
-	} `json:"download-queue-info,omitempty" plist:"download-queue-info,omitempty"`
+	} `json:"download-queue-info" plist:"download-queue-info,omitempty"`
 	PrivacyAcknowledgement map[string]int `json:"privacyAcknowledgement,omitempty" plist:"privacyAcknowledgement,omitempty"`
 }
 

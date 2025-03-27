@@ -497,7 +497,7 @@ func pad(x *big.Int, n int) []byte {
 	if len(b) < n {
 		z := n - len(b)
 		p := make([]byte, n)
-		for i := 0; i < z; i++ {
+		for i := range z {
 			p[i] = 0
 		}
 
@@ -554,7 +554,7 @@ func NewPrimeField(nbits int) (p, g *big.Int, err error) {
 // security.
 func newPrimeField(nbits int) (*primeField, error) {
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		p, err := safePrime(nbits)
 		if err != nil {
 			return nil, err
@@ -601,8 +601,8 @@ func init() {
 
 	one = big.NewInt(1)
 	pflist = make(map[int]*primeField)
-	lines := strings.Split(pflistStr, "\n")
-	for _, s := range lines {
+	lines := strings.SplitSeq(pflistStr, "\n")
+	for s := range lines {
 		v := strings.Split(s, ":")
 		b := atoi(v[0])
 

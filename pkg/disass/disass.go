@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 
 	"github.com/apex/log"
@@ -557,9 +558,7 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 				return nil, err
 			}
 
-			for k, v := range sb {
-				stubs[k] = v
-			}
+			maps.Copy(stubs, sb)
 		}
 	}
 

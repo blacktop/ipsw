@@ -49,7 +49,7 @@ type RssItem struct {
 	Desc    string     `xml:"description" json:"desc,omitempty"`
 	GUID    string     `xml:"guid" json:"guid,omitempty"`
 	PubDate pubDate    `xml:"pubDate" json:"pub_date,omitempty"`
-	Content RssContent `xml:"encoded" json:"content,omitempty"`
+	Content RssContent `xml:"encoded" json:"content"`
 }
 
 type RssChannel struct {
@@ -60,7 +60,7 @@ type RssChannel struct {
 }
 
 type Rss struct {
-	Channel RssChannel `xml:"channel" json:"channel,omitempty"`
+	Channel RssChannel `xml:"channel" json:"channel"`
 }
 
 // GetRSS returns the developer.apple.com/news/releases RSS feed as Rss object
