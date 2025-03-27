@@ -29,15 +29,12 @@ func Download(filepath string, url string, chunkSize int) error {
 
 	chunks := make([][]byte, numChunks)
 
-	for i := 0; i < numChunks; i++ {
+	for i := range numChunks {
 		go func(i int) {
 			defer wg.Done()
 
 			start := i * chunkSize
-			end := start + chunkSize
-			if end > fileSize {
-				end = fileSize
-			}
+			end := min(start+chunkSize, fileSize)
 
 			req, _ := http.NewRequest("GET", url, nil)
 			req.Header.Add("Range", "bytes="+strconv.Itoa(start)+"-"+strconv.Itoa(end))

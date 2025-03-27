@@ -37,7 +37,7 @@ type Im4p struct {
 // A CompressedCache represents an open compressed kernelcache file.
 type CompressedCache struct {
 	Magic  []byte
-	Header interface{}
+	Header any
 	Size   int
 	Data   []byte
 }
@@ -48,7 +48,7 @@ type KernelVersion struct {
 	// The darwin version
 	Darwin string `json:"darwin,omitempty"`
 	// The build date
-	Date time.Time `json:"date,omitempty"`
+	Date time.Time `json:"date"`
 	// The xnu version
 	XNU string `json:"xnu,omitempty"`
 	// The kernel type
@@ -74,9 +74,9 @@ type LLVMVersion struct {
 // swagger:response kernelcacheVersion
 type Version struct {
 	// swagger:model
-	KernelVersion `json:"kernel,omitempty"`
+	KernelVersion `json:"kernel"`
 	// swagger:allOf
-	LLVMVersion `json:"llvm,omitempty"`
+	LLVMVersion `json:"llvm"`
 	rawKernel   string
 	rawLLVM     string
 }

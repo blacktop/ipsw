@@ -160,7 +160,7 @@ func Patch(patch, target, output string) (err error) {
 			if err := binary.Read(dr, binary.LittleEndian, ddata); err != nil {
 				return err
 			}
-			for i := 0; i < len(indata); i++ {
+			for i := range indata {
 				indata[i] += ddata[i]
 			}
 			if n, err := obuf.Write(indata); err != nil {

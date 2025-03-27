@@ -12,6 +12,7 @@ package demangle
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -144,7 +145,7 @@ func ToAST(name string, options ...Option) (AST, error) {
 		i := 0
 		for i < len(options) {
 			if options[i] == NoParams {
-				options = append(options[:i], options[i+1:]...)
+				options = slices.Delete(options, i, i+1)
 			} else {
 				i++
 			}
@@ -2061,10 +2062,8 @@ func (st *state) setTemplate(a AST, tmpl *Template) {
 			// https://gcc.gnu.org/PR78252.
 			return false
 		default:
-			for _, v := range seen {
-				if v == a {
-					return false
-				}
+			if slices.Contains(seen, a) {
+				return false
 			}
 			seen = append(seen, a)
 			return true
@@ -2679,7 +2678,7 @@ func (st *state) discriminator(a AST) AST {
 	if len(st.str) == 0 || st.str[0] != '_' {
 		// clang can generate a discriminator at the end of
 		// the string with no underscore.
-		for i := 0; i < len(st.str); i++ {
+		for i := range len(st.str) {
 			if !isDigit(st.str[i]) {
 				return a
 			}
@@ -3052,10 +3051,8 @@ func (st *state) substitution(forPrefix bool) AST {
 			case *TemplateParam, *LambdaAuto:
 				return false
 			}
-			for _, v := range seen {
-				if v == a {
-					return true
-				}
+			if slices.Contains(seen, a) {
+				return true
 			}
 			seen = append(seen, a)
 			return false
@@ -3111,10 +3108,8 @@ func isLower(c byte) bool {
 func simplify(a AST) AST {
 	var seen []AST
 	skip := func(a AST) bool {
-		for _, v := range seen {
-			if v == a {
-				return true
-			}
+		if slices.Contains(seen, a) {
+			return true
 		}
 		seen = append(seen, a)
 		return false
@@ -3204,10 +3199,8 @@ func simplifyOne(a AST) AST {
 					if _, ok := sub.(*PackExpansion); ok {
 						return true
 					}
-					for _, v := range seen {
-						if v == sub {
-							return true
-						}
+					if slices.Contains(seen, sub) {
+						return true
 					}
 					seen = append(seen, sub)
 					return false
@@ -3250,10 +3243,8 @@ func (st *state) findArgumentPack(a AST) *ArgumentPack {
 		case *UnnamedType, *FixedType, *DefaultArg:
 			return false
 		}
-		for _, v := range seen {
-			if v == a {
-				return false
-			}
+		if slices.Contains(seen, a) {
+			return false
 		}
 		seen = append(seen, a)
 		return true

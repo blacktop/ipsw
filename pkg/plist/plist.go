@@ -87,7 +87,7 @@ type OTAInfo struct {
 	CFBundleName                  string      `plist:"CFBundleName,omitempty" json:"cf_bundle_name,omitempty"`
 	CFBundleShortVersionString    string      `plist:"CFBundleShortVersionString,omitempty" json:"cf_bundle_short_version_string,omitempty"`
 	CFBundleVersion               string      `plist:"CFBundleVersion,omitempty" json:"cf_bundle_version,omitempty"`
-	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty" json:"mobile_asset_properties,omitempty"`
+	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty" json:"mobile_asset_properties"`
 }
 
 // OTAInfo Stringer

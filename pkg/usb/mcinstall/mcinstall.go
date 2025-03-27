@@ -216,7 +216,7 @@ func (cc *CloudConfiguration) String() string {
 }
 
 type cloudConfigurationResponse struct {
-	CloudConfiguration CloudConfiguration `plist:"CloudConfiguration,omitempty" json:"cloud_conf,omitempty"`
+	CloudConfiguration CloudConfiguration `plist:"CloudConfiguration,omitempty" json:"cloud_conf"`
 	Status             string             `plist:"Status,omitempty" json:"status,omitempty"`
 }
 

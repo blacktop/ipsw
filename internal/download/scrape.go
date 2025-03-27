@@ -3,6 +3,7 @@ package download
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -90,10 +91,8 @@ func trimQuotes(s string) string {
 }
 
 func appendIfMissing(slice []string, i string) []string {
-	for _, ele := range slice {
-		if ele == i {
-			return slice
-		}
+	if slices.Contains(slice, i) {
+		return slice
 	}
 	return append(slice, i)
 }

@@ -244,7 +244,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 	if pset.MustBeMissingPathsCount > 0 {
 		sr.Seek(int64(pset.MustBeMissingPathsOffset), io.SeekStart)
 		br := bufio.NewReader(sr)
-		for i := 0; i < int(pset.MustBeMissingPathsCount); i++ {
+		for range int(pset.MustBeMissingPathsCount) {
 			s, err := br.ReadString('\x00')
 			if err != nil {
 				return nil, err

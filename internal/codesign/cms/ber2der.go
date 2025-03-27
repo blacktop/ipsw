@@ -139,7 +139,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 		}
 		//fmt.Printf("--> (compute length) indicator byte: %x\n", l)
 		//fmt.Printf("--> (compute length) length bytes: % X\n", ber[offset:offset+numberOfBytes])
-		for i := 0; i < numberOfBytes; i++ {
+		for range numberOfBytes {
 			length = length*256 + (int)(ber[offset])
 			offset++
 		}

@@ -16,7 +16,7 @@ const CTF_MAGIC = 0xcff1
 
 // CTF is the Compact ANSI-C Type Format object
 type CTF struct {
-	Header    header       `json:"header,omitempty"`
+	Header    header       `json:"header"`
 	Types     map[int]Type `json:"types,omitempty"`
 	Globals   []global     `json:"globals,omitempty"`
 	Functions []function   `json:"functions,omitempty"`

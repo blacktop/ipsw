@@ -216,7 +216,7 @@ func ParseTrustCache(data []byte) (*TrustCache, error) {
 		return nil, err
 	}
 
-	for i := 0; i < int(tc.NumEntries); i++ {
+	for range int(tc.NumEntries) {
 		switch tc.Version {
 		case 1:
 			var entry TrustCacheEntryV1

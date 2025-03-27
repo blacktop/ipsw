@@ -49,18 +49,18 @@ type Diagnostics struct {
 		DesignCapacity     int    `plist:"DesignCapacity,omitempty" json:"design_capacity,omitempty"`
 		FullChargeCapacity int    `plist:"FullChargeCapacity,omitempty" json:"full_charge_capacity,omitempty"`
 		Status             string `plist:"Status,omitempty" json:"status,omitempty"`
-	} `plist:"GasGauge,omitempty" json:"gas_gauge,omitempty"`
+	} `plist:"GasGauge,omitempty" json:"gas_gauge"`
 	HDMI struct {
 		Connection string `plist:"Connection,omitempty" json:"connection,omitempty"`
 		Status     string `plist:"Status,omitempty" json:"status,omitempty"`
-	} `plist:"HDMI,omitempty" json:"hdmi,omitempty"`
+	} `plist:"HDMI,omitempty" json:"hdmi"`
 	NAND struct {
 		Status string `plist:"Status,omitempty" json:"status,omitempty"`
-	} `plist:"NAND,omitempty" json:"nand,omitempty"`
+	} `plist:"NAND,omitempty" json:"nand"`
 	WiFi struct {
 		Active string `plist:"Active,omitempty" json:"active,omitempty"`
 		Status string `plist:"Status,omitempty" json:"status,omitempty"`
-	} `plist:"WiFi,omitempty" json:"wifi,omitempty"`
+	} `plist:"WiFi,omitempty" json:"wifi"`
 }
 
 func (d Diagnostics) String() string {
@@ -92,7 +92,7 @@ func (d Diagnostics) String() string {
 }
 
 type infoResponse struct {
-	Diagnostics Diagnostics `plist:"Diagnostics,omitempty" json:"diagnostics,omitempty"`
+	Diagnostics Diagnostics `plist:"Diagnostics,omitempty" json:"diagnostics"`
 	Status      string      `plist:"Status,omitempty" json:"status,omitempty"`
 }
 

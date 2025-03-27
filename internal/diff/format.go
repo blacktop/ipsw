@@ -238,7 +238,7 @@ func (d *Diff) String() string {
 
 	tmpl := template.Must(template.New("diff").
 		Funcs(template.FuncMap{
-			"noescape": func(value interface{}) template.HTML {
+			"noescape": func(value any) template.HTML {
 				return template.HTML(fmt.Sprint(value))
 			},
 		}).

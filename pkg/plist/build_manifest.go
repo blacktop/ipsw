@@ -41,7 +41,7 @@ type buildIdentity struct {
 	BbChipID                      string                      `json:"bb_chip_id,omitempty"`
 	BbFDRSecurityKeyHash          []byte                      `json:"bb_fdr_security_key_hash,omitempty"`
 	BbProvisioningManifestKeyHash []byte                      `json:"bb_provisioning_manifest_key_hash,omitempty"`
-	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info,omitempty"`
+	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info"`
 	Manifest                      map[string]IdentityManifest `json:"manifest,omitempty"`
 	PearlCertificationRootPub     []byte                      `json:"pearl_certification_root_pub,omitempty"`
 	ProductMarketingVersion       string                      `json:"product_marketing_version,omitempty"`

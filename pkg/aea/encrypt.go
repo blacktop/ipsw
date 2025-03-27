@@ -139,7 +139,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 		segmentHMACs := make([]HMAC, segmentsPerCluster)
 		segmentsData := new(bytes.Buffer)
 
-		for j := 0; j < segmentsPerCluster; j++ {
+		for j := range segmentsPerCluster {
 			n, ferr := f.ReadAt(data, int64(i*int64(clusterSize)+int64(j*segmentSize)))
 			if ferr != nil && ferr != io.EOF {
 				return fmt.Errorf("failed to read segment data: %v", ferr)

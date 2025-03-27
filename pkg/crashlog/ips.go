@@ -180,7 +180,7 @@ type IpsMetadata struct {
 	BuildVersion     string    `json:"build_version,omitempty"`
 	IncidentID       string    `json:"incident_id,omitempty"`
 	Platform         Platform  `json:"platform,omitempty"`
-	Timestamp        Timestamp `json:"timestamp,omitempty"`
+	Timestamp        Timestamp `json:"timestamp"`
 	SliceUUID        string    `json:"slice_uuid,omitempty"`
 	ShareWithAppDevs int       `json:"share_with_app_devs,omitempty"`
 	IsFirstParty     int       `json:"is_first_party,omitempty"`
@@ -218,12 +218,12 @@ type MemoryStatus struct {
 		Speculative int64 `json:"speculative,omitempty"`
 		Throttled   int64 `json:"throttled,omitempty"`
 		Wired       int64 `json:"wired,omitempty"`
-	} `json:"memoryPages,omitempty"`
+	} `json:"memoryPages"`
 	MemoryPressure        bool `json:"memoryPressure,omitempty"`
 	MemoryPressureDetails struct {
 		PagesReclaimed int64 `json:"pagesReclaimed,omitempty"`
 		PagesWanted    int64 `json:"pagesWanted,omitempty"`
-	} `json:"memoryPressureDetails,omitempty"`
+	} `json:"memoryPressureDetails"`
 	PageSize int64 `json:"pageSize,omitempty"`
 }
 
@@ -429,13 +429,13 @@ func (r Register) String() string {
 type ThreadState struct {
 	X      []Register `json:"x,omitempty"`
 	Flavor string     `json:"flavor,omitempty"`
-	LR     Register   `json:"lr,omitempty"`
-	CPSR   Register   `json:"cpsr,omitempty"`
-	FP     Register   `json:"fp,omitempty"`
-	SP     Register   `json:"sp,omitempty"`
-	ESR    Register   `json:"esr,omitempty"`
-	PC     Register   `json:"pc,omitempty"`
-	FAR    Register   `json:"far,omitempty"`
+	LR     Register   `json:"lr"`
+	CPSR   Register   `json:"cpsr"`
+	FP     Register   `json:"fp"`
+	SP     Register   `json:"sp"`
+	ESR    Register   `json:"esr"`
+	PC     Register   `json:"pc"`
+	FAR    Register   `json:"far"`
 }
 
 func (s ThreadState) HasSymbols() bool {
@@ -506,7 +506,7 @@ type UserThread struct {
 	ID          int         `json:"id,omitempty"`
 	Name        string      `json:"name,omitempty"`
 	Queue       string      `json:"queue,omitempty"`
-	ThreadState ThreadState `json:"threadState,omitempty"`
+	ThreadState ThreadState `json:"threadState"`
 	Triggered   bool        `json:"triggered,omitempty"`
 }
 
@@ -604,7 +604,7 @@ type IPSPayload struct {
 	MacOSPanicString string          `json:"macOSPanicString,omitempty"`
 	PanicFlags       string          `json:"panicFlags,omitempty"`
 	OtherString      string          `json:"otherString,omitempty"`
-	MemoryStatus     MemoryStatus    `json:"memoryStatus,omitempty"`
+	MemoryStatus     MemoryStatus    `json:"memoryStatus"`
 	ProcessByPid     map[int]Process `json:"processByPid,omitempty"`
 	BinaryImages     []BinaryImage   `json:"binaryImages,omitempty"`
 	Notes            []string        `json:"notes,omitempty"`
@@ -627,14 +627,14 @@ type IPSPayload struct {
 	DeployVersion         int        `json:"deployVersion,omitempty"`
 	ModelCode             string     `json:"modelCode,omitempty"`
 	CoalitionID           int        `json:"coalitionID,omitempty"`
-	OsVersion             OsVersion  `json:"osVersion,omitempty"`
+	OsVersion             OsVersion  `json:"osVersion"`
 	CaptureTime           string     `json:"captureTime,omitempty"`
 	PID                   int        `json:"pid,omitempty"`
 	CPUType               string     `json:"cpuType,omitempty"`
 	RootsInstalled        int        `json:"roots_installed,omitempty"`
 	BugType               string     `json:"bug_type,omitempty"`
-	BundleInfo            BundleInfo `json:"bundleInfo,omitempty"`
-	StoreInfo             StoreInfo  `json:"storeInfo,omitempty"`
+	BundleInfo            BundleInfo `json:"bundleInfo"`
+	StoreInfo             StoreInfo  `json:"storeInfo"`
 	ParentProc            string     `json:"parentProc,omitempty"`
 	ParentPid             int        `json:"parentPid,omitempty"`
 	CoalitionName         string     `json:"coalitionName,omitempty"`
@@ -644,7 +644,7 @@ type IPSPayload struct {
 	InstructionByteStream struct {
 		BeforePC string `json:"beforePC,omitempty"`
 		AtPC     string `json:"atPC,omitempty"`
-	} `json:"instructionByteStream,omitempty"`
+	} `json:"instructionByteStream"`
 	CodeSigningID                 string       `json:"codeSigningID,omitempty"`
 	CodeSigningTeamID             string       `json:"codeSigningTeamID,omitempty"`
 	CodeSigningFlags              int          `json:"codeSigningFlags,omitempty"`
@@ -670,17 +670,17 @@ type IPSPayload struct {
 		Base uint64 `json:"base,omitempty"`
 		Size uint64 `json:"size,omitempty"`
 		UUID string `json:"uuid,omitempty"`
-	} `json:"sharedCache,omitempty"`
+	} `json:"sharedCache"`
 	LegacyInfo struct {
 		ThreadTriggered struct {
 			Queue string `json:"queue,omitempty"`
-		} `json:"threadTriggered,omitempty"`
-	} `json:"legacyInfo,omitempty"`
+		} `json:"threadTriggered"`
+	} `json:"legacyInfo"`
 	TrialInfo struct {
 		Rollouts []struct {
 			RolloutID     string `json:"rolloutId,omitempty"`
 			FactorPackIds struct {
-			} `json:"factorPackIds,omitempty"`
+			} `json:"factorPackIds"`
 			DeploymentID int `json:"deploymentId,omitempty"`
 		} `json:"rollouts,omitempty"`
 		Experiments []struct {
@@ -688,16 +688,16 @@ type IPSPayload struct {
 			ExperimentID string `json:"experimentId,omitempty"`
 			DeploymentID int    `json:"deploymentId,omitempty"`
 		} `json:"experiments,omitempty"`
-	} `json:"trialInfo,omitempty"`
+	} `json:"trialInfo"`
 	DTAppStoreToolsBuild string      `json:"DTAppStoreToolsBuild,omitempty"`
 	Version              int         `json:"version,omitempty"`
 	VMSummary            string      `json:"vmSummary,omitempty"`
 	VmRegionInfo         string      `json:"vmregioninfo,omitempty"`
-	Termination          Termination `json:"termination,omitempty"`
+	Termination          Termination `json:"termination"`
 
 	AbsoluteTime      int               `json:"absoluteTime,omitempty"`
-	PostSampleVMStats PostSampleVMStats `json:"postSampleVMStats,omitempty"`
-	AdditionalDetails AdditionalDetails `json:"additionalDetails,omitempty"`
+	PostSampleVMStats PostSampleVMStats `json:"postSampleVMStats"`
+	AdditionalDetails AdditionalDetails `json:"additionalDetails"`
 
 	panic210 *Panic210
 }

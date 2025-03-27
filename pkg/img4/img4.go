@@ -169,7 +169,7 @@ type boolProp struct {
 	Bool bool
 }
 
-type ManifestProperties map[string]interface{}
+type ManifestProperties map[string]any
 
 const typeBNCH = "private,tag:1112425288"
 

@@ -177,7 +177,7 @@ func (p *props) decodeProps(buf []byte) {
 	if p.litContextBits > kNumLitContextBitsMax || p.litPosStateBits > 4 || p.posStateBits > kNumPosStatesBitsMax {
 		throw(headerError)
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		p.dictSize += uint32(buf[i+1]) << uint32(i*8)
 	}
 }
@@ -309,7 +309,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err error) {
 	z.prop.decodeProps(header)
 
 	z.unpackSize = 0
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		b := header[lzmaPropSize+i]
 		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
@@ -332,7 +332,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err error) {
 	z.rep0LongDecoders = initBitModels(kNumStates << kNumPosStatesBitsMax)
 	z.posDecoders = initBitModels(kNumFullDistances - kEndPosModelIndex)
 	z.posSlotCoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
-	for i := 0; i < kNumLenToPosStates; i++ {
+	for i := range kNumLenToPosStates {
 		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
 	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)

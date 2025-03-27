@@ -96,7 +96,7 @@ type WikiFirmware struct {
 	BoardID             string    `json:"board_id,omitempty"`
 	Devices             []string  `json:"keys,omitempty"`
 	Baseband            string    `json:"baseband,omitempty"`
-	ReleaseDate         time.Time `json:"release_date,omitempty"`
+	ReleaseDate         time.Time `json:"release_date"`
 	URL                 string    `json:"url,omitempty"`
 	Sha1Hash            string    `json:"sha1,omitempty"`
 	FileSize            int       `json:"file_size,omitempty"`
@@ -147,7 +147,7 @@ type wikiParseData struct {
 	Categories    []wikiCategory `json:"categories,omitempty"`
 	Templates     []wikiTemplate `json:"templates,omitempty"`
 	ExternalLinks []string       `json:"externallinks,omitempty"`
-	WikiText      wikiText       `json:"wikitext,omitempty"`
+	WikiText      wikiText       `json:"wikitext"`
 }
 
 type wikiParseResults struct {
@@ -595,7 +595,7 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 				return nil, fmt.Errorf("table end: invalid state '%s'", machine.Current())
 			}
 			machine.Transition("stop")
-			for i := 0; i < headerCount; i++ {
+			for i := range headerCount {
 				parseItem(i)
 			}
 			if ipsw.URL != "" {
@@ -614,7 +614,7 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 			case "subheader":
 				machine.Transition("process_item")
 			case "process_item":
-				for i := 0; i < headerCount; i++ {
+				for i := range headerCount {
 					parseItem(i)
 				}
 				if ipsw.URL != "" {
@@ -645,7 +645,7 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 					}
 					header2Values[field] = NewQueue(100)
-					for i := 0; i < colInc; i++ {
+					for range colInc {
 						index2Header[headerCount] = field
 						headerCount++
 					}
@@ -662,7 +662,7 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 					line = strings.TrimSpace(line)
 				}
 				var last string
-				for i := 0; i < headerCount; i++ {
+				for i := range headerCount {
 					if last == index2Header[i] {
 						index2Header[i] = line
 						header2Values[line] = NewQueue(100)
@@ -695,19 +695,19 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 					return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 				}
 				if colInc > 0 && rowInc > 0 {
-					for i := 0; i < colInc; i++ {
-						for j := 0; j < rowInc; j++ {
+					for i := range colInc {
+						for range rowInc {
 							header2Values[index2Header[fieldCount+i]].Push(field)
 						}
 					}
 				} else if colInc > 0 {
-					for i := 0; i < colInc; i++ {
+					for i := range colInc {
 						if fieldCount+i < len(header2Values) {
 							header2Values[index2Header[fieldCount+i]].Push(field)
 						}
 					}
 				} else if rowInc > 0 {
-					for i := 0; i < rowInc; i++ {
+					for range rowInc {
 						header2Values[index2Header[fieldCount]].Push(field)
 					}
 				}
@@ -947,7 +947,7 @@ func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
 				return nil, fmt.Errorf("table end: invalid state '%s'", machine.Current())
 			}
 			machine.Transition("stop")
-			for i := 0; i < headerCount; i++ {
+			for i := range headerCount {
 				parseItem(i)
 			}
 			if ipsw.URL != "" {
@@ -966,7 +966,7 @@ func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
 			case "subheader":
 				machine.Transition("process_item")
 			case "process_item":
-				for i := 0; i < headerCount; i++ {
+				for i := range headerCount {
 					parseItem(i)
 				}
 				if ipsw.URL != "" {
@@ -997,7 +997,7 @@ func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
 						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 					}
 					header2Values[field] = NewQueue(100)
-					for i := 0; i < colInc; i++ {
+					for range colInc {
 						index2Header[headerCount] = field
 						headerCount++
 					}
@@ -1014,7 +1014,7 @@ func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
 					line = strings.TrimSpace(line)
 				}
 				var last string
-				for i := 0; i < headerCount; i++ {
+				for i := range headerCount {
 					if last == index2Header[i] {
 						index2Header[i] = line
 						header2Values[line] = NewQueue(100)
@@ -1047,19 +1047,19 @@ func parseWikiKeyTable(text string) ([]WikiFirmware, error) {
 					return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 				}
 				if colInc > 0 && rowInc > 0 {
-					for i := 0; i < colInc; i++ {
-						for j := 0; j < rowInc; j++ {
+					for i := range colInc {
+						for range rowInc {
 							header2Values[index2Header[fieldCount+i]].Push(field)
 						}
 					}
 				} else if colInc > 0 {
-					for i := 0; i < colInc; i++ {
+					for i := range colInc {
 						if fieldCount+i < len(header2Values) {
 							header2Values[index2Header[fieldCount+i]].Push(field)
 						}
 					}
 				} else if rowInc > 0 {
-					for i := 0; i < rowInc; i++ {
+					for range rowInc {
 						header2Values[index2Header[fieldCount]].Push(field)
 					}
 				}

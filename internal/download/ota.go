@@ -127,7 +127,7 @@ type ota struct {
 	SessionID       string          `plist:"SessionId,omitempty" json:"SessionId,omitempty"`
 	LegacyXMLURL    string          `plist:"LegacyXmlUrl,omitempty" json:"LegacyXmlUrl,omitempty"`
 	PostingDate     string          `plist:"PostingDate,omitempty" json:"PostingDate,omitempty"`
-	Transformations transformations `plist:"Transformations,omitempty" json:"Transformations,omitempty"`
+	Transformations transformations `plist:"Transformations,omitempty" json:"Transformations"`
 }
 
 type transformations struct {

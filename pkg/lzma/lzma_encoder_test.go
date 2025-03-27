@@ -123,10 +123,10 @@ func TestEncoder(t *testing.T) {
 }
 
 func BenchmarkEncoder(b *testing.B) {
-	b.StopTimer()
+
 	buf := new(bytes.Buffer)
 	start := make(chan bool)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		in := bytes.NewBuffer(bench.raw)
 		pr, pw := io.Pipe()
 		defer pr.Close()

@@ -125,7 +125,7 @@ func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, err
 	}
 
 	var tr Response
-	for _, field := range strings.Split(string(body), "&") {
+	for field := range strings.SplitSeq(string(body), "&") {
 		key, value, ok := strings.Cut(field, "=")
 		if !ok {
 			log.Error("failed to parse response field")

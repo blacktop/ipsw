@@ -36,9 +36,9 @@ type githubRepo struct {
 	Description string    `json:"description,omitempty"`
 	FullName    string    `json:"full_name,omitempty"`
 	Tag         string    `json:"tag_name,omitempty"`
-	PublishedAt time.Time `json:"published_at,omitempty"`
-	CreatedAt   time.Time `json:"created_at,omitempty"`
-	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+	PublishedAt time.Time `json:"published_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type pageInfo struct {
@@ -59,8 +59,8 @@ type GithubReleaseAsset struct {
 	DownloadURL   string    `json:"browser_download_url,omitempty"`
 	Size          int       `json:"size,omitempty"`
 	DownloadCount int       `json:"download_count,omitempty"`
-	CreatedAt     time.Time `json:"created_at,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func (a GithubReleaseAsset) String() string {
@@ -75,8 +75,8 @@ type githubRelease struct {
 	HtmlURL     string               `json:"html_url,omitempty"`
 	TarballURL  string               `json:"tarball_url,omitempty"`
 	Tag         string               `json:"tag_name,omitempty"`
-	CreatedAt   time.Time            `json:"created_at,omitempty"`
-	PublishedAt time.Time            `json:"published_at,omitempty"`
+	CreatedAt   time.Time            `json:"created_at"`
+	PublishedAt time.Time            `json:"published_at"`
 	Assets      []GithubReleaseAsset `json:"assets,omitempty"`
 	Body        string               `json:"body,omitempty"`
 }
@@ -87,13 +87,13 @@ type GithubTag struct {
 	Name   string       `json:"name,omitempty"`
 	TarURL string       `json:"tarball_url,omitempty"`
 	ZipURL string       `json:"zipball_url,omitempty"`
-	Commit GithubCommit `json:"commit,omitempty"`
+	Commit GithubCommit `json:"commit"`
 }
 
 type GithubCommit struct {
 	SHA  string    `json:"sha,omitempty"`
 	URL  string    `json:"url,omitempty"`
-	Date time.Time `json:"date,omitempty"`
+	Date time.Time `json:"date"`
 }
 
 func GetLatestTag(prod, proxy string, insecure bool, api string) (string, error) {
@@ -258,7 +258,7 @@ func queryAppleGithubRepos(proxy string, insecure bool, api string) (GithubRepos
 func populatePageValues(r *http.Response) pageInfo {
 	var pinfo pageInfo
 	if links, ok := r.Header["Link"]; ok && len(links) > 0 {
-		for _, link := range strings.Split(links[0], ",") {
+		for link := range strings.SplitSeq(links[0], ",") {
 			segments := strings.Split(strings.TrimSpace(link), ";")
 
 			// link must at least have href and rel
@@ -500,7 +500,7 @@ type Commit struct {
 	Author       struct {
 		Name  githubv4.String       `json:"name,omitempty"`
 		Email githubv4.String       `json:"email,omitempty"`
-		Date  githubv4.GitTimestamp `json:"date,omitempty"`
+		Date  githubv4.GitTimestamp `json:"date"`
 	} `json:"author"`
 	ZipballURL string `json:"zipballUrl"`
 	TarballURL string `json:"tarballUrl"`
@@ -552,7 +552,7 @@ func GetGithubCommits(org, repo, branch, file, pattern string, days int, proxy s
 		filePath = githubv4.String(file)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"repoOrg":   githubv4.String(org),
 		"repoName":  githubv4.String(repo),
 		"repoRef":   githubv4.String(branch), // "main" etc
@@ -615,7 +615,7 @@ func GetLatestTagsV2(owner, repo string, limit int, proxy string, insecure bool,
 		limit = 1
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(owner),
 		"name":  githubv4.String(repo),
 		"limit": githubv4.Int(limit),
@@ -683,7 +683,7 @@ func AppleOssGraphQLTags(repo string, limit int, proxy string, insecure bool, ap
 				} `graphql:"repositories(first: 100, after: $endCursor)"`
 			} `graphql:"organization(login: $login)"`
 		}
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"login":     githubv4.String("apple-oss-distributions"),
 			"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
 		}
@@ -727,7 +727,7 @@ func AppleOssGraphQLTags(repo string, limit int, proxy string, insecure bool, ap
 	for _, repo := range repos {
 	loop:
 		for {
-			variables := map[string]interface{}{
+			variables := map[string]any{
 				"owner":     githubv4.String("apple-oss-distributions"),
 				"name":      githubv4.String(repo),
 				"limit":     githubv4.Int(limit),
@@ -810,7 +810,7 @@ func WebKitGraphQLTags(proxy string, insecure bool, apikey string) ([]GithubTag,
 		} `graphql:"repository(owner: \"WebKit\", name: \"WebKit\")"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
 	}
 

@@ -430,7 +430,7 @@ func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
 
 	var migs []MigKernSubsystem
 
-	for i := 0; i < len(subsystems); i++ {
+	for i := range subsystems {
 		r.Seek(int64(subsystems[i]-dataConst.Addr), io.SeekStart)
 
 		var mig MigKernSubsystem

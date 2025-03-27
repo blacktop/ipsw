@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -84,7 +85,7 @@ func TrimPrefixStrSlice(slice []string, prefix string) []string {
 func RemoveStrFromSlice(s []string, r string) []string {
 	for i, v := range s {
 		if v == r {
-			return append(s[:i], s[i+1:]...)
+			return slices.Delete(s, i, i+1)
 		}
 	}
 	return s
@@ -190,12 +191,7 @@ func UnicodeSanitize(s string) string {
 }
 
 func IsPunctuation(c byte) bool {
-	for _, r := range []byte("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~") {
-		if c == r {
-			return true
-		}
-	}
-	return false
+	return slices.Contains([]byte("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"), c)
 }
 
 func IsSpace(c byte) bool {

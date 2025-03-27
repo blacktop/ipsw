@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -104,11 +105,8 @@ var objcProtoCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to get objc class protocols: %v", err)
 					}
-					for _, protAddr := range protAddrs {
-						if protAddr == ptr {
-							fmt.Fprintf(w, "    %s: %s=%s\t%s=%s\n", colorAddr("%#09x", addr), colorClassField("dylib"), class.Dylib, colorClassField("class"), class.Name)
-							break
-						}
+					if slices.Contains(protAddrs, ptr) {
+						fmt.Fprintf(w, "    %s: %s=%s\t%s=%s\n", colorAddr("%#09x", addr), colorClassField("dylib"), class.Dylib, colorClassField("class"), class.Name)
 					}
 				}
 				w.Flush()

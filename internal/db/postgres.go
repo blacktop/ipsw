@@ -236,10 +236,7 @@ func (p *Postgres) processPaths(tx *gorm.DB, ipsw *model.Ipsw) error {
 	}
 
 	for i := 0; i < len(paths); i += p.BatchSize {
-		end := i + p.BatchSize
-		if end > len(paths) {
-			end = len(paths)
-		}
+		end := min(i+p.BatchSize, len(paths))
 		batch := paths[i:end]
 
 		// Bulk create or get Paths
@@ -254,10 +251,7 @@ func (p *Postgres) processPaths(tx *gorm.DB, ipsw *model.Ipsw) error {
 	// Fetch all created/existing Paths in batches
 	var allPaths []model.Path
 	for i := 0; i < len(paths); i += p.BatchSize {
-		end := i + p.BatchSize
-		if end > len(paths) {
-			end = len(paths)
-		}
+		end := min(i+p.BatchSize, len(paths))
 		batch := paths[i:end]
 
 		var batchPaths []model.Path
@@ -326,10 +320,7 @@ func (p *Postgres) processNames(tx *gorm.DB, ipsw *model.Ipsw) error {
 	}
 
 	for i := 0; i < len(names); i += p.BatchSize {
-		end := i + p.BatchSize
-		if end > len(names) {
-			end = len(names)
-		}
+		end := min(i+p.BatchSize, len(names))
 		batch := names[i:end]
 
 		// Bulk create or get Names
@@ -344,10 +335,7 @@ func (p *Postgres) processNames(tx *gorm.DB, ipsw *model.Ipsw) error {
 	// Fetch all created/existing Names in batches
 	var allNames []model.Name
 	for i := 0; i < len(names); i += p.BatchSize {
-		end := i + p.BatchSize
-		if end > len(names) {
-			end = len(names)
-		}
+		end := min(i+p.BatchSize, len(names))
 		batch := names[i:end]
 
 		var batchNames []model.Name

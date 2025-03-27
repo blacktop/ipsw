@@ -174,6 +174,7 @@ var WebkitCmd = &cobra.Command{
 			}
 			svnRev = fmt.Sprintf("%s (svn rev %s)", ver, rev)
 		} else if getGit {
+			log.Infof("WebKit Version: %s", webkit1)
 			log.Info("Querying https://github.com API...")
 			var tags []download.GithubTag
 			if len(apiToken) == 0 {
@@ -217,7 +218,7 @@ var WebkitCmd = &cobra.Command{
 			if asJSON {
 				b, err := json.Marshal(&struct {
 					Version string             `json:"version"`
-					Tag     download.GithubTag `json:"tag,omitempty"`
+					Tag     download.GithubTag `json:"tag"`
 					Exact   bool               `json:"exact"`
 				}{
 					Version: webkit1,

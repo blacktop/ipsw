@@ -35,10 +35,7 @@ func DiffVersion(v, w string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	pmdelta := pvm - pwm
-	if pmdelta < 0 {
-		pmdelta = 0
-	}
+	pmdelta := max(pvm-pwm, 0)
 	pvn, err := strconv.Atoi(pv.minor)
 	if err != nil {
 		return "", err
@@ -47,10 +44,7 @@ func DiffVersion(v, w string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	pndelta := pvn - pwn
-	if pndelta < 0 {
-		pndelta = 0
-	}
+	pndelta := max(pvn-pwn, 0)
 	pvp, err := strconv.Atoi(pv.patch)
 	if err != nil {
 		return "", err
@@ -59,10 +53,7 @@ func DiffVersion(v, w string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ppdelta := pvp - pwp
-	if ppdelta < 0 {
-		ppdelta = 0
-	}
+	ppdelta := max(pvp-pwp, 0)
 	pvs, err := strconv.Atoi(pv.short)
 	if err != nil {
 		return "", err
@@ -71,10 +62,7 @@ func DiffVersion(v, w string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	psdelta := pvs - pws
-	if psdelta < 0 {
-		psdelta = 0
-	}
+	psdelta := max(pvs-pws, 0)
 	pvc, err := strconv.Atoi(pv.micro)
 	if err != nil {
 		return "", err
@@ -83,10 +71,7 @@ func DiffVersion(v, w string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	pcdelta := pvc - pwc
-	if pcdelta < 0 {
-		pcdelta = 0
-	}
+	pcdelta := max(pvc-pwc, 0)
 	return fmt.Sprintf("%d.%d.%d.%d.%d", pmdelta, pndelta, ppdelta, psdelta, pcdelta), nil
 }
 

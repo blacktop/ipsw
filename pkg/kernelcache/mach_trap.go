@@ -293,7 +293,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 
 		// TODO: after the mach_trap_table are the 'mach_trap_names' array (in macOS or non stripped kernels) we should parse to get NEW trap names etc
 
-		for i := 0; i < len(mtrapts); i++ {
+		for i := range mtrapts {
 			mtrapts[i].Function = m.SlidePointer(mtrapts[i].Function)
 			mtrapts[i].ArgMunge32 = m.SlidePointer(mtrapts[i].ArgMunge32)
 			mtrap, err := syscalls.GetMachSyscallByNumber(i)

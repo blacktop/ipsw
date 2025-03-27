@@ -52,7 +52,7 @@ func NewNSKeyedArchiverParser(data []byte) (*NSKeyedArchiverParser, error) {
 }
 
 // NextObject parses the next object from the NSKeyedArchiver data
-func (p *NSKeyedArchiverParser) NextObject() (interface{}, error) {
+func (p *NSKeyedArchiverParser) NextObject() (any, error) {
 	// Parse the object info
 	objectInfo, err := p.parseObjectHeader()
 	if err != nil {
@@ -60,7 +60,7 @@ func (p *NSKeyedArchiverParser) NextObject() (interface{}, error) {
 	}
 
 	// Parse the object based on its type
-	var value interface{}
+	var value any
 	switch objectInfo.Type {
 	case ObjectTypeInt:
 		// Parse an integer value
@@ -307,7 +307,7 @@ func (p *NSKeyedArchiverParser) parseUID() (uint64, error) {
 }
 
 // parseArray parses an array object from the NSKeyedArchiver data
-func (p *NSKeyedArchiverParser) parseArray() ([]interface{}, error) {
+func (p *NSKeyedArchiverParser) parseArray() ([]any, error) {
 	// Parse the number of elements in the array
 	numElements, err := p.parseInt()
 	if err != nil {
@@ -315,7 +315,7 @@ func (p *NSKeyedArchiverParser) parseArray() ([]interface{}, error) {
 	}
 
 	// Parse the elements in the array
-	array := make([]interface{}, numElements)
+	array := make([]any, numElements)
 	for i := int64(0); i < numElements; i++ {
 		// Parse the element
 		element, err := p.NextObject()
@@ -331,7 +331,7 @@ func (p *NSKeyedArchiverParser) parseArray() ([]interface{}, error) {
 }
 
 // parseSet parses a set object from the NSKeyedArchiver data
-func (p *NSKeyedArchiverParser) parseSet() (map[interface{}]struct{}, error) {
+func (p *NSKeyedArchiverParser) parseSet() (map[any]struct{}, error) {
 	// Parse the number of elements in the set
 	numElements, err := p.parseInt()
 	if err != nil {
@@ -339,7 +339,7 @@ func (p *NSKeyedArchiverParser) parseSet() (map[interface{}]struct{}, error) {
 	}
 
 	// Parse the elements in the set
-	set := make(map[interface{}]struct{}, numElements)
+	set := make(map[any]struct{}, numElements)
 	for i := int64(0); i < numElements; i++ {
 		// Parse the element
 		element, err := p.NextObject()
@@ -355,7 +355,7 @@ func (p *NSKeyedArchiverParser) parseSet() (map[interface{}]struct{}, error) {
 }
 
 // parseDictionary parses a dictionary object from the NSKeyedArchiver data
-func (p *NSKeyedArchiverParser) parseDictionary() (map[string]interface{}, error) {
+func (p *NSKeyedArchiverParser) parseDictionary() (map[string]any, error) {
 	// Parse the number of key-value pairs in the dictionary
 	numPairs, err := p.parseInt()
 	if err != nil {
@@ -363,7 +363,7 @@ func (p *NSKeyedArchiverParser) parseDictionary() (map[string]interface{}, error
 	}
 
 	// Parse the key-value pairs in the dictionary
-	dictionary := make(map[string]interface{}, numPairs)
+	dictionary := make(map[string]any, numPairs)
 	for i := int64(0); i < numPairs; i++ {
 		// Parse the key
 		key, err := p.parseASCIIString()

@@ -822,12 +822,12 @@ func (o *ObjC) XCFramework() error {
 	}
 
 	/* generate modulemap */
-	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), []byte(fmt.Sprintf(
+	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), fmt.Appendf(nil,
 		"module %s [system] {\n"+
 			"    header \"Headers/%s.h\"\n"+ // NOTE: this SHOULD be the umbrella header
 			"    export *\n"+
 			"}\n", o.conf.Name, o.conf.Name,
-	)), 0o660); err != nil {
+	), 0o660); err != nil {
 		return fmt.Errorf("failed to write module.modulemap file: %v", err)
 	}
 

@@ -40,9 +40,9 @@ type CFBundle struct {
 	SupportedPlatforms  []string `plist:"CFBundleSupportedPlatforms,omitempty" json:"supported_platforms,omitempty"`
 	Signature           string   `plist:"CFBundleSignature,omitempty" json:"signature,omitempty"`
 
-	IOKitPersonalities map[string]interface{} `plist:"IOKitPersonalities,omitempty" json:"io_kit_personalities,omitempty"`
-	OSBundleLibraries  map[string]string      `plist:"OSBundleLibraries,omitempty" json:"os_bundle_libraries,omitempty"`
-	UIDeviceFamily     []int                  `plist:"UIDeviceFamily,omitempty" json:"ui_device_family,omitempty"`
+	IOKitPersonalities map[string]any    `plist:"IOKitPersonalities,omitempty" json:"io_kit_personalities,omitempty"`
+	OSBundleLibraries  map[string]string `plist:"OSBundleLibraries,omitempty" json:"os_bundle_libraries,omitempty"`
+	UIDeviceFamily     []int             `plist:"UIDeviceFamily,omitempty" json:"ui_device_family,omitempty"`
 
 	OSBundleRequired             string   `plist:"OSBundleRequired,omitempty" json:"os_bundle_required,omitempty"`
 	UIRequiredDeviceCapabilities []string `plist:"UIRequiredDeviceCapabilities,omitempty" json:"ui_required_device_capabilities,omitempty"`
