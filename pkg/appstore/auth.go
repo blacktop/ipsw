@@ -1,9 +1,6 @@
 package appstore
 
 import (
-	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"os"
 	"time"
@@ -19,44 +16,27 @@ func (as *AppStore) createToken(life time.Duration) error {
 		return nil
 	}
 
-	token := &jwt.Token{
-		Header: map[string]interface{}{
-			"alg": "ES256",
-			"kid": as.Kid,
-			"typ": "JWT",
-		},
-		Claims: jwt.MapClaims{
-			"iss": as.Iss,
-			"iat": time.Now().Unix(),
-			"exp": time.Now().Add(life).Unix(),
-			"aud": "appstoreconnect-v1",
-		},
-		Method: jwt.SigningMethodES256,
-	}
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.RegisteredClaims{
+		Issuer:    as.Iss,
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(life)), // Max 20 mins
+		Audience:  jwt.ClaimStrings{"appstoreconnect-v1"},
+	})
+	token.Header["kid"] = as.Kid // Key ID
 
-	data, err := os.ReadFile(as.P8)
+	keyData, err := os.ReadFile(as.P8)
 	if err != nil {
 		return fmt.Errorf("createToken: failed to read p8 key: %v", err)
 	}
 
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return fmt.Errorf("createToken: AuthKey must be a valid .p8 PEM file")
-	}
-
-	parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	privateKey, err := jwt.ParseECPrivateKeyFromPEM(keyData)
 	if err != nil {
-		return fmt.Errorf("createToken: failed to parse p8 key: %v", err)
+		return fmt.Errorf("parsing private key: %w", err)
 	}
 
-	pkey, ok := parsedKey.(*ecdsa.PrivateKey)
-	if !ok {
-		return fmt.Errorf("createToken: AuthKey must be of type ecdsa.PrivateKey")
-	}
-
-	as.token, err = token.SignedString(pkey)
+	as.token, err = token.SignedString(privateKey)
 	if err != nil {
-		return fmt.Errorf("createToken: failed to sign token: %v", err)
+		return fmt.Errorf("signing token: %w", err)
 	}
 
 	return nil
