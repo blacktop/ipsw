@@ -40,7 +40,7 @@ require (
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.14.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
-	github.com/gocolly/colly/v2 v2.1.0
+	github.com/gocolly/colly/v2 v2.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/google/gousb v1.1.3
@@ -98,6 +98,7 @@ require (
 	github.com/antchfx/xmlquery v1.4.4 // indirect
 	github.com/antchfx/xpath v1.3.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic v1.13.1 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
@@ -163,6 +164,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/nlnwa/whatwg-url v0.6.1 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
