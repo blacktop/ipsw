@@ -12,52 +12,76 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 )
 
-type certificateType string
+type CertificateType string
 
 const (
-	CT_IOS_DEVELOPMENT             certificateType = "IOS_DEVELOPMENT"
-	CT_IOS_DISTRIBUTION            certificateType = "IOS_DISTRIBUTION"
-	CT_MAC_APP_DISTRIBUTION        certificateType = "MAC_APP_DISTRIBUTION"
-	CT_MAC_INSTALLER_DISTRIBUTION  certificateType = "MAC_INSTALLER_DISTRIBUTION"
-	CT_MAC_APP_DEVELOPMENT         certificateType = "MAC_APP_DEVELOPMENT"
-	CT_DEVELOPER_ID_KEXT           certificateType = "DEVELOPER_ID_KEXT"
-	CT_DEVELOPER_ID_KEXT_G2        certificateType = "DEVELOPER_ID_KEXT_G2"
-	CT_DEVELOPER_ID_APPLICATION    certificateType = "DEVELOPER_ID_APPLICATION"
-	CT_DEVELOPER_ID_APPLICATION_G2 certificateType = "DEVELOPER_ID_APPLICATION_G2"
-	CT_DEVELOPMENT                 certificateType = "DEVELOPMENT"
-	CT_DISTRIBUTION                certificateType = "DISTRIBUTION"
-	CT_PASS_TYPE_ID                certificateType = "PASS_TYPE_ID"
-	CT_PASS_TYPE_ID_WITH_NFC       certificateType = "PASS_TYPE_ID_WITH_NFC"
+	CT_APPLE_PAY                   CertificateType = "APPLE_PAY"
+	CT_APPLE_PAY_MERCHANT_IDENTITY CertificateType = "APPLE_PAY_MERCHANT_IDENTITY"
+	CT_APPLE_PAY_PSP_IDENTITY      CertificateType = "APPLE_PAY_PSP_IDENTITY"
+	CT_APPLE_PAY_RSA               CertificateType = "APPLE_PAY_RSA"
+	CT_DEVELOPER_ID_KEXT           CertificateType = "DEVELOPER_ID_KEXT"
+	CT_DEVELOPER_ID_KEXT_G2        CertificateType = "DEVELOPER_ID_KEXT_G2"
+	CT_DEVELOPER_ID_APPLICATION    CertificateType = "DEVELOPER_ID_APPLICATION"
+	CT_DEVELOPER_ID_APPLICATION_G2 CertificateType = "DEVELOPER_ID_APPLICATION_G2"
+	CT_DEVELOPMENT                 CertificateType = "DEVELOPMENT"
+	CT_DISTRIBUTION                CertificateType = "DISTRIBUTION"
+	CT_IDENTITY_ACCESS             CertificateType = "IDENTITY_ACCESS"
+	CT_IOS_DEVELOPMENT             CertificateType = "IOS_DEVELOPMENT"
+	CT_IOS_DISTRIBUTION            CertificateType = "IOS_DISTRIBUTION"
+	CT_MAC_APP_DISTRIBUTION        CertificateType = "MAC_APP_DISTRIBUTION"
+	CT_MAC_INSTALLER_DISTRIBUTION  CertificateType = "MAC_INSTALLER_DISTRIBUTION"
+	CT_MAC_APP_DEVELOPMENT         CertificateType = "MAC_APP_DEVELOPMENT"
+	CT_PASS_TYPE_ID                CertificateType = "PASS_TYPE_ID"
+	CT_PASS_TYPE_ID_WITH_NFC       CertificateType = "PASS_TYPE_ID_WITH_NFC"
 )
 
 var CertTypes = []string{
-	string(CT_IOS_DEVELOPMENT),
-	string(CT_IOS_DISTRIBUTION),
-	string(CT_MAC_APP_DISTRIBUTION),
-	string(CT_MAC_INSTALLER_DISTRIBUTION),
-	string(CT_MAC_APP_DEVELOPMENT),
+	string(CT_APPLE_PAY),
+	string(CT_APPLE_PAY_MERCHANT_IDENTITY),
+	string(CT_APPLE_PAY_PSP_IDENTITY),
+	string(CT_APPLE_PAY_RSA),
 	string(CT_DEVELOPER_ID_KEXT),
 	string(CT_DEVELOPER_ID_KEXT_G2),
 	string(CT_DEVELOPER_ID_APPLICATION),
 	string(CT_DEVELOPER_ID_APPLICATION_G2),
 	string(CT_DEVELOPMENT),
 	string(CT_DISTRIBUTION),
+	string(CT_IDENTITY_ACCESS),
+	string(CT_IOS_DEVELOPMENT),
+	string(CT_IOS_DISTRIBUTION),
+	string(CT_MAC_APP_DISTRIBUTION),
+	string(CT_MAC_INSTALLER_DISTRIBUTION),
+	string(CT_MAC_APP_DEVELOPMENT),
 	string(CT_PASS_TYPE_ID),
 	string(CT_PASS_TYPE_ID_WITH_NFC),
+}
+
+type BundleIdPlatform string
+
+const (
+	BP_IOS       BundleIdPlatform = "IOS"
+	BP_MAC       BundleIdPlatform = "MAC_OS"
+	BP_UNIVERSAL BundleIdPlatform = "UNIVERSAL"
+)
+
+var BundleIdPlatforms = []string{
+	string(BP_IOS),
+	string(BP_MAC),
+	string(BP_UNIVERSAL),
 }
 
 type Certificate struct {
 	ID         string `json:"id"`
 	Type       string `json:"type"`
 	Attributes struct {
-		CertificateContent []byte          `json:"certificateContent"`
-		DisplayName        string          `json:"displayName"`
-		ExpirationDate     Date            `json:"expirationDate"`
-		Name               string          `json:"name"`
-		Platform           string          `json:"platform"`
-		SerialNumber       string          `json:"serialNumber"`
-		CertificateType    certificateType `json:"certificateType"`
-		CsrContent         any             `json:"csrContent"`
+		CertificateContent []byte           `json:"certificateContent"`
+		DisplayName        string           `json:"displayName"`
+		ExpirationDate     Date             `json:"expirationDate"`
+		Name               string           `json:"name"`
+		Platform           BundleIdPlatform `json:"platform"`
+		SerialNumber       string           `json:"serialNumber"`
+		CertificateType    CertificateType  `json:"certificateType"`
+		CsrContent         any              `json:"csrContent"`
 	} `json:"attributes"`
 	Links Links `json:"links"`
 }
@@ -177,7 +201,7 @@ func (as *AppStore) CreateCertificate(ctype string, csrData string) (*Certificat
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != 201 && resp.StatusCode != 409 {
 		var eresp ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
