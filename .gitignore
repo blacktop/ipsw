@@ -5,6 +5,7 @@
 *.so
 *.dylib
 *.a
+/ipsw
 
 # Test binary, build with `go test -c`
 *.test
