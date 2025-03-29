@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,7 +96,6 @@ var machoDisassCmd = &cobra.Command{
 		var m *macho.File
 		var ms []*macho.File
 		var middleAddr uint64
-		var symbolMap map[uint64]string
 		var engine *disass.MachoDisass
 
 		if viper.GetBool("verbose") {
@@ -138,6 +138,10 @@ var machoDisassCmd = &cobra.Command{
 		if ok, err := magic.IsMachO(machoPath); !ok {
 			return fmt.Errorf("failed to detect file type: %v", err)
 		}
+
+		// symbol caches
+		symbolMap := make(map[uint64]string)
+		dSymMap := make(map[uint64]string)
 
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
@@ -215,8 +219,6 @@ var machoDisassCmd = &cobra.Command{
 			ms = append(ms, m)
 		}
 
-		symbolMap = make(map[uint64]string)
-
 		if err := ctrlc.Default.Run(context.Background(), func() error {
 			for _, m := range ms {
 				if entryStart {
@@ -239,6 +241,28 @@ var machoDisassCmd = &cobra.Command{
 					if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
 						if _, err := os.Create(cacheFile); err != nil {
 							return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+						}
+						// if dSYM file exists, load symbols from it
+						dsym := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
+						if _, err := os.Stat(dsym); err == nil {
+							foundDSYM = true
+							log.Info("Detected dSYM file, using it for symbolication")
+							dm, err := macho.Open(dsym)
+							if err != nil {
+								log.Errorf("failed to open dSYM file for symbolication: %v", err)
+							} else {
+								for _, sym := range dm.Symtab.Syms {
+									if sym.Name != "" {
+										dSymMap[sym.Value] = sym.Name
+									}
+								}
+								// If the dSYM file has a symbol map, use it for the output
+								if len(dSymMap) > 0 {
+									log.Infof("Using dSYM symbol map with %d symbols", len(dSymMap))
+								} else {
+									log.Warn("No symbols found in dSYM file")
+								}
+							}
 						}
 					} else {
 						log.Infof("Loading symbol cache file...")
@@ -306,6 +330,7 @@ var machoDisassCmd = &cobra.Command{
 									}
 								}
 							}
+							maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
 							if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 								log.Errorf("failed to save symbol map: %v", err)
 							}
@@ -404,6 +429,7 @@ var machoDisassCmd = &cobra.Command{
 								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
 							}
 						}
+						maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 							log.Errorf("failed to save symbol map: %v", err)
 						}
