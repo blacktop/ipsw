@@ -245,7 +245,6 @@ var machoDisassCmd = &cobra.Command{
 						// if dSYM file exists, load symbols from it
 						dsym := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
 						if _, err := os.Stat(dsym); err == nil {
-							foundDSYM = true
 							log.Info("Detected dSYM file, using it for symbolication")
 							dm, err := macho.Open(dsym)
 							if err != nil {
