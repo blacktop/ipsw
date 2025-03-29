@@ -48,19 +48,26 @@ var ProfileTypes = []string{
 	string(MAC_CATALYST_APP_DIRECT),
 }
 
+type ProfileState string
+
+const (
+	PS_ACTIVE  ProfileState = "ACTIVE"
+	PS_INVALID ProfileState = "INVALID"
+)
+
 type Profile struct {
 	ID         string      `json:"id"`
 	Type       ProfileType `json:"type"` // profiles
 	Attributes struct {
-		Name           string      `json:"name"`
-		CreatedDate    Date        `json:"createdDate"`
-		ExpirationDate Date        `json:"expirationDate"`
-		ProfileContent []byte      `json:"profileContent"`
-		ProfileState   string      `json:"profileState"`
-		ProfileType    ProfileType `json:"profileType"`
-		UUID           string      `json:"uuid"`
-		Platform       string      `json:"platform"`
-		OfflineProfile bool        `json:"isOfflineProfile"`
+		Name           string           `json:"name"`
+		CreatedDate    Date             `json:"createdDate"`
+		ExpirationDate Date             `json:"expirationDate"`
+		ProfileContent []byte           `json:"profileContent"`
+		ProfileState   ProfileState     `json:"profileState"`
+		ProfileType    ProfileType      `json:"profileType"`
+		UUID           string           `json:"uuid"`
+		Platform       BundleIdPlatform `json:"platform"`
+		OfflineProfile bool             `json:"isOfflineProfile"`
 	} `json:"attributes"`
 	Relationships struct {
 		BundleID struct {
