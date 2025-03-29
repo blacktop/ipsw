@@ -75,7 +75,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
-	software.sslmate.com/src/go-pkcs12 v0.5.0
 )
 
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
