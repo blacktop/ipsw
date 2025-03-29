@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2025 blacktop
+Copyright © 2025 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,14 +26,14 @@ import (
 )
 
 func init() {
-	AppstoreCmd.AddCommand(ASProfileCmd)
+	AppstoreCmd.AddCommand(ASProvisionCmd)
 }
 
-// ASProfileCmd represents the appstore profile command
-var ASProfileCmd = &cobra.Command{
-	Use:     "profile",
-	Aliases: []string{"prof"},
-	Short:   "Create, delete, and download provisioning profiles that enable app installations for development and distribution",
+// ASProvisionCmd represents the provision command
+var ASProvisionCmd = &cobra.Command{
+	Use:     "provision",
+	Aliases: []string{"prov", "offline"},
+	Short:   "Provision system for XCode code signing",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

@@ -91,6 +91,8 @@ type AppStore struct {
 
 	Proxy    string
 	Insecure bool
+
+	conf *ProvisionSigningFilesConfig
 }
 
 // NewAppStore creates a new App Store Connect API object
