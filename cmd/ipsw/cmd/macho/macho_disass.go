@@ -423,9 +423,11 @@ var machoDisassCmd = &cobra.Command{
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						if err := engine.Analyze(); err != nil {
-							if !viper.GetBool("macho.disass.force") {
-								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
+						if len(symbolMap) == 0 {
+							if err := engine.Analyze(); err != nil {
+								if !viper.GetBool("macho.disass.force") {
+									return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
+								}
 							}
 						}
 						maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
