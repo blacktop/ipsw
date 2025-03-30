@@ -4,11 +4,11 @@ title: split
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: split
-description: Extracts all the dylibs using XCode's dsc_extractor
+description: Extracts all the dylibs using Xcode's dsc_extractor
 ---
 ## ipsw dyld split
 
-Extracts all the dylibs using XCode's dsc_extractor
+Extracts all the dylibs using Xcode's dsc_extractor
 
 ```
 ipsw dyld split <DSC> [flags]
@@ -18,7 +18,7 @@ ipsw dyld split <DSC> [flags]
 
 ```
   -b, --build string     Cache build
-  -c, --cache            Build XCode device support cache
+  -c, --cache            Build Xcode device support cache
   -h, --help             help for split
   -o, --output string    Directory to extract the dylibs (default: CWD)
   -v, --version string   Cache version

@@ -168,7 +168,7 @@ var devCmd = &cobra.Command{
 		} else {
 			prompt := &survey.Select{
 				Message: "Choose a download type:",
-				Options: []string{"OSes (iOS, macOS, tvOS...)", "Profiles (Logging)", "More (XCode, KDKs...)"},
+				Options: []string{"OSes (iOS, macOS, tvOS...)", "Profiles (Logging)", "More (Xcode, KDKs...)"},
 			}
 			if err := survey.AskOne(prompt, &dlType); err != nil {
 				if err == terminal.InterruptErr {

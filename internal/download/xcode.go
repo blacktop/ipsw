@@ -252,7 +252,7 @@ type XCodeRelease struct {
 	} `json:"version"`
 }
 
-// QueryXcodeReleasesAPI queries the xcodereleases.com API for the XCode Name
+// QueryXcodeReleasesAPI queries the xcodereleases.com API for the Xcode Name
 func QueryXcodeReleasesAPI(name string) (string, error) {
 	name = strings.Replace(name, "-", "_", -1)
 

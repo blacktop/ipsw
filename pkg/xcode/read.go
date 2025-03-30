@@ -26,7 +26,7 @@ func uniqueDevices(d []Device) []Device {
 	return bs
 }
 
-// ReadDeviceTraitsDB parse the XCode device_traits.db
+// ReadDeviceTraitsDB parse the Xcode device_traits.db
 func ReadDeviceTraitsDB() ([]Device, error) {
 	var allDevices []Device
 

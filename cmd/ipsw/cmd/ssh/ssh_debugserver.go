@@ -105,12 +105,12 @@ var sshDebugserverCmd = &cobra.Command{
 			}
 		} else if cli.FileExists("/usr/bin/debugserver") || viper.GetBool("ssh.debugserver.force") { // OLD location from DDI mount
 			if runtime.GOOS != "darwin" {
-				return fmt.Errorf("attempting to extract debugserver from DeveloperDiskImage in XCode.app on non-darwin system (not currently supported)")
+				return fmt.Errorf("attempting to extract debugserver from DeveloperDiskImage in Xcode.app on non-darwin system (not currently supported)")
 			}
 			// Find all the DeveloperDiskImages
 			images, err := filepath.Glob("/Applications/Xcode*.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
 			if err != nil {
-				return fmt.Errorf("failed to glob for DeveloperDiskImage.dmg (in XCode.app): %w", err)
+				return fmt.Errorf("failed to glob for DeveloperDiskImage.dmg (in Xcode.app): %w", err)
 			}
 
 			imagePath := viper.GetString("ssh.debugserver.image")

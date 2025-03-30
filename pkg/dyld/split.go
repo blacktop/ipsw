@@ -74,7 +74,7 @@ func GetHandle(libs []string) (*LibHandle, error) {
 			return h, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to open a handle to the XCode library (use --xcode-path to specify the path to Xcode)")
+	return nil, fmt.Errorf("unable to open a handle to the Xcode library (use --xcode-path to specify the path to Xcode)")
 }
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
@@ -112,7 +112,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		var err error
 		xcodePath, err = utils.GetXCodePath()
 		if err != nil {
-			return fmt.Errorf("failed to get XCode path: %v", err)
+			return fmt.Errorf("failed to get Xcode path: %v", err)
 		}
 	} else {
 		if !strings.HasSuffix(xcodePath, "Contents/Developer") {

@@ -147,7 +147,7 @@ var idevImgSignCmd = &cobra.Command{
 			if xcver.LessThan(semver.Must(semver.NewVersion("16.0"))) {
 				ddiPath = filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
 				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW Xcode.app or Xcode-beta.app)", xcode)
 				}
 			} else {
 				ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"

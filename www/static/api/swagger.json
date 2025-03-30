@@ -77,14 +77,14 @@
     },
     "/device_list": {
       "get": {
-        "description": "This will return JSON of all XCode devices.",
+        "description": "This will return JSON of all Xcode devices.",
         "produces": [
           "application/json"
         ],
         "tags": [
           "DeviceList"
         ],
-        "summary": "List XCode Devices.",
+        "summary": "List Xcode Devices.",
         "operationId": "getDeviceList",
         "responses": {
           "200": {
@@ -467,7 +467,7 @@
     },
     "/dsc/split": {
       "post": {
-        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e\n\n\u003cb\u003eNOTE:\u003c/b\u003e darwin ONLY",
+        "description": "Split the DSC into its constituent dylibs using Xcode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e\n\n\u003cb\u003eNOTE:\u003c/b\u003e darwin ONLY",
         "produces": [
           "application/json"
         ],

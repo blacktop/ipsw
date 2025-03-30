@@ -858,7 +858,7 @@ func (o *ObjC) XCFramework() error {
 		DTSDKBuild:                    "23E224",
 		DTSDKName:                     fmt.Sprintf("%s%s.internal", xcfw.SupportedPlatform, xcfw.DTPlatformVersion),
 		DTXcode:                       "1500",
-		DTXcodeBuild:                  "15E6079e", // XCode 15.3
+		DTXcodeBuild:                  "15E6079e", // Xcode 15.3
 		LSMinimumSystemVersion:        xcfw.LSMinimumSystemVersion,
 	}); err != nil {
 		return fmt.Errorf("failed to create XCFramework Info.plist")

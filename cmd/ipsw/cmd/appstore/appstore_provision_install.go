@@ -38,7 +38,7 @@ func init() {
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:           "install <CERT> <KEY> <PROFILE>",
-	Short:         "Install private key, certificate & provisioning profile for XCode signing",
+	Short:         "Install private key, certificate & provisioning profile for Xcode signing",
 	Args:          cobra.ExactArgs(3),
 	SilenceUsage:  true,
 	SilenceErrors: true,

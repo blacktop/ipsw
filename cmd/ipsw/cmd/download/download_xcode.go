@@ -40,7 +40,7 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(xcodeCmd)
-	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest XCode")
+	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")
 	xcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
 	xcodeCmd.Flags().StringP("runtime", "r", "", "Name of simulator runtime to download")
 
@@ -60,7 +60,7 @@ func init() {
 // xcodeCmd represents the xcode command
 var xcodeCmd = &cobra.Command{
 	Use:           "xcode",
-	Short:         "🚧 Download XCode 🚧",
+	Short:         "🚧 Download Xcode 🚧",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
@@ -185,7 +185,7 @@ var xcodeCmd = &cobra.Command{
 			}
 
 			prompt := &survey.Select{
-				Message:  "Select XCode to download:",
+				Message:  "Select Xcode to download:",
 				Options:  choices,
 				PageSize: 10,
 			}

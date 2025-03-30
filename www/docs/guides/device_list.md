@@ -1,11 +1,11 @@
 ---
-description: List all the devices XCode knows about.
+description: List all the devices Xcode knows about.
 hide_table_of_contents: true
 ---
 
 # List *OS Devices
 
-> List all the devices XCode knows about *(by parsing the `device_traits.db`)*
+> List all the devices Xcode knows about *(by parsing the `device_traits.db`)*
 
 ```bash
 ❯ ipsw device-list

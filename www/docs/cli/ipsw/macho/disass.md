@@ -22,6 +22,7 @@ ipsw macho disass <MACHO> [flags]
       --cache string           Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint             Number of instructions to disassemble
   -d, --demangle               Demangle symbol names
+  -e, --entry                  Disassemble entry point
   -t, --fileset-entry string   Which fileset entry to analyze
       --force                  Continue to disassemble even if there are analysis errors
   -h, --help                   help for disass
