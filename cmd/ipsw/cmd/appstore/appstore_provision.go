@@ -33,7 +33,7 @@ func init() {
 var ASProvisionCmd = &cobra.Command{
 	Use:     "provision",
 	Aliases: []string{"prov", "offline"},
-	Short:   "Provision system for XCode code signing",
+	Short:   "Provision system for Xcode code signing",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

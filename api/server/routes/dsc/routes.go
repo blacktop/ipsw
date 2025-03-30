@@ -148,7 +148,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//
 	// Split
 	//
-	// Split the DSC into its constituent dylibs using XCode's <code>dsc_extractor.bundle</code>
+	// Split the DSC into its constituent dylibs using Xcode's <code>dsc_extractor.bundle</code>
 	//
 	// <b>NOTE:</b> darwin ONLY
 	//

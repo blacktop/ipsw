@@ -57,11 +57,11 @@ func init() {
 var ASProvisionGenerateCmd = &cobra.Command{
 	Use:     "gen <BUNDLE_ID>",
 	Aliases: []string{"g", "create"},
-	Short:   "Download/Create priv key, certificate & provisioning profile for XCode signing",
+	Short:   "Download/Create priv key, certificate & provisioning profile for Xcode signing",
 	Long: `Downloads or creates the necessary certificate and provisioning profile
 from App Store Connect for a given bundle ID, based on the specified type
 (development, adhoc, distribution). It then optionally installs them locally
-for XCode code signing.`,
+for Xcode code signing.`,
 	Args: cobra.MaximumNArgs(1),
 	// SilenceUsage:  true,
 	SilenceErrors: true,

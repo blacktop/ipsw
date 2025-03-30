@@ -103,7 +103,7 @@ update_mod: ## Update go.mod file
 	go mod tidy
 
 .PHONY: update_devs
-update_devs: ## Parse XCode database for new devices
+update_devs: ## Parse Xcode database for new devices
 	@echo " > Updating device_traits.json"
 	go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
 

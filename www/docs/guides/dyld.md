@@ -650,7 +650,7 @@ Split up a _dyld_shared_cache_
 1444/1445
 ```
 
-To use an specific version of XCode
+To use an specific version of Xcode
 
 ```bash
 ❯ ipsw dyld split dyld_shared_cache_arm64e --xcode ~/Downloads/Xcode_12.5.1.app
@@ -661,7 +661,7 @@ To create a `~/Library/Developer/Xcode/iOS DeviceSupport/` folder from a _dyld_s
 ```bash
 ❯ ipsw dyld split dyld_shared_cache_arm64e --cache --version 16.3 --build 20D5035i
    • Splitting dyld_shared_cache to ~/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e
-   • Creating XCode cache ~/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e/Info.plist
+   • Creating Xcode cache ~/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e/Info.plist
 0/2700
 1/2700
 2/2700
@@ -685,7 +685,7 @@ To create a `~/Library/Developer/Xcode/iOS DeviceSupport/` folder from a _dyld_s
 ```
 
 :::info note
-This commnd calls into XCode's `dsc_extractor.bundle` so will ALWAYS work as long as your have a recent version of XCode installed
+This commnd calls into Xcode's `dsc_extractor.bundle` so will ALWAYS work as long as your have a recent version of Xcode installed
 :::
 
 :::info note

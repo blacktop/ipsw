@@ -64,7 +64,7 @@ const (
 	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
-	// XCode Simulator
+	// Xcode Simulator
 	iOsSimulatorUpdate      assetType = "com.apple.MobileAsset.iOSSimulatorRuntime"
 	tvOsSimulatorUpdate     assetType = "com.apple.MobileAsset.appleTVOSSimulatorRuntime"
 	watchOsSimulatorUpdate  assetType = "com.apple.MobileAsset.watchOSSimulatorRuntime"

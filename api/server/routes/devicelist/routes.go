@@ -19,9 +19,9 @@ type deviceListResponse struct {
 func AddRoutes(rg *gin.RouterGroup) {
 	// swagger:route GET /device_list DeviceList getDeviceList
 	//
-	// List XCode Devices.
+	// List Xcode Devices.
 	//
-	// This will return JSON of all XCode devices.
+	// This will return JSON of all Xcode devices.
 	//
 	//     Produces:
 	//     - application/json

@@ -21,7 +21,7 @@ import (
 func init() {
 	DyldCmd.AddCommand(SplitCmd)
 	SplitCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app")
-	SplitCmd.Flags().BoolP("cache", "c", false, "Build XCode device support cache")
+	SplitCmd.Flags().BoolP("cache", "c", false, "Build Xcode device support cache")
 	SplitCmd.Flags().StringP("version", "v", "", "Cache version")
 	SplitCmd.Flags().StringP("build", "b", "", "Cache build")
 	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs (default: CWD)")
@@ -36,7 +36,7 @@ func init() {
 // SplitCmd represents the split command
 var SplitCmd = &cobra.Command{
 	Use:   "split <DSC>",
-	Short: "Extracts all the dylibs using XCode's dsc_extractor",
+	Short: "Extracts all the dylibs using Xcode's dsc_extractor",
 	Args:  cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
