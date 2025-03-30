@@ -15,7 +15,7 @@ func PreferredDDI() (*ddi.Info, error) {
 	if runtime.GOOS != "darwin" {
 		return nil, fmt.Errorf("only supported on macOS")
 	}
-	cmd := exec.Command(devicectlPath, "list", "preferredDDI", "--json-output", "-")
+	cmd := exec.Command(devicectlPath, "list", "preferredDDI", "--quiet", "--json-output", "-")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get preferred DDI: %v", err)
@@ -31,7 +31,7 @@ func UpdateDDIsFromXCode() (string, error) {
 	if runtime.GOOS != "darwin" {
 		return "", fmt.Errorf("only supported on macOS")
 	}
-	cmd := exec.Command(devicectlPath, "manage", "ddis", "update", "--clean", "--no-include-coredevice")
+	cmd := exec.Command(devicectlPath, "manage", "ddis", "update", "--no-include-coredevice", "--include-xcode", "--clean")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to update DDIs: %v", err)
@@ -43,7 +43,7 @@ func UpdateDDIs(sourceDir string) (string, error) {
 	if runtime.GOOS != "darwin" {
 		return "", fmt.Errorf("only supported on macOS")
 	}
-	cmd := exec.Command(devicectlPath, "manage", "ddis", "update", "--clean", "--no-include-coredevice", "--no-include-xcode", "--source-dir", sourceDir)
+	cmd := exec.Command(devicectlPath, "manage", "ddis", "update", "--no-include-coredevice", "--no-include-xcode", "--source-dir", sourceDir, "--clean")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to update DDIs: %v", err)

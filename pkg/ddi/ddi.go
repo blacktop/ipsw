@@ -1,5 +1,12 @@
 package ddi
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/fatih/color"
+)
+
 const (
 	DeveloperDiskImagesDir = "/Library/Developer/DeveloperDiskImages"
 	CandidateDDIDir        = "/Library/Developer/CoreDevice/CandidateDDIs"
@@ -21,6 +28,39 @@ type Platform struct {
 		Variant string `json:"variant"`
 	} `json:"ddiMetadata"`
 	HostDDI string `json:"hostDDI"`
+}
+
+var colorField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+
+func (p *Platform) String() string {
+	var fields []string
+	for _, projectMetadata := range p.Metadata.ProjectMetadata {
+		fields = append(fields, fmt.Sprintf("   %s: %s", colorField(projectMetadata.Name), projectMetadata.Version))
+	}
+	return fmt.Sprintf(
+		"%s: %s\n"+
+			colorField("Metadata")+":\n"+
+			"  %s: %s\n"+
+			"  %s: %s\n"+
+			"  %s: %t\n"+
+			"  %s: %t\n"+
+			"  %s: %d\n"+
+			"  %s: %t\n"+
+			"  %s: %t\n"+
+			"  %s: %s\n"+
+			colorField("  ProjectMetadata")+":\n"+
+			"%s",
+		colorField("HostDDI"), p.HostDDI,
+		colorField("Platform"), p.Metadata.Platform,
+		colorField("BuildUpdate"), p.Metadata.BuildUpdate,
+		colorField("ContentIsCompatible"), p.Metadata.ContentIsCompatible,
+		colorField("CoreDeviceVersionChecksIncludeDevelopmentRevision"), p.Metadata.CoreDeviceVersionChecksIncludeDevelopmentRevision,
+		colorField("DevelopmentRevision"), p.Metadata.DevelopmentRevision,
+		colorField("EnforcingCoreDeviceVersionChecks"), p.Metadata.EnforcingCoreDeviceVersionChecks,
+		colorField("IsUsable"), p.Metadata.IsUsable,
+		colorField("Variant"), p.Metadata.Variant,
+		strings.Join(fields, "\n"),
+	)
 }
 
 type Info struct {
