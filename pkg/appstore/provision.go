@@ -221,6 +221,7 @@ func (as *AppStore) ensureCertificate(requiredCertType CertificateType, typeLabe
 	// 	return nil, "", fmt.Errorf("saving CSR: %w", err)
 	// }
 	// log.Infof("Certificate Signing Request (CSR) saved to %s", csrPath)
+	// NOTE: openssl req -in development.certSigningRequest -noout -text
 	log.Info("Submitting CSR to App Store Connect...")
 	createdCert, err := as.CreateCertificate(
 		string(requiredCertType), // Pass the required type as string
