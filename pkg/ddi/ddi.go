@@ -1,6 +1,7 @@
 package ddi
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,8 @@ const (
 	DeveloperDiskImagesDir = "/Library/Developer/DeveloperDiskImages"
 	CandidateDDIDir        = "/Library/Developer/CoreDevice/CandidateDDIs"
 )
+
+var ErrNoDDIsFound = errors.New("no DDIs found")
 
 type Platform struct {
 	Metadata struct {
@@ -63,16 +66,18 @@ func (p *Platform) String() string {
 	)
 }
 
-type Info struct {
-	Arguments   []string `json:"arguments"`
-	CommandType string   `json:"commandType"`
-	Environment struct {
-		TERM string `json:"TERM"`
-	} `json:"environment"`
-	JSONVersion int    `json:"jsonVersion"`
-	Outcome     string `json:"outcome"`
-	Version     string `json:"version"`
-	Result      struct {
+type PreferredDDI struct {
+	Info struct {
+		Arguments   []string `json:"arguments"`
+		CommandType string   `json:"commandType"`
+		Environment struct {
+			TERM string `json:"TERM"`
+		} `json:"environment"`
+		JSONVersion int    `json:"jsonVersion"`
+		Outcome     string `json:"outcome"`
+		Version     string `json:"version"`
+	} `json:"info"`
+	Result struct {
 		HostCoreDeviceVersion string `json:"hostCoreDeviceVersion"`
 		Platforms             struct {
 			IOS     []Platform `json:"iOS"`
@@ -82,6 +87,14 @@ type Info struct {
 			XrOS    []Platform `json:"xrOS"`
 		} `json:"platforms"`
 	} `json:"result"`
+}
+
+func (i *PreferredDDI) Empty() bool {
+	return i.Result.Platforms.IOS == nil &&
+		i.Result.Platforms.MacOS == nil &&
+		i.Result.Platforms.TvOS == nil &&
+		i.Result.Platforms.WatchOS == nil &&
+		i.Result.Platforms.XrOS == nil
 }
 
 type Version struct {
