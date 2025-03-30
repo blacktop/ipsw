@@ -33,6 +33,7 @@ ipsw idev img [flags]
 ### SEE ALSO
 
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
+* [ipsw idev img ddi](/docs/cli/ipsw/idev/img/ddi)	 - DDI commands
 * [ipsw idev img lookup](/docs/cli/ipsw/idev/img/lookup)	 - Lookup image type
 * [ipsw idev img ls](/docs/cli/ipsw/idev/img/ls)	 - List mounted images
 * [ipsw idev img mount](/docs/cli/ipsw/idev/img/mount)	 - Mount an image
