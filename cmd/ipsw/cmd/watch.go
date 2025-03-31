@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -33,8 +34,11 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/watch"
 	"github.com/blacktop/ipsw/internal/commands/watch/announce"
+	watchgit "github.com/blacktop/ipsw/internal/commands/watch/git"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
+	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -65,6 +69,7 @@ func init() {
 	watchCmd.Flags().BoolP("tags", "g", false, "Watch for new tags")
 	watchCmd.Flags().StringP("branch", "b", "main", "Repo branch to watch")
 	watchCmd.Flags().StringP("file", "f", "", "Commit file path to watch")
+	watchCmd.Flags().StringP("func", "", "", "Function name to watch (for local repos)")
 	watchCmd.Flags().StringP("pattern", "p", "", "Commit message pattern to match")
 	watchCmd.Flags().IntP("days", "d", 1, "Days back to search for commits")
 	watchCmd.Flags().StringP("api", "a", "", "Github API Token")
@@ -84,6 +89,7 @@ func init() {
 	watchCmd.Flags().String("cache", "", "Cache file to store seen commits/tags")
 	viper.BindPFlag("watch.tags", watchCmd.Flags().Lookup("tags"))
 	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
+	viper.BindPFlag("watch.func", watchCmd.Flags().Lookup("func"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("watch.days", watchCmd.Flags().Lookup("days"))
@@ -104,8 +110,6 @@ func init() {
 	viper.BindPFlag("watch.cache", watchCmd.Flags().Lookup("cache"))
 }
 
-// TODO: add support for watching local repos so that we can leverage `git log -L :func:file` to watch a single function
-
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
 	Use:   "watch <ORG/REPO>",
@@ -124,7 +128,9 @@ var watchCmd = &cobra.Command{
 		#   - IPSW_WATCH_MESSAGE
 		❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
 		# Watch WebKit/WebKit for new tags every 5 minutes and announce to Discord
-		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m`),
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m
+		# Watch a specific function in a local repo
+		❯ ipsw watch /path/to/local/REPO --func "MyFunction" --file "path/to/file.go" --timeout 5m`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -134,8 +140,11 @@ var watchCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
+		funcName := viper.GetString("watch.func")
+		filePath := viper.GetString("watch.file")
 		apiToken := viper.GetString("watch.api")
 		asJSON := viper.GetBool("watch.json")
 		postCommand := viper.GetString("watch.command")
@@ -161,9 +170,15 @@ var watchCmd = &cobra.Command{
 			if viper.IsSet("watch.command") {
 				return fmt.Errorf("--tags watching is not supported with --command")
 			}
+			if viper.IsSet("watch.func") {
+				return fmt.Errorf("--tags watching is not supported with --func")
+			}
 		} else {
 			if viper.IsSet("watch.post") {
 				return fmt.Errorf("commit watching is not supported with --post")
+			}
+			if viper.IsSet("watch.func") && !viper.IsSet("watch.file") {
+				return fmt.Errorf("--func requires --file to be set")
 			}
 		}
 		if discord {
@@ -200,6 +215,188 @@ var watchCmd = &cobra.Command{
 		}
 
 		parts := strings.Split(args[0], "/")
+		isLocalRepo := len(parts) == 1 || strings.HasPrefix(args[0], ".")
+
+		if isLocalRepo && viper.IsSet("watch.func") {
+			repoPath, err := filepath.Abs(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for repository: %v", err)
+			}
+			if !filepath.IsAbs(filePath) {
+				filePath = filepath.Join(repoPath, filePath)
+			}
+			fileInfo, err := os.Stat(filePath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return fmt.Errorf("file does not exist: %s", filePath)
+				}
+				return fmt.Errorf("error accessing file: %v", err)
+			}
+			if fileInfo.IsDir() {
+				return fmt.Errorf("path is a directory, not a file: %s", filePath)
+			}
+			relFilePath, err := filepath.Rel(repoPath, filePath)
+			if err != nil {
+				return fmt.Errorf("failed to get relative path: %v", err)
+			}
+			relFilePath = filepath.ToSlash(relFilePath)
+
+			repo, err := git.PlainOpen(repoPath)
+			if err != nil {
+				return fmt.Errorf("failed to open git repository: %v", err)
+			}
+
+			shouldStop := false
+			if time.Duration(viper.GetDuration("watch.timeout")) == 0 {
+				shouldStop = true
+			}
+
+			log.WithFields(log.Fields{
+				"func": funcName,
+				"file": relFilePath,
+			}).Infof("Watching Function")
+
+			if _, err = repo.Head(); err != nil {
+				return fmt.Errorf("repository appears to have no commits: %v", err)
+			}
+
+			for {
+				allChanges, err := watchgit.GetFunctionChanges(repo, funcName, relFilePath)
+				if err != nil {
+					if shouldStop {
+						return fmt.Errorf("failed to get function changes: %v", err)
+					}
+					log.Warnf("Failed to get function changes: %v", err)
+					time.Sleep(time.Duration(viper.GetDuration("watch.timeout")))
+					continue
+				}
+
+				if len(allChanges) == 0 {
+					// function not found or no history, wait and try again
+					if shouldStop {
+						log.Infof("Function '%s' not found in '%s'. Stopping.", funcName, relFilePath)
+						break // exit loop
+					}
+					log.WithFields(log.Fields{
+						"func": funcName,
+						"file": relFilePath,
+					}).Debugf("Function NOT found, waiting...")
+					time.Sleep(time.Duration(viper.GetDuration("watch.timeout")))
+					continue
+				}
+
+				latestChange := allChanges[0] // Newest change is first
+				latestCommitOID := string(latestChange.Commit.OID)
+
+				// Cache key based on function and file
+				cacheKey := fmt.Sprintf("%s:%s", funcName, relFilePath)
+				cachedValue, ok := cache.Get(cacheKey)
+
+				if !ok || cachedValue != latestCommitOID {
+					cache.Add(cacheKey, latestCommitOID)
+
+					// Prepare display output
+					var displayOutput strings.Builder
+					commit := latestChange.Commit
+					fmt.Fprintf(&displayOutput, "commit %s\n", commit.OID)
+					fmt.Fprintf(&displayOutput, "Author: %s <%s>\n", commit.Author.Name, commit.Author.Email)
+					fmt.Fprintf(&displayOutput, "Date: %s\n\n", commit.Author.Date.Format("Mon Jan 2 15:04:05 2006 -0700"))
+					fmt.Fprintf(&displayOutput, "    %s\n\n", commit.MsgHeadline)
+
+					// Generate diff with previous version if available
+					previousContent := ""
+					if len(allChanges) > 1 {
+						previousContent = allChanges[1].Content
+					}
+
+					if discord || mastodon || postCommand != "" {
+						diff, err := utils.GitDiff(previousContent, latestChange.Content,
+							&utils.GitDiffConfig{
+								Color: false,
+								Tool:  "git",
+							})
+						if err != nil {
+							return err
+						}
+						fmt.Fprintf(&displayOutput, "```diff\n%s\n```\n", diff)
+
+						notificationTitle := fmt.Sprintf("🆕 Change in %s:%s", relFilePath, funcName)
+						notificationBody := displayOutput.String()
+						if discord {
+							iconURL := viper.GetString("watch.discord-icon")
+							if iconURL == "" {
+								iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
+							}
+							if len(notificationBody) > 1997 { // truncate to 1997 characters (discord limit is 2000)
+								notificationBody = notificationBody[:1997] + "..."
+							}
+							if err := announce.Discord(notificationBody, &announce.DiscordConfig{
+								DiscordWebhookID:    viper.GetString("watch.discord-id"),
+								DiscordWebhookToken: viper.GetString("watch.discord-token"),
+								DiscordColor:        "16776960", // Yellow for changes
+								DiscordAuthor:       notificationTitle,
+								DiscordIconURL:      iconURL,
+							}); err != nil {
+								log.WithError(err).Error("Discord announce failed")
+							}
+						}
+						if mastodon {
+							mastodonBody := notificationTitle + "\n" + notificationBody
+							if len(mastodonBody) > 500 { // truncate to 500 characters (mastodon limit is 500)
+								mastodonBody = mastodonBody[:497] + "..."
+							}
+							if err := announce.Mastodon(mastodonBody, &announce.MastodonConfig{
+								Server:       viper.GetString("watch.mastodon-server"),
+								ClientID:     viper.GetString("watch.mastodon-client-id"),
+								ClientSecret: viper.GetString("watch.mastodon-client-secret"),
+								AccessToken:  viper.GetString("watch.mastodon-access-token"),
+							}); err != nil {
+								log.WithError(err).Error("Mastodon announce failed")
+							}
+						}
+						// run command if configured
+						if postCommand != "" {
+							if err := watch.RunCommand(postCommand, *commit); err != nil {
+								log.Errorf("post command failed: %v", err)
+							}
+						}
+					} else {
+						diff, err := utils.GitDiff(previousContent, latestChange.Content,
+							&utils.GitDiffConfig{
+								Color: viper.GetBool("color") && !viper.GetBool("no-color"),
+								Tool:  viper.GetString("diff-tool"),
+							})
+						if err != nil {
+							return err
+						}
+						fmt.Fprintf(&displayOutput, "%s\n", diff)
+						fmt.Println(displayOutput.String())
+					}
+				} // end if cache miss
+
+				if shouldStop {
+					break // exit loop
+				}
+
+				time.Sleep(time.Duration(viper.GetDuration("watch.timeout")))
+
+				// refresh repo
+				worktree, err := repo.Worktree()
+				if err != nil {
+					log.Warnf("Failed to get worktree: %v", err)
+				} else {
+					if err := worktree.Pull(&git.PullOptions{
+						RemoteName: "origin",
+						Progress:   os.Stdout,
+					}); err != nil && err != git.NoErrAlreadyUpToDate {
+						log.Warnf("Failed to pull: %v", err)
+					}
+				}
+			} // end for loop
+
+			return nil
+		}
+
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid repo: %s (should be in the form 'org/repo')", args[0])
 		}
