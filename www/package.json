@@ -28,7 +28,7 @@
     "prism-themes": "^1.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "redocusaurus": "^2.2.1"
+    "redocusaurus": "^2.2.2"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.7.0",
