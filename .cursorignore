@@ -38,6 +38,7 @@ www/docs/static/releases*.json
 *.lock
 internal/commands/ida/dscu/data/dscu.py
 venv/
+.env
 
 # Unicorn EMU
 unicorn2/
