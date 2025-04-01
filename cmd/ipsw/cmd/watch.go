@@ -385,10 +385,11 @@ var watchCmd = &cobra.Command{
 				if err != nil {
 					log.Warnf("Failed to get worktree: %v", err)
 				} else {
+					log.Debug("Pulling changes from remote")
 					if err := worktree.Pull(&git.PullOptions{
 						RemoteName: "origin",
 						Progress:   os.Stdout,
-					}); err != nil && err != git.NoErrAlreadyUpToDate {
+					}); err != nil && err != git.NoErrAlreadyUpToDate && err != git.ErrUnstagedChanges {
 						log.Warnf("Failed to pull: %v", err)
 					}
 				}
