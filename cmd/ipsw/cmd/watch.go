@@ -39,6 +39,8 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -87,6 +89,7 @@ func init() {
 	watchCmd.Flags().String("mastodon-client-secret", "", "Mastodon Client Secret")
 	watchCmd.Flags().String("mastodon-access-token", "", "Mastodon Access Token")
 	watchCmd.Flags().String("cache", "", "Cache file to store seen commits/tags")
+	watchCmd.Flags().String("ssh-key", "", "SSH private key for git operations")
 	viper.BindPFlag("watch.tags", watchCmd.Flags().Lookup("tags"))
 	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
@@ -108,6 +111,7 @@ func init() {
 	viper.BindPFlag("watch.mastodon-client-secret", watchCmd.Flags().Lookup("mastodon-client-secret"))
 	viper.BindPFlag("watch.mastodon-access-token", watchCmd.Flags().Lookup("mastodon-access-token"))
 	viper.BindPFlag("watch.cache", watchCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("watch.ssh-key", watchCmd.Flags().Lookup("ssh-key"))
 }
 
 // watchCmd represents the watch command
@@ -215,9 +219,8 @@ var watchCmd = &cobra.Command{
 		}
 
 		parts := strings.Split(args[0], "/")
-		isLocalRepo := len(parts) == 1 || strings.HasPrefix(args[0], ".")
 
-		if isLocalRepo && viper.IsSet("watch.func") {
+		if viper.IsSet("watch.func") {
 			repoPath, err := filepath.Abs(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to get absolute path for repository: %v", err)
@@ -386,9 +389,24 @@ var watchCmd = &cobra.Command{
 					log.Warnf("Failed to get worktree: %v", err)
 				} else {
 					log.Debug("Pulling changes from remote")
+					var auth transport.AuthMethod
+					if sshKeyPath := viper.GetString("watch.ssh-key"); sshKeyPath != "" {
+						// Use specified SSH key
+						if key, err := os.ReadFile(sshKeyPath); err == nil {
+							publicKeys, err := ssh.NewPublicKeys("git", key, "")
+							if err != nil {
+								log.Warnf("SSH key auth failed: %v", err)
+							} else {
+								auth = publicKeys
+							}
+						} else {
+							log.Warnf("Failed to read SSH key: %v", err)
+						}
+					}
 					if err := worktree.Pull(&git.PullOptions{
 						RemoteName: "origin",
 						Progress:   os.Stdout,
+						Auth:       auth,
 					}); err != nil && err != git.NoErrAlreadyUpToDate && err != git.ErrUnstagedChanges {
 						log.Warnf("Failed to pull: %v", err)
 					}
