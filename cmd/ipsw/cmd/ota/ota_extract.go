@@ -135,7 +135,8 @@ var otaExtractCmd = &cobra.Command{
 				log.Info("Extracting dyld_shared_cache Files")
 				out, err := o.ExtractFromCryptexes(dyld.CacheUberRegex, output)
 				if err != nil {
-					return fmt.Errorf("failed to extract dyld_shared_cache: %v", err)
+					log.WithError(err).Error("failed to extract dyld_shared_cache from cryptexes; falling back to OTA asset files/payloads")
+					viper.Set("ota.extract.pattern", dyld.CacheUberRegex)
 				}
 				for _, fname := range out {
 					if rel, err := filepath.Rel(cwd, fname); err != nil {
