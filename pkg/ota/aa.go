@@ -152,7 +152,18 @@ func Open(name string, symmetricKey ...string) (*AA, error) {
 func (a *AA) Info() (*info.Info, error) {
 	var pfiles []fs.File
 	for _, file := range a.Files() {
-		if filepath.Ext(file.Name()) == ".plist" || regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Name()) {
+		switch {
+		case regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Path()):
+			fallthrough
+		case regexp.MustCompile(`^Info.plist$`).MatchString(file.Path()):
+			fallthrough
+		case regexp.MustCompile(`^AssetData/Info.plist$`).MatchString(file.Path()):
+			fallthrough
+		case regexp.MustCompile(`Restore.plist$`).MatchString(file.Path()):
+			fallthrough
+		case regexp.MustCompile(`BuildManifest.plist$`).MatchString(file.Path()):
+			fallthrough
+		case regexp.MustCompile(`SystemVersion.plist$`).MatchString(file.Path()):
 			f, err := a.Open(file.Path(), true)
 			if err != nil {
 				return nil, err

@@ -329,19 +329,19 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read DATC field: %w", err)
 				}
-				entry.Data = dat
+				entry.Size = dat
 			case 'B':
 				var dat uint32
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read DATB field: %w", err)
 				}
-				entry.Data = uint64(dat)
+				entry.Size = uint64(dat)
 			case 'A':
 				var dat uint16
 				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return nil, fmt.Errorf("failed to read DATA field: %w", err)
 				}
-				entry.Data = uint64(dat)
+				entry.Size = uint64(dat)
 			default:
 				return nil, fmt.Errorf("found unknown DAT field: %s", string(field))
 			}
@@ -645,17 +645,17 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			return yaa, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
 		}
 
-		if ent.PatchType != 0 && ent.Data > 0 {
-			if ent.PatchType != Patch_Metadata {
-				curr, _ := r.Seek(0, io.SeekCurrent)
-				ent.fileOffset = curr
-				ent.r = &r
-				// skip compressed data ??
-				if _, err := r.Seek(int64(ent.Data), io.SeekCurrent); err != nil {
-					return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
-				}
-			}
-		}
+		// if ent.PatchType != 0 && ent.Data > 0 {
+		// 	if ent.PatchType != Patch_Metadata {
+		// 		curr, _ := r.Seek(0, io.SeekCurrent)
+		// 		ent.fileOffset = curr
+		// 		ent.r = &r
+		// 		// skip compressed data ??
+		// 		if _, err := r.Seek(int64(ent.Data), io.SeekCurrent); err != nil {
+		// 			return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+		// 		}
+		// 	}
+		// }
 
 		if ent.Type == RegularFile {
 			curr, _ := r.Seek(0, io.SeekCurrent)
