@@ -243,53 +243,53 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
-	// log.Info("Diffing KERNELCACHES")
-	// if err := d.parseKernelcache(); err != nil {
-	// 	return err
-	// }
+	log.Info("Diffing KERNELCACHES")
+	if err := d.parseKernelcache(); err != nil {
+		return err
+	}
 
-	// if d.Old.KDK != "" && d.New.KDK != "" {
-	// 	log.Info("Diffing KDKS")
-	// 	if err := d.parseKDKs(); err != nil {
-	// 		return err
-	// 	}
-	// }
+	if d.Old.KDK != "" && d.New.KDK != "" {
+		log.Info("Diffing KDKS")
+		if err := d.parseKDKs(); err != nil {
+			return err
+		}
+	}
 
-	// log.Info("Diffing DYLD_SHARED_CACHES")
-	// if err := d.mountSystemOsDMGs(); err != nil {
-	// 	return fmt.Errorf("failed to mount DMGs: %v", err)
-	// }
-	// defer d.unmountSystemOsDMGs()
+	log.Info("Diffing DYLD_SHARED_CACHES")
+	if err := d.mountSystemOsDMGs(); err != nil {
+		return fmt.Errorf("failed to mount DMGs: %v", err)
+	}
+	defer d.unmountSystemOsDMGs()
 
-	// if err := d.parseDSC(); err != nil {
-	// 	return err
-	// }
+	if err := d.parseDSC(); err != nil {
+		return err
+	}
 
-	// log.Info("Diffing MachOs")
-	// if err := d.parseMachos(); err != nil {
-	// 	return fmt.Errorf("failed to parse MachOs: %v", err)
-	// }
+	log.Info("Diffing MachOs")
+	if err := d.parseMachos(); err != nil {
+		return fmt.Errorf("failed to parse MachOs: %v", err)
+	}
 
-	// if d.conf.LaunchD {
-	// 	log.Info("Diffing launchd PLIST")
-	// 	if err := d.parseLaunchdPlists(); err != nil {
-	// 		return fmt.Errorf("failed to parse launchd config plists: %v", err)
-	// 	}
-	// }
+	if d.conf.LaunchD {
+		log.Info("Diffing launchd PLIST")
+		if err := d.parseLaunchdPlists(); err != nil {
+			return fmt.Errorf("failed to parse launchd config plists: %v", err)
+		}
+	}
 
-	// if d.conf.Firmware {
-	// 	log.Info("Diffing Firmware")
-	// 	if err := d.parseFirmwares(); err != nil {
-	// 		return err
-	// 	}
-	// }
+	if d.conf.Firmware {
+		log.Info("Diffing Firmware")
+		if err := d.parseFirmwares(); err != nil {
+			return err
+		}
+	}
 
-	// if d.conf.Features {
-	// 	log.Info("Diffing Feature Flags")
-	// 	if err := d.parseFeatureFlags(); err != nil {
-	// 		return err
-	// 	}
-	// }
+	if d.conf.Features {
+		log.Info("Diffing Feature Flags")
+		if err := d.parseFeatureFlags(); err != nil {
+			return err
+		}
+	}
 
 	if d.conf.Files {
 		log.Info("Diffing Files")
@@ -298,11 +298,11 @@ func (d *Diff) Diff() (err error) {
 		}
 	}
 
-	// log.Info("Diffing ENTITLEMENTS")
-	// d.Ents, err = d.parseEntitlements()
-	// if err != nil {
-	// 	return err
-	// }
+	log.Info("Diffing ENTITLEMENTS")
+	d.Ents, err = d.parseEntitlements()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
