@@ -26,9 +26,19 @@ jobs:
       - name: Package Installer
         run: |
           sudo snap install ipsw
-      - name: Run ipsw watch WebKit/WebKit
+      - name: Run ipsw watch WebKit/WebKit (LOCKDOWN MODE)
         run: |
           /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
+      - name: Run ipsw watch WebKit/WebKit tags
+        if: ${{ !inputs.skip_post }}
+        run: |
+          /snap/bin/ipsw watch WebKit/WebKit --tags \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
