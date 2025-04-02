@@ -460,6 +460,62 @@ func (d *Diff) Markdown() error {
 		}
 	}
 
+	// SUB-SECTION: Feature Flags
+	if d.Files != nil {
+		types := []string{"IPSW", "filesystem", "SystemOS", "AppOS", "ExclaveOS"}
+		hasNewFiles := false
+		hasRemovedFiles := false
+		for _, t := range types {
+			if len(d.Files.New[t]) > 0 {
+				hasNewFiles = true
+			}
+			if len(d.Files.Removed[t]) > 0 {
+				hasRemovedFiles = true
+			}
+		}
+		if hasNewFiles {
+			out.WriteString("### Files\n\n")
+			if len(d.Files.New) > 0 {
+				out.WriteString("#### 🆕 New\n\n")
+				for _, t := range types {
+					if len(d.Files.New[t]) > 0 {
+						out.WriteString(fmt.Sprintf("##### %s (%d)\n\n", t, len(d.Files.New[t])))
+						if len(d.Files.New[t]) > 10 {
+							out.WriteString("<details>\n" +
+								"  <summary><i>View Files</i></summary>\n\n")
+						}
+						for _, k := range d.Files.New[t] {
+							out.WriteString(fmt.Sprintf("- `%s`\n", k))
+						}
+						if len(d.Files.New[t]) > 10 {
+							out.WriteString("\n</details>\n")
+						}
+						out.WriteString("\n")
+					}
+				}
+			}
+		}
+		if hasRemovedFiles {
+			out.WriteString("#### ❌ Removed\n\n")
+			for _, t := range types {
+				if len(d.Files.Removed[t]) > 0 {
+					out.WriteString(fmt.Sprintf("##### %s (%d)\n\n", t, len(d.Files.Removed[t])))
+					if len(d.Files.Removed[t]) > 10 {
+						out.WriteString("<details>\n" +
+							"  <summary><i>View Files</i></summary>\n\n")
+					}
+					for _, k := range d.Files.Removed[t] {
+						out.WriteString(fmt.Sprintf("- `%s`\n", k))
+					}
+					if len(d.Files.Removed[t]) > 10 {
+						out.WriteString("\n</details>\n")
+					}
+					out.WriteString("\n")
+				}
+			}
+		}
+	}
+
 	out.WriteString("## EOF\n")
 
 	// Write README.md

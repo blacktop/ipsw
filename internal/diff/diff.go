@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,12 @@ type PlistDiff struct {
 	Updated map[string]string `json:"changed,omitempty"`
 }
 
+type FileDiff struct {
+	New     map[string][]string `json:"new,omitempty"`
+	Removed map[string][]string `json:"removed,omitempty"`
+	// Updated map[string]string `json:"changed,omitempty"`
+}
+
 type Config struct {
 	Title     string
 	IpswOld   string
@@ -58,6 +65,7 @@ type Config struct {
 	LaunchD   bool
 	Firmware  bool
 	Features  bool
+	Files     bool
 	CStrings  bool
 	AllowList []string
 	BlockList []string
@@ -101,9 +109,9 @@ type Diff struct {
 	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
 	Launchd   string          `json:"launchd,omitempty"`
 	Features  *PlistDiff      `json:"features,omitempty"`
-
-	tmpDir string `json:"-"`
-	conf   *Config
+	Files     *FileDiff       `json:"files,omitempty"`
+	tmpDir    string          `json:"-"`
+	conf      *Config
 }
 
 // New news the diff
@@ -235,59 +243,66 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
-	log.Info("Diffing KERNELCACHES")
-	if err := d.parseKernelcache(); err != nil {
-		return err
-	}
+	// log.Info("Diffing KERNELCACHES")
+	// if err := d.parseKernelcache(); err != nil {
+	// 	return err
+	// }
 
-	if d.Old.KDK != "" && d.New.KDK != "" {
-		log.Info("Diffing KDKS")
-		if err := d.parseKDKs(); err != nil {
+	// if d.Old.KDK != "" && d.New.KDK != "" {
+	// 	log.Info("Diffing KDKS")
+	// 	if err := d.parseKDKs(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// log.Info("Diffing DYLD_SHARED_CACHES")
+	// if err := d.mountSystemOsDMGs(); err != nil {
+	// 	return fmt.Errorf("failed to mount DMGs: %v", err)
+	// }
+	// defer d.unmountSystemOsDMGs()
+
+	// if err := d.parseDSC(); err != nil {
+	// 	return err
+	// }
+
+	// log.Info("Diffing MachOs")
+	// if err := d.parseMachos(); err != nil {
+	// 	return fmt.Errorf("failed to parse MachOs: %v", err)
+	// }
+
+	// if d.conf.LaunchD {
+	// 	log.Info("Diffing launchd PLIST")
+	// 	if err := d.parseLaunchdPlists(); err != nil {
+	// 		return fmt.Errorf("failed to parse launchd config plists: %v", err)
+	// 	}
+	// }
+
+	// if d.conf.Firmware {
+	// 	log.Info("Diffing Firmware")
+	// 	if err := d.parseFirmwares(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// if d.conf.Features {
+	// 	log.Info("Diffing Feature Flags")
+	// 	if err := d.parseFeatureFlags(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	if d.conf.Files {
+		log.Info("Diffing Files")
+		if err := d.parseFiles(); err != nil {
 			return err
 		}
 	}
 
-	log.Info("Diffing DYLD_SHARED_CACHES")
-	if err := d.mountSystemOsDMGs(); err != nil {
-		return fmt.Errorf("failed to mount DMGs: %v", err)
-	}
-	defer d.unmountSystemOsDMGs()
-
-	if err := d.parseDSC(); err != nil {
-		return err
-	}
-
-	log.Info("Diffing MachOs")
-	if err := d.parseMachos(); err != nil {
-		return fmt.Errorf("failed to parse MachOs: %v", err)
-	}
-
-	if d.conf.LaunchD {
-		log.Info("Diffing launchd PLIST")
-		if err := d.parseLaunchdPlists(); err != nil {
-			return fmt.Errorf("failed to parse launchd config plists: %v", err)
-		}
-	}
-
-	if d.conf.Firmware {
-		log.Info("Diffing Firmware")
-		if err := d.parseFirmwares(); err != nil {
-			return err
-		}
-	}
-
-	if d.conf.Features {
-		log.Info("Diffing Feature Flags")
-		if err := d.parseFeatureFlags(); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Diffing ENTITLEMENTS")
-	d.Ents, err = d.parseEntitlements()
-	if err != nil {
-		return err
-	}
+	// log.Info("Diffing ENTITLEMENTS")
+	// d.Ents, err = d.parseEntitlements()
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -714,6 +729,44 @@ func (d *Diff) parseFeatureFlags() (err error) {
 				d.Features.Updated[f2] = out
 			}
 		}
+	}
+
+	return nil
+}
+
+func (d *Diff) parseFiles() error {
+	d.Files = &FileDiff{
+		New:     make(map[string][]string),
+		Removed: make(map[string][]string),
+	}
+
+	/* PREVIOUS IPSW */
+
+	prev := make(map[string][]string)
+
+	if err := search.ForEachFileInIPSW(d.Old.IPSWPath, "", d.conf.PemDB, func(dmg, path string) error {
+		prev[dmg] = append(prev[dmg], path)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	/* NEXT IPSW */
+
+	next := make(map[string][]string)
+
+	if err := search.ForEachFileInIPSW(d.New.IPSWPath, "", d.conf.PemDB, func(dmg, path string) error {
+		next[dmg] = append(next[dmg], path)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	for dmg := range prev {
+		d.Files.New[dmg] = utils.Difference(prev[dmg], next[dmg])
+		d.Files.Removed[dmg] = utils.Difference(next[dmg], prev[dmg])
+		sort.Strings(d.Files.New[dmg])
+		sort.Strings(d.Files.Removed[dmg])
 	}
 
 	return nil
