@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/pkg/trie"
@@ -1762,7 +1764,16 @@ func (f *File) Image(name string) (*CacheImage, error) {
 		for _, m := range matches {
 			names = append(names, m.Name)
 		}
-		return nil, fmt.Errorf("multiple images found for %s (please supply FULL path):\n\t- %s", name, strings.Join(names, "\n\t- "))
+		var choice string
+		prompt := &survey.Select{
+			Message: "Multiple images found for " + name + ", please select one:",
+			Options: names,
+		}
+		if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			return nil, fmt.Errorf("multiple images found for %s (please supply FULL path):\n\t- %s", name, strings.Join(names, "\n\t- "))
+		}
+		return f.Image(choice)
 	}
 	return nil, fmt.Errorf("image %s not found in cache", name)
 }
