@@ -481,7 +481,7 @@ var MachoCmd = &cobra.Command{
 						fmt.Println("=====")
 					}
 					if err := image.Analyze(); err != nil {
-						return err
+						log.WithError(err).Warn("failed to analyze image")
 					}
 					for stubAddr, addr := range image.Analysis.SymbolStubs {
 						if symName, ok := f.AddressToSymbol[addr]; ok {
