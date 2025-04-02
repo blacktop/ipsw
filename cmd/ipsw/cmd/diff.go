@@ -45,6 +45,7 @@ func init() {
 	diffCmd.Flags().Bool("launchd", false, "Diff launchd configs")
 	diffCmd.Flags().Bool("fw", false, "Diff other firmwares")
 	diffCmd.Flags().Bool("feat", false, "Diff feature flags")
+	diffCmd.Flags().Bool("files", false, "Diff files")
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
 	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
@@ -61,6 +62,7 @@ func init() {
 	viper.BindPFlag("diff.fw", diffCmd.Flags().Lookup("fw"))
 	viper.BindPFlag("diff.feat", diffCmd.Flags().Lookup("feat"))
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
+	viper.BindPFlag("diff.files", diffCmd.Flags().Lookup("files"))
 	viper.BindPFlag("diff.allow-list", diffCmd.Flags().Lookup("allow-list"))
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
@@ -122,6 +124,7 @@ var diffCmd = &cobra.Command{
 				LaunchD:   viper.GetBool("diff.launchd"),
 				Firmware:  viper.GetBool("diff.fw"),
 				Features:  viper.GetBool("diff.feat"),
+				Files:     viper.GetBool("diff.files"),
 				CStrings:  viper.GetBool("diff.strs"),
 				AllowList: viper.GetStringSlice("diff.allow-list"),
 				BlockList: viper.GetStringSlice("diff.block-list"),

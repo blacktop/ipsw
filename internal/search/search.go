@@ -390,3 +390,76 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 
 	return nil
 }
+
+func ForEachFileInIPSW(ipswPath, directory, pemDB string, handler func(string, string) error) error {
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+
+	var dmg string
+	scanFile := func(mountPoint, filePath string) error {
+		// filter to only scan a specific directory (if provided)
+		if directory != "" && !strings.Contains(filePath, directory) {
+			return nil
+		}
+		if _, rest, ok := strings.Cut(filePath, mountPoint); ok {
+			filePath = rest
+		}
+		if err := handler(dmg, filePath); err != nil {
+			return fmt.Errorf("failed to handle file %s: %w", filePath, err)
+		}
+		return nil
+	}
+
+	// scan the IPSW as a zip file
+	zr, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to open IPSW: %v", err)
+	}
+	defer zr.Close()
+	dmg = "IPSW"
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		// skip DMGs/cryptexes as they always have a different name (i.e. 090-43228-337.dmg.aea)
+		if regexp.MustCompile(`[0-9]{3}-[0-9]{5}-[0-9]{3}\.dmg(\.aea|\.trustcache)?(\.root_hash|\.trustcache|.integrity_catalog|\.mtree)?$`).MatchString(f.Name) {
+			continue
+		}
+		if err := scanFile("", f.Name); err != nil {
+			return fmt.Errorf("failed to scan file %s: %w", f.Name, err)
+		}
+	}
+	// scan the IPSW's DMGs/cryptexes
+	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+		log.Info("Scanning filesystem")
+		dmg = "filesystem"
+		if err := scanDmg(ipswPath, fsOS, dmg, pemDB, scanFile); err != nil {
+			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
+		}
+	}
+	if systemOS, err := i.GetSystemOsDmg(); err == nil {
+		log.Info("Scanning SystemOS")
+		dmg = "SystemOS"
+		if err := scanDmg(ipswPath, systemOS, dmg, pemDB, scanFile); err != nil {
+			return fmt.Errorf("failed to scan files in SystemOS %s: %w", systemOS, err)
+		}
+	}
+	if appOS, err := i.GetAppOsDmg(); err == nil {
+		log.Info("Scanning AppOS")
+		dmg = "AppOS"
+		if err := scanDmg(ipswPath, appOS, dmg, pemDB, scanFile); err != nil {
+			return fmt.Errorf("failed to scan files in AppOS %s: %w", appOS, err)
+		}
+	}
+	if excOS, err := i.GetExclaveOSDmg(); err == nil {
+		log.Info("Scanning ExclaveOS")
+		dmg = "ExclaveOS"
+		if err := scanDmg(ipswPath, excOS, dmg, pemDB, scanFile); err != nil {
+			return fmt.Errorf("failed to scan files in ExclaveOS %s: %w", excOS, err)
+		}
+	}
+
+	return nil
+}
