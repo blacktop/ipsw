@@ -763,8 +763,8 @@ func (d *Diff) parseFiles() error {
 	}
 
 	for dmg := range prev {
-		d.Files.New[dmg] = utils.Difference(prev[dmg], next[dmg])
-		d.Files.Removed[dmg] = utils.Difference(next[dmg], prev[dmg])
+		d.Files.New[dmg] = utils.Difference(next[dmg], prev[dmg])
+		d.Files.Removed[dmg] = utils.Difference(prev[dmg], next[dmg])
 		sort.Strings(d.Files.New[dmg])
 		sort.Strings(d.Files.Removed[dmg])
 	}
