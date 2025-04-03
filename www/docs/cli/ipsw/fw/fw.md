@@ -39,7 +39,7 @@ ipsw fw [flags]
 * [ipsw fw dcp](/docs/cli/ipsw/fw/dcp)	 - Dump MachOs
 * [ipsw fw exclave](/docs/cli/ipsw/fw/exclave)	 - Dump MachOs
 * [ipsw fw gpu](/docs/cli/ipsw/fw/gpu)	 - Dump MachOs
-* [ipsw fw iboot](/docs/cli/ipsw/fw/iboot)	 - Dump firmwares
+* [ipsw fw iboot](/docs/cli/ipsw/fw/iboot)	 - Dump iBoot files
 * [ipsw fw ibootim](/docs/cli/ipsw/fw/ibootim)	 - Dump iBoot Images
 * [ipsw fw tc](/docs/cli/ipsw/fw/tc)	 - Dump TrustCache
 
