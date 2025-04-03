@@ -2,21 +2,36 @@ package iboot
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/lzfse-cgo"
 )
 
 const MinStringLength = 2
 
+var (
+	lzfseStart = []byte{0x62, 0x76, 0x78, 0x32} // bvx2
+	lzfseEnd   = []byte{0x62, 0x76, 0x78, 0x24} // bvx$
+
+	prologs = [][]byte{
+		{0x7F, 0x23, 0x03, 0xD5}, // PACIBSP
+		{0xBD, 0xA9},             //
+		{0xBF, 0xA9},             //
+	}
+)
+
 type IBoot struct {
-	Version   string
-	Release   string
-	Copyright string
-	Strings   map[string]map[int64]string
-	Files     map[string][]byte
+	Version     string
+	Release     string
+	Copyright   string
+	BaseAddress uint64
+	Strings     map[string]map[int64]string
+	Files       map[string][]byte
 }
 
 func (i *IBoot) String() string {
@@ -52,6 +67,11 @@ func Parse(data []byte) (*IBoot, error) {
 		return nil, fmt.Errorf("failed to read version string: %v", err)
 	}
 
+	iboot.BaseAddress, err = getBaseAddress(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get base address: %v", err)
+	}
+
 	strs, err := dumpStrings(r, MinStringLength)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump strings: %v", err)
@@ -62,8 +82,6 @@ func Parse(data []byte) (*IBoot, error) {
 	iboot.Files = make(map[string][]byte)
 	found := 0
 	var name string
-	lzfseStart := []byte{0x62, 0x76, 0x78, 0x32} // bvx2
-	lzfseEnd := []byte{0x62, 0x76, 0x78, 0x24}   // bvx$
 
 	for {
 		start := bytes.Index(data, lzfseStart)
@@ -100,6 +118,48 @@ func Parse(data []byte) (*IBoot, error) {
 	}
 
 	return iboot, nil
+}
+
+func getBaseAddress(r *bytes.Reader) (uint64, error) {
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("failed to seek to base address: %v", err)
+	}
+
+	var startAddr uint64 = 0
+	var instrValue uint32
+	var results [1024]byte
+
+	for {
+		err := binary.Read(r, binary.LittleEndian, &instrValue)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
+		}
+
+		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+		if err != nil {
+			return 0, fmt.Errorf("failed to decompose instruction @ %#x: %v", startAddr, err)
+		}
+
+		if strings.Contains(instruction.Encoding.String(), "loadlit") {
+			if _, err := r.Seek(int64(instruction.Operands[1].Immediate), io.SeekStart); err != nil {
+				return 0, fmt.Errorf("failed to seek to base address: %v", err)
+			}
+			var baseAddr uint64
+			if err := binary.Read(r, binary.LittleEndian, &baseAddr); err != nil {
+				return 0, fmt.Errorf("failed to read base address: %v", err)
+			}
+			return baseAddr, nil
+		}
+
+		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction)
+
+		startAddr += uint64(binary.Size(uint32(0)))
+	}
+
+	return 0, fmt.Errorf("failed to find base address")
 }
 
 func dumpStrings(r *bytes.Reader, minLen int) (map[int64]string, error) {
