@@ -23,18 +23,17 @@ package fw
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
-	// lzfse "github.com/blacktop/go-lzfse"
+	"github.com/blacktop/ipsw/internal/commands/extract"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/pkg/errors"
+	"github.com/blacktop/ipsw/pkg/iboot"
+	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/lzfse-cgo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,92 +41,156 @@ import (
 func init() {
 	FwCmd.AddCommand(ibootCmd)
 
+	ibootCmd.Flags().BoolP("info", "i", false, "Print info")
+	ibootCmd.Flags().Bool("version", false, "Print version")
+	ibootCmd.Flags().IntP("min", "m", 5, "Minimum length of string to print")
+	ibootCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
+	ibootCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting im4p files")
 	ibootCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	ibootCmd.MarkFlagDirname("output")
+	viper.BindPFlag("fw.iboot.info", ibootCmd.Flags().Lookup("info"))
+	viper.BindPFlag("fw.iboot.version", ibootCmd.Flags().Lookup("version"))
+	viper.BindPFlag("fw.iboot.min", ibootCmd.Flags().Lookup("min"))
+	viper.BindPFlag("fw.iboot.remote", ibootCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("fw.iboot.flat", ibootCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("fw.iboot.output", ibootCmd.Flags().Lookup("output"))
 }
 
 // ibootCmd represents the iboot command
 var ibootCmd = &cobra.Command{
-	Use:           "iboot <IBOOT_BIN>",
+	Use:           "iboot <IPSW|URL|IM4P>",
 	Aliases:       []string{"ib"},
-	Short:         "Dump firmwares",
+	Short:         "Dump iBoot files",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var name string
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		// flags
+		showInfo := viper.GetBool("fw.iboot.info")
+		showVersion := viper.GetBool("fw.iboot.version")
+		minLen := viper.GetInt("fw.iboot.min")
+		flat := viper.GetBool("fw.iboot.flat")
 		output := viper.GetString("fw.iboot.output")
-
-		f, err := os.Open(args[0])
-		if err != nil {
-			return errors.Wrapf(err, "unabled to open file: %s", args[0])
+		infile := filepath.Clean(args[0])
+		// validate flags
+		if showInfo && showVersion {
+			return fmt.Errorf("cannot set both --info and --version flags")
+		}
+		if minLen < iboot.MinStringLength {
+			return fmt.Errorf("minimum string length must be at least %d", iboot.MinStringLength)
+		}
+		if !viper.IsSet("fw.iboot.output") {
+			output = filepath.Dir(infile)
+		} else {
+			output = filepath.Clean(output)
+			if err := os.MkdirAll(output, 0o755); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
 		}
 
-		dat, err := io.ReadAll(f)
-		if err != nil {
-			return errors.Wrapf(err, "unabled to read file: %s", args[0])
-		}
-
-		lzfseStart := make([]byte, 4)
-		lzfseEnd := make([]byte, 4)
-		binary.LittleEndian.PutUint32(lzfseStart, 0x32787662)
-		binary.LittleEndian.PutUint32(lzfseEnd, 0x24787662)
-
-		found := 0
-
-		for {
-			firstStartMatch := bytes.Index(dat, lzfseStart)
-			firstEndMatch := bytes.Index(dat, lzfseEnd)
-
-			if firstStartMatch < 0 || firstEndMatch < 0 {
-				break
+		dowork := func(im4p *img4.Im4p, outputDir string) error {
+			if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
+				im4p.Data = lzfse.DecodeBuffer(im4p.Data)
 			}
 
-			decData, err := lzfse.NewDecoder(dat[firstStartMatch : firstEndMatch+4]).DecodeBuffer()
+			iboot, err := iboot.Parse(im4p.Data)
 			if err != nil {
-				return fmt.Errorf("failed to lzfse decompress embedded firmware: %v", err)
+				return fmt.Errorf("failed to parse iboot data: %v", err)
 			}
 
-			// decData := lzfse.DecodeBuffer(dat[firstStartMatch : firstEndMatch+4])
-			// lr := bytes.NewReader(dat[firstStartMatch : firstEndMatch+4])
-			// buf := new(bytes.Buffer)
-
-			// _, err := buf.ReadFrom(lr)
-			// if err != nil {
-			// 	return errors.Wrap(err, "failed to lzfse decompress embedded firmware")
-			// }
-
-			matches := utils.GrepStrings(decData, "AppleSMCFirmware")
-			if len(matches) > 0 {
-				name = strings.TrimPrefix(matches[0], "@@") + ".bin"
+			if showVersion {
+				fmt.Println(iboot.String())
+			} else if showInfo {
+				fmt.Println(iboot.String())
+				fmt.Println()
+				fmt.Println("iBoot Strings")
+				fmt.Println("============")
+				for offset, str := range iboot.Strings["iboot"] {
+					if len(str) < minLen {
+						continue
+					}
+					fmt.Printf("0x%08X: %s\n", offset, str)
+				}
+				for name, strs := range iboot.Strings {
+					if name == "iboot" {
+						continue
+					}
+					fmt.Println()
+					fmt.Printf("BLOB %s Strings\n", name)
+					fmt.Println("================")
+					for offset, str := range strs {
+						if len(str) < minLen {
+							continue
+						}
+						fmt.Printf("0x%08X: %s\n", offset, str)
+					}
+				}
 			} else {
-				matches = utils.GrepStrings(decData, "AppleStorageProcessorANS2")
-				if len(matches) > 0 {
-					name = matches[0] + ".bin"
-				} else {
-					name = fmt.Sprintf("firmware%d.bin", found)
+				fname := filepath.Join(outputDir, fmt.Sprintf("%s_%s.bin", iboot.Version, iboot.Release))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
+				if err := os.WriteFile(fname, im4p.Data, 0o755); err != nil {
+					return fmt.Errorf("failed to write file: %v", err)
+				}
+				for name, data := range iboot.Files {
+					fname := filepath.Join(outputDir, name)
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
+					if err := os.WriteFile(fname, data, 0o755); err != nil {
+						return fmt.Errorf("failed to write file: %v", err)
+					}
 				}
 			}
-			if len(output) > 0 {
-				if err := os.MkdirAll(output, 0o750); err != nil {
+
+			return nil
+		}
+
+		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.iboot.remote") {
+			return fmt.Errorf("failed to determine if file is a zip: %v", err)
+		} else if isZip || viper.GetBool("fw.iboot.remote") {
+			var out []string
+			if viper.GetBool("fw.iboot.remote") {
+				out, err = extract.Search(&extract.Config{
+					URL:     args[0],
+					Pattern: "iBoot\\..*\\.im4p$",
+					Flatten: flat,
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for a iboot remote IPSW: %v", err)
+				}
+			} else {
+				out, err = extract.Search(&extract.Config{
+					IPSW:    infile,
+					Pattern: "iBoot\\..*\\.im4p$",
+					Flatten: flat,
+					Output:  output,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to search for iboot in local IPSW: %v", err)
+				}
+			}
+			for _, f := range out {
+				im4p, err := img4.OpenIm4p(f)
+				if err != nil {
+					return fmt.Errorf("failed to open im4p: %v", err)
+				}
+				if err := dowork(im4p, filepath.Dir(f)); err != nil {
 					return err
 				}
-				name = filepath.Join(output, name)
+				os.Remove(f) // cleanup the extracted im4p file
 			}
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
-			if err := os.WriteFile(name, decData, 0o660); err != nil {
-				return errors.Wrapf(err, "unabled to write file: %s", name)
+		} else if ok, _ := magic.IsIm4p(args[0]); ok {
+			im4p, err := img4.OpenIm4p(infile)
+			if err != nil {
+				return err
 			}
-
-			found++
-			dat = dat[firstEndMatch+4:]
+			return dowork(im4p, output)
+		} else {
+			return fmt.Errorf("unsupported file type: %s", infile)
 		}
 
 		return nil

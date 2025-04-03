@@ -114,6 +114,22 @@ func ConvertStrToInt(intStr string) (uint64, error) {
 	return strconv.ParseUint(intStr, 10, 64)
 }
 
+func ReadCString(r io.Reader) (string, error) {
+	var bytes []byte
+	for {
+		b := make([]byte, 1)
+		_, err := r.Read(b)
+		if err != nil {
+			return "", err
+		}
+		if b[0] == 0 {
+			break
+		}
+		bytes = append(bytes, b[0])
+	}
+	return string(bytes), nil
+}
+
 // GrepStrings returns all matching strings in []byte
 func GrepStrings(data []byte, searchStr string) []string {
 
