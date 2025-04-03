@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -41,15 +42,15 @@ import (
 func init() {
 	FwCmd.AddCommand(ibootCmd)
 
-	ibootCmd.Flags().BoolP("info", "i", false, "Print info")
 	ibootCmd.Flags().Bool("version", false, "Print version")
+	ibootCmd.Flags().BoolP("strings", "s", false, "Print strings")
 	ibootCmd.Flags().IntP("min", "m", 5, "Minimum length of string to print")
 	ibootCmd.Flags().BoolP("remote", "r", false, "Parse remote IPSW URL")
 	ibootCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting im4p files")
 	ibootCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	ibootCmd.MarkFlagDirname("output")
-	viper.BindPFlag("fw.iboot.info", ibootCmd.Flags().Lookup("info"))
 	viper.BindPFlag("fw.iboot.version", ibootCmd.Flags().Lookup("version"))
+	viper.BindPFlag("fw.iboot.strings", ibootCmd.Flags().Lookup("strings"))
 	viper.BindPFlag("fw.iboot.min", ibootCmd.Flags().Lookup("min"))
 	viper.BindPFlag("fw.iboot.remote", ibootCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("fw.iboot.flat", ibootCmd.Flags().Lookup("flat"))
@@ -71,15 +72,15 @@ var ibootCmd = &cobra.Command{
 		}
 
 		// flags
-		showInfo := viper.GetBool("fw.iboot.info")
 		showVersion := viper.GetBool("fw.iboot.version")
+		showStrings := viper.GetBool("fw.iboot.strings")
 		minLen := viper.GetInt("fw.iboot.min")
 		flat := viper.GetBool("fw.iboot.flat")
 		output := viper.GetString("fw.iboot.output")
 		infile := filepath.Clean(args[0])
 		// validate flags
-		if showInfo && showVersion {
-			return fmt.Errorf("cannot set both --info and --version flags")
+		if showStrings && showVersion {
+			return fmt.Errorf("cannot set both --strings and --version flags")
 		}
 		if minLen < iboot.MinStringLength {
 			return fmt.Errorf("minimum string length must be at least %d", iboot.MinStringLength)
@@ -103,27 +104,30 @@ var ibootCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse iboot data: %v", err)
 			}
 
+			var names []string
+			for name := range iboot.Files {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+
 			if showVersion {
 				fmt.Println(iboot.String())
-			} else if showInfo {
-				fmt.Println(iboot.String())
-				fmt.Println()
-				fmt.Println("iBoot Strings")
-				fmt.Println("============")
+			} else if showStrings {
+				fmt.Printf("%s %s Strings\n", iboot.Version, iboot.Release)
+				fmt.Println("======================================")
 				for offset, str := range iboot.Strings["iboot"] {
 					if len(str) < minLen {
 						continue
 					}
 					fmt.Printf("0x%08X: %s\n", offset, str)
 				}
-				for name, strs := range iboot.Strings {
+				for _, name := range names {
 					if name == "iboot" {
 						continue
 					}
-					fmt.Println()
-					fmt.Printf("BLOB %s Strings\n", name)
-					fmt.Println("================")
-					for offset, str := range strs {
+					fmt.Printf("\n%s Strings\n", name)
+					fmt.Println("========================")
+					for offset, str := range iboot.Strings[name] {
 						if len(str) < minLen {
 							continue
 						}
@@ -136,10 +140,10 @@ var ibootCmd = &cobra.Command{
 				if err := os.WriteFile(fname, im4p.Data, 0o755); err != nil {
 					return fmt.Errorf("failed to write file: %v", err)
 				}
-				for name, data := range iboot.Files {
+				for _, name := range names {
 					fname := filepath.Join(outputDir, name)
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
-					if err := os.WriteFile(fname, data, 0o755); err != nil {
+					if err := os.WriteFile(fname, iboot.Files[name], 0o755); err != nil {
 						return fmt.Errorf("failed to write file: %v", err)
 					}
 				}
