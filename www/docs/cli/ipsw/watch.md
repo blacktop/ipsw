@@ -31,6 +31,8 @@ ipsw watch <ORG/REPO> [flags]
 ❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
 # Watch WebKit/WebKit for new tags every 5 minutes and announce to Discord
 ❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m
+# Watch a specific function in a local repo
+❯ ipsw watch /path/to/local/REPO --func "MyFunction" --file "path/to/file.go" --timeout 5m
 ```
 
 ### Options
@@ -46,6 +48,7 @@ ipsw watch <ORG/REPO> [flags]
       --discord-id string               Discord Webhook ID
       --discord-token string            Discord Webhook Token
   -f, --file string                     Commit file path to watch
+      --func string                     Function name to watch (for local repos)
   -h, --help                            help for watch
       --json                            Output downloadable tar.gz URLs as JSON
       --mastodon                        Annouce to Mastodon
@@ -55,6 +58,7 @@ ipsw watch <ORG/REPO> [flags]
       --mastodon-server string          Mastodon Server URL (default "https://mastodon.social")
   -p, --pattern string                  Commit message pattern to match
       --post                            Create social media post for NEW tags
+      --ssh-key string                  SSH private key for git operations
   -g, --tags                            Watch for new tags
   -t, --timeout duration                Timeout for watch attempts (default: 0s = no timeout/run once)
 ```

@@ -33,6 +33,7 @@ ipsw diff <IPSW> <IPSW> [flags]
       --allow-list strings   Filter MachO sections to diff (e.g. __TEXT.__text)
       --block-list strings   Remove MachO sections to diff (e.g. __TEXT.__info_plist)
       --feat                 Diff feature flags
+      --files                Diff files
       --fw                   Diff other firmwares
   -h, --help                 help for diff
       --html                 Save diff as HTML file
