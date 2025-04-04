@@ -291,6 +291,7 @@ func (d *Diff) Markdown() error {
 					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
 				}
 			}
+			out.WriteString("\n")
 		}
 		if len(d.IBoot.Removed) > 0 {
 			out.WriteString("### ❌ Removed\n\n")
@@ -300,6 +301,7 @@ func (d *Diff) Markdown() error {
 					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
 				}
 			}
+			out.WriteString("\n")
 		}
 	}
 
