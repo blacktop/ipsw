@@ -284,24 +284,28 @@ func (d *Diff) Markdown() error {
 			),
 		)
 		if len(d.IBoot.New) > 0 {
-			out.WriteString("### 🆕 NEW\n\n")
+			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.IBoot.New)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View NEW</i></summary>\n\n")
 			for k, v := range d.IBoot.New {
-				out.WriteString(fmt.Sprintf("#### `%s`\n", k))
+				out.WriteString(fmt.Sprintf("##### `%s`\n", k))
 				for _, str := range v {
 					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
 				}
 			}
-			out.WriteString("\n")
+			out.WriteString("\n</details>\n\n")
 		}
 		if len(d.IBoot.Removed) > 0 {
-			out.WriteString("### ❌ Removed\n\n")
+			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.IBoot.Removed)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View Removed</i></summary>\n\n")
 			for k, v := range d.IBoot.Removed {
-				out.WriteString(fmt.Sprintf("#### `%s`\n", k))
+				out.WriteString(fmt.Sprintf("##### `%s`\n", k))
 				for _, str := range v {
 					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
 				}
 			}
-			out.WriteString("\n")
+			out.WriteString("\n</details>\n\n")
 		}
 	}
 
