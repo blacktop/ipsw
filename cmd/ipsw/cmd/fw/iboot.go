@@ -22,7 +22,6 @@ THE SOFTWARE.
 package fw
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/iboot"
 	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/blacktop/lzfse-cgo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -95,10 +93,6 @@ var ibootCmd = &cobra.Command{
 		}
 
 		dowork := func(im4p *img4.Im4p, outputDir string) error {
-			if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
-				im4p.Data = lzfse.DecodeBuffer(im4p.Data)
-			}
-
 			iboot, err := iboot.Parse(im4p.Data)
 			if err != nil {
 				return fmt.Errorf("failed to parse iboot data: %v", err)
