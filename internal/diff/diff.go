@@ -705,7 +705,7 @@ func (d *Diff) parseIBoot() (err error) {
 	for name, strs := range newIBoot.Strings {
 		if _, ok := oldIBoot.Strings[name]; ok {
 			for _, str := range strs {
-				if len(str) < 5 {
+				if len(str) < 10 {
 					continue
 				}
 				found := false
@@ -728,7 +728,7 @@ func (d *Diff) parseIBoot() (err error) {
 	for name, strs := range oldIBoot.Strings {
 		if _, ok := newIBoot.Strings[name]; ok {
 			for _, str := range strs {
-				if len(str) < 5 {
+				if len(str) < 10 {
 					continue
 				}
 				found := false
