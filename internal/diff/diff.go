@@ -28,6 +28,8 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/iboot"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"golang.org/x/exp/maps"
@@ -55,6 +57,12 @@ type FileDiff struct {
 	New     map[string][]string `json:"new,omitempty"`
 	Removed map[string][]string `json:"removed,omitempty"`
 	// Updated map[string]string `json:"changed,omitempty"`
+}
+
+type IBootDiff struct {
+	Versions []string            `json:"versions,omitempty"`
+	New      map[string][]string `json:"new,omitempty"`
+	Removed  map[string][]string `json:"removed,omitempty"`
 }
 
 type Config struct {
@@ -107,6 +115,7 @@ type Diff struct {
 	Dylibs    *mcmd.MachoDiff `json:"dylibs,omitempty"`
 	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
 	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
+	IBoot     *IBootDiff      `json:"iboot,omitempty"`
 	Launchd   string          `json:"launchd,omitempty"`
 	Features  *PlistDiff      `json:"features,omitempty"`
 	Files     *FileDiff       `json:"files,omitempty"`
@@ -280,6 +289,10 @@ func (d *Diff) Diff() (err error) {
 	if d.conf.Firmware {
 		log.Info("Diffing Firmware")
 		if err := d.parseFirmwares(); err != nil {
+			return err
+		}
+		log.Info("Diffing iBoot")
+		if err := d.parseIBoot(); err != nil {
 			return err
 		}
 	}
@@ -654,6 +667,84 @@ func (d *Diff) parseFirmwares() (err error) {
 		CStrings:  d.conf.CStrings,
 	})
 	return
+}
+
+func (d *Diff) parseIBoot() (err error) {
+	d.IBoot = &IBootDiff{
+		New:     make(map[string][]string),
+		Removed: make(map[string][]string),
+	}
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_iboot")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory to store im4ps: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+	getIboot := func(ipswPath string) (*iboot.IBoot, error) {
+		iBootIm4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
+			// return regexp.MustCompile(`iBSS.*\.im4p$`).MatchString(f.Name) || regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
+			return regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to unzip iBoot im4p: %v", err)
+		}
+		im4p, err := img4.OpenIm4p(iBootIm4ps[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to open im4p: %v", err)
+		}
+		return iboot.Parse(im4p.Data)
+	}
+	oldIBoot, err := getIboot(d.Old.IPSWPath)
+	if err != nil {
+		return fmt.Errorf("failed to get iBoot from 'Old' IPSW: %v", err)
+	}
+	newIBoot, err := getIboot(d.New.IPSWPath)
+	if err != nil {
+		return fmt.Errorf("failed to get iBoot from 'New' IPSW: %v", err)
+	}
+	d.IBoot.Versions = []string{oldIBoot.Version, newIBoot.Version}
+	for name, strs := range newIBoot.Strings {
+		if _, ok := oldIBoot.Strings[name]; ok {
+			for _, str := range strs {
+				if len(str) < 5 {
+					continue
+				}
+				found := false
+				for _, oldStr := range oldIBoot.Strings[name] {
+					if str == oldStr {
+						found = true
+						break
+					}
+				}
+				if !found {
+					d.IBoot.New[name] = append(d.IBoot.New[name], str)
+				}
+			}
+		} else {
+			for _, str := range strs {
+				d.IBoot.New[name] = append(d.IBoot.New[name], str)
+			}
+		}
+	}
+	for name, strs := range oldIBoot.Strings {
+		if _, ok := newIBoot.Strings[name]; ok {
+			for _, str := range strs {
+				if len(str) < 5 {
+					continue
+				}
+				found := false
+				for _, newStr := range newIBoot.Strings[name] {
+					if str == newStr {
+						found = true
+						break
+					}
+				}
+				if !found {
+					d.IBoot.Removed[name] = append(d.IBoot.Removed[name], str)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (d *Diff) parseFeatureFlags() (err error) {

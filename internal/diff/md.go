@@ -108,7 +108,7 @@ func (d *Diff) Markdown() error {
 			"- `%s`\n\n",
 			d.Old.KDK, d.New.KDK,
 		)
-		fmt.Fprintf(f, d.KDKs)
+		fmt.Fprintf(f, "%s", d.KDKs)
 		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "KDK DIFF", "KDK.md"))
 	}
 
@@ -194,7 +194,7 @@ func (d *Diff) Markdown() error {
 			return fmt.Errorf("failed to create diff Entitlements Markdown: %w", err)
 		}
 		fmt.Fprintf(f, "## 🔑 Entitlements\n\n")
-		fmt.Fprintf(f, d.Ents)
+		fmt.Fprintf(f, "%s", d.Ents)
 		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "Entitlements DIFF", "Entitlements.md"))
 	}
 
@@ -267,6 +267,39 @@ func (d *Diff) Markdown() error {
 				}
 			}
 			out.WriteString("\n</details>\n\n")
+		}
+	}
+
+	// SECTION: iBoot
+	if d.IBoot != nil {
+		out.WriteString(
+			fmt.Sprintf(
+				"### iBoot\n\n"+
+					"| iOS | Version |\n"+
+					"| :-- | :------ |\n"+
+					"| %s *(%s)* | %s |\n"+
+					"| %s *(%s)* | %s |\n\n",
+				d.Old.Version, d.Old.Build, d.IBoot.Versions[0],
+				d.New.Version, d.New.Build, d.IBoot.Versions[1],
+			),
+		)
+		if len(d.IBoot.New) > 0 {
+			out.WriteString("### 🆕 NEW\n\n")
+			for k, v := range d.IBoot.New {
+				out.WriteString(fmt.Sprintf("#### `%s`\n", k))
+				for _, str := range v {
+					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
+				}
+			}
+		}
+		if len(d.IBoot.Removed) > 0 {
+			out.WriteString("### ❌ Removed\n\n")
+			for k, v := range d.IBoot.Removed {
+				out.WriteString(fmt.Sprintf("#### `%s`\n", k))
+				for _, str := range v {
+					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
+				}
+			}
 		}
 	}
 

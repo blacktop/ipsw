@@ -41,6 +41,14 @@ func Parse(data []byte) (*IBoot, error) {
 	iboot := &IBoot{
 		Strings: make(map[string]map[int64]string),
 	}
+	// check for compressed data
+	if len(data) < 4 {
+		return nil, fmt.Errorf("data too short to be iboot")
+	}
+	// check for lzfse
+	if bytes.Contains(data[:4], []byte("bvx2")) {
+		data = lzfse.DecodeBuffer(data)
+	}
 	r := bytes.NewReader(data)
 
 	var err error
@@ -97,16 +105,15 @@ func Parse(data []byte) (*IBoot, error) {
 			return nil, fmt.Errorf("failed to dump strings: %v", err)
 		}
 		// check for known files
-		idx := bytes.Index(decomp, []byte("AppleSMCFirmware"))
-		if idx > 0 {
+		name = fmt.Sprintf("iboot_blob%02d.bin", found)
+		if idx := bytes.Index(decomp, []byte("AppleSMCFirmware")); idx > 0 {
 			name = "AppleSMCFirmware.bin"
-		} else {
-			idx = bytes.Index(decomp, []byte("AppleStorageProcessorANS2"))
-			if idx > 0 {
-				name = "AppleStorageProcessorANS2.bin"
-			} else {
-				name = fmt.Sprintf("iboot_blob%02d.bin", found)
-			}
+		}
+		if idx := bytes.Index(decomp, []byte("AppleStorageProcessorANS2")); idx > 0 {
+			name = "AppleStorageProcessorANS2.bin"
+		}
+		if idx := bytes.Index(decomp, []byte("RTKit")); idx > 0 {
+			name = "RTKit.bin"
 		}
 
 		iboot.Files[name] = decomp
@@ -164,7 +171,7 @@ func getBaseAddress(r *bytes.Reader) (uint64, error) {
 func dumpStrings(r *bytes.Reader, minLen int) (map[int64]string, error) {
 	var currentString bytes.Buffer
 	var startOffset int64
-	strings := make(map[int64]string)
+	strs := make(map[int64]string)
 	for {
 		b, err := r.ReadByte()
 		if err != nil {
@@ -182,14 +189,16 @@ func dumpStrings(r *bytes.Reader, minLen int) (map[int64]string, error) {
 		} else {
 			// Non-printable character encountered
 			if currentString.Len() >= minLen {
-				strings[startOffset] = currentString.String()
+				if !strings.Contains(currentString.String(), "bvx$bvx2") && !strings.Contains(currentString.String(), "`") {
+					strs[startOffset] = strings.TrimSpace(currentString.String())
+				}
 			}
 			currentString.Reset()
 			startOffset = -1
 		}
 	}
 
-	return strings, nil
+	return strs, nil
 }
 
 func isPrintableASCII(b byte) bool {
