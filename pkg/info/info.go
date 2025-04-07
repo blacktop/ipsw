@@ -415,11 +415,11 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 		} else {
 			return "", fmt.Errorf("multiple filesystem DMGs found")
 		}
-	} else if i.Plists.Restore != nil {
+	} else if i.Plists != nil && i.Plists.Restore != nil {
 		if dmg, ok := i.Plists.Restore.SystemRestoreImages["User"]; ok {
 			return dmg, nil
 		}
-		return "", fmt.Errorf("no BuildManifest.plist OR SystemRestoreImages (used in older IPSWs) found")
+		return "", fmt.Errorf("no BuildManifest.plist AND no SystemRestoreImages (used in older IPSWs) found")
 	}
 	return "", fmt.Errorf("no BuildManifest.plist found")
 }
