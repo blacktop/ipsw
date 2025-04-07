@@ -9,12 +9,20 @@ import (
 
 // Restore is the Restore.plist object found in IPSWs/OTAs
 type Restore struct {
+	DeviceClass                   string             `plist:"DeviceClass,omitempty"`
+	FirmwareDirectory             string             `plist:"FirmwareDirectory,omitempty"`
+	KernelCachesByPlatform        map[string]any     `plist:"KernelCachesByPlatform,omitempty"`
 	DeviceMap                     []restoreDeviceMap `plist:"DeviceMap,omitempty"`
 	ProductBuildVersion           string             `plist:"ProductBuildVersion,omitempty"`
+	ProductType                   string             `plist:"ProductType,omitempty"`
 	ProductVersion                string             `plist:"ProductVersion,omitempty"`
+	RamDisksByPlatform            map[string]any     `plist:"RamDisksByPlatform,omitempty"`
+	RestoreKernelCaches           map[string]any     `plist:"RestoreKernelCaches,omitempty"`
+	RestoreRamDisks               map[string]any     `plist:"RestoreRamDisks,omitempty"`
 	SupportedProductTypeIDs       map[string][]int   `plist:"SupportedProductTypeIDs,omitempty"`
 	SupportedProductTypes         []string           `plist:"SupportedProductTypes,omitempty"`
 	SystemRestoreImageFileSystems map[string]string  `plist:"SystemRestoreImageFileSystems,omitempty"`
+	SystemRestoreImages           map[string]string  `plist:"SystemRestoreImages,omitempty"`
 }
 
 type restoreDeviceMap struct {
