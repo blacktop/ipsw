@@ -29,7 +29,8 @@ import (
 
 const (
 	tssControllerActionURL = "http://gs.apple.com/TSS/controller?action=2"
-	tssClientVersion       = "libauthinstall-973.0.1"
+	// tssControllerActionURL = "http://gsra.apple.com/TSS/controller?action=2" TODO: maybe this is the new URL?
+	tssClientVersion = "libauthinstall-973.0.1"
 )
 
 // Request is the request sent to the TSS server
