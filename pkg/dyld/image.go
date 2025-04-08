@@ -338,14 +338,17 @@ func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (i *CacheImage) ReadAt(p []byte, off int64) (n int, err error) {
-	if i.m == nil {
-		i.m, err = i.GetPartialMacho()
+	if i.pm == nil {
+		i.pm, err = i.GetPartialMacho()
 		if err != nil {
 			return -1, err
 		}
 	}
-	i.ruuid, _, err = i.cache.GetOffset(i.m.Segment("__LINKEDIT").Addr)
-	// i.ruuid, offset, err = i.cache.GetOffset(addr)
+	if i.pm.Segment("__LINKEDIT") != nil {
+		i.ruuid, _, err = i.cache.GetOffset(i.pm.Segment("__LINKEDIT").Addr)
+	} else {
+		return -1, fmt.Errorf("failed to get __LINKEDIT segment")
+	}
 	if err != nil {
 		return -1, err
 	}
@@ -486,6 +489,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	}
 	i.pm, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadIncluding: []types.LoadCmd{
+			types.LC_SEGMENT,
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
 			types.LC_DYLD_INFO_ONLY,
