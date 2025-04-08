@@ -23,8 +23,10 @@ package fw
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/apex/log"
@@ -109,11 +111,11 @@ var ibootCmd = &cobra.Command{
 			} else if showStrings {
 				fmt.Printf("%s %s Strings\n", iboot.Version, iboot.Release)
 				fmt.Println("======================================")
-				for offset, str := range iboot.Strings["iboot"] {
-					if len(str) < minLen {
+				for _, offset := range slices.Sorted(maps.Keys(iboot.Strings["iboot"])) {
+					if len(iboot.Strings["iboot"][offset]) < minLen {
 						continue
 					}
-					fmt.Printf("0x%08X: %s\n", offset, str)
+					fmt.Printf("0x%08X: %s\n", offset, iboot.Strings["iboot"][offset])
 				}
 				for _, name := range names {
 					if name == "iboot" {
@@ -121,11 +123,11 @@ var ibootCmd = &cobra.Command{
 					}
 					fmt.Printf("\n%s Strings\n", name)
 					fmt.Println("========================")
-					for offset, str := range iboot.Strings[name] {
-						if len(str) < minLen {
+					for _, offset := range slices.Sorted(maps.Keys(iboot.Strings[name])) {
+						if len(iboot.Strings[name][offset]) < minLen {
 							continue
 						}
-						fmt.Printf("0x%08X: %s\n", offset, str)
+						fmt.Printf("0x%08X: %s\n", offset, iboot.Strings[name][offset])
 					}
 				}
 			} else {
