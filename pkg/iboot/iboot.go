@@ -60,6 +60,11 @@ func Parse(data []byte) (*IBoot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read copyright: %v", err)
 	}
+	if !strings.HasPrefix(iboot.Copyright, "iBoot") &&
+		!strings.HasPrefix(iboot.Copyright, "SecureROM") &&
+		!strings.HasPrefix(iboot.Copyright, "AVPBooter") {
+		return nil, fmt.Errorf("iBoot potentially encrypted")
+	}
 	if _, err := r.Seek(0x240, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("failed to seek to release string: %v", err)
 	}
