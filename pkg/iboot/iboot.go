@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
@@ -80,11 +82,25 @@ func Parse(data []byte) (*IBoot, error) {
 		return nil, fmt.Errorf("failed to read version string: %v", err)
 	}
 
-	iboot.BaseAddress, err = getBaseAddress(r)
-	if err != nil {
-		log.WithError(err).Debug("failed to get iBoot base address")
+	if _, err := r.Seek(0x300, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("failed to seek to base address: %v", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &iboot.BaseAddress); err != nil {
+		return nil, fmt.Errorf("failed to read base address: %v", err)
+	}
+	if iboot.BaseAddress == 0 {
+		iboot.BaseAddress, err = getBaseAddress(r)
+		if err != nil {
+			log.WithError(err).Debug("failed to get iBoot base address")
+		}
 	}
 
+	// extract strings
+	if idx := bytes.Index(data, []byte("darwinos-ramdisk")); idx > 0 {
+		if _, err := r.Seek(int64(idx), io.SeekStart); err != nil {
+			return nil, fmt.Errorf("failed to seek to darwinos-ramdisk: %v", err)
+		}
+	}
 	strs, err := dumpStrings(r, MinStringLength)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump strings: %v", err)
@@ -175,38 +191,64 @@ func getBaseAddress(r *bytes.Reader) (uint64, error) {
 }
 
 func dumpStrings(r *bytes.Reader, minLen int) (map[int64]string, error) {
-	var currentString bytes.Buffer
-	var startOffset int64
+	originalOffset, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current offset: %w", err)
+	}
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read data: %w", err)
+	}
+
 	strs := make(map[int64]string)
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				break
+	var currentString strings.Builder
+	startOffset := int64(-1)
+
+	for byteOffset := 0; byteOffset < len(data); {
+		runeValue, runeSize := utf8.DecodeRune(data[byteOffset:])
+
+		// Check if the rune is valid and is a Latin letter, a digit, common ASCII punctuation/space, or a Symbol
+		isAllowed := unicode.Is(unicode.Latin, runeValue) || unicode.IsDigit(runeValue) || isAsciiPunctOrSpace(runeValue) || unicode.IsSymbol(runeValue)
+
+		if runeValue != utf8.RuneError && isAllowed {
+			if startOffset == -1 {
+				// Mark start when the first printable rune is found
+				startOffset = originalOffset + int64(byteOffset)
 			}
-			return nil, fmt.Errorf("failed to read byte: %v", err)
-		}
-		if isPrintableASCII(b) {
-			if currentString.Len() == 0 {
-				curr, _ := r.Seek(0, io.SeekCurrent)
-				startOffset = curr - 1 // Mark start when the first printable char is found
-			}
-			currentString.WriteByte(b)
+			currentString.WriteRune(runeValue)
 		} else {
-			// Non-printable character encountered
-			if currentString.Len() >= minLen {
-				if !strings.Contains(currentString.String(), "bvx$bvx2") && !strings.Contains(currentString.String(), "`") {
-					strs[startOffset] = strings.TrimSpace(currentString.String())
+			// Invalid rune or non-allowed rune encountered
+			if startOffset != -1 { // Check if we were building a string
+				s := currentString.String()
+				// Check rune count against minLen and exclude specific patterns
+				if utf8.RuneCountInString(s) >= minLen && !strings.Contains(s, "bvx$bvx2") && !strings.Contains(s, "`") {
+					strs[startOffset] = s
 				}
+				currentString.Reset()
+				startOffset = -1
 			}
-			currentString.Reset()
-			startOffset = -1
+		}
+		byteOffset += runeSize
+	}
+
+	// Handle case where the data ends with a printable string
+	if startOffset != -1 {
+		s := currentString.String()
+		if utf8.RuneCountInString(s) >= minLen && !strings.Contains(s, "bvx$bvx2") && !strings.Contains(s, "`") {
+			strs[startOffset] = s
 		}
 	}
 
 	return strs, nil
 }
 
-func isPrintableASCII(b byte) bool {
-	return b >= 32 && b <= 126
+// isAsciiPunctOrSpace checks if a rune is common ASCII punctuation or a space.
+func isAsciiPunctOrSpace(r rune) bool {
+	switch r {
+	case ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+		':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{', '|', '}', '~':
+		return true
+	default:
+		return false
+	}
 }
