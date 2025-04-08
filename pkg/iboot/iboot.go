@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/lzfse-cgo"
@@ -76,7 +77,7 @@ func Parse(data []byte) (*IBoot, error) {
 
 	iboot.BaseAddress, err = getBaseAddress(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get base address: %v", err)
+		log.WithError(err).Debug("failed to get iBoot base address")
 	}
 
 	strs, err := dumpStrings(r, MinStringLength)

@@ -254,13 +254,13 @@ func (d *Diff) Diff() (err error) {
 
 	log.Info("Diffing KERNELCACHES")
 	if err := d.parseKernelcache(); err != nil {
-		return err
+		log.WithError(err).Error("failed to parse kernelcaches")
 	}
 
 	if d.Old.KDK != "" && d.New.KDK != "" {
 		log.Info("Diffing KDKS")
 		if err := d.parseKDKs(); err != nil {
-			return err
+			log.WithError(err).Error("failed to parse KDKs")
 		}
 	}
 
@@ -271,50 +271,50 @@ func (d *Diff) Diff() (err error) {
 	defer d.unmountSystemOsDMGs()
 
 	if err := d.parseDSC(); err != nil {
-		return err
+		log.WithError(err).Error("failed to parse DSCs")
 	}
 
 	log.Info("Diffing MachOs")
 	if err := d.parseMachos(); err != nil {
-		return fmt.Errorf("failed to parse MachOs: %v", err)
+		log.WithError(err).Error("failed to parse MachOs")
 	}
 
 	if d.conf.LaunchD {
 		log.Info("Diffing launchd PLIST")
 		if err := d.parseLaunchdPlists(); err != nil {
-			return fmt.Errorf("failed to parse launchd config plists: %v", err)
+			log.WithError(err).Error("failed to parse launchd plists")
 		}
 	}
 
 	if d.conf.Firmware {
 		log.Info("Diffing Firmware")
 		if err := d.parseFirmwares(); err != nil {
-			return err
+			log.WithError(err).Error("failed to parse firmwares")
 		}
 		log.Info("Diffing iBoot")
 		if err := d.parseIBoot(); err != nil {
-			return err
+			log.WithError(err).Error("failed to parse iBoot")
 		}
 	}
 
 	if d.conf.Features {
 		log.Info("Diffing Feature Flags")
 		if err := d.parseFeatureFlags(); err != nil {
-			return err
+			log.WithError(err).Error("failed to parse feature flags")
 		}
 	}
 
 	if d.conf.Files {
 		log.Info("Diffing Files")
 		if err := d.parseFiles(); err != nil {
-			return err
+			log.WithError(err).Error("failed to parse files")
 		}
 	}
 
 	log.Info("Diffing ENTITLEMENTS")
 	d.Ents, err = d.parseEntitlements()
 	if err != nil {
-		return err
+		log.WithError(err).Error("failed to parse entitlements")
 	}
 
 	return nil
@@ -581,12 +581,12 @@ func (d *Diff) parseDSC() error {
 
 	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
 	if err != nil {
-		return fmt.Errorf("failed to get WebKit version: %v", err)
+		log.WithError(err).Error("failed to get WebKit version from 'old' DSC")
 	}
 
 	d.New.Webkit, err = dcmd.GetWebkitVersion(dscNEW)
 	if err != nil {
-		return fmt.Errorf("failed to get WebKit version: %v", err)
+		log.WithError(err).Error("failed to get WebKit version from 'new' DSC")
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
