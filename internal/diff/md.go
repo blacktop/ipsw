@@ -318,7 +318,7 @@ func (d *Diff) Markdown() error {
 
 	// SECTION: DSC
 	if d.Dylibs != nil && (len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0) ||
-		(len(d.Dylibs.New) > 0 || len(d.Dylibs.Removed) > 0 || len(d.Dylibs.Updated) > 0) {
+		(d.Dylibs.New != nil || d.Dylibs.Removed != nil || d.Dylibs.Updated != nil) {
 		out.WriteString("## DSC\n\n")
 	}
 	if len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0 {

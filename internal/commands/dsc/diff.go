@@ -1,8 +1,7 @@
 package dsc
 
 import (
-	"fmt"
-
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
@@ -20,7 +19,9 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *macho.DiffConfig) (*macho.MachoDif
 	for _, img := range f1.Images {
 		m, err := img.GetMacho()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
+			// return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
+			log.Errorf("failed to parse MachO for image %s: %v", img.Name, err)
+			continue
 		}
 		prev[img.Name] = macho.GenerateDiffInfo(m, conf)
 	}
@@ -32,7 +33,9 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *macho.DiffConfig) (*macho.MachoDif
 	for _, img := range f2.Images {
 		m, err := img.GetMacho()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
+			// return nil, fmt.Errorf("failed to create MachO for image %s: %v", img.Name, err)
+			log.Errorf("failed to parse MachO for image %s: %v", img.Name, err)
+			continue
 		}
 		next[img.Name] = macho.GenerateDiffInfo(m, conf)
 	}
