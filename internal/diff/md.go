@@ -272,17 +272,19 @@ func (d *Diff) Markdown() error {
 
 	// SECTION: iBoot
 	if d.IBoot != nil {
-		out.WriteString(
-			fmt.Sprintf(
-				"### iBoot\n\n"+
-					"| iOS | Version |\n"+
-					"| :-- | :------ |\n"+
-					"| %s *(%s)* | %s |\n"+
-					"| %s *(%s)* | %s |\n\n",
-				d.Old.Version, d.Old.Build, d.IBoot.Versions[0],
-				d.New.Version, d.New.Build, d.IBoot.Versions[1],
-			),
-		)
+		if len(d.IBoot.Versions) >= 2 {
+			out.WriteString(
+				fmt.Sprintf(
+					"### iBoot\n\n"+
+						"| iOS | Version |\n"+
+						"| :-- | :------ |\n"+
+						"| %s *(%s)* | %s |\n"+
+						"| %s *(%s)* | %s |\n\n",
+					d.Old.Version, d.Old.Build, d.IBoot.Versions[0],
+					d.New.Version, d.New.Build, d.IBoot.Versions[1],
+				),
+			)
+		}
 		if len(d.IBoot.New) > 0 {
 			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.IBoot.New)))
 			out.WriteString("<details>\n" +
