@@ -76,6 +76,9 @@ var ddiCmd = &cobra.Command{
 			!viper.IsSet("idev.img.ddi.backup") {
 			return fmt.Errorf("no subcommand provided, must provide one of: --info, --xcode, --source, --clean, --backup")
 		}
+		if (viper.IsSet("idev.img.ddi.source") || viper.IsSet("idev.img.ddi.clean")) && viper.IsSet("idev.img.ddi.backup") {
+			return fmt.Errorf("cannot specify both --backup AND [--source or --clean]")
+		}
 
 		if viper.GetBool("idev.img.ddi.info") {
 			ddi, err := utils.PreferredDDI()
@@ -160,18 +163,20 @@ var ddiCmd = &cobra.Command{
 				return fmt.Errorf("failed to update DDIs from source directory: %v", err)
 			}
 			fmt.Println(out)
-		} else if viper.GetBool("idev.img.ddi.backup") {
-			out, err := utils.BackupDDIs(viper.GetString("idev.img.ddi.output"))
-			if err != nil {
-				return fmt.Errorf("failed to backup DDIs: %v", err)
-			}
-			log.Infof("DDI backup created at: %s", out)
 		} else if viper.GetBool("idev.img.ddi.clean") {
 			out, err := utils.CleanDDIs()
 			if err != nil {
 				return fmt.Errorf("failed to clean DDIs: %v", err)
 			}
 			fmt.Println(out)
+		}
+
+		if viper.GetBool("idev.img.ddi.backup") {
+			out, err := utils.BackupDDIs(viper.GetString("idev.img.ddi.output"))
+			if err != nil {
+				return fmt.Errorf("failed to backup DDIs: %v", err)
+			}
+			log.Infof("DDI backup created at: %s", out)
 		}
 
 		return nil
