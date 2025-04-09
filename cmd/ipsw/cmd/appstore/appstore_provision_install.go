@@ -50,12 +50,9 @@ var installCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		if err := appstore.InstallCertificateAndKey(args[0], args[1]); err != nil {
-			return fmt.Errorf("installing certificate and key: %w", err)
+			log.Errorf("installing certificate and key: %w", err)
 		}
-		if err := appstore.VerifyCertificateInstallation(args[0]); err != nil {
-			return fmt.Errorf("verifying certificate installation: %w", err)
-		}
-		profile, err := appstore.InstallProvisioningProfile(args[3])
+		profile, err := appstore.InstallProvisioningProfile(args[2])
 		if err != nil {
 			return fmt.Errorf("installing provisioning profile: %w", err)
 		}
