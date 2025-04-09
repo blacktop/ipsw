@@ -40,7 +40,7 @@ import (
 func init() {
 	ImgCmd.AddCommand(idevImgMountCmd)
 
-	idevImgMountCmd.Flags().StringP("image-type", "t", "", "Image type to mount (i.e. Developer)")
+	idevImgMountCmd.Flags().StringP("image-type", "t", "Personalized", "Image type to mount")
 	idevImgMountCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app (i.e. /Applications/Xcode.app)")
 	idevImgMountCmd.Flags().StringP("ddi-img", "d", "", "DDI.dmg to mount")
 	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "trustcache to use")
@@ -91,6 +91,8 @@ var idevImgMountCmd = &cobra.Command{
 		}
 		if xcodePath != "" && (dmgPath != "" || trustcachePath != "" || manifestPath != "") {
 			return fmt.Errorf("cannot specify both --xcode AND ('--ddi-img' OR '--trust-cache' OR '--manifest')")
+		} else if xcodePath == "" && dmgPath == "" {
+			return fmt.Errorf("must supply --xcode OR --ddi-img")
 		}
 
 		var dev *lockdownd.DeviceValues
