@@ -43,11 +43,11 @@ func init() {
 	idevImgMountCmd.Flags().StringP("image-type", "t", "Personalized", "Image type to mount")
 	idevImgMountCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app (i.e. /Applications/Xcode.app)")
 	idevImgMountCmd.Flags().StringP("ddi-img", "d", "", "DDI.dmg to mount")
-	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "trustcache to use")
+	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "Trustcache to use")
 	idevImgMountCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
 	idevImgMountCmd.Flags().StringP("signature", "s", "", "Image signature to use")
 	idevImgMountCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	idevImgMountCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	idevImgMountCmd.Flags().Bool("insecure", false, "Do not verify ssl certs")
 
 	viper.BindPFlag("idev.img.mount.image-type", idevImgMountCmd.Flags().Lookup("image-type"))
 	viper.BindPFlag("idev.img.mount.xcode", idevImgMountCmd.Flags().Lookup("xcode"))
@@ -61,10 +61,10 @@ func init() {
 
 // idevImgMountCmd represents the img mount command
 var idevImgMountCmd = &cobra.Command{
-	Use:           "mount",
-	Short:         "Mount an image",
-	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
+	Use:   "mount",
+	Short: "Mount an image",
+	Args:  cobra.NoArgs,
+	// SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
@@ -88,6 +88,8 @@ var idevImgMountCmd = &cobra.Command{
 		}
 		if imageType == "Developer" && (len(trustcachePath) > 0 || len(manifestPath) > 0) {
 			return fmt.Errorf("invalid flags --trustcache or --manifest (not allowed when --image-type=Developer)")
+		} else if imageType == "Personalized" && len(signaturePath) == 0 {
+			return fmt.Errorf("invalid flags --signature (required when --image-type=Personalized)")
 		}
 		if xcodePath != "" && (dmgPath != "" || trustcachePath != "" || manifestPath != "") {
 			return fmt.Errorf("cannot specify both --xcode AND ('--ddi-img' OR '--trust-cache' OR '--manifest')")
@@ -135,9 +137,12 @@ var idevImgMountCmd = &cobra.Command{
 			ManifestPath:   manifestPath,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get DDI configuration: %w", err)
+			return fmt.Errorf("failed to get DDI info: %w", err)
 		}
 		defer ddi.Clean()
+		if err := ddi.Verify(); err != nil {
+			return fmt.Errorf("failed to verify DDI info: %w", err)
+		}
 
 		// Handle personalization for iOS 17+ with missing signature
 		if ddi.BuildManifest != nil && len(ddi.SignatureData) == 0 {
@@ -169,12 +174,12 @@ var idevImgMountCmd = &cobra.Command{
 			}
 		}
 
-		log.WithField("type", imageType).Info("Uploading image")
-		if err := cli.Upload(imageType, ddi.ImageData, ddi.SignatureData); err != nil {
+		log.WithField("type", ddi.ImageType).Info("Uploading image")
+		if err := cli.Upload(ddi.ImageType, ddi.ImageData, ddi.SignatureData); err != nil {
 			return fmt.Errorf("failed to upload image: %w", err)
 		}
-		log.WithField("type", imageType).Info("Mounting image")
-		if err := cli.Mount(imageType, ddi.SignatureData, ddi.TrustcachePath, ddi.ManifestPath); err != nil {
+		log.WithField("type", ddi.ImageType).Info("Mounting image")
+		if err := cli.Mount(ddi.ImageType, ddi.SignatureData, ddi.TrustcachePath, ddi.ManifestPath); err != nil {
 			return fmt.Errorf("failed to mount image: %w", err)
 		}
 

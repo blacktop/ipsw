@@ -59,8 +59,30 @@ func (d *DDIInfo) Clean() error {
 	return nil
 }
 
-func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
-	info := &DDIInfo{
+func (d *DDIInfo) Verify() error {
+	if d.ImageData == nil {
+		return fmt.Errorf("image data is nil")
+	}
+	if d.SignatureData == nil {
+		return fmt.Errorf("signature data is nil")
+	}
+
+	switch d.ImageType {
+	case "Developer":
+	case "Personalized":
+		if d.TrustcachePath == "" {
+			return fmt.Errorf("trustcache path is nil")
+		}
+		if d.ManifestPath == "" {
+			return fmt.Errorf("manifest path is nil")
+		}
+	}
+
+	return nil
+}
+
+func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
+	info = &DDIInfo{
 		ImageType: c.ImageType,
 	}
 
@@ -71,6 +93,8 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 
 	/* Old device (pre-iOS 17) */
 	if ver.LessThan(semver.Must(semver.NewVersion("17.0"))) {
+		info.ImageType = "Developer" // Developer was the only option for pre-iOS 17
+
 		if c.XCodePath != "" {
 			version := ver.Segments()
 			imgPath := filepath.Join(c.XCodePath,
@@ -89,32 +113,23 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 			}
 
 			return info, nil
-		} else if c.DDIFile != "" && c.SigFile != "" {
-			info.ImageData, err = os.ReadFile(c.DDIFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read image '%s': %w", c.DDIFile, err)
-			}
-
-			info.SignatureData, err = os.ReadFile(c.SigFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read signature '%s': %w", c.SigFile, err)
-			}
-
-			return info, nil
-		} else {
+		}
+		if c.DDIFile == "" || c.SigFile == "" {
 			return nil, fmt.Errorf("for iOS < 17.0, either --xcode or both --ddi-img and --signature must be specified")
 		}
 	}
 
 	/* iOS 17+ device */
+	var folder string
 
 	// If manifest path is already provided, use it
-	if c.ManifestPath != "" && c.TrustcachePath != "" {
+	if c.ManifestPath != "" {
 		info.ManifestPath = c.ManifestPath
+		folder = filepath.Dir(c.ManifestPath)
+	}
+	if c.TrustcachePath != "" {
 		info.TrustcachePath = c.TrustcachePath
 	}
-
-	var folder string
 
 	// Need to find files based on Xcode or DMG path
 	if c.XCodePath != "" {
@@ -143,7 +158,9 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 				info.ManifestPath = filepath.Join(folder, "Restore/BuildManifest.plist")
 				if _, err := os.Stat(info.ManifestPath); errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to find BuildManifest.plist at '%s' (run `%s -runFirstLaunch`)",
-						info.ManifestPath, filepath.Join(c.XCodePath, "Contents/Developer/usr/bin/xcodebuild"))
+						info.ManifestPath,
+						filepath.Join(c.XCodePath, "Contents/Developer/usr/bin/xcodebuild"),
+					)
 				}
 				info.ManifestPath = filepath.Join(folder, "Restore/BuildManifest.plist")
 			}
@@ -151,7 +168,7 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 	}
 
 	if info.ManifestPath == "" {
-		// At this point we have a DMG path that needs to be mounted
+		// At this point we have a DMG path that needs to be mounted to find the BuildManifest.plist
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", c.DDIFile))
 		mountPoint, alreadyMounted, err := utils.MountDMG(c.DDIFile)
 		if err != nil {
@@ -171,18 +188,22 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 		info.ManifestPath = filepath.Join(mountPoint, "Restore/BuildManifest.plist")
 	}
 
-	manifestData, err := os.ReadFile(info.ManifestPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read BuildManifest.plist: %w", err)
+	if c.DDIFile == "" {
+		// Read the BuildManifest.plist to find the DDI file
+		manifestData, err := os.ReadFile(info.ManifestPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read BuildManifest.plist: %w", err)
+		}
+		buildManifest, err := plist.ParseBuildManifest(manifestData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse BuildManifest.plist: %w", err)
+		}
+		info.TrustcachePath = filepath.Join(folder, "Restore", buildManifest.BuildIdentities[0].Manifest["LoadableTrustCache"].Info["Path"].(string))
+		c.DDIFile = filepath.Join(folder, "Restore", buildManifest.BuildIdentities[0].Manifest["PersonalizedDMG"].Info["Path"].(string))
 	}
-	buildManifest, err := plist.ParseBuildManifest(manifestData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse BuildManifest.plist: %w", err)
-	}
-	info.TrustcachePath = filepath.Join(folder, "Restore", buildManifest.BuildIdentities[0].Manifest["LoadableTrustCache"].Info["Path"].(string))
-	c.DDIFile = filepath.Join(folder, "Restore", buildManifest.BuildIdentities[0].Manifest["PersonalizedDMG"].Info["Path"].(string))
 
 	if c.DDIFile != "" {
+		// Read the DDI file
 		info.ImageData, err = os.ReadFile(c.DDIFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read image '%s': %w", c.DDIFile, err)
@@ -190,6 +211,7 @@ func GetDDIInfo(c *DDIConfig) (*DDIInfo, error) {
 	}
 
 	if c.SigFile != "" {
+		// Read the signature file
 		info.SignatureData, err = os.ReadFile(c.SigFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read signature '%s': %w", c.SigFile, err)
