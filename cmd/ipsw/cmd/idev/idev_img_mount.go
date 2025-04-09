@@ -48,7 +48,8 @@ func init() {
 		return supportedImageTypes, cobra.ShellCompDirectiveDefault
 	})
 	idevImgMountCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app (i.e. /Applications/Xcode.app)")
-	idevImgMountCmd.Flags().StringP("ddi-img", "d", "", "DDI.dmg to mount")
+	idevImgMountCmd.Flags().StringP("ddi-dmg", "d", "", "DDI.dmg to mount")
+	idevImgMountCmd.Flags().StringP("ddi-folder", "f", "", "DDI folder (i.e. /Library/Developer/DeveloperDiskImages/iOS_DDI)")
 	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "Trustcache to use")
 	idevImgMountCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
 	idevImgMountCmd.Flags().StringP("signature", "s", "", "Image signature to use")
@@ -57,7 +58,8 @@ func init() {
 
 	viper.BindPFlag("idev.img.mount.image-type", idevImgMountCmd.Flags().Lookup("image-type"))
 	viper.BindPFlag("idev.img.mount.xcode", idevImgMountCmd.Flags().Lookup("xcode"))
-	viper.BindPFlag("idev.img.mount.ddi-img", idevImgMountCmd.Flags().Lookup("ddi-img"))
+	viper.BindPFlag("idev.img.mount.ddi-dmg", idevImgMountCmd.Flags().Lookup("ddi-dmg"))
+	viper.BindPFlag("idev.img.mount.ddi-folder", idevImgMountCmd.Flags().Lookup("ddi-folder"))
 	viper.BindPFlag("idev.img.mount.trustcache", idevImgMountCmd.Flags().Lookup("trustcache"))
 	viper.BindPFlag("idev.img.mount.manifest", idevImgMountCmd.Flags().Lookup("manifest"))
 	viper.BindPFlag("idev.img.mount.signature", idevImgMountCmd.Flags().Lookup("signature"))
@@ -83,7 +85,8 @@ var idevImgMountCmd = &cobra.Command{
 		udid := viper.GetString("idev.udid")
 		imageType := viper.GetString("idev.img.mount.image-type")
 		xcodePath := viper.GetString("idev.img.mount.xcode")
-		dmgPath := viper.GetString("idev.img.mount.ddi-img")
+		ddiDmgPath := viper.GetString("idev.img.mount.ddi-dmg")
+		ddiFolder := viper.GetString("idev.img.mount.ddi-folder")
 		signaturePath := viper.GetString("idev.img.mount.signature")
 		trustcachePath := viper.GetString("idev.img.mount.trustcache")
 		manifestPath := viper.GetString("idev.img.mount.manifest")
@@ -97,10 +100,12 @@ var idevImgMountCmd = &cobra.Command{
 		} else if imageType == "Personalized" && len(signaturePath) == 0 {
 			return fmt.Errorf("invalid flags --signature (required when --image-type=Personalized)")
 		}
-		if xcodePath != "" && (dmgPath != "" || trustcachePath != "" || manifestPath != "") {
+		if xcodePath != "" && (ddiDmgPath != "" || trustcachePath != "" || manifestPath != "") {
 			return fmt.Errorf("cannot specify both --xcode AND ('--ddi-img' OR '--trust-cache' OR '--manifest')")
-		} else if xcodePath == "" && dmgPath == "" {
-			return fmt.Errorf("must supply --xcode OR --ddi-img")
+		} else if xcodePath != "" && ddiFolder != "" {
+			return fmt.Errorf("cannot specify both --xcode AND --ddi-folder")
+		} else if xcodePath == "" && ddiDmgPath == "" && ddiFolder == "" {
+			return fmt.Errorf("must supply --xcode OR --ddi-img OR --ddi-folder")
 		}
 
 		var dev *lockdownd.DeviceValues
@@ -132,13 +137,13 @@ var idevImgMountCmd = &cobra.Command{
 			return nil
 		}
 
-		// Get DDI configuration using the new function from internal package
 		ddi, err := device.GetDDIInfo(&device.DDIConfig{
 			Dev:            dev,
 			ImageType:      imageType,
 			XCodePath:      xcodePath,
-			DDIFile:        dmgPath,
-			SigFile:        signaturePath,
+			DDIDmgPath:     ddiDmgPath,
+			DDIFolder:      ddiFolder,
+			SignaturePath:  signaturePath,
 			TrustcachePath: trustcachePath,
 			ManifestPath:   manifestPath,
 		})
