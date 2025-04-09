@@ -25,6 +25,7 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/device"
@@ -37,10 +38,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+var supportedImageTypes = []string{"Developer", "Cryptex", "Personalized"}
+
 func init() {
 	ImgCmd.AddCommand(idevImgMountCmd)
 
 	idevImgMountCmd.Flags().StringP("image-type", "t", "Personalized", "Image type to mount")
+	idevImgMountCmd.RegisterFlagCompletionFunc("image-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return supportedImageTypes, cobra.ShellCompDirectiveDefault
+	})
 	idevImgMountCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app (i.e. /Applications/Xcode.app)")
 	idevImgMountCmd.Flags().StringP("ddi-img", "d", "", "DDI.dmg to mount")
 	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "Trustcache to use")
@@ -83,8 +89,8 @@ var idevImgMountCmd = &cobra.Command{
 		manifestPath := viper.GetString("idev.img.mount.manifest")
 
 		// verify flags
-		if !slices.Contains([]string{"Developer", "Cryptex", "Personalized"}, imageType) {
-			return fmt.Errorf("invalid --image-type: %s (must be Developer, Cryptex or Personalized)", imageType)
+		if !slices.Contains(supportedImageTypes, imageType) {
+			return fmt.Errorf("invalid --image-type: %s (must be one of: %s)", imageType, strings.Join(supportedImageTypes, ", "))
 		}
 		if imageType == "Developer" && (len(trustcachePath) > 0 || len(manifestPath) > 0) {
 			return fmt.Errorf("invalid flags --trustcache or --manifest (not allowed when --image-type=Developer)")
