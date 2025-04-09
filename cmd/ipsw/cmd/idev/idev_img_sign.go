@@ -27,14 +27,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/internal/commands/device"
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/fatih/color"
-	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,7 +40,10 @@ func init() {
 	ImgCmd.AddCommand(idevImgSignCmd)
 
 	idevImgSignCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app")
+	idevImgSignCmd.Flags().StringP("ddi-dmg", "d", "", "DDI.dmg to mount")
+	idevImgSignCmd.Flags().StringP("ddi-folder", "f", "", "DDI folder (i.e. /Library/Developer/DeveloperDiskImages/iOS_DDI)")
 	idevImgSignCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
+	// idevImgSignCmd.Flags().Bool("backup", false, "Backup DDI files for offline use")
 	idevImgSignCmd.Flags().Uint64P("board-id", "b", 0, "Device ApBoardID")
 	idevImgSignCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
 	idevImgSignCmd.Flags().Uint64P("ecid", "e", 0, "Device ApECID")
@@ -56,7 +56,10 @@ func init() {
 	idevImgSignCmd.MarkFlagDirname("output")
 
 	viper.BindPFlag("idev.img.sign.xcode", idevImgSignCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("idev.img.sign.ddi-dmg", idevImgSignCmd.Flags().Lookup("ddi-dmg"))
+	viper.BindPFlag("idev.img.sign.ddi-folder", idevImgSignCmd.Flags().Lookup("ddi-folder"))
 	viper.BindPFlag("idev.img.sign.manifest", idevImgSignCmd.Flags().Lookup("manifest"))
+	// viper.BindPFlag("idev.img.sign.backup", idevImgSignCmd.Flags().Lookup("backup"))
 	viper.BindPFlag("idev.img.sign.board-id", idevImgSignCmd.Flags().Lookup("board-id"))
 	viper.BindPFlag("idev.img.sign.chip-id", idevImgSignCmd.Flags().Lookup("chip-id"))
 	viper.BindPFlag("idev.img.sign.ecid", idevImgSignCmd.Flags().Lookup("ecid"))
@@ -83,7 +86,10 @@ var idevImgSignCmd = &cobra.Command{
 
 		// flags
 		xcode := viper.GetString("idev.img.sign.xcode")
+		ddiDmgPath := viper.GetString("idev.img.sign.ddi-dmg")
+		ddiFolder := viper.GetString("idev.img.sign.ddi-folder")
 		manifestPath := viper.GetString("idev.img.sign.manifest")
+		// backup := viper.GetBool("idev.img.sign.backup")
 		boardID := viper.GetUint64("idev.img.sign.board-id")
 		chipID := viper.GetUint64("idev.img.sign.chip-id")
 		ecid := viper.GetUint64("idev.img.sign.ecid")
@@ -92,10 +98,10 @@ var idevImgSignCmd = &cobra.Command{
 		input := viper.GetString("idev.img.sign.input")
 		output := viper.GetString("idev.img.sign.output")
 		// verify flags
-		if xcode != "" && manifestPath != "" {
-			return fmt.Errorf("cannot specify both --xcode and --manifest")
-		} else if xcode == "" && manifestPath == "" {
-			return fmt.Errorf("must specify either --xcode or --manifest")
+		if (xcode != "" || ddiDmgPath != "" || ddiFolder != "") && manifestPath != "" {
+			return fmt.Errorf("cannot specify both one of [--xcode, --ddi-dmg, --ddi-folder] AND --manifest")
+		} else if xcode == "" && ddiDmgPath == "" && ddiFolder == "" && manifestPath == "" {
+			return fmt.Errorf("must specify either one of [--xcode, --ddi-dmg, --ddi-folder] OR --manifest")
 		} else if (boardID == 0 || chipID == 0 || ecid == 0 || nonce == "") && input == "" {
 			return fmt.Errorf("must specify --board-id, --chip-id, --ecid AND --nonce")
 		}
@@ -134,67 +140,32 @@ var idevImgSignCmd = &cobra.Command{
 			}
 		}
 
-		if xcode != "" {
-			xcodeVersion, err := utils.GetXCodeVersion(xcode)
-			if err != nil {
-				return fmt.Errorf("failed to get Xcode version: %w", err)
-			}
-			xcver, err := semver.NewVersion(xcodeVersion) // check
-			if err != nil {
-				return fmt.Errorf("failed to convert version into semver object")
-			}
-			var ddiPath string
-			if xcver.LessThan(semver.Must(semver.NewVersion("16.0"))) {
-				ddiPath = filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
-				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW Xcode.app or Xcode-beta.app)", xcode)
-				}
-			} else {
-				ddiPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI.dmg"
-				if _, err := os.Stat(ddiPath); errors.Is(err, os.ErrNotExist) {
-					utils.Indent(log.Warn, 2)(fmt.Sprintf("DMG not found at '%s': trying NEW folder structure", ddiPath))
-					manifestPath = "/Library/Developer/DeveloperDiskImages/iOS_DDI/Restore/BuildManifest.plist"
-					if _, err := os.Stat(manifestPath); errors.Is(err, os.ErrNotExist) {
-						return fmt.Errorf("failed to find NEW '%s' as well (run `%s -runFirstLaunch` and try again)", manifestPath, filepath.Join(xcode, "Contents/Developer/usr/bin/xcodebuild"))
-					}
-				}
-			}
-			if manifestPath == "" {
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiPath))
-				mountPoint, alreadyMounted, err := utils.MountDMG(ddiPath)
-				if err != nil {
-					return fmt.Errorf("failed to mount iOS_DDI.dmg: %w", err)
-				}
-				if alreadyMounted {
-					utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ddiPath))
-				} else {
-					defer func() {
-						utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", ddiPath))
-						if err := utils.Retry(3, 2*time.Second, func() error {
-							return utils.Unmount(mountPoint, false)
-						}); err != nil {
-							log.Errorf("failed to unmount %s at %s: %v", ddiPath, mountPoint, err)
-						}
-					}()
-				}
-				manifestPath = filepath.Join(mountPoint, "Restore/BuildManifest.plist")
-			}
+		ddi, err := device.GetDDIInfo(&device.DDIConfig{
+			ImageType:  "Personalized",
+			XCodePath:  xcode,
+			DDIFolder:  ddiFolder,
+			DDIDmgPath: ddiDmgPath,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get DDI info: %w", err)
+		}
+		defer ddi.Clean()
+
+		if ddi.BuildManifest == nil {
+			return fmt.Errorf("failed to get BuildManifest")
 		}
 
-		manifestData, err := os.ReadFile(manifestPath)
-		if err != nil {
-			return fmt.Errorf("failed to read BuildManifest.plist: %w", err)
-		}
-		buildManifest, err := plist.ParseBuildManifest(manifestData)
-		if err != nil {
-			return fmt.Errorf("failed to parse BuildManifest.plist: %w", err)
-		}
+		// if backup {
+		// 	if err := ddi.Backup(output); err != nil {
+		// 		return fmt.Errorf("failed to backup DDI: %w", err)
+		// 	}
+		// }
 
 		sigData, err := tss.Personalize(&tss.PersonalConfig{
 			Proxy:         viper.GetString("idev.img.sign.proxy"),
 			Insecure:      viper.GetBool("idev.img.sign.insecure"),
 			PersonlID:     personlID,
-			BuildManifest: buildManifest,
+			BuildManifest: ddi.BuildManifest,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to personalize DDI: %w", err)
