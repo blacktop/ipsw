@@ -69,6 +69,8 @@ const (
 	tvOsSimulatorUpdate     assetType = "com.apple.MobileAsset.appleTVOSSimulatorRuntime"
 	watchOsSimulatorUpdate  assetType = "com.apple.MobileAsset.watchOSSimulatorRuntime"
 	visionOaSimulatorUpdate assetType = "com.apple.MobileAsset.xrOSSimulatorRuntime"
+	// misc
+	wallpaperUpdate assetType = "com.apple.MobileAsset.Wallpaper" // uses iOS generic audience
 )
 
 // Ota is an OTA object

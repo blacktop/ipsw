@@ -31,6 +31,9 @@ const (
 	CollectionsFolder          = "/Library/Wallpaper/Collections/"
 	CollectionsPlistGlob       = "Collections~*.plist"
 	CapPlayWallpapers          = "/System/Library/PrivateFrameworks/CarPlayUIServices.framework/"
+	updateURL                  = "https://mesu.apple.com/assets/com_apple_MobileAsset_Wallpaper/com_apple_MobileAsset_Wallpaper.xml"
+	macOsUpdateURL             = "https://mesu.apple.com/assets/macos/com_apple_MobileAsset_DesktopPicture/com_apple_MobileAsset_DesktopPicture.xml"
+	macOsAerialsURL            = "https://configuration.apple.com/configurations/internetservices/aerials/resources-config-15-0.plist"
 )
 
 type WallpaperID struct {
@@ -307,7 +310,7 @@ func ExtractWallpaperImages(camlPath, outputDir string) ([]string, error) {
 	imagePaths := make([]string, int(numImages))
 	imagePathsArr := (*[1 << 30]*C.char)(unsafe.Pointer(imagePathsPtr))
 
-	for i := 0; i < int(numImages); i++ {
+	for i := range int(numImages) {
 		imagePaths[i] = C.GoString(imagePathsArr[i])
 		C.free(unsafe.Pointer(imagePathsArr[i]))
 	}
