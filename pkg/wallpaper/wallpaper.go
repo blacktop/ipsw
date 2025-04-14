@@ -138,6 +138,7 @@ type Wallpapers struct {
 
 func ParseFolder(mountPoint string) (*Wallpapers, error) {
 	var wallpapers Wallpapers
+	// parse default wallpapers plist
 	defaults, err := filepath.Glob(filepath.Join(mountPoint, WallPapersFolder, DefaultWallpapersPlistGlob))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse folder: %w", err)
@@ -152,10 +153,10 @@ func ParseFolder(mountPoint string) (*Wallpapers, error) {
 	if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&wallpapers.DefaultWallpaper); err != nil {
 		return nil, fmt.Errorf("failed to decode plist %s: %w", defaults[0], err)
 	}
-
 	if wallpapers.Default.CollectionIdentifier == "" {
 		return nil, fmt.Errorf("no default wallpaper collection found in %s", defaults[0])
 	}
+	// parse collections plist
 	collections, err := filepath.Glob(filepath.Join(mountPoint, CollectionsFolder, CollectionsPlistGlob))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse folder: %w", err)
@@ -176,11 +177,9 @@ func ParseFolder(mountPoint string) (*Wallpapers, error) {
 		if err != nil {
 			return fmt.Errorf("error accessing path %s: %w", path, err)
 		}
-
 		if info.IsDir() {
 			return nil
 		}
-
 		if filepath.Base(path) == "WallpaperCollection.plist" {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -190,15 +189,14 @@ func ParseFolder(mountPoint string) (*Wallpapers, error) {
 			if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&collection.Meta); err != nil {
 				return fmt.Errorf("failed to decode plist %s: %w", path, err)
 			}
+			// walk through the wallpapers folder to find all wallpapers
 			if err := filepath.Walk(filepath.Join(filepath.Dir(path), "Wallpapers"), func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return fmt.Errorf("error accessing path %s: %w", path, err)
 				}
-
 				if info.IsDir() {
 					return nil
 				}
-
 				if filepath.Base(path) == "Wallpaper.plist" {
 					data, err := os.ReadFile(path)
 					if err != nil {
@@ -222,12 +220,11 @@ func ParseFolder(mountPoint string) (*Wallpapers, error) {
 
 			wallpapers.Collections = append(wallpapers.Collections, collection)
 		}
-
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to walk through collections folder: %w", err)
 	}
-
+	// walk through the CarPlay wallpapers folder to find all wallpapers
 	if err := filepath.Walk(filepath.Join(mountPoint, CapPlayWallpapers), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("error accessing path %s: %w", path, err)
