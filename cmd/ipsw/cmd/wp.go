@@ -85,7 +85,7 @@ var wpCmd = &cobra.Command{
 					utils.Indent(log.WithFields(log.Fields{
 						"id":    wallpaper.Meta.ID,
 						"name":  wallpaper.Meta.Name,
-						"size":  fmt.Sprintf("%dx%d", sz.Width, sz.Height),
+						"size":  fmt.Sprintf("%dw⨯%dh", sz.Width, sz.Height),
 						"scale": fmt.Sprintf("%dx", sz.Scale),
 					}).Info, 2)("Wallpaper")
 				} else {
