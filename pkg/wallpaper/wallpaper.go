@@ -31,9 +31,6 @@ const (
 	CollectionsFolder          = "/Library/Wallpaper/Collections/"
 	CollectionsPlistGlob       = "Collections~*.plist"
 	CapPlayWallpapers          = "/System/Library/PrivateFrameworks/CarPlayUIServices.framework/"
-	updateURL                  = "https://mesu.apple.com/assets/com_apple_MobileAsset_Wallpaper/com_apple_MobileAsset_Wallpaper.xml"
-	macOsUpdateURL             = "https://mesu.apple.com/assets/macos/com_apple_MobileAsset_DesktopPicture/com_apple_MobileAsset_DesktopPicture.xml"
-	macOsAerialsURL            = "https://configuration.apple.com/configurations/internetservices/aerials/resources-config-15-0.plist"
 )
 
 type WallpaperID struct {
