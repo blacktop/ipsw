@@ -9,6 +9,12 @@ import (
 	"github.com/blacktop/go-plist"
 )
 
+const (
+	updateURL       = "https://mesu.apple.com/assets/com_apple_MobileAsset_Wallpaper/com_apple_MobileAsset_Wallpaper.xml"
+	macOsUpdateURL  = "https://mesu.apple.com/assets/macos/com_apple_MobileAsset_DesktopPicture/com_apple_MobileAsset_DesktopPicture.xml"
+	macOsAerialsURL = "https://configuration.apple.com/configurations/internetservices/aerials/resources-config-15-0.plist"
+)
+
 type WallpaperAsset struct {
 	Build                       string `plist:"Build,omitempty"`
 	WallpaperBundleName         string `plist:"WallpaperBundleName,omitempty"`
