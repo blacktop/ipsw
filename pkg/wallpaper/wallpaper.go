@@ -1,26 +1,12 @@
-//go:build darwin && cgo
-
 package wallpaper
 
-/*
-#cgo CFLAGS: -x objective-c -fmodules
-#cgo LDFLAGS: -framework Foundation -framework CoreGraphics -framework QuartzCore
-
-#import <Foundation/Foundation.h>
-#import <CoreGraphics/CoreGraphics.h>
-
-#include "wallpaper.h"
-*/
-import "C"
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"unsafe"
 
 	"github.com/blacktop/go-plist"
 )
@@ -245,74 +231,4 @@ func ParseFolder(mountPoint string) (*Wallpapers, error) {
 	}
 
 	return &wallpapers, nil
-}
-
-// ParseCAMLWallpaper parses a CAML file and returns wallpaper data
-func ParseCAMLWallpaper(camlPath string) ([]byte, error) {
-	cPath := C.CString(camlPath)
-	defer C.free(unsafe.Pointer(cPath))
-
-	var outSize C.size_t
-	var cError C.wallpaper_error_t
-	result := C.parse_caml_wallpaper(cPath, &outSize, &cError)
-
-	// Handle error if one occurred
-	if cError.message != nil {
-		errMsg := C.GoString(cError.message)
-		C.free(unsafe.Pointer(cError.message))
-		return nil, fmt.Errorf("CAML parse error (code %d): %s", cError.code, errMsg)
-	}
-
-	if result == nil {
-		return nil, errors.New("failed to parse CAML wallpaper")
-	}
-
-	// Convert C buffer to Go slice
-	data := C.GoBytes(unsafe.Pointer(result), C.int(outSize))
-	// Free the C buffer
-	C.free(unsafe.Pointer(result))
-
-	return data, nil
-}
-
-// ExtractWallpaperImages extracts wallpaper images from a CAML package
-func ExtractWallpaperImages(camlPath, outputDir string) ([]string, error) {
-	absPath, err := filepath.Abs(camlPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
-	}
-
-	cPath := C.CString(absPath)
-	defer C.free(unsafe.Pointer(cPath))
-
-	cOutDir := C.CString(outputDir)
-	defer C.free(unsafe.Pointer(cOutDir))
-
-	var numImages C.int
-	var cError C.wallpaper_error_t
-	imagePathsPtr := C.extract_caml_images(cPath, cOutDir, &numImages, &cError)
-
-	// Handle error if one occurred
-	if cError.message != nil {
-		errMsg := C.GoString(cError.message)
-		C.free(unsafe.Pointer(cError.message))
-		return nil, fmt.Errorf("CAML extract error (code %d): %s", cError.code, errMsg)
-	}
-
-	if imagePathsPtr == nil {
-		return nil, errors.New("failed to extract wallpaper images")
-	}
-
-	// Convert C string array to Go slice
-	imagePaths := make([]string, int(numImages))
-	imagePathsArr := (*[1 << 30]*C.char)(unsafe.Pointer(imagePathsPtr))
-
-	for i := range int(numImages) {
-		imagePaths[i] = C.GoString(imagePathsArr[i])
-		C.free(unsafe.Pointer(imagePathsArr[i]))
-	}
-
-	C.free(unsafe.Pointer(imagePathsPtr))
-
-	return imagePaths, nil
 }
