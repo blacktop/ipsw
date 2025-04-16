@@ -185,7 +185,7 @@ func (d *Diff) Markdown() error {
 	}
 
 	// SUB-SECTION: Entitlements
-	if len(d.Ents) > 0 {
+	if len(d.Ents) > 0 && d.Ents != "- No differences found\n" {
 		out.WriteString("### 🔑 Entitlements\n\n")
 		fname := filepath.Join(d.conf.Output, "Entitlements.md")
 		log.Debugf("Creating diff Entitlements Markdown: %s", fname)
@@ -420,8 +420,10 @@ func (d *Diff) Markdown() error {
 				hasRemovedFiles = true
 			}
 		}
-		if hasNewFiles {
+		if hasNewFiles || hasRemovedFiles {
 			out.WriteString("## Files\n\n")
+		}
+		if hasNewFiles {
 			if len(d.Files.New) > 0 {
 				out.WriteString("### 🆕 New\n\n")
 				for _, t := range types {
