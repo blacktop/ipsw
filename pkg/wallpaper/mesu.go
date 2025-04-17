@@ -3,10 +3,17 @@ package wallpaper
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
+	"path/filepath"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/disintegration/imaging"
+	_ "github.com/strukturag/libheif/go/heif"
 )
 
 const (
@@ -61,4 +68,106 @@ func FetchWallpaperPlist() (*MESUAssets, error) {
 		return nil, fmt.Errorf("failed to decode wallpaper plist: %w", err)
 	}
 	return &assets, nil
+}
+
+// ExtractThumbnailBytes downloads a wallpaper zip from the given URL and extracts the thumbnail.jpg to a byte slice,
+// resizing it to a fixed height while preserving aspect ratio.
+func ExtractThumbnailBytes(url, proxy string, insecure bool) ([]byte, error) {
+	zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+		Proxy:    proxy,
+		Insecure: insecure,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to download remote zip: %v", err)
+	}
+	var thumbnailFile string
+	for _, f := range zr.File {
+		if filepath.Base(f.Name) == "Wallpaper.plist" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("unable to open Wallpaper.plist: %v", err)
+			}
+			defer rc.Close()
+
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read Wallpaper.plist: %v", err)
+			}
+
+			var wp Wallpaper
+			if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&wp.Meta); err != nil {
+				return nil, fmt.Errorf("failed to decode plist %s: %w", f.Name, err)
+			}
+
+			if lH, ok := wp.Meta.Assets["lockAndHome"].(map[string]any); ok {
+				if dlt, ok := lH["default"].(map[string]any); ok {
+					if thumbnailFile, ok = dlt["thumbnailImageFileName"].(string); !ok {
+						if fullSized, ok := dlt["fullSizeImageFileName"].(string); ok {
+							thumbnailFile = fullSized
+						} else {
+							return nil, fmt.Errorf("unable to find thumbnailImageFileName or fullSizeImageFileName in Wallpaper.plist")
+						}
+					}
+				}
+			}
+		}
+	}
+	for _, f := range zr.File {
+		if filepath.Base(f.Name) == thumbnailFile {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("unable to open thumbnail.jpg: %v", err)
+			}
+			defer rc.Close()
+			imgBytes, err := io.ReadAll(rc)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read thumbnail.jpg: %v", err)
+			}
+			if bytes.HasPrefix(imgBytes, []byte("\x89PNG")) {
+				thumbnailFile = "thumbnail.png"
+			}
+			switch filepath.Ext(thumbnailFile) {
+			case ".heic":
+				img, format, err := image.Decode(bytes.NewReader(imgBytes))
+				if err != nil {
+					return nil, fmt.Errorf("unable to decode thumbnail.heic: %v", err)
+				}
+				if format != "heif" && format != "heic" && format != "avif" {
+					return nil, fmt.Errorf("unsupported thumbnail format: %s", format)
+				}
+				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
+				var buf bytes.Buffer
+				if err := png.Encode(&buf, resizedImg); err != nil {
+					return nil, fmt.Errorf("could not encode image as PNG: %w", err)
+				}
+				return buf.Bytes(), nil
+			case ".jpeg", ".jpg":
+				img, err := jpeg.Decode(bytes.NewReader(imgBytes))
+				if err != nil {
+					return nil, fmt.Errorf("unable to decode thumbnail.jpg: %v", err)
+				}
+				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
+				var buf bytes.Buffer
+				if err := jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 90}); err != nil {
+					return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
+				}
+				return buf.Bytes(), nil
+			case ".png":
+				img, err := png.Decode(bytes.NewReader(imgBytes))
+				if err != nil {
+					return nil, fmt.Errorf("unable to decode thumbnail.jpg: %v", err)
+				}
+				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
+				var buf bytes.Buffer
+				if err := png.Encode(&buf, resizedImg); err != nil {
+					return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
+				}
+				return buf.Bytes(), nil
+			default:
+				return nil, fmt.Errorf("unsupported thumbnail format: %s", filepath.Ext(thumbnailFile))
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("unable to find thumbnail.jpg in wallpaper zip")
 }

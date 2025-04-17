@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-termimg"
 	"github.com/blacktop/ipsw/pkg/wallpaper"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -44,43 +46,48 @@ func gradientText(s string) string {
 }
 
 type keyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Enter  key.Binding
-	Quit   key.Binding
-	Search key.Binding
-	Latest key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Enter   key.Binding
+	Quit    key.Binding
+	Search  key.Binding
+	Latest  key.Binding
+	Preview key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Search, k.Latest, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Search, k.Latest, k.Preview, k.Quit}
 }
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter},
-		{k.Search, k.Latest, k.Quit},
+		{k.Search, k.Latest, k.Preview, k.Quit},
 	}
 }
 
 var keys = keyMap{
-	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
-	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-	Enter:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "download")),
-	Search: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
-	Latest: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "download latest")),
-	Quit:   key.NewBinding(key.WithKeys("q", "esc", "ctrl+c"), key.WithHelp("q/esc", "quit")),
+	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
+	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
+	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "download")),
+	Search:  key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	Latest:  key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "download latest")),
+	Preview: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "preview")),
+	Quit:    key.NewBinding(key.WithKeys("q", "esc", "ctrl+c"), key.WithHelp("q/esc", "quit")),
 }
 
 type model struct {
-	table    table.Model
-	help     help.Model
-	spinner  spinner.Model
-	loading  bool
-	search   string
-	assets   []wallpaper.WallpaperAsset
-	download map[int]bool // row index -> downloaded
-	quitting bool
-	status   string
+	table          table.Model
+	help           help.Model
+	spinner        spinner.Model
+	loading        bool
+	search         string
+	assets         []wallpaper.WallpaperAsset
+	download       map[int]bool // row index -> downloaded
+	quitting       bool
+	status         string
+	previewContent string           // stores the rendered preview string
+	lastPreview    *termimg.TermImg // stores the last TermImg instance for clearing
+	termWidth      int
 }
 
 func NewWallpaperTUI(ctx context.Context) (*model, error) {
@@ -138,23 +145,41 @@ func (m *model) Init() tea.Cmd {
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
+		return m, nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, keys.Quit):
+			// Clear the last preview image if it exists
+			if m.lastPreview != nil {
+				if err := m.lastPreview.Clear(); err != nil {
+					log.Errorf("failed to clear previous terminal image: %v", err)
+				}
+				m.lastPreview = nil
+			}
 			m.quitting = true
 			return m, tea.Quit
-		case key.Matches(msg, keys.Up):
-			m.table.MoveUp(1)
-		case key.Matches(msg, keys.Down):
-			m.table.MoveDown(1)
 		case key.Matches(msg, keys.Enter):
 			row := m.table.Cursor()
 			if !m.download[row] {
 				m.status = "Downloading..."
+				m.previewContent = m.status // Show status in preview pane
 				return m, downloadWallpaperCmd(m.assets[row], row)
 			}
+		case key.Matches(msg, keys.Preview):
+			row := m.table.Cursor()
+			m.status = "Loading preview..."
+			// Clear previous preview image and string
+			if m.lastPreview != nil {
+				if err := m.lastPreview.Clear(); err != nil {
+					log.Errorf("failed to clear previous terminal image: %v", err)
+				}
+				m.lastPreview = nil
+			}
+			m.previewContent = "" // Clear preview pane content immediately
+			return m, previewWallpaperCmd(m.assets[row], row)
 		case key.Matches(msg, keys.Latest):
-			// Download N most recent (let's use 5 for now)
 			N := min(len(m.assets), 5)
 			cmds := make([]tea.Cmd, 0, N)
 			for i := range N {
@@ -163,12 +188,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.status = "Downloading latest..."
+			m.previewContent = m.status // Show status in preview pane
 			return m, tea.Batch(cmds...)
 		}
 	case spinner.TickMsg:
 		if m.loading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
+			m.previewContent = "" // Clear preview content while loading
 			return m, cmd
 		}
 	case wallpapersMsg:
@@ -187,9 +214,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table.SetRows(rows)
 		m.status = fmt.Sprintf("Loaded %d wallpapers", len(msg.assets))
+		m.previewContent = m.status // Show initial status in preview pane
 	case downloadResultMsg:
 		if msg.err != nil {
 			m.status = "Download failed: " + msg.err.Error()
+			m.previewContent = m.status // Show error in preview pane
 		} else {
 			m.download[msg.row] = true
 			rows := m.table.Rows()
@@ -198,32 +227,96 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table.SetRows(rows)
 			}
 			m.status = "Downloaded: " + msg.name
+			// Don't clear preview content on download
+		}
+	case previewResultMsg:
+		if msg.err != nil {
+			m.status = "Preview failed: " + msg.err.Error()
+			m.previewContent = m.status // Put error message in preview content
+			m.lastPreview = nil         // Ensure no preview is stored on error
+		} else {
+			m.status = "Preview loaded"
+			// Render preview using go-termimg with NewTermImg
+			ti, err := termimg.NewTermImg(bytes.NewReader(msg.imgBytes))
+			if err != nil {
+				m.status = "Failed to load preview: " + err.Error()
+				m.previewContent = m.status // Show error in preview content
+				m.lastPreview = nil
+			} else {
+				// Store the instance for clearing later
+				m.lastPreview = ti
+				// Render the image to a string
+				previewStr, err := ti.Render()
+				if err != nil {
+					m.status = "Failed to render preview: " + err.Error()
+					m.previewContent = m.status // Show error in preview content
+					m.lastPreview = nil         // Clear if rendering fails
+				} else {
+					m.previewContent = previewStr // Put image string in preview content
+				}
+			}
 		}
 	}
-	return m, nil
+	// Propagate table updates (handles navigation, focus, etc.)
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
 }
 
 func (m *model) View() string {
 	if m.quitting {
 		return "Goodbye!"
 	}
-	var b strings.Builder
-	if m.loading {
-		b.WriteString(m.spinner.View() + " " + m.status + "\n")
-		return b.String()
+
+	// Title
+	title := titleStyle.Render(gradientText("Apple Wallpapers"))
+
+	// Define preview width and margin
+	previewMarginRight := 2
+	previewWidth := 60     // Example fixed width for preview content area
+	if m.termWidth < 100 { // Prevent negative table width on very small terms
+		previewWidth = m.termWidth / 3
 	}
-	// Center the title above the table, add gradient
-	tableWidth := m.table.Width()
-	title := "Apple Wallpapers"
-	title = gradientText(title)
-	if tableWidth > 0 {
-		title = lipgloss.PlaceHorizontal(tableWidth, lipgloss.Center, title)
+	totalPreviewAreaWidth := previewWidth + previewMarginRight
+	tableWidth := m.termWidth - totalPreviewAreaWidth - 3 // Account for spacing/borders
+	if tableWidth < 10 {
+		tableWidth = 10
 	}
-	b.WriteString(titleStyle.Render(title) + "\n")
-	b.WriteString(m.table.View() + "\n")
-	b.WriteString(m.status + "\n")
-	b.WriteString(m.help.View(keys))
-	return b.String()
+
+	// Table View
+	tableView := m.table.View()
+
+	// Preview View (will contain image *or* status/error)
+	previewViewContent := m.previewContent
+	if m.loading { // Show spinner instead of preview when loading
+		previewViewContent = m.spinner.View() + " Loading..."
+	} else if !m.loading && m.previewContent == "" { // Show status if no preview yet
+		previewViewContent = m.status
+	}
+
+	// Create styled sections for layout control
+	tableSection := lipgloss.NewStyle().Width(tableWidth).Render(tableView)
+	previewSection := lipgloss.NewStyle().
+		Width(previewWidth). // Set width for content
+		Align(lipgloss.Center).
+		MarginRight(previewMarginRight). // Add margin to the right
+		Render(previewViewContent)       // Render the combined content
+
+	// Join table and preview horizontally
+	splitView := lipgloss.JoinHorizontal(lipgloss.Top, tableSection, previewSection)
+
+	// Help Text
+	helpView := m.help.View(keys)
+
+	// Combine views vertically
+	finalView := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		splitView,
+		// Removed status bar from here
+		helpView,
+	)
+
+	return finalView
 }
 
 // --- Msgs and Cmds ---
@@ -277,5 +370,30 @@ func downloadWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
 			return downloadResultMsg{row: row, name: asset.WallpaperName, err: err}
 		}
 		return downloadResultMsg{row: row, name: asset.WallpaperName, err: nil}
+	}
+}
+
+type previewResultMsg struct {
+	row      int
+	imgBytes []byte
+	err      error
+}
+
+func previewWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
+	return func() tea.Msg {
+		log.Debugf("Previewing wallpaper: %s", asset.WallpaperName)
+		url := asset.BaseURL + asset.RelativePath
+
+		// Download and extract thumbnail
+		imgBytes, err := wallpaper.ExtractThumbnailBytes(url, "", false)
+		if err != nil {
+			return previewResultMsg{row: row, err: fmt.Errorf("failed to extract thumbnail: %w", err)}
+		}
+
+		if len(imgBytes) == 0 {
+			return previewResultMsg{row: row, err: fmt.Errorf("thumbnail not found in wallpaper")}
+		}
+
+		return previewResultMsg{row: row, imgBytes: imgBytes, err: nil}
 	}
 }

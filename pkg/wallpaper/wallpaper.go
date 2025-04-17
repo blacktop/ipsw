@@ -45,11 +45,11 @@ type WallpaperPlist struct {
 	Assets                  map[string]any  `plist:"assets,omitempty"`
 	ContentVersion          float64         `plist:"contentVersion,omitempty"`
 	Family                  string          `plist:"family,omitempty"`
-	ID                      int             `plist:"identifier,omitempty"`
+	ID                      any             `plist:"identifier,omitempty"`
 	LogicalScreenClass      string          `plist:"logicalScreenClass,omitempty"`
 	Name                    string          `plist:"name,omitempty"`
 	PreferredProminentColor ProminentColors `plist:"preferredProminentColor,omitempty"`
-	Version                 int             `plist:"version,omitempty"`
+	Version                 any             `plist:"version,omitempty"`
 }
 
 type Assets struct {
