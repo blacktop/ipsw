@@ -13,7 +13,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/disintegration/imaging"
-	_ "github.com/strukturag/libheif/go/heif"
+	_ "github.com/strukturag/libheif-go"
 )
 
 const (

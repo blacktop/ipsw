@@ -64,7 +64,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
-	github.com/strukturag/libheif v1.19.7
+	github.com/strukturag/libheif-go v0.0.0-20250130134905-55b3482bea15
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.6.0-alpha.3
 	github.com/unicorn-engine/unicorn v0.0.0-20250410153552-f8c6db950420
