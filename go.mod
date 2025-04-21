@@ -17,7 +17,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/blacktop/arm64-cgo v1.0.58
-	github.com/blacktop/go-apfs v1.0.26
+	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.245
 	github.com/blacktop/go-plist v1.0.2
@@ -129,7 +129,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -216,16 +216,16 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
-	golang.org/x/image v0.20.0 // indirect
+	golang.org/x/image v0.26.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250421163800-61c742ae3ef0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250421163800-61c742ae3ef0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
-	modernc.org/libc v1.62.1 // indirect
+	modernc.org/libc v1.63.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.10.0 // indirect
 	modernc.org/sqlite v1.37.0 // indirect
