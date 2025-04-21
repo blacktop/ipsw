@@ -22,7 +22,7 @@ x86-brew: ## Install the x86_64 homebrew on Apple Silicon
 	mkdir /tmp/homebrew
 	cd /tmp; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
 	sudo mv /tmp/homebrew /usr/local/homebrew
-	arch -x86_64 /usr/local/homebrew/bin/brew install unicorn libusb
+	arch -x86_64 /usr/local/homebrew/bin/brew install unicorn libusb libheif
 
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
