@@ -57,4 +57,5 @@ ipsw download [flags]
 * [ipsw download rss](/docs/cli/ipsw/download/rss)	 - Read Releases - Apple Developer RSS Feed
 * [ipsw download tss](/docs/cli/ipsw/download/tss)	 - 🚧 Download SHSH Blobs
 * [ipsw download wiki](/docs/cli/ipsw/download/wiki)	 - Download old(er) IPSWs from theiphonewiki.com
+* [ipsw download wp](/docs/cli/ipsw/download/wp)	 - Download and browse Apple wallpapers
 
