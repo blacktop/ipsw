@@ -121,7 +121,7 @@ jobs:
       - name: Build Dependencies (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          sudo apt-get -yq install fuse3 libfuse3-dev bzip2 libbz2-dev cmake libattr1-dev zlib1g-dev
+          sudo apt-get -yq install fuse3 libfuse3-dev bzip2 libbz2-dev cmake libattr1-dev zlib1g-dev libheif-dev
           git clone https://github.com/sgan81/apfs-fuse.git
           cd apfs-fuse
           git submodule init
