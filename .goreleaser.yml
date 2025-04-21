@@ -79,6 +79,7 @@ builds:
       - unicorn
       - objc
       - sandbox
+      - wallpaper
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -397,6 +398,8 @@ brews:
       - name: unicorn
         type: optional
       - name: git-delta
+        type: optional
+      - name: libheif
         type: optional
     conflicts:
       - ipsw-frida
