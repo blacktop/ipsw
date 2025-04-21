@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build !windows
 
 /*
 Copyright © 2025 blacktop
