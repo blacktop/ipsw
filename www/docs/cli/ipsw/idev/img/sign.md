@@ -20,6 +20,8 @@ ipsw idev img sign [flags]
   -a, --ap-item string                     Ap'Item to personalize (example: --ap-item 'Ap,SikaFuse')
   -b, --board-id uint                      Device ApBoardID
   -c, --chip-id uint                       Device ApChipID
+  -d, --ddi-dmg string                     DDI.dmg to mount
+  -f, --ddi-folder string                  DDI folder (i.e. /Library/Developer/DeveloperDiskImages/iOS_DDI)
   -e, --ecid uint                          Device ApECID
   -h, --help                               help for sign
   -i, --input ipsw idev img nonce --json   JSON file from ipsw idev img nonce --json command
