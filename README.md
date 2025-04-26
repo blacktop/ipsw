@@ -109,14 +109,11 @@ Use "ipsw [command] --help" for more information about a command.
 
 - [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw)
 
-```mermaid
-graph TD
-A[Download] --> B[Extract]
-B --> C[Parse]
-C --> D[Dump]
-D --> E[Search]
-E --> F[Symbolicate]
-```
+### 🆕 AI Generated Wiki
+
+You can now ask the repo questions 🤖
+
+- <https://deepwiki.com/blacktop/ipsw>
 
 ## `ipsw` Diffs
 
