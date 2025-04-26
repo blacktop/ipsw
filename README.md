@@ -120,6 +120,9 @@ You can now ask the repo questions 🤖
 A collection of `ipsw` diffs can be found here: 
 - <https://github.com/blacktop/ipsw-diffs>
 
+> [!WARNING]
+> It does contain some hallucinations etc.
+
 ## Community
 
 You have questions, need support and or just want to talk about `ipsw`?
