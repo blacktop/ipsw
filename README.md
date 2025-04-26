@@ -115,13 +115,13 @@ You can now ask the repo questions 🤖
 
 - <https://deepwiki.com/blacktop/ipsw>
 
+> [!WARNING]
+> It does contain some hallucinations etc.
+
 ## `ipsw` Diffs
 
 A collection of `ipsw` diffs can be found here: 
 - <https://github.com/blacktop/ipsw-diffs>
-
-> [!WARNING]
-> It does contain some hallucinations etc.
 
 ## Community
 
