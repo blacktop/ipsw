@@ -827,7 +827,7 @@ var machoInfoCmd = &cobra.Command{
 			if m.FunctionStarts() != nil {
 				for _, fn := range m.GetFunctions() {
 					if verbose {
-						fmt.Printf("%#016x-%#016x\n", fn.StartAddr, fn.EndAddr)
+						fmt.Printf("%#016x-%#016x size=%d\n", fn.StartAddr, fn.EndAddr, fn.EndAddr-fn.StartAddr)
 					} else {
 						fmt.Printf("%#016x\n", fn.StartAddr)
 					}
