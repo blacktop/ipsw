@@ -31,6 +31,8 @@ ipsw dyld disass <DSC> [flags]
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --demangle
 # Disassemble a function at a virtual address in dyld_shared_cache and do NOT markup analysis (Faster)
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
+# Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
+❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
 ```
 
 ### Options
@@ -38,6 +40,10 @@ ipsw dyld disass <DSC> [flags]
 ```
       --cache string          Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint            Number of instructions to disassemble
+  -D, --dec                   Decompile assembly
+      --dec-model string      LLM model to use for decompilation
+      --dec-temp float        LLM temperature for decompilation (default 0.2)
+      --dec-top-p float       LLM top_p for decompilation (default 0.1)
   -d, --demangle              Demangle symbol names
       --force                 Continue to disassemble even if there are analysis errors
   -h, --help                  help for disass

@@ -105,7 +105,9 @@ var DisassCmd = &cobra.Command{
 		# Disassemble a function at a virtual address in dyld_shared_cache and demangle symbol names
 		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --demangle
 		# Disassemble a function at a virtual address in dyld_shared_cache and do NOT markup analysis (Faster)
-		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet`),
+		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
+		# Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
+		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"`),
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault

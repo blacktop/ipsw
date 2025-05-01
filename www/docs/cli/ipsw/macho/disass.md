@@ -21,6 +21,10 @@ ipsw macho disass <MACHO> [flags]
       --arch string            Which architecture to use for fat/universal MachO
       --cache string           Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint             Number of instructions to disassemble
+  -D, --dec                    Decompile assembly
+      --dec-model string       LLM model to use for decompilation
+      --dec-temp float         LLM temperature for decompilation (default 0.2)
+      --dec-top-p float        LLM top_p for decompilation (default 0.1)
   -d, --demangle               Demangle symbol names
   -e, --entry                  Disassemble entry point
   -t, --fileset-entry string   Which fileset entry to analyze
