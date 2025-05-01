@@ -16,6 +16,7 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -450,13 +451,49 @@ func (d *MachoDisass) parseObjC() error {
 		if superRefs, err := d.f.GetObjCSuperReferences(); err == nil {
 			for off, class := range superRefs {
 				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)
-				d.a2s[d.f.GetBaseAddress()+class.ClassPtr] = class.Name
+				d.a2s[class.ClassPtr] = class.Name
+				d.a2s[class.IsaVMAddr] = class.Isa
 			}
 		}
 		if protoRefs, err := d.f.GetObjCProtoReferences(); err == nil {
 			for off, proto := range protoRefs {
 				d.a2s[off] = fmt.Sprintf("proto_%s", proto.Name)
 				d.a2s[d.f.GetBaseAddress()+proto.Ptr] = proto.Name
+			}
+		}
+		if objcStubs, err := d.f.GetObjCStubs(func(addr uint64, data []byte) (map[uint64]*objc.Stub, error) {
+			stubs := make(map[uint64]*objc.Stub)
+			addr2sel, err := ParseStubsASM(data, addr, func(u uint64) (uint64, error) {
+				ptr, err := d.f.GetPointerAtAddress(u)
+				if err != nil {
+					return 0, err
+				}
+				if name, err := d.f.GetBindName(ptr); err == nil && name == "_objc_msgSend" {
+					return 0, nil
+				}
+				ptr = d.f.SlidePointer(ptr)
+				if ptr < d.f.GetBaseAddress() {
+					return ptr + d.f.GetBaseAddress(), nil
+				}
+				return ptr, nil
+			})
+			if err != nil {
+				return nil, err
+			}
+			for addr, sel := range addr2sel {
+				if d.a2s[sel] != "_objc_msgSend" {
+					stubs[addr] = &objc.Stub{
+						Name:        d.a2s[sel],
+						SelectorRef: sel,
+					}
+				}
+			}
+			return stubs, nil
+		}); err == nil {
+			for addr, stub := range objcStubs {
+				if len(stub.Name) > 0 {
+					d.a2s[addr] = fmt.Sprintf("j__objc_msgSend(x0, \"%s\")", stub.Name)
+				}
 			}
 		}
 	}

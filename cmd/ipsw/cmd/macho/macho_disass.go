@@ -29,13 +29,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/ai"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/briandowns/spinner"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -53,6 +58,13 @@ func init() {
 	machoDisassCmd.Flags().Uint64P("off", "o", 0, "File offset to start disassembling")
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	machoDisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
+	machoDisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
+	machoDisassCmd.RegisterFlagCompletionFunc("dec-model", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ai.CopilotModels, cobra.ShellCompDirectiveDefault
+	})
+	machoDisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
+	machoDisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	machoDisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
@@ -71,6 +83,10 @@ func init() {
 	viper.BindPFlag("macho.disass.off", machoDisassCmd.Flags().Lookup("off"))
 	viper.BindPFlag("macho.disass.count", machoDisassCmd.Flags().Lookup("count"))
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("macho.disass.dec", machoDisassCmd.Flags().Lookup("dec"))
+	viper.BindPFlag("macho.disass.dec-model", machoDisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("macho.disass.dec-temp", machoDisassCmd.Flags().Lookup("dec-temp"))
+	viper.BindPFlag("macho.disass.dec-top-p", machoDisassCmd.Flags().Lookup("dec-top-p"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("macho.disass.force", machoDisassCmd.Flags().Lookup("force"))
@@ -112,6 +128,7 @@ var machoDisassCmd = &cobra.Command{
 		instructions := viper.GetUint64("macho.disass.count")
 		segmentSection := viper.GetString("macho.disass.section")
 
+		decompile := viper.GetBool("macho.disass.dec")
 		demangleFlag := viper.GetBool("macho.disass.demangle")
 		asJSON := viper.GetBool("macho.disass.json")
 		quiet := viper.GetBool("macho.disass.quiet")
@@ -337,7 +354,56 @@ var machoDisassCmd = &cobra.Command{
 						//***************
 						//* DISASSEMBLE *
 						//***************
-						disass.Disassemble(engine)
+						dis := disass.Disassemble(engine)
+						if decompile {
+							promptFmt, lexer, err := disass.GetPrompt(dis)
+							if err != nil {
+								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
+							}
+							copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
+								Prompt:      fmt.Sprintf(promptFmt, dis),
+								Model:       viper.GetString("macho.disass.dec-model"),
+								Temperature: viper.GetFloat64("macho.disass.dec-temp"),
+								TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
+								Stream:      true,
+							})
+							if err != nil {
+								return fmt.Errorf("failed to create github copilot client: %v", err)
+							}
+							if !viper.IsSet("macho.disass.dec-model") {
+								var choice string
+								prompt := &survey.Select{
+									Message:  "Select model to use:",
+									Options:  copilot.AvailableCopilotModels(),
+									PageSize: 10,
+								}
+								if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+									log.Warn("Exiting...")
+									return nil
+								}
+								if err := copilot.SetModel(choice); err != nil {
+									return fmt.Errorf("failed to set github copilot model: %v", err)
+								}
+							}
+							s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
+							s.Prefix = color.BlueString("   • Decompiling... ")
+							s.Start()
+
+							decmp, err := copilot.Chat()
+							s.Stop()
+							if err != nil {
+								return fmt.Errorf("failed to decompile via github copilot: %v", err)
+							}
+							if viper.GetBool("color") && !viper.GetBool("no-color") {
+								if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
+									return err
+								}
+							} else {
+								fmt.Println(string(decmp))
+							}
+						} else {
+							fmt.Println(dis)
+						}
 					}
 				} else {
 					if len(symbolName) > 0 {
@@ -431,6 +497,9 @@ var machoDisassCmd = &cobra.Command{
 							}
 						}
 						maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
+						if entryStart {
+							symbolMap[startAddr] = "start"
+						}
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 							log.Errorf("failed to save symbol map: %v", err)
 						}
@@ -438,7 +507,56 @@ var machoDisassCmd = &cobra.Command{
 					//***************
 					//* DISASSEMBLE *
 					//***************
-					disass.Disassemble(engine)
+					dis := disass.Disassemble(engine)
+					if decompile {
+						promptFmt, lexer, err := disass.GetPrompt(dis)
+						if err != nil {
+							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
+						}
+						copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
+							Prompt:      fmt.Sprintf(promptFmt, dis),
+							Model:       viper.GetString("macho.disass.dec-model"),
+							Temperature: viper.GetFloat64("macho.disass.dec-temp"),
+							TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
+							Stream:      true,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create github copilot client: %v", err)
+						}
+						if !viper.IsSet("macho.disass.dec-model") {
+							var choice string
+							prompt := &survey.Select{
+								Message:  "Select model to use:",
+								Options:  copilot.AvailableCopilotModels(),
+								PageSize: 10,
+							}
+							if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+								log.Warn("Exiting...")
+								return nil
+							}
+							if err := copilot.SetModel(choice); err != nil {
+								return fmt.Errorf("failed to set github copilot model: %v", err)
+							}
+						}
+						s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
+						s.Prefix = color.BlueString("   • Decompiling... ")
+						s.Start()
+
+						decmp, err := copilot.Chat()
+						s.Stop()
+						if err != nil {
+							return fmt.Errorf("failed to decompile via github copilot: %v", err)
+						}
+						if viper.GetBool("color") && !viper.GetBool("no-color") {
+							if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
+								return err
+							}
+						} else {
+							fmt.Println(string(decmp))
+						}
+					} else {
+						fmt.Println(dis)
+					}
 				}
 			}
 			return nil
