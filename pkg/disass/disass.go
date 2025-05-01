@@ -148,7 +148,8 @@ type Triage struct {
 	Locations map[uint64][]uint64
 }
 
-func Disassemble(d Disass) {
+func Disassemble(d Disass) string {
+	var sb strings.Builder
 	var instrStr string
 	var instrValue uint32
 	var results [1024]byte
@@ -223,7 +224,7 @@ func Disassemble(d Disass) {
 				}
 
 				if d.Color() {
-					fmt.Printf("%s:  %s   %s %s%s\n",
+					fmt.Fprintf(&sb, "%s:  %s   %s %s%s\n",
 						colorAddr("%#08x", uint64(startAddr)),
 						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
 						colorOp("%-7s", op),
@@ -231,7 +232,7 @@ func Disassemble(d Disass) {
 						colorComment(comment),
 					)
 				} else {
-					fmt.Printf("%#08x:  %s   %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), op, oprs, comment)
+					fmt.Fprintf(&sb, "%#08x:  %s   %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), op, oprs, comment)
 				}
 
 				goto INCR_ADDR
@@ -243,25 +244,25 @@ func Disassemble(d Disass) {
 				// check for start of a new function
 				if ok, fname := d.IsFunctionStart(instruction.Address); ok {
 					if d.Color() {
-						fmt.Print(colorOp("\n%s:\n", fname))
+						sb.WriteString(colorOp("\n%s:\n", fname))
 					} else {
-						fmt.Printf("\n%s:\n", fname)
+						fmt.Fprintf(&sb, "\n%s:\n", fname)
 					}
 				} else {
 					if name, ok := d.FindSymbol(uint64(instruction.Address)); ok {
 						if d.Color() {
-							fmt.Print(colorOp("\n%s\n", name))
+							sb.WriteString(colorOp("\n%s\n", name))
 						} else {
-							fmt.Printf("\n%s\n", name)
+							fmt.Fprintf(&sb, "\n%s\n", name)
 						}
 					}
 				}
 
 				if d.IsLocation(instruction.Address) {
 					if d.Color() {
-						fmt.Printf("%s\n", colorLocation("loc_%x", instruction.Address))
+						fmt.Fprintf(&sb, "%s\n", colorLocation("loc_%x", instruction.Address))
 					} else {
-						fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
+						fmt.Fprintf(&sb, "%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 					}
 				}
 
@@ -363,7 +364,7 @@ func Disassemble(d Disass) {
 						if ok, detail := d.IsData(adrpImm); ok {
 							_ = detail
 							if ok, detail := d.IsPointer(adrpImm); ok {
-								fmt.Printf("ptr_%x: .quad %s ; %s\n", adrpImm, detail, name)
+								fmt.Fprintf(&sb, "ptr_%x: .quad %s ; %s\n", adrpImm, detail, name)
 							}
 							if ptr, err := d.ReadAddr(adrpImm); err == nil {
 								if ptrname, ok := d.FindSymbol(ptr); ok {
@@ -379,8 +380,6 @@ func Disassemble(d Disass) {
 						} else {
 							comment = fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
 						}
-					} else if ok, detail := d.IsData(adrpImm); ok {
-						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
 					} else if cstr, err := d.GetCString(adrpImm); err == nil && len(cstr) > 0 {
 						if utils.IsASCII(cstr) {
 							if len(cstr) > 200 {
@@ -395,25 +394,27 @@ func Disassemble(d Disass) {
 								}
 							}
 						}
+					} else if ok, detail := d.IsData(adrpImm); ok {
+						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
 					}
 				}
 
 				if instruction.Encoding == disassemble.ENC_LDR_B_LDST_IMMPRE {
-					fmt.Println(instrStr)
+					fmt.Fprintf(&sb, "%s\n", instrStr)
 				}
 			}
 
 			if d.Middle() != 0 && d.Middle() == startAddr {
 				if d.Color() {
 					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
-					printCurLine("=>%08x:  %s   %-7s %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction.Operation, opStr, comment)
+					fmt.Fprintf(&sb, "=>%08x:  %s   %-7s %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction.Operation, opStr, comment)
 				} else {
-					fmt.Printf("=>%08x:  %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
+					fmt.Fprintf(&sb, "=>%08x:  %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
 				}
 			} else {
 				if d.Color() {
 					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
-					fmt.Printf("%s:  %s   %s %s%s\n",
+					fmt.Fprintf(&sb, "%s:  %s   %s %s%s\n",
 						colorAddr("%#08x", uint64(startAddr)),
 						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
 						colorOp("%-7s", instruction.Operation),
@@ -421,7 +422,7 @@ func Disassemble(d Disass) {
 						colorComment(comment),
 					)
 				} else {
-					fmt.Printf("%#08x:  %s   %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
+					fmt.Fprintf(&sb, "%#08x:  %s   %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
 				}
 			}
 
@@ -461,14 +462,16 @@ func Disassemble(d Disass) {
 		}
 		if len(funcsJSON) > 0 {
 			if dat, err := json.Marshal(funcsJSON); err == nil {
-				fmt.Println(string(dat))
+				fmt.Fprintf(&sb, "%s\n", string(dat))
 			}
 		} else {
 			if dat, err := json.Marshal(instructions); err == nil {
-				fmt.Println(string(dat))
+				fmt.Fprintf(&sb, "%s\n", string(dat))
 			}
 		}
 	}
+
+	return sb.String()
 }
 
 func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {

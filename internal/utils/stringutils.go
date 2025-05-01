@@ -156,10 +156,21 @@ func GrepStrings(data []byte, searchStr string) []string {
 	return matchStrings
 }
 
+// isAsciiPunctOrSpace checks if a rune is common ASCII punctuation or a space.
+func isAsciiPunctOrSpace(r rune) bool {
+	switch r {
+	case ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+		':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{', '|', '}', '~', '\n', '\r', '\t':
+		return true
+	default:
+		return false
+	}
+}
+
 // IsASCII checks if given string is ascii
 func IsASCII(s string) bool {
 	for _, r := range s {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+		if (r > unicode.MaxASCII || !unicode.IsPrint(r)) && !isAsciiPunctOrSpace(r) {
 			return false
 		}
 	}

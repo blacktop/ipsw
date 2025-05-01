@@ -1446,7 +1446,7 @@ func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 
 		for addr, stub := range image.ObjC.Stubs {
 			if len(stub.Name) > 0 {
-				f.AddressToSymbol[addr] = fmt.Sprintf("__objc_stub_%s", stub.Name)
+				f.AddressToSymbol[addr] = fmt.Sprintf("j__objc_msgSend(x0, \"%s\")", stub.Name)
 			}
 		}
 	}
