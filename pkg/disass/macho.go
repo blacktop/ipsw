@@ -343,8 +343,8 @@ func (d MachoDisass) Analyze() error {
 		d.a2s[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
 	}
 
-	for _, sym := range d.f.Symtab.Syms {
-		d.a2s[sym.Value] = sym.Name
+	if err := d.parseSymbols(); err != nil {
+		return fmt.Errorf("failed to parse symbols: %v", err)
 	}
 
 	if err := d.parseImports(); err != nil {
@@ -375,6 +375,44 @@ func (d MachoDisass) Analyze() error {
 		return fmt.Errorf("failed to parse symbol stubs: %v", err)
 	}
 
+	return nil
+}
+
+func (d *MachoDisass) parseSymbols() error {
+	for _, sym := range d.f.Symtab.Syms {
+		if sym.Value > 0 && len(sym.Name) > 0 {
+			if d.cfg.Demangle {
+				if strings.HasPrefix(sym.Name, "_$s") { // TODO: better detect swift symbols
+					sym.Name, _ = swift.Demangle(sym.Name)
+					d.a2s[sym.Value] = sym.Name
+				} else {
+					d.a2s[sym.Value] = demangle.Do(sym.Name, false, false)
+				}
+			} else {
+				d.a2s[sym.Value] = sym.Name
+			}
+		}
+	}
+	exports, err := d.f.GetExports()
+	if err != nil {
+		if err != macho.ErrMachODyldInfoNotFound {
+			return fmt.Errorf("failed to get exports: %v", err)
+		}
+	}
+	for _, sym := range exports {
+		if sym.Address > 0 {
+			if d.cfg.Demangle && len(sym.Name) > 0 {
+				if strings.HasPrefix(sym.Name, "_$s") { // TODO: better detect swift symbols
+					sym.Name, _ = swift.Demangle(sym.Name)
+					d.a2s[sym.Address] = sym.Name
+				} else {
+					d.a2s[sym.Address] = demangle.Do(sym.Name, false, false)
+				}
+			} else {
+				d.a2s[sym.Address] = sym.Name
+			}
+		}
+	}
 	return nil
 }
 
