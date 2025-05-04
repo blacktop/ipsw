@@ -22,18 +22,36 @@ Assembly:
 
 %s`
 
-func GetPrompt(content string) (string, string, error) {
+func GetPrompt(content string, lang string) (string, string, error) {
 	var tmptout bytes.Buffer
-	lang := "C"
-	lexer := "c"
-	// TODO: add better language checks
-	if content != "" {
-		if strings.Contains(strings.ToLower(content), "swift_") {
+	var lexer string
+	if lang != "" {
+		switch strings.ToLower(lang) {
+		case "swift":
 			lang = "Swift"
 			lexer = "swift"
-		} else if strings.Contains(strings.ToLower(content), "_objc_") {
+		case "objc":
 			lang = "Objective-C"
 			lexer = "objc"
+		case "c":
+			lang = "C"
+			lexer = "c"
+		default:
+			lexer = strings.ToLower(lang)
+		}
+	} else { // autodetect
+		// TODO: add better language checks
+		if content != "" {
+			if strings.Contains(strings.ToLower(content), "swift_") {
+				lang = "Swift"
+				lexer = "swift"
+			} else if strings.Contains(strings.ToLower(content), "_objc_") {
+				lang = "Objective-C"
+				lexer = "objc"
+			} else {
+				lang = "C"
+				lexer = "c"
+			}
 		}
 	}
 	tmpl := template.Must(template.New("prompt").Parse(promptTemplate))
