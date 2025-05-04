@@ -28,6 +28,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/ai"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/briandowns/spinner"
 	"github.com/caarlos0/ctrlc"
@@ -63,6 +65,7 @@ func init() {
 	machoDisassCmd.RegisterFlagCompletionFunc("dec-model", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return ai.CopilotModels, cobra.ShellCompDirectiveDefault
 	})
+	machoDisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
 	machoDisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	machoDisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -85,6 +88,7 @@ func init() {
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.disass.dec", machoDisassCmd.Flags().Lookup("dec"))
 	viper.BindPFlag("macho.disass.dec-model", machoDisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("macho.disass.dec-lang", machoDisassCmd.Flags().Lookup("dec-lang"))
 	viper.BindPFlag("macho.disass.dec-temp", machoDisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("macho.disass.dec-top-p", machoDisassCmd.Flags().Lookup("dec-top-p"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
@@ -257,7 +261,24 @@ var machoDisassCmd = &cobra.Command{
 					}
 					if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
 						if _, err := os.Create(cacheFile); err != nil {
-							return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+							if errors.Is(err, os.ErrPermission) {
+								var e *os.PathError
+								if errors.As(err, &e) {
+									log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
+								}
+								tmpDir := os.TempDir()
+								if runtime.GOOS == "darwin" {
+									tmpDir = "/tmp"
+								}
+								cacheFile = filepath.Join(tmpDir, m.UUID().String()+".a2s")
+								if _, err = os.Create(cacheFile); err != nil {
+									return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+								}
+								utils.Indent(log.Warn, 2)(fmt.Sprintf("creating in the temp folder: %s", cacheFile))
+								utils.Indent(log.Warn, 2)(fmt.Sprintf("to use this symbol cache in the future you must supply the flag: --cache %s ", cacheFile))
+							} else if err != nil {
+								return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+							}
 						}
 						// if dSYM file exists, load symbols from it
 						dsym := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
@@ -356,7 +377,7 @@ var machoDisassCmd = &cobra.Command{
 						//***************
 						dis := disass.Disassemble(engine)
 						if decompile {
-							promptFmt, lexer, err := disass.GetPrompt(dis)
+							promptFmt, lexer, err := disass.GetPrompt(dis, viper.GetString("macho.disass.dec-lang"))
 							if err != nil {
 								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 							}
@@ -509,7 +530,7 @@ var machoDisassCmd = &cobra.Command{
 					//***************
 					dis := disass.Disassemble(engine)
 					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(dis)
+						promptFmt, lexer, err := disass.GetPrompt(dis, viper.GetString("macho.disass.dec-lang"))
 						if err != nil {
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
