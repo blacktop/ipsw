@@ -24,6 +24,7 @@ type Disass interface {
 	IsData(uint64) (bool, *AddrDetails)
 	IsPointer(uint64) (bool, *AddrDetails)
 	FindSymbol(uint64) (string, bool)
+	FindSwiftString(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	// getters
 	Demangle() bool
@@ -264,6 +265,10 @@ func Disassemble(d Disass) string {
 					} else {
 						fmt.Fprintf(&sb, "%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 					}
+				}
+
+				if swiftstr, ok := d.FindSwiftString(instruction.Address); ok {
+					comment = fmt.Sprintf(" ; %#v", swiftstr)
 				}
 
 				// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
