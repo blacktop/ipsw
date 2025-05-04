@@ -295,14 +295,14 @@ var machoDisassCmd = &cobra.Command{
 						//***************
 						//* DISASSEMBLE *
 						//***************
-						dis := disass.Disassemble(engine)
+						asm := disass.Disassemble(engine)
 						if decompile {
-							promptFmt, lexer, err := disass.GetPrompt(dis, viper.GetString("macho.disass.dec-lang"))
+							promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("macho.disass.dec-lang"))
 							if err != nil {
 								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 							}
 							copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
-								Prompt:      fmt.Sprintf(promptFmt, dis),
+								Prompt:      fmt.Sprintf(promptFmt, asm),
 								Model:       viper.GetString("macho.disass.dec-model"),
 								Temperature: viper.GetFloat64("macho.disass.dec-temp"),
 								TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
@@ -343,7 +343,7 @@ var machoDisassCmd = &cobra.Command{
 								fmt.Println(string(decmp))
 							}
 						} else {
-							fmt.Println(dis)
+							fmt.Println(asm)
 						}
 					}
 				} else {
@@ -450,14 +450,14 @@ var machoDisassCmd = &cobra.Command{
 					//***************
 					//* DISASSEMBLE *
 					//***************
-					dis := disass.Disassemble(engine)
+					asm := disass.Disassemble(engine)
 					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(dis, viper.GetString("macho.disass.dec-lang"))
+						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("macho.disass.dec-lang"))
 						if err != nil {
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
 						copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
-							Prompt:      fmt.Sprintf(promptFmt, dis),
+							Prompt:      fmt.Sprintf(promptFmt, asm),
 							Model:       viper.GetString("macho.disass.dec-model"),
 							Temperature: viper.GetFloat64("macho.disass.dec-temp"),
 							TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
@@ -498,7 +498,7 @@ var machoDisassCmd = &cobra.Command{
 							fmt.Println(string(decmp))
 						}
 					} else {
-						fmt.Println(dis)
+						fmt.Println(asm)
 					}
 				}
 			}
