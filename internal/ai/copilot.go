@@ -208,34 +208,43 @@ func readLocalToken() (string, error) {
 		return "", err
 	}
 
-	configPath := filepath.Join(home, ".config/github-copilot/hosts.json")
-	if runtime.GOOS == "windows" {
-		configPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "github-copilot", "hosts.json")
-	}
+	for _, path := range []string{
+		"hosts.json",
+		"apps.json",
+	} {
+		configPath := filepath.Join(home, ".config/github-copilot", path)
+		if runtime.GOOS == "windows" {
+			configPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "github-copilot", path)
+		}
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return "", err
-	}
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			continue
+		}
 
-	var config map[string]json.RawMessage
-	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("failed to parse Copilot configuration file at %s: %w", configPath, err)
-	}
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return "", err
+		}
 
-	for key, value := range config {
-		if key == "github.com" || strings.HasPrefix(key, "github.com:") {
-			var tokenData map[string]string
-			if err := json.Unmarshal(value, &tokenData); err != nil {
-				continue
-			}
-			if token, exists := tokenData["oauth_token"]; exists {
-				return token, nil
+		var config map[string]json.RawMessage
+		if err := json.Unmarshal(data, &config); err != nil {
+			return "", fmt.Errorf("failed to parse Copilot configuration file at %s: %w", configPath, err)
+		}
+
+		for key, value := range config {
+			if key == "github.com" || strings.HasPrefix(key, "github.com:") {
+				var tokenData map[string]string
+				if err := json.Unmarshal(value, &tokenData); err != nil {
+					continue
+				}
+				if token, exists := tokenData["oauth_token"]; exists {
+					return token, nil
+				}
 			}
 		}
 	}
 
-	return "", fmt.Errorf("token not found in '%s'", configPath)
+	return "", fmt.Errorf("token not found in HOME/.config/github-copilot hosts.json OR apps.json")
 }
 
 func getAPIToken(ctx context.Context, oauth string) (*tokenResponse, error) {
