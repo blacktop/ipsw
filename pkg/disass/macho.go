@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,15 +26,16 @@ import (
 )
 
 type MachoDisass struct {
-	f     *macho.File
-	cfg   *Config
-	tr    *Triage
-	a2s   map[uint64]string
-	sinfo map[uint64]uint64
+	f         *macho.File
+	cfg       *Config
+	tr        *Triage
+	a2s       map[uint64]string
+	sinfo     map[uint64]uint64
+	swiftstrs map[uint64]string
 }
 
 func NewMachoDisass(f *macho.File, cfg *Config) *MachoDisass {
-	return &MachoDisass{f: f, cfg: cfg, a2s: make(map[uint64]string)}
+	return &MachoDisass{f: f, cfg: cfg, a2s: make(map[uint64]string, 0), swiftstrs: make(map[uint64]string, 0)}
 }
 
 func (d MachoDisass) Demangle() bool {
@@ -324,6 +326,13 @@ func (d MachoDisass) FindSymbol(addr uint64) (string, bool) {
 	return "", false
 }
 
+func (d MachoDisass) FindSwiftString(addr uint64) (string, bool) {
+	if str, ok := d.swiftstrs[addr]; ok {
+		return str, true
+	}
+	return "", false
+}
+
 // Contains returns true if Triage immediates contains a given address and will return the instruction address
 func (d MachoDisass) Contains(address uint64) (bool, uint64) {
 	for loc, addr := range d.tr.Addresses {
@@ -374,6 +383,12 @@ func (d MachoDisass) Analyze() error {
 
 	if err := d.parseStubs(); err != nil {
 		return fmt.Errorf("failed to parse symbol stubs: %v", err)
+	}
+
+	if a2s, err := d.FindSwiftStrings(); err == nil {
+		maps.Copy(d.swiftstrs, a2s)
+	} else {
+		return fmt.Errorf("failed to find swift strings: %v", err)
 	}
 
 	return nil
