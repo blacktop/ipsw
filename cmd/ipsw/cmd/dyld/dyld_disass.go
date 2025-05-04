@@ -52,12 +52,14 @@ func init() {
 	DisassCmd.Flags().String("symbol-image", "", "Dylib to search for symbol (speeds up symbol lookup)")
 	DisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	DisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
+	DisassCmd.Flags().Bool("dylibs", false, "Analyze all dylibs loaded by the image as well (could improve accuracy)")
 	DisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	DisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
 	DisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
 	DisassCmd.RegisterFlagCompletionFunc("dec-model", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return ai.CopilotModels, cobra.ShellCompDirectiveDefault
 	})
+	DisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
 	DisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	DisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
 	DisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -72,9 +74,11 @@ func init() {
 	viper.BindPFlag("dyld.disass.symbol-image", DisassCmd.Flags().Lookup("symbol-image"))
 	viper.BindPFlag("dyld.disass.vaddr", DisassCmd.Flags().Lookup("vaddr"))
 	viper.BindPFlag("dyld.disass.count", DisassCmd.Flags().Lookup("count"))
+	viper.BindPFlag("dyld.disass.dylibs", DisassCmd.Flags().Lookup("dylibs"))
 	viper.BindPFlag("dyld.disass.demangle", DisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.disass.dec", DisassCmd.Flags().Lookup("dec"))
 	viper.BindPFlag("dyld.disass.dec-model", DisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("dyld.disass.dec-lang", DisassCmd.Flags().Lookup("dec-lang"))
 	viper.BindPFlag("dyld.disass.dec-temp", DisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("dyld.disass.dec-top-p", DisassCmd.Flags().Lookup("dec-top-p"))
 	viper.BindPFlag("dyld.disass.json", DisassCmd.Flags().Lookup("json"))
@@ -235,10 +239,12 @@ var DisassCmd = &cobra.Command{
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						for _, img := range engine.Dylibs() {
-							if err := img.Analyze(); err != nil {
-								if !viper.GetBool("dyld.disass.force") {
-									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+						if viper.GetBool("dyld.disass.dylibs") {
+							for _, img := range engine.Dylibs() {
+								if err := img.Analyze(); err != nil {
+									if !viper.GetBool("dyld.disass.force") {
+										return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+									}
 								}
 							}
 						}
@@ -254,14 +260,14 @@ var DisassCmd = &cobra.Command{
 					//***************
 					//* DISASSEMBLE *
 					//***************
-					dis := disass.Disassemble(engine)
+					asm := disass.Disassemble(engine)
 					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(dis)
+						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
 						if err != nil {
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
 						copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
-							Prompt:      fmt.Sprintf(promptFmt, dis),
+							Prompt:      fmt.Sprintf(promptFmt, asm),
 							Model:       viper.GetString("dyld.disass.dec-model"),
 							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
 							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
@@ -302,7 +308,7 @@ var DisassCmd = &cobra.Command{
 							fmt.Println(string(decmp))
 						}
 					} else {
-						fmt.Println(dis)
+						fmt.Println(asm)
 					}
 				}
 			}
@@ -378,10 +384,12 @@ var DisassCmd = &cobra.Command{
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						for _, img := range engine.Dylibs() {
-							if err := img.Analyze(); err != nil {
-								if !viper.GetBool("dyld.disass.force") {
-									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+						if viper.GetBool("dyld.disass.dylibs") {
+							for _, img := range engine.Dylibs() {
+								if err := img.Analyze(); err != nil {
+									if !viper.GetBool("dyld.disass.force") {
+										return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+									}
 								}
 							}
 						}
@@ -398,14 +406,14 @@ var DisassCmd = &cobra.Command{
 					//***************
 					//* DISASSEMBLE *
 					//***************
-					dis := disass.Disassemble(engine)
+					asm := disass.Disassemble(engine)
 					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(dis)
+						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
 						if err != nil {
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
 						copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
-							Prompt:      fmt.Sprintf(promptFmt, dis),
+							Prompt:      fmt.Sprintf(promptFmt, asm),
 							Model:       viper.GetString("dyld.disass.dec-model"),
 							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
 							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
@@ -446,7 +454,7 @@ var DisassCmd = &cobra.Command{
 							fmt.Println(string(decmp))
 						}
 					} else {
-						fmt.Println(dis)
+						fmt.Println(asm)
 					}
 				}
 			} else { // SYMBOL or VAADDR
@@ -467,7 +475,7 @@ var DisassCmd = &cobra.Command{
 						if !quiet {
 							if err := image.Analyze(); err != nil {
 								if !viper.GetBool("dyld.disass.force") {
-									return fmt.Errorf("failed to analyze image %s: %v", filepath.Base(image.Name), err)
+									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(image.Name), err)
 								}
 							}
 						}
@@ -539,10 +547,12 @@ var DisassCmd = &cobra.Command{
 					if err := engine.Triage(); err != nil {
 						return fmt.Errorf("first pass triage failed: %v (use --force to continue anyway)", err)
 					}
-					for _, img := range engine.Dylibs() {
-						if err := img.Analyze(); err != nil {
-							if !viper.GetBool("dyld.disass.force") {
-								return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+					if viper.GetBool("dyld.disass.dylibs") {
+						for _, img := range engine.Dylibs() {
+							if err := img.Analyze(); err != nil {
+								if !viper.GetBool("dyld.disass.force") {
+									return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(img.Name), err)
+								}
 							}
 						}
 					}
@@ -559,14 +569,14 @@ var DisassCmd = &cobra.Command{
 				//***************
 				//* DISASSEMBLE *
 				//***************
-				dis := disass.Disassemble(engine)
+				asm := disass.Disassemble(engine)
 				if decompile {
-					promptFmt, lexer, err := disass.GetPrompt(dis)
+					promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
 					if err != nil {
 						return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 					}
 					copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
-						Prompt:      fmt.Sprintf(promptFmt, dis),
+						Prompt:      fmt.Sprintf(promptFmt, asm),
 						Model:       viper.GetString("dyld.disass.dec-model"),
 						Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
 						TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
@@ -607,7 +617,7 @@ var DisassCmd = &cobra.Command{
 						fmt.Println(string(decmp))
 					}
 				} else {
-					fmt.Println(dis)
+					fmt.Println(asm)
 				}
 			}
 		}
