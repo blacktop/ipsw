@@ -742,15 +742,32 @@ func (i *CacheImage) ParseObjC() error {
 // ParseGOT parse global offset table in MachO
 func (i *CacheImage) ParseGOT() error {
 
+	i.Analysis.GotPointers = make(map[uint64]uint64)
+
 	m, err := i.GetPartialMacho()
 	if err != nil {
 		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
 	}
 	defer m.Close()
 
-	i.Analysis.GotPointers, err = disass.ParseGotPtrs(m)
-	if err != nil {
-		return err
+	for _, secName := range []string{"__got", "__auth_got", "__auth_ptr"} {
+		for _, sec := range m.Sections {
+			if (sec.Seg == "__AUTH_CONST" || sec.Seg == "__DATA_CONST") && sec.Name == secName {
+				dat := make([]byte, sec.Size)
+				if _, err := i.ReadAtAddr(dat, sec.Addr); err != nil {
+					return fmt.Errorf("failed to read GOT section %s: %v", secName, err)
+				}
+				ptrs := make([]uint64, sec.Size/8)
+				if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
+					return fmt.Errorf("failed to read %s.%s got pointers; %v", sec.Seg, sec.Name, err)
+				}
+				for idx, ptr := range ptrs {
+					if ptr != 0 {
+						i.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = i.cache.SlideInfo.SlidePointer(ptr)
+					}
+				}
+			}
+		}
 	}
 
 	i.Analysis.State.SetGot(true)
