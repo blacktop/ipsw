@@ -155,14 +155,12 @@ func getKernelInvalidAddress(m *macho.File) (uint64, error) {
 		return 0, err
 	}
 
-	symbolMap := make(map[uint64]string)
-
 	data, err := m.Section("__TEXT_EXEC", "__text").Data()
 	if err != nil {
 		return 0, err
 	}
 
-	engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+	engine := disass.NewMachoDisass(m, &disass.Config{
 		Data:         data,
 		StartAddress: m.Section("__TEXT_EXEC", "__text").Addr,
 	})

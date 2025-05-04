@@ -22,9 +22,7 @@ func FindSwiftStrings(m *macho.File) (map[uint64]string, error) {
 		return nil, fmt.Errorf("failed to get __TEXT.__text data: %v", err)
 	}
 
-	symbolMap := make(map[uint64]string)
-
-	engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+	engine := disass.NewMachoDisass(m, &disass.Config{
 		Data:         data,
 		StartAddress: text.Addr,
 		Middle:       text.Addr + text.Size,

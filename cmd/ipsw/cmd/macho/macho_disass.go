@@ -23,12 +23,9 @@ package macho
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -40,7 +37,6 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/ai"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/briandowns/spinner"
 	"github.com/caarlos0/ctrlc"
@@ -160,10 +156,6 @@ var machoDisassCmd = &cobra.Command{
 			return fmt.Errorf("failed to detect file type: %v", err)
 		}
 
-		// symbol caches
-		symbolMap := make(map[uint64]string)
-		dSymMap := make(map[uint64]string)
-
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
 			log.Fatal(err.Error())
@@ -259,80 +251,6 @@ var machoDisassCmd = &cobra.Command{
 					if len(cacheFile) == 0 {
 						cacheFile = machoPath + ".a2s"
 					}
-					if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
-						if _, err := os.Create(cacheFile); err != nil {
-							if errors.Is(err, os.ErrPermission) {
-								var e *os.PathError
-								if errors.As(err, &e) {
-									log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
-								}
-								tmpDir := os.TempDir()
-								if runtime.GOOS == "darwin" {
-									tmpDir = "/tmp"
-								}
-								cacheFile = filepath.Join(tmpDir, m.UUID().String()+".a2s")
-								if _, err = os.Create(cacheFile); err != nil {
-									return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-								}
-								utils.Indent(log.Warn, 2)(fmt.Sprintf("creating in the temp folder: %s", cacheFile))
-								utils.Indent(log.Warn, 2)(fmt.Sprintf("to use this symbol cache in the future you must supply the flag: --cache %s ", cacheFile))
-							} else if err != nil {
-								return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-							}
-						}
-						// if dSYM file exists, load symbols from it
-						dsym := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
-						if _, err := os.Stat(dsym); err == nil {
-							log.Info("Detected dSYM file, using it for symbolication")
-							dm, err := macho.Open(dsym)
-							if err != nil {
-								log.Errorf("failed to open dSYM file for symbolication: %v", err)
-							} else {
-								for _, sym := range dm.Symtab.Syms {
-									if sym.Name != "" {
-										dSymMap[sym.Value] = sym.Name
-									}
-								}
-								// If the dSYM file has a symbol map, use it for the output
-								if len(dSymMap) > 0 {
-									log.Infof("Using dSYM symbol map with %d symbols", len(dSymMap))
-								} else {
-									log.Warn("No symbols found in dSYM file")
-								}
-							}
-						}
-					} else {
-						log.Infof("Loading symbol cache file...")
-						if f, err := os.Open(cacheFile); err != nil {
-							return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
-						} else {
-							if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
-								yes := false
-								if viper.GetBool("macho.disass.replace") {
-									yes = true
-								} else {
-									log.Errorf("address-to-symbol cache file is corrupt: %v", err)
-									prompt := &survey.Confirm{
-										Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
-										Default: true,
-									}
-									survey.AskOne(prompt, &yes)
-								}
-								if yes {
-									f.Close()
-									if err := os.Remove(cacheFile); err != nil {
-										return fmt.Errorf("failed to remove address-to-symbol cache file %s: %v", cacheFile, err)
-									}
-									if _, err := os.Create(cacheFile); err != nil {
-										return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-									}
-								} else {
-									return nil
-								}
-							}
-							f.Close()
-						}
-					}
 				}
 
 				if allFuncs && len(segmentSection) == 0 {
@@ -343,7 +261,7 @@ var machoDisassCmd = &cobra.Command{
 							continue
 						}
 
-						engine = disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+						engine = disass.NewMachoDisass(m, &disass.Config{
 							Data:         data,
 							StartAddress: fn.StartAddr,
 							Middle:       0,
@@ -357,17 +275,19 @@ var machoDisassCmd = &cobra.Command{
 						//* First pass ANALYSIS *
 						//***********************
 						if !quiet {
+							if err := engine.OpenOrCreateSymMap(cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+								return fmt.Errorf("failed to open or create symbol map: %v", err)
+							}
 							if err := engine.Triage(); err != nil {
 								return fmt.Errorf("first pass triage failed: %v", err)
 							}
-							if len(symbolMap) == 0 {
+							if engine.EmptySymMap() {
 								if err := engine.Analyze(); err != nil {
 									if !viper.GetBool("macho.disass.force") {
 										return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
 									}
 								}
 							}
-							maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
 							if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 								log.Errorf("failed to save symbol map: %v", err)
 							}
@@ -493,7 +413,7 @@ var machoDisassCmd = &cobra.Command{
 						log.Fatal("failed to disassemble")
 					}
 
-					engine = disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+					engine = disass.NewMachoDisass(m, &disass.Config{
 						Data:         data,
 						StartAddress: startAddr,
 						Middle:       middleAddr,
@@ -507,19 +427,21 @@ var machoDisassCmd = &cobra.Command{
 					//* First pass ANALYSIS *
 					//***********************
 					if !quiet {
+						if err := engine.OpenOrCreateSymMap(cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+							return fmt.Errorf("failed to open or create symbol map: %v", err)
+						}
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						if len(symbolMap) == 0 {
+						if engine.EmptySymMap() {
 							if err := engine.Analyze(); err != nil {
 								if !viper.GetBool("macho.disass.force") {
 									return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
 								}
 							}
 						}
-						maps.Copy(symbolMap, dSymMap) // merge dSYM symbols into symbolMap
 						if entryStart {
-							symbolMap[startAddr] = "start"
+							engine.SetStartSym(startAddr)
 						}
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 							log.Errorf("failed to save symbol map: %v", err)

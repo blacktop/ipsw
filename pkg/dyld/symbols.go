@@ -356,58 +356,62 @@ func (f *File) GetStubIslands() (map[uint64]string, error) {
 // OpenOrCreateA2SCache returns an address to symbol map if the cache file exists otherwise it will create a NEW one
 func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
-		log.Info("parsing public symbols...")
-		if err := f.ParsePublicSymbols(false); err != nil {
-			utils.Indent(log.Warn, 2)(fmt.Sprintf("failed to parse all exported symbols: %v", err))
+		// check for temp dir
+		tmpDir := os.TempDir()
+		if runtime.GOOS == "darwin" {
+			tmpDir = "/tmp"
 		}
-		log.Info("parsing private symbols...")
-		if err = f.ParseLocalSyms(false); err != nil {
-			if errors.Is(err, ErrNoLocals) {
-				utils.Indent(log.Warn, 2)("cache does NOT contain local symbols")
-			} else {
-				return err
+		tempa2sfile := filepath.Join(tmpDir, f.UUID.String()+".a2s")
+		if _, err := os.Stat(tempa2sfile); os.IsNotExist(err) {
+			log.Info("parsing public symbols...")
+			if err := f.ParsePublicSymbols(false); err != nil {
+				utils.Indent(log.Warn, 2)(fmt.Sprintf("failed to parse all exported symbols: %v", err))
 			}
-		}
-		if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
-			log.Info("parsing stub islands...")
-			if err := f.ParseStubIslands(); err != nil {
-				return fmt.Errorf("failed to parse stub islands: %v", err)
+			log.Info("parsing private symbols...")
+			if err = f.ParseLocalSyms(false); err != nil {
+				if errors.Is(err, ErrNoLocals) {
+					utils.Indent(log.Warn, 2)("cache does NOT contain local symbols")
+				} else {
+					return err
+				}
 			}
-			for stub, target := range f.islandStubs {
-				if symName, ok := f.AddressToSymbol[target]; ok {
-					if !strings.HasPrefix(symName, "j_") {
-						f.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
-					} else {
-						f.AddressToSymbol[stub] = symName
+			if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
+				log.Info("parsing stub islands...")
+				if err := f.ParseStubIslands(); err != nil {
+					return fmt.Errorf("failed to parse stub islands: %v", err)
+				}
+				for stub, target := range f.islandStubs {
+					if symName, ok := f.AddressToSymbol[target]; ok {
+						if !strings.HasPrefix(symName, "j_") {
+							f.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+						} else {
+							f.AddressToSymbol[stub] = symName
+						}
 					}
 				}
 			}
+			log.Info("parsing objc info...")
+			if err := f.ParseAllObjc(); err != nil {
+				utils.Indent(log.Error, 2)(fmt.Sprintf("failed to parse objc info: %v: Continuing on without it...", err))
+			}
+			return f.SaveAddrToSymMap(cacheFile)
+		} else {
+			log.Warnf("found symbol cache in %s", tempa2sfile)
+			cacheFile = tempa2sfile
 		}
-		log.Info("parsing objc info...")
-		if err := f.ParseAllObjc(); err != nil {
-			utils.Indent(log.Error, 2)(fmt.Sprintf("failed to parse objc info: %v: Continuing on without it...", err))
-		}
-		return f.SaveAddrToSymMap(cacheFile)
 	}
 
 	a2sFile, err := os.Open(cacheFile)
 	if err != nil {
 		return err
 	}
+	defer a2sFile.Close()
 
 	log.Infof("Loading symbol cache file...")
-	// gzr, err := gzip.NewReader(a2sFile)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create gzip reader: %v", err)
-	// }
-	// Decoding the serialized data
-	// err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-	err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
-	if err != nil {
-		return err
+	if err := gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol); err != nil {
+		a2sFile.Close()
+		return fmt.Errorf("failed to decode addr2sym map from binary: %v", err)
 	}
-	// gzr.Close()
-	a2sFile.Close()
 
 	f.symCacheLoaded = true
 
@@ -415,11 +419,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 }
 
 // SaveAddrToSymMap saves the dyld address-to-symbol map to disk
-func (f *File) SaveAddrToSymMap(dest string) error {
-	var err error
+func (f *File) SaveAddrToSymMap(dest string) (err error) {
 	var of *os.File
-
-	buff := new(bytes.Buffer)
 
 	of, err = os.Create(dest)
 	if errors.Is(err, os.ErrPermission) {
@@ -443,21 +444,16 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	}
 	defer of.Close()
 
+	buff := new(bytes.Buffer)
 	e := gob.NewEncoder(buff)
 
 	// Encoding the map
-	err = e.Encode(f.AddressToSymbol)
-	if err != nil {
+	if err := e.Encode(f.AddressToSymbol); err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
 
-	// gzw := gzip.NewWriter(of)
-	// defer gzw.Close()
-
-	// _, err = buff.WriteTo(gzw)
-	_, err = buff.WriteTo(of)
-	if err != nil {
-		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
+	if _, err = buff.WriteTo(of); err != nil {
+		return fmt.Errorf("failed to write addr2sym map to file: %v", err)
 	}
 
 	return nil
