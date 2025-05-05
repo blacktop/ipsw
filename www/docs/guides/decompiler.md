@@ -154,7 +154,7 @@ func getDefaultLDMGlobalEnabled() -> Bool {
 ```
 
 :::info note
-If you don't supply a `--dec-model` `ipsw` will query the llm provider and present you with a list off all available models to choose from.
+If you don't supply a `--dec-model` `ipsw` will query the llm provider and present you with a list of all available models to choose from.
 :::
 
 :::info note
