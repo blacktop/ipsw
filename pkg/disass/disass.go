@@ -356,7 +356,8 @@ func Disassemble(d Disass) string {
 					(instruction.Operation == disassemble.ARM64_ADD ||
 						instruction.Operation == disassemble.ARM64_LDR ||
 						instruction.Operation == disassemble.ARM64_LDRB ||
-						instruction.Operation == disassemble.ARM64_LDRSW) {
+						instruction.Operation == disassemble.ARM64_LDRSW ||
+						instruction.Operation == disassemble.ARM64_STRB) {
 					adrpRegister := prevInstr.Operands[0].Registers[0]
 					adrpImm := prevInstr.Operands[1].Immediate
 					if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
@@ -366,6 +367,8 @@ func Disassemble(d Disass) string {
 					} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 						adrpImm += instruction.Operands[2].Immediate
 					} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+						adrpImm += instruction.Operands[1].Immediate
+					} else if instruction.Operation == disassemble.ARM64_STRB && adrpRegister == instruction.Operands[1].Registers[0] {
 						adrpImm += instruction.Operands[1].Immediate
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
@@ -391,7 +394,7 @@ func Disassemble(d Disass) string {
 							}
 						}
 					} else if ok, detail := d.IsData(adrpImm); ok {
-						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
+						instrStr += fmt.Sprintf(" ; data_%x (%s)", adrpImm, detail)
 					}
 				}
 
