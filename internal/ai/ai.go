@@ -7,12 +7,14 @@ import (
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
 	"github.com/blacktop/ipsw/internal/ai/copilot"
 	"github.com/blacktop/ipsw/internal/ai/ollama"
+	"github.com/blacktop/ipsw/internal/ai/openai"
 )
 
 var Providers = []string{
 	"claude",
 	"copilot",
 	"ollama",
+	"openai",
 }
 
 type AI interface {
@@ -55,6 +57,14 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			Model:       cfg.Model,
 			Temperature: cfg.Temperature,
 			TopP:        cfg.TopP,
+		})
+	case "openai":
+		return openai.NewOpenAI(ctx, &openai.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
 		})
 	default:
 		return nil, fmt.Errorf("unknown AI provider: %s", cfg.Provider)
