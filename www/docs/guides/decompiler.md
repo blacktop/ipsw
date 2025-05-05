@@ -3,9 +3,7 @@ hide_table_of_contents: true
 description: Using the AI decompiler.
 ---
 
-# Decompiler
-
-Using the AI decompiler.
+# AI Decompiler
 
 ## Requirements
 
@@ -50,6 +48,10 @@ You must signup for and buy some API credits from https://console.anthropic.com/
 ### Ollama (local LLMs)
 
 Install [ollama](https://ollama.com) and download a few popular models *(maybe `qwen3` or `llama4`)* and as long as the `ollama` server is running you will be able to use the `--llm ollama` provider.
+
+:::warning note
+I personally have NEVER gotten usable results from a local LLM, but maybe some of you have BEEFY machines and can run the 200B+ parameter models, my laptop would just self-destruct if I tried 💻🔥
+:::
 
 ## Getting Started
 
