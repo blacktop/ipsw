@@ -367,6 +367,11 @@ retry:
 		return nil, err
 	}
 
+	if f.SlideInfo.SlidePointer(ptr) == 0 {
+		sym.Symbol = "?"
+		return sym, nil
+	}
+
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, f.SlideInfo.SlidePointer(ptr)))
 
 	addr = f.SlideInfo.SlidePointer(ptr)
