@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -62,6 +63,9 @@ func init() {
 	machoDisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	machoDisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
 	machoDisassCmd.Flags().String("llm", "", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	machoDisassCmd.RegisterFlagCompletionFunc("llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ai.Providers, cobra.ShellCompDirectiveDefault
+	})
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	machoDisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
@@ -147,6 +151,11 @@ var machoDisassCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --fileset-entry OR --all-fileset-entries (not both)")
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
 			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
+		}
+		if viper.IsSet("macho.disass.llm") {
+			if !slices.Contains(ai.Providers, viper.GetString("macho.disass.llm")) {
+				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.llm"), strings.Join(ai.Providers, ", "))
+			}
 		}
 
 		machoPath := filepath.Clean(args[0])
