@@ -41,15 +41,18 @@ ipsw dyld disass <DSC> [flags]
       --cache string          Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint            Number of instructions to disassemble
   -D, --dec                   Decompile assembly
+      --dec-lang string       Language to decompile to (C, ObjC or Swift)
       --dec-model string      LLM model to use for decompilation
       --dec-temp float        LLM temperature for decompilation (default 0.2)
       --dec-top-p float       LLM top_p for decompilation (default 0.1)
   -d, --demangle              Demangle symbol names
+      --dylibs                Analyze all dylibs loaded by the image as well (could improve accuracy)
       --force                 Continue to disassemble even if there are analysis errors
   -h, --help                  help for disass
   -i, --image strings         Dylib(s) to disassemble
       --input string          Input function JSON file
   -j, --json                  Output as JSON
+      --llm string            LLM provider to use for decompilation (ollama, copilot, etc.) (default "copilot")
   -q, --quiet                 Do NOT markup analysis (Faster)
   -s, --symbol string         Function to disassemble
       --symbol-image string   Dylib to search for symbol (speeds up symbol lookup)

@@ -22,6 +22,7 @@ ipsw macho disass <MACHO> [flags]
       --cache string           Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint             Number of instructions to disassemble
   -D, --dec                    Decompile assembly
+      --dec-lang string        Language to decompile to (C, ObjC or Swift)
       --dec-model string       LLM model to use for decompilation
       --dec-temp float         LLM temperature for decompilation (default 0.2)
       --dec-top-p float        LLM top_p for decompilation (default 0.1)
@@ -31,6 +32,7 @@ ipsw macho disass <MACHO> [flags]
       --force                  Continue to disassemble even if there are analysis errors
   -h, --help                   help for disass
   -j, --json                   Output as JSON
+      --llm string             LLM provider to use for decompilation (ollama, copilot, etc.)
   -o, --off uint               File offset to start disassembling
   -q, --quiet                  Do NOT markup analysis (Faster)
       --replace                Replace .a2s
