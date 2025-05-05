@@ -62,7 +62,7 @@ There are 2 `ipsw` disassemblers:
 
 ```bash
 ❱ ipsw macho disass /System/Library/PrivateFrameworks/ApplePushService.framework/apsd --entry \
-             --dec --dec-model "Claude 3.7 Sonnet" --llm copilot
+             --dec --dec-model "Claude 3.7 Sonnet" --llm "copilot"
    • Loading symbol cache file...
    • Decompiling... 🕒
 ```
@@ -105,7 +105,8 @@ int main(int argc, char *argv[]) {
 ### `dsc`
 
 ```bash
-❱ ipsw dsc disass 22F5068a__iPhone17,1/dyld_shared_cache_arm64e --vaddr 0x2532DB6C8 --demangle --dec --dec-lang Swift --llm openai
+❱ ipsw dsc disass 22F5068a__iPhone17,1/dyld_shared_cache_arm64e --vaddr 0x2532DB6C8 --demangle \
+             --dec --dec-lang "Swift" --llm "openai"
    • Loading symbol cache file...
 ? Select model to use: gpt-4.1-2025-04-14
    • Decompiling... 🕒
