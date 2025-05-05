@@ -532,6 +532,11 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
+	if err := i.ParseObjC(); err != nil {
+		log.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+		// return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err) FIXME: should this error out?
+	}
+
 	if err := i.ParsePublicSymbols(false); err != nil {
 		log.Errorf("failed to parse exported symbols for %s: %w", i.Name, err)
 	}
@@ -540,11 +545,6 @@ func (i *CacheImage) Analyze() error {
 		if !errors.Is(err, ErrNoLocals) {
 			return fmt.Errorf("failed to parse local symbols for %s: %w", i.Name, err)
 		}
-	}
-
-	if err := i.ParseObjC(); err != nil {
-		log.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
-		// return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err) FIXME: should this error out?
 	}
 
 	if !i.cache.IsArm64() {

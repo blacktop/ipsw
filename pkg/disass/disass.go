@@ -268,8 +268,10 @@ func Disassemble(d Disass) string {
 					}
 				}
 
-				if swiftstr, ok := d.FindSwiftString(instruction.Address); ok {
-					comment = fmt.Sprintf(" ; %#v", swiftstr)
+				if instruction.Address != startAddr {
+					if swiftstr, ok := d.FindSwiftString(instruction.Address); ok {
+						comment = fmt.Sprintf(" ; %#v", swiftstr)
+					}
 				}
 
 				// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {

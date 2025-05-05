@@ -382,11 +382,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				}
 				for stub, target := range f.islandStubs {
 					if symName, ok := f.AddressToSymbol[target]; ok {
-						if !strings.HasPrefix(symName, "j_") {
-							f.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
-						} else {
-							f.AddressToSymbol[stub] = symName
-						}
+						f.AddressToSymbol[stub] = symName
 					}
 				}
 			}
