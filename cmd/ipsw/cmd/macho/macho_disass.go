@@ -58,12 +58,10 @@ func init() {
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
 	machoDisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
-	machoDisassCmd.RegisterFlagCompletionFunc("dec-model", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return ai.CopilotModels, cobra.ShellCompDirectiveDefault
-	})
 	machoDisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
 	machoDisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	machoDisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
+	machoDisassCmd.Flags().String("llm", "", "LLM provider to use for decompilation (ollama, copilot, etc.)")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	machoDisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
@@ -87,6 +85,7 @@ func init() {
 	viper.BindPFlag("macho.disass.dec-lang", machoDisassCmd.Flags().Lookup("dec-lang"))
 	viper.BindPFlag("macho.disass.dec-temp", machoDisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("macho.disass.dec-top-p", machoDisassCmd.Flags().Lookup("dec-top-p"))
+	viper.BindPFlag("macho.disass.llm", machoDisassCmd.Flags().Lookup("llm"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("macho.disass.force", machoDisassCmd.Flags().Lookup("force"))
@@ -301,39 +300,40 @@ var machoDisassCmd = &cobra.Command{
 							if err != nil {
 								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 							}
-							copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
+							llm, err := ai.NewAI(context.Background(), &ai.Config{
+								Provider:    viper.GetString("dyld.disass.llm"),
 								Prompt:      fmt.Sprintf(promptFmt, asm),
-								Model:       viper.GetString("macho.disass.dec-model"),
-								Temperature: viper.GetFloat64("macho.disass.dec-temp"),
-								TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
+								Model:       viper.GetString("dyld.disass.dec-model"),
+								Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
+								TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
 								Stream:      true,
 							})
 							if err != nil {
-								return fmt.Errorf("failed to create github copilot client: %v", err)
+								return fmt.Errorf("failed to create llm client: %v", err)
 							}
-							if !viper.IsSet("macho.disass.dec-model") {
+							if !viper.IsSet("dyld.disass.dec-model") {
 								var choice string
 								prompt := &survey.Select{
 									Message:  "Select model to use:",
-									Options:  copilot.AvailableCopilotModels(),
+									Options:  llm.Models(),
 									PageSize: 10,
 								}
 								if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
 									log.Warn("Exiting...")
 									return nil
 								}
-								if err := copilot.SetModel(choice); err != nil {
-									return fmt.Errorf("failed to set github copilot model: %v", err)
+								if err := llm.SetModel(choice); err != nil {
+									return fmt.Errorf("failed to set llm model: %v", err)
 								}
 							}
 							s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
 							s.Prefix = color.BlueString("   • Decompiling... ")
 							s.Start()
 
-							decmp, err := copilot.Chat()
+							decmp, err := llm.Chat()
 							s.Stop()
 							if err != nil {
-								return fmt.Errorf("failed to decompile via github copilot: %v", err)
+								return fmt.Errorf("failed to decompile via llm: %v", err)
 							}
 							if viper.GetBool("color") && !viper.GetBool("no-color") {
 								if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
@@ -456,39 +456,40 @@ var machoDisassCmd = &cobra.Command{
 						if err != nil {
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
-						copilot, err := ai.NewCopilot(context.Background(), &ai.Config{
+						llm, err := ai.NewAI(context.Background(), &ai.Config{
+							Provider:    viper.GetString("dyld.disass.llm"),
 							Prompt:      fmt.Sprintf(promptFmt, asm),
-							Model:       viper.GetString("macho.disass.dec-model"),
-							Temperature: viper.GetFloat64("macho.disass.dec-temp"),
-							TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
+							Model:       viper.GetString("dyld.disass.dec-model"),
+							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
+							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
 							Stream:      true,
 						})
 						if err != nil {
-							return fmt.Errorf("failed to create github copilot client: %v", err)
+							return fmt.Errorf("failed to create llm client: %v", err)
 						}
-						if !viper.IsSet("macho.disass.dec-model") {
+						if !viper.IsSet("dyld.disass.dec-model") {
 							var choice string
 							prompt := &survey.Select{
 								Message:  "Select model to use:",
-								Options:  copilot.AvailableCopilotModels(),
+								Options:  llm.Models(),
 								PageSize: 10,
 							}
 							if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
 								log.Warn("Exiting...")
 								return nil
 							}
-							if err := copilot.SetModel(choice); err != nil {
-								return fmt.Errorf("failed to set github copilot model: %v", err)
+							if err := llm.SetModel(choice); err != nil {
+								return fmt.Errorf("failed to set llm model: %v", err)
 							}
 						}
 						s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
 						s.Prefix = color.BlueString("   • Decompiling... ")
 						s.Start()
 
-						decmp, err := copilot.Chat()
+						decmp, err := llm.Chat()
 						s.Stop()
 						if err != nil {
-							return fmt.Errorf("failed to decompile via github copilot: %v", err)
+							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
 						if viper.GetBool("color") && !viper.GetBool("no-color") {
 							if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
