@@ -1,4 +1,4 @@
-package ai
+package copilot
 
 import (
 	"bufio"
@@ -11,8 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/blacktop/ipsw/internal/ai/utils"
 )
 
 const (
@@ -186,11 +189,12 @@ func NewCopilot(ctx context.Context, conf *Config) (*Copilot, error) {
 	return c, nil
 }
 
-func (c *Copilot) AvailableCopilotModels() []string {
+func (c *Copilot) Models() []string {
 	modelList := make([]string, 0, len(c.models))
 	for model := range c.models {
 		modelList = append(modelList, model)
 	}
+	sort.Strings(modelList)
 	return modelList
 }
 
@@ -371,7 +375,7 @@ func (c *Copilot) Chat() (string, error) {
 				}
 			}
 		}
-		return removeMarkdownCodeBlock(out.String()), nil
+		return utils.Clean(out.String()), nil
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -384,29 +388,10 @@ func (c *Copilot) Chat() (string, error) {
 		// print full assistant message
 		for _, choice := range ev.Choices {
 			if choice.Message != nil {
-				return removeMarkdownCodeBlock(choice.Message.Content), nil
+				return utils.Clean(choice.Message.Content), nil
 			}
 		}
 	}
 
 	return "", fmt.Errorf("no response from API")
-}
-
-/* utils */
-
-func removeThink(content string) string {
-	if strings.HasPrefix(content, "<think>") {
-		if _, rest, found := strings.Cut(content, "</think>"); found {
-			return rest
-		}
-	}
-	return content
-}
-
-func removeMarkdownCodeBlock(content string) string {
-	content = removeThink(content)
-	if strings.HasPrefix(content, "```") {
-		_, content, _ = strings.Cut(content, "\n")
-	}
-	return strings.TrimSuffix(content, "```")
 }
