@@ -121,6 +121,7 @@ type astate struct {
 	Starts   bool
 	ObjC     bool
 	Slide    bool
+	Swift    bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -225,6 +226,18 @@ func (a *astate) IsSlideInfoDone() bool {
 	return a.Slide
 }
 
+func (a *astate) SetSwift(done bool) {
+	a.mu.Lock()
+	a.Swift = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsSwiftDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Swift
+}
+
 type analysis struct {
 	State        astate
 	Dependencies []string
@@ -253,6 +266,7 @@ type CacheImage struct {
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
+	Swift            switInfo
 
 	Analysis analysis
 
@@ -538,6 +552,16 @@ func (i *CacheImage) Analyze() error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
+	if !i.Analysis.State.IsSwiftDone() {
+		// TODO: add more swift runtime metadata
+		if i.cache.IsArm64() {
+			if err := i.ParseSwiftStrings(); err != nil {
+				return fmt.Errorf("failed to parse swift strings for %s: %w", i.Name, err)
+			}
+		}
+		i.Analysis.State.SetSwift(true)
+	}
+
 	if !i.Analysis.State.IsSlideInfoDone() {
 		if err := i.ParseSlideInfo(); err != nil {
 			return fmt.Errorf("failed to parse slide info for %s: %w", i.Name, err)
@@ -821,6 +845,46 @@ func (i *CacheImage) ParseHelpers() error {
 	}
 
 	i.Analysis.State.SetHelpers(true)
+
+	return nil
+}
+
+func (i *CacheImage) ParseSwiftStrings() error {
+
+	if i.Swift.Strings == nil {
+		i.Swift.Strings = make(map[uint64]string)
+	}
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+
+	text := m.Section("__TEXT", "__text")
+	if text == nil {
+		return fmt.Errorf("no __TEXT.__text section found")
+	}
+
+	data, err := text.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get __TEXT.__text data: %v", err)
+	}
+
+	engine := disass.NewMachoDisass(m, &disass.Config{
+		Data:         data,
+		StartAddress: text.Addr,
+		Middle:       text.Addr + text.Size,
+	})
+
+	strs, err := engine.FindSwiftStrings()
+	if err != nil {
+		return fmt.Errorf("failed to find swift strings: %v", err)
+	}
+	for addr, str := range strs {
+		if len(str) > 0 {
+			i.cache.AddressToSymbol[addr] = fmt.Sprintf("%v", str)
+		}
+	}
 
 	return nil
 }

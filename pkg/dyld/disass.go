@@ -358,6 +358,13 @@ func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
 	return "", false
 }
 
+func (d DyldDisass) FindSwiftString(addr uint64) (string, bool) {
+	if str, ok := d.f.AddressToSymbol[addr]; ok {
+		return str, true
+	}
+	return "", false
+}
+
 func (d DyldDisass) GetCString(addr uint64) (string, error) {
 	return d.f.GetCString(addr)
 }
