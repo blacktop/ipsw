@@ -349,10 +349,6 @@ func (d MachoDisass) GetCString(addr uint64) (string, error) {
 
 func (d MachoDisass) Analyze() error {
 
-	for _, fn := range d.f.GetFunctions() {
-		d.a2s[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
-	}
-
 	if err := d.parseSymbols(); err != nil {
 		return fmt.Errorf("failed to parse symbols: %v", err)
 	}
@@ -363,6 +359,10 @@ func (d MachoDisass) Analyze() error {
 
 	if err := d.parseObjC(); err != nil {
 		return fmt.Errorf("failed to parse objc runtime: %v", err)
+	}
+
+	if err := d.parseSwift(); err != nil {
+		return fmt.Errorf("failed to parse swift: %v", err)
 	}
 
 	if err := d.parseRebaseInfo(); err != nil {
@@ -496,6 +496,22 @@ func (d *MachoDisass) parseObjC() error {
 				d.a2s[d.f.GetBaseAddress()+sel.VMAddr] = sel.Name
 			}
 		}
+		if classes, err := d.f.GetObjCClasses(); err == nil {
+			for _, class := range classes {
+				d.a2s[class.ClassPtr] = fmt.Sprintf("class_%s", class.Name)
+				d.a2s[class.IsaVMAddr] = fmt.Sprintf("objc_isa_%s", class.Isa)
+				for _, meth := range class.ClassMethods {
+					if len(meth.Name) > 0 {
+						d.a2s[meth.ImpVMAddr] = fmt.Sprintf("+[%s %s]", class.Name, meth.Name)
+					}
+				}
+				for _, imeth := range class.InstanceMethods {
+					if len(imeth.Name) > 0 {
+						d.a2s[imeth.ImpVMAddr] = fmt.Sprintf("-[%s %s]", class.Name, imeth.Name)
+					}
+				}
+			}
+		}
 		if classRefs, err := d.f.GetObjCClassReferences(); err == nil {
 			for off, class := range classRefs {
 				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)
@@ -552,6 +568,47 @@ func (d *MachoDisass) parseObjC() error {
 		}
 	}
 
+	return nil
+}
+
+func (d *MachoDisass) parseSwift() error {
+	if d.f.HasSwift() {
+		if types, err := d.f.GetSwiftTypes(); err == nil {
+			for _, typ := range types {
+				if typ.Name != "" {
+					if d.cfg.Demangle {
+						typ.Name, _ = swift.Demangle(typ.Name)
+					}
+					d.a2s[typ.Address] = fmt.Sprintf("type descriptor for %s", typ.Name)
+				}
+			}
+		}
+		if fields, err := d.f.GetSwiftFields(); err == nil {
+			for _, field := range fields {
+				if field.Type != "" {
+					if d.cfg.Demangle {
+						field.Type, _ = swift.Demangle(field.Type)
+					}
+					d.a2s[field.Address] = fmt.Sprintf("field descriptor for %s", field.Type)
+				}
+			}
+		}
+		if dtds, err := d.f.GetSwiftProtocolConformances(); err == nil {
+			for _, dtd := range dtds {
+				if dtd.TypeRef.Name != "" {
+					if dtd.TypeRef.Parent != nil && dtd.TypeRef.Parent.Name != "" &&
+						dtd.TypeRef.Parent.Parent != nil && dtd.TypeRef.Parent.Parent.Name != "" {
+						dtd.TypeRef.Name = fmt.Sprintf("%s.%s", dtd.TypeRef.Parent, dtd.TypeRef.Name)
+					}
+					if d.cfg.Demangle {
+						dtd.Protocol, _ = swift.DemangleSimple(dtd.Protocol)
+					}
+					log.Debugf("nominal type descriptor for %s : %s", dtd.TypeRef.Name, dtd.Protocol)
+					d.a2s[dtd.TypeRef.Address] = fmt.Sprintf("nominal type descriptor for %s : %s", dtd.TypeRef.Name, dtd.Protocol)
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -744,12 +801,8 @@ func (d *MachoDisass) OpenOrCreateSymMap(cacheFile, machoPath string, replace bo
 	return nil
 }
 
-func (d *MachoDisass) SaveAddrToSymMap(dest string) error {
-	var err error
+func (d *MachoDisass) SaveAddrToSymMap(dest string) (err error) {
 	var of *os.File
-
-	buff := new(bytes.Buffer)
-
 	of, err = os.Create(dest)
 	if errors.Is(err, os.ErrPermission) {
 		var e *os.PathError
@@ -772,21 +825,15 @@ func (d *MachoDisass) SaveAddrToSymMap(dest string) error {
 	}
 	defer of.Close()
 
+	buff := new(bytes.Buffer)
 	e := gob.NewEncoder(buff)
 
 	// Encoding the map
-	err = e.Encode(d.a2s)
-	if err != nil {
+	if err := e.Encode(d.a2s); err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
-
-	// gzw := gzip.NewWriter(of)
-	// defer gzw.Close()
-
-	// _, err = buff.WriteTo(gzw)
-	_, err = buff.WriteTo(of)
-	if err != nil {
-		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
+	if _, err := buff.WriteTo(of); err != nil {
+		return fmt.Errorf("failed to write addr2sym map to file: %v", err)
 	}
 
 	return nil
