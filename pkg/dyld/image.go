@@ -266,7 +266,6 @@ type CacheImage struct {
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
-	Swift            switInfo
 
 	Analysis analysis
 
@@ -850,10 +849,6 @@ func (i *CacheImage) ParseHelpers() error {
 }
 
 func (i *CacheImage) ParseSwiftStrings() error {
-
-	if i.Swift.Strings == nil {
-		i.Swift.Strings = make(map[uint64]string)
-	}
 
 	m, err := i.GetPartialMacho()
 	if err != nil {
