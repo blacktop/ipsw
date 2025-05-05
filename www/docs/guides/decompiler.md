@@ -1,8 +1,11 @@
 ---
+hide_table_of_contents: true
 description: Using the AI decompiler.
 ---
 
 # Decompiler
+
+Using the AI decompiler.
 
 ## Requirements
 
