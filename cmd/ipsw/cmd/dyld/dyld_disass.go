@@ -27,6 +27,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -59,7 +61,10 @@ func init() {
 	DisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
 	DisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	DisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
-	DisassCmd.Flags().String("llm", "", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	DisassCmd.Flags().String("llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	DisassCmd.RegisterFlagCompletionFunc("llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ai.Providers, cobra.ShellCompDirectiveDefault
+	})
 	DisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	DisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	DisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
@@ -145,6 +150,11 @@ var DisassCmd = &cobra.Command{
 		// validate flags
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
+		}
+		if viper.IsSet("dyld.disass.llm") {
+			if !slices.Contains(ai.Providers, viper.GetString("dyld.disass.llm")) {
+				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.llm"), strings.Join(ai.Providers, ", "))
+			}
 		}
 
 		dscPath := filepath.Clean(args[0])

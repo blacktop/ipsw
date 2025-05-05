@@ -4,9 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blacktop/ipsw/internal/ai/anthropic"
 	"github.com/blacktop/ipsw/internal/ai/copilot"
 	"github.com/blacktop/ipsw/internal/ai/ollama"
 )
+
+var Providers = []string{
+	"claude",
+	"copilot",
+	"ollama",
+}
 
 type AI interface {
 	Chat() (string, error)
@@ -26,6 +33,14 @@ type Config struct {
 // NewAI creates a new AI instance based on the provided configuration.
 func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	switch cfg.Provider {
+	case "claude":
+		return anthropic.NewClaude(ctx, &anthropic.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+		})
 	case "copilot":
 		return copilot.NewCopilot(ctx, &copilot.Config{
 			Prompt:      cfg.Prompt,
