@@ -58,6 +58,7 @@ const sidebars = {
         "guides/debugserver",
         "guides/pongo",
         "guides/ida_pro",
+        "guides/decompiler",
         // {
         //   type: "category",
         //   label: "Docs",
