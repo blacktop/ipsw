@@ -15,30 +15,34 @@ There are currently 4 supported LLM providers
 
 ### Github Copilot
 
-To use the `copilot` provider you will need an accout which you can sign up for here <https://github.com/features/copilot>
+To use the `copilot` provider you will need an accout which you can sign up for here https://github.com/features/copilot
 
 :::info note
-Here is a list of all the FREE models available <https://docs.github.com/en/copilot/about-github-copilot/plans-for-github-copilot#models>
+Here is a list of all the FREE models available https://docs.github.com/en/copilot/about-github-copilot/plans-for-github-copilot#models
 :::
 
 Once you signed up for an account you need to login with one of:
 
-- [VSCode](https://code.visualstudio.com) via <https://code.visualstudio.com/docs/copilot/setup>
-- XCode via <https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/installing-the-github-copilot-extension-in-your-environment?tool=xcode>
+- [VSCode](https://code.visualstudio.com) via [VSCode Setup Guide](https://code.visualstudio.com/docs/copilot/setup)
+- [XCode](https://developer.apple.com/xcode/) via [Xcode Setup Guide](https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/installing-the-github-copilot-extension-in-your-environment?tool=xcode)
 
 This should have created a folder `~/.config/github-copilot/` with either a `hosts.json` or an `apps.json` which is what `ipsw` needs to generate an API key to use your Copilot account.
 
 :::info note
-In my opinion Copilot is the best option because it is the cheapest and you can also use it with VSCode, Xcode and Zed 😎
+In my opinion Copilot is the best option because it is the cheapest *(at the time of writing this)*, you get ALL the best models to play with AND you can also use it with VSCode, Xcode and Zed when not decompiling and just coding. 😎
+:::
+
+:::warning note
+Some people have said they have had issues when trying to use a Github Copilot FREE account with either this folder not being created or the API key usage returning an 404. My initial guess is they didn't fully activate the account before trying it with `ipsw`, however, I will try and recreate when I get time.
 :::
 
 ### OpenAI
 
-You must signup for and buy some API credits from <https://platform.openai.com/api-keys> first. Then generate an API key and put it in your environment as `OPENAI_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm openai` provider.
+You must signup for and buy some API credits from https://platform.openai.com/api-keys first. Then generate an API key and put it in your environment as `OPENAI_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm openai` provider.
 
 ### Claude (Anthropic)
 
-You must signup for and buy some API credits from <https://console.anthropic.com/login> first. Then generate an API key and put it in your environment as `ANTHROPIC_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm claude` provider.
+You must signup for and buy some API credits from https://console.anthropic.com/login first. Then generate an API key and put it in your environment as `ANTHROPIC_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm claude` provider.
 
 ### Ollama (local LLMs)
 
