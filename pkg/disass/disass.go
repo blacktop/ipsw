@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -366,19 +367,7 @@ func Disassemble(d Disass) string {
 						adrpImm += instruction.Operands[1].Immediate
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
-						if ok, detail := d.IsData(adrpImm); ok {
-							_ = detail
-							if ok, detail := d.IsPointer(adrpImm); ok {
-								fmt.Fprintf(&sb, "ptr_%x: .quad %s ; %s\n", adrpImm, detail, name)
-							}
-							if ptr, err := d.ReadAddr(adrpImm); err == nil {
-								if ptrname, ok := d.FindSymbol(ptr); ok {
-									comment = fmt.Sprintf(" ; %s _ptr.%s", name, ptrname)
-								}
-							}
-						} else {
-							comment = fmt.Sprintf(" ; %s", name)
-						}
+						comment = fmt.Sprintf(" ; %s", name)
 					} else if ok, detail := d.IsPointer(adrpImm); ok {
 						if name, ok := d.FindSymbol(uint64(detail.Pointer)); ok {
 							comment = fmt.Sprintf(" ; _ptr.%s", name)
@@ -483,36 +472,10 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 
 	gots := make(map[uint64]uint64)
 
-	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
-
-		dat, err := authPtr.Data()
-		if err != nil {
-			off, err := m.GetOffset(authPtr.Addr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get offset for __AUTH_CONST.__auth_ptr: %v", err)
-			}
-			dat = make([]byte, authPtr.Size)
-			if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
-				return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr data: %v", err)
-			}
-		}
-
-		ptrs := make([]uint64, authPtr.Size/8)
-		if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
-			return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %v", err)
-		}
-
-		for idx, ptr := range ptrs {
-			gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
-		}
-	}
-
 	for _, sec := range m.Sections {
-		if sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers() { // TODO: make sure this doesn't break things
-			if sec.Seg == "__AUTH_CONST" && sec.Name == "__auth_ptr" {
-				continue
-			}
-
+		if slices.Contains([]string{"__AUTH_CONST", "__DATA_CONST"}, sec.Seg) &&
+			slices.Contains([]string{"__got", "__auth_got", "__auth_ptr"}, sec.Name) ||
+			(sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers()) {
 			dat, err := sec.Data()
 			if err != nil {
 				off, err := m.GetOffset(sec.Addr)
@@ -531,8 +494,7 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 			}
 
 			for idx, ptr := range ptrs {
-				// gots[sec.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
-				gots[sec.Addr+uint64(idx*8)] = ptr
+				gots[sec.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
 			}
 		}
 	}
@@ -563,7 +525,7 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 				return m.GetPointerAtAddress(m.SlidePointer(u))
 			})
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s.%s section stubs data: %v", sec.Seg, sec.Name, err)
 			}
 
 			maps.Copy(stubs, sb)
