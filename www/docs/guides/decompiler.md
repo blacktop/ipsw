@@ -22,19 +22,26 @@ To use the `copilot` provider you will need an accout which you can sign up for 
 Here is a list of all the FREE models available https://docs.github.com/en/copilot/about-github-copilot/plans-for-github-copilot#models
 :::
 
+:::info note
+After you signup for Copilot make sure you goto https://github.com/settings/copilot and enable all the models or they won't be usable and won't show up in the model listing.
+:::
+
 Once you signed up for an account you need to login with one of:
 
-- [VSCode](https://code.visualstudio.com) via [VSCode Setup Guide](https://code.visualstudio.com/docs/copilot/setup)
+- [Zed](https://zed.dev) via [Zed Setup Guide](https://zed.dev/docs/assistant/configuration?highlight=copilot#github-copilot-chat)
+  - Open the Agent Panel (Command+?)
+  - Open the Settings (Option+Command+C)
+  - Sign in to Github Copilot Chat
 - [XCode](https://developer.apple.com/xcode/) via [Xcode Setup Guide](https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/installing-the-github-copilot-extension-in-your-environment?tool=xcode)
 
-This should have created a folder `~/.config/github-copilot/` with either a `hosts.json` or an `apps.json` which is what `ipsw` needs to generate an API key to use your Copilot account.
+This should have created a folder `~/.config/github-copilot/` with either an `apps.json` or a `hosts.json` file which is what `ipsw` needs to generate an API key to use your Copilot account.
 
 :::info note
-In my opinion Copilot is the best option because it is the cheapest *(at the time of writing this)*, you get ALL the best models to play with AND you can also use it with VSCode, Xcode and Zed when not decompiling and just coding. 😎
+In my opinion Copilot is the best option because it is the cheapest *(at the time of writing this)* and the FREE option is amazing, you get ALL the best models to play with AND you can also use it with VSCode, Xcode and Zed when not decompiling and just coding. 😎
 :::
 
 :::warning note
-Some people have said they have had issues when trying to use a Github Copilot FREE account with either this folder not being created or the API key usage returning an 404. My initial guess is they didn't fully activate the account before trying it with `ipsw`, however, I will try and recreate when I get time.
+It appears that you can't use VSCode editor to create the required JSON file as they are now stored 'securely' somewhere else.
 :::
 
 ### OpenAI
