@@ -28,7 +28,7 @@ After you signup for Copilot make sure you goto https://github.com/settings/copi
 
 Once you signed up for an account you need to login with one of:
 
-- [Zed](https://zed.dev) via [Zed Setup Guide](https://zed.dev/docs/assistant/configuration?highlight=copilot#github-copilot-chat)
+- [Zed](https://zed.dev) via [Zed Setup Guide](https://zed.dev/docs/assistant/configuration?highlight=copilot#github-copilot-chat) *(easiest in my opinion)*
   - Open the Agent Panel (Command+?)
   - Open the Settings (Option+Command+C)
   - Sign in to Github Copilot Chat
