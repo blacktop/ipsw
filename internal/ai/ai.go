@@ -6,6 +6,7 @@ import (
 
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
 	"github.com/blacktop/ipsw/internal/ai/copilot"
+	"github.com/blacktop/ipsw/internal/ai/gemini"
 	"github.com/blacktop/ipsw/internal/ai/ollama"
 	"github.com/blacktop/ipsw/internal/ai/openai"
 )
@@ -13,6 +14,7 @@ import (
 var Providers = []string{
 	"claude",
 	"copilot",
+	"gemini",
 	"ollama",
 	"openai",
 }
@@ -51,12 +53,21 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			TopP:        cfg.TopP,
 			Stream:      cfg.Stream,
 		})
+	case "gemini":
+		return gemini.NewGemini(ctx, &gemini.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+		})
 	case "ollama":
 		return ollama.NewOllama(ctx, &ollama.Config{
 			Prompt:      cfg.Prompt,
 			Model:       cfg.Model,
 			Temperature: cfg.Temperature,
 			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
 		})
 	case "openai":
 		return openai.NewOpenAI(ctx, &openai.Config{

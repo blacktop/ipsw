@@ -12,6 +12,7 @@ There are currently 4 supported LLM providers
 - Github Copilot
 - OpenAI
 - Claude (Anthropic)
+- Gemini (Google AI)
 - Ollama (local LLMs)
 
 ### Github Copilot
@@ -51,6 +52,10 @@ You must signup for and buy some API credits from https://platform.openai.com/ap
 ### Claude (Anthropic)
 
 You must signup for and buy some API credits from https://console.anthropic.com/login first. Then generate an API key and put it in your environment as `ANTHROPIC_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm claude` provider.
+
+### Gemini (Google AI)
+
+Head to https://aistudio.google.com/apikey login and create an API key and put it in your environment as `GEMINI_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm gemini` provider.
 
 ### Ollama (local LLMs)
 

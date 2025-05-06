@@ -14,6 +14,7 @@ type Config struct {
 	Model       string  `json:"model"`
 	Temperature float64 `json:"temperature"`
 	TopP        float64 `json:"top_p"`
+	Stream      bool    `json:"stream"`
 }
 
 type Ollama struct {
