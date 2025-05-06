@@ -310,17 +310,17 @@ var machoDisassCmd = &cobra.Command{
 								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 							}
 							llm, err := ai.NewAI(context.Background(), &ai.Config{
-								Provider:    viper.GetString("dyld.disass.llm"),
+								Provider:    viper.GetString("macho.disass.llm"),
 								Prompt:      fmt.Sprintf(promptFmt, asm),
-								Model:       viper.GetString("dyld.disass.dec-model"),
-								Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
-								TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
+								Model:       viper.GetString("macho.disass.dec-model"),
+								Temperature: viper.GetFloat64("macho.disass.dec-temp"),
+								TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
 								Stream:      true,
 							})
 							if err != nil {
 								return fmt.Errorf("failed to create llm client: %v", err)
 							}
-							if !viper.IsSet("dyld.disass.dec-model") {
+							if !viper.IsSet("macho.disass.dec-model") {
 								var choice string
 								prompt := &survey.Select{
 									Message:  "Select model to use:",
@@ -466,17 +466,17 @@ var machoDisassCmd = &cobra.Command{
 							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 						}
 						llm, err := ai.NewAI(context.Background(), &ai.Config{
-							Provider:    viper.GetString("dyld.disass.llm"),
+							Provider:    viper.GetString("macho.disass.llm"),
 							Prompt:      fmt.Sprintf(promptFmt, asm),
-							Model:       viper.GetString("dyld.disass.dec-model"),
-							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
-							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
+							Model:       viper.GetString("macho.disass.dec-model"),
+							Temperature: viper.GetFloat64("macho.disass.dec-temp"),
+							TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
 							Stream:      true,
 						})
 						if err != nil {
 							return fmt.Errorf("failed to create llm client: %v", err)
 						}
-						if !viper.IsSet("dyld.disass.dec-model") {
+						if !viper.IsSet("macho.disass.dec-model") {
 							var choice string
 							prompt := &survey.Select{
 								Message:  "Select model to use:",
