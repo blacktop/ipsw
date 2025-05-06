@@ -7,7 +7,7 @@ description: Using the AI decompiler.
 
 ## Requirements
 
-There are currently 4 supported LLM providers
+There are currently 5 supported LLM providers
 
 - Github Copilot
 - OpenAI
