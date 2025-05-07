@@ -359,6 +359,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 		// check for temp cache file
 		tempa2sfile := filepath.Join(os.TempDir(), f.UUID.String()+".a2s")
 		if _, err := os.Stat(tempa2sfile); os.IsNotExist(err) {
+			// neither cache file exists, so create a new one
 			log.Info("parsing public symbols...")
 			if err := f.ParsePublicSymbols(false); err != nil {
 				utils.Indent(log.Warn, 2)(fmt.Sprintf("failed to parse all exported symbols: %v", err))
@@ -392,7 +393,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 			cacheFile = tempa2sfile
 		}
 	}
-
+	// cache file exists, so load it
 	a2sFile, err := os.Open(cacheFile)
 	if err != nil {
 		return err
@@ -414,6 +415,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 func (f *File) SaveAddrToSymMap(dest string) (err error) {
 	of, err := os.Create(dest)
 	if err != nil {
+		// check for permission error (read-only location)
 		if errors.Is(err, os.ErrPermission) {
 			var e *os.PathError
 			if errors.As(err, &e) {
@@ -442,6 +444,7 @@ func (f *File) SaveAddrToSymMap(dest string) (err error) {
 	if _, err = buff.WriteTo(of); err != nil {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) {
+			// check for out of space error (mounted IPSW dmgs return this)
 			if errors.Is(pathErr.Err, syscall.ENOSPC) {
 				log.Errorf("failed to create symbol cache file %s (most likely a mounted IPSW dmg): %v", filepath.Base(pathErr.Path), pathErr.Err)
 				tmpcache := filepath.Join(os.TempDir(), f.UUID.String()+".a2s")
