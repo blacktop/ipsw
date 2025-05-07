@@ -3,7 +3,6 @@ package openai
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/blacktop/ipsw/internal/ai/utils"
 	"github.com/openai/openai-go"
@@ -31,19 +30,17 @@ func NewOpenAI(ctx context.Context, conf *Config) (*OpenAI, error) {
 		conf: conf,
 		cli:  &cli,
 	}
-	if err := openai.getModels(); err != nil {
-		return nil, fmt.Errorf("failed to get models: %w", err)
-	}
 	return openai, nil
 }
 
-func (c *OpenAI) Models() []string {
-	modelList := make([]string, 0, len(c.models))
-	for model := range c.models {
-		modelList = append(modelList, model)
+func (c *OpenAI) Models() (map[string]string, error) {
+	if len(c.models) > 0 {
+		return c.models, nil
 	}
-	sort.Strings(modelList)
-	return modelList
+	if err := c.getModels(); err != nil {
+		return nil, fmt.Errorf("openai: failed to get models: %w", err)
+	}
+	return c.models, nil
 }
 
 func (c *OpenAI) SetModel(model string) error {
@@ -52,6 +49,11 @@ func (c *OpenAI) SetModel(model string) error {
 	}
 	c.conf.Model = model
 	return nil
+}
+
+func (c *OpenAI) SetModels(models map[string]string) (map[string]string, error) {
+	c.models = models
+	return c.models, nil
 }
 
 func (c *OpenAI) getModels() error {

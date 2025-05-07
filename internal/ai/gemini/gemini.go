@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 
 	"github.com/blacktop/ipsw/internal/ai/utils"
 	"google.golang.org/genai"
@@ -43,19 +42,17 @@ func NewGemini(ctx context.Context, conf *Config) (*Gemini, error) {
 		conf: conf,
 		cli:  cli,
 	}
-	if err := gemini.getModels(); err != nil {
-		return nil, fmt.Errorf("failed to get models: %w", err)
-	}
 	return gemini, nil
 }
 
-func (c *Gemini) Models() []string {
-	modelList := make([]string, 0, len(c.models))
-	for model := range c.models {
-		modelList = append(modelList, model)
+func (c *Gemini) Models() (map[string]string, error) {
+	if len(c.models) > 0 {
+		return c.models, nil
 	}
-	sort.Strings(modelList)
-	return modelList
+	if err := c.getModels(); err != nil {
+		return nil, fmt.Errorf("gemini: failed to get models: %w", err)
+	}
+	return c.models, nil
 }
 
 func (c *Gemini) SetModel(model string) error {
@@ -64,6 +61,11 @@ func (c *Gemini) SetModel(model string) error {
 	}
 	c.conf.Model = model
 	return nil
+}
+
+func (c *Gemini) SetModels(models map[string]string) (map[string]string, error) {
+	c.models = models
+	return c.models, nil
 }
 
 func (c *Gemini) getModels() error {

@@ -3,7 +3,6 @@ package anthropic
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/blacktop/ipsw/internal/ai/utils"
@@ -31,19 +30,17 @@ func NewClaude(ctx context.Context, conf *Config) (*Claude, error) {
 		conf: conf,
 		cli:  &cli,
 	}
-	if err := claude.getModels(); err != nil {
-		return nil, fmt.Errorf("failed to get models: %w", err)
-	}
 	return claude, nil
 }
 
-func (c *Claude) Models() []string {
-	modelList := make([]string, 0, len(c.models))
-	for model := range c.models {
-		modelList = append(modelList, model)
+func (c *Claude) Models() (map[string]string, error) {
+	if len(c.models) > 0 {
+		return c.models, nil
 	}
-	sort.Strings(modelList)
-	return modelList
+	if err := c.getModels(); err != nil {
+		return nil, fmt.Errorf("claude: failed to get models: %w", err)
+	}
+	return c.models, nil
 }
 
 func (c *Claude) SetModel(model string) error {
@@ -52,6 +49,11 @@ func (c *Claude) SetModel(model string) error {
 	}
 	c.conf.Model = model
 	return nil
+}
+
+func (c *Claude) SetModels(models map[string]string) (map[string]string, error) {
+	c.models = models
+	return c.models, nil
 }
 
 func (c *Claude) getModels() error {
