@@ -9,7 +9,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 
@@ -841,37 +840,19 @@ func (d *MachoDisass) OpenOrCreateSymMap(cacheFile *string, machoPath string) er
 }
 
 func (d *MachoDisass) SaveAddrToSymMap(dest string) (err error) {
-	var of *os.File
-	of, err = os.Create(dest)
-	if errors.Is(err, os.ErrPermission) {
-		var e *os.PathError
-		if errors.As(err, &e) {
-			log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
-		}
-		tmpDir := os.TempDir()
-		if runtime.GOOS == "darwin" {
-			tmpDir = "/tmp"
-		}
-		tempa2sfile := filepath.Join(tmpDir, dest)
-		of, err = os.Create(tempa2sfile)
-		if err != nil {
-			return err
-		}
-		utils.Indent(log.Warn, 2)("creating in the temp folder")
-		utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future you must supply the flag: --cache %s ", tempa2sfile))
-	} else if err != nil {
-		return fmt.Errorf("failed to open address to symbol cache file %s: %v", dest, err)
+	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open symbol cache file %s: %v", dest, err)
 	}
-	defer of.Close()
+	defer f.Close()
 
 	buff := new(bytes.Buffer)
-	e := gob.NewEncoder(buff)
 
 	// Encoding the map
-	if err := e.Encode(d.a2s); err != nil {
+	if err := gob.NewEncoder(buff).Encode(d.a2s); err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
-	if _, err := buff.WriteTo(of); err != nil {
+	if _, err := buff.WriteTo(f); err != nil {
 		return fmt.Errorf("failed to write addr2sym map to file: %v", err)
 	}
 
