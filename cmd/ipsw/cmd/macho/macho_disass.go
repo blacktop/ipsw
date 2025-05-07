@@ -24,22 +24,19 @@ package macho
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/ai"
+	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
-	"github.com/briandowns/spinner"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -58,13 +55,18 @@ func init() {
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
-	machoDisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
 	machoDisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
+	machoDisassCmd.Flags().String("dec-llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	machoDisassCmd.RegisterFlagCompletionFunc("dec-llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ai.Providers, cobra.ShellCompDirectiveDefault
+	})
+	machoDisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
+	machoDisassCmd.Flags().Bool("dec-nocache", false, "Do not use decompilation cache")
 	machoDisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	machoDisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
-	machoDisassCmd.Flags().String("llm", "", "LLM provider to use for decompilation (ollama, copilot, etc.)")
-	machoDisassCmd.RegisterFlagCompletionFunc("llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return ai.Providers, cobra.ShellCompDirectiveDefault
+	machoDisassCmd.Flags().String("dec-theme", "nord", "Decompilation color theme (nord, github, etc)")
+	machoDisassCmd.RegisterFlagCompletionFunc("dec-theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
 	})
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
@@ -85,11 +87,13 @@ func init() {
 	viper.BindPFlag("macho.disass.count", machoDisassCmd.Flags().Lookup("count"))
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.disass.dec", machoDisassCmd.Flags().Lookup("dec"))
-	viper.BindPFlag("macho.disass.dec-model", machoDisassCmd.Flags().Lookup("dec-model"))
 	viper.BindPFlag("macho.disass.dec-lang", machoDisassCmd.Flags().Lookup("dec-lang"))
+	viper.BindPFlag("macho.disass.dec-llm", machoDisassCmd.Flags().Lookup("dec-llm"))
+	viper.BindPFlag("macho.disass.dec-model", machoDisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("macho.disass.dec-nocache", machoDisassCmd.Flags().Lookup("dec-nocache"))
 	viper.BindPFlag("macho.disass.dec-temp", machoDisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("macho.disass.dec-top-p", machoDisassCmd.Flags().Lookup("dec-top-p"))
-	viper.BindPFlag("macho.disass.llm", machoDisassCmd.Flags().Lookup("llm"))
+	viper.BindPFlag("macho.disass.dec-theme", machoDisassCmd.Flags().Lookup("dec-theme"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("macho.disass.force", machoDisassCmd.Flags().Lookup("force"))
@@ -152,9 +156,9 @@ var machoDisassCmd = &cobra.Command{
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
 			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
-		if viper.IsSet("macho.disass.llm") {
-			if !slices.Contains(ai.Providers, viper.GetString("macho.disass.llm")) {
-				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.llm"), strings.Join(ai.Providers, ", "))
+		if viper.IsSet("macho.disass.dec-llm") {
+			if !slices.Contains(ai.Providers, viper.GetString("macho.disass.dec-llm")) {
+				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}
 		}
 
@@ -276,14 +280,14 @@ var machoDisassCmd = &cobra.Command{
 							AsJSON:       asJSON,
 							Demangle:     demangleFlag,
 							Quite:        quiet,
-							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+							Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 						})
 
 						//***********************
 						//* First pass ANALYSIS *
 						//***********************
 						if !quiet {
-							if err := engine.OpenOrCreateSymMap(cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+							if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
 								return fmt.Errorf("failed to open or create symbol map: %v", err)
 							}
 							if err := engine.Triage(); err != nil {
@@ -304,53 +308,24 @@ var machoDisassCmd = &cobra.Command{
 						//* DISASSEMBLE *
 						//***************
 						asm := disass.Disassemble(engine)
-						if decompile {
-							promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("macho.disass.dec-lang"))
-							if err != nil {
-								return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
-							}
-							llm, err := ai.NewAI(context.Background(), &ai.Config{
-								Provider:    viper.GetString("macho.disass.llm"),
-								Prompt:      fmt.Sprintf(promptFmt, asm),
-								Model:       viper.GetString("macho.disass.dec-model"),
-								Temperature: viper.GetFloat64("macho.disass.dec-temp"),
-								TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
-								Stream:      true,
+						if decompile && len(asm) > 0 {
+							decmp, err := dcmd.Decompile(asm, &dcmd.Config{
+								UUID:         m.UUID().String(),
+								LLM:          viper.GetString("macho.disass.dec-llm"),
+								Language:     viper.GetString("macho.disass.dec-lang"),
+								Model:        viper.GetString("macho.disass.dec-model"),
+								Temperature:  viper.GetFloat64("macho.disass.dec-temp"),
+								TopP:         viper.GetFloat64("macho.disass.dec-top-p"),
+								Stream:       false,
+								DisableCache: viper.GetBool("macho.disass.dec-nocache"),
+								Verbose:      viper.GetBool("verbose"),
+								Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+								Theme:        viper.GetString("macho.disass.dec-theme"),
 							})
-							if err != nil {
-								return fmt.Errorf("failed to create llm client: %v", err)
-							}
-							if !viper.IsSet("macho.disass.dec-model") {
-								var choice string
-								prompt := &survey.Select{
-									Message:  "Select model to use:",
-									Options:  llm.Models(),
-									PageSize: 10,
-								}
-								if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-									log.Warn("Exiting...")
-									return nil
-								}
-								if err := llm.SetModel(choice); err != nil {
-									return fmt.Errorf("failed to set llm model: %v", err)
-								}
-							}
-							s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-							s.Prefix = color.BlueString("   • Decompiling... ")
-							s.Start()
-
-							decmp, err := llm.Chat()
-							s.Stop()
 							if err != nil {
 								return fmt.Errorf("failed to decompile via llm: %v", err)
 							}
-							if viper.GetBool("color") && !viper.GetBool("no-color") {
-								if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
-									return err
-								}
-							} else {
-								fmt.Println(string(decmp))
-							}
+							fmt.Println(decmp)
 						} else {
 							fmt.Println(asm)
 						}
@@ -429,14 +404,14 @@ var machoDisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
 					//***********************
 					//* First pass ANALYSIS *
 					//***********************
 					if !quiet {
-						if err := engine.OpenOrCreateSymMap(cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+						if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
 							return fmt.Errorf("failed to open or create symbol map: %v", err)
 						}
 						if err := engine.Triage(); err != nil {
@@ -460,53 +435,24 @@ var machoDisassCmd = &cobra.Command{
 					//* DISASSEMBLE *
 					//***************
 					asm := disass.Disassemble(engine)
-					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("macho.disass.dec-lang"))
-						if err != nil {
-							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
-						}
-						llm, err := ai.NewAI(context.Background(), &ai.Config{
-							Provider:    viper.GetString("macho.disass.llm"),
-							Prompt:      fmt.Sprintf(promptFmt, asm),
-							Model:       viper.GetString("macho.disass.dec-model"),
-							Temperature: viper.GetFloat64("macho.disass.dec-temp"),
-							TopP:        viper.GetFloat64("macho.disass.dec-top-p"),
-							Stream:      true,
+					if decompile && len(asm) > 0 {
+						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
+							UUID:         m.UUID().String(),
+							LLM:          viper.GetString("macho.disass.dec-llm"),
+							Language:     viper.GetString("macho.disass.dec-lang"),
+							Model:        viper.GetString("macho.disass.dec-model"),
+							Temperature:  viper.GetFloat64("macho.disass.dec-temp"),
+							TopP:         viper.GetFloat64("macho.disass.dec-top-p"),
+							Stream:       false,
+							DisableCache: viper.GetBool("macho.disass.dec-nocache"),
+							Verbose:      viper.GetBool("verbose"),
+							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:        viper.GetString("macho.disass.dec-theme"),
 						})
-						if err != nil {
-							return fmt.Errorf("failed to create llm client: %v", err)
-						}
-						if !viper.IsSet("macho.disass.dec-model") {
-							var choice string
-							prompt := &survey.Select{
-								Message:  "Select model to use:",
-								Options:  llm.Models(),
-								PageSize: 10,
-							}
-							if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-								log.Warn("Exiting...")
-								return nil
-							}
-							if err := llm.SetModel(choice); err != nil {
-								return fmt.Errorf("failed to set llm model: %v", err)
-							}
-						}
-						s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-						s.Prefix = color.BlueString("   • Decompiling... ")
-						s.Start()
-
-						decmp, err := llm.Chat()
-						s.Stop()
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
-						if viper.GetBool("color") && !viper.GetBool("no-color") {
-							if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
-								return err
-							}
-						} else {
-							fmt.Println(string(decmp))
-						}
+						fmt.Println(decmp)
 					} else {
 						fmt.Println(asm)
 					}

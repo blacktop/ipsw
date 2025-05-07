@@ -120,3 +120,8 @@ func (o *Ollama) getModels() error {
 
 	return nil
 }
+
+// Close implements the ai.AI interface.
+func (o *Ollama) Close() error {
+	return nil // No specific resources to close for Ollama client
+}

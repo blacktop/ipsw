@@ -103,3 +103,8 @@ func (c *Gemini) Chat() (string, error) {
 
 	return utils.Clean(message.Text()), nil
 }
+
+// Close implements the ai.AI interface.
+func (g *Gemini) Close() error {
+	return nil // No specific resources to close for Gemini client
+}

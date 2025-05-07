@@ -92,3 +92,8 @@ func (c *Claude) Chat() (string, error) {
 
 	return utils.Clean(message.Content[0].Text), nil
 }
+
+// Close implements the ai.AI interface.
+func (c *Claude) Close() error {
+	return nil // No specific resources to close for Claude client
+}
