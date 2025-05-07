@@ -88,3 +88,8 @@ func (c *OpenAI) Chat() (string, error) {
 
 	return utils.Clean(message.Choices[0].Message.Content), nil
 }
+
+// Close implements the ai.AI interface.
+func (o *OpenAI) Close() error {
+	return nil // No specific resources to close for OpenAI client
+}

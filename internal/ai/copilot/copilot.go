@@ -395,3 +395,8 @@ func (c *Copilot) Chat() (string, error) {
 
 	return "", fmt.Errorf("no response from API")
 }
+
+// Close implements the ai.AI interface.
+func (c *Copilot) Close() error {
+	return nil // No specific resources to close for Copilot client
+}

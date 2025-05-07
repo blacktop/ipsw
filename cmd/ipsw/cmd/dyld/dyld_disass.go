@@ -22,24 +22,20 @@ THE SOFTWARE.
 package dyld
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai"
+	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -57,13 +53,18 @@ func init() {
 	DisassCmd.Flags().Bool("dylibs", false, "Analyze all dylibs loaded by the image as well (could improve accuracy)")
 	DisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	DisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
-	DisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
 	DisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
+	DisassCmd.Flags().String("dec-llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	DisassCmd.RegisterFlagCompletionFunc("dec-llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ai.Providers, cobra.ShellCompDirectiveDefault
+	})
+	DisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
+	DisassCmd.Flags().Bool("dec-nocache", false, "Do not use decompilation cache")
 	DisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	DisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
-	DisassCmd.Flags().String("llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
-	DisassCmd.RegisterFlagCompletionFunc("llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return ai.Providers, cobra.ShellCompDirectiveDefault
+	DisassCmd.Flags().String("dec-theme", "nord", "Decompilation color theme (nord, github, etc)")
+	DisassCmd.RegisterFlagCompletionFunc("dec-theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
 	})
 	DisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	DisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
@@ -80,11 +81,13 @@ func init() {
 	viper.BindPFlag("dyld.disass.dylibs", DisassCmd.Flags().Lookup("dylibs"))
 	viper.BindPFlag("dyld.disass.demangle", DisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.disass.dec", DisassCmd.Flags().Lookup("dec"))
-	viper.BindPFlag("dyld.disass.dec-model", DisassCmd.Flags().Lookup("dec-model"))
 	viper.BindPFlag("dyld.disass.dec-lang", DisassCmd.Flags().Lookup("dec-lang"))
+	viper.BindPFlag("dyld.disass.dec-llm", DisassCmd.Flags().Lookup("dec-llm"))
+	viper.BindPFlag("dyld.disass.dec-model", DisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("dyld.disass.dec-nocache", DisassCmd.Flags().Lookup("dec-nocache"))
 	viper.BindPFlag("dyld.disass.dec-temp", DisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("dyld.disass.dec-top-p", DisassCmd.Flags().Lookup("dec-top-p"))
-	viper.BindPFlag("dyld.disass.llm", DisassCmd.Flags().Lookup("llm"))
+	viper.BindPFlag("dyld.disass.dec-theme", DisassCmd.Flags().Lookup("dec-theme"))
 	viper.BindPFlag("dyld.disass.json", DisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.disass.quiet", DisassCmd.Flags().Lookup("quiet"))
 	viper.BindPFlag("dyld.disass.force", DisassCmd.Flags().Lookup("force"))
@@ -151,9 +154,9 @@ var DisassCmd = &cobra.Command{
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
 		}
-		if viper.IsSet("dyld.disass.llm") {
-			if !slices.Contains(ai.Providers, viper.GetString("dyld.disass.llm")) {
-				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.llm"), strings.Join(ai.Providers, ", "))
+		if viper.IsSet("dyld.disass.dec-llm") {
+			if !slices.Contains(ai.Providers, viper.GetString("dyld.disass.dec-llm")) {
+				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}
 		}
 
@@ -233,7 +236,7 @@ var DisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
 					if !quiet {
@@ -270,53 +273,24 @@ var DisassCmd = &cobra.Command{
 					//* DISASSEMBLE *
 					//***************
 					asm := disass.Disassemble(engine)
-					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
-						if err != nil {
-							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
-						}
-						llm, err := ai.NewAI(context.Background(), &ai.Config{
-							Provider:    viper.GetString("dyld.disass.llm"),
-							Prompt:      fmt.Sprintf(promptFmt, asm),
-							Model:       viper.GetString("dyld.disass.dec-model"),
-							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
-							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
-							Stream:      true,
+					if decompile && len(asm) > 0 {
+						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
+							UUID:         f.UUID.String(),
+							LLM:          viper.GetString("dyld.disass.dec-llm"),
+							Language:     viper.GetString("dyld.disass.dec-lang"),
+							Model:        viper.GetString("dyld.disass.dec-model"),
+							Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
+							TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
+							Stream:       false,
+							DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
+							Verbose:      viper.GetBool("verbose"),
+							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:        viper.GetString("dyld.disass.dec-theme"),
 						})
-						if err != nil {
-							return fmt.Errorf("failed to create llm client: %v", err)
-						}
-						if !viper.IsSet("dyld.disass.dec-model") {
-							var choice string
-							prompt := &survey.Select{
-								Message:  "Select model to use:",
-								Options:  llm.Models(),
-								PageSize: 10,
-							}
-							if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-								log.Warn("Exiting...")
-								return nil
-							}
-							if err := llm.SetModel(choice); err != nil {
-								return fmt.Errorf("failed to set llm model: %v", err)
-							}
-						}
-						s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-						s.Prefix = color.BlueString("   • Decompiling... ")
-						s.Start()
-
-						decmp, err := llm.Chat()
-						s.Stop()
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
-						if viper.GetBool("color") && !viper.GetBool("no-color") {
-							if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
-								return err
-							}
-						} else {
-							fmt.Println(string(decmp))
-						}
+						fmt.Println(decmp)
 					} else {
 						fmt.Println(asm)
 					}
@@ -375,7 +349,7 @@ var DisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
 					if !quiet {
@@ -417,53 +391,24 @@ var DisassCmd = &cobra.Command{
 					//* DISASSEMBLE *
 					//***************
 					asm := disass.Disassemble(engine)
-					if decompile {
-						promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
-						if err != nil {
-							return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
-						}
-						llm, err := ai.NewAI(context.Background(), &ai.Config{
-							Provider:    viper.GetString("dyld.disass.llm"),
-							Prompt:      fmt.Sprintf(promptFmt, asm),
-							Model:       viper.GetString("dyld.disass.dec-model"),
-							Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
-							TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
-							Stream:      true,
+					if decompile && len(asm) > 0 {
+						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
+							UUID:         f.UUID.String(),
+							LLM:          viper.GetString("dyld.disass.dec-llm"),
+							Language:     viper.GetString("dyld.disass.dec-lang"),
+							Model:        viper.GetString("dyld.disass.dec-model"),
+							Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
+							TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
+							Stream:       false,
+							DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
+							Verbose:      viper.GetBool("verbose"),
+							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:        viper.GetString("dyld.disass.dec-theme"),
 						})
-						if err != nil {
-							return fmt.Errorf("failed to create llm client: %v", err)
-						}
-						if !viper.IsSet("dyld.disass.dec-model") {
-							var choice string
-							prompt := &survey.Select{
-								Message:  "Select model to use:",
-								Options:  llm.Models(),
-								PageSize: 10,
-							}
-							if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-								log.Warn("Exiting...")
-								return nil
-							}
-							if err := llm.SetModel(choice); err != nil {
-								return fmt.Errorf("failed to set llm model: %v", err)
-							}
-						}
-						s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-						s.Prefix = color.BlueString("   • Decompiling... ")
-						s.Start()
-
-						decmp, err := llm.Chat()
-						s.Stop()
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
-						if viper.GetBool("color") && !viper.GetBool("no-color") {
-							if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
-								return err
-							}
-						} else {
-							fmt.Println(string(decmp))
-						}
+						fmt.Println(decmp)
 					} else {
 						fmt.Println(asm)
 					}
@@ -548,7 +493,7 @@ var DisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+					Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 				})
 
 				if !quiet {
@@ -581,53 +526,24 @@ var DisassCmd = &cobra.Command{
 				//* DISASSEMBLE *
 				//***************
 				asm := disass.Disassemble(engine)
-				if decompile {
-					promptFmt, lexer, err := disass.GetPrompt(asm, viper.GetString("dyld.disass.dec-lang"))
-					if err != nil {
-						return fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
-					}
-					llm, err := ai.NewAI(context.Background(), &ai.Config{
-						Provider:    viper.GetString("dyld.disass.llm"),
-						Prompt:      fmt.Sprintf(promptFmt, asm),
-						Model:       viper.GetString("dyld.disass.dec-model"),
-						Temperature: viper.GetFloat64("dyld.disass.dec-temp"),
-						TopP:        viper.GetFloat64("dyld.disass.dec-top-p"),
-						Stream:      true,
+				if decompile && len(asm) > 0 {
+					decmp, err := dcmd.Decompile(asm, &dcmd.Config{
+						UUID:         f.UUID.String(),
+						LLM:          viper.GetString("dyld.disass.dec-llm"),
+						Language:     viper.GetString("dyld.disass.dec-lang"),
+						Model:        viper.GetString("dyld.disass.dec-model"),
+						Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
+						TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
+						Stream:       false,
+						DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
+						Verbose:      viper.GetBool("verbose"),
+						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
+						Theme:        viper.GetString("dyld.disass.dec-theme"),
 					})
-					if err != nil {
-						return fmt.Errorf("failed to create llm client: %v", err)
-					}
-					if !viper.IsSet("dyld.disass.dec-model") {
-						var choice string
-						prompt := &survey.Select{
-							Message:  "Select model to use:",
-							Options:  llm.Models(),
-							PageSize: 10,
-						}
-						if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-							log.Warn("Exiting...")
-							return nil
-						}
-						if err := llm.SetModel(choice); err != nil {
-							return fmt.Errorf("failed to set llm model: %v", err)
-						}
-					}
-					s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-					s.Prefix = color.BlueString("   • Decompiling... ")
-					s.Start()
-
-					decmp, err := llm.Chat()
-					s.Stop()
 					if err != nil {
 						return fmt.Errorf("failed to decompile via llm: %v", err)
 					}
-					if viper.GetBool("color") && !viper.GetBool("no-color") {
-						if err := quick.Highlight(os.Stdout, "\n"+string(decmp)+"\n", lexer, "terminal256", "nord"); err != nil {
-							return err
-						}
-					} else {
-						fmt.Println(string(decmp))
-					}
+					fmt.Println(decmp)
 				} else {
 					fmt.Println(asm)
 				}
