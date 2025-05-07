@@ -174,20 +174,22 @@ func NewCopilot(ctx context.Context, conf *Config) (*Copilot, error) {
 
 func (c *Copilot) GetToken() error {
 	var tr *tokenResponse
-	token, err := c.conf.Cache.GetToken(copilotTokenCacheKey)
-	if err == nil && token != nil {
-		if time.Now().Before(time.Unix(token.ExpiresAt, 0)) {
-			// Token from cache is valid and not expired
-			if err := json.Unmarshal([]byte(token.TokenResponseJSON), &tr); err != nil {
-				log.FromContext(c.ctx).WithError(err).Warn("Failed to unmarshal cached Copilot token JSON")
-				tr = nil // Ensure we fetch a new one
+	if c.conf.Cache != nil {
+		token, err := c.conf.Cache.GetToken(copilotTokenCacheKey)
+		if err == nil && token != nil {
+			if time.Now().Before(time.Unix(token.ExpiresAt, 0)) {
+				// Token from cache is valid and not expired
+				if err := json.Unmarshal([]byte(token.TokenResponseJSON), &tr); err != nil {
+					log.FromContext(c.ctx).WithError(err).Warn("Failed to unmarshal cached Copilot token JSON")
+					tr = nil // Ensure we fetch a new one
+				}
+			} else if token.ExpiresAt > 0 { // It was found but expired
+				log.FromContext(c.ctx).Infof("Cached Copilot API token expired at %s, fetching new one.", time.Unix(token.ExpiresAt, 0).Format(time.RFC1123))
 			}
-		} else if token.ExpiresAt > 0 { // It was found but expired
-			log.FromContext(c.ctx).Infof("Cached Copilot API token expired at %s, fetching new one.", time.Unix(token.ExpiresAt, 0).Format(time.RFC1123))
+		} else if err != nil && !errors.Is(err, model.ErrNotFound) {
+			// Log error only if it's not ErrNotFound (which is expected if cache is empty)
+			log.FromContext(c.ctx).WithError(err).Warn("Failed to get Copilot token from cache")
 		}
-	} else if err != nil && !errors.Is(err, model.ErrNotFound) {
-		// Log error only if it's not ErrNotFound (which is expected if cache is empty)
-		log.FromContext(c.ctx).WithError(err).Warn("Failed to get Copilot token from cache")
 	}
 
 	if tr == nil { // If not cached, expired, or error during cache retrieval/unmarshal
