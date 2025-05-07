@@ -825,13 +825,13 @@ func (d *MachoDisass) OpenOrCreateSymMap(cacheFile *string, machoPath string) er
 			if errors.As(err, &e) {
 				log.Errorf("failed to create symbol cache file %s (most likely a read-only location): %v", filepath.Base(e.Path), e.Err)
 			}
-			tmpcach := d.getTempCachePath(cacheFile)
-			if _, err := os.Create(tmpcach); err != nil {
+			tmpcache := d.getTempCachePath(cacheFile)
+			if _, err := os.Create(tmpcache); err != nil {
 				return fmt.Errorf("failed to create temp cache file: %v", err)
 			}
 			utils.Indent(log.Warn, 2)("creating in the temp folder")
-			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcach))
-			*cacheFile = tmpcach
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcache))
+			*cacheFile = tmpcache
 		}
 		return fmt.Errorf("failed to create cache file: %v", err)
 	}
