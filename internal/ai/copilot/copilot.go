@@ -5,17 +5,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai/utils"
+	model "github.com/blacktop/ipsw/internal/model/ai"
 )
 
 const (
@@ -49,21 +51,21 @@ type tokenResponse struct {
 		Proxy         string `json:"proxy"`
 		Telemetry     string `json:"telemetry"`
 	} `json:"endpoints"`
-	ExpiresAt             int64       `json:"expires_at"`
-	Individual            bool        `json:"individual"`
-	LimitedUserQuotas     interface{} `json:"limited_user_quotas"`
-	LimitedUserResetDate  interface{} `json:"limited_user_reset_date"`
-	Prompt8K              bool        `json:"prompt_8k"`
-	PublicSuggestions     string      `json:"public_suggestions"`
-	RefreshIn             int         `json:"refresh_in"`
-	SKU                   string      `json:"sku"`
-	SnippyLoadTestEnabled bool        `json:"snippy_load_test_enabled"`
-	Telemetry             string      `json:"telemetry"`
-	Token                 string      `json:"token"`
-	TrackingID            string      `json:"tracking_id"`
-	VscElectronFetcherV2  bool        `json:"vsc_electron_fetcher_v2"`
-	Xcode                 bool        `json:"xcode"`
-	XcodeChat             bool        `json:"xcode_chat"`
+	ExpiresAt             int64  `json:"expires_at"`
+	Individual            bool   `json:"individual"`
+	LimitedUserQuotas     any    `json:"limited_user_quotas"`
+	LimitedUserResetDate  any    `json:"limited_user_reset_date"`
+	Prompt8K              bool   `json:"prompt_8k"`
+	PublicSuggestions     string `json:"public_suggestions"`
+	RefreshIn             int    `json:"refresh_in"`
+	SKU                   string `json:"sku"`
+	SnippyLoadTestEnabled bool   `json:"snippy_load_test_enabled"`
+	Telemetry             string `json:"telemetry"`
+	Token                 string `json:"token"`
+	TrackingID            string `json:"tracking_id"`
+	VscElectronFetcherV2  bool   `json:"vsc_electron_fetcher_v2"`
+	Xcode                 bool   `json:"xcode"`
+	XcodeChat             bool   `json:"xcode_chat"`
 	ErrorDetails          *struct {
 		URL            string `json:"url,omitempty"`
 		Message        string `json:"message,omitempty"`
@@ -138,12 +140,19 @@ type responseEvent struct {
 	ID      string `json:"id"`
 }
 
+// Cache defines the interface for caching Copilot tokens.
+type Cache interface {
+	GetToken(key string) (*model.CopilotToken, error)
+	SetToken(token *model.CopilotToken) error
+}
+
 type Config struct {
 	Prompt      string  `json:"prompt"`
 	Model       string  `json:"model"`
 	Temperature float64 `json:"temperature"`
 	TopP        float64 `json:"top_p"`
 	Stream      bool    `json:"stream"`
+	Cache       Cache
 }
 
 type Copilot struct {
@@ -153,25 +162,83 @@ type Copilot struct {
 	models map[string]string
 }
 
+const copilotTokenCacheKey = "active_copilot_token"
+
 func NewCopilot(ctx context.Context, conf *Config) (*Copilot, error) {
-	c := &Copilot{
+	return &Copilot{
 		ctx:    ctx,
 		conf:   conf,
 		models: make(map[string]string),
+	}, nil
+}
+
+func (c *Copilot) GetToken() error {
+	var tr *tokenResponse
+	token, err := c.conf.Cache.GetToken(copilotTokenCacheKey)
+	if err == nil && token != nil {
+		if time.Now().Before(time.Unix(token.ExpiresAt, 0)) {
+			// Token from cache is valid and not expired
+			if err := json.Unmarshal([]byte(token.TokenResponseJSON), &tr); err != nil {
+				log.FromContext(c.ctx).WithError(err).Warn("Failed to unmarshal cached Copilot token JSON")
+				tr = nil // Ensure we fetch a new one
+			}
+		} else if token.ExpiresAt > 0 { // It was found but expired
+			log.FromContext(c.ctx).Infof("Cached Copilot API token expired at %s, fetching new one.", time.Unix(token.ExpiresAt, 0).Format(time.RFC1123))
+		}
+	} else if err != nil && !errors.Is(err, model.ErrNotFound) {
+		// Log error only if it's not ErrNotFound (which is expected if cache is empty)
+		log.FromContext(c.ctx).WithError(err).Warn("Failed to get Copilot token from cache")
 	}
-	oauth, err := readLocalToken()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read local github copilot token: %v", err)
+
+	if tr == nil { // If not cached, expired, or error during cache retrieval/unmarshal
+		oauth, err := readLocalToken()
+		if err != nil {
+			return fmt.Errorf("failed to read local github copilot token: %v", err)
+		}
+		apiTokenResp, err := getAPIToken(c.ctx, oauth)
+		if err != nil {
+			return fmt.Errorf("failed to get github copilot API token: %v", err)
+		}
+		tr = apiTokenResp // Assign the newly fetched token response
+
+		// Check expiry of the newly fetched token before caching
+		if time.Now().After(time.Unix(tr.ExpiresAt, 0)) {
+			expiresAt := time.Unix(tr.ExpiresAt, 0).Format(time.RFC1123)
+			return fmt.Errorf("newly fetched github copilot API token is already expired at %s", expiresAt)
+		}
+
+		if c.conf.Cache != nil {
+			tokenJSON, err := json.Marshal(tr)
+			if err != nil {
+				log.FromContext(c.ctx).WithError(err).Warn("Failed to marshal Copilot token for caching")
+			} else {
+				dbTokenToCache := &model.CopilotToken{
+					Key:               copilotTokenCacheKey,
+					Token:             tr.Token,
+					ExpiresAt:         tr.ExpiresAt,
+					TokenResponseJSON: string(tokenJSON),
+				}
+				if err := c.conf.Cache.SetToken(dbTokenToCache); err != nil {
+					log.FromContext(c.ctx).WithError(err).Warn("Failed to set Copilot token in cache")
+				} else {
+					log.FromContext(c.ctx).Infof("Saved new Copilot API token to cache, expires at %s", time.Unix(tr.ExpiresAt, 0).Format(time.RFC1123))
+				}
+			}
+		}
 	}
-	c.token, err = getAPIToken(ctx, oauth)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get github copilot API token: %v", err)
+
+	c.token = tr
+	return nil
+}
+
+func (c *Copilot) Models() (map[string]string, error) {
+	if len(c.models) > 0 {
+		return c.models, nil
 	}
-	if time.Now().After(time.Unix(c.token.ExpiresAt, 0)) {
-		expiresAt := time.Unix(c.token.ExpiresAt, 0).Format(time.RFC1123)
-		return nil, fmt.Errorf("github copilot API token expired at %s", expiresAt)
+	if err := c.GetToken(); err != nil {
+		return nil, fmt.Errorf("failed to get Copilot token: %v", err)
 	}
-	modelsResponse, err := c.token.getModels(ctx)
+	modelsResponse, err := c.token.getModels(c.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get models: %v", err)
 	}
@@ -181,21 +248,12 @@ func NewCopilot(ctx context.Context, conf *Config) (*Copilot, error) {
 			// fmt.Println(model.Name)
 		}
 	}
-	if len(c.conf.Model) > 0 {
-		if _, ok := c.models[c.conf.Model]; !ok {
-			return nil, fmt.Errorf("model '%s' not found", c.conf.Model)
-		}
-	}
-	return c, nil
+	return c.models, nil
 }
 
-func (c *Copilot) Models() []string {
-	modelList := make([]string, 0, len(c.models))
-	for model := range c.models {
-		modelList = append(modelList, model)
-	}
-	sort.Strings(modelList)
-	return modelList
+func (c *Copilot) SetModels(models map[string]string) (map[string]string, error) {
+	c.models = models
+	return c.models, nil
 }
 
 func (c *Copilot) SetModel(model string) error {
@@ -294,8 +352,9 @@ func (api *tokenResponse) getModels(ctx context.Context) (*modelsResponse, error
 	}
 	req.Header.Set("Authorization", "Bearer "+api.Token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Copilot-Integration-Id", "vscode-chat")
+	// req.Header.Set("Copilot-Integration-Id", "vscode-chat")
 	req.Header.Set("Editor-Version", copilotEditorVersion)
+	req.Header.Set("User-Agent", copilotUserAgent)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -311,6 +370,10 @@ func (api *tokenResponse) getModels(ctx context.Context) (*modelsResponse, error
 }
 
 func (c *Copilot) Chat() (string, error) {
+	if err := c.GetToken(); err != nil {
+		return "", fmt.Errorf("failed to get Copilot token: %v", err)
+	}
+
 	reqBody := chatRequest{
 		Intent:      true,
 		N:           1,
@@ -331,8 +394,9 @@ func (c *Copilot) Chat() (string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token.Token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Copilot-Integration-Id", "vscode-chat")
+	// req.Header.Set("Copilot-Integration-Id", "vscode-chat")
 	req.Header.Set("Editor-Version", copilotEditorVersion)
+	req.Header.Set("User-Agent", copilotUserAgent)
 
 	client := &http.Client{Timeout: 0} // no timeout for streaming
 	resp, err := client.Do(req)

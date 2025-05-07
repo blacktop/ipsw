@@ -3,7 +3,6 @@ package ollama
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/blacktop/ipsw/internal/ai/utils"
 	"github.com/ollama/ollama/api"
@@ -90,13 +89,14 @@ func (o *Ollama) Chat() (string, error) {
 	return utils.Clean(out), nil
 }
 
-func (o *Ollama) Models() []string {
-	modelList := make([]string, 0, len(o.models))
-	for model := range o.models {
-		modelList = append(modelList, model)
+func (o *Ollama) Models() (map[string]string, error) {
+	if len(o.models) > 0 {
+		return o.models, nil
 	}
-	sort.Strings(modelList)
-	return modelList
+	if err := o.getModels(); err != nil {
+		return nil, fmt.Errorf("ollama: failed to get models: %w", err)
+	}
+	return o.models, nil
 }
 
 func (o *Ollama) SetModel(model string) error {
@@ -105,6 +105,10 @@ func (o *Ollama) SetModel(model string) error {
 	}
 	o.cfg.Model = model
 	return nil
+}
+
+func (o *Ollama) SetModels(models map[string]string) (map[string]string, error) {
+	return o.models, nil // cache is not used for local models
 }
 
 func (o *Ollama) getModels() error {

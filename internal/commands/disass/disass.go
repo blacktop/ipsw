@@ -3,6 +3,9 @@ package disass
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -50,10 +53,17 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		return "", fmt.Errorf("failed to create llm client: %v", err)
 	}
 	if cfg.Model == "" {
+		modelMap, err := llm.Models()
+		if err != nil {
+			return "", fmt.Errorf("failed to get llm models: %v", err)
+		}
+		models := slices.Collect(maps.Keys(modelMap))
+		sort.Strings(models)
+
 		var choice string
 		prompt := &survey.Select{
 			Message:  "Select model to use:",
-			Options:  llm.Models(),
+			Options:  models,
 			PageSize: 10,
 		}
 		if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {

@@ -18,6 +18,13 @@ const cacheDBName = "dec.db"
 type CacheDB interface {
 	Get(uuid, provider, modelName, prompt string, temperature, topP float64) (*model.ChatResponse, error)
 	Set(entry *model.ChatResponse) error
+	// Copilot Token Caching
+	GetToken(key string) (*model.CopilotToken, error)
+	SetToken(token *model.CopilotToken) error
+	// Provider Models Caching
+	GetProviderModels(providerName string) (*model.ProviderModels, error)
+	SetProviderModels(models *model.ProviderModels) error
+	DeleteProviderModels(providerName string) error
 	Close() error
 }
 
@@ -51,7 +58,11 @@ func NewCacheDB(verbose bool) (CacheDB, error) {
 		gormDB.Logger = logger.Default.LogMode(logger.Info)
 	}
 
-	if err := gormDB.AutoMigrate(&model.ChatResponse{}); err != nil {
+	if err := gormDB.AutoMigrate(
+		&model.ChatResponse{},
+		&model.CopilotToken{},
+		&model.ProviderModels{},
+	); err != nil {
 		sqlDB, closeErr := gormDB.DB()
 		if closeErr == nil {
 			_ = sqlDB.Close()
@@ -61,6 +72,10 @@ func NewCacheDB(verbose bool) (CacheDB, error) {
 
 	return &DB{db: gormDB}, nil
 }
+
+/*
+	Chat Response Caching Methods
+*/
 
 // Get fetches an entry from the AI cache by parameters.
 func (d *DB) Get(uuid, provider, modelName, prompt string, temperature, topP float64) (*model.ChatResponse, error) {
@@ -97,4 +112,65 @@ func (d *DB) Close() error {
 		return fmt.Errorf("failed to get underlying DB instance: %w", err)
 	}
 	return sqlDB.Close()
+}
+
+/*
+	Copilot Token Caching Methods
+*/
+
+// GetToken retrieves a cached Copilot token.
+func (d *DB) GetToken(key string) (*model.CopilotToken, error) {
+	var token model.CopilotToken
+	if err := d.db.Where("key = ?", key).First(&token).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound // Use your defined ErrNotFound from model pkg
+		}
+		return nil, fmt.Errorf("failed to get copilot token from cache: %w", err)
+	}
+	return &token, nil
+}
+
+// SetToken stores or updates a Copilot token in the cache.
+func (d *DB) SetToken(tokenToSet *model.CopilotToken) error {
+	// Attempt to find by key, then update or create.
+	// Using Assign to either update the existing record or create a new one if not found.
+	if err := d.db.Where(model.CopilotToken{Key: tokenToSet.Key}).Assign(tokenToSet).FirstOrCreate(tokenToSet).Error; err != nil {
+		return fmt.Errorf("failed to set copilot token in cache: %w", err)
+	}
+	return nil
+}
+
+/*
+	Provider Models Caching Methods
+*/
+
+// GetProviderModels retrieves cached models for a provider.
+func (d *DB) GetProviderModels(provider string) (*model.ProviderModels, error) {
+	var pm model.ProviderModels
+	if err := d.db.Where("provider = ?", provider).First(&pm).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get provider models from cache for %s: %w", provider, err)
+	}
+	return &pm, nil
+}
+
+// SetProviderModels stores or updates cached models for a provider.
+func (d *DB) SetProviderModels(modelsToSet *model.ProviderModels) error {
+	if err := d.db.Where(model.ProviderModels{Provider: modelsToSet.Provider}).Assign(modelsToSet).FirstOrCreate(modelsToSet).Error; err != nil {
+		return fmt.Errorf("failed to set provider models in cache for %s: %w", modelsToSet.Provider, err)
+	}
+	return nil
+}
+
+// DeleteProviderModels removes cached models for a provider.
+func (d *DB) DeleteProviderModels(provider string) error {
+	if err := d.db.Where("provider = ?", provider).Delete(&model.ProviderModels{}).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil // Not an error if it's already gone or never existed
+		}
+		return fmt.Errorf("failed to delete provider models from cache for %s: %w", provider, err)
+	}
+	return nil
 }

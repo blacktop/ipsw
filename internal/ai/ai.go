@@ -2,8 +2,10 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
@@ -26,7 +28,9 @@ var Providers = []string{
 
 type AI interface {
 	Chat() (string, error)
-	Models() []string
+	Models() (map[string]string, error)
+	// FIXME: dump convienence method to set models from cache
+	SetModels(map[string]string) (map[string]string, error)
 	SetModel(string) error
 	Close() error
 }
@@ -50,42 +54,108 @@ type CachingAI struct {
 }
 
 func (c *CachingAI) Chat() (string, error) {
-	chat, err := c.cache.Get(c.config.UUID, c.config.Provider, c.config.Model, c.config.Prompt, c.config.Temperature, c.config.TopP)
-	if err == nil && chat != nil {
-		return chat.Response, nil
-	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Warnf("cache get error: %v", err)
+	if c.cache != nil && !c.config.DisableCache && !c.config.Stream {
+		chat, err := c.cache.Get(c.config.UUID, c.config.Provider, c.config.Model, c.config.Prompt, c.config.Temperature, c.config.TopP)
+		if err == nil && chat != nil {
+			return chat.Response, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) && !errors.Is(err, model.ErrNotFound) {
+			log.Warnf("cache get error: %v", err)
+		}
 	}
 
 	response, err := c.ai.Chat()
 	if err != nil {
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "model not found") ||
+			strings.Contains(errStr, "invalid model") ||
+			strings.Contains(errStr, "unknown model") ||
+			strings.Contains(errStr, "does not exist") ||
+			strings.Contains(errStr, "404") ||
+			strings.Contains(errStr, "400") {
+			log.Warnf("Potential model error detected ('%s'), clearing DB models cache for provider %s", err.Error(), c.config.Provider)
+			if c.cache != nil {
+				if delErr := c.cache.DeleteProviderModels(c.config.Provider); delErr != nil {
+					log.Warnf("Failed to delete provider models from cache for %s: %v", c.config.Provider, delErr)
+				}
+			}
+		}
 		return "", err
 	}
 
-	newEntry := &model.ChatResponse{
-		UUID:        c.config.UUID,
-		Provider:    c.config.Provider,
-		LLMModel:    c.config.Model,
-		Prompt:      c.config.Prompt,
-		Temperature: c.config.Temperature,
-		TopP:        c.config.TopP,
-		Response:    response,
-	}
-	if err := c.cache.Set(newEntry); err != nil {
-		log.Warnf("cache set error: %v", err)
+	if c.cache != nil && !c.config.DisableCache && !c.config.Stream {
+		newEntry := &model.ChatResponse{
+			UUID:        c.config.UUID,
+			Provider:    c.config.Provider,
+			LLMModel:    c.config.Model,
+			Prompt:      c.config.Prompt,
+			Temperature: c.config.Temperature,
+			TopP:        c.config.TopP,
+			Response:    response,
+		}
+		if err := c.cache.Set(newEntry); err != nil {
+			log.Warnf("cache set error: %v", err)
+		}
 	}
 
 	return response, nil
 }
 
-func (c *CachingAI) Models() []string {
-	return c.ai.Models()
+func (c *CachingAI) Models() (map[string]string, error) {
+	if c.cache != nil {
+		cachedProviderModels, err := c.cache.GetProviderModels(c.config.Provider)
+		if err == nil && cachedProviderModels != nil && cachedProviderModels.ModelsJSON != "" {
+			var modelsList map[string]string
+			if err := json.Unmarshal([]byte(cachedProviderModels.ModelsJSON), &modelsList); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal cached models for provider %s: %w", c.config.Provider, err)
+			}
+			return c.SetModels(modelsList)
+		} else if err != nil && !errors.Is(err, model.ErrNotFound) && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("failed to get cached models for provider %s: %w", c.config.Provider, err)
+		}
+	}
+
+	log.Debugf("Fetching models for provider %s from underlying AI", c.config.Provider)
+	models, err := c.ai.Models()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get models from underlying AI provider %s: %w", c.config.Provider, err)
+	}
+
+	if c.cache != nil && len(models) > 0 {
+		modelsJSON, err := json.Marshal(models)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal models for provider %s: %w", c.config.Provider, err)
+		} else {
+			providerModelsToCache := &model.ProviderModels{
+				Provider:   c.config.Provider,
+				ModelsJSON: string(modelsJSON),
+			}
+			if err := c.cache.SetProviderModels(providerModelsToCache); err != nil {
+				return nil, fmt.Errorf("failed to set provider models in cache for %s: %w", c.config.Provider, err)
+			}
+		}
+	} else if c.cache != nil && len(models) == 0 {
+		log.Debugf("Underlying AI returned no models for provider %s. Caching empty list.", c.config.Provider)
+		modelsJSON, _ := json.Marshal([]string{})
+		providerModelsToCache := &model.ProviderModels{
+			Provider:   c.config.Provider,
+			ModelsJSON: string(modelsJSON),
+		}
+		if err := c.cache.SetProviderModels(providerModelsToCache); err != nil {
+			return nil, fmt.Errorf("failed to set provider models in cache for %s: %w", c.config.Provider, err)
+		}
+	}
+
+	return models, nil
 }
 
 func (c *CachingAI) SetModel(model string) error {
 	c.config.Model = model
 	return c.ai.SetModel(model)
+}
+
+func (c *CachingAI) SetModels(models map[string]string) (map[string]string, error) {
+	return c.ai.SetModels(models)
 }
 
 func (c *CachingAI) Close() error {
@@ -109,6 +179,20 @@ func (c *CachingAI) Close() error {
 func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	var baseAI AI
 	var err error
+	var cache db.CacheDB
+
+	if !cfg.DisableCache && !cfg.Stream {
+		cache, err = db.NewCacheDB(cfg.Verbose)
+		if err != nil {
+			log.Warnf("Failed to initialize AI cache: %v. Proceeding without DB caching for tokens/chat.", err)
+			cache = nil
+		} else {
+			log.Info("AI caching is enabled")
+		}
+	} else {
+		log.Warn("AI caching is disabled by config")
+		cache = nil
+	}
 
 	switch cfg.Provider {
 	case "claude":
@@ -126,6 +210,7 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			Temperature: cfg.Temperature,
 			TopP:        cfg.TopP,
 			Stream:      cfg.Stream,
+			Cache:       cache,
 		})
 	case "gemini":
 		baseAI, err = gemini.NewGemini(ctx, &gemini.Config{
@@ -159,21 +244,15 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 		return nil, fmt.Errorf("failed to create base AI provider %s: %w", cfg.Provider, err)
 	}
 
-	if cfg.DisableCache || cfg.Stream {
-		log.Warn("AI caching is disabled by config")
-		return baseAI, nil
-	}
-
-	aiCache, cacheErr := db.NewCacheDB(cfg.Verbose)
-	if cacheErr != nil {
-		log.Warnf("Failed to initialize AI cache: %v. Proceeding without caching", cacheErr)
-		return baseAI, nil
-	}
-
-	log.Info("AI caching is enabled")
-	return &CachingAI{
+	ai := &CachingAI{
 		ai:     baseAI,
-		cache:  aiCache,
+		cache:  cache,
 		config: cfg,
-	}, nil
+	}
+
+	if _, err := ai.Models(); err != nil {
+		return nil, fmt.Errorf("failed to prefetch models: %w", err)
+	}
+
+	return ai, nil
 }
