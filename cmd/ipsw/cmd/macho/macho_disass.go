@@ -76,7 +76,6 @@ func init() {
 	machoDisassCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
-	machoDisassCmd.Flags().Bool("replace", false, "Replace .a2s")
 	machoDisassCmd.MarkFlagsMutuallyExclusive("entry", "symbol", "vaddr", "off")
 
 	viper.BindPFlag("macho.disass.arch", machoDisassCmd.Flags().Lookup("arch"))
@@ -102,7 +101,6 @@ func init() {
 	viper.BindPFlag("macho.disass.all-fileset-entries", machoDisassCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.disass.section", machoDisassCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
-	viper.BindPFlag("macho.disass.replace", machoDisassCmd.Flags().Lookup("replace"))
 
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -287,7 +285,7 @@ var machoDisassCmd = &cobra.Command{
 						//* First pass ANALYSIS *
 						//***********************
 						if !quiet {
-							if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+							if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath); err != nil {
 								return fmt.Errorf("failed to open or create symbol map: %v", err)
 							}
 							if err := engine.Triage(); err != nil {
@@ -411,13 +409,13 @@ var machoDisassCmd = &cobra.Command{
 					//* First pass ANALYSIS *
 					//***********************
 					if !quiet {
-						if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath, viper.GetBool("macho.disass.replace")); err != nil {
+						if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath); err != nil {
 							return fmt.Errorf("failed to open or create symbol map: %v", err)
 						}
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						// if engine.EmptySymMap() {
+						// if engine.EmptySymMap() { FIXME: this is fast enough where we don't need to do this optimization
 						if err := engine.Analyze(); err != nil {
 							if !viper.GetBool("macho.disass.force") {
 								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)

@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
@@ -603,7 +602,7 @@ func (d *MachoDisass) parseSwift() error {
 					if d.cfg.Demangle {
 						dtd.Protocol, _ = swift.DemangleSimple(dtd.Protocol)
 					}
-					log.Debugf("nominal type descriptor for %s : %s", dtd.TypeRef.Name, dtd.Protocol)
+					// log.Debugf("nominal type descriptor for %s : %s", dtd.TypeRef.Name, dtd.Protocol)
 					d.a2s[dtd.TypeRef.Address] = fmt.Sprintf("nominal type descriptor for %s : %s", dtd.TypeRef.Name, dtd.Protocol)
 				}
 			}
@@ -722,82 +721,122 @@ func (d *MachoDisass) SetStartSym(addr uint64) {
 	d.a2s[addr] = "start"
 }
 
-func (d *MachoDisass) OpenOrCreateSymMap(cacheFile, machoPath string, replace bool) error {
-	if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
-		// attempt to create the cache file, create in tmp if permission denied
-		if _, err := os.Create(cacheFile); err != nil {
-			if errors.Is(err, os.ErrPermission) {
-				var e *os.PathError
-				if errors.As(err, &e) {
-					log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
-				}
-				tmpDir := os.TempDir()
-				if runtime.GOOS == "darwin" {
-					tmpDir = "/tmp"
-				}
-				cacheFile = filepath.Join(tmpDir, d.f.UUID().String()+".a2s")
-				if _, err = os.Create(cacheFile); err != nil {
-					return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-				}
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("creating in the temp folder: %s", cacheFile))
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("to use this symbol cache in the future you must supply the flag: --cache %s ", cacheFile))
-			} else {
-				return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-			}
-		}
-		// if dSYM file exists, load symbols from it
-		dsym := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
-		if _, err := os.Stat(dsym); err == nil {
-			log.Info("Detected dSYM file, using it for symbolication")
-			dm, err := macho.Open(dsym)
-			if err != nil {
-				log.Errorf("failed to open dSYM file for symbolication: %v", err)
-			} else {
-				for _, sym := range dm.Symtab.Syms {
-					if sym.Name != "" {
-						d.a2s[sym.Value] = sym.Name
-					}
-				}
-				// If the dSYM file has a symbol map, use it for the output
-				if len(d.a2s) > 0 {
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Using dSYM symbol map with %d symbols", len(d.a2s)))
-				} else {
-					utils.Indent(log.Warn, 2)("No symbols found in dSYM file")
-				}
-			}
-		}
-	} else {
-		log.Infof("Loading symbol cache file...")
-		if f, err := os.Open(cacheFile); err != nil {
-			return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
+func (d *MachoDisass) loadDwarf(machoPath string) error {
+	dsymPath := filepath.Join(machoPath+".dSYM", "Contents/Resources/DWARF", filepath.Base(machoPath))
+	if _, statErr := os.Stat(dsymPath); statErr == nil {
+		dm, err := macho.Open(dsymPath)
+		if err != nil {
+			return fmt.Errorf("failed to open dSYM file: %v", err)
 		} else {
-			if err := gob.NewDecoder(f).Decode(&d.a2s); err != nil {
-				yes := false
-				if replace {
-					yes = true
-				} else {
-					log.Errorf("address-to-symbol cache file is corrupt: %v", err)
-					prompt := &survey.Confirm{
-						Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
-						Default: true,
+			foundDSYMSymbols := false
+			for _, sym := range dm.Symtab.Syms {
+				if sym.Name != "" {
+					name := sym.Name
+					if d.cfg.Demangle {
+						if strings.HasPrefix(name, "_$s") {
+							name, _ = swift.Demangle(name)
+						} else {
+							name = demangle.Do(name, false, false)
+						}
 					}
-					survey.AskOne(prompt, &yes)
-				}
-				if yes {
-					f.Close()
-					if err := os.Remove(cacheFile); err != nil {
-						return fmt.Errorf("failed to remove address-to-symbol cache file %s: %v", cacheFile, err)
-					}
-					if _, err := os.Create(cacheFile); err != nil {
-						return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
-					}
-				} else {
-					return nil
+					d.a2s[sym.Value] = name
+					foundDSYMSymbols = true
 				}
 			}
-			f.Close()
+			dm.Close()
+			if foundDSYMSymbols {
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Loaded %d symbols from .dSYM file", len(d.a2s)))
+			} else {
+				utils.Indent(log.Warn, 2)("No symbols found in dSYM file")
+			}
 		}
 	}
+	return nil
+}
+
+func (d *MachoDisass) getTempCachePath(cacheFile *string) string {
+	var tmpfile string
+	if d.f != nil {
+		uuid := d.f.UUID()
+		if uuid.UUID.IsNull() {
+			tmpfile = filepath.Base(*cacheFile)
+		} else {
+			tmpfile = uuid.String() + ".a2s"
+		}
+	}
+	return filepath.Join(os.TempDir(), tmpfile)
+}
+
+var ErrCorruptCache = errors.New("corrupt cache file")
+
+func (d *MachoDisass) loadCache(cacheFile *string) error {
+	f, err := os.Open(*cacheFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
+		return fmt.Errorf("failed to open cache file %s: %v", *cacheFile, err)
+	}
+	defer f.Close()
+
+	a2s := make(map[uint64]string)
+	if gobErr := gob.NewDecoder(f).Decode(&a2s); gobErr != nil {
+		return ErrCorruptCache
+	}
+
+	maps.Copy(d.a2s, a2s)
+	log.Infof("Loaded %d symbols from cache file: %s", len(d.a2s), *cacheFile)
+
+	return nil
+}
+
+func (d *MachoDisass) OpenOrCreateSymMap(cacheFile *string, machoPath string) error {
+	if err := d.loadCache(cacheFile); err == nil {
+		return nil // cache file loaded successfully
+	} else if errors.Is(err, os.ErrNotExist) {
+		tmpcache := d.getTempCachePath(cacheFile)
+		if err := d.loadCache(&tmpcache); err == nil {
+			*cacheFile = tmpcache
+			return nil // temp cache file loaded successfully
+		} else if errors.Is(err, os.ErrNotExist) {
+			// cache AND temp cache files do not exist (create new one)
+		} else if errors.Is(err, ErrCorruptCache) {
+			log.Warn("temp cache file is corrupt, recreating it")
+			if err := os.Remove(tmpcache); err != nil {
+				return fmt.Errorf("failed to remove temp cache file: %v", err)
+			}
+		} else {
+			return fmt.Errorf("failed to load temp cache file: %v", err)
+		}
+	} else if errors.Is(err, ErrCorruptCache) {
+		log.Warn("cache file is corrupt, recreating it")
+		if err := os.Remove(*cacheFile); err != nil {
+			return fmt.Errorf("failed to remove cache file: %v", err)
+		}
+	} else {
+		return fmt.Errorf("failed to load cache file: %v", err)
+	}
+	// load the .dSYM file if it exists
+	if err := d.loadDwarf(machoPath); err != nil {
+		return fmt.Errorf("failed to load dSYM file: %v", err)
+	}
+	if _, err := os.Create(*cacheFile); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			var e *os.PathError
+			if errors.As(err, &e) {
+				log.Errorf("failed to create symbol cache file %s (most likely a read-only location): %v", filepath.Base(e.Path), e.Err)
+			}
+			tmpcach := d.getTempCachePath(cacheFile)
+			if _, err := os.Create(tmpcach); err != nil {
+				return fmt.Errorf("failed to create temp cache file: %v", err)
+			}
+			utils.Indent(log.Warn, 2)("creating in the temp folder")
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcach))
+			*cacheFile = tmpcach
+		}
+		return fmt.Errorf("failed to create cache file: %v", err)
+	}
+
 	return nil
 }
 
