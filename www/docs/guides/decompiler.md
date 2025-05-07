@@ -47,19 +47,19 @@ It appears that you can't use VSCode editor to create the required JSON file as 
 
 ### OpenAI
 
-You must signup for and buy some API credits from https://platform.openai.com/api-keys first. Then generate an API key and put it in your environment as `OPENAI_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm openai` provider.
+You must signup for and buy some API credits from https://platform.openai.com/api-keys first. Then generate an API key and put it in your environment as `OPENAI_API_KEY` and `ipsw` will auto-detect this and use it via the `--dec-llm openai` provider.
 
 ### Claude (Anthropic)
 
-You must signup for and buy some API credits from https://console.anthropic.com/login first. Then generate an API key and put it in your environment as `ANTHROPIC_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm claude` provider.
+You must signup for and buy some API credits from https://console.anthropic.com/login first. Then generate an API key and put it in your environment as `ANTHROPIC_API_KEY` and `ipsw` will auto-detect this and use it via the `--dec-llm claude` provider.
 
 ### Gemini (Google AI)
 
-Head to https://aistudio.google.com/apikey login and create an API key and put it in your environment as `GEMINI_API_KEY` and `ipsw` will auto-detect this and use it via the `--llm gemini` provider.
+Head to https://aistudio.google.com/apikey login and create an API key and put it in your environment as `GEMINI_API_KEY` and `ipsw` will auto-detect this and use it via the `--dec-llm gemini` provider.
 
 ### Ollama (local LLMs)
 
-Install [ollama](https://ollama.com) and download a few popular models *(maybe `qwen3` or `llama4`)* and as long as the `ollama` server is running you will be able to use the `--llm ollama` provider.
+Install [ollama](https://ollama.com) and download a few popular models *(maybe `qwen3` or `llama4`)* and as long as the `ollama` server is running you will be able to use the `--dec-llm ollama` provider.
 
 :::warning note
 I personally have NEVER gotten usable results from a local LLM, but maybe some of you have BEEFY machines and can run the 200B+ parameter models, my laptop would just self-destruct if I tried 💻🔥
@@ -76,7 +76,7 @@ There are 2 `ipsw` disassemblers:
 
 ```bash
 ❱ ipsw macho disass /System/Library/PrivateFrameworks/ApplePushService.framework/apsd --entry \
-             --dec --dec-model "Claude 3.7 Sonnet" --llm "copilot"
+             --dec --dec-model "Claude 3.7 Sonnet" --dec-llm "copilot"
    • Loading symbol cache file...
    • Decompiling... 🕒
 ```
@@ -116,11 +116,15 @@ int main(int argc, char *argv[]) {
 }
 ```
 
+:::info note
+If you don't supply a `--dec-model` `ipsw` will query the llm provider and present you with a list of all available models to choose from.
+:::
+
 ### `dsc`
 
 ```bash
 ❱ ipsw dsc disass 22F5068a__iPhone17,1/dyld_shared_cache_arm64e --vaddr 0x2532DB6C8 --demangle \
-             --dec --dec-lang "Swift" --llm "openai"
+             --dec --dec-lang "Swift" --dec-llm "openai"
    • Loading symbol cache file...
 ? Select model to use: gpt-4.1-2025-04-14
    • Decompiling... 🕒
@@ -167,10 +171,6 @@ func getDefaultLDMGlobalEnabled() -> Bool {
     return false
 }
 ```
-
-:::info note
-If you don't supply a `--dec-model` `ipsw` will query the llm provider and present you with a list of all available models to choose from.
-:::
 
 :::info note
 You can supply `--dec-lang Swift` to force the LLM to interpret the ASM as Swift *(if it doesn't auto-detect the correct language)*
