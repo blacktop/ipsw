@@ -118,7 +118,9 @@ var DisassCmd = &cobra.Command{
 		# Disassemble a function at a virtual address in dyld_shared_cache and do NOT markup analysis (Faster)
 		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
 		# Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
-		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"`),
+		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
+		# Decompile a function using OpenRouter to access various models
+		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"`),
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
