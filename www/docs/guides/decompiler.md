@@ -7,13 +7,14 @@ description: Using the AI decompiler.
 
 ## Requirements
 
-There are currently 5 supported LLM providers
+There are currently 6 supported LLM providers
 
 - Github Copilot
 - OpenAI
 - Claude (Anthropic)
 - Gemini (Google AI)
 - Ollama (local LLMs)
+- OpenRouter (API access to multiple models)
 
 ### Github Copilot
 
@@ -64,6 +65,15 @@ Install [ollama](https://ollama.com) and download a few popular models *(maybe `
 :::warning note
 I personally have NEVER gotten usable results from a local LLM, but maybe some of you have BEEFY machines and can run the 200B+ parameter models, my laptop would just self-destruct if I tried 💻🔥
 :::
+
+### OpenRouter (API access to multiple models)
+
+OpenRouter provides API access to a variety of models from different providers (OpenAI, Anthropic, Google, Meta, etc.) through a unified API.
+
+You must signup for and buy some API credits from https://openrouter.ai/ first. Then generate an API key and put it in your environment as `OPENROUTER_API_KEY` and `ipsw` will auto-detect this and use it via the `--dec-llm openrouter` provider.
+
+Optionally, set `OPENROUTER_CLIENT_TITLE` to identify your application in requests when reviewing credit usage activity.
+
 
 ## Getting Started
 
