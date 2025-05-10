@@ -13,6 +13,7 @@ import (
 	"github.com/blacktop/ipsw/internal/ai/gemini"
 	"github.com/blacktop/ipsw/internal/ai/ollama"
 	"github.com/blacktop/ipsw/internal/ai/openai"
+	"github.com/blacktop/ipsw/internal/ai/openrouter"
 	db "github.com/blacktop/ipsw/internal/db/ai"
 	model "github.com/blacktop/ipsw/internal/model/ai"
 	"gorm.io/gorm"
@@ -24,6 +25,7 @@ var Providers = []string{
 	"gemini",
 	"ollama",
 	"openai",
+	"openrouter",
 }
 
 type AI interface {
@@ -230,6 +232,14 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 		})
 	case "openai":
 		baseAI, err = openai.NewOpenAI(ctx, &openai.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+		})
+	case "openrouter":
+		baseAI, err = openrouter.NewOpenRouter(ctx, &openrouter.Config{
 			Prompt:      cfg.Prompt,
 			Model:       cfg.Model,
 			Temperature: cfg.Temperature,
