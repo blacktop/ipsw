@@ -31,6 +31,8 @@ type Config struct {
 	Verbose      bool
 	Color        bool
 	Theme        string
+	MaxRetries   int
+	RetryBackoff time.Duration
 }
 
 func Decompile(asm string, cfg *Config) (string, error) {
@@ -48,6 +50,8 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		Stream:       cfg.Stream,
 		DisableCache: cfg.DisableCache,
 		Verbose:      cfg.Verbose,
+		MaxRetries:   cfg.MaxRetries,
+		RetryBackoff: cfg.RetryBackoff,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create llm client: %v", err)
