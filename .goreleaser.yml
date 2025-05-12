@@ -592,32 +592,39 @@ nfpms:
     vendor: Blacktop
     bindir: /usr/bin
     section: utils
+    mtime: "{{ .CommitDate }}"
     contents:
       - src: ./config.example.yml
         dst: /etc/ipsw/config.yml
         type: config|noreplace
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipsw/_bash
         dst: /usr/share/bash-completion/completions/ipsw
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipsw/_zsh
         dst: /usr/share/zsh/vendor-completions/_ipsw
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipsw/_fish
         dst: /usr/share/fish/vendor_completions.d/ipsw.fish
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./manpages/ipsw.1.gz
         dst: /usr/share/man/man1/ipsw.1.gz
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
     file_name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- .Os }}_
@@ -645,6 +652,7 @@ nfpms:
     vendor: Blacktop
     bindir: /usr/bin
     section: utils
+    mtime: "{{ .CommitDate }}"
     provides:
       - ipswd
     contents:
@@ -657,22 +665,27 @@ nfpms:
         type: config|noreplace
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipswd/_bash
         dst: /usr/share/bash-completion/completions/ipswd
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipswd/_zsh
         dst: /usr/share/zsh/vendor-completions/_ipswd
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./completions/ipswd/_fish
         dst: /usr/share/fish/vendor_completions.d/ipswd.fish
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
         file_info:
           mode: 0644
+          mtime: "{{ .CommitDate }}"
     scripts:
       postinstall: "./hack/goreleaser/linux_install/postinstall.sh"
       postremove: "./hack/goreleaser/linux_install/postremove.sh"
