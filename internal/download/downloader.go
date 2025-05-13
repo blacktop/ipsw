@@ -298,18 +298,6 @@ func (d *Download) Do() error {
 		)
 
 		var bar *mpb.Bar
-		bar = p.New(d.size,
-			mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
-			mpb.PrependDecorators(
-				decor.CountersKibiByte("\t% .2f / % .2f"),
-			),
-			mpb.AppendDecorators(
-				decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
-				decor.Name(" ] "),
-				decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
-			),
-		)
-
 		if d.resume {
 			bar = p.New(d.size,
 				mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
@@ -327,9 +315,20 @@ func (d *Download) Do() error {
 				// 	decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", float64(d.size)/2048),
 				// ),
 			)
-			bar.IncrInt64(d.bytesResumed)
+			bar.SetCurrent(d.bytesResumed)
 			bar.SetRefill(d.bytesResumed)
-			// bar.IncrInt64(d.size - d.bytesResumed)
+		} else {
+			bar = p.New(d.size,
+				mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
+				mpb.PrependDecorators(
+					decor.CountersKibiByte("\t% .2f / % .2f"),
+				),
+				mpb.AppendDecorators(
+					decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+					decor.Name(" ] "),
+					decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
+				),
+			)
 		}
 
 		// create proxy reader
