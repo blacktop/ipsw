@@ -88,6 +88,7 @@ type OtaConf struct {
 	Latest          bool
 	Delta           bool
 	RSR             bool
+	Simulator       bool
 	Device          string
 	Model           string
 	Version         *version.Version
@@ -110,6 +111,7 @@ type pallasRequest struct {
 	BuildVersion            string    `json:"BuildVersion"`
 	Build                   string    `json:"Build,omitempty"`
 	RequestedProductVersion string    `json:"RequestedProductVersion,omitempty"`
+	RequestedBuild          string    `json:"RequestedBuild,omitempty"`
 	Supervised              bool      `json:"Supervised,omitempty"`
 	DelayRequested          bool      `json:"DelayRequested,omitempty"`
 	CompatibilityVersion    int       `json:"CompatibilityVersion,omitempty"`
@@ -305,6 +307,20 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 		if o.Config.RSR {
 			return []assetType{rsrUpdate}, nil
 		}
+		if o.Config.Simulator {
+			switch o.Config.Platform {
+			case "ios":
+				return []assetType{iOsSimulatorUpdate}, nil
+			case "watchos":
+				return []assetType{watchOsSimulatorUpdate}, nil
+			case "tvos":
+				return []assetType{tvOsSimulatorUpdate}, nil
+			case "visionos":
+				return []assetType{visionOaSimulatorUpdate}, nil
+			default:
+				return nil, fmt.Errorf("unsupported simulator platform %s", o.Config.Platform)
+			}
+		}
 		if o.Config.Platform == "ios" {
 			return []assetType{softwareUpdate}, nil
 		}
@@ -381,6 +397,9 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 			}, nil
 		}
 	default:
+		if o.Config.Simulator {
+			return []string{assetAudienceDB["macos"].Generic}, nil
+		}
 		if o.Config.Version != nil {
 			segs := o.Config.Version.Segments()
 			if len(segs) == 0 {
@@ -462,6 +481,10 @@ func (o *Ota) getRequests(atype assetType, audienceID string) (reqs []pallasRequ
 	if o.Config.RSR {
 		req.RestoreVersion = "0.0.0.0.0,0"
 		req.Build = o.Config.Build
+	}
+
+	if o.Config.Simulator {
+		req.RequestedBuild = o.Config.Build
 	}
 
 	if len(o.Config.Device) > 0 && len(o.Config.Model) == 0 {
@@ -561,6 +584,21 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 
 	oassets := o.QueryPublicXML()
 
+	if o.Config.Simulator {
+		if o.Config.Version.Original() == "0" && o.Config.Build == "0" {
+			return nil, fmt.Errorf("you must supply: --build, --version or --latest WITH --sim")
+		} else if o.Config.Version.Original() != "0" && o.Config.Build == "0" {
+			dvt, err := GetDVTDownloadableIndex()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get simulators index: %v", err)
+			}
+			o.Config.Build, err = dvt.LookupBuild(o.Config.Version.Original(), o.Config.Platform)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lookup simulator build: %v", err)
+			}
+		}
+	}
+
 	pallasReqs, err := o.buildPallasRequests()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build the pallas requests: %v", err)
@@ -617,6 +655,8 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 			log.Debugf("[ERROR]\n%s", string(b64data))
 			continue
 		}
+
+		// os.WriteFile("pallas.json", b64data, 0644)
 
 		res := ota{}
 		if err := json.Unmarshal(b64data, &res); err != nil {
@@ -698,6 +738,16 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	var devices []string
 	var filteredDevices []string
 	var filteredOtas []types.Asset
+
+	if o.Config.Simulator {
+		for _, ota := range otas {
+			switch assetType(ota.AssetType) {
+			case iOsSimulatorUpdate, watchOsSimulatorUpdate, tvOsSimulatorUpdate, visionOaSimulatorUpdate:
+				filteredOtas = append(filteredOtas, ota)
+			}
+		}
+		return filteredOtas
+	}
 
 	if o.Config.Platform == "macos" {
 		if o.Config.Build != "0" && !o.Config.RSR {
