@@ -218,6 +218,22 @@ var otaDLCmd = &cobra.Command{
 		 * GET OTA INFO *
 		 ****************/
 		if otaInfo {
+			if getSim {
+				dvt, err := download.GetDVTDownloadableIndex()
+				if err != nil {
+					return err
+				}
+				for _, dl := range dvt.Downloadables {
+					fmt.Printf("%-40s %s=%s\t%s=%s\n",
+						dl.Name,
+						color.New(color.Bold, color.FgHiBlue).Sprint("build"),
+						dl.SimulatorVersion.BuildUpdate,
+						color.New(color.Bold, color.FgHiBlue).Sprint("size"),
+						humanize.Bytes(uint64(dl.FileSize)),
+					)
+				}
+				return nil
+			}
 			if len(device) > 0 {
 				log.WithField("device", device).Info("OTAs")
 				for _, asset := range as.ForDevice(device) {
