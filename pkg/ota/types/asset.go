@@ -46,6 +46,7 @@ type Asset struct {
 	AssetType                             string             `json:"AssetType" plist:"AssetType,omitempty"`
 	BridgeVersionInfo                     bridgeVersionInfo  `json:"BridgeVersionInfo" plist:"BridgeVersionInfo,omitempty"`
 	Build                                 string             `json:"Build" plist:"Build,omitempty"`
+	SimulatorVersion                      string             `json:"SimulatorVersion" plist:"SimulatorVersion,omitempty"`
 	DataTemplateSize                      int                `json:"DataTemplateSize" plist:"DataTemplateSize,omitempty"`
 	EAPFSEnabled                          bool               `json:"EAPFSEnabled,omitempty" plist:"EAPFSEnabled,omitempty"`
 	InstallationSize                      string             `json:"InstallationSize" plist:"InstallationSize,omitempty"`
@@ -83,6 +84,7 @@ type Asset struct {
 	IsZipStreamable                       bool               `json:"_IsZipStreamable" plist:"_IsZipStreamable,omitempty"`
 	MasteredVersion                       string             `json:"_MasteredVersion" plist:"_MasteredVersion,omitempty"`
 	Hash                                  []byte             `json:"_Measurement" plist:"_Measurement,omitempty"`
+	Sha256Hash                            []byte             `json:"_Measurement-SHA256" plist:"_Measurement-SHA256,omitempty"`
 	HashAlgorithm                         string             `json:"_MeasurementAlgorithm" plist:"_MeasurementAlgorithm,omitempty"`
 	UnarchivedSize                        int                `json:"_UnarchivedSize" plist:"_UnarchivedSize,omitempty"`
 	AssetDefaultGarbageCollectionBehavior string             `json:"__AssetDefaultGarbageCollectionBehavior" plist:"__AssetDefaultGarbageCollectionBehavior,omitempty"`

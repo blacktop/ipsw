@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 )
@@ -23,6 +24,14 @@ const (
 	XcodeDlURL       = "https://storage.googleapis.com/xcodes-cache"
 	xcodeReleasesAPI = "https://xcodereleases.com/data.json"
 )
+
+var platforms = map[string]string{
+	"macos":    "com.apple.platform.macosx",
+	"ios":      "com.apple.platform.iphoneos",
+	"tvos":     "com.apple.platform.appletvos",
+	"watchos":  "com.apple.platform.watchos",
+	"visionos": "com.apple.platform.xros",
+}
 
 type Downloadable struct {
 	Authentication    string `plist:"authentication,omitempty"`
@@ -86,6 +95,20 @@ func GetDVTDownloadableIndex() (*DVTDownloadable, error) {
 	utils.Reverse(dvt.Downloadables)
 
 	return &dvt, nil
+}
+
+func (d *DVTDownloadable) LookupBuild(version, platform string) (string, error) {
+	platform, ok := platforms[platform]
+	if !ok {
+		return "", fmt.Errorf("platform not supported: %s", platform)
+	}
+	for _, dl := range d.Downloadables {
+		if dl.SimulatorVersion.Version == version && dl.Platform == platform {
+			log.WithField("name", dl.Name).Debug("Simulator")
+			return dl.SimulatorVersion.BuildUpdate, nil
+		}
+	}
+	return "", fmt.Errorf("build not found for: %s", version)
 }
 
 type Contents struct {

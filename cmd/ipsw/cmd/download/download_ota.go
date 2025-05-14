@@ -65,6 +65,7 @@ func init() {
 	otaDLCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	otaDLCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	otaDLCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
+	otaDLCmd.Flags().Bool("sim", false, "Download Simulator OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
@@ -87,6 +88,7 @@ func init() {
 	viper.BindPFlag("download.ota.latest", otaDLCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ota.delta", otaDLCmd.Flags().Lookup("delta"))
 	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
+	viper.BindPFlag("download.ota.sim", otaDLCmd.Flags().Lookup("sim"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("download.ota.urls", otaDLCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.ota.json", otaDLCmd.Flags().Lookup("json"))
@@ -159,6 +161,7 @@ var otaDLCmd = &cobra.Command{
 		getBeta := viper.GetBool("download.ota.beta")
 		getLatest := viper.GetBool("download.ota.latest")
 		getRSR := viper.GetBool("download.ota.rsr")
+		getSim := viper.GetBool("download.ota.sim")
 		remoteDyld := viper.GetBool("download.ota.dyld")
 		dyldArches := viper.GetStringSlice("download.ota.dyld-arch")
 		dyldDriverKit := viper.GetBool("download.ota.driver-kit")
@@ -269,6 +272,7 @@ var otaDLCmd = &cobra.Command{
 			Latest:          getLatest,
 			Delta:           viper.GetBool("download.ota.delta"),
 			RSR:             getRSR,
+			Simulator:       getSim,
 			Device:          device,
 			Model:           model,
 			Version:         ver,
@@ -322,7 +326,7 @@ var otaDLCmd = &cobra.Command{
 			for _, o := range otas {
 				utils.Indent(log.WithFields(log.Fields{
 					"name":         o.DocumentationID,
-					"version":      o.OSVersion,
+					"version":      or([]string{o.OSVersion, o.SimulatorVersion}),
 					"build":        o.Build,
 					"device_count": len(o.SupportedDevices),
 					"model_count":  len(o.SupportedDeviceModels),
@@ -357,7 +361,7 @@ var otaDLCmd = &cobra.Command{
 						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices, " "), len(o.SupportedDevices)),
 						"model":   strings.Join(o.SupportedDeviceModels, " "),
 					}
-					if o.IsEncrypted {
+					if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
 						fields["encrypted"] = true
 						fields["key"] = o.ArchiveDecryptionKey
 					}
@@ -422,6 +426,9 @@ var otaDLCmd = &cobra.Command{
 				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
+					if getSim {
+						folder = filepath.Join(destPath, fmt.Sprintf("%s_%s_Simulator_OTAs", strings.ToUpper(platform), o.SimulatorVersion))
+					}
 					os.MkdirAll(folder, 0750)
 					var devices string
 					if len(o.SupportedDevices) > 0 {
@@ -445,21 +452,24 @@ var otaDLCmd = &cobra.Command{
 						isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
 					}
 					var isAEA string
-					if o.IsEncrypted {
+					if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
 						filesafe := o.ArchiveDecryptionKey
 						filesafe = strings.ReplaceAll(filesafe, "/", "_")
 						filesafe = strings.ReplaceAll(filesafe, "+", "-")
 						isAEA = "KEY_[" + filesafe + "]_"
 					}
 					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s", devices, isRSR, isAEA, getDestName(url, removeCommas)))
+					if getSim {
+						destName = filepath.Join(folder, fmt.Sprintf("simulator_%s%s", isAEA, getDestName(url, removeCommas)))
+					}
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						fields := log.Fields{
 							"device": strings.Join(o.SupportedDevices, " "),
 							"model":  strings.Join(o.SupportedDeviceModels, " "),
 							"build":  o.Build,
-							"type":   o.DocumentationID,
+							"type":   or([]string{o.DocumentationID, "simulator"}),
 						}
-						if o.IsEncrypted {
+						if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
 							fields["encrypted"] = true
 							fields["key"] = o.ArchiveDecryptionKey
 						}
@@ -481,4 +491,13 @@ var otaDLCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func or(values []string) string {
+	for _, v := range values {
+		if len(v) > 0 {
+			return v
+		}
+	}
+	return ""
 }
