@@ -65,7 +65,7 @@ const (
 
 	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
-	userAgent = "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6"
+	userAgent = "Configurator/2.18 (Macintosh; OS X 15.4.1; 24E263) AppleWebKit/0621.1.15.11.10"
 
 	hashcashVersion        = 1
 	hashcashHeader         = "X-APPLE-HC"
