@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/styles"
@@ -62,6 +63,8 @@ func init() {
 	DisassCmd.Flags().Bool("dec-nocache", false, "Do not use decompilation cache")
 	DisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	DisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
+	DisassCmd.Flags().Int("dec-retries", 0, "Number of retries for LLM decompilation")
+	DisassCmd.Flags().Duration("dec-retry-backoff", 30*time.Second, "Backoff time between retries (e.g. '30s', '2m')")
 	DisassCmd.Flags().String("dec-theme", "nord", "Decompilation color theme (nord, github, etc)")
 	DisassCmd.RegisterFlagCompletionFunc("dec-theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
@@ -87,6 +90,8 @@ func init() {
 	viper.BindPFlag("dyld.disass.dec-nocache", DisassCmd.Flags().Lookup("dec-nocache"))
 	viper.BindPFlag("dyld.disass.dec-temp", DisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("dyld.disass.dec-top-p", DisassCmd.Flags().Lookup("dec-top-p"))
+	viper.BindPFlag("dyld.disass.dec-retries", DisassCmd.Flags().Lookup("dec-retries"))
+	viper.BindPFlag("dyld.disass.dec-retry-backoff", DisassCmd.Flags().Lookup("dec-retry-backoff"))
 	viper.BindPFlag("dyld.disass.dec-theme", DisassCmd.Flags().Lookup("dec-theme"))
 	viper.BindPFlag("dyld.disass.json", DisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.disass.quiet", DisassCmd.Flags().Lookup("quiet"))
@@ -288,6 +293,8 @@ var DisassCmd = &cobra.Command{
 							Verbose:      viper.GetBool("verbose"),
 							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 							Theme:        viper.GetString("dyld.disass.dec-theme"),
+							MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
+							RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
 						})
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
@@ -406,6 +413,8 @@ var DisassCmd = &cobra.Command{
 							Verbose:      viper.GetBool("verbose"),
 							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 							Theme:        viper.GetString("dyld.disass.dec-theme"),
+							MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
+							RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
 						})
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
@@ -541,6 +550,8 @@ var DisassCmd = &cobra.Command{
 						Verbose:      viper.GetBool("verbose"),
 						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
 						Theme:        viper.GetString("dyld.disass.dec-theme"),
+						MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
+						RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
 					})
 					if err != nil {
 						return fmt.Errorf("failed to decompile via llm: %v", err)
