@@ -31,8 +31,9 @@ import (
 // CREDIT - https://github.com/majd/ipatool
 
 const (
-	appStoreAuthURL     = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-	appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	appStoreAuthURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+	// appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	appStoreDownloadURL = "https://downloaddispatch.itunes.apple.com/WebObjects/DownloadDispatch.woa/wa/ent/download?guid="
 	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/buyProduct"
 	appStoreSearchURL   = "https://itunes.apple.com/search"
 	appStoreLookupURL   = "https://itunes.apple.com/lookup"
@@ -181,12 +182,20 @@ type purchaseResponse struct {
 }
 
 type downloadRequest struct {
-	GUID              string `plist:"guid,omitempty"`
-	Price             string `plist:"price,omitempty"`
-	PricingParameters string `plist:"pricingParameters,omitempty"`
-	ProductType       string `plist:"productType,omitempty"`
-	SalableAdamId     string `plist:"salableAdamId,omitempty"`
+	CreditDisplay string `plist:"creditDisplay,omitempty"`
+	GUID          string `plist:"guid,omitempty"`
+	KBSync        string `plist:"kbsync,omitempty"`
+	SalableAdamId string `plist:"salableAdamId,omitempty"`
+	SerialNumber  string `plist:"serialNumber,omitempty"`
 }
+
+// type downloadRequest struct {
+// 	GUID              string `plist:"guid,omitempty"`
+// 	Price             string `plist:"price,omitempty"`
+// 	PricingParameters string `plist:"pricingParameters,omitempty"`
+// 	ProductType       string `plist:"productType,omitempty"`
+// 	SalableAdamId     string `plist:"salableAdamId,omitempty"`
+// }
 
 type downloadResponse struct {
 	FailureType     string              `plist:"failureType,omitempty"`
@@ -744,14 +753,14 @@ func (as *AppStore) Download(bundleID, output string) error {
 	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 
 	plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
-		GUID:              guid,
-		Price:             "0",
-		PricingParameters: "STDRDL",
-		ProductType:       "C",
-		SalableAdamId:     strconv.Itoa(app.ID),
+		CreditDisplay: "$0.00",
+		GUID:          guid,
+		KBSync:        "0",
+		SalableAdamId: strconv.Itoa(app.ID),
+		SerialNumber:  "0",
 	})
 
-	req, err := http.NewRequest("POST", appStoreDownloadURL, buf)
+	req, err := http.NewRequest("POST", appStoreDownloadURL+guid, buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
