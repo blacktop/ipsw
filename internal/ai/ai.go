@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/blacktop/ipsw/internal/utils"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
@@ -47,6 +50,8 @@ type Config struct {
 	Stream       bool
 	DisableCache bool
 	Verbose      bool
+	MaxRetries   int
+	RetryBackoff time.Duration
 }
 
 type CachingAI struct {
@@ -66,8 +71,11 @@ func (c *CachingAI) Chat() (string, error) {
 		}
 	}
 
-	response, err := c.ai.Chat()
-	if err != nil {
+	response, err := utils.RetryWithResult(c.config.MaxRetries+1, c.config.RetryBackoff, func() (string, error) {
+		resp, err := c.ai.Chat()
+		if err == nil {
+			return resp, nil
+		}
 		errStr := strings.ToLower(err.Error())
 		if strings.Contains(errStr, "model not found") ||
 			strings.Contains(errStr, "invalid model") ||
@@ -81,7 +89,12 @@ func (c *CachingAI) Chat() (string, error) {
 					log.Warnf("Failed to delete provider models from cache for %s: %v", c.config.Provider, delErr)
 				}
 			}
+			// No need to retry if the model is not found
+			return "", &utils.StopRetryingError{Err: err}
 		}
+		return "", err
+	})
+	if err != nil {
 		return "", err
 	}
 
@@ -194,6 +207,11 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	} else {
 		log.Warn("AI caching is disabled by config")
 		cache = nil
+	}
+
+	// Set default values for retry-related fields if not specified
+	if cfg.MaxRetries <= 0 {
+		cfg.MaxRetries = 0 // Default: no retries
 	}
 
 	switch cfg.Provider {

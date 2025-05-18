@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -25,19 +26,40 @@ import (
 var normalPadding = cli.Default.Padding
 
 // Retry will retry a function f a number of attempts with a sleep duration in between
-func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
-	for i := range attempts {
+func Retry(attempts int, sleep time.Duration, f func() error) error {
+	_, err := RetryWithResult(attempts, sleep, func() (struct{}, error) {
+		return struct{}{}, f()
+	})
+	return err
+}
+
+type StopRetryingError struct {
+	Err error
+}
+
+func (e *StopRetryingError) Error() string {
+	return e.Err.Error()
+}
+
+// RetryWithResult will retry a function f a number of attempts with a sleep duration in between, returning the result if successful
+func RetryWithResult[T any](attempts int, sleep time.Duration, f func() (T, error)) (result T, err error) {
+	for i := 0; i < attempts; i++ {
 		if i > 0 {
 			Indent(log.Debug, 2)(fmt.Sprintf("retrying after error: %s", err))
 			time.Sleep(sleep)
 			sleep *= 2
 		}
-		err = f()
+		result, err = f()
 		if err == nil {
-			return nil
+			return result, nil
+		}
+		// If StopRetryingError is returned, unwrap and return immediately
+		var stopErr *StopRetryingError
+		if errors.As(err, &stopErr) {
+			return result, stopErr.Err
 		}
 	}
-	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
+	return result, fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
 
 func RandomAgent() string {
