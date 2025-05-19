@@ -24,6 +24,7 @@ type DiffConfig struct {
 	FuncStarts bool
 	PemDB      string
 	SymMap     map[string]signature.SymbolMap
+	Verbose    bool
 }
 
 type MachoDiff struct {
@@ -39,6 +40,7 @@ type section struct {
 
 type DiffInfo struct {
 	Version   string
+	UUID      string
 	Imports   []string
 	Sections  []section
 	Functions int
@@ -46,6 +48,7 @@ type DiffInfo struct {
 	Symbols   []string
 	CStrings  []string
 	SymbolMap map[uint64]string
+	Verbose   bool
 }
 
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.SymbolMap) *DiffInfo {
@@ -82,8 +85,10 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	if m.Symtab != nil {
 		for _, sym := range m.Symtab.Syms {
 			syms = append(syms, sym.Name)
-			if len(sym.Name) != 0 && sym.Name != "<redacted>" {
-				smap[sym.Value] = sym.Name
+			if conf.FuncStarts {
+				if len(sym.Name) != 0 && sym.Name != "<redacted>" {
+					smap[sym.Value] = sym.Name
+				}
 			}
 		}
 		slices.Sort(syms)
@@ -97,9 +102,16 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 			}
 			slices.Sort(strs)
 		}
+		if cfstrs, err := m.GetCFStrings(); err == nil {
+			for _, val := range cfstrs {
+				strs = append(strs, val.Name)
+			}
+			slices.Sort(strs)
+		}
 	}
 	return &DiffInfo{
 		Version:   sourceVersion,
+		UUID:      m.UUID().String(),
 		Imports:   m.ImportedLibraries(),
 		Sections:  secs,
 		Functions: len(starts),
@@ -107,6 +119,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 		Symbols:   syms,
 		CStrings:  strs,
 		SymbolMap: smap,
+		Verbose:   conf.Verbose,
 	}
 }
 
@@ -134,9 +147,14 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 	if len(i.Symbols) != len(x.Symbols) {
 		return false
 	}
-	// if i.Version != x.Version { (this could be a lie)
-	// 	return false
-	// }
+	if i.Verbose && x.Verbose {
+		if i.Version != x.Version { // (this could be a lie)
+			return false
+		}
+	}
+	if i.UUID != x.UUID {
+		return false
+	}
 	return true
 }
 
@@ -149,6 +167,7 @@ func (i *DiffInfo) String() string {
 	for _, i := range i.Imports {
 		out += fmt.Sprintf("  - %s\n", i)
 	}
+	out += fmt.Sprintf("  UUID: %s\n", i.UUID)
 	out += fmt.Sprintf("  Functions: %d\n", i.Functions)
 	out += fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols))
 	out += fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings))
