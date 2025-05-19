@@ -317,9 +317,11 @@ func (d *Diff) Markdown() error {
 	}
 
 	// SECTION: DSC
-	if d.Dylibs != nil && (len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0) ||
-		(d.Dylibs.New != nil || d.Dylibs.Removed != nil || d.Dylibs.Updated != nil) {
-		out.WriteString("## DSC\n\n")
+	if d.Dylibs != nil {
+		if (len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0) ||
+			(d.Dylibs.New != nil || d.Dylibs.Removed != nil || d.Dylibs.Updated != nil) {
+			out.WriteString("## DSC\n\n")
+		}
 	}
 	if len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0 {
 		out.WriteString(
