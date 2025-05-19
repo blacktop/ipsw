@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/signature"
 	"golang.org/x/exp/maps"
 )
 
@@ -66,19 +67,21 @@ type IBootDiff struct {
 }
 
 type Config struct {
-	Title     string
-	IpswOld   string
-	IpswNew   string
-	KDKs      []string
-	LaunchD   bool
-	Firmware  bool
-	Features  bool
-	Files     bool
-	CStrings  bool
-	AllowList []string
-	BlockList []string
-	PemDB     string
-	Output    string
+	Title      string
+	IpswOld    string
+	IpswNew    string
+	KDKs       []string
+	LaunchD    bool
+	Firmware   bool
+	Features   bool
+	Files      bool
+	CStrings   bool
+	FuncStarts bool
+	AllowList  []string
+	BlockList  []string
+	PemDB      string
+	Signatures string
+	Output     string
 }
 
 // Context is the context for the diff
@@ -465,13 +468,37 @@ func (d *Diff) parseKernelcache() error {
 	}
 	defer m2.Close()
 
+	var smap map[string]signature.SymbolMap
+	if d.conf.Signatures != "" {
+		smap = make(map[string]signature.SymbolMap)
+		log.Info("Parsing Kernel Signatures")
+		sigs, err := signature.Parse(d.conf.Signatures)
+		if err != nil {
+			return fmt.Errorf("failed to parse signatures: %v", err)
+		}
+
+		smap[m1.UUID().String()] = signature.NewSymbolMap()
+		log.WithField("kernelcache", d.Old.Kernel.Path).Info("Symbolicating...")
+		if err := smap[m1.UUID().String()].Symbolicate(d.Old.Kernel.Path, sigs, true); err != nil {
+			log.Errorf("failed to symbolicate kernelcache: %v", err)
+		}
+
+		smap[m2.UUID().String()] = signature.NewSymbolMap()
+		log.WithField("kernelcache", d.New.Kernel.Path).Info("Symbolicating...")
+		if err := smap[m2.UUID().String()].Symbolicate(d.New.Kernel.Path, sigs, true); err != nil {
+			log.Errorf("failed to symbolicate kernelcache: %v", err)
+		}
+	}
+
 	d.Kexts, err = kcmd.Diff(m1, m2, &mcmd.DiffConfig{
-		Markdown:  true,
-		Color:     false,
-		DiffTool:  "git",
-		AllowList: d.conf.AllowList,
-		BlockList: d.conf.BlockList,
-		CStrings:  d.conf.CStrings,
+		Markdown:   true,
+		Color:      false,
+		DiffTool:   "git",
+		AllowList:  d.conf.AllowList,
+		BlockList:  d.conf.BlockList,
+		CStrings:   d.conf.CStrings,
+		FuncStarts: d.conf.FuncStarts,
+		SymMap:     smap,
 	})
 	if err != nil {
 		return err
@@ -590,12 +617,13 @@ func (d *Diff) parseDSC() error {
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
-		Markdown:  true,
-		Color:     false,
-		DiffTool:  "git",
-		AllowList: d.conf.AllowList,
-		BlockList: d.conf.BlockList,
-		CStrings:  d.conf.CStrings,
+		Markdown:   true,
+		Color:      false,
+		DiffTool:   "git",
+		AllowList:  d.conf.AllowList,
+		BlockList:  d.conf.BlockList,
+		CStrings:   d.conf.CStrings,
+		FuncStarts: d.conf.FuncStarts,
 	})
 	if err != nil {
 		return err
@@ -624,12 +652,13 @@ func (d *Diff) parseEntitlements() (string, error) {
 
 func (d *Diff) parseMachos() (err error) {
 	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
-		Markdown:  true,
-		Color:     false,
-		DiffTool:  "git",
-		AllowList: d.conf.AllowList,
-		BlockList: d.conf.BlockList,
-		CStrings:  d.conf.CStrings,
+		Markdown:   true,
+		Color:      false,
+		DiffTool:   "git",
+		AllowList:  d.conf.AllowList,
+		BlockList:  d.conf.BlockList,
+		CStrings:   d.conf.CStrings,
+		FuncStarts: d.conf.FuncStarts,
 	})
 	return
 }
@@ -659,12 +688,13 @@ func (d *Diff) parseLaunchdPlists() error {
 
 func (d *Diff) parseFirmwares() (err error) {
 	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
-		Markdown:  true,
-		Color:     false,
-		DiffTool:  "git",
-		AllowList: d.conf.AllowList,
-		BlockList: d.conf.BlockList,
-		CStrings:  d.conf.CStrings,
+		Markdown:   true,
+		Color:      false,
+		DiffTool:   "git",
+		AllowList:  d.conf.AllowList,
+		BlockList:  d.conf.BlockList,
+		CStrings:   d.conf.CStrings,
+		FuncStarts: d.conf.FuncStarts,
 	})
 	return
 }

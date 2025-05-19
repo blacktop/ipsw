@@ -6,6 +6,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/pkg/signature"
 )
 
 // Diff compares two MH_FILESET kernelcache files
@@ -24,7 +25,15 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 			}
-			prev[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf)
+			var smaps []signature.SymbolMap
+			if conf.SymMap != nil {
+				smap, ok := conf.SymMap[k1.UUID().String()]
+				if !ok {
+					return nil, fmt.Errorf("failed to find symbol map for kernelcache %s", k1.UUID().String())
+				}
+				smaps = append(smaps, smap)
+			}
+			prev[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf, smaps...)
 		}
 	}
 
@@ -38,7 +47,15 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse entry %s: %v", fe.EntryID, err)
 			}
-			next[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf)
+			var smaps []signature.SymbolMap
+			if conf.SymMap != nil {
+				smap, ok := conf.SymMap[k2.UUID().String()]
+				if !ok {
+					return nil, fmt.Errorf("failed to find symbol map for kernelcache %s", k2.UUID().String())
+				}
+				smaps = append(smaps, smap)
+			}
+			next[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf, smaps...)
 		}
 	}
 
