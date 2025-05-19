@@ -67,21 +67,23 @@ type IBootDiff struct {
 }
 
 type Config struct {
-	Title      string
-	IpswOld    string
-	IpswNew    string
-	KDKs       []string
-	LaunchD    bool
-	Firmware   bool
-	Features   bool
-	Files      bool
-	CStrings   bool
-	FuncStarts bool
-	AllowList  []string
-	BlockList  []string
-	PemDB      string
-	Signatures string
-	Output     string
+	Title        string
+	IpswOld      string
+	IpswNew      string
+	KDKs         []string
+	LaunchD      bool
+	Firmware     bool
+	Features     bool
+	Files        bool
+	CStrings     bool
+	FuncStarts   bool
+	Entitlements bool
+	AllowList    []string
+	BlockList    []string
+	PemDB        string
+	Signatures   string
+	Output       string
+	Verbose      bool
 }
 
 // Context is the context for the diff
@@ -314,10 +316,12 @@ func (d *Diff) Diff() (err error) {
 		}
 	}
 
-	log.Info("Diffing ENTITLEMENTS")
-	d.Ents, err = d.parseEntitlements()
-	if err != nil {
-		log.WithError(err).Error("failed to parse entitlements")
+	if d.conf.Entitlements {
+		log.Info("Diffing ENTITLEMENTS")
+		d.Ents, err = d.parseEntitlements()
+		if err != nil {
+			log.WithError(err).Error("failed to parse entitlements")
+		}
 	}
 
 	return nil
@@ -499,6 +503,7 @@ func (d *Diff) parseKernelcache() error {
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
 		SymMap:     smap,
+		Verbose:    d.conf.Verbose,
 	})
 	if err != nil {
 		return err
@@ -624,6 +629,7 @@ func (d *Diff) parseDSC() error {
 		BlockList:  d.conf.BlockList,
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
+		Verbose:    d.conf.Verbose,
 	})
 	if err != nil {
 		return err
@@ -659,6 +665,7 @@ func (d *Diff) parseMachos() (err error) {
 		BlockList:  d.conf.BlockList,
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
+		Verbose:    d.conf.Verbose,
 	})
 	return
 }
@@ -695,6 +702,7 @@ func (d *Diff) parseFirmwares() (err error) {
 		BlockList:  d.conf.BlockList,
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
+		Verbose:    d.conf.Verbose,
 	})
 	return
 }

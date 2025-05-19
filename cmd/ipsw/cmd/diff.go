@@ -48,6 +48,7 @@ func init() {
 	diffCmd.Flags().Bool("files", false, "Diff files")
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
 	diffCmd.Flags().Bool("starts", false, "Diff MachO function starts")
+	diffCmd.Flags().Bool("ent", false, "Diff MachO entitlements")
 	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
 	diffCmd.Flags().StringP("signatures", "s", "", "Path to symbolicator signatures folder")
@@ -66,6 +67,7 @@ func init() {
 	viper.BindPFlag("diff.feat", diffCmd.Flags().Lookup("feat"))
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
 	viper.BindPFlag("diff.starts", diffCmd.Flags().Lookup("starts"))
+	viper.BindPFlag("diff.ent", diffCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("diff.files", diffCmd.Flags().Lookup("files"))
 	viper.BindPFlag("diff.allow-list", diffCmd.Flags().Lookup("allow-list"))
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
@@ -122,20 +124,22 @@ var diffCmd = &cobra.Command{
 				return fmt.Errorf("you must specify two IPSWs to diff")
 			}
 			d = diff.New(&diff.Config{
-				Title:      viper.GetString("diff.title"),
-				IpswOld:    filepath.Clean(args[0]),
-				IpswNew:    filepath.Clean(args[1]),
-				KDKs:       viper.GetStringSlice("diff.kdk"),
-				LaunchD:    viper.GetBool("diff.launchd"),
-				Firmware:   viper.GetBool("diff.fw"),
-				Features:   viper.GetBool("diff.feat"),
-				Files:      viper.GetBool("diff.files"),
-				CStrings:   viper.GetBool("diff.strs"),
-				FuncStarts: viper.GetBool("diff.starts"),
-				AllowList:  viper.GetStringSlice("diff.allow-list"),
-				BlockList:  viper.GetStringSlice("diff.block-list"),
-				Signatures: viper.GetString("diff.signatures"),
-				Output:     viper.GetString("diff.output"),
+				Title:        viper.GetString("diff.title"),
+				IpswOld:      filepath.Clean(args[0]),
+				IpswNew:      filepath.Clean(args[1]),
+				KDKs:         viper.GetStringSlice("diff.kdk"),
+				LaunchD:      viper.GetBool("diff.launchd"),
+				Firmware:     viper.GetBool("diff.fw"),
+				Features:     viper.GetBool("diff.feat"),
+				Files:        viper.GetBool("diff.files"),
+				CStrings:     viper.GetBool("diff.strs"),
+				FuncStarts:   viper.GetBool("diff.starts"),
+				Entitlements: viper.GetBool("diff.ent"),
+				AllowList:    viper.GetStringSlice("diff.allow-list"),
+				BlockList:    viper.GetStringSlice("diff.block-list"),
+				Signatures:   viper.GetString("diff.signatures"),
+				Output:       viper.GetString("diff.output"),
+				Verbose:      Verbose,
 			})
 			if err := d.Diff(); err != nil {
 				return err
