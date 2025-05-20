@@ -44,12 +44,14 @@ func init() {
 	ipaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipaCmd.Flags().StringP("store-front", "s", "US", "The country code for the App Store to download from")
 	ipaCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
+	ipaCmd.Flags().StringP("keybag-plist", "p", "", "Path to the keybag plist file (includes kbsync)")
 	ipaCmd.MarkFlagDirname("output")
 	viper.BindPFlag("download.ipa.sms", ipaCmd.Flags().Lookup("sms"))
 	viper.BindPFlag("download.ipa.search", ipaCmd.Flags().Lookup("search"))
 	viper.BindPFlag("download.ipa.output", ipaCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipa.store-front", ipaCmd.Flags().Lookup("store-front"))
 	viper.BindPFlag("download.ipa.vault-password", ipaCmd.Flags().Lookup("vault-password"))
+	viper.BindPFlag("download.ipa.keybag-plist", ipaCmd.Flags().Lookup("keybag-plist"))
 	ipaCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
@@ -106,6 +108,7 @@ var ipaCmd = &cobra.Command{
 			ConfigDir:     filepath.Join(home, ".ipsw"),
 			VaultPassword: viper.GetString("download.ipa.vault-password"),
 			StoreFront:    viper.GetString("download.ipa.store-front"),
+			KeybagPlist:   viper.GetString("download.ipa.keybag-plist"),
 			Verbose:       viper.GetBool("verbose"),
 		})
 
