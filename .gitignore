@@ -67,6 +67,7 @@ www/docs/static/releases*.json
 internal/commands/ida/dscu/data/dscu.py
 internal/download/data/proto
 venv/
+keybag.plist
 
 # Unicorn EMU
 unicorn2/

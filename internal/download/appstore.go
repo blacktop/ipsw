@@ -66,6 +66,7 @@ type AppStoreConfig struct {
 	StoreFront    string
 	VaultPassword string
 	ConfigDir     string
+	KeybagPlist   string
 }
 
 type AppStore struct {
@@ -749,16 +750,33 @@ func (as *AppStore) Download(bundleID, output string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get mac address: %v", err)
 	}
-
 	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 
-	plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
-		CreditDisplay: "$0.00",
-		GUID:          guid,
-		KBSync:        "0",
-		SalableAdamId: strconv.Itoa(app.ID),
-		SerialNumber:  "0",
-	})
+	if as.config.KeybagPlist != "" {
+		keybag, err := os.ReadFile(as.config.KeybagPlist)
+		if err != nil {
+			return fmt.Errorf("failed to read keybag plist '%s': %v", as.config.KeybagPlist, err)
+		}
+		var dlReq downloadRequest
+		if err := plist.NewDecoder(bytes.NewReader(keybag)).Decode(&dlReq); err != nil {
+			return fmt.Errorf("failed to decode keybag plist '%s': %v", as.config.KeybagPlist, err)
+		}
+		guid = dlReq.GUID
+		plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
+			GUID:          dlReq.GUID,
+			KBSync:        dlReq.KBSync,
+			SalableAdamId: strconv.Itoa(app.ID),
+			SerialNumber:  dlReq.SerialNumber,
+		})
+	} else {
+		plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
+			CreditDisplay: "$0.00",
+			GUID:          guid,
+			KBSync:        "0",
+			SalableAdamId: strconv.Itoa(app.ID),
+			SerialNumber:  "0",
+		})
+	}
 
 	req, err := http.NewRequest("POST", appStoreDownloadURL+guid, buf)
 	if err != nil {
