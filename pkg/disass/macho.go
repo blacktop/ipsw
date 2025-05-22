@@ -832,6 +832,7 @@ func (d *MachoDisass) OpenOrCreateSymMap(cacheFile *string, machoPath string) er
 			utils.Indent(log.Warn, 2)("creating in the temp folder")
 			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcache))
 			*cacheFile = tmpcache
+			return nil // Successfully created temp cache file
 		}
 		return fmt.Errorf("failed to create cache file: %v", err)
 	}
