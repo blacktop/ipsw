@@ -74,13 +74,10 @@ func (c *Claude) getModels() error {
 func (c *Claude) Chat() (string, error) {
 	message, err := c.cli.Messages.New(c.ctx, anthropic.MessageNewParams{
 		MaxTokens: 1024,
-		Messages: []anthropic.MessageParam{{
-			Role: anthropic.MessageParamRoleUser,
-			Content: []anthropic.ContentBlockParamUnion{{
-				OfRequestTextBlock: &anthropic.TextBlockParam{Text: c.conf.Prompt},
-			}},
-		}},
-		Model:       c.models[c.conf.Model],
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(c.conf.Prompt)),
+		},
+		Model:       anthropic.Model(c.models[c.conf.Model]),
 		Temperature: anthropic.Float(c.conf.Temperature),
 		TopP:        anthropic.Float(c.conf.TopP),
 	})
