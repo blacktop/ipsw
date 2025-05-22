@@ -9,6 +9,7 @@ import (
 	model "github.com/blacktop/ipsw/internal/model/ai"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -158,8 +159,12 @@ func (d *DB) GetProviderModels(provider string) (*model.ProviderModels, error) {
 
 // SetProviderModels stores or updates cached models for a provider.
 func (d *DB) SetProviderModels(modelsToSet *model.ProviderModels) error {
-	if err := d.db.Where(model.ProviderModels{Provider: modelsToSet.Provider}).Assign(modelsToSet).FirstOrCreate(modelsToSet).Error; err != nil {
-		return fmt.Errorf("failed to set provider models in cache for %s: %w", modelsToSet.Provider, err)
+	// This will update the ModelsJSON if the provider already exists, or insert if it doesn't
+	if err := d.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "provider"}},
+		DoUpdates: clause.AssignmentColumns([]string{"models_json", "updated_at"}),
+	}).Create(modelsToSet).Error; err != nil {
+		return fmt.Errorf("failed to upsert provider models in cache for %s: %w", modelsToSet.Provider, err)
 	}
 	return nil
 }
