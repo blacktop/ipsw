@@ -129,18 +129,25 @@ func CodeSign(filePath, signature string) error {
 // CodeSignWithEntitlements codesigns a given binary with given entitlements
 func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) error {
 	if runtime.GOOS == "darwin" {
-		Indent(log.Debug, 2)(fmt.Sprintf("Converting entitlements file '%s' to XML format", entitlementsPath))
-		cmd := exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
+		cmd := exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("%v: %s", err, out)
-		}
+			if strings.Contains(string(out), "AMFIUnserializeXML: syntax error") {
+				Indent(log.Info, 2)(fmt.Sprintf("Converting entitlements file '%s' to XML1 format", entitlementsPath))
+				cmd = exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
+				out, err = cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("%v: %s", err, out)
+				}
 
-		Indent(log.Debug, 2)(fmt.Sprintf("Adding entitlements to '%s'", filePath))
-		cmd = exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%v: %s", err, out)
+				cmd = exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
+				out, err = cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("%v: %s", err, out)
+				}
+			} else {
+				return fmt.Errorf("%v: %s", err, out)
+			}
 		}
 
 		return nil
