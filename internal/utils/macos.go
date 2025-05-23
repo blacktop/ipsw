@@ -127,32 +127,30 @@ func CodeSign(filePath, signature string) error {
 }
 
 // CodeSignWithEntitlements codesigns a given binary with given entitlements
-func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) error {
+func CodeSignWithEntitlements(filePath, entitlementsPath, signature string, isRetry ...bool) error {
+	retry := len(isRetry) > 0 && isRetry[0]
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
 		out, err := cmd.CombinedOutput()
-		if err != nil {
-			if strings.Contains(string(out), "AMFIUnserializeXML: syntax error") {
-				Indent(log.Info, 2)(fmt.Sprintf("Converting entitlements file '%s' to XML1 format", entitlementsPath))
-				cmd = exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
-				out, err = cmd.CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("%v: %s", err, out)
-				}
-
-				cmd = exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
-				out, err = cmd.CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("%v: %s", err, out)
-				}
-			} else {
+		
+		if err == nil {
+			return nil
+		}
+		
+		if strings.Contains(string(out), "AMFIUnserializeXML: syntax error") && !retry {
+			Indent(log.Info, 2)(fmt.Sprintf("Converting entitlements file '%s' to XML1 format", entitlementsPath))
+			
+			cmd = exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
+			out, err = cmd.CombinedOutput()
+			if err != nil {
 				return fmt.Errorf("%v: %s", err, out)
 			}
+			
+			return CodeSignWithEntitlements(filePath, entitlementsPath, signature, true)
 		}
-
-		return nil
+		
+		return fmt.Errorf("%v: %s", err, out)
 	}
-
 	return fmt.Errorf("only supported on macOS")
 }
 
