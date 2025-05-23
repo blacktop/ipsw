@@ -80,6 +80,7 @@ func (c *Claude) Chat() (string, error) {
 		Model:       anthropic.Model(c.models[c.conf.Model]),
 		Temperature: anthropic.Float(c.conf.Temperature),
 		TopP:        anthropic.Float(c.conf.TopP),
+		ServiceTier: anthropic.MessageNewParamsServiceTierAuto,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create message: %w", err)
