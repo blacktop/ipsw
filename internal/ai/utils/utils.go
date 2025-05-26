@@ -1,6 +1,9 @@
 package utils
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 func removeThink(content string) string {
 	if strings.HasPrefix(content, "<think>") {
@@ -14,9 +17,11 @@ func removeThink(content string) string {
 func Clean(content string) string {
 	content = removeThink(content)
 	content = strings.TrimSpace(content)
-	// remove code block
-	if strings.HasPrefix(content, "```") {
-		_, content, _ = strings.Cut(content, "\n")
+	// Use regex to extract code from Markdown code blocks
+	codeBlockRegex := regexp.MustCompile("(?s)```(?:[a-zA-Z0-9_+-]*\\n)?(.*?)\\n?```")
+	matches := codeBlockRegex.FindStringSubmatch(content)
+	if len(matches) > 1 {
+		return strings.TrimSpace(matches[1])
 	}
-	return strings.TrimSuffix(content, "```")
+	return content
 }
