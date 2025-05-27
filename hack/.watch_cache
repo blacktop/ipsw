@@ -1,16 +1,12 @@
-macos-152
-80451b7f998e69cb61db8260e0265fee8d5ff4fc
-3c566dd24b1b66c1afc09bab560cca8e821d140f
-macos-153
-wpewebkit-2.48.0
-webkitgtk-2.48.1
-wpewebkit-2.48.1
-webkitgtk-2.49.1
-wpewebkit-2.49.1
-69431ee5773488ddff588de2776df095f0ba6ed5
-ffe241451cd0a2cc8bd76fd859af26f01fc7d0cb
-macos-154
-WebKit-7621.2.5.14.7
-webkitgtk-2.48.2
-wpewebkit-2.48.2
-macos-155
+{
+    "WebKit/WebKit": [
+        "wpewebkit-2.48.2",
+        "webkitgtk-2.48.2",
+        "ffe241451cd0a2cc8bd76fd859af26f01fc7d0cb",
+        "69431ee5773488ddff588de2776df095f0ba6ed5"
+    ],
+    "apple-oss-distributions/distribution-macOS": [
+        "macos-155",
+        "macos-154"
+    ]
+}
