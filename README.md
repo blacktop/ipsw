@@ -34,11 +34,12 @@
 ### Installation
 
 #### macOS
+Using blacktop tap (includes extras)
 ```bash
-# Using blacktop tap (includes extras)
 brew install blacktop/tap/ipsw
-
-# Using official Homebrew formula
+```
+Using official Homebrew formula
+```bash
 brew install ipsw
 ```
 
