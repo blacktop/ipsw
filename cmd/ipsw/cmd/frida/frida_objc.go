@@ -273,7 +273,7 @@ var fridaObjcCmd = &cobra.Command{
 				}
 			})
 
-			if err := compiler.Watch(watch); err != nil {
+			if err := compiler.Watch(watch, nil); err != nil {
 				return fmt.Errorf("error watching file: %v", err)
 			}
 			log.Infof("Watching %s for changes", watch)
