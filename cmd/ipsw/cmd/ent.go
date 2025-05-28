@@ -32,13 +32,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/ent"
+	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
@@ -60,8 +59,7 @@ func init() {
 	entCmd.Flags().StringP("key", "k", "", "Entitlement KEY regex to search for")
 	entCmd.Flags().StringP("val", "v", "", "Entitlement VALUE regex to search for (i.e. <array> strings)")
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO as plist")
-	entCmd.Flags().String("db", "", "Folder to r/w entitlement databases")
-	entCmd.MarkFlagDirname("db")
+	entCmd.Flags().String("db", "", "Path to SQLite database")
 	entCmd.Flags().Bool("file-only", false, "Only output the file path of matches")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
@@ -90,28 +88,40 @@ var entCmd = &cobra.Command{
 	Short: "Search IPSW filesystem DMG or Folder for MachOs with a given entitlement",
 	Example: heredoc.Doc(`
 		# Search IPSW for entitlement key
-		❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
+		 ❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
 
 		# Search local folder for entitlement key
-		❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
+		 ❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
 
 		# Search IPSW for entitlement value (i.e. one of the <array> strings)
-		❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
+		 ❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
 
 		# Dump entitlements for MachO in IPSW
-		❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
+		 ❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
 
 		# Diff two IPSWs
-		❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+		 ❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+
+		# Store IPSW entitlements in SQLite database
+		 ❯ ipsw ent --ipsw <IPSW> --db entitlements.db
+
+		# Query SQLite database for entitlement key pattern
+		 ❯ ipsw ent --query-key platform --db entitlements.db
+
+		# Query SQLite database for entitlement value pattern
+		 ❯ ipsw ent --query-value LockdownMode --db entitlements.db
+
+		# Query SQLite database for specific file pattern
+		 ❯ ipsw ent --query-file WebContent --db entitlements.db
+
+		# Query SQLite database for specific IPSW version
+		 ❯ ipsw ent --query-version 18.5 --db entitlements.db
 
 		# Launch Web UI (http://localhost:3993)
-		❯ ipsw ent --ui --ipsw <IPSW>`),
+		 ❯ ipsw ent --ui --ipsw <IPSW>`),
 	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		entDBs := make([]map[string]string, 0, 2)
-
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -119,7 +129,7 @@ var entCmd = &cobra.Command{
 		// flags
 		ipsws := viper.GetStringSlice("ent.ipsw")
 		inputs := viper.GetStringSlice("ent.input")
-		dbFolder := viper.GetString("ent.db")
+		entDBPath := viper.GetString("ent.db")
 		entitlementKey := viper.GetString("ent.key")
 		entitlementValue := viper.GetString("ent.val")
 		searchFile := viper.GetString("ent.file")
@@ -128,7 +138,7 @@ var entCmd = &cobra.Command{
 		markdown := viper.GetBool("ent.md")
 		showUI := viper.GetBool("ent.ui")
 		// check flags
-		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
+		if len(entDBPath) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
 			return fmt.Errorf("must supply either --db, --ipsw or --input")
 		} else if showUI && doDiff {
 			return fmt.Errorf("cannot use --ui and --diff together")
@@ -139,50 +149,31 @@ var entCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color") || onlyFiles
 
-		if len(dbFolder) > 0 && len(ipsws) == 0 && len(inputs) == 0 {
-			// search preprocessed entitlement databases
-			dbs, err := filepath.Glob(filepath.Join(dbFolder, "*.entDB"))
+		if len(entDBPath) > 0 && len(ipsws) == 0 && len(inputs) == 0 {
+			entDB, err := ent.GetDatabase(&ent.Config{Database: entDBPath})
 			if err != nil {
-				return fmt.Errorf("failed to glob entitlement databases: %v", err)
-			}
-			if len(dbs) == 0 {
-				return fmt.Errorf("no entitlement databases found in %s", dbFolder)
-			}
-
-			var choices []string
-			for _, db := range dbs {
-				choices = append(choices, strings.TrimSuffix(filepath.Base(db), ".entDB"))
-			}
-
-			dbIndices := []int{}
-			prompt := &survey.MultiSelect{
-				Message:  "Select DB(s):",
-				Options:  choices,
-				PageSize: 20,
-			}
-			if err := survey.AskOne(prompt, &dbIndices); err == terminal.InterruptErr {
-				log.Warn("Exiting...")
-				os.Exit(0)
-			}
-
-			for _, idx := range dbIndices {
-				entDB, err := ent.GetDatabase(&ent.Config{Database: dbs[idx]})
-				if err != nil {
-					return fmt.Errorf("failed to get entitlement database: %v", err)
-				}
-				entDBs = append(entDBs, entDB)
+				return fmt.Errorf("failed to get entitlement database: %v", err)
 			}
 		} else { // create NEW entitlement databases
 			for _, ipswPath := range ipsws {
-				entDBPath := strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
-				if len(dbFolder) > 0 {
-					entDBPath = filepath.Join(dbFolder, filepath.Base(entDBPath))
-				}
 				entDB, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, Database: entDBPath})
 				if err != nil {
 					return fmt.Errorf("failed to get entitlement database: %v", err)
 				}
-				entDBs = append(entDBs, entDB)
+				// Create SQLite database instance
+				dbConn, err := db.NewSqlite(viper.GetString("ent.db"), 1000)
+				if err != nil {
+					return fmt.Errorf("failed to create SQLite database: %v", err)
+				}
+				if err := dbConn.Connect(); err != nil {
+					return fmt.Errorf("failed to connect to SQLite database: %v", err)
+				}
+
+				dbService := ent.NewDatabaseService(dbConn)
+				if err := dbService.StoreEntitlements(ipswPath, entDB); err != nil {
+					return fmt.Errorf("failed to store entitlements in database: %v", err)
+				}
+				log.Info("Entitlements stored in database successfully")
 			}
 			for _, input := range inputs {
 				md5Hash := md5.Sum([]byte(input))
@@ -219,7 +210,8 @@ var entCmd = &cobra.Command{
 				Host:    viper.GetString("ent.ui-host"),
 				Port:    viper.GetInt("ent.ui-port"),
 			})
-		} else if doDiff { // DIFF ENTITLEMENTS
+		} else if doDiff {
+			// DIFF ENTITLEMENTS
 			if len(searchFile) > 0 { // DIFF MACHO'S ENTITLEMENTS
 				dmp := diffmatchpatch.New()
 				for f2, ent2 := range entDBs[1] {
@@ -439,4 +431,294 @@ var entCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// handleSQLiteQueries handles all SQLite database query operations
+func handleSQLiteQueries(queryKey, queryValue, queryFile, queryVersion, queryBuild string, showStats bool, sqlitePath string, onlyFiles bool) error {
+	// Create SQLite database instance
+	dbConn, err := db.NewSqlite(sqlitePath, 1000)
+	if err != nil {
+		return fmt.Errorf("failed to create SQLite database: %v", err)
+	}
+	if err := dbConn.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to SQLite database: %v", err)
+	}
+	defer dbConn.Close()
+
+	dbService := ent.NewDatabaseService(dbConn)
+
+	if showStats {
+		return showDatabaseStatistics(dbService)
+	}
+
+	if queryKey != "" {
+		return queryEntitlementsByKey(dbService, queryKey, onlyFiles)
+	}
+
+	if queryValue != "" {
+		return queryEntitlementsByValue(dbService, queryValue, onlyFiles)
+	}
+
+	if queryFile != "" {
+		return queryEntitlementsByFile(dbService, queryFile, onlyFiles)
+	}
+
+	if queryVersion != "" || queryBuild != "" {
+		return queryEntitlementsByIPSW(dbService, queryVersion, queryBuild, onlyFiles)
+	}
+
+	return fmt.Errorf("no query specified")
+}
+
+// showDatabaseStatistics displays database statistics
+func showDatabaseStatistics(dbService *ent.DatabaseService) error {
+	stats, err := dbService.GetStatistics()
+	if err != nil {
+		return fmt.Errorf("failed to get database statistics: %v", err)
+	}
+
+	log.Info("SQLite Database Statistics")
+	fmt.Printf("\n")
+	fmt.Printf("IPSWs:        %d\n", stats["ipsw_count"])
+	fmt.Printf("Entitlements: %d\n", stats["entitlement_count"])
+	fmt.Printf("Keys:         %d\n", stats["key_count"])
+	fmt.Printf("\n")
+
+	if topKeys, ok := stats["top_keys"].([]struct {
+		Key   string
+		Count int64
+	}); ok && len(topKeys) > 0 {
+		fmt.Printf("Top 10 Most Common Entitlement Keys:\n")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		for i, key := range topKeys {
+			fmt.Fprintf(w, "%d.\t%s\t%d\n", i+1, colorKey(key.Key), key.Count)
+		}
+		w.Flush()
+	}
+
+	return nil
+}
+
+// queryEntitlementsByKey searches for entitlements by key pattern
+func queryEntitlementsByKey(dbService *ent.DatabaseService, keyPattern string, onlyFiles bool) error {
+	entitlements, err := dbService.QueryEntitlementsByKey(keyPattern)
+	if err != nil {
+		return fmt.Errorf("failed to query entitlements by key: %v", err)
+	}
+
+	if len(entitlements) == 0 {
+		log.Infof("No entitlements found with key pattern: %s", keyPattern)
+		return nil
+	}
+
+	if !onlyFiles {
+		log.Infof("Found %d entitlements with key pattern: %s", len(entitlements), keyPattern)
+		fmt.Printf("\n")
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	for _, ent := range entitlements {
+		for _, key := range ent.Keys {
+			if strings.Contains(strings.ToLower(key.Key), strings.ToLower(keyPattern)) {
+				if onlyFiles {
+					fmt.Fprintf(w, "%s\n", colorBin(ent.FilePath))
+				} else {
+					fmt.Fprintf(w, "%s\t%s\t[%s %s]\n",
+						colorKey(key.Key),
+						colorBin(ent.FilePath),
+						ent.Ipsw.Version,
+						ent.Ipsw.BuildID)
+					if key.ValueType == "string" && key.StringValue != "" {
+						fmt.Fprintf(w, " - %s\n", colorValue(key.StringValue))
+					} else if key.ValueType == "bool" && key.BoolValue != nil {
+						fmt.Fprintf(w, " - %s\n", colorValue(fmt.Sprintf("%t", *key.BoolValue)))
+					} else if key.ValueType == "number" && key.NumberValue != nil {
+						fmt.Fprintf(w, " - %s\n", colorValue(fmt.Sprintf("%d", *key.NumberValue)))
+					} else if key.ValueType == "array" && key.ArrayValue != "" {
+						fmt.Fprintf(w, " - %s\n", colorValue(key.ArrayValue))
+					} else if key.ValueType == "dict" && key.DictValue != "" {
+						fmt.Fprintf(w, " - %s\n", colorValue(key.DictValue))
+					}
+				}
+			}
+		}
+	}
+	w.Flush()
+
+	return nil
+}
+
+// queryEntitlementsByValue searches for entitlements by value pattern
+func queryEntitlementsByValue(dbService *ent.DatabaseService, valuePattern string, onlyFiles bool) error {
+	entitlements, err := dbService.QueryEntitlementsByValue(valuePattern)
+	if err != nil {
+		return fmt.Errorf("failed to query entitlements by value: %v", err)
+	}
+
+	if len(entitlements) == 0 {
+		log.Infof("No entitlements found with value pattern: %s", valuePattern)
+		return nil
+	}
+
+	if !onlyFiles {
+		log.Infof("Found %d entitlements with value pattern: %s", len(entitlements), valuePattern)
+		fmt.Printf("\n")
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	for _, ent := range entitlements {
+		for _, key := range ent.Keys {
+			valueFound := false
+			var displayValue string
+
+			if key.ValueType == "string" && strings.Contains(strings.ToLower(key.StringValue), strings.ToLower(valuePattern)) {
+				valueFound = true
+				displayValue = key.StringValue
+			} else if key.ValueType == "array" && strings.Contains(strings.ToLower(key.ArrayValue), strings.ToLower(valuePattern)) {
+				valueFound = true
+				displayValue = key.ArrayValue
+			} else if key.ValueType == "dict" && strings.Contains(strings.ToLower(key.DictValue), strings.ToLower(valuePattern)) {
+				valueFound = true
+				displayValue = key.DictValue
+			}
+
+			if valueFound {
+				if onlyFiles {
+					fmt.Fprintf(w, "%s\n", colorBin(ent.FilePath))
+				} else {
+					fmt.Fprintf(w, "%s\t%s\t[%s %s]\n",
+						colorKey(key.Key),
+						colorBin(ent.FilePath),
+						ent.Ipsw.Version,
+						ent.Ipsw.BuildID)
+					fmt.Fprintf(w, " - %s\n", colorValue(displayValue))
+				}
+			}
+		}
+	}
+	w.Flush()
+
+	return nil
+}
+
+// queryEntitlementsByFile searches for entitlements by file path pattern
+func queryEntitlementsByFile(dbService *ent.DatabaseService, filePattern string, onlyFiles bool) error {
+	entitlements, err := dbService.QueryEntitlementsByFile(filePattern)
+	if err != nil {
+		return fmt.Errorf("failed to query entitlements by file: %v", err)
+	}
+
+	if len(entitlements) == 0 {
+		log.Infof("No entitlements found for file pattern: %s", filePattern)
+		return nil
+	}
+
+	if !onlyFiles {
+		log.Infof("Found %d entitlements for file pattern: %s", len(entitlements), filePattern)
+		fmt.Printf("\n")
+	}
+
+	for _, ent := range entitlements {
+		if onlyFiles {
+			fmt.Printf("%s\n", colorBin(ent.FilePath))
+		} else {
+			fmt.Printf("%s [%s %s]\n",
+				colorBin(ent.FilePath),
+				ent.Ipsw.Version,
+				ent.Ipsw.BuildID)
+
+			if len(ent.Keys) > 0 {
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				for _, key := range ent.Keys {
+					fmt.Fprintf(w, "  %s\t", colorKey(key.Key))
+					if key.ValueType == "string" && key.StringValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.StringValue))
+					} else if key.ValueType == "bool" && key.BoolValue != nil {
+						fmt.Fprintf(w, "%s\n", colorValue(fmt.Sprintf("%t", *key.BoolValue)))
+					} else if key.ValueType == "number" && key.NumberValue != nil {
+						fmt.Fprintf(w, "%s\n", colorValue(fmt.Sprintf("%d", *key.NumberValue)))
+					} else if key.ValueType == "array" && key.ArrayValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.ArrayValue))
+					} else if key.ValueType == "dict" && key.DictValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.DictValue))
+					} else {
+						fmt.Fprintf(w, "%s\n", colorValue("true"))
+					}
+				}
+				w.Flush()
+			}
+			fmt.Printf("\n")
+		}
+	}
+
+	return nil
+}
+
+// queryEntitlementsByIPSW searches for entitlements by IPSW version/build
+func queryEntitlementsByIPSW(dbService *ent.DatabaseService, version, build string, onlyFiles bool) error {
+	entitlements, err := dbService.QueryEntitlementsByIPSW(version, build)
+	if err != nil {
+		return fmt.Errorf("failed to query entitlements by IPSW: %v", err)
+	}
+
+	if len(entitlements) == 0 {
+		criteria := ""
+		if version != "" && build != "" {
+			criteria = fmt.Sprintf("version %s build %s", version, build)
+		} else if version != "" {
+			criteria = fmt.Sprintf("version %s", version)
+		} else if build != "" {
+			criteria = fmt.Sprintf("build %s", build)
+		}
+		log.Infof("No entitlements found for IPSW %s", criteria)
+		return nil
+	}
+
+	if !onlyFiles {
+		criteria := ""
+		if version != "" && build != "" {
+			criteria = fmt.Sprintf("version %s build %s", version, build)
+		} else if version != "" {
+			criteria = fmt.Sprintf("version %s", version)
+		} else if build != "" {
+			criteria = fmt.Sprintf("build %s", build)
+		}
+		log.Infof("Found %d entitlements for IPSW %s", len(entitlements), criteria)
+		fmt.Printf("\n")
+	}
+
+	for _, ent := range entitlements {
+		if onlyFiles {
+			fmt.Printf("%s\n", colorBin(ent.FilePath))
+		} else {
+			fmt.Printf("%s [%s %s]\n",
+				colorBin(ent.FilePath),
+				ent.Ipsw.Version,
+				ent.Ipsw.BuildID)
+
+			if len(ent.Keys) > 0 {
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				for _, key := range ent.Keys {
+					fmt.Fprintf(w, "  %s\t", colorKey(key.Key))
+					if key.ValueType == "string" && key.StringValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.StringValue))
+					} else if key.ValueType == "bool" && key.BoolValue != nil {
+						fmt.Fprintf(w, "%s\n", colorValue(fmt.Sprintf("%t", *key.BoolValue)))
+					} else if key.ValueType == "number" && key.NumberValue != nil {
+						fmt.Fprintf(w, "%s\n", colorValue(fmt.Sprintf("%d", *key.NumberValue)))
+					} else if key.ValueType == "array" && key.ArrayValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.ArrayValue))
+					} else if key.ValueType == "dict" && key.DictValue != "" {
+						fmt.Fprintf(w, "%s\n", colorValue(key.DictValue))
+					} else {
+						fmt.Fprintf(w, "%s\n", colorValue("true"))
+					}
+				}
+				w.Flush()
+			}
+			fmt.Printf("\n")
+		}
+	}
+
+	return nil
 }
