@@ -37,7 +37,6 @@ func NewMemoryCache(size int) (*MemoryCache, error) {
 func (c *MemoryCache) Add(key string, value any) {
 	c.cache.Add(key, value)
 }
-
 func (c *MemoryCache) Get(key, value string) (any, bool) {
 	val, found := c.cache.Get(key)
 	if !found {
@@ -118,7 +117,11 @@ func (c *FileCache) Add(key string, value any) {
 		// set the latest value
 		switch v := val.(type) {
 		case []any:
-			m[key] = append(v, value)
+			if slice, ok := value.([]any); ok {
+				m[key] = append(v, slice...)
+			} else {
+				m[key] = append(v, value)
+			}
 		case map[string]any:
 			maps.Copy(v, value.(map[string]any))
 		case string:
