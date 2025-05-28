@@ -156,7 +156,7 @@ ipsw appstore profile create --name "Development Profile"
 - **Class Dumping**: ObjC and Swift class extraction
 - **SSH Access**: Jailbroken device SSH with debugserver
 - **Frida Integration**: Dynamic instrumentation capabilities
-- **AI Assistance**: Integration with Claude, OpenAI, Gemini, Ollama
+- **AI Powered Decompiler**: Integration with Claude, OpenAI, Gemini, Ollama and OpenRouter
 
 ```bash
 ipsw symbolicate crash.ips --dsym /path/to/symbols
@@ -187,14 +187,48 @@ cp config.example.yml ~/.config/ipsw/config.yaml
 - **SQLite** (default) - Local storage
 - **PostgreSQL** - Production deployments
 
-### AI Integration
-Configure AI providers for enhanced analysis:
-```yaml
-ai:
-  anthropic:
-    api_key: "your-key"
-  openai:
-    api_key: "your-key"
+### AI Decompiler
+> https://blacktop.github.io/ipsw/docs/guides/decompiler
+```bash
+❱ ipsw macho disass /System/Library/PrivateFrameworks/ApplePushService.framework/apsd --entry \
+             --dec --dec-model "Claude 3.7 Sonnet"
+   • Loading symbol cache file...
+   • Decompiling... 🕒
+```
+```objc
+int main(int argc, char *argv[]) {
+    @autoreleasepool {
+        __set_user_dir_suffix(@"com.apple.apsd");
+
+        @autoreleasepool {
+            APSDaemon *daemon = [[APSDaemon alloc] init];
+
+            if (daemon) {
+                NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
+                [runLoop run];
+                [runLoop release];
+            }
+
+            [daemon release];
+        }
+
+        return 0;
+    }
+
+    @catch (NSException *exception) {
+        if ([exception reason] == 1) {
+            id exceptionObj = [exception retain];
+            id logger = [APSLog daemon];
+
+            if (_os_log_type_enabled(logger, 0x11)) {
+                [exceptionObj logWithLogger:logger];
+            }
+
+            [logger release];
+            [exceptionObj release];
+        }
+    }
+}
 ```
 
 ## Use Cases
