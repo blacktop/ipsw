@@ -293,12 +293,14 @@ var watchCmd = &cobra.Command{
 
 				// Cache key based on function and file
 				cacheKey := fmt.Sprintf("%s:%s", funcName, relFilePath)
-				cachedValue, ok := cache.Get(repoPath, cacheKey)
+				cachedValue := cache.Get(repoPath)
 
-				if !ok || cachedValue != latestCommitOID {
-					cache.Add(repoPath, map[string]string{
+				if cachedValue == nil || string(cachedValue.Commit) != latestCommitOID {
+					if err := cache.Add(repoPath, watch.Function{
 						cacheKey: latestCommitOID,
-					})
+					}); err != nil {
+						return fmt.Errorf("failed to add to latest function change commit %s to cache: %v", latestCommitOID, err)
+					}
 
 					// Prepare display output
 					var displayOutput strings.Builder
@@ -436,8 +438,10 @@ var watchCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get %s tags: %v", args[0], err)
 				}
-				if !cache.Has(args[0], tags[0]) {
-					cache.Add(args[0], []string{tags[0], tags[1]})
+				if !cache.Has(args[0], watch.Tags{tags[0]}) {
+					if err := cache.Add(args[0], watch.Tags{tags[0], tags[1]}); err != nil {
+						return fmt.Errorf("failed to add tags to cache: %v", err)
+					}
 
 					if viper.GetBool("watch.post") {
 						post, err = watch.Post(tags[1], tags[0])
@@ -502,8 +506,10 @@ var watchCmd = &cobra.Command{
 				}
 
 				for idx, commit := range commits {
-					if !cache.Has(args[0], string(commit.OID)) {
-						cache.Add(args[0], string(commit.OID))
+					if !cache.Has(args[0], watch.Commit(commit.OID)) {
+						if err := cache.Add(args[0], watch.Commit(commit.OID)); err != nil {
+							return fmt.Errorf("failed to add commit %s to cache: %v", string(commit.OID), err)
+						}
 
 						if discord || mastodon {
 							if discord && !viper.IsSet("watch.command") {

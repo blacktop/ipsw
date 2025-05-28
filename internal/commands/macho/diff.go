@@ -77,6 +77,10 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	if m.SourceVersion() != nil {
 		sourceVersion = m.SourceVersion().Version.String()
 	}
+	var uuidStr string
+	if m.UUID() != nil {
+		uuidStr = m.UUID().String()
+	}
 	smap := make(map[uint64]string)
 	if len(smaps) > 0 {
 		maps.Copy(smap, smaps[0])
@@ -111,7 +115,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	}
 	return &DiffInfo{
 		Version:   sourceVersion,
-		UUID:      m.UUID().String(),
+		UUID:      uuidStr,
 		Imports:   m.ImportedLibraries(),
 		Sections:  secs,
 		Functions: len(starts),
