@@ -15,6 +15,10 @@
     [
       "webkitgtk-2.48.3",
       "wpewebkit-2.48.2"
+    ],
+    [
+      "webkitgtk-2.48.3",
+      "wpewebkit-2.48.2"
     ]
   ],
   "apple-oss-distributions/distribution-macOS": [
