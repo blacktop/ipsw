@@ -750,7 +750,7 @@ snapcrafts:
     apps:
       ipsw:
         command: ipsw
-        plugs: ["home", "network"]
+        plugs: ["home", "network", "fuse-support"]
   - id: snaps-daemon
     ids:
       - linux_daemon_build
