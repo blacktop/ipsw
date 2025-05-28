@@ -1,19 +1,35 @@
 package watch
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 
-	"github.com/apex/log"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
+type Tags []string
+
+type Commit string
+
+type Function map[string]string
+
+type CacheItem struct {
+	Tags      Tags     `json:"tags,omitempty"`
+	Commit    Commit   `json:"commit,omitempty"`
+	Functions Function `json:"functions,omitempty"`
+}
+
+type Cache map[string]CacheItem
+
 type WatchCache interface {
-	Add(key string, value any)
-	Get(key, value string) (any, bool)
-	Has(key, value string) bool
+	Add(key string, value any) error
+	Get(key string) *CacheItem
+	Has(key string, value any) bool
 }
 
 type MemoryCache struct {
@@ -34,50 +50,34 @@ func NewMemoryCache(size int) (*MemoryCache, error) {
 	}, nil
 }
 
-func (c *MemoryCache) Add(key string, value any) {
+func (c *MemoryCache) Add(key string, value any) error {
 	c.cache.Add(key, value)
+	return nil
 }
-func (c *MemoryCache) Get(key, value string) (any, bool) {
+func (c *MemoryCache) Get(key string) *CacheItem {
 	val, found := c.cache.Get(key)
 	if !found {
-		return nil, false
+		return nil
 	}
-	switch v := val.(type) {
-	case []any:
-		for _, item := range v {
-			if itemStr, ok := item.(string); ok && itemStr == value {
-				return item, true
-			}
-		}
-	case map[string]any:
-		if vv, ok := v[value]; ok {
-			return vv, true
-		}
-	case string:
-		if v == value {
-			return v, true
-		}
-	}
-	return nil, false
+	item := val.(CacheItem)
+	return &item
 }
-func (c *MemoryCache) Has(key, value string) bool {
-	if val, ok := c.cache.Get(key); ok {
-		switch v := val.(type) {
-		case []any:
-			for _, item := range v {
-				if itemStr, ok := item.(string); ok && itemStr == value {
+func (c *MemoryCache) Has(key string, value any) bool {
+	if item, ok := c.cache.Get(key); ok {
+		switch v := value.(type) {
+		case Tags:
+			for _, tag := range v {
+				if slices.Contains(item.(CacheItem).Tags, tag) {
 					return true
 				}
 			}
-		case map[string]any:
-			if vStr, ok := v[value]; ok {
-				if strVal, ok := vStr.(string); ok && strVal == value {
+		case Commit:
+			return item.(CacheItem).Commit == v
+		case Function:
+			for name, commit := range v {
+				if commitVal, ok := item.(CacheItem).Functions[name]; ok && commitVal == commit {
 					return true
 				}
-			}
-		case string:
-			if v == value {
-				return true
 			}
 		}
 	}
@@ -88,116 +88,114 @@ func NewFileCache(path string) (*FileCache, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err
 	}
-
 	// Check if file exists, create it if it doesn't
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// initialize empty JSON object
-		if err := os.WriteFile(path, []byte("{}"), 0644); err != nil {
+		cache := Cache{}
+		var out bytes.Buffer
+		if err := json.NewEncoder(&out).Encode(cache); err != nil {
+			return nil, fmt.Errorf("failed to encode initial cache data: %w", err)
+		}
+		if err := os.WriteFile(path, out.Bytes(), 0644); err != nil {
 			return nil, err
 		}
 	}
-
 	return &FileCache{
 		path: path,
 	}, nil
 }
 
-func (c *FileCache) Add(key string, value any) {
+func (c *FileCache) Add(key string, value any) error {
 	// read existing JSON
 	data, err := os.ReadFile(c.path)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to read cache file %s: %w", c.path, err)
 	}
-	m := make(map[string]any)
-	if err := json.Unmarshal(data, &m); err != nil {
-		// on parse error, reset map
-		m = make(map[string]any)
+	var cache Cache
+	if err := json.Unmarshal(data, &cache); err != nil {
+		return fmt.Errorf("failed to unmarshal cache file %s: %w", c.path, err)
 	}
-	if val, found := m[key]; found {
-		// set the latest value
-		switch v := val.(type) {
-		case []any:
-			if slice, ok := value.([]any); ok {
-				m[key] = append(v, slice...)
-			} else {
-				m[key] = append(v, value)
+	if item, found := cache[key]; found {
+		switch v := value.(type) {
+		case Tags:
+			// Merge tags with existing ones
+			for _, tag := range v {
+				if !slices.Contains(item.Tags, tag) {
+					item.Tags = append(item.Tags, tag)
+				}
 			}
-		case map[string]any:
-			maps.Copy(v, value.(map[string]any))
-		case string:
-			m[key] = value
+		case Commit:
+			// Update commit if it is not empty
+			if v != "" {
+				item.Commit = v
+			}
+		case Function:
+			maps.Copy(item.Functions, v)
+		default:
+			return fmt.Errorf("unexpected cache item type %T", v)
 		}
+		cache[key] = item
 	} else {
-		// if the key doesn't exist, set the value
-		m[key] = value
-	}
-
-	out, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		log.WithError(err).Error("failed to marshal cache JSON")
-		return
-	}
-	if err := os.WriteFile(c.path, out, 0644); err != nil {
-		log.WithError(err).Error("failed to write cache JSON")
-	}
-}
-
-func (c *FileCache) Get(key, value string) (any, bool) {
-	data, err := os.ReadFile(c.path)
-	if err != nil {
-		return nil, false
-	}
-	m := make(map[string]any)
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, false
-	}
-	if val, ok := m[key]; ok {
-		switch v := val.(type) {
-		case []any:
-			for _, item := range v {
-				if itemStr, ok := item.(string); ok && itemStr == value {
-					return item, true
-				}
-			}
-		case map[string]any:
-			if vv, ok := v[value]; ok {
-				return vv, true
-			}
-		case string:
-			if v == value {
-				return v, true
-			}
+		switch v := value.(type) {
+		case Tags:
+			cache[key] = CacheItem{Tags: v}
+		case Commit:
+			cache[key] = CacheItem{Commit: v}
+		case Function:
+			cache[key] = CacheItem{Functions: v}
+		default:
+			return fmt.Errorf("unexpected cache item type %T", v)
 		}
 	}
-	return nil, false
+	var out bytes.Buffer
+	if err := json.NewEncoder(&out).Encode(cache); err != nil {
+		return fmt.Errorf("failed to encode cache to JSON: %w", err)
+	}
+	if err := os.WriteFile(c.path, out.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write cache JSON: %w", err)
+	}
+
+	return nil
 }
 
-func (c *FileCache) Has(key, value string) bool {
+func (c *FileCache) Get(key string) *CacheItem {
+	data, err := os.ReadFile(c.path)
+	if err != nil {
+		return nil
+	}
+	var cache Cache
+	if err := json.Unmarshal(data, &cache); err != nil {
+		return nil
+	}
+	if item, ok := cache[key]; ok {
+		return &item
+	}
+	return nil
+}
+
+func (c *FileCache) Has(key string, value any) bool {
 	data, err := os.ReadFile(c.path)
 	if err != nil {
 		return false
 	}
-	m := make(map[string]any)
-	if err := json.Unmarshal(data, &m); err != nil {
+	var cache Cache
+	if err := json.Unmarshal(data, &cache); err != nil {
 		return false
 	}
-	if vals, ok := m[key]; ok {
-		switch v := vals.(type) {
-		case []any:
-			for _, item := range v {
-				if itemStr, ok := item.(string); ok && itemStr == value {
+	if item, ok := cache[key]; ok {
+		switch v := value.(type) {
+		case Tags:
+			for _, tag := range v {
+				if slices.Contains(item.Tags, tag) {
 					return true
 				}
 			}
-		case map[string]any:
-			if vStr, ok := v[value]; ok {
-				if strVal, ok := vStr.(string); ok && strVal == value {
+		case Commit:
+			return item.Commit == v
+		case Function:
+			for name, commit := range v {
+				if commitVal, ok := item.Functions[name]; ok && commitVal == commit {
 					return true
 				}
-			}
-		case string:
-			if v == value {
-				return true
 			}
 		}
 	}
