@@ -127,31 +127,35 @@ func CodeSign(filePath, signature string) error {
 }
 
 // CodeSignWithEntitlements codesigns a given binary with given entitlements
-func CodeSignWithEntitlements(filePath, entitlementsPath, signature string, isRetry ...bool) error {
-	retry := len(isRetry) > 0 && isRetry[0]
-	if runtime.GOOS == "darwin" {
+func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("only supported on macOS")
+	}
+
+	return Retry(2, 0, func() error {
+		Indent(log.Info, 2)(fmt.Sprintf("Codesigning '%s' with entitlements", filepath.Base(filePath)))
 		cmd := exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
 		out, err := cmd.CombinedOutput()
-		
+
 		if err == nil {
 			return nil
 		}
-		
-		if strings.Contains(string(out), "AMFIUnserializeXML: syntax error") && !retry {
+
+		if strings.Contains(string(out), "AMFIUnserializeXML: syntax error") {
+			Indent(log.Error, 2)(fmt.Sprintf("%v: %s", err, strings.TrimSpace(string(out))))
 			Indent(log.Info, 2)(fmt.Sprintf("Converting entitlements file '%s' to XML1 format", entitlementsPath))
-			
-			cmd = exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
-			out, err = cmd.CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("%v: %s", err, out)
+
+			convertCmd := exec.Command("/usr/bin/plutil", "-convert", "xml1", entitlementsPath)
+			convertOut, convertErr := convertCmd.CombinedOutput()
+			if convertErr != nil {
+				return &StopRetryingError{Err: fmt.Errorf("%v: %s", convertErr, strings.TrimSpace(string(convertOut)))}
 			}
-			
-			return CodeSignWithEntitlements(filePath, entitlementsPath, signature, true)
+
+			return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 		}
-		
-		return fmt.Errorf("%v: %s", err, out)
-	}
-	return fmt.Errorf("only supported on macOS")
+
+		return &StopRetryingError{Err: fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))}
+	})
 }
 
 // CodeSignAdHoc codesigns a given binary with ad-hoc signature
