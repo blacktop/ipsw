@@ -155,6 +155,7 @@ func (d *Download) Do() error {
 		}
 	}
 
+	d.resume = false
 	if d.canResume {
 		if f, err := os.Stat(d.DestName + ".download"); !os.IsNotExist(err) {
 			// don't try to download files being downloaded elsewhere
