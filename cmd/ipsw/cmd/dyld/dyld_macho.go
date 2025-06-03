@@ -437,12 +437,16 @@ var MachoCmd = &cobra.Command{
 						fmt.Println("STRINGS")
 						fmt.Println("=======")
 					}
-					strs, err := mcmd.GetStrings(m)
+					cstrs, err := m.GetCStrings()
 					if err != nil {
 						return fmt.Errorf("failed to get strings: %v", err)
 					}
-					for pos, s := range strs {
-						fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
+					for sec, strs := range cstrs {
+						fmt.Printf("\n[%s]\n", sec)
+						fmt.Println(strings.Repeat("-", len(sec)) + "--")
+						for s, pos := range strs {
+							fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
+						}
 					}
 
 					if cfstrs, err := m.GetCFStrings(); err == nil {
