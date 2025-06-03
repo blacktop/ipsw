@@ -341,7 +341,7 @@ func Disassemble(d Disass) string {
 							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
 								opStr = strings.Replace(opStr, fmt.Sprintf("%#x", operand.Immediate), name, 1)
 							} else if cstr, err := d.GetCString(uint64(operand.Immediate)); err == nil {
-								if utils.IsASCII(cstr) {
+								if utils.IsPrintable(cstr) {
 									if len(cstr) > 200 {
 										comment = fmt.Sprintf(" ; %#v...", cstr[:200])
 									} else if len(cstr) > 1 {
@@ -380,7 +380,7 @@ func Disassemble(d Disass) string {
 							comment = fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
 						}
 					} else if cstr, err := d.GetCString(adrpImm); err == nil && len(cstr) > 0 {
-						if utils.IsASCII(cstr) {
+						if utils.IsPrintable(cstr) {
 							if len(cstr) > 200 {
 								comment = fmt.Sprintf(" ; %#v...", cstr[:200])
 							} else if len(cstr) > 1 {
