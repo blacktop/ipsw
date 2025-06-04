@@ -16,7 +16,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/alecthomas/chroma/v2 v2.18.0
-	github.com/anthropics/anthropic-sdk-go v1.2.2
+	github.com/anthropics/anthropic-sdk-go v1.3.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.0
 	github.com/blacktop/arm64-cgo v1.0.58
