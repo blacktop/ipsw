@@ -500,6 +500,17 @@ func (i *Info) GetCPU(board string) string {
 // GetFolder returns a folder name for all the devices included in an IPSW
 func (i *Info) GetFolder(device ...string) (string, error) {
 	if i.Plists.BuildManifest == nil {
+		if i.Plists.Type == "OTA" && i.Plists.OTAInfo.CFBundleName == "SimulatorRuntimeAsset" {
+			typ, found := strings.CutPrefix(i.Plists.OTAInfo.CFBundleIdentifier, "com.apple.MobileAsset.")
+			if !found {
+				typ = "Simulator"
+			}
+			return fmt.Sprintf("%s_%s_%s",
+				i.Plists.OTAInfo.MobileAssetProperties.SimulatorVersion,
+				i.Plists.OTAInfo.MobileAssetProperties.Build,
+				typ,
+			), nil
+		}
 		return "", fmt.Errorf("no BuildManifest.plist found")
 	}
 

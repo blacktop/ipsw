@@ -197,9 +197,9 @@ func (r *Reader) initZip(rdr io.ReaderAt, size int64) (err error) {
 
 func (r *Reader) init(rdr io.ReaderAt, size int64) (err error) {
 	r.r = rdr
+	r.yaa = &yaa.YAA{}
 	rs := io.NewSectionReader(rdr, 0, size)
-	r.yaa, err = yaa.Parse(rs)
-	if err != nil {
+	if err := r.yaa.Parse(rs); err != nil {
 		return err
 	}
 	return nil
@@ -387,8 +387,8 @@ func (r *Reader) initPayloadMap() (perr error) {
 					perr = err
 					return
 				}
-				aa, err := yaa.Parse(bytes.NewReader(pbuf.Bytes()))
-				if err != nil {
+				aa := &yaa.YAA{}
+				if err := aa.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
 					if !errors.Is(err, io.ErrUnexpectedEOF) {
 						perr = fmt.Errorf("failed to parse payload: %v", err)
 						return
@@ -874,6 +874,7 @@ func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 			return f.zfile.Open()
 		}
 	}
+
 	if _, err := f.entry.Read(mdata[:]); err != nil {
 		if err == io.EOF {
 			rc = &otaReader{
