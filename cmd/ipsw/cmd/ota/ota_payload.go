@@ -72,7 +72,7 @@ var otaPayloadCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both --files and --dirs flags")
 		}
 
-		var aa *yaa.YAA
+		aa := &yaa.YAA{}
 
 		if len(args) < 2 {
 			isPBZX, err := magic.IsPBZX(filepath.Clean(args[0]))
@@ -89,13 +89,11 @@ var otaPayloadCmd = &cobra.Command{
 				if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
 					return err
 				}
-				aa, err = yaa.Parse(bytes.NewReader(pbuf.Bytes()))
-				if err != nil {
+				if err := aa.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
 					return fmt.Errorf("failed to parse payload: %v", err)
 				}
 			} else {
-				aa, err = yaa.Parse(pf)
-				if err != nil {
+				if err := aa.Parse(pf); err != nil {
 					return fmt.Errorf("failed to parse payload: %v", err)
 				}
 			}
@@ -125,13 +123,11 @@ var otaPayloadCmd = &cobra.Command{
 				if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
 					return err
 				}
-				aa, err = yaa.Parse(bytes.NewReader(pbuf.Bytes()))
-				if err != nil {
+				if err := aa.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
 					return fmt.Errorf("failed to parse payload: %v", err)
 				}
 			} else {
-				aa, err = yaa.Parse(bytes.NewReader(data))
-				if err != nil {
+				if err := aa.Parse(bytes.NewReader(data)); err != nil {
 					return fmt.Errorf("failed to parse payload: %v", err)
 				}
 			}

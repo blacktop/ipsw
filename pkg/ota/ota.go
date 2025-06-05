@@ -257,8 +257,8 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 
 	rr := bytes.NewReader(xzBuf.Bytes())
 
-	aa, err := yaa.Parse(rr)
-	if err != nil {
+	aa := &yaa.YAA{}
+	if err = aa.Parse(rr); err != nil {
 		if !errors.Is(err, yaa.ErrInvalidMagic) {
 			return false, "", err
 		}
