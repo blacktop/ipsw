@@ -1,18 +1,23 @@
 package yaa
 
-//go:generate go tool stringer -type=entryType,patchType -trimprefix=Patch_ -output yaa_string.go
+//go:generate go tool stringer -type=entryType,yopType -trimprefix=Patch_ -output yaa_string.go
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
 )
 
@@ -21,7 +26,10 @@ const (
 	MagicAA01 = 0x31304141 // "AA01"
 )
 
-var ErrInvalidMagic = fmt.Errorf("invalid magic")
+var (
+	ErrInvalidMagic    = fmt.Errorf("invalid magic")
+	ErrPostBomNotFound = fmt.Errorf("post.bom not found")
+)
 
 type entryType byte
 
@@ -36,64 +44,67 @@ const (
 	Socket           entryType = 'S'
 )
 
-type patchType byte
+type yopType byte
 
 const (
-	Patch_C        patchType = 'C'
-	Patch_Entry    patchType = 'E'
-	Patch_Metadata patchType = 'M'
-	Patch_P        patchType = 'P'
-	Patch_R        patchType = 'R'
-	Patch_O        patchType = 'O'
+	YOP_COPY      yopType = 'C'
+	YOP_EXTRACT   yopType = 'E'
+	YOP_MANIFEST  yopType = 'M'
+	YOP_PATCH     yopType = 'P'
+	YOP_REMOVE    yopType = 'R'
+	YOP_DST_FIXUP yopType = 'O' // fixup regular file metadata (add additional fields)
 )
 
 // Entry is a YAA entry type
 type Entry struct {
-	Type      entryType   // entry type
-	Path      string      // entry path
-	Link      string      // link path
-	Uid       uint16      // user id
-	Gid       uint16      // group id
-	Mod       fs.FileMode // access mode
-	Flag      uint32      // BSD flags
-	Mtm       time.Time   // modification time
-	Btm       time.Time   // backup time
-	Ctm       time.Time   // creation time
-	Size      uint64      // file data size
-	Data      uint64      // file contents
-	Index     uint64      // entry index in input archive
-	ESize     uint64      // entry size in input archive
-	Aft       uint32
-	Afr       uint32
-	Hlc       uint32
-	Hlo       uint32
-	Fli       uint32
-	PatchType patchType
-	Label     string
-	Xat       uint32 // extended attributes
+	Type  entryType   // entry type
+	Path  string      // entry path
+	Link  string      // link path
+	Uid   uint16      // user id
+	Gid   uint16      // group id
+	Mod   fs.FileMode // access mode
+	Flag  uint32      // BSD flags
+	Mtm   time.Time   // modification time
+	Btm   time.Time   // backup time
+	Ctm   time.Time   // creation time
+	Size  uint64      // file data size
+	Data  uint64      // file contents
+	Index uint64      // entry index in input archive
+	ESize uint64      // entry size in input archive
+	Aft   uint32
+	Afr   uint32
+	Hlc   uint32
+	Hlo   uint32
+	Fli   uint32
+	Yop   yopType // operation ?
+	Yec   uint32  // file data error correcting codes
+	Sh2   [32]byte
+	Label string
+	Xat   uint32 // extended attributes
 
-	r          *io.ReadSeeker
-	fileOffset int64
+	needs2bExtracted bool
+	r                *io.ReadSeeker
+	fileOffset       int64
 }
 
 func (e *Entry) String() string {
 	switch e.Type {
 	case Metadata:
-		switch e.PatchType {
-		case Patch_C:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_Entry:
-			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x (%s), in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, humanize.Bytes(uint64(e.Index)), e.ESize, humanize.Bytes(uint64(e.ESize)))
-		case Patch_Metadata:
-			return fmt.Sprintf("[%s    ] %s: size: %#x (%s)", e.Type, e.PatchType, e.Size, humanize.Bytes(uint64(e.Size)))
-		case Patch_P:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_R:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_O:
-			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x, in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, e.ESize, humanize.Bytes(uint64(e.ESize)))
+		switch e.Yop {
+		case YOP_COPY:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_EXTRACT:
+			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x (%s), in_size: %#x (%s)", e.Type, e.Yop, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, humanize.Bytes(uint64(e.Index)), e.ESize, humanize.Bytes(uint64(e.ESize)))
+		case YOP_MANIFEST:
+			return fmt.Sprintf("[%s    ] %s: size: %#x (%s)", e.Type, e.Yop, e.Size, humanize.Bytes(uint64(e.Size)))
+		case YOP_PATCH:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_REMOVE:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_DST_FIXUP:
+			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x, in_size: %#x (%s)", e.Type, e.Yop, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, e.ESize, humanize.Bytes(uint64(e.ESize)))
 		default:
-			return fmt.Sprintf("[%s    ] YOP_UNK: '%c'", e.Type, e.PatchType)
+			return fmt.Sprintf("[%s    ] YOP_UNK: '%c'", e.Type, e.Yop)
 		}
 	case Directory:
 		if e.Path == "" {
@@ -107,7 +118,11 @@ func (e *Entry) String() string {
 			e.Flag,
 			e.Path)
 	case RegularFile:
-		return fmt.Sprintf("[%s ] %s uid: %d gid: %d flag: %d size: %s hlc: %d hlo: %d aft: %d afr: %d '%s'",
+		var sh2 string
+		if e.Sh2 != [32]byte{} {
+			sh2 = fmt.Sprintf(" sha256: %s", hex.EncodeToString(e.Sh2[:]))
+		}
+		return fmt.Sprintf("[%s ] %s uid: %d gid: %d flag: %d size: %s hlc: %d hlo: %d aft: %d afr: %d%s '%s'",
 			e.Type,
 			unixModeToFileMode(uint32(e.Mod)),
 			e.Uid,
@@ -118,6 +133,7 @@ func (e *Entry) String() string {
 			e.Hlo,
 			e.Aft,
 			e.Afr,
+			sh2,
 			e.Path)
 	case SymbolicLink:
 		return fmt.Sprintf("[%s] %s uid: %d gid: %d flag: %d '%s' -> '%s'",
@@ -543,9 +559,33 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				if ptype, err = r.ReadByte(); err != nil {
 					return nil, fmt.Errorf("failed to read YOP1 field: %w", err)
 				}
-				entry.PatchType = patchType(ptype)
+				entry.Yop = yopType(ptype)
 			default:
 				return nil, fmt.Errorf("found unknown YOP field: %s", string(field))
+			}
+		case "YEC": // file data error correcting codes size
+			switch field[3] {
+			case 'B':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Yec); err != nil {
+					return nil, fmt.Errorf("failed to read YECB field: %w", err)
+				}
+			case 'A':
+				var dat uint16
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+					return nil, fmt.Errorf("failed to read YECA field: %w", err)
+				}
+				entry.Yec = uint32(dat)
+			default:
+				return nil, fmt.Errorf("found unknown YEC field: %s", string(field))
+			}
+		case "SH2": // SHA2-256 digest
+			switch field[3] {
+			case 'H':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Sh2); err != nil {
+					return nil, fmt.Errorf("failed to read SH2H field: %w", err)
+				}
+			default:
+				return nil, fmt.Errorf("found unknown SH2 field: %s", string(field))
 			}
 		case "LBL": // label
 			switch field[3] {
@@ -594,7 +634,7 @@ func (y *YAA) PostBOM() ([]fs.FileInfo, error) {
 			return bom.GetPaths()
 		}
 	}
-	return nil, fmt.Errorf("'post.bom' not found")
+	return nil, ErrPostBomNotFound
 }
 
 func (y *YAA) FileSize() uint64 {
@@ -644,18 +684,47 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 		if err != nil {
 			return yaa, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
 		}
+		log.Debug(ent.String())
 
-		// if ent.PatchType != 0 && ent.Data > 0 {
-		// 	if ent.PatchType != Patch_Metadata {
-		// 		curr, _ := r.Seek(0, io.SeekCurrent)
-		// 		ent.fileOffset = curr
-		// 		ent.r = &r
-		// 		// skip compressed data ??
-		// 		if _, err := r.Seek(int64(ent.Data), io.SeekCurrent); err != nil {
-		// 			return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
-		// 		}
-		// 	}
-		// }
+		if ent.Type == Metadata {
+			curr, _ := r.Seek(0, io.SeekCurrent)
+			ent.fileOffset = curr
+			ent.r = &r
+			switch ent.Yop {
+			case YOP_MANIFEST, YOP_EXTRACT:
+				if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
+					return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+				}
+			case YOP_DST_FIXUP:
+				var pbuf bytes.Buffer
+				if err := pbzx.Extract(context.Background(), r, &pbuf, runtime.NumCPU()); err != nil {
+					return yaa, fmt.Errorf("Parse: failed to extract aa pbzx patch data: %w", err)
+				}
+				subYaa, err := Parse(bytes.NewReader(pbuf.Bytes()))
+				if err != nil {
+					return yaa, fmt.Errorf("Parse: failed to parse aa patch: %w", err)
+				} else {
+					for _, e := range subYaa.Entries {
+						if idx, ok := seen[e.Path]; ok {
+							yaa.Entries[idx-1].Uid = e.Uid
+							yaa.Entries[idx-1].Gid = e.Gid
+							yaa.Entries[idx-1].Mod = e.Mod
+							yaa.Entries[idx-1].Flag = e.Flag
+							yaa.Entries[idx-1].Mtm = e.Mtm
+							yaa.Entries[idx-1].Btm = e.Btm
+							yaa.Entries[idx-1].Ctm = e.Ctm
+							copy(yaa.Entries[idx-1].Sh2[:], e.Sh2[:])
+						} else {
+							e.needs2bExtracted = true
+							yaa.Entries = append(yaa.Entries, e)
+							seen[e.Path] = len(yaa.Entries)
+						}
+					}
+				}
+			default:
+				log.Warnf("Parse: unsupported YOP operation: %s (let author know)", ent.Yop)
+			}
+		}
 
 		if ent.Type == RegularFile {
 			curr, _ := r.Seek(0, io.SeekCurrent)
@@ -665,6 +734,12 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
 				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
 			}
+			if ent.Yec > 0 {
+				// skip ECC data
+				if _, err := r.Seek(int64(ent.Yec), io.SeekCurrent); err != nil {
+					return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+				}
+			}
 		}
 
 		if ent.Xat > 0 {
@@ -672,18 +747,6 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			if _, err := r.Seek(int64(ent.Xat), io.SeekCurrent); err != nil {
 				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
 			}
-		}
-
-		// Added for NEW YOP format
-		if idx, ok := seen[ent.Path]; ok {
-			yaa.Entries[idx-1].Uid = ent.Uid
-			yaa.Entries[idx-1].Gid = ent.Gid
-			yaa.Entries[idx-1].Mod = ent.Mod
-			yaa.Entries[idx-1].Flag = ent.Flag
-			yaa.Entries[idx-1].Mtm = ent.Mtm
-			yaa.Entries[idx-1].Btm = ent.Btm
-			yaa.Entries[idx-1].Ctm = ent.Ctm
-			continue // skip duplicate
 		}
 
 		yaa.Entries = append(yaa.Entries, ent)

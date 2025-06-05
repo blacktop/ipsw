@@ -106,10 +106,13 @@ func Open(name string, symmetricKey ...string) (*AA, error) {
 		return nil, err
 	} else if isAEA { // check if file is AEA encrypted
 		var key string
-		if len(symmetricKey) > 0 {
+		if len(symmetricKey) > 0 && symmetricKey[0] != "" {
 			key = symmetricKey[0]
 		} else {
-			key, _ = getKeyFromName(name)
+			key, err = getKeyFromName(name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get key from name: %v (must supply --key-val)", err)
+			}
 		}
 		name, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:     name,
@@ -328,14 +331,16 @@ func (r *Reader) initFileList() (ferr error) {
 					files[name] = idx
 				}
 			}
-			// TODO: some of these aren't in the payloads ??
 			// add BOM files
 			bomFiles, err := r.yaa.PostBOM()
 			if err != nil {
-				ferr = err
-				return
+				if !errors.Is(err, yaa.ErrPostBomNotFound) {
+					ferr = err
+					return
+				}
+			} else {
+				r.bomFiles = bomFiles
 			}
-			r.bomFiles = bomFiles
 		}
 
 		sort.Slice(r.fileList, func(i, j int) bool { return fileEntryLess(r.fileList[i].name, r.fileList[j].name) })
