@@ -1,18 +1,23 @@
 package yaa
 
-//go:generate go tool stringer -type=entryType,patchType -trimprefix=Patch_ -output yaa_string.go
+//go:generate go tool stringer -type=entryType,yopType -trimprefix=Patch_ -output yaa_string.go
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
 )
 
@@ -21,7 +26,10 @@ const (
 	MagicAA01 = 0x31304141 // "AA01"
 )
 
-var ErrInvalidMagic = fmt.Errorf("invalid magic")
+var (
+	ErrInvalidMagic    = fmt.Errorf("invalid magic")
+	ErrPostBomNotFound = fmt.Errorf("post.bom not found")
+)
 
 type entryType byte
 
@@ -36,41 +44,43 @@ const (
 	Socket           entryType = 'S'
 )
 
-type patchType byte
+type yopType byte
 
 const (
-	Patch_C        patchType = 'C'
-	Patch_Entry    patchType = 'E'
-	Patch_Metadata patchType = 'M'
-	Patch_P        patchType = 'P'
-	Patch_R        patchType = 'R'
-	Patch_O        patchType = 'O'
+	YOP_COPY      yopType = 'C'
+	YOP_EXTRACT   yopType = 'E'
+	YOP_MANIFEST  yopType = 'M'
+	YOP_PATCH     yopType = 'P'
+	YOP_REMOVE    yopType = 'R'
+	YOP_DST_FIXUP yopType = 'O' // fixup regular file metadata (add additional fields)
 )
 
 // Entry is a YAA entry type
 type Entry struct {
-	Type      entryType   // entry type
-	Path      string      // entry path
-	Link      string      // link path
-	Uid       uint16      // user id
-	Gid       uint16      // group id
-	Mod       fs.FileMode // access mode
-	Flag      uint32      // BSD flags
-	Mtm       time.Time   // modification time
-	Btm       time.Time   // backup time
-	Ctm       time.Time   // creation time
-	Size      uint64      // file data size
-	Data      uint64      // file contents
-	Index     uint64      // entry index in input archive
-	ESize     uint64      // entry size in input archive
-	Aft       uint32
-	Afr       uint32
-	Hlc       uint32
-	Hlo       uint32
-	Fli       uint32
-	PatchType patchType
-	Label     string
-	Xat       uint32 // extended attributes
+	Type  entryType   // entry type
+	Path  string      // entry path
+	Link  string      // link path
+	Uid   uint16      // user id
+	Gid   uint16      // group id
+	Mod   fs.FileMode // access mode
+	Flag  uint32      // BSD flags
+	Mtm   time.Time   // modification time
+	Btm   time.Time   // backup time
+	Ctm   time.Time   // creation time
+	Size  uint64      // file data size
+	Data  uint64      // file contents
+	Index uint64      // entry index in input archive
+	ESize uint64      // entry size in input archive
+	Aft   uint32
+	Afr   uint32
+	Hlc   uint32
+	Hlo   uint32
+	Fli   uint32
+	Yop   yopType // operation ?
+	Yec   uint32  // file data error correcting codes
+	Sh2   [32]byte
+	Label string
+	Xat   uint32 // extended attributes
 
 	r          *io.ReadSeeker
 	fileOffset int64
@@ -79,21 +89,21 @@ type Entry struct {
 func (e *Entry) String() string {
 	switch e.Type {
 	case Metadata:
-		switch e.PatchType {
-		case Patch_C:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_Entry:
-			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x (%s), in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, humanize.Bytes(uint64(e.Index)), e.ESize, humanize.Bytes(uint64(e.ESize)))
-		case Patch_Metadata:
-			return fmt.Sprintf("[%s    ] %s: size: %#x (%s)", e.Type, e.PatchType, e.Size, humanize.Bytes(uint64(e.Size)))
-		case Patch_P:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_R:
-			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.PatchType, e.Path)
-		case Patch_O:
-			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x, in_size: %#x (%s)", e.Type, e.PatchType, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, e.ESize, humanize.Bytes(uint64(e.ESize)))
+		switch e.Yop {
+		case YOP_COPY:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_EXTRACT:
+			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x (%s), in_size: %#x (%s)", e.Type, e.Yop, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, humanize.Bytes(uint64(e.Index)), e.ESize, humanize.Bytes(uint64(e.ESize)))
+		case YOP_MANIFEST:
+			return fmt.Sprintf("[%s    ] %s: size: %#x (%s)", e.Type, e.Yop, e.Size, humanize.Bytes(uint64(e.Size)))
+		case YOP_PATCH:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_REMOVE:
+			return fmt.Sprintf("[%s    ] %s: %s", e.Type, e.Yop, e.Path)
+		case YOP_DST_FIXUP:
+			return fmt.Sprintf("[%s    ] %s: '%s' size: %#x (%s), index: %#x, in_size: %#x (%s)", e.Type, e.Yop, e.Label, e.Size, humanize.Bytes(uint64(e.Size)), e.Index, e.ESize, humanize.Bytes(uint64(e.ESize)))
 		default:
-			return fmt.Sprintf("[%s    ] YOP_UNK: '%c'", e.Type, e.PatchType)
+			return fmt.Sprintf("[%s    ] YOP_UNK: '%c'", e.Type, e.Yop)
 		}
 	case Directory:
 		if e.Path == "" {
@@ -107,7 +117,11 @@ func (e *Entry) String() string {
 			e.Flag,
 			e.Path)
 	case RegularFile:
-		return fmt.Sprintf("[%s ] %s uid: %d gid: %d flag: %d size: %s hlc: %d hlo: %d aft: %d afr: %d '%s'",
+		var sh2 string
+		if e.Sh2 != [32]byte{} {
+			sh2 = fmt.Sprintf(" sha256: %s", hex.EncodeToString(e.Sh2[:]))
+		}
+		return fmt.Sprintf("[%s ] %s uid: %d gid: %d flag: %d size: %s hlc: %d hlo: %d aft: %d afr: %d%s '%s'",
 			e.Type,
 			unixModeToFileMode(uint32(e.Mod)),
 			e.Uid,
@@ -118,6 +132,7 @@ func (e *Entry) String() string {
 			e.Hlo,
 			e.Aft,
 			e.Afr,
+			sh2,
 			e.Path)
 	case SymbolicLink:
 		return fmt.Sprintf("[%s] %s uid: %d gid: %d flag: %d '%s' -> '%s'",
@@ -141,7 +156,12 @@ func (e *Entry) Read(out []byte) (int, error) {
 	if e.r == nil {
 		return 0, fmt.Errorf("yaa entry reader is nil")
 	}
-	(*e.r).Seek(e.fileOffset, io.SeekStart)
+	if _, err := (*e.r).Seek(e.fileOffset, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("failed to seek to file offset: %w", err)
+	}
+	if uint64(len(out)) > e.Size {
+		out = out[:e.Size]
+	}
 	return (*e.r).Read(out)
 }
 
@@ -543,9 +563,33 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 				if ptype, err = r.ReadByte(); err != nil {
 					return nil, fmt.Errorf("failed to read YOP1 field: %w", err)
 				}
-				entry.PatchType = patchType(ptype)
+				entry.Yop = yopType(ptype)
 			default:
 				return nil, fmt.Errorf("found unknown YOP field: %s", string(field))
+			}
+		case "YEC": // file data error correcting codes size
+			switch field[3] {
+			case 'B':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Yec); err != nil {
+					return nil, fmt.Errorf("failed to read YECB field: %w", err)
+				}
+			case 'A':
+				var dat uint16
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+					return nil, fmt.Errorf("failed to read YECA field: %w", err)
+				}
+				entry.Yec = uint32(dat)
+			default:
+				return nil, fmt.Errorf("found unknown YEC field: %s", string(field))
+			}
+		case "SH2": // SHA2-256 digest
+			switch field[3] {
+			case 'H':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Sh2); err != nil {
+					return nil, fmt.Errorf("failed to read SH2H field: %w", err)
+				}
+			default:
+				return nil, fmt.Errorf("found unknown SH2 field: %s", string(field))
 			}
 		case "LBL": // label
 			switch field[3] {
@@ -573,6 +617,7 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 type YAA struct {
 	Entries []*Entry
 	sr      io.ReadSeeker
+	seen    map[string]int // track seen entries across recursive calls
 }
 
 func (y *YAA) ReadAt(p []byte, off int64) (n int, err error) {
@@ -594,7 +639,7 @@ func (y *YAA) PostBOM() ([]fs.FileInfo, error) {
 			return bom.GetPaths()
 		}
 	}
-	return nil, fmt.Errorf("'post.bom' not found")
+	return nil, ErrPostBomNotFound
 }
 
 func (y *YAA) FileSize() uint64 {
@@ -607,10 +652,13 @@ func (y *YAA) FileSize() uint64 {
 	return total
 }
 
-func Parse(r io.ReadSeeker) (*YAA, error) {
-	yaa := &YAA{sr: r}
-
-	seen := make(map[string]int)
+func (y *YAA) Parse(r io.ReadSeeker) error {
+	if y.sr == nil {
+		y.sr = r
+	}
+	if y.seen == nil {
+		y.seen = make(map[string]int)
+	}
 
 	var magic uint32
 	var headerSize uint16
@@ -622,78 +670,97 @@ func Parse(r io.ReadSeeker) (*YAA, error) {
 			if err == io.EOF {
 				break
 			}
-			return yaa, fmt.Errorf("Parse: failed to read magic: %w", err)
+			return fmt.Errorf("YAA.Parse: failed to read magic: %w", err)
 		}
 
 		if magic != MagicYAA1 && magic != MagicAA01 {
-			return nil, ErrInvalidMagic
+			return ErrInvalidMagic
 		}
 		if err := binary.Read(r, binary.LittleEndian, &headerSize); err != nil {
-			return yaa, fmt.Errorf("Parse: failed to read header size: %w", err)
+			return fmt.Errorf("YAA.Parse: failed to read header size: %w", err)
 		}
 		if headerSize <= 5 {
-			return yaa, fmt.Errorf("Parse invalid header size: %d", headerSize)
+			return fmt.Errorf("YAA.Parse: invalid header size: %d", headerSize)
 		}
 
 		header := make([]byte, headerSize-uint16(binary.Size(magic))-uint16(binary.Size(headerSize)))
 		if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-			return yaa, fmt.Errorf("Parse: failed to read header: %w", err)
+			return fmt.Errorf("YAA.Parse: failed to read header: %w", err)
 		}
 
 		ent, err = DecodeEntry(bytes.NewReader(header))
 		if err != nil {
-			return yaa, fmt.Errorf("Parse: failed to decode AA entry: %v", err)
+			return fmt.Errorf("YAA.Parse: failed to decode AA entry: %v", err)
+		}
+		log.Debug(ent.String())
+
+		if ent.Type == Metadata {
+			ent.fileOffset, _ = r.Seek(0, io.SeekCurrent)
+			ent.r = &r
+			switch ent.Yop {
+			case YOP_MANIFEST:
+				if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
+				}
+			case YOP_EXTRACT, YOP_DST_FIXUP:
+				data := make([]byte, ent.Size)
+				if _, err := io.ReadFull(r, data); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to read aa pbzx patch data: %w", err)
+				}
+				var pbuf bytes.Buffer
+				if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to extract aa pbzx patch data: %w", err)
+				}
+
+				if err := y.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
+				}
+			default:
+				log.Warnf("YAA.Parse: unsupported YOP operation: %s (let author know)", ent.Yop)
+			}
 		}
 
-		// if ent.PatchType != 0 && ent.Data > 0 {
-		// 	if ent.PatchType != Patch_Metadata {
-		// 		curr, _ := r.Seek(0, io.SeekCurrent)
-		// 		ent.fileOffset = curr
-		// 		ent.r = &r
-		// 		// skip compressed data ??
-		// 		if _, err := r.Seek(int64(ent.Data), io.SeekCurrent); err != nil {
-		// 			return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
-		// 		}
-		// 	}
-		// }
-
 		if ent.Type == RegularFile {
-			curr, _ := r.Seek(0, io.SeekCurrent)
-			ent.fileOffset = curr
+			ent.fileOffset, _ = r.Seek(0, io.SeekCurrent)
 			ent.r = &r
 			// skip file data
 			if _, err := r.Seek(int64(ent.Size), io.SeekCurrent); err != nil {
-				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+				return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
+			}
+			if ent.Yec > 0 {
+				// skip ECC data
+				if _, err := r.Seek(int64(ent.Yec), io.SeekCurrent); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
+				}
 			}
 		}
 
 		if ent.Xat > 0 {
 			// skip extended attributes
 			if _, err := r.Seek(int64(ent.Xat), io.SeekCurrent); err != nil {
-				return yaa, fmt.Errorf("Parse: failed to seek to next entry: %w", err)
+				return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
 			}
 		}
 
-		// Added for NEW YOP format
-		if idx, ok := seen[ent.Path]; ok {
-			yaa.Entries[idx-1].Uid = ent.Uid
-			yaa.Entries[idx-1].Gid = ent.Gid
-			yaa.Entries[idx-1].Mod = ent.Mod
-			yaa.Entries[idx-1].Flag = ent.Flag
-			yaa.Entries[idx-1].Mtm = ent.Mtm
-			yaa.Entries[idx-1].Btm = ent.Btm
-			yaa.Entries[idx-1].Ctm = ent.Ctm
-			continue // skip duplicate
-		}
-
-		yaa.Entries = append(yaa.Entries, ent)
-		// add to seen
-		if len(ent.Path) > 0 {
-			seen[ent.Path] = len(yaa.Entries)
+		if idx, ok := y.seen[ent.Path]; ok {
+			y.Entries[idx-1].Uid = ent.Uid
+			y.Entries[idx-1].Gid = ent.Gid
+			y.Entries[idx-1].Mod = ent.Mod
+			y.Entries[idx-1].Flag = ent.Flag
+			y.Entries[idx-1].Mtm = ent.Mtm
+			y.Entries[idx-1].Btm = ent.Btm
+			y.Entries[idx-1].Ctm = ent.Ctm
+			copy(y.Entries[idx-1].Sh2[:], ent.Sh2[:])
+		} else {
+			y.Entries = append(y.Entries, ent)
+			// add to seen
+			if len(ent.Path) > 0 {
+				y.seen[ent.Path] = len(y.Entries)
+			}
 		}
 	}
 
-	return yaa, nil
+	return nil
 }
 
 const (

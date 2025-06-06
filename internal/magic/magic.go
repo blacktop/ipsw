@@ -364,7 +364,7 @@ func IsAA(filePath string) (bool, error) {
 	if _, err := f.Read(magic); err != nil {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
-	switch Magic(binary.BigEndian.Uint32(magic[:])) {
+	switch Magic(binary.LittleEndian.Uint32(magic[:])) {
 	case MagicYAA1, MagicAA01:
 		return true, nil
 	default:

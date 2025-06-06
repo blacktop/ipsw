@@ -155,9 +155,9 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 		if i.Version != x.Version { // (this could be a lie)
 			return false
 		}
-	}
-	if i.UUID != x.UUID {
-		return false
+		if i.UUID != x.UUID {
+			return false
+		}
 	}
 	return true
 }

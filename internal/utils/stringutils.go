@@ -177,6 +177,17 @@ func IsASCII(s string) bool {
 	return true
 }
 
+func IsPrintable(s string) bool {
+	isPrintable := true
+	for _, r := range s {
+		if !unicode.IsPrint(r) && !unicode.IsSpace(r) {
+			isPrintable = false
+			break
+		}
+	}
+	return isPrintable
+}
+
 // UnicodeSanitize sanitizes string to be used in Hugo URL's, allowing only
 // a predefined set of special Unicode characters.
 // If RemovePathAccents configuration flag is enabled, Unicode accents
