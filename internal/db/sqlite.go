@@ -50,6 +50,7 @@ func (s *Sqlite) Connect() (err error) {
 		&model.Symbol{},
 		&model.Entitlement{},
 		&model.EntitlementKey{},
+		&model.EntitlementWebSearch{},
 	)
 }
 

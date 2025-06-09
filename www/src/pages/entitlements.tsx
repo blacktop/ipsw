@@ -1,23 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '@theme/Layout';
 import { createDbWorker } from 'sql.js-httpvfs';
 
 export default function Entitlements() {
     const [dbWorker, setDbWorker] = useState<any>(null);
-    const [key, setKey] = useState<string>('');
-    const [results, setResults] = useState<string[]>([]);
+    const [iosVersions, setIosVersions] = useState<string[]>([]);
+    const [selectedVersion, setSelectedVersion] = useState<string>('');
+    const [searchType, setSearchType] = useState<'key' | 'file'>('key');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [dbLoading, setDbLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
+    const [workerBlobUrl, setWorkerBlobUrl] = useState<string | null>(null);
+    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
+    const [selectedExecutablePath, setSelectedExecutablePath] = useState<string>('');
+    const [availableExecutablePaths, setAvailableExecutablePaths] = useState<string[]>([]);
 
     useEffect(() => {
         const initDb = async () => {
             if (!dbWorker) {
-                // Set a timeout to prevent hanging forever
                 const timeoutId = setTimeout(() => {
                     setDbLoading(false);
                     setError('Database initialization timed out. The database file may be missing or corrupted.');
-                }, 10000); // 10 second timeout
+                }, 30000); // Increase timeout to 30 seconds for large database
 
                 try {
                     setDbLoading(true);
@@ -27,53 +34,109 @@ export default function Entitlements() {
 
                     let worker;
                     try {
+                        // Check for WASM support first
+                        if (typeof WebAssembly === 'undefined') {
+                            throw new Error('WebAssembly is not supported in this browser');
+                        }
+                        
+                        // Determine base URL for development vs production
+                        const isDev = process.env.NODE_ENV === 'development';
+                        const currentPath = window.location.pathname;
+                        let basePath = '';
+                        
+                        if (isDev) {
+                            // In development, Docusaurus serves static files from /ipsw/ even in dev mode
+                            basePath = window.location.origin + '/ipsw';
+                        } else {
+                            // In production, handle the /ipsw base URL
+                            basePath = window.location.origin + '/ipsw';
+                        }
+                        
+                        console.log('Environment:', process.env.NODE_ENV);
+                        console.log('Current path:', currentPath);
+                        console.log('Base path:', basePath);
+                        
+                        // Create blob URL for worker to avoid MIME type issues
+                        let workerUrl, wasmUrl;
+                        try {
+                            console.log('Fetching worker and WASM files...');
+                            
+                            // Fetch the worker file and create a blob URL
+                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
+                            if (!workerResponse.ok) {
+                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
+                            }
+                            const workerBlob = await workerResponse.blob();
+                            workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
+                            setWorkerBlobUrl(workerUrl); // Store for cleanup
+                            
+                            // WASM file can be loaded directly
+                            wasmUrl = `${basePath}/sql-wasm.wasm`;
+                            
+                            console.log('Loading from paths:', {
+                                db: `${basePath}/db/ipsw.db`,
+                                worker: workerUrl,
+                                wasm: wasmUrl
+                            });
+                        } catch (fetchError) {
+                            console.error('Failed to fetch worker files:', fetchError);
+                            throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
+                        }
+                        
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
                                 config: {
                                     serverMode: 'full',
-                                    requestChunkSize: 4096,
-                                    url: './db/ipsw.db'
+                                    requestChunkSize: 4096, // Match SQLite page size for optimal performance
+                                    url: `${basePath}/db/ipsw.db`
                                 }
                             }],
-                            // Use relative paths to the worker files that should be in static folder
-                            './sqlite.worker.js',
-                            './sql-wasm.wasm'
+                            workerUrl,
+                            wasmUrl
                         );
                         console.log('Database worker created successfully');
+                        
+                        // Test if database is accessible
+                        try {
+                            console.log('Testing database connectivity...');
+                            await (worker.db as any).exec('SELECT 1;');
+                            console.log('Database connectivity test successful');
+                        } catch (connectivityError) {
+                            console.error('Database connectivity test failed:', connectivityError);
+                            throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
+                        }
+                        
                     } catch (workerError) {
                         console.error('Failed to create database worker:', workerError);
                         clearTimeout(timeoutId);
-                        throw new Error(`Failed to load database worker: ${workerError.message}. This usually means the database file is missing or corrupted.`);
+                        throw new Error(`Failed to load database worker: ${workerError.message}`);
                     }
 
-                    // Clear the timeout since we got a response
                     clearTimeout(timeoutId);
 
                     // Validate database schema
                     try {
                         console.log('Starting database validation...');
-                        // Check if required tables exist
                         const tableRes = await (worker.db as any).exec(
                             `SELECT name FROM sqlite_master WHERE type='table';`
                         );
 
-                        // Handle case where database is completely empty or has no results
                         let tables: string[] = [];
                         if (tableRes && tableRes.length > 0 && tableRes[0] && tableRes[0].values) {
-                            tables = tableRes[0].values.map((row: any[]) => row[0]);
+                            tables = tableRes[0].values.map((row: any[]) => row[0] as string);
                         }
                         console.log('Available tables:', tables);
 
                         if (tables.length === 0) {
-                            throw new Error('Database is empty or corrupted. No tables found. Please ensure the database file contains the required entitlement data.');
+                            throw new Error('Database is empty or corrupted. No tables found.');
                         }
 
                         if (!tables.includes('entitlement_keys')) {
-                            throw new Error(`Database schema mismatch. Expected 'entitlement_keys' table but found tables: ${tables.join(', ')}. Please ensure you're using the correct database file.`);
+                            throw new Error(`Database schema mismatch. Expected 'entitlement_keys' table but found tables: ${tables.join(', ')}`);
                         }
 
-                        // Check if the entitlement_keys table has the expected columns
+                        // Check schema for new columns
                         const schemaRes = await (worker.db as any).exec(
                             `PRAGMA table_info(entitlement_keys);`
                         );
@@ -84,14 +147,26 @@ export default function Entitlements() {
                         }
                         console.log('entitlement_keys columns:', columns);
 
-                        const requiredColumns = ['file_path', 'key'];
+                        const requiredColumns = ['file_path', 'key', 'ios_version'];
                         const missingColumns = requiredColumns.filter(col => !columns.includes(col));
 
                         if (missingColumns.length > 0) {
-                            throw new Error(`Database schema mismatch. Missing required columns in 'entitlement_keys' table: ${missingColumns.join(', ')}`);
+                            throw new Error(`Database schema mismatch. Missing required columns: ${missingColumns.join(', ')}`);
                         }
 
-                        // Test a simple query to make sure the data format is correct
+                        // Get available iOS versions
+                        const versionsRes = await (worker.db as any).exec(
+                            `SELECT DISTINCT ios_version FROM entitlement_keys ORDER BY ios_version DESC;`
+                        );
+
+                        let versions: string[] = [];
+                        if (versionsRes && versionsRes.length > 0 && versionsRes[0] && versionsRes[0].values) {
+                            versions = versionsRes[0].values.map((row: any[]) => row[0] as string).filter((v: string) => v);
+                        }
+                        console.log('Available iOS versions:', versions);
+                        setIosVersions(versions);
+
+                        // Test query
                         const testRes = await (worker.db as any).exec(
                             `SELECT COUNT(*) FROM entitlement_keys LIMIT 1;`
                         );
@@ -103,7 +178,7 @@ export default function Entitlements() {
                         console.log('Total entitlement records:', count);
 
                         if (count === 0) {
-                            throw new Error('Database contains no data. No entitlement records found in the entitlement_keys table. Please ensure the database contains entitlement data.');
+                            throw new Error('Database contains no data. No entitlement records found.');
                         }
 
                     } catch (validationError) {
@@ -114,7 +189,7 @@ export default function Entitlements() {
                     setDbWorker(worker);
                 } catch (err) {
                     console.error('Failed to initialize database:', err);
-                    clearTimeout(timeoutId); // Clear timeout on error
+                    clearTimeout(timeoutId);
                     setError(`Failed to initialize database: ${err.message}`);
                 } finally {
                     setDbLoading(false);
@@ -124,9 +199,33 @@ export default function Entitlements() {
         initDb();
     }, [dbWorker]);
 
-    const handleSearch = async () => {
+    // Cleanup blob URL and timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (workerBlobUrl) {
+                URL.revokeObjectURL(workerBlobUrl);
+            }
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+        };
+    }, [workerBlobUrl, searchTimeout]);
+
+    // Debounced search function
+    const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
         if (!dbWorker) {
             setError('Database not initialized yet');
+            return;
+        }
+
+        if (!query.trim()) {
+            setResults([]);
+            setError('');
+            return;
+        }
+
+        // Don't search if input is focused (user is still typing) unless forced
+        if (isInputFocused && !forceSearch) {
             return;
         }
 
@@ -134,25 +233,67 @@ export default function Entitlements() {
             setLoading(true);
             setError('');
 
-            // First, let's check what tables exist in the database
-            const tableRes = await (dbWorker.db as any).exec(
-                `SELECT name FROM sqlite_master WHERE type='table';`
-            );
-            console.log('Available tables:', tableRes[0]?.values || []);
+            let sqlQuery = '';
+            let params: any[] = [];
 
-            // Try to query the entitlement_keys table
-            const res = await (dbWorker.db as any).exec(
-                `SELECT DISTINCT file_path FROM entitlement_keys WHERE key LIKE ? LIMIT 100`,
-                [`%${key}%`]
-            );
+            if (type === 'key') {
+                sqlQuery = `
+                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
+                    FROM entitlement_keys 
+                    WHERE key LIKE ?
+                `;
+                params = [`%${query}%`];
+            } else {
+                sqlQuery = `
+                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
+                    FROM entitlement_keys 
+                    WHERE file_path LIKE ?
+                `;
+                params = [`%${query}%`];
+            }
 
-            // Handle cases where res is empty or undefined
-            let searchResults: string[] = [];
+            // Add iOS version filter if selected
+            if (version) {
+                sqlQuery += ` AND ios_version = ?`;
+                params.push(version);
+            }
+
+            // Add executable path filter if selected
+            if (selectedExecutablePath) {
+                sqlQuery += ` AND file_path = ?`;
+                params.push(selectedExecutablePath);
+            }
+
+            sqlQuery += ` ORDER BY file_path, key LIMIT 200`;
+
+            console.log('Executing query:', sqlQuery, 'with params:', params);
+
+            const res = await (dbWorker.db as any).exec(sqlQuery, params);
+
+            let searchResults: any[] = [];
             if (res && res.length > 0 && res[0] && res[0].values) {
-                searchResults = res[0].values.map((row: any[]) => row[0]);
+                searchResults = res[0].values.map((row: any[]) => ({
+                    file_path: row[0],
+                    key: row[1],
+                    value_type: row[2],
+                    string_value: row[3],
+                    bool_value: row[4],
+                    number_value: row[5],
+                    array_value: row[6],
+                    dict_value: row[7],
+                    ios_version: row[8],
+                    build_id: row[9],
+                    device_list: row[10]
+                }));
             }
 
             setResults(searchResults);
+
+            // Extract unique executable paths for the filter dropdown
+            if (!selectedExecutablePath && searchResults.length > 0) {
+                const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
+                setAvailableExecutablePaths(uniquePaths);
+            }
         } catch (err) {
             console.error('Search failed:', err);
             setError(`Search failed: ${err.message}`);
@@ -160,219 +301,809 @@ export default function Entitlements() {
         } finally {
             setLoading(false);
         }
+    }, [dbWorker, isInputFocused, selectedExecutablePath]);
+
+    // Handle search with debouncing
+    const handleSearchInput = useCallback((newQuery: string) => {
+        setSearchQuery(newQuery);
+        
+        // Clear executable path filter when starting a new search
+        setSelectedExecutablePath('');
+        setAvailableExecutablePaths([]);
+        
+        // Clear existing timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        // Set new timeout for debounced search with longer delay when input is focused
+        const timeout = setTimeout(() => {
+            debouncedSearch(newQuery, selectedVersion, searchType, false);
+        }, isInputFocused ? 1000 : 500); // 1000ms when focused, 500ms when not
+
+        setSearchTimeout(timeout);
+    }, [selectedVersion, searchType, debouncedSearch, searchTimeout, isInputFocused]);
+
+    // Handle version change
+    const handleVersionChange = useCallback((newVersion: string) => {
+        setSelectedVersion(newVersion);
+        // If there's a search query, re-run the search with the new version (force it)
+        if (searchQuery.trim()) {
+            debouncedSearch(searchQuery, newVersion, searchType, true);
+        }
+    }, [searchQuery, searchType, debouncedSearch]);
+
+    // Handle search type change
+    const handleSearchTypeChange = useCallback((newType: 'key' | 'file') => {
+        setSearchType(newType);
+        // If there's a search query, re-run the search with the new type (force it)
+        if (searchQuery.trim()) {
+            debouncedSearch(searchQuery, selectedVersion, newType, true);
+        }
+    }, [searchQuery, selectedVersion, debouncedSearch]);
+
+    // Manual search trigger (for search button)
+    const handleSearch = async () => {
+        // Clear any pending debounced search
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        // Execute search immediately (force it)
+        await debouncedSearch(searchQuery, selectedVersion, searchType, true);
+    };
+
+    // Handle input focus/blur events
+    const handleInputFocus = useCallback(() => {
+        setIsInputFocused(true);
+    }, []);
+
+    const handleInputBlur = useCallback(() => {
+        setIsInputFocused(false);
+        // When input loses focus, trigger search if there's a query
+        if (searchQuery.trim()) {
+            // Small delay to allow for the search to happen after blur
+            setTimeout(() => {
+                debouncedSearch(searchQuery, selectedVersion, searchType, true);
+            }, 100);
+        }
+    }, [searchQuery, selectedVersion, searchType, debouncedSearch]);
+
+    // Handle executable path filter change
+    const handleExecutablePathChange = useCallback((newPath: string) => {
+        setSelectedExecutablePath(newPath);
+        // If changing from "All executables" to a specific path, clear the available paths
+        if (newPath !== '') {
+            setAvailableExecutablePaths([]);
+        }
+        // If there's a search query, re-run the search with the new path filter
+        if (searchQuery.trim()) {
+            debouncedSearch(searchQuery, selectedVersion, searchType, true);
+        }
+    }, [searchQuery, selectedVersion, searchType, debouncedSearch]);
+
+    const formatValue = (result: any) => {
+        switch (result.value_type) {
+            case 'bool':
+                return {
+                    type: 'bool',
+                    value: result.bool_value,
+                    display: result.bool_value ? 'true' : 'false'
+                };
+            case 'number':
+                return {
+                    type: 'number',
+                    value: result.number_value,
+                    display: result.number_value?.toString() || ''
+                };
+            case 'string':
+                return {
+                    type: 'string',
+                    value: result.string_value,
+                    display: result.string_value || ''
+                };
+            case 'array':
+                try {
+                    const arrayValue = JSON.parse(result.array_value || '[]');
+                    return {
+                        type: 'array',
+                        value: arrayValue,
+                        display: result.array_value || ''
+                    };
+                } catch {
+                    return {
+                        type: 'array',
+                        value: [],
+                        display: result.array_value || ''
+                    };
+                }
+            case 'dict':
+                return {
+                    type: 'dict',
+                    value: result.dict_value,
+                    display: result.dict_value || ''
+                };
+            default:
+                return {
+                    type: 'unknown',
+                    value: 'true',
+                    display: 'true'
+                };
+        }
     };
 
     return (
         <Layout title="Entitlements">
-            <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-                <div style={{ marginBottom: '2rem' }}>
-                    <h1 style={{ marginBottom: '0.5rem', color: '#2e3440' }}>Entitlements Browser</h1>
-                    <p style={{ margin: 0, color: '#5e6c84', fontSize: '1.1em' }}>
-                        Search for entitlement keys across iOS system files. This database contains entitlement information extracted from iOS system files.
+            <div className="entitlements-container">
+                <div className="entitlements-header">
+                    <h1 className="entitlements-title">Entitlements Browser</h1>
+                    <p className="entitlements-subtitle">
+                        Search for entitlement keys and files across iOS system binaries.
                     </p>
                 </div>
 
                 {dbLoading && (
-                    <div style={{
-                        padding: '1rem',
-                        backgroundColor: '#e3f2fd',
-                        borderRadius: '8px',
-                        marginBottom: '1rem',
-                        color: '#1565c0',
-                        border: '1px solid #bbdefb',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}>
-                        <div style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '50%',
-                            background: 'conic-gradient(#1565c0, #bbdefb, #1565c0)'
-                        }}></div>
+                    <div className="loading-banner">
+                        <div className="loading-spinner"></div>
                         <span>Loading database and validating schema...</span>
                     </div>
                 )}
 
                 {error && !dbLoading && (
-                    <div style={{
-                        padding: '1rem',
-                        backgroundColor: '#ffebee',
-                        borderRadius: '8px',
-                        marginBottom: '1rem',
-                        color: '#c62828',
-                        border: '1px solid #ffcdd2'
-                    }}>
+                    <div className="error-banner">
                         <strong>Database Error:</strong> {error}
-                        {(error.includes('empty') || error.includes('No tables found') || error.includes('no data')) && (
-                            <div style={{
-                                marginTop: '1rem',
-                                fontSize: '0.9em',
-                                backgroundColor: '#fff3e0',
-                                color: '#e65100',
-                                padding: '0.75rem',
-                                borderRadius: '4px',
-                                border: '1px solid #ffcc02'
-                            }}>
-                                <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>📋 To set up the entitlements database:</p>
-                                <ol style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                                    <li>Use the ipsw CLI tool to extract entitlement data from iOS files</li>
-                                    <li>Generate a SQLite database with an <code>entitlement_keys</code> table</li>
-                                    <li>Ensure the table has <code>file_path</code> and <code>key</code> columns</li>
-                                    <li>Place the database file at <code>www/static/db/ipsw.db</code></li>
-                                </ol>
-                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85em' }}>
-                                    💡 <strong>Tip:</strong> The current database file is {error.includes('No tables found') ? 'empty (0 bytes)' : 'missing required data'}
-                                </p>
-                            </div>
-                        )}
-                        {error.includes('schema mismatch') && (
-                            <div style={{
-                                marginTop: '1rem',
-                                fontSize: '0.9em',
-                                backgroundColor: '#fff3e0',
-                                color: '#e65100',
-                                padding: '0.75rem',
-                                borderRadius: '4px',
-                                border: '1px solid #ffcc02'
-                            }}>
-                                <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>🔧 Database Schema Issue:</p>
-                                <p style={{ margin: '0.5rem 0' }}>
-                                    The database file exists but doesn't have the expected structure.
-                                    Please verify that your database contains an <code>entitlement_keys</code> table
-                                    with <code>file_path</code> and <code>key</code> columns.
-                                </p>
-                            </div>
-                        )}
                     </div>
                 )}
 
                 {!dbLoading && !error && dbWorker && (
-                    <div style={{
-                        backgroundColor: '#f8fffe',
-                        border: '1px solid #e0f2f1',
-                        borderRadius: '8px',
-                        padding: '1.5rem'
-                    }}>
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{
-                                display: 'block',
-                                marginBottom: '0.5rem',
-                                fontWeight: '600',
-                                color: '#2e3440'
-                            }}>
-                                Search Entitlement Keys
+                    <div className="search-panel">
+                        {/* Top Row: Version Filter and Search Type */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="form-label">
+                                    iOS Version Filter
+                                </label>
+                                <select
+                                    value={selectedVersion}
+                                    onChange={(e) => handleVersionChange(e.target.value)}
+                                    className="form-select"
+                                >
+                                    <option value="">All versions</option>
+                                    {iosVersions.map(version => (
+                                        <option key={version} value={version}>{version}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Search Type
+                                </label>
+                                <div className="radio-group">
+                                    <label className="radio-option">
+                                        <input
+                                            type="radio"
+                                            value="key"
+                                            checked={searchType === 'key'}
+                                            onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                            className="radio-input"
+                                        />
+                                        <span className="radio-label">Entitlement Key</span>
+                                    </label>
+                                    <label className="radio-option">
+                                        <input
+                                            type="radio"
+                                            value="file"
+                                            checked={searchType === 'file'}
+                                            onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                            className="radio-input"
+                                        />
+                                        <span className="radio-label">Executable Path</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="form-group">
+                            <label className="form-label">
+                                Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
                             </label>
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <div className="search-input-group">
                                 <input
                                     type="text"
-                                    value={key}
-                                    onChange={(e) => setKey(e.target.value)}
-                                    placeholder="Enter entitlement key (e.g., com.apple.security.app-sandbox)"
-                                    style={{
-                                        flex: 1,
-                                        padding: '0.875rem 1rem',
-                                        fontSize: '1rem',
-                                        border: '2px solid #e0e7ff',
-                                        borderRadius: '6px',
-                                        outline: 'none',
-                                        transition: 'border-color 0.2s',
-                                        backgroundColor: '#fff'
-                                    }}
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearchInput(e.target.value)}
+                                    onFocus={handleInputFocus}
+                                    onBlur={handleInputBlur}
+                                    placeholder={searchType === 'key' 
+                                        ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)' 
+                                        : 'Enter executable name (e.g., WebContent, Safari)'
+                                    }
+                                    className="search-input"
                                     disabled={loading}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && !loading && key.trim()) {
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !loading && searchQuery.trim()) {
                                             handleSearch();
                                         }
                                     }}
-                                    onFocus={(e) => (e.currentTarget as HTMLInputElement).style.borderColor = '#3b82f6'}
-                                    onBlur={(e) => (e.currentTarget as HTMLInputElement).style.borderColor = '#e0e7ff'}
                                 />
                                 <button
                                     onClick={handleSearch}
-                                    style={{
-                                        padding: '0.875rem 1.75rem',
-                                        fontSize: '1rem',
-                                        backgroundColor: (!loading && key.trim()) ? '#3b82f6' : '#9ca3af',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: (!loading && key.trim()) ? 'pointer' : 'not-allowed',
-                                        fontWeight: '600',
-                                        transition: 'background-color 0.2s',
-                                        minWidth: '120px'
-                                    }}
-                                    disabled={loading || !key.trim()}
-                                    onMouseEnter={(e) => {
-                                        if (!loading && key.trim()) {
-                                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#2563eb';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!loading && key.trim()) {
-                                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#3b82f6';
-                                        }
-                                    }}
+                                    className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
+                                    disabled={loading || !searchQuery.trim()}
                                 >
                                     {loading ? 'Searching...' : 'Search'}
                                 </button>
                             </div>
                         </div>
 
-                        <div style={{ marginTop: '1.5rem' }}>
+                        {/* Results */}
+                        <div className="results-section">
                             {results.length > 0 ? (
                                 <div>
-                                    <h3 style={{
-                                        marginBottom: '1rem',
-                                        color: '#059669',
-                                        fontSize: '1.2em'
-                                    }}>
-                                        Found {results.length} file{results.length === 1 ? '' : 's'} containing "{key}":
-                                    </h3>
-                                    <div style={{
-                                        backgroundColor: '#fff',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px',
-                                        maxHeight: '500px',
-                                        overflowY: 'auto',
-                                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                                    }}>
-                                        {results.map((path, idx) => (
-                                            <div key={idx} style={{
-                                                padding: '0.75rem 1.25rem',
-                                                borderBottom: idx < results.length - 1 ? '1px solid #f3f4f6' : 'none',
-                                                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                                                fontSize: '0.9em',
-                                                color: '#374151',
-                                                backgroundColor: idx % 2 === 0 ? '#fafafa' : '#fff',
-                                                transition: 'background-color 0.1s',
-                                                cursor: 'default'
-                                            }}
-                                                onMouseEnter={(e) => (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f0f9ff'}
-                                                onMouseLeave={(e) => (e.currentTarget as HTMLDivElement).style.backgroundColor = idx % 2 === 0 ? '#fafafa' : '#fff'}
-                                            >
-                                                {path}
+                                    <div className="results-header-row">
+                                        <h3 className="results-header">
+                                            Found {results.length} result{results.length === 1 ? '' : 's'}
+                                        </h3>
+                                        
+                                        {/* Executable Path Filter - only show if we have results and no specific path selected */}
+                                        {availableExecutablePaths.length > 1 && (
+                                            <div className="executable-filter">
+                                                <select
+                                                    value={selectedExecutablePath}
+                                                    onChange={(e) => handleExecutablePathChange(e.target.value)}
+                                                    className="form-select form-select--small"
+                                                >
+                                                    <option value="">All executables ({availableExecutablePaths.length})</option>
+                                                    {availableExecutablePaths.map(path => (
+                                                        <option key={path} value={path}>{path}</option>
+                                                    ))}
+                                                </select>
                                             </div>
-                                        ))}
+                                        )}
+                                    </div>
+
+                                    {/* Show global metadata if version is selected */}
+                                    {selectedVersion && results.length > 0 && (
+                                        <div className="global-metadata">
+                                            iOS {results[0].ios_version} ({results[0].build_id}) • {results[0].device_list}
+                                        </div>
+                                    )}
+
+                                    <div className="results-container">
+                                        {results.map((result, idx) => {
+                                            const valueData = formatValue(result);
+                                            const showMetadata = !selectedVersion; // Only show metadata in each item if no version selected
+                                            const showFilePath = !selectedExecutablePath; // Only show file path if no specific executable selected
+                                            
+                                            return (
+                                                <div key={idx} className="result-item">
+                                                    <div className="result-main">
+                                                        <span className="result-key">{result.key}</span>
+                                                        {showFilePath && (
+                                                            <>
+                                                                <span className="result-in"> in </span>
+                                                                <span className="result-path">{result.file_path}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {showMetadata && (
+                                                        <div className="result-meta">
+                                                            iOS {result.ios_version} ({result.build_id}) • {result.device_list}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {valueData && valueData.display && (
+                                                        <div className="result-value">
+                                                            {valueData.type === 'bool' ? (
+                                                                <span className={`bool-value ${valueData.value ? 'bool-true' : 'bool-false'}`}>
+                                                                    {valueData.display}
+                                                                </span>
+                                                            ) : valueData.type === 'array' && Array.isArray(valueData.value) ? (
+                                                                <ul className="array-value">
+                                                                    {valueData.value.map((item, itemIdx) => (
+                                                                        <li key={itemIdx}>{item}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            ) : (
+                                                                <span className="regular-value">{valueData.display}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            ) : (
-                                key.trim() && !loading && (
-                                    <div style={{
-                                        padding: '1.25rem',
-                                        backgroundColor: '#fffbeb',
-                                        border: '1px solid #fbbf24',
-                                        borderRadius: '8px',
-                                        color: '#92400e'
-                                    }}>
-                                        <strong>No results found</strong> for "{key}". Try a different search term or check if the database contains this entitlement.
-                                    </div>
-                                )
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 )}
             </div>
+
+            <style>{`
+                .entitlements-container {
+                    min-height: 100vh;
+                    background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 100%);
+                    padding: 2rem;
+                    color: var(--ifm-color-content);
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .entitlements-header {
+                    text-align: center;
+                    margin-bottom: 3rem;
+                    max-width: 800px;
+                    margin-left: auto;
+                    margin-right: auto;
+                    flex-shrink: 0;
+                }
+
+                .entitlements-title {
+                    font-size: 3rem;
+                    font-weight: 700;
+                    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+                    background-clip: text;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    margin-bottom: 1rem;
+                    letter-spacing: -0.025em;
+                }
+
+                .entitlements-subtitle {
+                    font-size: 1.25rem;
+                    color: var(--ifm-color-content-secondary);
+                    line-height: 1.6;
+                    margin: 0;
+                }
+
+                .loading-banner {
+                    background: rgba(31, 41, 55, 0.8);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(75, 85, 99, 0.3);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 2rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                    color: var(--ifm-color-content);
+                    max-width: 1000px;
+                    margin-left: auto;
+                    margin-right: auto;
+                    flex-shrink: 0;
+                }
+
+                .loading-spinner {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background: conic-gradient(#a78bfa, #60a5fa, #f472b6, #a78bfa);
+                    animation: spin 1s linear infinite;
+                    flex-shrink: 0;
+                }
+
+                .error-banner {
+                    background: linear-gradient(135deg, #7f1d1d, #991b1b);
+                    border: 1px solid #ef4444;
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 2rem;
+                    color: #fecaca;
+                    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
+                    flex-shrink: 0;
+                }
+
+                .search-panel {
+                    background: rgba(31, 41, 55, 0.8);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(75, 85, 99, 0.3);
+                    border-radius: 16px;
+                    padding: 2rem;
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                    min-height: 0;
+                }
+
+                .form-row {
+                    display: flex;
+                    gap: 3rem;
+                    align-items: flex-start;
+                    margin-bottom: 1rem;
+                    flex-wrap: wrap;
+                }
+
+                .form-group {
+                    margin-bottom: 1rem;
+                    flex: 1;
+                    min-width: 250px;
+                }
+
+                .form-label {
+                    display: block;
+                    font-weight: 600;
+                    color: #9ca3af;
+                    margin-bottom: 0.75rem;
+                    font-size: 0.95rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .form-select {
+                    width: 100%;
+                    max-width: 300px;
+                    padding: 0.75rem 1rem;
+                    font-size: 1rem;
+                    background: rgba(55, 65, 81, 0.8);
+                    border: 2px solid rgba(75, 85, 99, 0.5);
+                    border-radius: 8px;
+                    color: var(--ifm-color-content);
+                    transition: all 0.2s ease;
+                }
+
+                .form-select:focus {
+                    outline: none;
+                    border-color: #60a5fa;
+                    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+                }
+
+                .form-select option {
+                    background: var(--ifm-background-color);
+                    color: var(--ifm-color-content);
+                }
+
+                .form-select--small {
+                    max-width: 200px;
+                    padding: 0.5rem 0.75rem;
+                    font-size: 0.9rem;
+                }
+
+                .radio-group {
+                    display: flex;
+                    gap: 2rem;
+                    flex-wrap: wrap;
+                }
+
+                .radio-option {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    padding: 0.5rem;
+                    border-radius: 8px;
+                }
+
+                .radio-option:hover {
+                    background: rgba(75, 85, 99, 0.2);
+                }
+
+                .radio-input {
+                    width: 18px;
+                    height: 18px;
+                    accent-color: #60a5fa;
+                }
+
+                .radio-label {
+                    font-size: 1rem;
+                    color: var(--ifm-color-content);
+                    font-weight: 500;
+                }
+
+                .search-input-group {
+                    display: flex;
+                    gap: 1rem;
+                    align-items: stretch;
+                }
+
+                .search-input {
+                    flex: 1;
+                    padding: 1rem 1.25rem;
+                    font-size: 1rem;
+                    background: rgba(55, 65, 81, 0.8);
+                    border: 2px solid rgba(75, 85, 99, 0.5);
+                    border-radius: 12px;
+                    color: var(--ifm-color-content);
+                    transition: all 0.2s ease;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                }
+
+                .search-input:focus {
+                    outline: none;
+                    border-color: #60a5fa;
+                    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+                }
+
+                .search-input::placeholder {
+                    color: #6b7280;
+                    opacity: 0.7;
+                }
+
+                .search-input:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+
+                .search-button {
+                    padding: 1rem 2rem;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    border: none;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    min-width: 140px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .search-button--active {
+                    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                    color: white;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                }
+
+                .search-button--active:hover {
+                    background: linear-gradient(135deg, #2563eb, #1e40af);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+                }
+
+                .search-button--disabled {
+                    background: rgba(75, 85, 99, 0.5);
+                    color: rgba(156, 163, 175, 0.8);
+                    cursor: not-allowed;
+                }
+
+                .results-section {
+                    margin-top: 2rem;
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                }
+
+                .results-header-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1rem;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                }
+
+                .results-header {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    color: #10b981;
+                    margin: 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .results-header::before {
+                    content: '✓';
+                    width: 20px;
+                    height: 20px;
+                    background: #10b981;
+                    color: white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    font-weight: bold;
+                }
+
+                .executable-filter {
+                    display: flex;
+                    align-items: center;
+                }
+
+                .global-metadata {
+                    background: rgba(59, 130, 246, 0.1);
+                    border: 1px solid rgba(59, 130, 246, 0.2);
+                    border-radius: 8px;
+                    padding: 0.75rem 1rem;
+                    margin-bottom: 1rem;
+                    color: #93c5fd;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    text-align: center;
+                }
+
+                .results-container {
+                    background: rgba(17, 24, 39, 0.8);
+                    border: 1px solid rgba(75, 85, 99, 0.3);
+                    border-radius: 12px;
+                    flex: 1;
+                    overflow-y: auto;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                    min-height: 400px;
+                    max-height: calc(100vh - 500px);
+                }
+
+                .result-item {
+                    padding: 1.5rem;
+                    border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+                    transition: all 0.2s ease;
+                }
+
+                .result-item:last-child {
+                    border-bottom: none;
+                }
+
+                .result-item:hover {
+                    background: rgba(75, 85, 99, 0.1);
+                }
+
+                .result-main {
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                    font-size: 0.95rem;
+                    margin-bottom: 0.75rem;
+                    line-height: 1.5;
+                }
+
+                .result-key {
+                    color: #60a5fa;
+                    font-weight: 600;
+                }
+
+                .result-in {
+                    color: var(--ifm-color-content-secondary);
+                    font-weight: 400;
+                }
+
+                .result-path {
+                    color: #f472b6;
+                    font-weight: 500;
+                }
+
+                .result-meta {
+                    font-size: 0.85rem;
+                    color: var(--ifm-color-content-secondary);
+                    margin-bottom: 0.5rem;
+                    font-weight: 500;
+                }
+
+                .result-value {
+                    margin-top: 0.75rem;
+                }
+
+                .bool-value {
+                    display: inline-block;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .bool-true {
+                    background: rgba(16, 185, 129, 0.15);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    color: #34d399;
+                }
+
+                .bool-false {
+                    background: rgba(239, 68, 68, 0.15);
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                    color: #f87171;
+                }
+
+                .array-value {
+                    background: rgba(99, 102, 241, 0.1);
+                    border: 1px solid rgba(99, 102, 241, 0.2);
+                    border-radius: 6px;
+                    padding: 0.75rem 0.75rem 0.75rem 2rem;
+                    margin: 0;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                    font-size: 0.8rem;
+                    color: #a5b4fc;
+                }
+
+                .array-value li {
+                    padding: 0.25rem 0;
+                    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+                }
+
+                .array-value li:last-child {
+                    border-bottom: none;
+                }
+
+                .array-value li::marker {
+                    color: #818cf8;
+                }
+
+                .regular-value {
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                    font-size: 0.8rem;
+                    background: rgba(99, 102, 241, 0.1);
+                    border: 1px solid rgba(99, 102, 241, 0.2);
+                    color: #a5b4fc;
+                    padding: 0.5rem 0.75rem;
+                    border-radius: 6px;
+                    word-break: break-all;
+                    display: block;
+                }
+
+                .no-results {
+                    background: rgba(146, 64, 14, 0.1);
+                    border: 1px solid rgba(251, 191, 36, 0.3);
+                    border-radius: 12px;
+                    padding: 2rem;
+                    text-align: center;
+                    color: #fbbf24;
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                @media (max-width: 768px) {
+                    .entitlements-container {
+                        padding: 1rem;
+                    }
+
+                    .entitlements-title {
+                        font-size: 2rem;
+                    }
+
+                    .search-panel {
+                        padding: 1.5rem;
+                    }
+
+                    .form-row {
+                        flex-direction: column;
+                        gap: 1.5rem;
+                    }
+
+                    .form-group {
+                        min-width: auto;
+                    }
+
+                    .search-input-group {
+                        flex-direction: column;
+                    }
+
+                    .radio-group {
+                        flex-direction: column;
+                        gap: 1rem;
+                    }
+
+                    .results-header-row {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+
+                    .executable-filter {
+                        width: 100%;
+                    }
+
+                    .form-select--small {
+                        max-width: 100%;
+                    }
+
+                    .result-item {
+                        padding: 1rem;
+                    }
+
+                    .array-value {
+                        padding: 0.5rem;
+                    }
+                }
+            `}</style>
         </Layout>
     );
-} 
+}

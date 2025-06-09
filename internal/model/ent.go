@@ -29,6 +29,34 @@ type EntitlementKey struct {
 	DictValue     string `gorm:"type:text" json:"dict_value,omitempty"`  // JSON encoded
 }
 
+// TableName returns the table name for EntitlementKey
+func (EntitlementKey) TableName() string {
+	return "entitlement_keys_normalized" // Use a different table name to avoid conflicts
+}
+
+// EntitlementWebSearch represents a denormalized table optimized for web queries
+// This table is designed to be efficient for HTTP_RANGE requests and sql.js-httpvfs
+type EntitlementWebSearch struct {
+	ID           uint   `gorm:"primaryKey" json:"id"`
+	IOSVersion   string `gorm:"index:idx_version_key,priority:1;not null" json:"ios_version"`
+	BuildID      string `gorm:"index;not null" json:"build_id"`
+	DeviceList   string `gorm:"index" json:"device_list"` // comma-separated device names
+	FilePath     string `gorm:"index:idx_version_file,priority:2;not null" json:"file_path"`
+	Key          string `gorm:"index:idx_version_key,priority:2;not null" json:"key"`
+	ValueType    string `gorm:"not null" json:"value_type"`
+	StringValue  string `gorm:"index" json:"string_value,omitempty"`
+	BoolValue    *bool  `json:"bool_value,omitempty"`
+	NumberValue  *int64 `json:"number_value,omitempty"`
+	ArrayValue   string `gorm:"type:text" json:"array_value,omitempty"`
+	DictValue    string `gorm:"type:text" json:"dict_value,omitempty"`
+	ReleaseDate  *time.Time `json:"release_date,omitempty"`
+}
+
+// TableName returns the table name for EntitlementWebSearch
+func (EntitlementWebSearch) TableName() string {
+	return "entitlement_keys" // Match the expected table name in web UI
+}
+
 // EntitlementQuery represents query parameters for searching entitlements
 type EntitlementQuery struct {
 	Version      string

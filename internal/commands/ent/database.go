@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/db"
@@ -76,6 +77,11 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 		if err := ds.storeEntitlement(ipswRecord.ID, filePath, entPlist); err != nil {
 			return fmt.Errorf("failed to store entitlement for %s: %v", filePath, err)
 		}
+	}
+
+	// Populate web-optimized table
+	if err := ds.populateWebSearchTable(ipswRecord); err != nil {
+		return fmt.Errorf("failed to populate web search table: %v", err)
 	}
 
 	return nil
@@ -282,4 +288,116 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 	stats["top_keys"] = topKeys
 
 	return stats, nil
+}
+
+// populateWebSearchTable creates denormalized records optimized for web queries
+func (ds *DatabaseService) populateWebSearchTable(ipswRecord *model.Ipsw) error {
+	if ds.gormDB == nil {
+		return fmt.Errorf("GORM database required for web search table population")
+	}
+
+	// Get all entitlements for this IPSW
+	entitlements, err := ds.GetEntitlementsByIPSW(ipswRecord.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get entitlements for IPSW %s: %v", ipswRecord.ID, err)
+	}
+
+	// Build device list string
+	var deviceNames []string
+	for _, device := range ipswRecord.Devices {
+		deviceNames = append(deviceNames, device.Name)
+	}
+	deviceList := strings.Join(deviceNames, ",")
+
+	// Clear existing web search entries for this IPSW to avoid duplicates
+	if err := ds.gormDB.Where("ios_version = ? AND build_id = ?", ipswRecord.Version, ipswRecord.BuildID).
+		Delete(&model.EntitlementWebSearch{}).Error; err != nil {
+		return fmt.Errorf("failed to clear existing web search entries: %v", err)
+	}
+
+	// Create web search entries
+	var webEntries []*model.EntitlementWebSearch
+	for _, entitlement := range entitlements {
+		for _, key := range entitlement.Keys {
+			webEntry := &model.EntitlementWebSearch{
+				IOSVersion:  ipswRecord.Version,
+				BuildID:     ipswRecord.BuildID,
+				DeviceList:  deviceList,
+				FilePath:    entitlement.FilePath,
+				Key:         key.Key,
+				ValueType:   key.ValueType,
+				StringValue: key.StringValue,
+				BoolValue:   key.BoolValue,
+				NumberValue: key.NumberValue,
+				ArrayValue:  key.ArrayValue,
+				DictValue:   key.DictValue,
+			}
+			webEntries = append(webEntries, webEntry)
+		}
+	}
+
+	// Batch insert web search entries
+	if len(webEntries) > 0 {
+		if err := ds.gormDB.CreateInBatches(webEntries, 1000).Error; err != nil {
+			return fmt.Errorf("failed to create web search entries: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// GetIOSVersions returns all available iOS versions in the database
+func (ds *DatabaseService) GetIOSVersions() ([]string, error) {
+	if ds.gormDB == nil {
+		return nil, fmt.Errorf("GORM database required for version queries")
+	}
+
+	var versions []string
+	if err := ds.gormDB.Model(&model.EntitlementWebSearch{}).
+		Distinct("ios_version").
+		Order("ios_version DESC").
+		Pluck("ios_version", &versions).Error; err != nil {
+		return nil, fmt.Errorf("failed to get iOS versions: %v", err)
+	}
+
+	return versions, nil
+}
+
+// SearchWebEntitlements performs optimized queries for the web UI
+func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePattern string, limit int) ([]*model.EntitlementWebSearch, error) {
+	if ds.gormDB == nil {
+		return nil, fmt.Errorf("GORM database required for web search")
+	}
+
+	query := ds.gormDB.Model(&model.EntitlementWebSearch{})
+
+	// Filter by iOS version (required for optimal HTTP_RANGE performance)
+	if version != "" {
+		query = query.Where("ios_version = ?", version)
+	}
+
+	// Filter by key pattern
+	if keyPattern != "" {
+		query = query.Where("key LIKE ?", "%"+keyPattern+"%")
+	}
+
+	// Filter by file pattern
+	if filePattern != "" {
+		query = query.Where("file_path LIKE ?", "%"+filePattern+"%")
+	}
+
+	// Order by file_path for consistent results
+	query = query.Order("file_path, key")
+
+	// Apply limit
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	var results []*model.EntitlementWebSearch
+	if err := query.Find(&results).Error; err != nil {
+		return nil, fmt.Errorf("failed to search web entitlements: %v", err)
+	}
+
+	return results, nil
 }
