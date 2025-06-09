@@ -11,6 +11,8 @@ export default function Entitlements() {
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [dbLoading, setDbLoading] = useState<boolean>(true);
+    const [loadingProgress, setLoadingProgress] = useState<number>(0);
+    const [loadingPhase, setLoadingPhase] = useState<string>('Initializing...');
     const [error, setError] = useState<string>('');
     const [workerBlobUrl, setWorkerBlobUrl] = useState<string | null>(null);
     const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -29,8 +31,29 @@ export default function Entitlements() {
 
                 try {
                     setDbLoading(true);
+                    setLoadingProgress(0);
+                    setLoadingPhase('Initializing...');
                     setError('');
 
+                    // Get database file size for progress tracking
+                    let dbFileSize = 0;
+                    try {
+                        setLoadingPhase('Checking database size...');
+                        const basePath = process.env.NODE_ENV === 'development' 
+                            ? window.location.origin + '/ipsw'
+                            : window.location.origin + '/ipsw';
+                        
+                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
+                        if (headResponse.ok) {
+                            const contentLength = headResponse.headers.get('content-length');
+                            if (contentLength) {
+                                dbFileSize = parseInt(contentLength, 10);
+                            }
+                        }
+                    } catch (sizeError) {
+                        console.warn('Could not determine database file size:', sizeError);
+                        // Continue without size info
+                    }
 
                     let worker;
                     try {
@@ -56,6 +79,8 @@ export default function Entitlements() {
                         // Create blob URL for worker to avoid MIME type issues
                         let workerUrl, wasmUrl;
                         try {
+                            setLoadingPhase('Loading worker files...');
+                            setLoadingProgress(10);
 
                             // Fetch the worker file and create a blob URL
                             const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
@@ -99,6 +124,9 @@ export default function Entitlements() {
                             requestChunkSize = 262144; // 256KB
                         }
 
+                        setLoadingPhase('Creating database connection...');
+                        setLoadingProgress(20);
+
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
@@ -114,8 +142,22 @@ export default function Entitlements() {
                             wasmUrl
                         );
 
+                        // Start progress monitoring if we have file size
+                        let progressInterval: NodeJS.Timeout | null = null;
+                        if (dbFileSize > 0 && (worker as any).worker?.bytesRead !== undefined) {
+                            progressInterval = setInterval(() => {
+                                const bytesRead = (worker as any).worker.bytesRead || 0;
+                                const progress = Math.min(90, 20 + (bytesRead / dbFileSize) * 60); // 20-80% for loading
+                                setLoadingProgress(progress);
+                                setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                            }, 100);
+                        }
+
                         // Test if database is accessible and prefetch initial data
                         try {
+                            setLoadingPhase('Connecting to database...');
+                            setLoadingProgress(dbFileSize > 0 ? 85 : 60);
+                            
                             // This query will force loading of the SQLite header and schema
                             await (worker.db as any).exec('SELECT 1;');
 
@@ -126,6 +168,11 @@ export default function Entitlements() {
                         } catch (connectivityError) {
                             console.error('Database connectivity test failed:', connectivityError);
                             throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
+                        } finally {
+                            // Clean up progress interval
+                            if (progressInterval) {
+                                clearInterval(progressInterval);
+                            }
                         }
 
                     } catch (workerError) {
@@ -138,6 +185,8 @@ export default function Entitlements() {
 
                     // Validate database schema
                     try {
+                        setLoadingPhase('Validating database schema...');
+                        setLoadingProgress(90);
                         const tableRes = await (worker.db as any).exec(
                             `SELECT name FROM sqlite_master WHERE type='table';`
                         );
@@ -173,6 +222,8 @@ export default function Entitlements() {
                         }
 
                         // Get available iOS versions
+                        setLoadingPhase('Loading iOS versions...');
+                        setLoadingProgress(95);
                         const versionsRes = await (worker.db as any).exec(
                             `SELECT DISTINCT ios_version FROM entitlement_keys ORDER BY ios_version DESC;`
                         );
@@ -202,6 +253,8 @@ export default function Entitlements() {
                         throw new Error(`Database validation failed: ${validationError.message}`);
                     }
 
+                    setLoadingPhase('Ready!');
+                    setLoadingProgress(100);
                     setDbWorker(worker);
                 } catch (err) {
                     console.error('Failed to initialize database:', err);
@@ -493,8 +546,16 @@ export default function Entitlements() {
                     <div className="loading-banner">
                         <div className="loading-spinner"></div>
                         <div className="loading-text">
-                            <span>Loading entitlements database...</span>
-                            <span className="loading-subtitle">Optimizing for your connection speed</span>
+                            <span>{loadingPhase}</span>
+                            <div className="progress-container">
+                                <div className="progress-bar">
+                                    <div 
+                                        className="progress-fill" 
+                                        style={{ width: `${loadingProgress}%` }}
+                                    ></div>
+                                </div>
+                                <span className="progress-text">{Math.round(loadingProgress)}%</span>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -833,13 +894,37 @@ export default function Entitlements() {
                 .loading-text {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.25rem;
+                    gap: 0.75rem;
+                    flex: 1;
                 }
 
-                .loading-subtitle {
+                .progress-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .progress-bar {
+                    flex: 1;
+                    height: 8px;
+                    background: rgba(75, 85, 99, 0.3);
+                    border-radius: 4px;
+                    overflow: hidden;
+                }
+
+                .progress-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+                    border-radius: 4px;
+                    transition: width 0.3s ease;
+                }
+
+                .progress-text {
                     font-size: 0.875rem;
                     color: var(--ifm-color-content-secondary);
-                    opacity: 0.8;
+                    font-weight: 600;
+                    min-width: 45px;
+                    text-align: right;
                 }
 
                 .loading-spinner {
