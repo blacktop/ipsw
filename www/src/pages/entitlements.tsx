@@ -1509,6 +1509,11 @@ export default function Entitlements() {
                         padding: 0.5rem;
                     }
                 }
+
+                /* Hide footer on this page for cleaner full-screen experience */
+                footer[class*="footer"] {
+                    display: none !important;
+                }
             `}</style>
         </Layout>
     );
