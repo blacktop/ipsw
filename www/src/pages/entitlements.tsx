@@ -38,12 +38,12 @@ export default function Entitlements() {
                         if (typeof WebAssembly === 'undefined') {
                             throw new Error('WebAssembly is not supported in this browser');
                         }
-                        
+
                         // Determine base URL for development vs production
                         const isDev = process.env.NODE_ENV === 'development';
                         const currentPath = window.location.pathname;
                         let basePath = '';
-                        
+
                         if (isDev) {
                             // In development, Docusaurus serves static files from /ipsw/ even in dev mode
                             basePath = window.location.origin + '/ipsw';
@@ -51,12 +51,12 @@ export default function Entitlements() {
                             // In production, handle the /ipsw base URL
                             basePath = window.location.origin + '/ipsw';
                         }
-                        
-                        
+
+
                         // Create blob URL for worker to avoid MIME type issues
                         let workerUrl, wasmUrl;
                         try {
-                            
+
                             // Fetch the worker file and create a blob URL
                             const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
                             if (!workerResponse.ok) {
@@ -65,24 +65,24 @@ export default function Entitlements() {
                             const workerBlob = await workerResponse.blob();
                             workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
                             setWorkerBlobUrl(workerUrl); // Store for cleanup
-                            
+
                             // WASM file can be loaded directly
                             wasmUrl = `${basePath}/sql-wasm.wasm`;
-                            
+
                         } catch (fetchError) {
                             console.error('Failed to fetch worker files:', fetchError);
                             throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
                         }
-                        
+
                         // Detect connection speed and adjust chunk size accordingly
                         let requestChunkSize = 4096; // Default: 4KB (SQLite page size)
-                        
+
                         // Use Network Information API if available
                         const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
                         if (connection) {
                             const effectiveType = connection.effectiveType;
                             const downlink = connection.downlink; // Mbps
-                            
+
                             // Adjust chunk size based on connection quality
                             if (effectiveType === '4g' || (downlink && downlink > 10)) {
                                 requestChunkSize = 262144; // 256KB for fast connections
@@ -92,11 +92,11 @@ export default function Entitlements() {
                                 requestChunkSize = 4096; // 4KB for slow connections
                             } else {
                                 // Default to larger chunks if we can't determine speed
-                                requestChunkSize = 131072; // 128KB
+                                requestChunkSize = 131072; // 256KB
                             }
                         } else {
                             // No Network Information API, use a reasonable default for modern connections
-                            requestChunkSize = 131072; // 128KB
+                            requestChunkSize = 262144; // 256KB
                         }
 
                         worker = await createDbWorker(
@@ -107,18 +107,18 @@ export default function Entitlements() {
                                     requestChunkSize: requestChunkSize,
                                     url: `${basePath}/db/ipsw.db`,
                                     // Enable caching for better performance
-                                    cacheBust: false
+                                    cacheBust: true
                                 }
                             }],
                             workerUrl,
                             wasmUrl
                         );
-                        
+
                         // Test if database is accessible and prefetch initial data
                         try {
                             // This query will force loading of the SQLite header and schema
                             await (worker.db as any).exec('SELECT 1;');
-                            
+
                             // Prefetch the iOS versions to cache the index pages
                             await (worker.db as any).exec(
                                 `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
@@ -127,7 +127,7 @@ export default function Entitlements() {
                             console.error('Database connectivity test failed:', connectivityError);
                             throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
                         }
-                        
+
                     } catch (workerError) {
                         console.error('Failed to create database worker:', workerError);
                         clearTimeout(timeoutId);
@@ -328,12 +328,12 @@ export default function Entitlements() {
     // Handle search with debouncing
     const handleSearchInput = useCallback((newQuery: string) => {
         setSearchQuery(newQuery);
-        
+
         // Clear executable path filter when starting a new search
         setSelectedExecutablePath('');
         setAvailableExecutablePaths([]);
         setHasSearched(false);
-        
+
         // Clear existing timeout
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -567,7 +567,7 @@ export default function Entitlements() {
                                         className="form-select form-select--executable"
                                     >
                                         <option value="">
-                                            {availableExecutablePaths.length > 0 
+                                            {availableExecutablePaths.length > 0
                                                 ? `All executables (${availableExecutablePaths.length})`
                                                 : 'All executables'
                                             }
@@ -582,15 +582,15 @@ export default function Entitlements() {
                                                     </option>
                                                 );
                                             }
-                                            
+
                                             // Always show full paths to avoid ambiguity
                                             return availableExecutablePaths.map(path => {
                                                 const basename = path.split('/').pop() || path;
                                                 // Show basename first, then full path for clarity
-                                                const displayName = path.length > 50 ? 
-                                                    `${basename} - ${path.substring(0, 47)}...` : 
+                                                const displayName = path.length > 50 ?
+                                                    `${basename} - ${path.substring(0, 47)}...` :
                                                     `${basename} - ${path}`;
-                                                
+
                                                 return (
                                                     <option key={path} value={path}>
                                                         {displayName}
@@ -602,175 +602,175 @@ export default function Entitlements() {
                                 </div>
                             )}
 
-                        {/* Search Input */}
-                        <div className="form-group">
-                            <label className="form-label">
-                                Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
-                            </label>
-                            <div className="search-input-group">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => handleSearchInput(e.target.value)}
-                                    onFocus={handleInputFocus}
-                                    onBlur={handleInputBlur}
-                                    placeholder={searchType === 'key' 
-                                        ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)' 
-                                        : 'Enter executable name (e.g., WebContent, Safari)'
-                                    }
-                                    className="search-input"
-                                    disabled={loading}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !loading && searchQuery.trim()) {
-                                            handleSearch();
+                            {/* Search Input */}
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                </label>
+                                <div className="search-input-group">
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => handleSearchInput(e.target.value)}
+                                        onFocus={handleInputFocus}
+                                        onBlur={handleInputBlur}
+                                        placeholder={searchType === 'key'
+                                            ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
+                                            : 'Enter executable name (e.g., WebContent, Safari)'
                                         }
-                                    }}
-                                />
-                                <button
-                                    onClick={handleSearch}
-                                    className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
-                                    disabled={loading || !searchQuery.trim()}
-                                >
-                                    {loading ? 'Searching...' : 'Search'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* No Results Warning */}
-                        {!loading && hasSearched && searchQuery.trim() && results.length === 0 && (
-                            <div className="no-results-warning">
-                                <span className="warning-icon">⚠️</span>
-                                <div className="warning-content">
-                                    <div className="warning-text">
-                                        No entitlements found for <strong>"{searchQuery}"</strong>
-                                        {selectedVersion && <span> in iOS {selectedVersion}</span>}
-                                        {selectedExecutablePath && <span> in {selectedExecutablePath}</span>}
-                                    </div>
-                                    <div className="warning-hint">Try adjusting your search terms or filters</div>
+                                        className="search-input"
+                                        disabled={loading}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                handleSearch();
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handleSearch}
+                                        className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
+                                        disabled={loading || !searchQuery.trim()}
+                                    >
+                                        {loading ? 'Searching...' : 'Search'}
+                                    </button>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Results */}
-                        <div className="results-section">
-                            {results.length > 0 ? (
-                                <div>
-                                    <div className="results-header-row">
-                                        <h3 className="results-header">
-                                            Found {results.length} result{results.length === 1 ? '' : 's'}
-                                        </h3>
-                                    </div>
-
-                                    {/* Show global metadata if version is selected or executable is filtered (but not when searching by executable path) */}
-                                    {(selectedVersion || (selectedExecutablePath && searchType === 'key')) && results.length > 0 && (
-                                        <div className="global-metadata">
-                                            iOS {results[0].ios_version} ({results[0].build_id}) • {results[0].device_list}
-                                            {selectedExecutablePath && searchType === 'key' && (
-                                                <> • {selectedExecutablePath.split('/').pop()}</>
-                                            )}
+                            {/* No Results Warning */}
+                            {!loading && hasSearched && searchQuery.trim() && results.length === 0 && (
+                                <div className="no-results-warning">
+                                    <span className="warning-icon">⚠️</span>
+                                    <div className="warning-content">
+                                        <div className="warning-text">
+                                            No entitlements found for <strong>"{searchQuery}"</strong>
+                                            {selectedVersion && <span> in iOS {selectedVersion}</span>}
+                                            {selectedExecutablePath && <span> in {selectedExecutablePath}</span>}
                                         </div>
-                                    )}
+                                        <div className="warning-hint">Try adjusting your search terms or filters</div>
+                                    </div>
+                                </div>
+                            )}
 
-                                    <div className="results-container">
-                                        {results.map((result, idx) => {
-                                            const valueData = formatValue(result);
-                                            const showMetadata = !selectedVersion; // Only show metadata in each item if no version selected
-                                            // Hide file path if filtered to specific executable OR if searching by file and all results have the same path
-                                            const allSamePath = searchType === 'file' && results.every(r => r.file_path === results[0].file_path);
-                                            const showFilePath = !selectedExecutablePath && !allSamePath;
-                                            
-                                            return (
-                                                <div key={idx} className="result-item">
-                                                    <div className="result-main">
-                                                        <span className="result-key">{result.key}</span>
-                                                        {showFilePath && (
-                                                            <>
-                                                                <span className="result-in"> in </span>
-                                                                <span className="result-path">{result.file_path}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    {showMetadata && (
-                                                        <div className="result-meta">
-                                                            iOS {result.ios_version} ({result.build_id}) • {result.device_list}
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {valueData && valueData.display && (
-                                                        <div className="result-value">
-                                                            {valueData.type === 'bool' ? (
-                                                                <span className={`bool-value ${valueData.value ? 'bool-true' : 'bool-false'}`}>
-                                                                    {valueData.display}
-                                                                </span>
-                                                            ) : valueData.type === 'array' && Array.isArray(valueData.value) ? (
-                                                                // Check if array contains objects
-                                                                valueData.value.length > 0 && typeof valueData.value[0] === 'object' && valueData.value[0] !== null ? (
-                                                                    <div className="array-dict-value">
-                                                                        {valueData.value.map((item, itemIdx) => (
-                                                                            <div key={itemIdx} className="dict-item">
-                                                                                {typeof item === 'object' && item !== null ? (
-                                                                                    Object.entries(item).map(([key, val], entryIdx) => (
-                                                                                        <div key={entryIdx} className="dict-entry">
-                                                                                            <span className="dict-key">{key}</span>
-                                                                                            <span className="dict-sep">→</span>
-                                                                                            <span className="dict-val">{String(val)}</span>
-                                                                                        </div>
-                                                                                    ))
-                                                                                ) : (
-                                                                                    <span>{String(item)}</span>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : (
-                                                                    <ul className="array-value">
-                                                                        {valueData.value.map((item, itemIdx) => (
-                                                                            <li key={itemIdx}>{String(item)}</li>
-                                                                        ))}
-                                                                    </ul>
-                                                                )
-                                                            ) : valueData.type === 'dict' && typeof valueData.value === 'object' ? (
-                                                                <div className="dict-value">
-                                                                    {Array.isArray(valueData.value) ? (
-                                                                        valueData.value.map((item, itemIdx) => (
-                                                                            <div key={itemIdx} className="dict-item">
-                                                                                {typeof item === 'object' ? (
-                                                                                    Object.entries(item).map(([key, val], entryIdx) => (
-                                                                                        <div key={entryIdx} className="dict-entry">
-                                                                                            <span className="dict-key">{key}</span>
-                                                                                            <span className="dict-sep">→</span>
-                                                                                            <span className="dict-val">{String(val)}</span>
-                                                                                        </div>
-                                                                                    ))
-                                                                                ) : (
-                                                                                    <span className="dict-simple">{String(item)}</span>
-                                                                                )}
-                                                                            </div>
-                                                                        ))
-                                                                    ) : (
-                                                                        Object.entries(valueData.value).map(([key, val], entryIdx) => (
-                                                                            <div key={entryIdx} className="dict-entry">
-                                                                                <span className="dict-key">{key}</span>
-                                                                                <span className="dict-sep">→</span>
-                                                                                <span className="dict-val">{String(val)}</span>
-                                                                            </div>
-                                                                        ))
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="regular-value">{valueData.display}</span>
+                            {/* Results */}
+                            <div className="results-section">
+                                {results.length > 0 ? (
+                                    <div>
+                                        <div className="results-header-row">
+                                            <h3 className="results-header">
+                                                Found {results.length} result{results.length === 1 ? '' : 's'}
+                                            </h3>
+                                        </div>
+
+                                        {/* Show global metadata if version is selected or executable is filtered (but not when searching by executable path) */}
+                                        {(selectedVersion || (selectedExecutablePath && searchType === 'key')) && results.length > 0 && (
+                                            <div className="global-metadata">
+                                                iOS {results[0].ios_version} ({results[0].build_id}) • {results[0].device_list}
+                                                {selectedExecutablePath && searchType === 'key' && (
+                                                    <> • {selectedExecutablePath.split('/').pop()}</>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="results-container">
+                                            {results.map((result, idx) => {
+                                                const valueData = formatValue(result);
+                                                const showMetadata = !selectedVersion; // Only show metadata in each item if no version selected
+                                                // Hide file path if filtered to specific executable OR if searching by file and all results have the same path
+                                                const allSamePath = searchType === 'file' && results.every(r => r.file_path === results[0].file_path);
+                                                const showFilePath = !selectedExecutablePath && !allSamePath;
+
+                                                return (
+                                                    <div key={idx} className="result-item">
+                                                        <div className="result-main">
+                                                            <span className="result-key">{result.key}</span>
+                                                            {showFilePath && (
+                                                                <>
+                                                                    <span className="result-in"> in </span>
+                                                                    <span className="result-path">{result.file_path}</span>
+                                                                </>
                                                             )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+
+                                                        {showMetadata && (
+                                                            <div className="result-meta">
+                                                                iOS {result.ios_version} ({result.build_id}) • {result.device_list}
+                                                            </div>
+                                                        )}
+
+                                                        {valueData && valueData.display && (
+                                                            <div className="result-value">
+                                                                {valueData.type === 'bool' ? (
+                                                                    <span className={`bool-value ${valueData.value ? 'bool-true' : 'bool-false'}`}>
+                                                                        {valueData.display}
+                                                                    </span>
+                                                                ) : valueData.type === 'array' && Array.isArray(valueData.value) ? (
+                                                                    // Check if array contains objects
+                                                                    valueData.value.length > 0 && typeof valueData.value[0] === 'object' && valueData.value[0] !== null ? (
+                                                                        <div className="array-dict-value">
+                                                                            {valueData.value.map((item, itemIdx) => (
+                                                                                <div key={itemIdx} className="dict-item">
+                                                                                    {typeof item === 'object' && item !== null ? (
+                                                                                        Object.entries(item).map(([key, val], entryIdx) => (
+                                                                                            <div key={entryIdx} className="dict-entry">
+                                                                                                <span className="dict-key">{key}</span>
+                                                                                                <span className="dict-sep">→</span>
+                                                                                                <span className="dict-val">{String(val)}</span>
+                                                                                            </div>
+                                                                                        ))
+                                                                                    ) : (
+                                                                                        <span>{String(item)}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <ul className="array-value">
+                                                                            {valueData.value.map((item, itemIdx) => (
+                                                                                <li key={itemIdx}>{String(item)}</li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    )
+                                                                ) : valueData.type === 'dict' && typeof valueData.value === 'object' ? (
+                                                                    <div className="dict-value">
+                                                                        {Array.isArray(valueData.value) ? (
+                                                                            valueData.value.map((item, itemIdx) => (
+                                                                                <div key={itemIdx} className="dict-item">
+                                                                                    {typeof item === 'object' ? (
+                                                                                        Object.entries(item).map(([key, val], entryIdx) => (
+                                                                                            <div key={entryIdx} className="dict-entry">
+                                                                                                <span className="dict-key">{key}</span>
+                                                                                                <span className="dict-sep">→</span>
+                                                                                                <span className="dict-val">{String(val)}</span>
+                                                                                            </div>
+                                                                                        ))
+                                                                                    ) : (
+                                                                                        <span className="dict-simple">{String(item)}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))
+                                                                        ) : (
+                                                                            Object.entries(valueData.value).map(([key, val], entryIdx) => (
+                                                                                <div key={entryIdx} className="dict-entry">
+                                                                                    <span className="dict-key">{key}</span>
+                                                                                    <span className="dict-sep">→</span>
+                                                                                    <span className="dict-val">{String(val)}</span>
+                                                                                </div>
+                                                                            ))
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="regular-value">{valueData.display}</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ) : null}
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
                     </div>
                 )}
             </div>
