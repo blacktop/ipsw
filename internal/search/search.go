@@ -159,9 +159,9 @@ func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.
 	}
 
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-		log.Info("Scanning filesystem")
+		log.Info("Scanning FileSystem")
 		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDbPath, scanMacho); err != nil {
-			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
+			return fmt.Errorf("failed to scan files in FileSystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
@@ -364,9 +364,9 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 	}
 
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-		log.Info("Scanning filesystem")
+		log.Info("Scanning FileSystem")
 		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDB, scanPlist); err != nil {
-			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
+			return fmt.Errorf("failed to scan files in FileSystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {
@@ -433,10 +433,10 @@ func ForEachFileInIPSW(ipswPath, directory, pemDB string, handler func(string, s
 	}
 	// scan the IPSW's DMGs/cryptexes
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-		log.Info("Scanning filesystem")
+		log.Info("Scanning FileSystem")
 		dmg = "filesystem"
 		if err := scanDmg(ipswPath, fsOS, dmg, pemDB, scanFile); err != nil {
-			return fmt.Errorf("failed to scan files in filesystem %s: %w", fsOS, err)
+			return fmt.Errorf("failed to scan files in FileSystem %s: %w", fsOS, err)
 		}
 	}
 	if systemOS, err := i.GetSystemOsDmg(); err == nil {

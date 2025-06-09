@@ -48,6 +48,9 @@ func (s *Sqlite) Connect() (err error) {
 		&model.DyldSharedCache{},
 		&model.Macho{},
 		&model.Symbol{},
+		&model.Entitlement{},
+		&model.EntitlementKey{},
+		&model.EntitlementWebSearch{},
 	)
 }
 
@@ -160,6 +163,83 @@ func (s *Sqlite) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	return syms, nil
 }
 
+// CreateEntitlement creates a new entitlement entry in the database
+func (s *Sqlite) CreateEntitlement(entitlement *model.Entitlement) error {
+	if result := s.db.Create(entitlement); result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+// GetEntitlementsByIPSW returns all entitlements for a given IPSW
+func (s *Sqlite) GetEntitlementsByIPSW(ipswID string) ([]*model.Entitlement, error) {
+	var entitlements []*model.Entitlement
+	if err := s.db.Preload("Keys").Where("ipsw_id = ?", ipswID).Find(&entitlements).Error; err != nil {
+		return nil, err
+	}
+	return entitlements, nil
+}
+
+// SearchEntitlements searches for entitlements based on query parameters
+func (s *Sqlite) SearchEntitlements(query *model.EntitlementQuery) ([]*model.Entitlement, error) {
+	var entitlements []*model.Entitlement
+
+	dbQuery := s.db.Preload("Keys").Preload("Ipsw").Preload("Ipsw.Devices")
+
+	// Join with IPSW table for version/build filtering
+	if query.Version != "" || query.Build != "" {
+		dbQuery = dbQuery.Joins("JOIN ipsws ON ipsws.id = entitlements.ipsw_id")
+		if query.Version != "" {
+			dbQuery = dbQuery.Where("ipsws.version = ?", query.Version)
+		}
+		if query.Build != "" {
+			dbQuery = dbQuery.Where("ipsws.build_id = ?", query.Build)
+		}
+	}
+
+	// Filter by device
+	if query.Device != "" {
+		dbQuery = dbQuery.Joins("JOIN ipsw_devices ON ipsw_devices.ipsw_id = entitlements.ipsw_id").
+			Where("ipsw_devices.device_name = ?", query.Device)
+	}
+
+	// Filter by file path
+	if query.FilePath != "" {
+		dbQuery = dbQuery.Where("entitlements.file_path LIKE ?", "%"+query.FilePath+"%")
+	}
+
+	// Filter by entitlement key
+	if query.KeyPattern != "" {
+		dbQuery = dbQuery.Joins("JOIN entitlement_keys ON entitlement_keys.entitlement_id = entitlements.id").
+			Where("entitlement_keys.key REGEXP ?", query.KeyPattern)
+	}
+
+	// Filter by entitlement value
+	if query.ValuePattern != "" {
+		dbQuery = dbQuery.Joins("LEFT JOIN entitlement_keys ek ON ek.entitlement_id = entitlements.id").
+			Where("ek.string_value REGEXP ? OR ek.array_value REGEXP ? OR ek.dict_value REGEXP ?",
+				query.ValuePattern, query.ValuePattern, query.ValuePattern)
+	}
+
+	if err := dbQuery.Find(&entitlements).Error; err != nil {
+		return nil, err
+	}
+
+	return entitlements, nil
+}
+
+// GetEntitlementByFile returns entitlement for a specific file in an IPSW
+func (s *Sqlite) GetEntitlementByFile(ipswID, filePath string) (*model.Entitlement, error) {
+	var entitlement model.Entitlement
+	if err := s.db.Preload("Keys").Where("ipsw_id = ? AND file_path = ?", ipswID, filePath).First(&entitlement).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.ErrNotFound
+		}
+		return nil, err
+	}
+	return &entitlement, nil
+}
+
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
 func (s *Sqlite) Save(value any) error {
@@ -184,4 +264,9 @@ func (s *Sqlite) Close() error {
 		return err
 	}
 	return db.Close()
+}
+
+// GetDB returns the underlying GORM database instance
+func (s *Sqlite) GetDB() *gorm.DB {
+	return s.db
 }

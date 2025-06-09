@@ -1070,7 +1070,7 @@ Search for MachOs that have split segments
 
 ```bash
 ❯ ipsw macho search --ipsw iPhone15,2_16.3_20D47_Restore.ipsw --load-command 'LC_SEGMENT_SPLIT_INFO'
-   • Scanning filesystem
+   • Scanning FileSystem
 /System/DriverKit/usr/lib/libSystem_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
 /System/DriverKit/usr/lib/system/libdispatch_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
 /System/DriverKit/usr/lib/system/libdispatch_profile.dylib	load=LC_SEGMENT_SPLIT_INFO
