@@ -227,8 +227,8 @@ export default function Entitlements() {
         };
     }, [workerBlobUrl, searchTimeout]);
 
-    // Debounced search function
-    const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
+    // Debounced search function with optional path parameter
+    const debouncedSearchWithPath = useCallback(async (query: string, version: string, type: 'key' | 'file', pathFilter: string = '', forceSearch = false) => {
         if (!dbWorker) {
             setError('Database not initialized yet');
             return;
@@ -276,9 +276,10 @@ export default function Entitlements() {
             }
 
             // Add executable path filter if selected
-            if (selectedExecutablePath) {
+            const effectivePathFilter = pathFilter || selectedExecutablePath;
+            if (effectivePathFilter) {
                 sqlQuery += ` AND file_path = ?`;
-                params.push(selectedExecutablePath);
+                params.push(effectivePathFilter);
             }
 
             sqlQuery += ` ORDER BY file_path, key LIMIT 200`;
@@ -306,7 +307,7 @@ export default function Entitlements() {
             setHasSearched(true);
 
             // Extract unique executable paths for the filter dropdown
-            if (!selectedExecutablePath && searchResults.length > 0) {
+            if (!effectivePathFilter && searchResults.length > 0) {
                 const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
                 setAvailableExecutablePaths(uniquePaths);
             }
@@ -318,6 +319,11 @@ export default function Entitlements() {
             setLoading(false);
         }
     }, [dbWorker, isInputFocused, selectedExecutablePath]);
+
+    // Original debouncedSearch function for backward compatibility
+    const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
+        return debouncedSearchWithPath(query, version, type, '', forceSearch);
+    }, [debouncedSearchWithPath]);
 
     // Handle search with debouncing
     const handleSearchInput = useCallback((newQuery: string) => {
@@ -394,9 +400,10 @@ export default function Entitlements() {
         }
         // If there's a search query, re-run the search with the new path filter
         if (searchQuery.trim()) {
-            debouncedSearch(searchQuery, selectedVersion, searchType, true);
+            // Pass the new path directly instead of relying on state
+            debouncedSearchWithPath(searchQuery, selectedVersion, searchType, newPath, true);
         }
-    }, [searchQuery, selectedVersion, searchType, debouncedSearch]);
+    }, [searchQuery, selectedVersion, searchType]);
 
     const formatValue = (result: any) => {
         switch (result.value_type) {
@@ -576,23 +583,17 @@ export default function Entitlements() {
                                                 );
                                             }
                                             
-                                            // Check for duplicate basenames
-                                            const baseNameCounts = new Map<string, number>();
-                                            const pathToBaseName = new Map<string, string>();
-                                            
-                                            availableExecutablePaths.forEach(path => {
-                                                const basename = path.split('/').pop() || path;
-                                                pathToBaseName.set(path, basename);
-                                                baseNameCounts.set(basename, (baseNameCounts.get(basename) || 0) + 1);
-                                            });
-                                            
+                                            // Always show full paths to avoid ambiguity
                                             return availableExecutablePaths.map(path => {
-                                                const basename = pathToBaseName.get(path) || path;
-                                                const hasDuplicates = (baseNameCounts.get(basename) || 0) > 1;
+                                                const basename = path.split('/').pop() || path;
+                                                // Show basename first, then full path for clarity
+                                                const displayName = path.length > 50 ? 
+                                                    `${basename} - ${path.substring(0, 47)}...` : 
+                                                    `${basename} - ${path}`;
                                                 
                                                 return (
                                                     <option key={path} value={path}>
-                                                        {hasDuplicates ? path : basename}
+                                                        {displayName}
                                                     </option>
                                                 );
                                             });
@@ -1101,7 +1102,6 @@ export default function Entitlements() {
                     flex: 1;
                     overflow-y: auto;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-                    min-height: 400px;
                     max-height: calc(100vh - 500px);
                 }
 
