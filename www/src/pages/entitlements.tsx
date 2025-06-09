@@ -100,7 +100,9 @@ export default function Entitlements() {
                         }
 
                         // Detect connection speed and adjust chunk size accordingly
-                        let requestChunkSize = 4096; // Default: 4KB (SQLite page size)
+                        // Base size aligned with optimized SQLite page size (1024 bytes)
+                        const basePageSize = 1024;
+                        let requestChunkSize = basePageSize; // Start with SQLite page size
 
                         // Use Network Information API if available
                         const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
@@ -108,26 +110,26 @@ export default function Entitlements() {
                             const effectiveType = connection.effectiveType;
                             const downlink = connection.downlink; // Mbps
 
-                            // Aggressive chunk sizing for high-speed connections
+                            // Scale chunk size based on connection speed (multiples of page size for efficiency)
                             if (downlink && downlink > 100) {
-                                // Ultra-fast connections (>100 Mbps): Use very large chunks
-                                requestChunkSize = 2097152; // 2MB for ultra-fast connections
+                                // Ultra-fast connections (>100 Mbps): 2MB (2048 pages)
+                                requestChunkSize = basePageSize * 2048;
                             } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
-                                // Fast connections (>25 Mbps): Use large chunks
-                                requestChunkSize = 1048576; // 1MB for fast connections
+                                // Fast connections (>25 Mbps): 1MB (1024 pages)
+                                requestChunkSize = basePageSize * 1024;
                             } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
-                                // Medium connections (>5 Mbps): Use medium chunks
-                                requestChunkSize = 262144; // 256KB for medium connections
+                                // Medium connections (>5 Mbps): 256KB (256 pages)
+                                requestChunkSize = basePageSize * 256;
                             } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
-                                // Slow connections: Use small chunks
-                                requestChunkSize = 65536; // 64KB for slow connections
+                                // Slow connections: 64KB (64 pages)
+                                requestChunkSize = basePageSize * 64;
                             } else {
-                                // Default to large chunks for unknown but modern connections
-                                requestChunkSize = 524288; // 512KB default
+                                // Default to large chunks for unknown but modern connections: 512KB (512 pages)
+                                requestChunkSize = basePageSize * 512;
                             }
                         } else {
-                            // No Network Information API, assume modern fast connection
-                            requestChunkSize = 1048576; // 1MB for modern connections
+                            // No Network Information API, assume modern fast connection: 2MB (2048 pages)
+                            requestChunkSize = basePageSize * 2048;
                         }
 
                         console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
@@ -144,9 +146,9 @@ export default function Entitlements() {
                                 config: {
                                     serverMode: 'full',
                                     requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`,
-                                    // Enable caching for better performance
-                                    cacheBust: false // Set to false for better caching
+                                    url: `${basePath}/db/ipsw.db`
+                                    // Note: Removed cacheBust to enable browser caching
+                                    // Database will be cached by browser's HTTP cache
                                 }
                             }],
                             workerUrl,
