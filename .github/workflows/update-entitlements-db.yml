@@ -20,16 +20,11 @@ jobs:
         run: |
           go build -o ipsw ./cmd/ipsw
 
-      - name: Download latest IPSW(s)
-        run: |
-          # TODO: add commands to fetch latest IPSW files
-          echo "No IPSW download step configured"
-
       - name: Determine latest IPSW URL
         id: get-ipsw
         run: |
           # TODO: replace with actual logic to fetch the latest IPSW URL
-          echo "CURRENT_IPSW_URL=$(curl -s 'https://api.example.com/latest-ipsw-url')" >> $GITHUB_ENV
+          echo "CURRENT_IPSW_URL=$(./ipsw dl ipsw --device iPhone17,1 --latest --urls)" >> $GITHUB_ENV
 
       - name: Check for new IPSW
         run: |
@@ -47,7 +42,7 @@ jobs:
 
       - name: Generate entitlements database
         run: |
-          ./ipsw ent --sql --sqlite-db www/static/db/ipsw.db --ipsw latest.ipsw
+          ./ipsw ent --db www/static/db/ipsw.db --ipsw latest.ipsw
 
       - name: Commit and push updated DB
         run: |
