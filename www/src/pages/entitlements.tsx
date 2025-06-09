@@ -108,24 +108,35 @@ export default function Entitlements() {
                             const effectiveType = connection.effectiveType;
                             const downlink = connection.downlink; // Mbps
 
-                            // Adjust chunk size based on connection quality
-                            if (effectiveType === '4g' || (downlink && downlink > 10)) {
-                                requestChunkSize = 262144; // 256KB for fast connections
-                            } else if (effectiveType === '3g' || (downlink && downlink > 2)) {
-                                requestChunkSize = 65536; // 64KB for medium connections
+                            // Aggressive chunk sizing for high-speed connections
+                            if (downlink && downlink > 100) {
+                                // Ultra-fast connections (>100 Mbps): Use very large chunks
+                                requestChunkSize = 2097152; // 2MB for ultra-fast connections
+                            } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
+                                // Fast connections (>25 Mbps): Use large chunks
+                                requestChunkSize = 1048576; // 1MB for fast connections
+                            } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
+                                // Medium connections (>5 Mbps): Use medium chunks
+                                requestChunkSize = 262144; // 256KB for medium connections
                             } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
-                                requestChunkSize = 4096; // 4KB for slow connections
+                                // Slow connections: Use small chunks
+                                requestChunkSize = 65536; // 64KB for slow connections
                             } else {
-                                // Default to larger chunks if we can't determine speed
-                                requestChunkSize = 131072; // 256KB
+                                // Default to large chunks for unknown but modern connections
+                                requestChunkSize = 524288; // 512KB default
                             }
                         } else {
-                            // No Network Information API, use a reasonable default for modern connections
-                            requestChunkSize = 262144; // 256KB
+                            // No Network Information API, assume modern fast connection
+                            requestChunkSize = 1048576; // 1MB for modern connections
                         }
+
+                        console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
 
                         setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
+
+                        // Set reasonable max bytes to read based on database size
+                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
 
                         worker = await createDbWorker(
                             [{
@@ -135,32 +146,70 @@ export default function Entitlements() {
                                     requestChunkSize: requestChunkSize,
                                     url: `${basePath}/db/ipsw.db`,
                                     // Enable caching for better performance
-                                    cacheBust: true
+                                    cacheBust: false // Set to false for better caching
                                 }
                             }],
                             workerUrl,
-                            wasmUrl
+                            wasmUrl,
+                            maxBytesToRead
                         );
 
-                        // Start progress monitoring if we have file size
+                        // Start progress monitoring with fallback timing
                         let progressInterval: NodeJS.Timeout | null = null;
-                        if (dbFileSize > 0 && (worker as any).worker?.bytesRead !== undefined) {
-                            progressInterval = setInterval(() => {
+                        let startTime = Date.now();
+                        let lastProgress = 20;
+                        
+                        const updateProgress = () => {
+                            const elapsed = Date.now() - startTime;
+                            let progress = lastProgress;
+                            
+                            // Try to get actual bytes read if available
+                            if ((worker as any).worker?.bytesRead !== undefined && dbFileSize > 0) {
                                 const bytesRead = (worker as any).worker.bytesRead || 0;
-                                const progress = Math.min(90, 20 + (bytesRead / dbFileSize) * 60); // 20-80% for loading
-                                setLoadingProgress(progress);
-                                setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                            }, 100);
-                        }
+                                if (bytesRead > 0) {
+                                    const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
+                                    progress = Math.min(85, 20 + bytesProgress);
+                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                                }
+                            } else {
+                                // Fallback: time-based estimation (assuming 10 seconds for large DBs)
+                                const estimatedDuration = dbFileSize > 50 * 1024 * 1024 ? 10000 : 5000; // 10s for >50MB, 5s otherwise
+                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
+                                progress = 20 + timeProgress;
+                                
+                                if (dbFileSize > 0) {
+                                    const estimatedMB = Math.min(
+                                        Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
+                                        Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
+                                    );
+                                    setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                                } else {
+                                    setLoadingPhase('Loading database...');
+                                }
+                            }
+                            
+                            setLoadingProgress(Math.min(85, progress));
+                            lastProgress = progress;
+                        };
+
+                        progressInterval = setInterval(updateProgress, 200);
 
                         // Test if database is accessible and prefetch initial data
                         try {
+                            // Clean up progress interval before final steps
+                            if (progressInterval) {
+                                clearInterval(progressInterval);
+                            }
+                            
                             setLoadingPhase('Connecting to database...');
-                            setLoadingProgress(dbFileSize > 0 ? 85 : 60);
+                            setLoadingProgress(87);
                             
                             // This query will force loading of the SQLite header and schema
                             await (worker.db as any).exec('SELECT 1;');
 
+                            setLoadingPhase('Initializing database...');
+                            setLoadingProgress(90);
+                            
                             // Prefetch the iOS versions to cache the index pages
                             await (worker.db as any).exec(
                                 `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
@@ -168,11 +217,6 @@ export default function Entitlements() {
                         } catch (connectivityError) {
                             console.error('Database connectivity test failed:', connectivityError);
                             throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
-                        } finally {
-                            // Clean up progress interval
-                            if (progressInterval) {
-                                clearInterval(progressInterval);
-                            }
                         }
 
                     } catch (workerError) {
@@ -186,7 +230,7 @@ export default function Entitlements() {
                     // Validate database schema
                     try {
                         setLoadingPhase('Validating database schema...');
-                        setLoadingProgress(90);
+                        setLoadingProgress(93);
                         const tableRes = await (worker.db as any).exec(
                             `SELECT name FROM sqlite_master WHERE type='table';`
                         );
@@ -223,7 +267,7 @@ export default function Entitlements() {
 
                         // Get available iOS versions
                         setLoadingPhase('Loading iOS versions...');
-                        setLoadingProgress(95);
+                        setLoadingProgress(97);
                         const versionsRes = await (worker.db as any).exec(
                             `SELECT DISTINCT ios_version FROM entitlement_keys ORDER BY ios_version DESC;`
                         );
