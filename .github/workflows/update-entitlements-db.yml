@@ -1,0 +1,60 @@
+name: Update Entitlements DB
+
+on:
+  schedule:
+    - cron: '0 19 * * *'  # daily at 11:00 PST (19:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  update-entitlements-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Build ipsw CLI
+        run: |
+          go build -o ipsw ./cmd/ipsw
+
+      - name: Download latest IPSW(s)
+        run: |
+          # TODO: add commands to fetch latest IPSW files
+          echo "No IPSW download step configured"
+
+      - name: Determine latest IPSW URL
+        id: get-ipsw
+        run: |
+          # TODO: replace with actual logic to fetch the latest IPSW URL
+          echo "CURRENT_IPSW_URL=$(curl -s 'https://api.example.com/latest-ipsw-url')" >> $GITHUB_ENV
+
+      - name: Check for new IPSW
+        run: |
+          LAST=$(jq -r '.latest_ipsw_url // ""' hack/.watch_cache)
+          echo "Last cached IPSW URL: $LAST"
+          echo "Current IPSW URL: $CURRENT_IPSW_URL"
+          if [ "$LAST" = "$CURRENT_IPSW_URL" ]; then
+            echo "No new IPSW found; skipping"
+            exit 0
+          fi
+
+      - name: Download IPSW
+        run: |
+          curl -L "$CURRENT_IPSW_URL" -o latest.ipsw
+
+      - name: Generate entitlements database
+        run: |
+          ./ipsw ent --sql --sqlite-db www/static/db/ipsw.db --ipsw latest.ipsw
+
+      - name: Commit and push updated DB
+        run: |
+          jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw_url = $url' hack/.watch_cache > hack/.watch_cache.tmp
+          mv hack/.watch_cache.tmp hack/.watch_cache
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add hack/.watch_cache www/static/db/ipsw.db
+          git commit -m "chore(ents): update to $CURRENT_IPSW_URL [skip ci]" || echo "No changes to commit"
+          git push 

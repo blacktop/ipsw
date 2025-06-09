@@ -73,9 +73,9 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 				}
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				utils.Indent(log.Info, 3)("Scanning filesystem")
+				utils.Indent(log.Info, 3)("Scanning FileSystem")
 				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem", conf.PemDB); err != nil {
-					return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+					return nil, fmt.Errorf("failed to scan files in FileSystem %s: %v", fsOS, err)
 				} else {
 					maps.Copy(entDB, ents)
 				}
