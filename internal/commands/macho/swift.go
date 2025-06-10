@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2/quick"
@@ -28,6 +29,7 @@ type SwiftConfig struct {
 	Interface bool
 	Deps      bool
 	Demangle  bool
+	Headers   bool
 
 	IpswVersion string
 
@@ -624,7 +626,232 @@ func (s *Swift) Dump() error {
 
 // Interface outputs Swift swift-dump interface from a MachO
 func (s *Swift) Interface() error {
-	panic("not implemented yet")
+	if s.conf.Headers {
+		return s.writeHeaders()
+	}
+	
+	// TODO: Implement single file interface generation
+	return fmt.Errorf("single file interface generation not implemented yet")
+}
+
+func (s *Swift) writeHeaders() error {
+	writeSwiftHeaders := func(m *macho.File) error {
+		var headers []string
+
+		if !m.HasSwift() {
+			return nil
+		}
+
+		if err := m.PreCache(); err != nil { // cache fields and types
+			log.Errorf("failed to precache swift fields/types: %v", err)
+		}
+
+		var buildVersions []string
+		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
+			for _, bv := range bvers {
+				buildVersions = append(buildVersions, bv.String())
+			}
+		}
+		var sourceVersion string
+		if svers := m.GetLoadsByName("LC_SOURCE_VERSION"); len(svers) > 0 {
+			sourceVersion = svers[0].String()
+		}
+
+		/* generate Swift type headers */
+		if types, err := m.GetSwiftTypes(); err == nil {
+			for _, typ := range types {
+				var sout string
+				if s.conf.Verbose {
+					sout = typ.Verbose()
+					if s.conf.Demangle {
+						sout = swift.DemangleBlob(sout)
+					}
+				} else {
+					sout = typ.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(typ.String())
+					}
+				}
+				
+				// Create a safe filename from the type name
+				safeName := strings.ReplaceAll(typ.Name, ".", "_")
+				safeName = strings.ReplaceAll(safeName, "<", "_")
+				safeName = strings.ReplaceAll(safeName, ">", "_")
+				safeName = strings.ReplaceAll(safeName, " ", "_")
+				
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+".swift")
+				if err := writeSwiftHeader(&headerInfo{
+					FileName:      fname,
+					IpswVersion:   s.conf.IpswVersion,
+					BuildVersions: buildVersions,
+					SourceVersion: sourceVersion,
+					Name:          safeName,
+					Object:        sout,
+				}); err != nil {
+					return err
+				}
+				headers = append(headers, filepath.Base(fname))
+			}
+		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+			log.Errorf("failed to parse swift types: %v", err)
+		}
+
+		/* generate Swift protocol headers */
+		if protos, err := m.GetSwiftProtocols(); err == nil {
+			for _, proto := range protos {
+				var sout string
+				if s.conf.Verbose {
+					sout = proto.Verbose()
+					if s.conf.Demangle {
+						sout = swift.DemangleBlob(sout)
+					}
+				} else {
+					sout = proto.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(proto.String())
+					}
+				}
+				
+				// Create a safe filename from the protocol name
+				safeName := strings.ReplaceAll(proto.Name, ".", "_")
+				safeName = strings.ReplaceAll(safeName, "<", "_")
+				safeName = strings.ReplaceAll(safeName, ">", "_")
+				safeName = strings.ReplaceAll(safeName, " ", "_")
+				
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Protocol.swift")
+				if err := writeSwiftHeader(&headerInfo{
+					FileName:      fname,
+					IpswVersion:   s.conf.IpswVersion,
+					BuildVersions: buildVersions,
+					SourceVersion: sourceVersion,
+					Name:          safeName + "_Protocol",
+					Object:        sout,
+				}); err != nil {
+					return err
+				}
+				headers = append(headers, filepath.Base(fname))
+			}
+		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+			log.Errorf("failed to parse swift protocols: %v", err)
+		}
+
+		/* generate Swift extension headers */
+		if exts, err := m.GetSwiftProtocolConformances(); err == nil {
+			for _, ext := range exts {
+				var sout string
+				if s.conf.Verbose {
+					sout = ext.Verbose()
+					if s.conf.Demangle {
+						sout = swift.DemangleBlob(sout)
+					}
+				} else {
+					sout = ext.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(ext.String())
+					}
+				}
+				
+				// Create a safe filename from the extension info
+				safeName := strings.ReplaceAll(ext.Protocol, ".", "_")
+				safeName = strings.ReplaceAll(safeName, "<", "_")
+				safeName = strings.ReplaceAll(safeName, ">", "_")
+				safeName = strings.ReplaceAll(safeName, " ", "_")
+				
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Extension.swift")
+				if err := writeSwiftHeader(&headerInfo{
+					FileName:      fname,
+					IpswVersion:   s.conf.IpswVersion,
+					BuildVersions: buildVersions,
+					SourceVersion: sourceVersion,
+					Name:          safeName + "_Extension",
+					Object:        sout,
+				}); err != nil {
+					return err
+				}
+				headers = append(headers, filepath.Base(fname))
+			}
+		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+			log.Errorf("failed to parse swift protocol conformances: %v", err)
+		}
+
+		/* generate Swift associated type headers */
+		if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
+			for _, at := range asstyps {
+				var sout string
+				if s.conf.Verbose {
+					sout = at.Verbose()
+					if s.conf.Demangle {
+						sout = swift.DemangleBlob(sout)
+					}
+				} else {
+					sout = at.String()
+					if s.conf.Demangle {
+						sout = swift.DemangleSimpleBlob(at.String())
+					}
+				}
+				
+				// Create a safe filename from the associated type info
+				safeName := strings.ReplaceAll(at.ConformingTypeName, ".", "_")
+				safeName = strings.ReplaceAll(safeName, "<", "_")
+				safeName = strings.ReplaceAll(safeName, ">", "_")
+				safeName = strings.ReplaceAll(safeName, " ", "_")
+				
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-AssociatedType.swift")
+				if err := writeSwiftHeader(&headerInfo{
+					FileName:      fname,
+					IpswVersion:   s.conf.IpswVersion,
+					BuildVersions: buildVersions,
+					SourceVersion: sourceVersion,
+					Name:          safeName + "_AssociatedType",
+					Object:        sout,
+				}); err != nil {
+					return err
+				}
+				headers = append(headers, filepath.Base(fname))
+			}
+		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+			log.Errorf("failed to parse swift associated types: %v", err)
+		}
+
+		/* generate umbrella header */
+		if len(headers) > 0 {
+			var umbrella string
+			if slices.Contains(headers, s.conf.Name+".swift") {
+				umbrella = s.conf.Name + "-Umbrella"
+			} else {
+				umbrella = s.conf.Name
+			}
+
+			for i, header := range headers {
+				headers[i] = "import \"" + header + "\""
+			}
+
+			fname := filepath.Join(s.conf.Output, s.conf.Name, umbrella+".swift")
+			if err := writeSwiftHeader(&headerInfo{
+				FileName:      fname,
+				IpswVersion:   s.conf.IpswVersion,
+				BuildVersions: buildVersions,
+				SourceVersion: sourceVersion,
+				IsUmbrella:    true,
+				Name:          strings.ReplaceAll(umbrella, "-", "_"),
+				Object:        strings.Join(headers, "\n") + "\n",
+			}); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	if len(s.deps) > 0 {
+		for _, m := range s.deps {
+			if err := writeSwiftHeaders(m); err != nil {
+				return err
+			}
+		}
+	}
+
+	return writeSwiftHeaders(s.file)
 }
 
 /* UTILS */
@@ -647,6 +874,35 @@ func writeInterface(hdr *headerInfo) error {
 	log.Infof("Creating %s", hdr.FileName)
 	if err := os.WriteFile(hdr.FileName, []byte(out), 0644); err != nil {
 		return fmt.Errorf("failed to write header %s: %v", hdr.FileName, err)
+	}
+
+	return nil
+}
+
+func writeSwiftHeader(hdr *headerInfo) error {
+	out := fmt.Sprintf(
+		"//\n"+
+			"//   Generated by https://github.com/blacktop/ipsw (%s)\n"+
+			"//\n"+
+			"//    - LC_BUILD_VERSION:  %s\n"+
+			"//    - LC_SOURCE_VERSION: %s\n"+
+			"//\n",
+		hdr.IpswVersion,
+		strings.Join(hdr.BuildVersions, "\n//    - LC_BUILD_VERSION:  "),
+		hdr.SourceVersion)
+
+	if !hdr.IsUmbrella {
+		out += "import Foundation\n\n"
+	}
+
+	out += fmt.Sprintf("%s\n", hdr.Object)
+
+	if err := os.MkdirAll(filepath.Dir(hdr.FileName), 0o750); err != nil {
+		return err
+	}
+	log.Infof("Creating %s", hdr.FileName)
+	if err := os.WriteFile(hdr.FileName, []byte(out), 0644); err != nil {
+		return fmt.Errorf("failed to write Swift header %s: %v", hdr.FileName, err)
 	}
 
 	return nil
