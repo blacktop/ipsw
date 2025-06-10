@@ -31,9 +31,9 @@ import (
 // CREDIT - https://github.com/majd/ipatool
 
 const (
-	appStoreAuthURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-	// appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
-	appStoreDownloadURL = "https://downloaddispatch.itunes.apple.com/WebObjects/DownloadDispatch.woa/wa/ent/download?guid="
+	appStoreAuthURL     = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+	appStoreDownloadURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid="
+	// appStoreDownloadURL = "https://downloaddispatch.itunes.apple.com/WebObjects/DownloadDispatch.woa/wa/ent/download?guid="
 	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/buyProduct"
 	appStoreSearchURL   = "https://itunes.apple.com/search"
 	appStoreLookupURL   = "https://itunes.apple.com/lookup"
@@ -186,7 +186,7 @@ type downloadRequest struct {
 	CreditDisplay string `plist:"creditDisplay,omitempty"`
 	GUID          string `plist:"guid,omitempty"`
 	KBSync        string `plist:"kbsync,omitempty"`
-	SalableAdamId string `plist:"salableAdamId,omitempty"`
+	SalableAdamId int    `plist:"salableAdamId,omitempty"`
 	SerialNumber  string `plist:"serialNumber,omitempty"`
 }
 
@@ -752,30 +752,12 @@ func (as *AppStore) Download(bundleID, output string) error {
 	}
 	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 
-	if as.config.KeybagPlist != "" {
-		keybag, err := os.ReadFile(as.config.KeybagPlist)
-		if err != nil {
-			return fmt.Errorf("failed to read keybag plist '%s': %v", as.config.KeybagPlist, err)
-		}
-		var dlReq downloadRequest
-		if err := plist.NewDecoder(bytes.NewReader(keybag)).Decode(&dlReq); err != nil {
-			return fmt.Errorf("failed to decode keybag plist '%s': %v", as.config.KeybagPlist, err)
-		}
-		guid = dlReq.GUID
-		plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
-			GUID:          dlReq.GUID,
-			KBSync:        dlReq.KBSync,
-			SalableAdamId: strconv.Itoa(app.ID),
-			SerialNumber:  dlReq.SerialNumber,
-		})
-	} else {
-		plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
-			CreditDisplay: "$0.00",
-			GUID:          guid,
-			KBSync:        "0",
-			SalableAdamId: strconv.Itoa(app.ID),
-			SerialNumber:  "0",
-		})
+	if err := plist.NewEncoderForFormat(buf, plist.XMLFormat).Encode(&downloadRequest{
+		CreditDisplay: "",
+		GUID:          guid,
+		SalableAdamId: app.ID,
+	}); err != nil {
+		return fmt.Errorf("failed to encode download request: %v", err)
 	}
 
 	req, err := http.NewRequest("POST", appStoreDownloadURL+guid, buf)
@@ -830,6 +812,10 @@ func (as *AppStore) Download(bundleID, output string) error {
 			return fmt.Errorf("failed to purchase app: %v", err)
 		}
 		return as.Download(bundleID, output)
+	}
+
+	if dl.FailureType == FailureTypeUnknownError {
+		return errors.New(dl.CustomerMessage)
 	}
 
 	if len(dl.Apps) == 0 {
