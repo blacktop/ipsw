@@ -73,7 +73,7 @@ jobs:
         # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
-      - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5
+      - uses: stefanzweifel/git-auto-commit-action@3cc016cfc892e0844046da36fc68da4e525e081f # v5
         with:
           commit_message: Update .watch_cache
       # - name: Commit Cache Changes
