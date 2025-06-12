@@ -758,7 +758,7 @@ func (f *File) ParseStubIslands() error {
 				return f.ReadPointerAtAddress(u)
 			})
 			if err != nil {
-				return err
+				return fmt.Errorf("ParseStubIslands: %v", err)
 			}
 			maps.Copy(f.islandStubs, stubs)
 		}
