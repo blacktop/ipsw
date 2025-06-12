@@ -168,6 +168,10 @@ typedef struct
     uint64 dynamicDataMaxSize;   // maximum size of space reserved from dynamic dataz
     uint32 tProMappingOffset;    // file offset to first dyld_cache_tpro_mapping_info
     uint32 tProMappingCount;     // number of dyld_cache_tpro_mapping_info entries
+    uint64    functionVariantInfoAddr;// (unslid) address of dyld_cache_function_variant_info
+    uint64    functionVariantInfoSize;// Size of all of the variant information pointed to via the dyld_cache_function_variant_info
+    uint64    prewarmingDataOffset;   // file offset to dyld_prewarming_header
+    uint64    prewarmingDataSize;     // byte size of prewarming data
 } dyld_cache_header;
 
 typedef struct

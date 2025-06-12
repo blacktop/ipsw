@@ -193,6 +193,10 @@ type CacheHeader struct {
 	DynamicDataMaxSize            uint64         // maximum size of space reserved from dynamic data
 	TPROMappingsOffset            uint32         // file offset to first dyld_cache_tpro_mapping_info
 	TPROMappingsCount             uint32         // number of dyld_cache_tpro_mapping_info entries
+	FunctionVariantInfoAddr       uint64         // (unslid) address of dyld_cache_function_variant_info
+	FunctionVariantInfoSize       uint64         // Size of all of the variant information pointed to via the dyld_cache_function_variant_info
+	PrewarmingDataOffset          uint64         // file offset to dyld_prewarming_header
+	PrewarmingDataSize            uint64         // byte size of prewarming data
 }
 
 type CacheMappingInfo struct {
