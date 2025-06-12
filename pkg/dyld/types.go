@@ -37,6 +37,7 @@ const (
 	IsSimulator            formatVersion = 0x200
 	LocallyBuiltCache      formatVersion = 0x400
 	BuiltFromChainedFixups formatVersion = 0x800
+	NewFormatTLVs          formatVersion = 0x1000
 )
 
 type cacheType uint64
@@ -66,6 +67,9 @@ func (f formatVersion) IsLocallyBuiltCache() bool {
 func (f formatVersion) IsBuiltFromChainedFixups() bool {
 	return (f & BuiltFromChainedFixups) != 0
 }
+func (f formatVersion) IsNewFormatTLVs() bool {
+	return (f & NewFormatTLVs) != 0
+}
 
 func (f formatVersion) String() string {
 	var fStr []string
@@ -80,6 +84,9 @@ func (f formatVersion) String() string {
 	}
 	if f.IsBuiltFromChainedFixups() {
 		fStr = append(fStr, "BuiltFromChainedFixups")
+	}
+	if f.IsNewFormatTLVs() {
+		fStr = append(fStr, "NewFormatTLVs")
 	}
 	if len(fStr) > 0 {
 		return fmt.Sprintf("%d (%s)", f.Version(), strings.Join(fStr, "|"))
@@ -148,7 +155,8 @@ type CacheHeader struct {
 	   simulator              : 1,  // for simulator of specified platform
 	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
 	   builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
-	   padding                : 20; // TBD */
+	   newFormatTLVs          : 1,  // TLVs have been set by cache builder as new format (not needing runtime side table)
+	   padding                : 19; // TBD */
 	SharedRegionStart      uint64   // base load address of cache if not slid
 	SharedRegionSize       uint64   // overall size of region cache can be mapped into
 	MaxSlide               maxSlide // runtime slide of cache can be between zero and this value
