@@ -124,7 +124,8 @@ typedef struct
     uint simulator : 1;                   // for simulator of specified platform
     uint locallyBuiltCache : 1;           // 0 for B&I built cache, 1 for locally built cache
     uint builtFromChainedFixups : 1;      // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
-    uint padding : 20;                    // TBD
+    uint newFormatTLVs          : 1;      // TLVs have been set by cache builder as new format (not needing runtime side table)
+    uint padding : 19;                    // TBD
     uint64 sharedRegionStart;             // base load address of cache if not slid
     uint64 sharedRegionSize;              // overall size of region cache can be mapped into
     uint64 maxSlide<format = hex>;        // runtime slide of cache can be between zero and this value
