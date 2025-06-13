@@ -1234,6 +1234,99 @@ type TPROMapping struct {
 	Size uint64
 }
 
+const (
+	DyldCachePrewarmingDataPageSize = 0x4000 // 16k pages
+)
+
+type CacheFunctionVariantEntry struct {
+	FixupLocVmAddr               uint64 // location of pointer that needs to be re-bound (unslid)
+	FunctionVariantTableVmAddr   uint64 // location of FunctionVariants in LINKEDIT (unslid)
+	DylibHeaderVmAddr            uint64 // location of mach_heaer of dylib that implements this function variant
+	PackedData                   uint32 // contains variantIndex (12 bits), pacAuth (1 bit), pacAddress (1 bit), pacKey (2 bits), pacDiversity (16 bits)
+	TargetDylibIndex             uint16 // which dylib has the function variant
+	FunctionVariantTableSizeDiv4 uint16 // size of FunctionVariants in LINKEDIT (unslid) divided by 4
+}
+
+func (e *CacheFunctionVariantEntry) VariantIndex() uint32 {
+	return e.PackedData & 0xFFF // 12 bits
+}
+
+func (e *CacheFunctionVariantEntry) PacAuth() bool {
+	return (e.PackedData>>12)&0x1 != 0 // 1 bit
+}
+
+func (e *CacheFunctionVariantEntry) PacAddress() bool {
+	return (e.PackedData>>13)&0x1 != 0 // 1 bit
+}
+
+func (e *CacheFunctionVariantEntry) PacKey() uint32 {
+	return (e.PackedData >> 14) & 0x3 // 2 bits
+}
+
+func (e *CacheFunctionVariantEntry) PacDiversity() uint32 {
+	return (e.PackedData >> 16) & 0xFFFF // 16 bits
+}
+
+func (e *CacheFunctionVariantEntry) SetVariantIndex(index uint32) {
+	e.PackedData = (e.PackedData &^ 0xFFF) | (index & 0xFFF)
+}
+
+func (e *CacheFunctionVariantEntry) SetPacAuth(auth bool) {
+	if auth {
+		e.PackedData |= (1 << 12)
+	} else {
+		e.PackedData &^= (1 << 12)
+	}
+}
+
+func (e *CacheFunctionVariantEntry) SetPacAddress(address bool) {
+	if address {
+		e.PackedData |= (1 << 13)
+	} else {
+		e.PackedData &^= (1 << 13)
+	}
+}
+
+func (e *CacheFunctionVariantEntry) SetPacKey(key uint32) {
+	e.PackedData = (e.PackedData &^ (0x3 << 14)) | ((key & 0x3) << 14)
+}
+
+func (e *CacheFunctionVariantEntry) SetPacDiversity(diversity uint32) {
+	e.PackedData = (e.PackedData &^ (0xFFFF << 16)) | ((diversity & 0xFFFF) << 16)
+}
+
+type CacheFunctionVariantInfo struct {
+	Version uint32                      // == 1 for now
+	Count   uint32                      // number of elements in entries array
+	Entries []CacheFunctionVariantEntry // variable length array
+}
+
+type PrewarmingEntry struct {
+	PackedData uint64 // contains cacheVMOffset (40 bits) and numPages (24 bits)
+}
+
+func (e *PrewarmingEntry) CacheVMOffset() uint64 {
+	return e.PackedData & 0xFFFFFFFFFF // 40 bits - up to 1TB caches
+}
+
+func (e *PrewarmingEntry) NumPages() uint32 {
+	return uint32((e.PackedData >> 40) & 0xFFFFFF) // 24 bits - assumes 16k pages
+}
+
+func (e *PrewarmingEntry) SetCacheVMOffset(offset uint64) {
+	e.PackedData = (e.PackedData &^ 0xFFFFFFFFFF) | (offset & 0xFFFFFFFFFF)
+}
+
+func (e *PrewarmingEntry) SetNumPages(pages uint32) {
+	e.PackedData = (e.PackedData &^ (0xFFFFFF << 40)) | ((uint64(pages) & 0xFFFFFF) << 40)
+}
+
+type PrewarmingHeader struct {
+	Version uint32            // version
+	Count   uint32            // count
+	Entries []PrewarmingEntry // variable length array
+}
+
 // This struct is a small piece of dynamic data that can be included in the shared region, and contains configuration
 // data about the shared cache in use by the process. It is located
 type CacheDynamicDataHeader struct {

@@ -338,6 +338,34 @@ func (f *File) DumpStubIslands() error {
 	return nil
 }
 
+func (f *File) DumpPrewarmData() error {
+	if err := f.ParsePrewarmData(); err != nil {
+		return fmt.Errorf("failed to parse prewarming data: %v", err)
+	}
+	fmt.Printf("Prewarming data version: %d:\n", f.prewarmData.Version)
+	for _, entry := range f.prewarmData.Entries {
+		_, addr, err := f.GetCacheVMAddress(entry.CacheVMOffset())
+		if err != nil {
+			return fmt.Errorf("failed to get cache VM address for entry %v: %v", entry, err)
+		}
+		target := addr + uint64(entry.NumPages()*DyldCachePrewarmingDataPageSize)
+		addrName, aok := f.AddressToSymbol[addr]
+		targetName, tok := f.AddressToSymbol[target]
+		if aok || tok {
+			if addrName == "" {
+				addrName = "?"
+			}
+			if targetName == "" {
+				targetName = "?"
+			}
+			fmt.Printf("%#x -> %#x (%s -> %s)\n", addr, target, addrName, targetName)
+		} else {
+			fmt.Printf("%#x -> %#x\n", addr, target)
+		}
+	}
+	return nil
+}
+
 func (f *File) GetStubIslands() (map[uint64]string, error) {
 	stubs := make(map[uint64]string)
 	if len(f.islandStubs) == 0 {

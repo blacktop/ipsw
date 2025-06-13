@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -91,6 +92,7 @@ type File struct {
 	dyldStartFnAddr uint64
 	objcOptRoAddr   uint64
 	islandStubs     map[uint64]uint64
+	prewarmData     *PrewarmingHeader
 	size            int64
 
 	r       map[mtypes.UUID]io.ReaderAt
@@ -766,6 +768,38 @@ func (f *File) ParseStubIslands() error {
 		}
 	}
 	return nil
+}
+
+func (f *File) ParsePrewarmData() error {
+	if f.Headers[f.UUID].MappingOffset <= uint32(unsafe.Offsetof(CacheHeader{}.PrewarmingDataOffset)) {
+		return fmt.Errorf("prewarm data not supported in this DSC format")
+	}
+	// Read prewarm data
+	if f.Headers[f.UUID].PrewarmingDataOffset > 0 && f.Headers[f.UUID].PrewarmingDataSize > 0 {
+		uuid, off, err := f.GetOffset(f.Headers[f.UUID].SharedRegionStart + f.Headers[f.UUID].PrewarmingDataOffset)
+		if err != nil {
+			return fmt.Errorf("failed to get offset for prewarm data header at addr %#x: %v",
+				f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].PrewarmingDataOffset, err)
+		}
+		sr := io.NewSectionReader(f.r[uuid], int64(off), int64(f.Headers[f.UUID].PrewarmingDataSize))
+		var pw PrewarmingHeader
+		if err := binary.Read(sr, f.ByteOrder, &pw.Version); err != nil {
+			return fmt.Errorf("failed to read prewarming header version: %v", err)
+		}
+		if pw.Version != 1 {
+			return fmt.Errorf("unsupported prewarming data version: %d", pw.Version)
+		}
+		if err := binary.Read(sr, f.ByteOrder, &pw.Count); err != nil {
+			return fmt.Errorf("failed to read prewarming header count: %v", err)
+		}
+		pw.Entries = make([]PrewarmingEntry, pw.Count)
+		if err := binary.Read(sr, f.ByteOrder, &pw.Entries); err != nil {
+			return fmt.Errorf("failed to read prewarming entries: %v", err)
+		}
+		f.prewarmData = &pw
+		return nil
+	}
+	return fmt.Errorf("no prewarm data found in DSC %s", f.UUID)
 }
 
 // GetSlideInfo returns just the slideinfo header info
