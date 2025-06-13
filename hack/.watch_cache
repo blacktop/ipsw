@@ -1,1 +1,19 @@
-{"WebKit/WebKit":{"tags":["webkitgtk-2.48.3","wpewebkit-2.48.2","wpewebkit-2.48.3","webkitgtk-2.49.2","wpewebkit-2.49.2"],"commit":"816f1ebffac4b57b5a734c89c7baea99d4444fec"},"apple-oss-distributions/distribution-macOS":{"tags":["macos-155","macos-154"]}}
+{
+  "WebKit/WebKit": {
+    "tags": [
+      "webkitgtk-2.48.3",
+      "wpewebkit-2.48.2",
+      "wpewebkit-2.48.3",
+      "webkitgtk-2.49.2",
+      "wpewebkit-2.49.2"
+    ],
+    "commit": "816f1ebffac4b57b5a734c89c7baea99d4444fec"
+  },
+  "apple-oss-distributions/distribution-macOS": {
+    "tags": [
+      "macos-155",
+      "macos-154"
+    ]
+  },
+  "latest_ipsw_url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/082-45783/9A345601-C46E-4195-A367-4BCA31447055/iPhone17,1_18.5_22F76_Restore.ipsw"
+}
