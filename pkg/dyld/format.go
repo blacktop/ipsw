@@ -555,11 +555,7 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 				if err != nil {
 					output += fmt.Sprintf("\n> Cache UUID: %s\n\n", uuid)
 				} else {
-					var stubs string
-					if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-						stubs = "STUB Island "
-					}
-					output += fmt.Sprintf("\n> %sCache (%s) UUID: %s\n\n", stubs, ext, uuid)
+					output += fmt.Sprintf("\n> Cache (%s) UUID: %s\n\n", ext, uuid)
 				}
 			}
 			output += "Mappings\n--------\n\n"

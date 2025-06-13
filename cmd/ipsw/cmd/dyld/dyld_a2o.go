@@ -116,15 +116,10 @@ var AddrToOffsetCmd = &cobra.Command{
 			fmt.Printf("%#x\n", off.File.Offset)
 		} else {
 			if f.IsDyld4 {
-				var stubs string
-				if off.File.SubCache.InStubs {
-					stubs = "STUB Island "
-				}
 				log.WithFields(log.Fields{
 					"hex": fmt.Sprintf("%#x", off.File.Offset),
 					"dec": fmt.Sprintf("%d", off.File.Offset),
-					"sub_cache": fmt.Sprintf("%sdsc%s, mapping: %s, UUID: %s",
-						stubs,
+					"sub_cache": fmt.Sprintf("dsc%s, mapping: %s, UUID: %s",
 						off.File.SubCache.Extension,
 						off.File.SubCache.Mapping,
 						off.File.SubCache.UUID,
@@ -140,15 +135,10 @@ var AddrToOffsetCmd = &cobra.Command{
 		}
 
 		if off.Cache != nil {
-			var stubs string
-			if off.Cache.SubCache.InStubs {
-				stubs = "STUB Island "
-			}
 			log.WithFields(log.Fields{
 				"hex": fmt.Sprintf("%#x", off.Cache.Offset),
 				"dec": fmt.Sprintf("%d", off.Cache.Offset),
-				"sub_cache": fmt.Sprintf("%sdsc%s, mapping: %s, UUID: %s",
-					stubs,
+				"sub_cache": fmt.Sprintf("dsc%s, mapping: %s, UUID: %s",
 					off.Cache.SubCache.Extension,
 					off.Cache.SubCache.Mapping,
 					off.Cache.SubCache.UUID,
