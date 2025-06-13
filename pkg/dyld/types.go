@@ -1241,7 +1241,7 @@ const (
 type CacheFunctionVariantEntry struct {
 	FixupLocVmAddr               uint64 // location of pointer that needs to be re-bound (unslid)
 	FunctionVariantTableVmAddr   uint64 // location of FunctionVariants in LINKEDIT (unslid)
-	DylibHeaderVmAddr            uint64 // location of mach_heaer of dylib that implements this function variant
+	DylibHeaderVmAddr            uint64 // location of mach_header of dylib that implements this function variant
 	PackedData                   uint32 // contains variantIndex (12 bits), pacAuth (1 bit), pacAddress (1 bit), pacKey (2 bits), pacDiversity (16 bits)
 	TargetDylibIndex             uint16 // which dylib has the function variant
 	FunctionVariantTableSizeDiv4 uint16 // size of FunctionVariants in LINKEDIT (unslid) divided by 4
@@ -1293,6 +1293,21 @@ func (e *CacheFunctionVariantEntry) SetPacKey(key uint32) {
 
 func (e *CacheFunctionVariantEntry) SetPacDiversity(diversity uint32) {
 	e.PackedData = (e.PackedData &^ (0xFFFF << 16)) | ((diversity & 0xFFFF) << 16)
+}
+
+func (e *CacheFunctionVariantEntry) String() string {
+	var pac string
+	if e.PacAuth() {
+		pac = fmt.Sprintf(" pac={addr=%t, key=%d, diversity=%#x}", e.PacAddress(), e.PacKey(), e.PacDiversity())
+	}
+	return fmt.Sprintf("%#x: %#x - %#x (dylib-hdr=%#x dylib-idx=%d%s)",
+		e.FixupLocVmAddr,
+		e.FunctionVariantTableVmAddr,
+		e.FunctionVariantTableVmAddr+uint64(e.FunctionVariantTableSizeDiv4*4),
+		e.DylibHeaderVmAddr,
+		e.TargetDylibIndex,
+		pac,
+	)
 }
 
 type CacheFunctionVariantInfo struct {
