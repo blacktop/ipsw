@@ -638,6 +638,8 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 			}
 		}
 
+		// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
+
 		queue[1] = queue[0] // push instruction onto const length FIFO queue
 		queue[0] = instruction
 		startAddr += uint64(binary.Size(uint32(0)))

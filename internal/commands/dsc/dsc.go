@@ -109,8 +109,6 @@ type subCache struct {
 	UUID string `json:"uuid"`
 	// the DSC sub-cache file extension
 	Extension string `json:"ext"`
-	// is the offset in a DSC stub island
-	InStubs bool `json:"stubs"`
 	// the DSC sub-cache mapping name
 	Mapping string `json:"mapping"`
 }
@@ -179,9 +177,6 @@ func ConvertAddressToOffset(f *dyld.File, addr uint64) (*Offset, error) {
 
 	if f.IsDyld4 {
 		o.File.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
-		if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-			o.File.SubCache.InStubs = true
-		}
 	}
 
 	if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
@@ -204,9 +199,6 @@ func ConvertAddressToOffset(f *dyld.File, addr uint64) (*Offset, error) {
 
 		if f.IsDyld4 {
 			o.Cache.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
-			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-				o.Cache.SubCache.InStubs = true
-			}
 		}
 	}
 
@@ -238,9 +230,6 @@ func ConvertOffsetToAddress(f *dyld.File, offset uint64) (*Address, error) {
 
 		if f.IsDyld4 {
 			aa.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
-			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-				aa.SubCache.InStubs = true
-			}
 		}
 		a.Files = append(a.Files, aa)
 	}
@@ -265,9 +254,6 @@ func ConvertOffsetToAddress(f *dyld.File, offset uint64) (*Address, error) {
 
 		if f.IsDyld4 {
 			a.Cache.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
-			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-				a.Cache.SubCache.InStubs = true
-			}
 		}
 	}
 

@@ -748,19 +748,21 @@ func (f *File) ParseImageArrays() error {
 
 func (f *File) ParseStubIslands() error {
 	for _, sc := range f.SubCacheInfo {
-		if f.Headers[sc.UUID].ImagesCountOld == 0 && f.Headers[sc.UUID].ImagesCount == 0 {
-			// found a stub island
-			dat := make([]byte, f.Headers[sc.UUID].CodeSignatureOffset-0x4000)
-			if _, err := f.r[sc.UUID].ReadAt(dat, 0x4000); err != nil {
-				return fmt.Errorf("failed to read stub island data: %v", err)
+		for _, mapping := range f.MappingsWithSlideInfo[sc.UUID] {
+			if mapping.Flags.IsTextStubs() {
+				// found a stub island
+				dat := make([]byte, f.Headers[sc.UUID].CodeSignatureOffset-0x4000)
+				if _, err := f.r[sc.UUID].ReadAt(dat, 0x4000); err != nil {
+					return fmt.Errorf("ParseStubIslands: failed to read stub island data: %v", err)
+				}
+				stubs, err := disass.ParseStubsASM(dat, mapping.Address+0x4000, func(u uint64) (uint64, error) {
+					return f.ReadPointerAtAddress(u)
+				})
+				if err != nil {
+					return fmt.Errorf("ParseStubIslands: failed to parse stub island assembly: %v", err)
+				}
+				maps.Copy(f.islandStubs, stubs)
 			}
-			stubs, err := disass.ParseStubsASM(dat, f.MappingsWithSlideInfo[sc.UUID][0].Address+0x4000, func(u uint64) (uint64, error) {
-				return f.ReadPointerAtAddress(u)
-			})
-			if err != nil {
-				return fmt.Errorf("ParseStubIslands: %v", err)
-			}
-			maps.Copy(f.islandStubs, stubs)
 		}
 	}
 	return nil

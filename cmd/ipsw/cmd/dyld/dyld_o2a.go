@@ -117,15 +117,10 @@ var OffsetToAddrCmd = &cobra.Command{
 				fmt.Printf("%#x\n", addr.Address)
 			} else {
 				if f.IsDyld4 {
-					var stubs string
-					if addr.SubCache.InStubs {
-						stubs = "STUB Island "
-					}
 					log.WithFields(log.Fields{
 						"hex": fmt.Sprintf("%#x", addr.Address),
 						"dec": fmt.Sprintf("%d", addr.Address),
-						"sub_cache": fmt.Sprintf("%sdsc%-16s mapping: %s, UUID: %s",
-							stubs,
+						"sub_cache": fmt.Sprintf("dsc%-16s mapping: %s, UUID: %s",
 							addr.SubCache.Extension,
 							addr.SubCache.Mapping,
 							addr.SubCache.UUID,
@@ -142,15 +137,10 @@ var OffsetToAddrCmd = &cobra.Command{
 		}
 
 		if addr.Cache != nil {
-			var stubs string
-			if addr.Cache.SubCache.InStubs {
-				stubs = "STUB Island "
-			}
 			log.WithFields(log.Fields{
 				"hex": fmt.Sprintf("%#x", addr.Cache.Address),
 				"dec": fmt.Sprintf("%d", addr.Cache.Address),
-				"sub_cache": fmt.Sprintf("%sdsc%-16s mapping: %s, UUID: %s",
-					stubs,
+				"sub_cache": fmt.Sprintf("dsc%-16s mapping: %s, UUID: %s",
 					addr.Cache.SubCache.Extension,
 					addr.Cache.SubCache.Mapping,
 					addr.Cache.SubCache.UUID,
