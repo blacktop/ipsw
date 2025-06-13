@@ -1650,7 +1650,7 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-						Title: strings.ReplaceAll(a.Text(), "\u00a0", " "),
+						Title: strings.ReplaceAll(strings.ReplaceAll(a.Text(), "\u00a0", " "), "\n\t\t\t\t\t\t", ""),
 						Build: p.Text(),
 						URL:   href,
 						Type:  "ios",
