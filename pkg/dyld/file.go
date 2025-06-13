@@ -802,6 +802,37 @@ func (f *File) ParsePrewarmData() error {
 	return fmt.Errorf("no prewarm data found in DSC %s", f.UUID)
 }
 
+func (f *File) ParseFunctionVariantInfo() error {
+	if f.Headers[f.UUID].MappingOffset <= uint32(unsafe.Offsetof(CacheHeader{}.FunctionVariantInfoAddr)) {
+		return fmt.Errorf("function variant info not supported in this DSC format")
+	}
+	// Read function variant info
+	if f.Headers[f.UUID].FunctionVariantInfoAddr > 0 && f.Headers[f.UUID].FunctionVariantInfoSize > 0 {
+		uuid, off, err := f.GetOffset(f.Headers[f.UUID].FunctionVariantInfoAddr)
+		if err != nil {
+			return fmt.Errorf("failed to get offset for function variant info header at addr %#x: %v",
+				f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].FunctionVariantInfoAddr, err)
+		}
+		sr := io.NewSectionReader(f.r[uuid], int64(off), int64(f.Headers[f.UUID].FunctionVariantInfoSize))
+		var fv CacheFunctionVariantInfo
+		if err := binary.Read(sr, f.ByteOrder, &fv.Version); err != nil {
+			return fmt.Errorf("failed to read function variant info version: %v", err)
+		}
+		if fv.Version != 1 {
+			return fmt.Errorf("unsupported function variant info version: %d", fv.Version)
+		}
+		if err := binary.Read(sr, f.ByteOrder, &fv.Count); err != nil {
+			return fmt.Errorf("failed to read function variant info count: %v", err)
+		}
+		fv.Entries = make([]CacheFunctionVariantEntry, fv.Count)
+		if err := binary.Read(sr, f.ByteOrder, &fv.Entries); err != nil {
+			return fmt.Errorf("failed to read function variant entries: %v", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("no function variant info found in DSC %s", f.UUID)
+}
+
 // GetSlideInfo returns just the slideinfo header info
 func (f *File) GetSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo) error {
 	_, err := f.parseSlideInfo(uuid, mapping, false, false, 0, 0)
