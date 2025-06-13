@@ -15,5 +15,7 @@
       "macos-154"
     ]
   },
-  "latest_ipsw_url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/082-45783/9A345601-C46E-4195-A367-4BCA31447055/iPhone17,1_18.5_22F76_Restore.ipsw"
+  "latest_ipsw": {
+    "url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/082-45783/9A345601-C46E-4195-A367-4BCA31447055/iPhone17,1_18.5_22F76_Restore.ipsw"
+  }
 }

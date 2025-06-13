@@ -35,7 +35,7 @@ jobs:
 
       - name: Check for new IPSW
         run: |
-          LAST=$(jq -r '.latest_ipsw_url // ""' hack/.watch_cache)
+          LAST=$(jq -r '.latest_ipsw.url // ""' hack/.watch_cache)
           echo "Last cached IPSW URL: $LAST"
           echo "Current IPSW URL: $CURRENT_IPSW_URL"
           if [ "$LAST" = "$CURRENT_IPSW_URL" ]; then
@@ -53,7 +53,7 @@ jobs:
 
       - name: Commit and push updated DB
         run: |
-          jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw_url = $url' hack/.watch_cache > hack/.watch_cache.tmp
+          jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw = {"url": $url}' hack/.watch_cache > hack/.watch_cache.tmp
           mv hack/.watch_cache.tmp hack/.watch_cache
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
