@@ -375,8 +375,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 			if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
 				log.Info("parsing stub islands...")
 				if err := f.ParseStubIslands(); err != nil {
-					// return fmt.Errorf("failed to parse stub islands: %v", err)
-					log.Errorf("failed to parse stub islands: %v", err)
+					return fmt.Errorf("failed to parse stub islands: %v", err)
 				}
 				for stub, target := range f.islandStubs {
 					if symName, ok := f.AddressToSymbol[target]; ok {
