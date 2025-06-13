@@ -22,6 +22,7 @@ type CacheItem struct {
 	Tags      Tags     `json:"tags,omitempty"`
 	Commit    Commit   `json:"commit,omitempty"`
 	Functions Function `json:"functions,omitempty"`
+	URL       string   `json:"url,omitempty"`
 }
 
 type Cache map[string]CacheItem
