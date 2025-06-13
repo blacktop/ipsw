@@ -342,7 +342,7 @@ func (f *File) DumpPrewarmData() error {
 	if err := f.ParsePrewarmData(); err != nil {
 		return fmt.Errorf("failed to parse prewarming data: %v", err)
 	}
-	fmt.Printf("Prewarming data version: %d:\n", f.prewarmData.Version)
+	fmt.Printf("Prewarming data version: %d\n", f.prewarmData.Version)
 	for _, entry := range f.prewarmData.Entries {
 		_, addr, err := f.GetCacheVMAddress(entry.CacheVMOffset())
 		if err != nil {
