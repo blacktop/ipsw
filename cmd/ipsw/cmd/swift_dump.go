@@ -109,10 +109,8 @@ var swiftDumpCmd = &cobra.Command{
 				viper.GetString("swift-dump.ext") != "") ||
 			viper.GetString("swift-dump.ass") != "" {
 			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
-		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") {
-			return fmt.Errorf("cannot set --output without setting --interface")
-		} else if viper.GetBool("swift-dump.headers") && !viper.GetBool("swift-dump.interface") {
-			return fmt.Errorf("cannot set --headers without setting --interface")
+		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") && !viper.GetBool("swift-dump.headers") {
+			return fmt.Errorf("cannot set --output without setting --interface or --headers")
 		} else if viper.GetBool("swift-dump.headers") && len(viper.GetString("swift-dump.output")) == 0 {
 			return fmt.Errorf("cannot set --headers without setting --output")
 		}
@@ -132,6 +130,12 @@ var swiftDumpCmd = &cobra.Command{
 		}
 
 		doDemangle := viper.GetBool("swift-dump.demangle")
+		
+		// Auto-enable demangle and interface when headers is specified
+		if viper.GetBool("swift-dump.headers") {
+			doDemangle = true
+			viper.Set("swift-dump.interface", true)
+		}
 
 		conf := mcmd.SwiftConfig{
 			Verbose: Verbose,
@@ -228,6 +232,10 @@ var swiftDumpCmd = &cobra.Command{
 				}
 			}
 
+			if viper.GetBool("swift-dump.headers") {
+				return s.WriteHeaders()
+			}
+
 			if doDump {
 				return s.Dump()
 			}
@@ -313,6 +321,12 @@ var swiftDumpCmd = &cobra.Command{
 
 				if viper.GetString("swift-dump.ass") != "" {
 					if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetBool("swift-dump.headers") {
+					if err := s.WriteHeaders(); err != nil {
 						return err
 					}
 				}

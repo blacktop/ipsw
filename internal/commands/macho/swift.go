@@ -627,14 +627,14 @@ func (s *Swift) Dump() error {
 // Interface outputs Swift swift-dump interface from a MachO
 func (s *Swift) Interface() error {
 	if s.conf.Headers {
-		return s.writeHeaders()
+		return s.WriteHeaders()
 	}
 	
 	// TODO: Implement single file interface generation
 	return fmt.Errorf("single file interface generation not implemented yet")
 }
 
-func (s *Swift) writeHeaders() error {
+func (s *Swift) WriteHeaders() error {
 	writeSwiftHeaders := func(m *macho.File) error {
 		var headers []string
 
