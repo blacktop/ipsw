@@ -51,6 +51,7 @@ func init() {
 	swiftDumpCmd.Flags().BoolP("interface", "i", false, "🚧 Dump Swift Interface")
 	swiftDumpCmd.Flags().StringP("output", "o", "", "🚧 Folder to write interface to")
 	swiftDumpCmd.MarkFlagDirname("output")
+	swiftDumpCmd.Flags().Bool("headers", false, "Create separate header files for each Swift type/protocol/extension")
 	swiftDumpCmd.Flags().String("theme", "nord", "Color theme (nord, github, etc)")
 	swiftDumpCmd.RegisterFlagCompletionFunc("theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
@@ -68,6 +69,7 @@ func init() {
 	viper.BindPFlag("swift-dump.extra", swiftDumpCmd.Flags().Lookup("extra"))
 	viper.BindPFlag("swift-dump.interface", swiftDumpCmd.Flags().Lookup("interface"))
 	viper.BindPFlag("swift-dump.output", swiftDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("swift-dump.headers", swiftDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("swift-dump.theme", swiftDumpCmd.Flags().Lookup("theme"))
 	viper.BindPFlag("swift-dump.type", swiftDumpCmd.Flags().Lookup("type"))
 	viper.BindPFlag("swift-dump.proto", swiftDumpCmd.Flags().Lookup("proto"))
@@ -107,8 +109,10 @@ var swiftDumpCmd = &cobra.Command{
 				viper.GetString("swift-dump.ext") != "") ||
 			viper.GetString("swift-dump.ass") != "" {
 			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
-		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") {
-			return fmt.Errorf("cannot set --output without setting --interface")
+		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") && !viper.GetBool("swift-dump.headers") {
+			return fmt.Errorf("cannot set --output without setting --interface or --headers")
+		} else if viper.GetBool("swift-dump.headers") && len(viper.GetString("swift-dump.output")) == 0 {
+			return fmt.Errorf("cannot set --headers without setting --output")
 		}
 		doDump := false
 		if !viper.IsSet("swift-dump.interface") &&
@@ -126,6 +130,12 @@ var swiftDumpCmd = &cobra.Command{
 		}
 
 		doDemangle := viper.GetBool("swift-dump.demangle")
+		
+		// Auto-enable demangle and interface when headers is specified
+		if viper.GetBool("swift-dump.headers") {
+			doDemangle = true
+			viper.Set("swift-dump.interface", true)
+		}
 
 		conf := mcmd.SwiftConfig{
 			Verbose: Verbose,
@@ -138,6 +148,7 @@ var swiftDumpCmd = &cobra.Command{
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("swift-dump.theme"),
 			Output:      viper.GetString("swift-dump.output"),
+			Headers:     viper.GetBool("swift-dump.headers"),
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
@@ -219,6 +230,10 @@ var swiftDumpCmd = &cobra.Command{
 				if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
 					return fmt.Errorf("failed to dump associated type: %v", err)
 				}
+			}
+
+			if viper.GetBool("swift-dump.headers") {
+				return s.WriteHeaders()
 			}
 
 			if doDump {
@@ -306,6 +321,12 @@ var swiftDumpCmd = &cobra.Command{
 
 				if viper.GetString("swift-dump.ass") != "" {
 					if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
+						return err
+					}
+				}
+
+				if viper.GetBool("swift-dump.headers") {
+					if err := s.WriteHeaders(); err != nil {
 						return err
 					}
 				}
