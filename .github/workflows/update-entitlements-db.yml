@@ -34,24 +34,31 @@ jobs:
           echo "CURRENT_IPSW_URL=$(./ipsw dl ipsw --device iPhone17,1 --latest --urls)" >> $GITHUB_ENV
 
       - name: Check for new IPSW
+        id: check-ipsw
         run: |
           LAST=$(jq -r '.latest_ipsw.url // ""' hack/.watch_cache)
           echo "Last cached IPSW URL: $LAST"
           echo "Current IPSW URL: $CURRENT_IPSW_URL"
           if [ "$LAST" = "$CURRENT_IPSW_URL" ]; then
             echo "No new IPSW found; skipping"
-            exit 0
+            echo "should_update=false" >> $GITHUB_OUTPUT
+          else
+            echo "New IPSW found; proceeding with update"
+            echo "should_update=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Download IPSW
+        if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
           curl -L "$CURRENT_IPSW_URL" -o latest.ipsw
 
       - name: Generate entitlements database
+        if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
           ./ipsw ent --db www/static/db/ipsw.db --ipsw latest.ipsw
 
       - name: Commit and push updated DB
+        if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
           jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw = {"url": $url}' hack/.watch_cache > hack/.watch_cache.tmp
           mv hack/.watch_cache.tmp hack/.watch_cache
