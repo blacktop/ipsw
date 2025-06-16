@@ -19,9 +19,11 @@ ipsw download ipa [flags]
 ```
   -h, --help                    help for ipa
   -o, --output string           Folder to download files to
+      --password string         Password for authentication
       --search                  Search for app to download
       --sms                     Prefer SMS Two-factor authentication
   -s, --store-front string      The country code for the App Store to download from (default "US")
+      --username string         Username for authentication
   -k, --vault-password string   Password to unlock credential vault (only for file vaults)
 ```
 

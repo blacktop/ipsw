@@ -46,6 +46,7 @@ ipsw download ota [options] [flags]
       --rsr                     Download Rapid Security Response OTAs
       --show-latest-build       Show latest iOS build
       --show-latest-version     Show latest iOS version
+      --sim                     Download Simulator OTAs
   -u, --urls                    Dump URLs only
 ```
 
