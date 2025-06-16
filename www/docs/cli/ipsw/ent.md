@@ -4,11 +4,11 @@ title: ent
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: ent
-description: Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
+description: Manage and search entitlements in SQLite database
 ---
 ## ipsw ent
 
-Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
+Manage and search entitlements in SQLite database
 
 ```
 ipsw ent [flags]
@@ -17,41 +17,45 @@ ipsw ent [flags]
 ### Examples
 
 ```bash
-# Search IPSW for entitlement key
-❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
+# Create SQLite database from IPSW
+❯ ipsw ent --db entitlements.db --ipsw iPhone16,1_18.2_22C150_Restore.ipsw
 
-# Search local folder for entitlement key
-❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
+# Create database from multiple IPSWs  
+❯ ipsw ent --db entitlements.db --ipsw *.ipsw
 
-# Search IPSW for entitlement value (i.e. one of the <array> strings)
-❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
+# Search for entitlement key
+❯ ipsw ent --db entitlements.db --key platform-application
 
-# Dump entitlements for MachO in IPSW
-❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
+# Search for entitlement value
+❯ ipsw ent --db entitlements.db --value LockdownMode
 
-# Diff two IPSWs
-❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
+# Search for specific file
+❯ ipsw ent --db entitlements.db --file WebContent
 
-# Launch Web UI (http://localhost:3993)
-❯ ipsw ent --ui --ipsw <IPSW>
+# Filter by iOS version and search
+❯ ipsw ent --db entitlements.db --version 18.2 --key sandbox
+
+# Show database statistics
+❯ ipsw ent --db entitlements.db --stats
+
+# GitHub Action usage (for automation)
+❯ ipsw ent --db www/static/db/ipsw.db --ipsw latest.ipsw
 ```
 
 ### Options
 
 ```
-      --db string           Folder to r/w entitlement databases
-  -d, --diff                Diff entitlements
-  -f, --file string         Dump entitlements for MachO as plist
-      --file-only           Only output the file path of matches
+      --db string           Path to SQLite database
+  -f, --file string         Search for file path pattern
+      --file-only           Only output file paths
   -h, --help                help for ent
       --input stringArray   Folders of MachOs to analyze
-      --ipsw stringArray    IPSWs to analyze
-  -k, --key string          Entitlement KEY regex to search for
-  -m, --md                  Markdown style output
-      --ui                  Show entitlements Web UI
-      --ui-host string      UI host to server on (default "localhost")
-      --ui-port int         UI port to server on (default 3993)
-  -v, --val string          Entitlement VALUE regex to search for (i.e. <array> strings)
+      --ipsw stringArray    IPSWs to process
+  -k, --key string          Search for entitlement key pattern
+      --limit int           Limit number of results (default 100)
+      --stats               Show database statistics
+  -v, --value string        Search for entitlement value pattern
+      --version string      Filter by iOS version
 ```
 
 ### Options inherited from parent commands

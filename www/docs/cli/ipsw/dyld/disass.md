@@ -33,32 +33,36 @@ ipsw dyld disass <DSC> [flags]
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
 # Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
+# Decompile a function using OpenRouter to access various models
+❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"
 ```
 
 ### Options
 
 ```
-      --cache string          Path to .a2s addr to sym cache file (speeds up analysis)
-  -c, --count uint            Number of instructions to disassemble
-  -D, --dec                   Decompile assembly
-      --dec-lang string       Language to decompile to (C, ObjC or Swift)
-      --dec-llm string        LLM provider to use for decompilation (ollama, copilot, etc.) (default "copilot")
-      --dec-model string      LLM model to use for decompilation
-      --dec-nocache           Do not use decompilation cache
-      --dec-temp float        LLM temperature for decompilation (default 0.2)
-      --dec-theme string      Decompilation color theme (nord, github, etc) (default "nord")
-      --dec-top-p float       LLM top_p for decompilation (default 0.1)
-  -d, --demangle              Demangle symbol names
-      --dylibs                Analyze all dylibs loaded by the image as well (could improve accuracy)
-      --force                 Continue to disassemble even if there are analysis errors
-  -h, --help                  help for disass
-  -i, --image strings         Dylib(s) to disassemble
-      --input string          Input function JSON file
-  -j, --json                  Output as JSON
-  -q, --quiet                 Do NOT markup analysis (Faster)
-  -s, --symbol string         Function to disassemble
-      --symbol-image string   Dylib to search for symbol (speeds up symbol lookup)
-  -a, --vaddr uint            Virtual address to start disassembling
+      --cache string                 Path to .a2s addr to sym cache file (speeds up analysis)
+  -c, --count uint                   Number of instructions to disassemble
+  -D, --dec                          Decompile assembly
+      --dec-lang string              Language to decompile to (C, ObjC or Swift)
+      --dec-llm string               LLM provider to use for decompilation (ollama, copilot, etc.) (default "copilot")
+      --dec-model string             LLM model to use for decompilation
+      --dec-nocache                  Do not use decompilation cache
+      --dec-retries int              Number of retries for LLM decompilation
+      --dec-retry-backoff duration   Backoff time between retries (e.g. '30s', '2m') (default 30s)
+      --dec-temp float               LLM temperature for decompilation (default 0.2)
+      --dec-theme string             Decompilation color theme (nord, github, etc) (default "nord")
+      --dec-top-p float              LLM top_p for decompilation (default 0.1)
+  -d, --demangle                     Demangle symbol names
+      --dylibs                       Analyze all dylibs loaded by the image as well (could improve accuracy)
+      --force                        Continue to disassemble even if there are analysis errors
+  -h, --help                         help for disass
+  -i, --image strings                Dylib(s) to disassemble
+      --input string                 Input function JSON file
+  -j, --json                         Output as JSON
+  -q, --quiet                        Do NOT markup analysis (Faster)
+  -s, --symbol string                Function to disassemble
+      --symbol-image string          Dylib to search for symbol (speeds up symbol lookup)
+  -a, --vaddr uint                   Virtual address to start disassembling
 ```
 
 ### Options inherited from parent commands
