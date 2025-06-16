@@ -1,10 +1,10 @@
-//go:build darwin && cgo && !ios
+//go:build darwin && cgo && ios
 
 package apsd
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: ${SRCDIR}/ApplePushService.tbd
+#cgo LDFLAGS: ${SRCDIR}/ApplePushService-iOS.tbd
 #include <stdint.h>
 #include "applepushservice.h"
 const char* state(uint64_t style) {
