@@ -48,6 +48,8 @@ builds:
       - ios
     goarch:
       - arm64
+    goarm64:
+      - v9.0
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
