@@ -16,6 +16,7 @@ export default function Entitlements() {
     const [selectedExecutablePath, setSelectedExecutablePath] = useState<string>('');
     const [availableExecutablePaths, setAvailableExecutablePaths] = useState<string[]>([]);
     const [hasSearched, setHasSearched] = useState<boolean>(false);
+    const [accordionExpanded, setAccordionExpanded] = useState<boolean>(true);
 
     useEffect(() => {
         const initSupabase = async () => {
@@ -97,6 +98,11 @@ export default function Entitlements() {
             setResults(searchResults);
             setHasSearched(true);
 
+            // Auto-collapse accordion after successful search with results
+            if (searchResults.length > 0 && accordionExpanded) {
+                setTimeout(() => setAccordionExpanded(false), 300);
+            }
+
             // Extract unique executable paths for the filter dropdown
             if (!effectivePathFilter && searchResults.length > 0) {
                 const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
@@ -109,7 +115,7 @@ export default function Entitlements() {
         } finally {
             setLoading(false);
         }
-    }, [isInputFocused, selectedExecutablePath]);
+    }, [isInputFocused, selectedExecutablePath, accordionExpanded]);
 
     // Original debouncedSearch function for backward compatibility
     const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
@@ -310,269 +316,296 @@ export default function Entitlements() {
 
                 {!dbLoading && !error && (
                     <div className="search-wrapper">
-                        <div className="search-panel">
-                            {/* Top Row: Version Filter and Search Type */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        iOS Version Filter
-                                    </label>
-                                    <select
-                                        value={selectedVersion}
-                                        onChange={(e) => handleVersionChange(e.target.value)}
-                                        className="form-select"
-                                    >
-                                        <option value="">All versions</option>
-                                        {iosVersions.map(version => (
-                                            <option key={version} value={version}>{version}</option>
-                                        ))}
-                                    </select>
+                        <div className="search-accordion">
+                            {/* Accordion Header */}
+                            <button
+                                className="accordion-header"
+                                onClick={() => setAccordionExpanded(!accordionExpanded)}
+                                type="button"
+                                aria-expanded={accordionExpanded}
+                            >
+                                <div className="accordion-title">
+                                    <span className="accordion-icon"></span>
+                                    <span>Search & Filters</span>
+                                    {hasSearched && !accordionExpanded && (
+                                        <span className="active-search-indicator">
+                                            {searchQuery && `"${searchQuery}"`}
+                                            {selectedExecutablePath && ` • ${selectedExecutablePath.split('/').pop()}`}
+                                        </span>
+                                    )}
                                 </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        Search Type
-                                    </label>
-                                    <div className="radio-group">
-                                        <label className="radio-option">
-                                            <input
-                                                type="radio"
-                                                value="key"
-                                                checked={searchType === 'key'}
-                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                className="radio-input"
-                                            />
-                                            <span className="radio-label">Entitlement Key</span>
-                                        </label>
-                                        <label className="radio-option">
-                                            <input
-                                                type="radio"
-                                                value="file"
-                                                checked={searchType === 'file'}
-                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                className="radio-input"
-                                            />
-                                            <span className="radio-label">Executable Path</span>
-                                        </label>
-                                    </div>
+                                <div className={`accordion-chevron ${accordionExpanded ? 'accordion-chevron--expanded' : ''}`}>
+                                    ▼
                                 </div>
-                            </div>
+                            </button>
 
-                            {/* Executable Path Filter - full width row */}
-                            {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
-                                <div className="form-group form-group--full-width">
-                                    <label className="form-label">
-                                        Executable Filter
-                                    </label>
-                                    <select
-                                        value={selectedExecutablePath}
-                                        onChange={(e) => handleExecutablePathChange(e.target.value)}
-                                        className="form-select form-select--executable"
-                                    >
-                                        <option value="">
-                                            {availableExecutablePaths.length > 0
-                                                ? `All executables (${availableExecutablePaths.length})`
-                                                : 'All executables'
-                                            }
-                                        </option>
-                                        {(() => {
-                                            // If we have a selected path but no available paths, show just the selected one
-                                            if (selectedExecutablePath && availableExecutablePaths.length === 0) {
-                                                const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
-                                                return (
-                                                    <option key={selectedExecutablePath} value={selectedExecutablePath}>
-                                                        {basename}
-                                                    </option>
-                                                );
-                                            }
-
-                                            // Always show full paths to avoid ambiguity
-                                            return availableExecutablePaths.map(path => {
-                                                const basename = path.split('/').pop() || path;
-                                                // Show basename first, then full path for clarity
-                                                const displayName = path.length > 50 ?
-                                                    `${basename} - ${path.substring(0, 47)}...` :
-                                                    `${basename} - ${path}`;
-
-                                                return (
-                                                    <option key={path} value={path}>
-                                                        {displayName}
-                                                    </option>
-                                                );
-                                            });
-                                        })()}
-                                    </select>
-                                </div>
-                            )}
-
-                            {/* Search Input */}
-                            <div className="form-group">
-                                <label className="form-label">
-                                    Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
-                                </label>
-                                <div className="search-input-group">
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => handleSearchInput(e.target.value)}
-                                        onFocus={handleInputFocus}
-                                        onBlur={handleInputBlur}
-                                        placeholder={searchType === 'key'
-                                            ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
-                                            : 'Enter executable name (e.g., WebContent, Safari)'
-                                        }
-                                        className="search-input"
-                                        disabled={loading}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !loading && searchQuery.trim()) {
-                                                handleSearch();
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={handleSearch}
-                                        className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
-                                        disabled={loading || !searchQuery.trim()}
-                                    >
-                                        {loading ? 'Searching...' : 'Search'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* No Results Warning */}
-                            {!loading && hasSearched && searchQuery.trim() && results.length === 0 && (
-                                <div className="no-results-warning">
-                                    <span className="warning-icon">⚠️</span>
-                                    <div className="warning-content">
-                                        <div className="warning-text">
-                                            No entitlements found for <strong>"{searchQuery}"</strong>
-                                            {selectedVersion && <span> in iOS {selectedVersion}</span>}
-                                            {selectedExecutablePath && <span> in {selectedExecutablePath}</span>}
-                                        </div>
-                                        <div className="warning-hint">Try adjusting your search terms or filters</div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Results */}
-                            <div className="results-section">
-                                {results.length > 0 ? (
-                                    <div>
-                                        <div className="results-header-row">
-                                            <h3 className="results-header">
-                                                Found {results.length} result{results.length === 1 ? '' : 's'}
-                                            </h3>
+                            {/* Accordion Content */}
+                            {accordionExpanded && (
+                                <div className="accordion-content">
+                                    {/* Top Row: Version Filter and Search Type */}
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label className="form-label">
+                                                iOS Version Filter
+                                            </label>
+                                            <select
+                                                value={selectedVersion}
+                                                onChange={(e) => handleVersionChange(e.target.value)}
+                                                className="form-select"
+                                            >
+                                                <option value="">All versions</option>
+                                                {iosVersions.map(version => (
+                                                    <option key={version} value={version}>{version}</option>
+                                                ))}
+                                            </select>
                                         </div>
 
-                                        {/* Show global metadata if version is selected or executable is filtered (but not when searching by executable path) */}
-                                        {(selectedVersion || (selectedExecutablePath && searchType === 'key')) && results.length > 0 && (
-                                            <div className="global-metadata">
-                                                iOS {results[0].ios_version} ({results[0].build_id}) • {results[0].device_list}
-                                                {selectedExecutablePath && searchType === 'key' && (
-                                                    <> • {selectedExecutablePath.split('/').pop()}</>
-                                                )}
+                                        <div className="form-group">
+                                            <label className="form-label">
+                                                Search Type
+                                            </label>
+                                            <div className="radio-group">
+                                                <label className="radio-option">
+                                                    <input
+                                                        type="radio"
+                                                        value="key"
+                                                        checked={searchType === 'key'}
+                                                        onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                        className="radio-input"
+                                                    />
+                                                    <span className="radio-label">Entitlement Key</span>
+                                                </label>
+                                                <label className="radio-option">
+                                                    <input
+                                                        type="radio"
+                                                        value="file"
+                                                        checked={searchType === 'file'}
+                                                        onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                        className="radio-input"
+                                                    />
+                                                    <span className="radio-label">Executable Path</span>
+                                                </label>
                                             </div>
-                                        )}
+                                        </div>
+                                    </div>
 
-                                        <div className="results-container">
-                                            {results.map((result, idx) => {
-                                                const valueData = formatValue(result);
-                                                const showMetadata = !selectedVersion; // Only show metadata in each item if no version selected
-                                                // Hide file path if filtered to specific executable OR if searching by file and all results have the same path
-                                                const allSamePath = searchType === 'file' && results.every(r => r.file_path === results[0].file_path);
-                                                const showFilePath = !selectedExecutablePath && !allSamePath;
+                                    {/* Executable Path Filter - full width row */}
+                                    {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
+                                        <div className="form-group form-group--full-width">
+                                            <label className="form-label">
+                                                Executable Filter
+                                            </label>
+                                            <select
+                                                value={selectedExecutablePath}
+                                                onChange={(e) => handleExecutablePathChange(e.target.value)}
+                                                className="form-select form-select--executable"
+                                            >
+                                                <option value="">
+                                                    {availableExecutablePaths.length > 0
+                                                        ? `All executables (${availableExecutablePaths.length})`
+                                                        : 'All executables'
+                                                    }
+                                                </option>
+                                                {(() => {
+                                                    // If we have a selected path but no available paths, show just the selected one
+                                                    if (selectedExecutablePath && availableExecutablePaths.length === 0) {
+                                                        const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
+                                                        return (
+                                                            <option key={selectedExecutablePath} value={selectedExecutablePath}>
+                                                                {basename}
+                                                            </option>
+                                                        );
+                                                    }
 
-                                                return (
-                                                    <div key={idx} className="result-item">
-                                                        <div className="result-main">
-                                                            <span className="result-key">{result.key}</span>
-                                                            {showFilePath && (
-                                                                <>
-                                                                    <span className="result-in"> in </span>
-                                                                    <span className="result-path">{result.file_path}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
+                                                    // Always show full paths to avoid ambiguity
+                                                    return availableExecutablePaths.map(path => {
+                                                        const basename = path.split('/').pop() || path;
+                                                        // Show basename first, then full path for clarity
+                                                        const displayName = path.length > 50 ?
+                                                            `${basename} - ${path.substring(0, 47)}...` :
+                                                            `${basename} - ${path}`;
 
-                                                        {showMetadata && (
-                                                            <div className="result-meta">
-                                                                iOS {result.ios_version} ({result.build_id}) • {result.device_list}
-                                                            </div>
-                                                        )}
+                                                        return (
+                                                            <option key={path} value={path}>
+                                                                {displayName}
+                                                            </option>
+                                                        );
+                                                    });
+                                                })()}
+                                            </select>
+                                        </div>
+                                    )}
 
-                                                        {valueData && valueData.display && (
-                                                            <div className="result-value">
-                                                                {valueData.type === 'bool' ? (
-                                                                    <span className={`bool-value ${valueData.value ? 'bool-true' : 'bool-false'}`}>
-                                                                        {valueData.display}
-                                                                    </span>
-                                                                ) : valueData.type === 'array' && Array.isArray(valueData.value) ? (
-                                                                    // Check if array contains objects
-                                                                    valueData.value.length > 0 && typeof valueData.value[0] === 'object' && valueData.value[0] !== null ? (
-                                                                        <div className="array-dict-value">
-                                                                            {valueData.value.map((item, itemIdx) => (
-                                                                                <div key={itemIdx} className="dict-item">
-                                                                                    {typeof item === 'object' && item !== null ? (
-                                                                                        Object.entries(item).map(([key, val], entryIdx) => (
-                                                                                            <div key={entryIdx} className="dict-entry">
-                                                                                                <span className="dict-key">{key}</span>
-                                                                                                <span className="dict-sep">→</span>
-                                                                                                <span className="dict-val">{String(val)}</span>
-                                                                                            </div>
-                                                                                        ))
-                                                                                    ) : (
-                                                                                        <span>{String(item)}</span>
-                                                                                    )}
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <ul className="array-value">
-                                                                            {valueData.value.map((item, itemIdx) => (
-                                                                                <li key={itemIdx}>{String(item)}</li>
-                                                                            ))}
-                                                                        </ul>
-                                                                    )
-                                                                ) : valueData.type === 'dict' && typeof valueData.value === 'object' ? (
-                                                                    <div className="dict-value">
-                                                                        {Array.isArray(valueData.value) ? (
-                                                                            valueData.value.map((item, itemIdx) => (
-                                                                                <div key={itemIdx} className="dict-item">
-                                                                                    {typeof item === 'object' ? (
-                                                                                        Object.entries(item).map(([key, val], entryIdx) => (
-                                                                                            <div key={entryIdx} className="dict-entry">
-                                                                                                <span className="dict-key">{key}</span>
-                                                                                                <span className="dict-sep">→</span>
-                                                                                                <span className="dict-val">{String(val)}</span>
-                                                                                            </div>
-                                                                                        ))
-                                                                                    ) : (
-                                                                                        <span className="dict-simple">{String(item)}</span>
-                                                                                    )}
-                                                                                </div>
-                                                                            ))
-                                                                        ) : (
-                                                                            Object.entries(valueData.value).map(([key, val], entryIdx) => (
-                                                                                <div key={entryIdx} className="dict-entry">
-                                                                                    <span className="dict-key">{key}</span>
-                                                                                    <span className="dict-sep">→</span>
-                                                                                    <span className="dict-val">{String(val)}</span>
-                                                                                </div>
-                                                                            ))
-                                                                        )}
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="regular-value">{valueData.display}</span>
-                                                                )}
-                                                            </div>
+                                    {/* Search Input */}
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                        </label>
+                                        <div className="search-input-group">
+                                            <input
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={(e) => handleSearchInput(e.target.value)}
+                                                onFocus={handleInputFocus}
+                                                onBlur={handleInputBlur}
+                                                placeholder={searchType === 'key'
+                                                    ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
+                                                    : 'Enter executable name (e.g., WebContent, Safari)'
+                                                }
+                                                className="search-input"
+                                                disabled={loading}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                        handleSearch();
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={handleSearch}
+                                                className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
+                                                disabled={loading || !searchQuery.trim()}
+                                            >
+                                                {loading ? 'Searching...' : 'Search'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* No Results Warning */}
+                                    {!loading && hasSearched && searchQuery.trim() && results.length === 0 && (
+                                        <div className="no-results-warning">
+                                            <span className="warning-icon">⚠️</span>
+                                            <div className="warning-content">
+                                                <div className="warning-text">
+                                                    No entitlements found for <strong>"{searchQuery}"</strong>
+                                                    {selectedVersion && <span> in iOS {selectedVersion}</span>}
+                                                    {selectedExecutablePath && <span> in {selectedExecutablePath}</span>}
+                                                </div>
+                                                <div className="warning-hint">Try adjusting your search terms or filters</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Results */}
+                        <div className="results-section">
+                            {results.length > 0 ? (
+                                <div>
+                                    <div className="results-header-row">
+                                        <h3 className="results-header">
+                                            Found {results.length} result{results.length === 1 ? '' : 's'}
+                                        </h3>
+                                    </div>
+
+                                    {/* Show global metadata if version is selected or executable is filtered (but not when searching by executable path) */}
+                                    {(selectedVersion || (selectedExecutablePath && searchType === 'key')) && results.length > 0 && (
+                                        <div className="global-metadata">
+                                            iOS {results[0].ios_version} ({results[0].build_id}){results[0].device_list && ` • ${results[0].device_list}`}
+                                            {selectedExecutablePath && searchType === 'key' && (
+                                                <> • {selectedExecutablePath.split('/').pop()}</>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className={`results-container ${!accordionExpanded ? 'results-container--expanded' : ''}`}>
+                                        {results.map((result, idx) => {
+                                            const valueData = formatValue(result);
+                                            const showMetadata = !selectedVersion; // Only show metadata in each item if no version selected
+                                            // Hide file path if filtered to specific executable OR if searching by file and all results have the same path
+                                            const allSamePath = searchType === 'file' && results.every(r => r.file_path === results[0].file_path);
+                                            const showFilePath = !selectedExecutablePath && !allSamePath;
+
+                                            return (
+                                                <div key={idx} className="result-item">
+                                                    <div className="result-main">
+                                                        <span className="result-key">{result.key}</span>
+                                                        {showFilePath && (
+                                                            <>
+                                                                <span className="result-in"> in </span>
+                                                                <span className="result-path">{result.file_path}</span>
+                                                            </>
                                                         )}
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
+
+                                                    {showMetadata && (
+                                                        <div className="result-meta">
+                                                            iOS {result.ios_version} ({result.build_id}){result.device_list && ` • ${result.device_list}`}
+                                                        </div>
+                                                    )}
+
+                                                    {valueData && valueData.display && (
+                                                        <div className="result-value">
+                                                            {valueData.type === 'bool' ? (
+                                                                <span className={`bool-value ${valueData.value ? 'bool-true' : 'bool-false'}`}>
+                                                                    {valueData.display}
+                                                                </span>
+                                                            ) : valueData.type === 'array' && Array.isArray(valueData.value) ? (
+                                                                // Check if array contains objects
+                                                                valueData.value.length > 0 && typeof valueData.value[0] === 'object' && valueData.value[0] !== null ? (
+                                                                    <div className="array-dict-value">
+                                                                        {valueData.value.map((item, itemIdx) => (
+                                                                            <div key={itemIdx} className="dict-item">
+                                                                                {typeof item === 'object' && item !== null ? (
+                                                                                    Object.entries(item).map(([key, val], entryIdx) => (
+                                                                                        <div key={entryIdx} className="dict-entry">
+                                                                                            <span className="dict-key">{key}</span>
+                                                                                            <span className="dict-sep">→</span>
+                                                                                            <span className="dict-val">{String(val)}</span>
+                                                                                        </div>
+                                                                                    ))
+                                                                                ) : (
+                                                                                    <span>{String(item)}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <ul className="array-value">
+                                                                        {valueData.value.map((item, itemIdx) => (
+                                                                            <li key={itemIdx}>{String(item)}</li>
+                                                                        ))}
+                                                                    </ul>
+                                                                )
+                                                            ) : valueData.type === 'dict' && typeof valueData.value === 'object' ? (
+                                                                <div className="dict-value">
+                                                                    {Array.isArray(valueData.value) ? (
+                                                                        valueData.value.map((item, itemIdx) => (
+                                                                            <div key={itemIdx} className="dict-item">
+                                                                                {typeof item === 'object' ? (
+                                                                                    Object.entries(item).map(([key, val], entryIdx) => (
+                                                                                        <div key={entryIdx} className="dict-entry">
+                                                                                            <span className="dict-key">{key}</span>
+                                                                                            <span className="dict-sep">→</span>
+                                                                                            <span className="dict-val">{String(val)}</span>
+                                                                                        </div>
+                                                                                    ))
+                                                                                ) : (
+                                                                                    <span className="dict-simple">{String(item)}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        Object.entries(valueData.value).map(([key, val], entryIdx) => (
+                                                                            <div key={entryIdx} className="dict-entry">
+                                                                                <span className="dict-key">{key}</span>
+                                                                                <span className="dict-sep">→</span>
+                                                                                <span className="dict-val">{String(val)}</span>
+                                                                            </div>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="regular-value">{valueData.display}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                ) : null}
-                            </div>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 )}
@@ -695,16 +728,89 @@ export default function Entitlements() {
                     flex: 1;
                 }
 
-                .search-panel {
+                .search-accordion {
                     background: rgba(31, 41, 55, 0.8);
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(75, 85, 99, 0.3);
                     border-radius: 16px;
-                    padding: 2rem;
                     width: 100%;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                    overflow: hidden;
+                    margin-bottom: 1rem;
+                }
+
+                .accordion-header {
+                    width: 100%;
+                    padding: 1.5rem 2rem;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
                     display: flex;
-                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: center;
+                    transition: all 0.2s ease;
+                    color: var(--ifm-color-content);
+                }
+
+                .accordion-header:hover {
+                    background: rgba(75, 85, 99, 0.1);
+                }
+
+                .accordion-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    flex: 1;
+                }
+
+                .accordion-icon {
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid currentColor;
+                    border-radius: 50%;
+                    opacity: 0.6;
+                    position: relative;
+                    flex-shrink: 0;
+                }
+
+                .accordion-icon::after {
+                    content: '';
+                    position: absolute;
+                    width: 6px;
+                    height: 2px;
+                    background: currentColor;
+                    border-radius: 1px;
+                    top: 12px;
+                    left: 12px;
+                    transform: rotate(45deg);
+                    transform-origin: 0 50%;
+                }
+
+                .active-search-indicator {
+                    font-size: 0.85rem;
+                    color: var(--ifm-color-content-secondary);
+                    font-weight: 400;
+                    margin-left: 1rem;
+                    opacity: 0.8;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                }
+
+                .accordion-chevron {
+                    font-size: 0.8rem;
+                    color: var(--ifm-color-content-secondary);
+                    transition: transform 0.2s ease;
+                    transform: rotate(0deg);
+                }
+
+                .accordion-chevron--expanded {
+                    transform: rotate(180deg);
+                }
+
+                .accordion-content {
+                    padding: 0 2rem 2rem 2rem;
+                    animation: slideDown 0.2s ease-out;
                 }
 
                 .form-row {
@@ -866,8 +972,47 @@ export default function Entitlements() {
                     cursor: not-allowed;
                 }
 
+
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                @media (max-width: 768px) {
+                    .accordion-header {
+                        padding: 1.25rem 1.5rem;
+                    }
+                    
+                    .accordion-content {
+                        padding: 0 1.5rem 1.5rem 1.5rem;
+                    }
+                    
+                    .accordion-title {
+                        font-size: 1rem;
+                    }
+                    
+                    .active-search-indicator {
+                        font-size: 0.75rem;
+                        margin-left: 0.5rem;
+                    }
+                    
+                    .results-container {
+                        max-height: calc(100vh - 400px);
+                    }
+                    
+                    .results-container--expanded {
+                        max-height: calc(100vh - 220px);
+                    }
+                }
+
                 .results-section {
-                    margin-top: 2rem;
+                    margin-top: 0;
                     flex: 1;
                     display: flex;
                     flex-direction: column;
@@ -927,6 +1072,10 @@ export default function Entitlements() {
                     overflow-y: auto;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                     max-height: calc(100vh - 500px);
+                }
+
+                .results-container--expanded {
+                    max-height: calc(100vh - 350px);
                 }
 
                 .result-item {
@@ -1207,7 +1356,7 @@ export default function Entitlements() {
                 footer[class*="footer"] {
                     display: none !important;
                 }
-            `}</style>
+                    `}</style>
         </Layout>
     );
 }

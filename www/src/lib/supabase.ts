@@ -51,18 +51,40 @@ export class EntitlementsService {
       throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
     }
 
-    const { data, error } = await supabase
-      .from('entitlement_keys')
-      .select('ios_version')
-      .order('ios_version', { ascending: false });
+    // Use the ipsws table which only has 2 records - much more efficient!
+    try {
+      const { data, error } = await supabase
+        .from('ipsws')
+        .select('version')
+        .order('version', { ascending: false }); // Sort versions descending
 
-    if (error) {
+      if (error) {
+        throw new Error(`Failed to fetch iOS versions: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        console.warn('No iOS version data found in ipsws table');
+        return [];
+      }
+
+      // Extract unique versions and filter out any null/undefined values
+      const versions = data.map(row => row.version).filter(Boolean) as string[];
+
+      // Sort versions numerically (e.g., 26.0, 18.5, 18.2, etc.) - just to be sure
+      versions.sort((a: string, b: string) => {
+        const parseVersion = (version: string) => {
+          const parts = version.split('.').map(Number);
+          return parts[0] * 1000 + (parts[1] || 0);
+        };
+        return parseVersion(b) - parseVersion(a); // Descending order
+      });
+
+      return versions;
+
+    } catch (error: any) {
+      console.error('Error fetching iOS versions from ipsws table:', error);
       throw new Error(`Failed to fetch iOS versions: ${error.message}`);
     }
-
-    // Get unique versions
-    const uniqueVersions = [...new Set(data.map(row => row.ios_version))].filter(Boolean);
-    return uniqueVersions;
   }
 
   /**
@@ -119,7 +141,7 @@ export class EntitlementsService {
         .from('entitlement_unique_paths')
         .select('id')
         .eq('path', executablePath);
-      
+
       if (matchingPaths && matchingPaths.length > 0) {
         const pathIds = matchingPaths.map(p => p.id);
         query = query.in('path_id', pathIds);
