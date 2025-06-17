@@ -40,10 +40,10 @@ export default function Entitlements() {
                     let dbFileSize = 0;
                     try {
                         setLoadingPhase('Checking database size...');
-                        const basePath = process.env.NODE_ENV === 'development'
+                        const basePath = process.env.NODE_ENV === 'development' 
                             ? window.location.origin + '/ipsw'
                             : window.location.origin + '/ipsw';
-
+                        
                         const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
                         if (headResponse.ok) {
                             const contentLength = headResponse.headers.get('content-length');
@@ -65,10 +65,81 @@ export default function Entitlements() {
 
                         // Determine base URL for development vs production
                         const isDev = process.env.NODE_ENV === 'development';
-                        const basePath = isDev ? window.location.origin + '/ipsw' : window.location.origin + '/ipsw';
+                        const currentPath = window.location.pathname;
+                        let basePath = '';
 
-                        setLoadingPhase('Initializing database worker...');
+                        if (isDev) {
+                            // In development, Docusaurus serves static files from /ipsw/ even in dev mode
+                            basePath = window.location.origin + '/ipsw';
+                        } else {
+                            // In production, handle the /ipsw base URL
+                            basePath = window.location.origin + '/ipsw';
+                        }
+
+
+                        // Create blob URL for worker to avoid MIME type issues
+                        let workerUrl, wasmUrl;
+                        try {
+                            setLoadingPhase('Loading worker files...');
+                            setLoadingProgress(10);
+
+                            // Fetch the worker file and create a blob URL
+                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
+                            if (!workerResponse.ok) {
+                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
+                            }
+                            const workerBlob = await workerResponse.blob();
+                            workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
+                            setWorkerBlobUrl(workerUrl); // Store for cleanup
+
+                            // WASM file can be loaded directly
+                            wasmUrl = `${basePath}/sql-wasm.wasm`;
+
+                        } catch (fetchError) {
+                            console.error('Failed to fetch worker files:', fetchError);
+                            throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
+                        }
+
+                        // Detect connection speed and adjust chunk size accordingly
+                        // Base size aligned with optimized SQLite page size (1024 bytes)
+                        const basePageSize = 1024;
+                        let requestChunkSize = basePageSize; // Start with SQLite page size
+
+                        // Use Network Information API if available
+                        const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+                        if (connection) {
+                            const effectiveType = connection.effectiveType;
+                            const downlink = connection.downlink; // Mbps
+
+                            // Scale chunk size based on connection speed (multiples of page size for efficiency)
+                            if (downlink && downlink > 100) {
+                                // Ultra-fast connections (>100 Mbps): 2MB (2048 pages)
+                                requestChunkSize = basePageSize * 2048;
+                            } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
+                                // Fast connections (>25 Mbps): 1MB (1024 pages)
+                                requestChunkSize = basePageSize * 1024;
+                            } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
+                                // Medium connections (>5 Mbps): 256KB (256 pages)
+                                requestChunkSize = basePageSize * 256;
+                            } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
+                                // Slow connections: 64KB (64 pages)
+                                requestChunkSize = basePageSize * 64;
+                            } else {
+                                // Default to large chunks for unknown but modern connections: 512KB (512 pages)
+                                requestChunkSize = basePageSize * 512;
+                            }
+                        } else {
+                            // No Network Information API, assume modern fast connection: 2MB (2048 pages)
+                            requestChunkSize = basePageSize * 2048;
+                        }
+
+                        console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
+
+                        setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
+
+                        // Set reasonable max bytes to read based on database size
+                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
 
                         // Use full mode with explicit file length - GitHub Pages compression handling
                         worker = await createDbWorker(
@@ -86,26 +157,66 @@ export default function Entitlements() {
                             dbFileSize + (5 * 1024 * 1024) // DB size + 5MB buffer
                         );
 
-                        setLoadingProgress(70);
+                        // Start progress monitoring with fallback timing
+                        let progressInterval: NodeJS.Timeout | null = null;
+                        let startTime = Date.now();
+                        let lastProgress = 20;
+                        
+                        const updateProgress = () => {
+                            const elapsed = Date.now() - startTime;
+                            let progress = lastProgress;
+                            
+                            // Try to get actual bytes read if available
+                            if ((worker as any).worker?.bytesRead !== undefined && dbFileSize > 0) {
+                                const bytesRead = (worker as any).worker.bytesRead || 0;
+                                if (bytesRead > 0) {
+                                    const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
+                                    progress = Math.min(85, 20 + bytesProgress);
+                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                                }
+                            } else {
+                                // Fallback: time-based estimation (assuming 10 seconds for large DBs)
+                                const estimatedDuration = dbFileSize > 50 * 1024 * 1024 ? 10000 : 5000; // 10s for >50MB, 5s otherwise
+                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
+                                progress = 20 + timeProgress;
+                                
+                                if (dbFileSize > 0) {
+                                    const estimatedMB = Math.min(
+                                        Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
+                                        Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
+                                    );
+                                    setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                                } else {
+                                    setLoadingPhase('Loading database...');
+                                }
+                            }
+                            
+                            setLoadingProgress(Math.min(85, progress));
+                            lastProgress = progress;
+                        };
 
-                        // Monitor database loading progress
-                        setLoadingPhase('Loading database schema...');
+                        progressInterval = setInterval(updateProgress, 200);
 
-                        // Add a brief delay to allow worker to initialize
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                        setLoadingProgress(85);
-
-                        // Test if database is accessible
+                        // Test if database is accessible and prefetch initial data
                         try {
-                            setLoadingPhase('Testing database connection...');
-                            setLoadingProgress(95);
-
-                            // Test basic database functionality
+                            // Clean up progress interval before final steps
+                            if (progressInterval) {
+                                clearInterval(progressInterval);
+                            }
+                            
+                            setLoadingPhase('Connecting to database...');
+                            setLoadingProgress(87);
+                            
+                            // This query will force loading of the SQLite header and schema
                             await (worker.db as any).exec('SELECT 1;');
 
-                            // Prefetch the iOS versions
-                            await (worker.db as any).exec(`SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`);
+                            setLoadingPhase('Initializing database...');
+                            setLoadingProgress(90);
+                            
+                            // Prefetch the iOS versions to cache the index pages
+                            await (worker.db as any).exec(
+                                `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
+                            );
                         } catch (connectivityError) {
                             console.error('Database connectivity test failed:', connectivityError);
                             throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
@@ -499,8 +610,8 @@ export default function Entitlements() {
                             <span>{loadingPhase}</span>
                             <div className="progress-container">
                                 <div className="progress-bar">
-                                    <div
-                                        className="progress-fill"
+                                    <div 
+                                        className="progress-fill" 
                                         style={{ width: `${loadingProgress}%` }}
                                     ></div>
                                 </div>
@@ -538,131 +649,131 @@ export default function Entitlements() {
                             <div className={`filters-container ${filtersCollapsed ? 'collapsed' : ''}`}>
                                 {/* Top Row: Version Filter and Search Type */}
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">
-                                            iOS Version Filter
-                                        </label>
-                                        <select
-                                            value={selectedVersion}
-                                            onChange={(e) => handleVersionChange(e.target.value)}
-                                            className="form-select"
-                                        >
-                                            <option value="">All versions</option>
-                                            {iosVersions.map(version => (
-                                                <option key={version} value={version}>{version}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">
-                                            Search Type
-                                        </label>
-                                        <div className="radio-group">
-                                            <label className="radio-option">
-                                                <input
-                                                    type="radio"
-                                                    value="key"
-                                                    checked={searchType === 'key'}
-                                                    onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                    className="radio-input"
-                                                />
-                                                <span className="radio-label">Entitlement Key</span>
-                                            </label>
-                                            <label className="radio-option">
-                                                <input
-                                                    type="radio"
-                                                    value="file"
-                                                    checked={searchType === 'file'}
-                                                    onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                    className="radio-input"
-                                                />
-                                                <span className="radio-label">Executable Path</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Executable Path Filter - full width row */}
-                                {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
-                                    <div className="form-group form-group--full-width">
-                                        <label className="form-label">
-                                            Executable Filter
-                                        </label>
-                                        <select
-                                            value={selectedExecutablePath}
-                                            onChange={(e) => handleExecutablePathChange(e.target.value)}
-                                            className="form-select form-select--executable"
-                                        >
-                                            <option value="">
-                                                {availableExecutablePaths.length > 0
-                                                    ? `All executables (${availableExecutablePaths.length})`
-                                                    : 'All executables'
-                                                }
-                                            </option>
-                                            {(() => {
-                                                // If we have a selected path but no available paths, show just the selected one
-                                                if (selectedExecutablePath && availableExecutablePaths.length === 0) {
-                                                    const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
-                                                    return (
-                                                        <option key={selectedExecutablePath} value={selectedExecutablePath}>
-                                                            {basename}
-                                                        </option>
-                                                    );
-                                                }
-
-                                                // Always show full paths to avoid ambiguity
-                                                return availableExecutablePaths.map(path => {
-                                                    const basename = path.split('/').pop() || path;
-                                                    // Show basename first, then full path for clarity
-                                                    const displayName = path.length > 50 ?
-                                                        `${basename} - ${path.substring(0, 47)}...` :
-                                                        `${basename} - ${path}`;
-
-                                                    return (
-                                                        <option key={path} value={path}>
-                                                            {displayName}
-                                                        </option>
-                                                    );
-                                                });
-                                            })()}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {/* Search Input */}
                                 <div className="form-group">
                                     <label className="form-label">
-                                        Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                        iOS Version Filter
                                     </label>
-                                    <div className="search-input-group">
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => handleSearchInput(e.target.value)}
-                                            onFocus={handleInputFocus}
-                                            onBlur={handleInputBlur}
-                                            placeholder={searchType === 'key'
-                                                ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
-                                                : 'Enter executable name (e.g., WebContent, Safari)'
-                                            }
-                                            className="search-input"
-                                            disabled={loading}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !loading && searchQuery.trim()) {
-                                                    handleSearch();
-                                                }
-                                            }}
-                                        />
-                                        <button
-                                            onClick={handleSearch}
-                                            className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
-                                            disabled={loading || !searchQuery.trim()}
-                                        >
-                                            {loading ? 'Searching...' : 'Search'}
-                                        </button>
+                                    <select
+                                        value={selectedVersion}
+                                        onChange={(e) => handleVersionChange(e.target.value)}
+                                        className="form-select"
+                                    >
+                                        <option value="">All versions</option>
+                                        {iosVersions.map(version => (
+                                            <option key={version} value={version}>{version}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">
+                                        Search Type
+                                    </label>
+                                    <div className="radio-group">
+                                        <label className="radio-option">
+                                            <input
+                                                type="radio"
+                                                value="key"
+                                                checked={searchType === 'key'}
+                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                className="radio-input"
+                                            />
+                                            <span className="radio-label">Entitlement Key</span>
+                                        </label>
+                                        <label className="radio-option">
+                                            <input
+                                                type="radio"
+                                                value="file"
+                                                checked={searchType === 'file'}
+                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                className="radio-input"
+                                            />
+                                            <span className="radio-label">Executable Path</span>
+                                        </label>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Executable Path Filter - full width row */}
+                            {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
+                                <div className="form-group form-group--full-width">
+                                    <label className="form-label">
+                                        Executable Filter
+                                    </label>
+                                    <select
+                                        value={selectedExecutablePath}
+                                        onChange={(e) => handleExecutablePathChange(e.target.value)}
+                                        className="form-select form-select--executable"
+                                    >
+                                        <option value="">
+                                            {availableExecutablePaths.length > 0
+                                                ? `All executables (${availableExecutablePaths.length})`
+                                                : 'All executables'
+                                            }
+                                        </option>
+                                        {(() => {
+                                            // If we have a selected path but no available paths, show just the selected one
+                                            if (selectedExecutablePath && availableExecutablePaths.length === 0) {
+                                                const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
+                                                return (
+                                                    <option key={selectedExecutablePath} value={selectedExecutablePath}>
+                                                        {basename}
+                                                    </option>
+                                                );
+                                            }
+
+                                            // Always show full paths to avoid ambiguity
+                                            return availableExecutablePaths.map(path => {
+                                                const basename = path.split('/').pop() || path;
+                                                // Show basename first, then full path for clarity
+                                                const displayName = path.length > 50 ?
+                                                    `${basename} - ${path.substring(0, 47)}...` :
+                                                    `${basename} - ${path}`;
+
+                                                return (
+                                                    <option key={path} value={path}>
+                                                        {displayName}
+                                                    </option>
+                                                );
+                                            });
+                                        })()}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Search Input */}
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                </label>
+                                <div className="search-input-group">
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => handleSearchInput(e.target.value)}
+                                        onFocus={handleInputFocus}
+                                        onBlur={handleInputBlur}
+                                        placeholder={searchType === 'key'
+                                            ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
+                                            : 'Enter executable name (e.g., WebContent, Safari)'
+                                        }
+                                        className="search-input"
+                                        disabled={loading}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                handleSearch();
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handleSearch}
+                                        className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
+                                        disabled={loading || !searchQuery.trim()}
+                                    >
+                                        {loading ? 'Searching...' : 'Search'}
+                                    </button>
+                                </div>
+                            </div>
                             </div>
 
                             {/* No Results Warning */}
@@ -1212,11 +1323,6 @@ export default function Entitlements() {
                     overflow-y: auto;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                     max-height: calc(100vh - 500px);
-                    transition: max-height 0.3s ease;
-                }
-
-                .search-panel.filters-collapsed .results-container {
-                    max-height: calc(100vh - 300px);
                 }
 
                 .result-item {
