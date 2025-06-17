@@ -194,36 +194,47 @@ export default function Entitlements() {
                             console.warn('Could not check content encoding, trying full mode first:', headerCheckError);
                         }
 
+                        const dbUrl = `${basePath}/db/ipsw.db`;
+                        console.log('Database URL:', dbUrl);
+                        console.log('Server mode:', serverMode);
+                        console.log('File length:', useFileLength);
+                        
                         try {
+                            const workerConfig: any = {
+                                serverMode: serverMode,
+                                requestChunkSize: requestChunkSize,
+                                url: dbUrl
+                            };
+                            
+                            // Only add fileLength if we have it and we're not in chunked mode
+                            if (useFileLength && serverMode === 'full') {
+                                workerConfig.fileLength = useFileLength;
+                            }
+                            
                             worker = await createDbWorker(
                                 [{
                                     from: 'inline',
-                                    config: {
-                                        serverMode: serverMode,
-                                        requestChunkSize: requestChunkSize,
-                                        url: `${basePath}/db/ipsw.db`,
-                                        ...(useFileLength && { fileLength: useFileLength })
-                                        // Note: Removed cacheBust to enable browser caching
-                                        // Database will be cached by browser's HTTP cache
-                                    } as any
+                                    config: workerConfig as any
                                 }],
                                 workerUrl,
                                 wasmUrl,
                                 maxBytesToRead
                             );
                         } catch (fullModeError) {
-                            if (serverMode === 'full' && fullModeError.message.includes('malformed')) {
-                                console.warn('Full mode failed with malformed database, trying chunked mode:', fullModeError);
+                            if (serverMode === 'full' && (fullModeError.message.includes('malformed') || fullModeError.message.includes('undefined'))) {
+                                console.warn('Full mode failed, trying chunked mode:', fullModeError);
                                 // Retry with chunked mode
+                                const chunkedConfig = {
+                                    serverMode: 'chunked',
+                                    requestChunkSize: Math.min(requestChunkSize, 512 * 1024), // Smaller chunks for chunked mode
+                                    url: dbUrl
+                                    // Explicitly no fileLength for chunked mode
+                                };
+                                
                                 worker = await createDbWorker(
                                     [{
                                         from: 'inline',
-                                        config: {
-                                            serverMode: 'chunked',
-                                            requestChunkSize: Math.min(requestChunkSize, 512 * 1024), // Smaller chunks for chunked mode
-                                            url: `${basePath}/db/ipsw.db`
-                                            // No fileLength for chunked mode
-                                        } as any
+                                        config: chunkedConfig as any
                                     }],
                                     workerUrl,
                                     wasmUrl,
