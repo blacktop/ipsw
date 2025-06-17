@@ -150,12 +150,18 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 					return fmt.Errorf("failed to get unique value ID for '%s' (type: %s): %v", valueStr, valueType, err)
 				}
 
+				// Get or create unique path ID
+				pathID, err := ds.getOrCreateUniquePath(filePath)
+				if err != nil {
+					return fmt.Errorf("failed to get unique path ID for '%s': %v", filePath, err)
+				}
+
 				// Create web search entry
 				webEntry := &model.EntitlementWebSearch{
 					IOSVersion: ipswRecord.Version,
 					BuildID:    ipswRecord.BuildID,
 					DeviceList: deviceList,
-					FilePath:   filePath,
+					PathID:     pathID,
 					KeyID:      keyID,
 					ValueID:    valueID,
 				}
@@ -227,6 +233,26 @@ func (ds *DatabaseService) getOrCreateUniqueValue(valueType, value string) (uint
 	return uniqueValue.ID, nil
 }
 
+// getOrCreateUniquePath ensures a unique path exists and returns its ID
+func (ds *DatabaseService) getOrCreateUniquePath(path string) (uint, error) {
+	var uniquePath model.EntitlementUniquePath
+	
+	// Try to find existing path
+	if err := ds.gormDB.Where("path = ?", path).First(&uniquePath).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create new unique path
+			uniquePath = model.EntitlementUniquePath{Path: path}
+			if err := ds.gormDB.Create(&uniquePath).Error; err != nil {
+				return 0, fmt.Errorf("failed to create unique path: %v", err)
+			}
+		} else {
+			return 0, fmt.Errorf("failed to query unique path: %v", err)
+		}
+	}
+	
+	return uniquePath.ID, nil
+}
+
 // GetIOSVersions returns all available iOS versions in the database
 func (ds *DatabaseService) GetIOSVersions() ([]string, error) {
 	if ds.gormDB == nil {
@@ -251,6 +277,7 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 	}
 
 	query := ds.gormDB.Model(&model.EntitlementWebSearch{}).
+		Preload("UniquePath").
 		Preload("UniqueKey").
 		Preload("UniqueValue")
 
@@ -265,13 +292,14 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 			Where("entitlement_unique_keys.key LIKE ?", "%"+keyPattern+"%")
 	}
 
-	// Filter by file pattern
+	// Filter by file pattern (now requires join with unique paths table)
 	if filePattern != "" {
-		query = query.Where("file_path LIKE ?", "%"+filePattern+"%")
+		query = query.Joins("JOIN entitlement_unique_paths ON entitlement_unique_paths.id = entitlement_keys.path_id").
+			Where("entitlement_unique_paths.path LIKE ?", "%"+filePattern+"%")
 	}
 
-	// Order by file_path for consistent results
-	query = query.Order("file_path, key_id")
+	// Order by path_id for consistent results
+	query = query.Order("path_id, key_id")
 
 	// Apply limit
 	if limit > 0 {
@@ -317,6 +345,12 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("failed to count unique values: %v", err)
 	}
 	stats["unique_value_count"] = uniqueValueCount
+
+	var uniquePathCount int64
+	if err := ds.gormDB.Model(&model.EntitlementUniquePath{}).Count(&uniquePathCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count unique paths: %v", err)
+	}
+	stats["unique_path_count"] = uniquePathCount
 
 	// Get top 10 most common entitlement keys
 	var topKeys []struct {
