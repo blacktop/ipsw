@@ -32,6 +32,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/db"
+	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -254,24 +255,18 @@ func searchEntitlements(dbPath, keyPattern, valuePattern, filePattern, versionFi
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 	for _, result := range results {
+		// Extract key and value from related objects
+		if result.UniqueKey == nil || result.UniqueValue == nil {
+			continue // Skip if relations weren't loaded
+		}
+
+		key := result.UniqueKey.Key
+		value := result.UniqueValue.Value
+		valueType := result.UniqueValue.ValueType
+
 		// Check value pattern if specified
 		if valuePattern != "" {
-			found := false
-			switch result.ValueType {
-			case "string":
-				if contains(result.StringValue, valuePattern) {
-					found = true
-				}
-			case "array":
-				if contains(result.ArrayValue, valuePattern) {
-					found = true
-				}
-			case "dict":
-				if contains(result.DictValue, valuePattern) {
-					found = true
-				}
-			}
-			if !found {
+			if !contains(value, valuePattern) {
 				continue
 			}
 		}
@@ -280,32 +275,20 @@ func searchEntitlements(dbPath, keyPattern, valuePattern, filePattern, versionFi
 			fmt.Fprintf(w, "%s\n", colorBin(result.FilePath))
 		} else {
 			fmt.Fprintf(w, "%s\t%s\t[%s %s]\n",
-				colorKey(result.Key),
+				colorKey(key),
 				colorBin(result.FilePath),
 				colorVersion(result.IOSVersion),
 				result.BuildID)
 
 			// Display value based on type
-			switch result.ValueType {
-			case "string":
-				if result.StringValue != "" {
-					fmt.Fprintf(w, " - %s\n", colorValue(result.StringValue))
+			switch valueType {
+			case "string", "bool", "number":
+				if value != "" {
+					fmt.Fprintf(w, " - %s\n", colorValue(value))
 				}
-			case "bool":
-				if result.BoolValue != nil {
-					fmt.Fprintf(w, " - %s\n", colorValue(fmt.Sprintf("%t", *result.BoolValue)))
-				}
-			case "number":
-				if result.NumberValue != nil {
-					fmt.Fprintf(w, " - %s\n", colorValue(fmt.Sprintf("%d", *result.NumberValue)))
-				}
-			case "array":
-				if result.ArrayValue != "" {
-					fmt.Fprintf(w, " - %s\n", colorValue(result.ArrayValue))
-				}
-			case "dict":
-				if result.DictValue != "" {
-					fmt.Fprintf(w, " - %s\n", colorValue(result.DictValue))
+			case "array", "dict":
+				if value != "" {
+					fmt.Fprintf(w, " - %s\n", colorValue(value))
 				}
 			}
 		}
@@ -333,11 +316,19 @@ func showDatabaseStatistics(dbPath string) error {
 		return fmt.Errorf("failed to get database statistics: %v", err)
 	}
 
+	// Get database file size
+	var fileSize int64
+	if fileInfo, err := os.Stat(dbPath); err == nil {
+		fileSize = fileInfo.Size()
+	}
+
 	log.Info("SQLite Database Statistics")
 	fmt.Printf("\n")
-	fmt.Printf("IPSWs:        %d\n", stats["ipsw_count"])
-	fmt.Printf("Entitlements: %d\n", stats["entitlement_count"])
-	fmt.Printf("Keys:         %d\n", stats["key_count"])
+	fmt.Printf("IPSWs:         %d\n", stats["ipsw_count"])
+	fmt.Printf("Entitlements:  %d\n", stats["entitlement_mapping_count"])
+	fmt.Printf("Unique Keys:   %d\n", stats["unique_key_count"])
+	fmt.Printf("Unique Values: %d\n", stats["unique_value_count"])
+	fmt.Printf("Database Size: %s\n", humanize.Bytes(uint64(fileSize)))
 	fmt.Printf("\n")
 
 	// Show available iOS versions
@@ -359,6 +350,19 @@ func showDatabaseStatistics(dbPath string) error {
 		fmt.Printf("Top 10 Most Common Entitlement Keys:\n")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for i, key := range topKeys {
+			fmt.Fprintf(w, "%d.\t%s\t%d\n", i+1, colorKey(key.Key), key.Count)
+		}
+		w.Flush()
+		fmt.Printf("\n")
+	}
+
+	if leastKeys, ok := stats["least_keys"].([]struct {
+		Key   string
+		Count int64
+	}); ok && len(leastKeys) > 0 {
+		fmt.Printf("Top 10 Least Common Entitlement Keys (>1 occurrence):\n")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		for i, key := range leastKeys {
 			fmt.Fprintf(w, "%d.\t%s\t%d\n", i+1, colorKey(key.Key), key.Count)
 		}
 		w.Flush()
