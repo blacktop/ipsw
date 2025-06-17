@@ -2,6 +2,8 @@ package ent
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -20,147 +22,152 @@ type DatabaseService struct {
 	gormDB *gorm.DB
 }
 
-// NewDatabaseService creates a new database service for entitlements
+// NewDatabaseService creates a new database service
 func NewDatabaseService(database db.Database) *DatabaseService {
-	service := &DatabaseService{db: database}
-
-	// Try to get the underlying GORM DB for advanced queries
-	if sqliteDB, ok := database.(*db.Sqlite); ok {
-		service.gormDB = sqliteDB.GetDB()
+	ds := &DatabaseService{db: database}
+	
+	// Try to get GORM database if available
+	if gormDB, ok := database.(*db.Sqlite); ok {
+		ds.gormDB = gormDB.GetDB()
 	}
-
-	return service
+	
+	return ds
 }
 
-// StoreEntitlements processes and stores entitlements for either IPSW or folder input
+// StoreEntitlements stores entitlements from a database into the SQLite database
 func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]string) error {
+	// Get or create IPSW record
 	var ipswRecord *model.Ipsw
 
-	// Handle IPSW vs folder input
 	if ipswPath != "" {
-		// Parse IPSW info to get metadata
-		i, err := info.Parse(ipswPath)
+		// Parse IPSW info from file
+		ipswInfo, err := info.Parse(ipswPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse IPSW: %v", err)
+			return fmt.Errorf("failed to parse IPSW info: %v", err)
 		}
 
-		// Create or get IPSW record
 		ipswRecord = &model.Ipsw{
-			ID:      generateIPSWID(i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion),
+			ID:      generateIPSWID(ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
 			Name:    filepath.Base(ipswPath),
-			Version: i.Plists.BuildManifest.ProductVersion,
-			BuildID: i.Plists.BuildManifest.ProductBuildVersion,
+			Version: ipswInfo.Plists.BuildManifest.ProductVersion,
+			BuildID: ipswInfo.Plists.BuildManifest.ProductBuildVersion,
 		}
 
-		// Add supported devices
-		for _, deviceType := range i.Plists.BuildManifest.SupportedProductTypes {
-			device := &model.Device{Name: deviceType}
+		// Add devices
+		for _, deviceName := range ipswInfo.Plists.BuildManifest.SupportedProductTypes {
+			device := &model.Device{Name: deviceName}
 			ipswRecord.Devices = append(ipswRecord.Devices, device)
 		}
 
-		// Create IPSW record (will be skipped if exists)
+		// Create or update IPSW record
 		if err := ds.db.Create(ipswRecord); err != nil {
-			// Continue even if IPSW already exists
+			return fmt.Errorf("failed to create IPSW record: %v", err)
 		}
 	} else {
-		// For folder input, create a generic record
+		// Create a minimal IPSW record for standalone usage
 		ipswRecord = &model.Ipsw{
-			ID:      "folder-input",
-			Name:    "Folder Input",
+			ID:      generateIPSWID("unknown", "unknown"),
 			Version: "unknown",
 			BuildID: "unknown",
 		}
 	}
 
-	// Store entitlements
+	// Store entitlements directly to the normalized structure
 	for filePath, entPlist := range entDB {
-		if err := ds.storeEntitlement(ipswRecord.ID, filePath, entPlist); err != nil {
+		if err := ds.storeEntitlement(ipswRecord, filePath, entPlist); err != nil {
 			return fmt.Errorf("failed to store entitlement for %s: %v", filePath, err)
 		}
-	}
-
-	// Populate web-optimized table
-	if err := ds.populateWebSearchTable(ipswRecord); err != nil {
-		return fmt.Errorf("failed to populate web search table: %v", err)
 	}
 
 	return nil
 }
 
-// storeEntitlement stores a single entitlement record
-func (ds *DatabaseService) storeEntitlement(ipswID, filePath, entPlist string) error {
-	entitlement := &model.Entitlement{
-		FilePath: filePath,
-		IpswID:   ipswID,
-		RawPlist: entPlist,
+// storeEntitlement stores entitlement data directly to the normalized structure
+func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, entPlist string) error {
+	if ds.gormDB == nil {
+		return fmt.Errorf("GORM database required for normalized entitlement storage")
 	}
 
 	// Parse entitlement plist if not empty
 	if len(entPlist) > 0 {
 		ents := make(map[string]any)
 		if err := plist.NewDecoder(bytes.NewReader([]byte(entPlist))).Decode(&ents); err == nil {
-			// Parse each entitlement key-value pair
+			// Build device list string
+			var deviceNames []string
+			for _, device := range ipswRecord.Devices {
+				deviceNames = append(deviceNames, device.Name)
+			}
+			deviceList := strings.Join(deviceNames, ",")
+
+			// Process each entitlement key-value pair directly
 			for key, value := range ents {
-				entKey := &model.EntitlementKey{
-					Key: key,
+				// Get or create unique key ID
+				keyID, err := ds.getOrCreateUniqueKey(key)
+				if err != nil {
+					return fmt.Errorf("failed to get unique key ID for '%s': %v", key, err)
 				}
 
+				// Determine the value string and type based on value type
+				var valueStr, valueType string
 				switch v := value.(type) {
 				case bool:
-					entKey.ValueType = "bool"
-					entKey.BoolValue = &v
+					valueType = "bool"
+					if v {
+						valueStr = "true"
+					} else {
+						valueStr = "false"
+					}
 				case string:
-					entKey.ValueType = "string"
-					entKey.StringValue = v
+					valueType = "string"
+					valueStr = v
 				case int, int64, uint64:
-					entKey.ValueType = "number"
+					valueType = "number"
 					if num, ok := v.(int64); ok {
-						entKey.NumberValue = &num
+						valueStr = fmt.Sprintf("%d", num)
 					} else if num, ok := v.(int); ok {
-						num64 := int64(num)
-						entKey.NumberValue = &num64
+						valueStr = fmt.Sprintf("%d", num)
 					} else if num, ok := v.(uint64); ok {
-						num64 := int64(num)
-						entKey.NumberValue = &num64
+						valueStr = fmt.Sprintf("%d", num)
 					}
 				case []any:
-					entKey.ValueType = "array"
+					valueType = "array"
 					if jsonData, err := json.Marshal(v); err == nil {
-						entKey.ArrayValue = string(jsonData)
+						valueStr = string(jsonData)
 					}
 				case map[string]any:
-					entKey.ValueType = "dict"
+					valueType = "dict"
 					if jsonData, err := json.Marshal(v); err == nil {
-						entKey.DictValue = string(jsonData)
+						valueStr = string(jsonData)
 					}
 				default:
-					entKey.ValueType = "unknown"
-					entKey.StringValue = fmt.Sprintf("%v", v)
+					valueType = "unknown"
+					valueStr = fmt.Sprintf("%v", v)
 				}
 
-				entitlement.Keys = append(entitlement.Keys, entKey)
+				// Get or create unique value ID
+				valueID, err := ds.getOrCreateUniqueValue(valueType, valueStr)
+				if err != nil {
+					return fmt.Errorf("failed to get unique value ID for '%s' (type: %s): %v", valueStr, valueType, err)
+				}
+
+				// Create web search entry
+				webEntry := &model.EntitlementWebSearch{
+					IOSVersion: ipswRecord.Version,
+					BuildID:    ipswRecord.BuildID,
+					DeviceList: deviceList,
+					FilePath:   filePath,
+					KeyID:      keyID,
+					ValueID:    valueID,
+				}
+
+				if err := ds.gormDB.Create(webEntry).Error; err != nil {
+					return fmt.Errorf("failed to create web search entry: %v", err)
+				}
 			}
 		}
 	}
 
-	return ds.db.Create(entitlement)
-}
-
-// SearchEntitlements searches for entitlements based on criteria
-func (ds *DatabaseService) SearchEntitlements(query *model.EntitlementQuery) ([]*model.Entitlement, error) {
-	// Use the database-specific search method
-	if sqliteDB, ok := ds.db.(*db.Sqlite); ok {
-		return sqliteDB.SearchEntitlements(query)
-	}
-	return nil, fmt.Errorf("search not implemented for this database type")
-}
-
-// GetEntitlementsByIPSW gets all entitlements for an IPSW
-func (ds *DatabaseService) GetEntitlementsByIPSW(ipswID string) ([]*model.Entitlement, error) {
-	if sqliteDB, ok := ds.db.(*db.Sqlite); ok {
-		return sqliteDB.GetEntitlementsByIPSW(ipswID)
-	}
-	return nil, fmt.Errorf("method not implemented for this database type")
+	return nil
 }
 
 // generateIPSWID creates a unique ID for an IPSW based on version and build
@@ -168,182 +175,56 @@ func generateIPSWID(version, build string) string {
 	return fmt.Sprintf("%s_%s", version, build)
 }
 
-// GetIPSWsWithEntitlements returns all IPSWs that have entitlement data
-func (ds *DatabaseService) GetIPSWsWithEntitlements() ([]*model.Ipsw, error) {
-	// This would need to be implemented based on the specific database interface
-	// For now, return error indicating not implemented
-	return nil, fmt.Errorf("GetIPSWsWithEntitlements not yet implemented")
+// createValueHash creates a hash for a value to ensure uniqueness
+func createValueHash(valueType, value string) string {
+	hashInput := fmt.Sprintf("%s:%s", valueType, value)
+	hash := sha256.Sum256([]byte(hashInput))
+	return hex.EncodeToString(hash[:])
 }
 
-// QueryEntitlementsByKey searches for entitlements containing a specific key pattern
-func (ds *DatabaseService) QueryEntitlementsByKey(keyPattern string) ([]*model.Entitlement, error) {
-	if ds.gormDB == nil {
-		return nil, fmt.Errorf("advanced queries not supported with this database type")
-	}
-
-	var entitlements []*model.Entitlement
-	if err := ds.gormDB.Preload("Keys", "key LIKE ?", "%"+keyPattern+"%").
-		Preload("Ipsw").
-		Find(&entitlements).Error; err != nil {
-		return nil, fmt.Errorf("failed to query entitlements by key: %v", err)
-	}
-	return entitlements, nil
-}
-
-// QueryEntitlementsByValue searches for entitlements containing a specific value pattern
-func (ds *DatabaseService) QueryEntitlementsByValue(valuePattern string) ([]*model.Entitlement, error) {
-	if ds.gormDB == nil {
-		return nil, fmt.Errorf("advanced queries not supported with this database type")
-	}
-
-	var entitlements []*model.Entitlement
-	if err := ds.gormDB.Preload("Keys", "string_value LIKE ? OR array_value LIKE ? OR dict_value LIKE ?",
-		"%"+valuePattern+"%", "%"+valuePattern+"%", "%"+valuePattern+"%").
-		Preload("Ipsw").
-		Find(&entitlements).Error; err != nil {
-		return nil, fmt.Errorf("failed to query entitlements by value: %v", err)
-	}
-	return entitlements, nil
-}
-
-// QueryEntitlementsByFile searches for entitlements for a specific file path pattern
-func (ds *DatabaseService) QueryEntitlementsByFile(filePattern string) ([]*model.Entitlement, error) {
-	if ds.gormDB == nil {
-		return nil, fmt.Errorf("advanced queries not supported with this database type")
-	}
-
-	var entitlements []*model.Entitlement
-	if err := ds.gormDB.Preload("Keys").
-		Preload("Ipsw").
-		Where("file_path LIKE ?", "%"+filePattern+"%").
-		Find(&entitlements).Error; err != nil {
-		return nil, fmt.Errorf("failed to query entitlements by file: %v", err)
-	}
-	return entitlements, nil
-}
-
-// QueryEntitlementsByIPSW searches for entitlements for a specific IPSW version/build
-func (ds *DatabaseService) QueryEntitlementsByIPSW(version, build string) ([]*model.Entitlement, error) {
-	if ds.gormDB == nil {
-		return nil, fmt.Errorf("advanced queries not supported with this database type")
-	}
-
-	var entitlements []*model.Entitlement
-	query := ds.gormDB.Preload("Keys").Preload("Ipsw")
-
-	if version != "" {
-		query = query.Joins("JOIN ipsws ON ipsws.id = entitlements.ipsw_id").
-			Where("ipsws.version = ?", version)
-	}
-	if build != "" {
-		query = query.Joins("JOIN ipsws ON ipsws.id = entitlements.ipsw_id").
-			Where("ipsws.build_id = ?", build)
-	}
-
-	if err := query.Find(&entitlements).Error; err != nil {
-		return nil, fmt.Errorf("failed to query entitlements by IPSW: %v", err)
-	}
-	return entitlements, nil
-}
-
-// GetStatistics returns database statistics
-func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
-	if ds.gormDB == nil {
-		return nil, fmt.Errorf("statistics not supported with this database type")
-	}
-
-	stats := make(map[string]interface{})
-
-	var ipswCount int64
-	if err := ds.gormDB.Model(&model.Ipsw{}).Count(&ipswCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to count IPSWs: %v", err)
-	}
-	stats["ipsw_count"] = ipswCount
-
-	var entitlementCount int64
-	if err := ds.gormDB.Model(&model.Entitlement{}).Count(&entitlementCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to count entitlements: %v", err)
-	}
-	stats["entitlement_count"] = entitlementCount
-
-	var keyCount int64
-	if err := ds.gormDB.Model(&model.EntitlementKey{}).Count(&keyCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to count entitlement keys: %v", err)
-	}
-	stats["key_count"] = keyCount
-
-	// Get top 10 most common entitlement keys
-	var topKeys []struct {
-		Key   string
-		Count int64
-	}
-	if err := ds.gormDB.Model(&model.EntitlementKey{}).
-		Select("key, COUNT(*) as count").
-		Group("key").
-		Order("count DESC").
-		Limit(10).
-		Scan(&topKeys).Error; err != nil {
-		return nil, fmt.Errorf("failed to get top keys: %v", err)
-	}
-	stats["top_keys"] = topKeys
-
-	return stats, nil
-}
-
-// populateWebSearchTable creates denormalized records optimized for web queries
-func (ds *DatabaseService) populateWebSearchTable(ipswRecord *model.Ipsw) error {
-	if ds.gormDB == nil {
-		return fmt.Errorf("GORM database required for web search table population")
-	}
-
-	// Get all entitlements for this IPSW
-	entitlements, err := ds.GetEntitlementsByIPSW(ipswRecord.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get entitlements for IPSW %s: %v", ipswRecord.ID, err)
-	}
-
-	// Build device list string
-	var deviceNames []string
-	for _, device := range ipswRecord.Devices {
-		deviceNames = append(deviceNames, device.Name)
-	}
-	deviceList := strings.Join(deviceNames, ",")
-
-	// Clear existing web search entries for this IPSW to avoid duplicates
-	if err := ds.gormDB.Where("ios_version = ? AND build_id = ?", ipswRecord.Version, ipswRecord.BuildID).
-		Delete(&model.EntitlementWebSearch{}).Error; err != nil {
-		return fmt.Errorf("failed to clear existing web search entries: %v", err)
-	}
-
-	// Create web search entries
-	var webEntries []*model.EntitlementWebSearch
-	for _, entitlement := range entitlements {
-		for _, key := range entitlement.Keys {
-			webEntry := &model.EntitlementWebSearch{
-				IOSVersion:  ipswRecord.Version,
-				BuildID:     ipswRecord.BuildID,
-				DeviceList:  deviceList,
-				FilePath:    entitlement.FilePath,
-				Key:         key.Key,
-				ValueType:   key.ValueType,
-				StringValue: key.StringValue,
-				BoolValue:   key.BoolValue,
-				NumberValue: key.NumberValue,
-				ArrayValue:  key.ArrayValue,
-				DictValue:   key.DictValue,
+// getOrCreateUniqueKey ensures a unique key exists and returns its ID
+func (ds *DatabaseService) getOrCreateUniqueKey(key string) (uint, error) {
+	var uniqueKey model.EntitlementUniqueKey
+	
+	// Try to find existing key
+	if err := ds.gormDB.Where("key = ?", key).First(&uniqueKey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create new unique key
+			uniqueKey = model.EntitlementUniqueKey{Key: key}
+			if err := ds.gormDB.Create(&uniqueKey).Error; err != nil {
+				return 0, fmt.Errorf("failed to create unique key: %v", err)
 			}
-			webEntries = append(webEntries, webEntry)
+		} else {
+			return 0, fmt.Errorf("failed to query unique key: %v", err)
 		}
 	}
+	
+	return uniqueKey.ID, nil
+}
 
-	// Batch insert web search entries
-	if len(webEntries) > 0 {
-		if err := ds.gormDB.CreateInBatches(webEntries, 1000).Error; err != nil {
-			return fmt.Errorf("failed to create web search entries: %v", err)
+// getOrCreateUniqueValue ensures a unique value exists and returns its ID
+func (ds *DatabaseService) getOrCreateUniqueValue(valueType, value string) (uint, error) {
+	valueHash := createValueHash(valueType, value)
+	var uniqueValue model.EntitlementUniqueValue
+	
+	// Try to find existing value
+	if err := ds.gormDB.Where("value_hash = ?", valueHash).First(&uniqueValue).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create new unique value
+			uniqueValue = model.EntitlementUniqueValue{
+				Value:     value,
+				ValueType: valueType,
+				ValueHash: valueHash,
+			}
+			if err := ds.gormDB.Create(&uniqueValue).Error; err != nil {
+				return 0, fmt.Errorf("failed to create unique value: %v", err)
+			}
+		} else {
+			return 0, fmt.Errorf("failed to query unique value: %v", err)
 		}
 	}
-
-	return nil
+	
+	return uniqueValue.ID, nil
 }
 
 // GetIOSVersions returns all available iOS versions in the database
@@ -369,16 +250,19 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 		return nil, fmt.Errorf("GORM database required for web search")
 	}
 
-	query := ds.gormDB.Model(&model.EntitlementWebSearch{})
+	query := ds.gormDB.Model(&model.EntitlementWebSearch{}).
+		Preload("UniqueKey").
+		Preload("UniqueValue")
 
 	// Filter by iOS version (required for optimal HTTP_RANGE performance)
 	if version != "" {
 		query = query.Where("ios_version = ?", version)
 	}
 
-	// Filter by key pattern
+	// Filter by key pattern (now requires join with unique keys table)
 	if keyPattern != "" {
-		query = query.Where("key LIKE ?", "%"+keyPattern+"%")
+		query = query.Joins("JOIN entitlement_unique_keys ON entitlement_unique_keys.id = entitlement_keys.key_id").
+			Where("entitlement_unique_keys.key LIKE ?", "%"+keyPattern+"%")
 	}
 
 	// Filter by file pattern
@@ -387,7 +271,7 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 	}
 
 	// Order by file_path for consistent results
-	query = query.Order("file_path, key")
+	query = query.Order("file_path, key_id")
 
 	// Apply limit
 	if limit > 0 {
@@ -400,4 +284,72 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 	}
 
 	return results, nil
+}
+
+// GetStatistics returns database statistics using the new normalized structure
+func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
+	if ds.gormDB == nil {
+		return nil, fmt.Errorf("statistics not supported with this database type")
+	}
+
+	stats := make(map[string]interface{})
+
+	var ipswCount int64
+	if err := ds.gormDB.Model(&model.Ipsw{}).Count(&ipswCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count IPSWs: %v", err)
+	}
+	stats["ipsw_count"] = ipswCount
+
+	var mappingCount int64
+	if err := ds.gormDB.Model(&model.EntitlementWebSearch{}).Count(&mappingCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count entitlement mappings: %v", err)
+	}
+	stats["entitlement_mapping_count"] = mappingCount
+
+	var uniqueKeyCount int64
+	if err := ds.gormDB.Model(&model.EntitlementUniqueKey{}).Count(&uniqueKeyCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count unique keys: %v", err)
+	}
+	stats["unique_key_count"] = uniqueKeyCount
+
+	var uniqueValueCount int64
+	if err := ds.gormDB.Model(&model.EntitlementUniqueValue{}).Count(&uniqueValueCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count unique values: %v", err)
+	}
+	stats["unique_value_count"] = uniqueValueCount
+
+	// Get top 10 most common entitlement keys
+	var topKeys []struct {
+		Key   string
+		Count int64
+	}
+	if err := ds.gormDB.Table("entitlement_keys ek").
+		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
+		Select("uk.key, COUNT(*) as count").
+		Group("uk.key").
+		Order("count DESC").
+		Limit(10).
+		Scan(&topKeys).Error; err != nil {
+		return nil, fmt.Errorf("failed to get top keys: %v", err)
+	}
+	stats["top_keys"] = topKeys
+
+	// Get top 10 least common entitlement keys (excluding single occurrences)
+	var leastKeys []struct {
+		Key   string
+		Count int64
+	}
+	if err := ds.gormDB.Table("entitlement_keys ek").
+		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
+		Select("uk.key, COUNT(*) as count").
+		Group("uk.key").
+		Having("count > 1").  // Exclude keys that appear only once
+		Order("count ASC").
+		Limit(10).
+		Scan(&leastKeys).Error; err != nil {
+		return nil, fmt.Errorf("failed to get least common keys: %v", err)
+	}
+	stats["least_keys"] = leastKeys
+
+	return stats, nil
 }
