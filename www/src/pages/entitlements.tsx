@@ -72,8 +72,7 @@ export default function Entitlements() {
 
                         // Determine base URL for development vs production
                         const isDev = process.env.NODE_ENV === 'development';
-                        const currentPath = window.location.pathname;
-                        let basePath = '';
+                        let basePath: string;
 
                         if (isDev) {
                             // In development, Docusaurus serves static files from /ipsw/ even in dev mode
@@ -82,6 +81,13 @@ export default function Entitlements() {
                             // In production, handle the /ipsw base URL
                             basePath = window.location.origin + '/ipsw';
                         }
+                        
+                        // Ensure basePath is never undefined
+                        if (!basePath) {
+                            basePath = window.location.origin + '/ipsw';
+                        }
+                        
+                        console.log('Base path:', basePath);
 
                         // Create blob URL for worker to avoid MIME type issues
                         let workerUrl, wasmUrl;
@@ -173,77 +179,26 @@ export default function Entitlements() {
                         // Set reasonable max bytes to read based on database size
                         const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
 
-                        // GitHub Pages often serves files with gzip encoding which breaks range requests
-                        // Try full mode first, fall back to chunked mode if it fails
-                        let serverMode = 'full';
-                        let useFileLength = dbFileSize;
-                        
-                        // Detect if server uses gzip encoding by checking response headers
-                        try {
-                            const testResponse = await fetch(`${basePath}/db/ipsw.db`, { 
-                                method: 'HEAD',
-                                headers: { 'Accept-Encoding': 'identity' } // Request uncompressed
-                            });
-                            const contentEncoding = testResponse.headers.get('content-encoding');
-                            if (contentEncoding && contentEncoding.includes('gzip')) {
-                                console.warn('Server uses gzip encoding, switching to chunked mode');
-                                serverMode = 'chunked';
-                                useFileLength = undefined; // Don't specify file length for chunked mode
-                            }
-                        } catch (headerCheckError) {
-                            console.warn('Could not check content encoding, trying full mode first:', headerCheckError);
-                        }
-
                         const dbUrl = `${basePath}/db/ipsw.db`;
                         console.log('Database URL:', dbUrl);
-                        console.log('Server mode:', serverMode);
-                        console.log('File length:', useFileLength);
+                        console.log('Database file size:', dbFileSize);
                         
-                        try {
-                            const workerConfig: any = {
-                                serverMode: serverMode,
-                                requestChunkSize: requestChunkSize,
-                                url: dbUrl
-                            };
-                            
-                            // Only add fileLength if we have it and we're not in chunked mode
-                            if (useFileLength && serverMode === 'full') {
-                                workerConfig.fileLength = useFileLength;
-                            }
-                            
-                            worker = await createDbWorker(
-                                [{
-                                    from: 'inline',
-                                    config: workerConfig as any
-                                }],
-                                workerUrl,
-                                wasmUrl,
-                                maxBytesToRead
-                            );
-                        } catch (fullModeError) {
-                            if (serverMode === 'full' && (fullModeError.message.includes('malformed') || fullModeError.message.includes('undefined'))) {
-                                console.warn('Full mode failed, trying chunked mode:', fullModeError);
-                                // Retry with chunked mode
-                                const chunkedConfig = {
-                                    serverMode: 'chunked',
-                                    requestChunkSize: Math.min(requestChunkSize, 512 * 1024), // Smaller chunks for chunked mode
+                        // Use the exact same approach as the working version
+                        worker = await createDbWorker(
+                            [{
+                                from: 'inline',
+                                config: {
+                                    serverMode: 'full',
+                                    requestChunkSize: requestChunkSize,
                                     url: dbUrl
-                                    // Explicitly no fileLength for chunked mode
-                                };
-                                
-                                worker = await createDbWorker(
-                                    [{
-                                        from: 'inline',
-                                        config: chunkedConfig as any
-                                    }],
-                                    workerUrl,
-                                    wasmUrl,
-                                    maxBytesToRead
-                                );
-                            } else {
-                                throw fullModeError;
-                            }
-                        }
+                                    // Note: Removed cacheBust to enable browser caching
+                                    // Database will be cached by browser's HTTP cache
+                                }
+                            }],
+                            workerUrl,
+                            wasmUrl,
+                            maxBytesToRead
+                        );
 
                         // Start progress monitoring with fallback timing
                         let progressInterval: NodeJS.Timeout | null = null;
