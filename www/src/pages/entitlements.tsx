@@ -43,11 +43,46 @@ export default function Entitlements() {
                             ? window.location.origin + '/ipsw'
                             : window.location.origin + '/ipsw';
 
-                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD', headers: { 'Accept-Encoding': 'identity' } });
+                        // Try multiple methods to get the actual file size
+                        // Method 1: HEAD with Accept-Encoding: identity
+                        let headResponse = await fetch(`${basePath}/db/ipsw.db`, { 
+                            method: 'HEAD', 
+                            headers: { 'Accept-Encoding': 'identity' } 
+                        });
+                        
                         if (headResponse.ok) {
                             const contentLength = headResponse.headers.get('content-length');
-                            if (contentLength) {
+                            const contentEncoding = headResponse.headers.get('content-encoding');
+                            
+                            if (contentLength && !contentEncoding) {
+                                // Got uncompressed size
                                 dbFileSize = parseInt(contentLength, 10);
+                                console.log('Got uncompressed file size from HEAD:', dbFileSize);
+                            } else if (contentLength && contentEncoding === 'gzip') {
+                                // Server returned gzipped size, try Range request to get real size
+                                console.log('HEAD returned gzipped size, trying Range request...');
+                                try {
+                                    const rangeResponse = await fetch(`${basePath}/db/ipsw.db`, {
+                                        headers: { 
+                                            'Range': 'bytes=-1',
+                                            'Accept-Encoding': 'identity'
+                                        }
+                                    });
+                                    
+                                    if (rangeResponse.status === 206) {
+                                        const contentRange = rangeResponse.headers.get('content-range');
+                                        if (contentRange) {
+                                            // Parse "bytes start-end/total" format
+                                            const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
+                                            if (match) {
+                                                dbFileSize = parseInt(match[1], 10);
+                                                console.log('Got uncompressed file size from Range:', dbFileSize);
+                                            }
+                                        }
+                                    }
+                                } catch (rangeError) {
+                                    console.warn('Range request failed:', rangeError);
+                                }
                             }
                         }
                     } catch (sizeError) {
@@ -147,10 +182,7 @@ export default function Entitlements() {
                                     serverMode: 'full',
                                     requestChunkSize: requestChunkSize,
                                     url: `${basePath}/db/ipsw.db`,
-                                    databaseLengthBytes: dbFileSize, // Actual uncompressed size of ipsw.db
-                                    headers: {
-                                        'Accept-Encoding': 'identity'
-                                    }
+                                    fileLength: dbFileSize // Use the actual calculated file size
                                     // Note: Removed cacheBust to enable browser caching
                                     // Database will be cached by browser's HTTP cache
                                 }
