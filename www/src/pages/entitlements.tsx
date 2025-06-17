@@ -44,10 +44,15 @@ export default function Entitlements() {
                             : window.location.origin + '/ipsw';
 
                         // Try multiple methods to get the actual file size
-                        // Method 1: HEAD with Accept-Encoding: identity
+                        // Method 1: HEAD with Accept-Encoding: identity and CORS mode
                         let headResponse = await fetch(`${basePath}/db/ipsw.db`, {
                             method: 'HEAD',
-                            headers: { 'Accept-Encoding': 'identity' }
+                            mode: 'cors',
+                            cache: 'no-cache',
+                            headers: { 
+                                'Accept-Encoding': 'identity',
+                                'Cache-Control': 'no-cache'
+                            }
                         });
 
                         if (headResponse.ok) {
@@ -63,9 +68,12 @@ export default function Entitlements() {
                                 console.log('HEAD returned gzipped size, trying Range request...');
                                 try {
                                     const rangeResponse = await fetch(`${basePath}/db/ipsw.db`, {
+                                        mode: 'cors',
+                                        cache: 'no-cache',
                                         headers: {
                                             'Range': 'bytes=-1',
-                                            'Accept-Encoding': 'identity'
+                                            'Accept-Encoding': 'identity',
+                                            'Cache-Control': 'no-cache'
                                         }
                                     });
 
@@ -107,7 +115,63 @@ export default function Entitlements() {
                             basePath = window.location.origin + '/ipsw';
                         } else {
                             // In production, handle the /ipsw base URL
-                            basePath = window.location.origin + '/ipsw';
+                            // GitHub Pages may serve from /ipsw or root depending on configuration
+                            const isGitHubPages = window.location.hostname.includes('github.io');
+                            if (isGitHubPages) {
+                                // For GitHub Pages, try different base path strategies
+                                const pathSegments = window.location.pathname.split('/').filter(s => s);
+                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
+                                    // Already at /ipsw/ path
+                                    basePath = window.location.origin + '/ipsw';
+                                } else if (pathSegments.length > 0) {
+                                    // Might be at /repository-name/
+                                    basePath = window.location.origin + '/' + pathSegments[0];
+                                } else {
+                                    // Fallback to /ipsw
+                                    basePath = window.location.origin + '/ipsw';
+                                }
+                            } else {
+                                basePath = window.location.origin + '/ipsw';
+                            }
+                        }
+
+                        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
+                        console.log(`Current path: ${currentPath}`);
+                        console.log(`Determined base path: ${basePath}`);
+                        console.log(`Will attempt to load database from: ${basePath}/db/ipsw.db`);
+                        console.log(`Will attempt to load worker from: ${basePath}/sqlite.worker.js`);
+
+                        // Test file accessibility before proceeding
+                        try {
+                            setLoadingPhase('Verifying file accessibility...');
+                            setLoadingProgress(5);
+                            
+                            // Quick accessibility test for critical files
+                            const testRequests = [
+                                fetch(`${basePath}/sqlite.worker.js`, { method: 'HEAD', mode: 'cors' }),
+                                fetch(`${basePath}/sql-wasm.wasm`, { method: 'HEAD', mode: 'cors' }),
+                                fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD', mode: 'cors' })
+                            ];
+                            
+                            const testResults = await Promise.allSettled(testRequests);
+                            const [workerTest, wasmTest, dbTest] = testResults;
+                            
+                            if (workerTest.status === 'rejected' || (workerTest.status === 'fulfilled' && !workerTest.value.ok)) {
+                                throw new Error(`Worker file not accessible: ${basePath}/sqlite.worker.js (Status: ${workerTest.status === 'fulfilled' ? workerTest.value.status : 'Network Error'})`);
+                            }
+                            
+                            if (wasmTest.status === 'rejected' || (wasmTest.status === 'fulfilled' && !wasmTest.value.ok)) {
+                                throw new Error(`WASM file not accessible: ${basePath}/sql-wasm.wasm (Status: ${wasmTest.status === 'fulfilled' ? wasmTest.value.status : 'Network Error'})`);
+                            }
+                            
+                            if (dbTest.status === 'rejected' || (dbTest.status === 'fulfilled' && !dbTest.value.ok)) {
+                                throw new Error(`Database file not accessible: ${basePath}/db/ipsw.db (Status: ${dbTest.status === 'fulfilled' ? dbTest.value.status : 'Network Error'})`);
+                            }
+                            
+                            console.log('All required files are accessible');
+                        } catch (accessError) {
+                            console.error('File accessibility test failed:', accessError);
+                            throw new Error(`File accessibility test failed: ${accessError.message}\n\nPlease ensure all required files are properly deployed to GitHub Pages.`);
                         }
 
 
@@ -117,20 +181,35 @@ export default function Entitlements() {
                             setLoadingPhase('Loading worker files...');
                             setLoadingProgress(10);
 
-                            // Fetch the worker file and create a blob URL
-                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
+                            // Fetch the worker file and create a blob URL with CORS headers
+                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`, {
+                                mode: 'cors',
+                                cache: 'force-cache', // Use browser cache for better performance
+                                headers: {
+                                    'Accept': 'application/javascript, text/javascript, */*'
+                                }
+                            });
                             if (!workerResponse.ok) {
-                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
+                                throw new Error(`Worker fetch failed: ${workerResponse.status} ${workerResponse.statusText}`);
                             }
                             const workerBlob = await workerResponse.blob();
                             workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
                             setWorkerBlobUrl(workerUrl); // Store for cleanup
 
-                            // WASM file can be loaded directly
+                            // WASM file can be loaded directly with CORS
                             wasmUrl = `${basePath}/sql-wasm.wasm`;
 
                         } catch (fetchError) {
                             console.error('Failed to fetch worker files:', fetchError);
+                            
+                            // Check if this is a CORS error
+                            if (fetchError.message.includes('CORS') || 
+                                fetchError.message.includes('Cross-Origin') ||
+                                fetchError.message.includes('NetworkError') ||
+                                fetchError.name === 'TypeError') {
+                                throw new Error(`CORS Error: Unable to load worker files. This may be due to GitHub Pages CORS restrictions. Please ensure your database and worker files are properly deployed and accessible. Original error: ${fetchError.message}`);
+                            }
+                            
                             throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
                         }
 
@@ -181,7 +260,7 @@ export default function Entitlements() {
                                 config: {
                                     serverMode: 'full',
                                     requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`,
+                                    url: `${basePath}/db/ipsw.db`
                                     // fileLength: dbFileSize // Use the actual calculated file size
                                     // Note: Removed cacheBust to enable browser caching
                                     // Database will be cached by browser's HTTP cache
@@ -260,6 +339,15 @@ export default function Entitlements() {
                     } catch (workerError) {
                         console.error('Failed to create database worker:', workerError);
                         clearTimeout(timeoutId);
+                        
+                        // Provide specific guidance for common CORS issues
+                        if (workerError.message.includes('CORS') || 
+                            workerError.message.includes('Cross-Origin') ||
+                            workerError.message.includes('NetworkError') ||
+                            workerError.name === 'TypeError') {
+                            throw new Error(`CORS Error: Failed to load database worker. This typically happens when:\n\n1. Database files are not properly deployed to GitHub Pages\n2. GitHub Pages is not serving files with correct MIME types\n3. Files are blocked by browser security policies\n\nPlease ensure:\n- The 'db/' directory and 'sqlite.worker.js' + 'sql-wasm.wasm' files are in your GitHub Pages static directory\n- Files are accessible via direct URL\n- Your repository has GitHub Pages enabled\n\nOriginal error: ${workerError.message}`);
+                        }
+                        
                         throw new Error(`Failed to load database worker: ${workerError.message}`);
                     }
 
