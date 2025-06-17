@@ -420,7 +420,9 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
-	os.MkdirAll(folder, 0750)
+	if err := os.MkdirAll(folder, 0750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", folder, err)
+	}
 
 	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
