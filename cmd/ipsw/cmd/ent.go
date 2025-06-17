@@ -255,14 +255,15 @@ func searchEntitlements(dbPath, keyPattern, valuePattern, filePattern, versionFi
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 	for _, result := range results {
-		// Extract key and value from related objects
-		if result.UniqueKey == nil || result.UniqueValue == nil {
+		// Extract key, value, and path from related objects
+		if result.UniqueKey == nil || result.UniqueValue == nil || result.UniquePath == nil {
 			continue // Skip if relations weren't loaded
 		}
 
 		key := result.UniqueKey.Key
 		value := result.UniqueValue.Value
 		valueType := result.UniqueValue.ValueType
+		filePath := result.UniquePath.Path
 
 		// Check value pattern if specified
 		if valuePattern != "" {
@@ -272,11 +273,11 @@ func searchEntitlements(dbPath, keyPattern, valuePattern, filePattern, versionFi
 		}
 
 		if fileOnly {
-			fmt.Fprintf(w, "%s\n", colorBin(result.FilePath))
+			fmt.Fprintf(w, "%s\n", colorBin(filePath))
 		} else {
 			fmt.Fprintf(w, "%s\t%s\t[%s %s]\n",
 				colorKey(key),
-				colorBin(result.FilePath),
+				colorBin(filePath),
 				colorVersion(result.IOSVersion),
 				result.BuildID)
 

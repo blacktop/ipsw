@@ -71,6 +71,7 @@ func (s *Sqlite) Connect() (err error) {
 		&model.Symbol{},
 		&model.EntitlementUniqueKey{},
 		&model.EntitlementUniqueValue{},
+		&model.EntitlementUniquePath{},
 		&model.EntitlementWebSearch{},
 	); err != nil {
 		return err

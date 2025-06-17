@@ -54,13 +54,13 @@ export default function Entitlements() {
                         
                         // Fallback to hardcoded size if HEAD request fails (GitHub Pages issue)
                         if (!dbFileSize) {
-                            dbFileSize = 54394880; // 51.9 MB uncompressed - fallback size
+                            dbFileSize = 16967680; // 16.2 MB - actual database size
                             console.warn('Using fallback database size:', dbFileSize);
                         }
                     } catch (sizeError) {
                         console.warn('Could not determine database file size:', sizeError);
                         // Fallback to hardcoded size
-                        dbFileSize = 54394880; // 51.9 MB uncompressed
+                        dbFileSize = 16967680; // 16.2 MB - actual database size
                     }
 
                     let worker;
@@ -310,20 +310,23 @@ export default function Entitlements() {
                             columns = schemaRes[0].values.map((row: any[]) => row[1]);
                         }
 
-                        // Check for both old and new schema formats
+                        // Check for different schema formats
                         const oldSchemaColumns = ['file_path', 'key', 'ios_version'];
                         const newSchemaColumns = ['file_path', 'key_id', 'value_id', 'ios_version'];
+                        const normalizedSchemaColumns = ['path_id', 'key_id', 'value_id', 'ios_version'];
                         
                         const hasOldSchema = oldSchemaColumns.every(col => columns.includes(col));
-                        const hasNewSchema = newSchemaColumns.every(col => columns.includes(col));
+                        const hasNewSchema = newSchemaColumns.every(col => columns.includes(col)) && !columns.includes('path_id');
+                        const hasNormalizedSchema = normalizedSchemaColumns.every(col => columns.includes(col));
                         
-                        if (!hasOldSchema && !hasNewSchema) {
+                        if (!hasOldSchema && !hasNewSchema && !hasNormalizedSchema) {
                             const missingOldColumns = oldSchemaColumns.filter(col => !columns.includes(col));
                             const missingNewColumns = newSchemaColumns.filter(col => !columns.includes(col));
-                            throw new Error(`Database schema mismatch. Missing columns for old schema: ${missingOldColumns.join(', ')} or new schema: ${missingNewColumns.join(', ')}`);
+                            const missingNormalizedColumns = normalizedSchemaColumns.filter(col => !columns.includes(col));
+                            throw new Error(`Database schema mismatch. Missing columns for old schema: ${missingOldColumns.join(', ')}, new schema: ${missingNewColumns.join(', ')}, or normalized schema: ${missingNormalizedColumns.join(', ')}`);
                         }
                         
-                        console.log(hasOldSchema ? 'Using old database schema' : 'Using new database schema');
+                        console.log(hasOldSchema ? 'Using old database schema' : hasNormalizedSchema ? 'Using normalized database schema' : 'Using new database schema');
 
                         // Get available iOS versions
                         setLoadingPhase('Loading iOS versions...');

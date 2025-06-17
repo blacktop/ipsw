@@ -19,6 +19,12 @@ type EntitlementUniqueValue struct {
 	ValueHash string `gorm:"uniqueIndex;not null" json:"value_hash"` // hash of type:value for uniqueness
 }
 
+// EntitlementUniquePath represents unique file paths
+type EntitlementUniquePath struct {
+	ID   uint   `gorm:"primaryKey" json:"id"`
+	Path string `gorm:"uniqueIndex;not null" json:"path"`
+}
+
 // EntitlementWebSearch represents the optimized mapping table for web queries
 // This replaces the denormalized table with foreign key references
 type EntitlementWebSearch struct {
@@ -26,12 +32,13 @@ type EntitlementWebSearch struct {
 	IOSVersion  string    `gorm:"index:idx_version_key,priority:1;not null" json:"ios_version"`
 	BuildID     string    `gorm:"index;not null" json:"build_id"`
 	DeviceList  string    `gorm:"index" json:"device_list"` // comma-separated device names
-	FilePath    string    `gorm:"index:idx_version_file,priority:2;not null" json:"file_path"`
+	PathID      uint      `gorm:"index:idx_version_path,priority:2;not null" json:"path_id"`
 	KeyID       uint      `gorm:"index:idx_version_key,priority:2;not null" json:"key_id"`
 	ValueID     uint      `gorm:"index;not null" json:"value_id"`
 	ReleaseDate *time.Time `json:"release_date,omitempty"`
 	
 	// Foreign key relationships
+	UniquePath  *EntitlementUniquePath  `gorm:"foreignKey:PathID" json:"unique_path,omitempty"`
 	UniqueKey   *EntitlementUniqueKey   `gorm:"foreignKey:KeyID" json:"unique_key,omitempty"`
 	UniqueValue *EntitlementUniqueValue `gorm:"foreignKey:ValueID" json:"unique_value,omitempty"`
 }
