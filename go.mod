@@ -44,11 +44,11 @@ require (
 	github.com/frida/frida-go v1.0.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.11.0
+	github.com/gen2brain/beeep v0.11.1
 	github.com/gin-gonic/gin v1.10.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.16.2
-	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/go-viper/mapstructure/v2 v2.3.0
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
@@ -60,8 +60,8 @@ require (
 	github.com/mattn/go-mastodon v0.0.9
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/ollama/ollama v0.9.0
-	github.com/openai/openai-go v1.5.0
+	github.com/ollama/ollama v0.9.2
+	github.com/openai/openai-go v1.6.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.4.0
@@ -83,7 +83,7 @@ require (
 	golang.org/x/sync v0.15.0
 	golang.org/x/sys v0.33.0
 	golang.org/x/term v0.32.0
-	google.golang.org/genai v1.11.0
+	google.golang.org/genai v1.11.1
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
@@ -120,7 +120,7 @@ require (
 	github.com/caarlos0/go-version v0.2.0 // indirect
 	github.com/caarlos0/svu/v3 v3.2.3 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
-	github.com/charmbracelet/x/ansi v0.9.2 // indirect
+	github.com/charmbracelet/x/ansi v0.9.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
@@ -223,7 +223,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/ugorji/go/codec v1.2.14 // indirect
+	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/ulikunitz/lz v0.4.1 // indirect
 	github.com/vbauerster/mpb/v7 v7.5.3 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
@@ -246,7 +246,7 @@ require (
 	google.golang.org/grpc v1.73.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
-	modernc.org/libc v1.65.10 // indirect
+	modernc.org/libc v1.66.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.38.0 // indirect
