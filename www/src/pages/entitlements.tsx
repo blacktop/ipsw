@@ -89,34 +89,50 @@ export default function Entitlements() {
                         setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
 
-                        // Use chunked mode without explicit fileLength for GitHub Pages compatibility
-                        // This allows the library to auto-detect the file size and handle compression
+                        // GitHub Pages gzip issue workaround: explicitly provide uncompressed file size
+                        // The ETag header format is W/"[timestamp]-[hex_file_size]" 
+                        // Current database uncompressed size: 54,394,880 bytes (0x33d5800)
+                        const uncompressedDbSize = 54394880; // 51.9 MB uncompressed
+
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
                                 config: {
-                                    serverMode: 'full', // full database mode
-                                    url: `${basePath}/db/ipsw.db`, // Let GitHub Pages handle compression automatically
-                                    requestChunkSize: 1024 * 1024 // 1MB chunks for good balance of requests vs overhead
-                                }
+                                    serverMode: 'full',
+                                    url: `${basePath}/db/ipsw.db`,
+                                    requestChunkSize: 1024 * 1024, // 1MB chunks for good balance
+                                    fileLength: uncompressedDbSize // Explicit file length to bypass HEAD request issues
+                                } as any
                             }],
                             workerUrl,
                             wasmUrl
                         );
 
-                        // Start time-based progress monitoring
+                        // Start progress monitoring with known file size
                         let progressInterval: NodeJS.Timeout | null = null;
                         let startTime = Date.now();
                         let lastProgress = 20;
 
                         const updateProgress = () => {
                             const elapsed = Date.now() - startTime;
-                            // Time-based progress estimation (assuming 8-12 seconds for database loading)
-                            const estimatedDuration = 10000; // 10 seconds
-                            const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
-                            const progress = 20 + timeProgress;
+                            let progress = lastProgress;
 
-                            setLoadingPhase('Loading database...');
+                            // Try to get actual bytes read if available
+                            if ((worker as any).worker?.bytesRead !== undefined) {
+                                const bytesRead = (worker as any).worker.bytesRead || 0;
+                                if (bytesRead > 0) {
+                                    const bytesProgress = (bytesRead / uncompressedDbSize) * 60; // 60% of total progress
+                                    progress = Math.min(85, 20 + bytesProgress);
+                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((uncompressedDbSize / 1024 / 1024) * 10) / 10}MB`);
+                                }
+                            } else {
+                                // Fallback: time-based estimation
+                                const estimatedDuration = 10000; // 10 seconds
+                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65);
+                                progress = 20 + timeProgress;
+                                setLoadingPhase('Loading database...');
+                            }
+
                             setLoadingProgress(Math.min(85, progress));
                             lastProgress = progress;
                         };
