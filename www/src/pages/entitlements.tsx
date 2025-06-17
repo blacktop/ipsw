@@ -45,15 +45,15 @@ export default function Entitlements() {
 
                         // Try multiple methods to get the actual file size
                         // Method 1: HEAD with Accept-Encoding: identity
-                        let headResponse = await fetch(`${basePath}/db/ipsw.db`, { 
-                            method: 'HEAD', 
-                            headers: { 'Accept-Encoding': 'identity' } 
+                        let headResponse = await fetch(`${basePath}/db/ipsw.db`, {
+                            method: 'HEAD',
+                            headers: { 'Accept-Encoding': 'identity' }
                         });
-                        
+
                         if (headResponse.ok) {
                             const contentLength = headResponse.headers.get('content-length');
                             const contentEncoding = headResponse.headers.get('content-encoding');
-                            
+
                             if (contentLength && !contentEncoding) {
                                 // Got uncompressed size
                                 dbFileSize = parseInt(contentLength, 10);
@@ -63,12 +63,12 @@ export default function Entitlements() {
                                 console.log('HEAD returned gzipped size, trying Range request...');
                                 try {
                                     const rangeResponse = await fetch(`${basePath}/db/ipsw.db`, {
-                                        headers: { 
+                                        headers: {
                                             'Range': 'bytes=-1',
                                             'Accept-Encoding': 'identity'
                                         }
                                     });
-                                    
+
                                     if (rangeResponse.status === 206) {
                                         const contentRange = rangeResponse.headers.get('content-range');
                                         if (contentRange) {
@@ -182,7 +182,7 @@ export default function Entitlements() {
                                     serverMode: 'full',
                                     requestChunkSize: requestChunkSize,
                                     url: `${basePath}/db/ipsw.db`,
-                                    fileLength: dbFileSize // Use the actual calculated file size
+                                    // fileLength: dbFileSize // Use the actual calculated file size
                                     // Note: Removed cacheBust to enable browser caching
                                     // Database will be cached by browser's HTTP cache
                                 }
