@@ -36,12 +36,6 @@ export default function Entitlements() {
                     setLoadingPhase('Initializing...');
                     setError('');
 
-                    // For GitHub Pages, we need to handle gzip compression properly
-                    // We'll let the library auto-detect the file size and handle compression
-                    const basePath = process.env.NODE_ENV === 'development'
-                        ? window.location.origin + '/ipsw'
-                        : window.location.origin + '/ipsw';
-
                     let worker;
                     try {
                         // Check for WASM support first
@@ -71,10 +65,11 @@ export default function Entitlements() {
 
                             // Fetch the worker file and patch it to force fileLength support for full mode
                             const workerText = await (await fetch(`${basePath}/sqlite.worker.js`)).text();
-                            // Patch: override the condition that only passes fileLength for 'chunked' mode
+                            // Patch: force fileLength to be forwarded even in "full" mode
+                            // We replace the minified snippet that conditionally sets fileLength
                             const patchedWorkerText = workerText.replace(
-                                /fileLength:"chunked"===e\.serverMode\?e\.databaseLengthBytes:void 0/,
-                                'fileLength:e.fileLength||e.databaseLengthBytes'
+                                /fileLength\s*:\s*"chunked"[^?]*\?\s*e\.databaseLengthBytes\s*:\s*void 0/,
+                                'fileLength: e.fileLength || e.databaseLengthBytes'
                             );
                             const workerBlob = new Blob([patchedWorkerText], { type: 'application/javascript' });
                             workerUrl = URL.createObjectURL(workerBlob);
