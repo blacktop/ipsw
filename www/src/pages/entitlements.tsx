@@ -54,19 +54,22 @@ export default function Entitlements() {
                         setLoadingPhase('Initializing database worker...');
                         setLoadingProgress(20);
 
-                        // Use full mode with smaller chunk size for better compatibility
+                        // Use full mode with explicit file length for GitHub Pages compatibility
+                        const actualDbSize = 30897152; // Exact size from: stat -f%z www/static/db/ipsw.db
+                        
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
                                 config: {
                                     serverMode: 'full',
                                     url: `${basePath}/db/ipsw.db`,
-                                    requestChunkSize: 512 * 1024 // Smaller 512KB chunks for better compatibility
+                                    requestChunkSize: 512 * 1024, // Smaller 512KB chunks for better compatibility
+                                    ...{ fileLength: actualDbSize } as any // Explicitly provide file length
                                 }
                             }],
                             `${basePath}/sqlite.worker.js`,
                             `${basePath}/sql-wasm.wasm`,
-                            50 * 1024 * 1024 // 50MB max memory allocation
+                            actualDbSize + (5 * 1024 * 1024) // DB size + 5MB buffer
                         );
 
                         setLoadingProgress(70);
