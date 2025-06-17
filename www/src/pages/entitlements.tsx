@@ -36,6 +36,33 @@ export default function Entitlements() {
                     setLoadingPhase('Initializing...');
                     setError('');
 
+                    // Get database file size for progress tracking
+                    let dbFileSize = 0;
+                    try {
+                        setLoadingPhase('Checking database size...');
+                        const basePath = process.env.NODE_ENV === 'development' 
+                            ? window.location.origin + '/ipsw'
+                            : window.location.origin + '/ipsw';
+                        
+                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
+                        if (headResponse.ok) {
+                            const contentLength = headResponse.headers.get('content-length');
+                            if (contentLength) {
+                                dbFileSize = parseInt(contentLength, 10);
+                            }
+                        }
+                        
+                        // Fallback to hardcoded size if HEAD request fails (GitHub Pages issue)
+                        if (!dbFileSize) {
+                            dbFileSize = 54394880; // 51.9 MB uncompressed - fallback size
+                            console.warn('Using fallback database size:', dbFileSize);
+                        }
+                    } catch (sizeError) {
+                        console.warn('Could not determine database file size:', sizeError);
+                        // Fallback to hardcoded size
+                        dbFileSize = 54394880; // 51.9 MB uncompressed
+                    }
+
                     let worker;
                     try {
                         // Check for WASM support first
@@ -56,21 +83,43 @@ export default function Entitlements() {
                             basePath = window.location.origin + '/ipsw';
                         }
 
-
                         // Create blob URL for worker to avoid MIME type issues
                         let workerUrl, wasmUrl;
                         try {
                             setLoadingPhase('Loading worker files...');
                             setLoadingProgress(10);
 
-                            // Fetch the worker file and patch it to force fileLength support for full mode
-                            const workerText = await (await fetch(`${basePath}/sqlite.worker.js`)).text();
-                            // Patch: force fileLength to be forwarded even in "full" mode
-                            // We replace the minified snippet that conditionally sets fileLength
-                            const patchedWorkerText = workerText.replace(
-                                /fileLength\s*:\s*"chunked"[^?]*\?\s*e\.databaseLengthBytes\s*:\s*void 0/,
-                                'fileLength: e.fileLength || e.databaseLengthBytes'
-                            );
+                            // Fetch the worker file and optionally patch it to force fileLength support for full mode
+                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
+                            if (!workerResponse.ok) {
+                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
+                            }
+                            const workerText = await workerResponse.text();
+                            
+                            // Try to patch worker for better fileLength support, but don't fail if patch doesn't match
+                            let patchedWorkerText = workerText;
+                            try {
+                                // Multiple patch attempts for different minification patterns
+                                const patches = [
+                                    // Original patch pattern
+                                    /fileLength\s*:\s*"chunked"[^?]*\?\s*e\.databaseLengthBytes\s*:\s*void 0/,
+                                    // Alternative patterns for different minifications
+                                    /fileLength\s*:\s*"chunked"[^}]*\?\s*[^:]*\.databaseLengthBytes\s*:\s*void 0/,
+                                    /fileLength\s*:\s*"chunked"[^}]*\?\s*[^:]*:\s*void 0/
+                                ];
+                                
+                                for (const patch of patches) {
+                                    if (patch.test(workerText)) {
+                                        patchedWorkerText = workerText.replace(patch, 'fileLength: e.fileLength || e.databaseLengthBytes');
+                                        console.log('Worker patched successfully');
+                                        break;
+                                    }
+                                }
+                            } catch (patchError) {
+                                console.warn('Worker patching failed, using original:', patchError);
+                                // Continue with original worker text
+                            }
+                            
                             const workerBlob = new Blob([patchedWorkerText], { type: 'application/javascript' });
                             workerUrl = URL.createObjectURL(workerBlob);
                             setWorkerBlobUrl(workerUrl);
@@ -83,58 +132,103 @@ export default function Entitlements() {
                             throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
                         }
 
+                        // Detect connection speed and adjust chunk size accordingly
+                        // Base size aligned with optimized SQLite page size (1024 bytes)
+                        const basePageSize = 1024;
+                        let requestChunkSize = basePageSize; // Start with SQLite page size
+
+                        // Use Network Information API if available
+                        const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+                        if (connection) {
+                            const effectiveType = connection.effectiveType;
+                            const downlink = connection.downlink; // Mbps
+
+                            // Scale chunk size based on connection speed (multiples of page size for efficiency)
+                            if (downlink && downlink > 100) {
+                                // Ultra-fast connections (>100 Mbps): 2MB (2048 pages)
+                                requestChunkSize = basePageSize * 2048;
+                            } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
+                                // Fast connections (>25 Mbps): 1MB (1024 pages)
+                                requestChunkSize = basePageSize * 1024;
+                            } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
+                                // Medium connections (>5 Mbps): 256KB (256 pages)
+                                requestChunkSize = basePageSize * 256;
+                            } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
+                                // Slow connections: 64KB (64 pages)
+                                requestChunkSize = basePageSize * 64;
+                            } else {
+                                // Default to large chunks for unknown but modern connections: 512KB (512 pages)
+                                requestChunkSize = basePageSize * 512;
+                            }
+                        } else {
+                            // No Network Information API, assume modern fast connection: 2MB (2048 pages)
+                            requestChunkSize = basePageSize * 2048;
+                        }
+
+                        console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
+
                         setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
 
-                        // GitHub Pages gzip issue workaround: explicitly provide uncompressed file size
-                        // The ETag header format is W/"[timestamp]-[hex_file_size]" 
-                        // Current database uncompressed size: 54,394,880 bytes (0x33d5800)
-                        const uncompressedDbSize = 54394880; // 51.9 MB uncompressed
+                        // Set reasonable max bytes to read based on database size
+                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
 
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
                                 config: {
                                     serverMode: 'full',
+                                    requestChunkSize: requestChunkSize,
                                     url: `${basePath}/db/ipsw.db`,
-                                    requestChunkSize: 1024 * 1024, // 1MB chunks for good balance
-                                    fileLength: uncompressedDbSize // Explicit file length to bypass HEAD request issues
+                                    fileLength: dbFileSize // Use detected or fallback file size
+                                    // Note: Removed cacheBust to enable browser caching
+                                    // Database will be cached by browser's HTTP cache
                                 } as any
                             }],
                             workerUrl,
-                            wasmUrl
+                            wasmUrl,
+                            maxBytesToRead
                         );
 
-                        // Start progress monitoring with known file size
+                        // Start progress monitoring with fallback timing
                         let progressInterval: NodeJS.Timeout | null = null;
                         let startTime = Date.now();
                         let lastProgress = 20;
-
+                        
                         const updateProgress = () => {
                             const elapsed = Date.now() - startTime;
                             let progress = lastProgress;
-
+                            
                             // Try to get actual bytes read if available
-                            if ((worker as any).worker?.bytesRead !== undefined) {
+                            if ((worker as any).worker?.bytesRead !== undefined && dbFileSize > 0) {
                                 const bytesRead = (worker as any).worker.bytesRead || 0;
                                 if (bytesRead > 0) {
-                                    const bytesProgress = (bytesRead / uncompressedDbSize) * 60; // 60% of total progress
+                                    const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
                                     progress = Math.min(85, 20 + bytesProgress);
-                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((uncompressedDbSize / 1024 / 1024) * 10) / 10}MB`);
+                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
                                 }
                             } else {
-                                // Fallback: time-based estimation
-                                const estimatedDuration = 10000; // 10 seconds
-                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65);
+                                // Fallback: time-based estimation (assuming 10 seconds for large DBs)
+                                const estimatedDuration = dbFileSize > 50 * 1024 * 1024 ? 10000 : 5000; // 10s for >50MB, 5s otherwise
+                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
                                 progress = 20 + timeProgress;
-                                setLoadingPhase('Loading database...');
+                                
+                                if (dbFileSize > 0) {
+                                    const estimatedMB = Math.min(
+                                        Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
+                                        Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
+                                    );
+                                    setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
+                                } else {
+                                    setLoadingPhase('Loading database...');
+                                }
                             }
-
+                            
                             setLoadingProgress(Math.min(85, progress));
                             lastProgress = progress;
                         };
 
-                        progressInterval = setInterval(updateProgress, 300);
+                        progressInterval = setInterval(updateProgress, 200);
 
                         // Test if database is accessible and prefetch initial data
                         try {
@@ -200,12 +294,20 @@ export default function Entitlements() {
                             columns = schemaRes[0].values.map((row: any[]) => row[1]);
                         }
 
-                        const requiredColumns = ['file_path', 'key_id', 'value_id', 'ios_version'];
-                        const missingColumns = requiredColumns.filter(col => !columns.includes(col));
-
-                        if (missingColumns.length > 0) {
-                            throw new Error(`Database schema mismatch. Missing required columns: ${missingColumns.join(', ')}`);
+                        // Check for both old and new schema formats
+                        const oldSchemaColumns = ['file_path', 'key', 'ios_version'];
+                        const newSchemaColumns = ['file_path', 'key_id', 'value_id', 'ios_version'];
+                        
+                        const hasOldSchema = oldSchemaColumns.every(col => columns.includes(col));
+                        const hasNewSchema = newSchemaColumns.every(col => columns.includes(col));
+                        
+                        if (!hasOldSchema && !hasNewSchema) {
+                            const missingOldColumns = oldSchemaColumns.filter(col => !columns.includes(col));
+                            const missingNewColumns = newSchemaColumns.filter(col => !columns.includes(col));
+                            throw new Error(`Database schema mismatch. Missing columns for old schema: ${missingOldColumns.join(', ')} or new schema: ${missingNewColumns.join(', ')}`);
                         }
+                        
+                        console.log(hasOldSchema ? 'Using old database schema' : 'Using new database schema');
 
                         // Get available iOS versions
                         setLoadingPhase('Loading iOS versions...');
@@ -289,80 +391,151 @@ export default function Entitlements() {
             setLoading(true);
             setError('');
 
+            // First detect which schema we're using
+            const schemaRes = await (dbWorker.db as any).exec(`PRAGMA table_info(entitlement_keys);`);
+            let columns: string[] = [];
+            if (schemaRes && schemaRes.length > 0 && schemaRes[0] && schemaRes[0].values) {
+                columns = schemaRes[0].values.map((row: any[]) => row[1]);
+            }
+            
+            const hasOldSchema = ['file_path', 'key', 'ios_version'].every(col => columns.includes(col));
             let sqlQuery = '';
             let params: any[] = [];
 
-            if (type === 'key') {
-                sqlQuery = `
-                    SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value, 
-                           CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
-                           CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
-                           CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
-                           CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
-                           ek.ios_version, ek.build_id, ek.device_list
-                    FROM entitlement_keys ek
-                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
-                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
-                    WHERE uk.key LIKE ?
-                `;
-                params = [`%${query}%`];
+            if (hasOldSchema) {
+                // Use old schema format
+                if (type === 'key') {
+                    sqlQuery = `
+                        SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
+                        FROM entitlement_keys 
+                        WHERE key LIKE ?
+                    `;
+                    params = [`%${query}%`];
+                } else {
+                    sqlQuery = `
+                        SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
+                        FROM entitlement_keys 
+                        WHERE file_path LIKE ?
+                    `;
+                    params = [`%${query}%`];
+                }
+
+                // Add iOS version filter if selected
+                if (version) {
+                    sqlQuery += ` AND ios_version = ?`;
+                    params.push(version);
+                }
+
+                // Add executable path filter if selected
+                const effectivePathFilter = pathFilter || selectedExecutablePath;
+                if (effectivePathFilter) {
+                    sqlQuery += ` AND file_path = ?`;
+                    params.push(effectivePathFilter);
+                }
+
+                sqlQuery += ` ORDER BY file_path, key LIMIT 200`;
+
+                const res = await (dbWorker.db as any).exec(sqlQuery, params);
+
+                let searchResults: any[] = [];
+                if (res && res.length > 0 && res[0] && res[0].values) {
+                    searchResults = res[0].values.map((row: any[]) => ({
+                        file_path: row[0],
+                        key: row[1],
+                        value_type: row[2],
+                        string_value: row[3],
+                        bool_value: row[4],
+                        number_value: row[5],
+                        array_value: row[6],
+                        dict_value: row[7],
+                        ios_version: row[8],
+                        build_id: row[9],
+                        device_list: row[10]
+                    }));
+                }
+
+                setResults(searchResults);
+                setHasSearched(true);
+
+                // Extract unique executable paths for the filter dropdown
+                if (!effectivePathFilter && searchResults.length > 0) {
+                    const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
+                    setAvailableExecutablePaths(uniquePaths);
+                }
             } else {
-                sqlQuery = `
-                    SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value,
-                           CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
-                           CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
-                           CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
-                           CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
-                           ek.ios_version, ek.build_id, ek.device_list
-                    FROM entitlement_keys ek
-                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
-                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
-                    WHERE ek.file_path LIKE ?
-                `;
-                params = [`%${query}%`];
-            }
+                // Use new schema format with JOINs
+                if (type === 'key') {
+                    sqlQuery = `
+                        SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value, 
+                               CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
+                               CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
+                               CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
+                               CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
+                               ek.ios_version, ek.build_id, ek.device_list
+                        FROM entitlement_keys ek
+                        JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                        JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                        WHERE uk.key LIKE ?
+                    `;
+                    params = [`%${query}%`];
+                } else {
+                    sqlQuery = `
+                        SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value,
+                               CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
+                               CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
+                               CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
+                               CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
+                               ek.ios_version, ek.build_id, ek.device_list
+                        FROM entitlement_keys ek
+                        JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                        JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                        WHERE ek.file_path LIKE ?
+                    `;
+                    params = [`%${query}%`];
+                }
 
-            // Add iOS version filter if selected
-            if (version) {
-                sqlQuery += ` AND ek.ios_version = ?`;
-                params.push(version);
-            }
+                // Add iOS version filter if selected
+                if (version) {
+                    sqlQuery += ` AND ek.ios_version = ?`;
+                    params.push(version);
+                }
 
-            // Add executable path filter if selected
-            const effectivePathFilter = pathFilter || selectedExecutablePath;
-            if (effectivePathFilter) {
-                sqlQuery += ` AND ek.file_path = ?`;
-                params.push(effectivePathFilter);
-            }
+                // Add executable path filter if selected
+                const effectivePathFilter = pathFilter || selectedExecutablePath;
+                if (effectivePathFilter) {
+                    sqlQuery += ` AND ek.file_path = ?`;
+                    params.push(effectivePathFilter);
+                }
 
-            sqlQuery += ` ORDER BY ek.file_path, uk.key LIMIT 200`;
+                sqlQuery += ` ORDER BY ek.file_path, uk.key LIMIT 200`;
 
-            const res = await (dbWorker.db as any).exec(sqlQuery, params);
+                const res = await (dbWorker.db as any).exec(sqlQuery, params);
 
-            let searchResults: any[] = [];
-            if (res && res.length > 0 && res[0] && res[0].values) {
-                searchResults = res[0].values.map((row: any[]) => ({
-                    file_path: row[0],
-                    key: row[1],
-                    value_type: row[2],
-                    string_value: row[3],
-                    bool_value: row[4],
-                    number_value: row[5],
-                    array_value: row[6],
-                    dict_value: row[7],
-                    ios_version: row[8],
-                    build_id: row[9],
-                    device_list: row[10]
-                }));
-            }
+                let searchResults: any[] = [];
+                if (res && res.length > 0 && res[0] && res[0].values) {
+                    searchResults = res[0].values.map((row: any[]) => ({
+                        file_path: row[0],
+                        key: row[1],
+                        value_type: row[2],
+                        string_value: row[3],
+                        bool_value: row[4],
+                        number_value: row[5],
+                        array_value: row[6],
+                        dict_value: row[7],
+                        ios_version: row[8],
+                        build_id: row[9],
+                        device_list: row[10]
+                    }));
+                }
 
-            setResults(searchResults);
-            setHasSearched(true);
+                setResults(searchResults);
+                setHasSearched(true);
 
-            // Extract unique executable paths for the filter dropdown
-            if (!effectivePathFilter && searchResults.length > 0) {
-                const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
-                setAvailableExecutablePaths(uniquePaths);
+                // Extract unique executable paths for the filter dropdown
+                if (!effectivePathFilter && searchResults.length > 0) {
+                    const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
+                    setAvailableExecutablePaths(uniquePaths);
+                }
             }
         } catch (err) {
             console.error('Search failed:', err);
