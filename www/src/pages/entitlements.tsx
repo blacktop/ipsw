@@ -38,7 +38,7 @@ export default function Entitlements() {
 
                     // Use pre-calculated database file size for reliable progress tracking
                     // Update this size when the database changes using: ./hack/update-db-size.sh
-                    const dbFileSize = 32550912; // Exact size of ipsw.db in bytes
+                    const dbFileSize = 30897152; // Exact size of ipsw.db in bytes
 
                     let worker;
                     try {
@@ -54,14 +54,15 @@ export default function Entitlements() {
                         setLoadingPhase('Initializing database worker...');
                         setLoadingProgress(20);
 
-                        // Use chunked mode to avoid gzip compression issues on GitHub Pages
+                        // Use full mode with explicit file length - GitHub Pages compression handling
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
                                 config: {
-                                    serverMode: 'chunked',
+                                    serverMode: 'full',
                                     url: `${basePath}/db/ipsw.db`,
-                                    requestChunkSize: 512 * 1024 // 512KB chunks for better compatibility
+                                    requestChunkSize: 512 * 1024, // 512KB chunks for better compatibility
+                                    ...{ fileLength: dbFileSize } as any // Use uncompressed size explicitly
                                 }
                             }],
                             `${basePath}/sqlite.worker.js`,
