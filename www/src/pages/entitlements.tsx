@@ -146,7 +146,8 @@ export default function Entitlements() {
                                 config: {
                                     serverMode: 'full',
                                     requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`
+                                    url: `${basePath}/db/ipsw.db`,
+                                    totalBytes: 14630912 // Actual uncompressed size of ipsw.db
                                     // Note: Removed cacheBust to enable browser caching
                                     // Database will be cached by browser's HTTP cache
                                 }
