@@ -54,13 +54,13 @@ export default function Entitlements() {
                         
                         // Fallback to hardcoded size if HEAD request fails (GitHub Pages issue)
                         if (!dbFileSize) {
-                            dbFileSize = 16967680; // 16.2 MB - actual database size
+                            dbFileSize = 9800704; // 9.3 MB - actual database size
                             console.warn('Using fallback database size:', dbFileSize);
                         }
                     } catch (sizeError) {
                         console.warn('Could not determine database file size:', sizeError);
                         // Fallback to hardcoded size
-                        dbFileSize = 16967680; // 16.2 MB - actual database size
+                        dbFileSize = 9800704; // 9.3 MB - actual database size
                     }
 
                     let worker;
