@@ -35,25 +35,9 @@ export default function Entitlements() {
                     setLoadingPhase('Initializing...');
                     setError('');
 
-                    // Get database file size for progress tracking
-                    let dbFileSize = 0;
-                    try {
-                        setLoadingPhase('Checking database size...');
-                        const basePath = process.env.NODE_ENV === 'development' 
-                            ? window.location.origin + '/ipsw'
-                            : window.location.origin + '/ipsw';
-                        
-                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
-                        if (headResponse.ok) {
-                            const contentLength = headResponse.headers.get('content-length');
-                            if (contentLength) {
-                                dbFileSize = parseInt(contentLength, 10);
-                            }
-                        }
-                    } catch (sizeError) {
-                        console.warn('Could not determine database file size:', sizeError);
-                        // Continue without size info
-                    }
+                    // Use pre-calculated database file size for reliable progress tracking
+                    // Update this size when the database changes using: ./hack/update-db-size.sh
+                    const dbFileSize = 128379904; // Exact size of ipsw.db in bytes
 
                     let worker;
                     try {
@@ -137,8 +121,10 @@ export default function Entitlements() {
                         setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
 
-                        // Set reasonable max bytes to read based on database size
-                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
+                        // Use pre-calculated database size since GitHub Pages doesn't always provide Content-Length
+                        // Update this size when the database changes using: ./hack/update-db-size.sh
+                        const actualDbSize = 128379904; // Exact size of ipsw.db in bytes
+                        const maxBytesToRead = actualDbSize + (10 * 1024 * 1024); // DB size + 10MB buffer
 
                         worker = await createDbWorker(
                             [{
@@ -160,13 +146,13 @@ export default function Entitlements() {
                         let progressInterval: NodeJS.Timeout | null = null;
                         let startTime = Date.now();
                         let lastProgress = 20;
-                        
+
                         const updateProgress = () => {
                             const elapsed = Date.now() - startTime;
                             let progress = lastProgress;
-                            
+
                             // Try to get actual bytes read if available
-                            if ((worker as any).worker?.bytesRead !== undefined && dbFileSize > 0) {
+                            if ((worker as any).worker?.bytesRead !== undefined) {
                                 const bytesRead = (worker as any).worker.bytesRead || 0;
                                 if (bytesRead > 0) {
                                     const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
@@ -174,22 +160,18 @@ export default function Entitlements() {
                                     setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
                                 }
                             } else {
-                                // Fallback: time-based estimation (assuming 10 seconds for large DBs)
-                                const estimatedDuration = dbFileSize > 50 * 1024 * 1024 ? 10000 : 5000; // 10s for >50MB, 5s otherwise
+                                // Fallback: time-based estimation (10 seconds for this 128MB DB)
+                                const estimatedDuration = 10000; // 10 seconds for our 128MB database
                                 const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
                                 progress = 20 + timeProgress;
-                                
-                                if (dbFileSize > 0) {
-                                    const estimatedMB = Math.min(
-                                        Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
-                                        Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
-                                    );
-                                    setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                                } else {
-                                    setLoadingPhase('Loading database...');
-                                }
+
+                                const estimatedMB = Math.min(
+                                    Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
+                                    Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
+                                );
+                                setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
                             }
-                            
+
                             setLoadingProgress(Math.min(85, progress));
                             lastProgress = progress;
                         };
@@ -202,16 +184,16 @@ export default function Entitlements() {
                             if (progressInterval) {
                                 clearInterval(progressInterval);
                             }
-                            
+
                             setLoadingPhase('Connecting to database...');
                             setLoadingProgress(87);
-                            
+
                             // This query will force loading of the SQLite header and schema
                             await (worker.db as any).exec('SELECT 1;');
 
                             setLoadingPhase('Initializing database...');
                             setLoadingProgress(90);
-                            
+
                             // Prefetch the iOS versions to cache the index pages
                             await (worker.db as any).exec(
                                 `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
@@ -595,8 +577,8 @@ export default function Entitlements() {
                             <span>{loadingPhase}</span>
                             <div className="progress-container">
                                 <div className="progress-bar">
-                                    <div 
-                                        className="progress-fill" 
+                                    <div
+                                        className="progress-fill"
                                         style={{ width: `${loadingProgress}%` }}
                                     ></div>
                                 </div>
@@ -904,10 +886,7 @@ export default function Entitlements() {
                 .entitlements-title {
                     font-size: 3rem;
                     font-weight: 700;
-                    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
-                    background-clip: text;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    color: var(--ifm-color-primary);
                     margin-bottom: 1rem;
                     letter-spacing: -0.025em;
                 }
