@@ -125,18 +125,19 @@ export default function Entitlements() {
                         // Use pre-calculated database size since GitHub Pages doesn't always provide Content-Length
                         // Update this size when the database changes using: ./hack/update-db-size.sh
                         const actualDbSize = 32550912; // Exact size of ipsw.db in bytes
-                        const maxBytesToRead = actualDbSize + (10 * 1024 * 1024); // DB size + 10MB buffer
+
+                        // Create a custom lazyFile configuration with known size
+                        const lazyFileConfig = {
+                            serverMode: 'full',
+                            requestChunkSize: requestChunkSize,
+                            url: `${basePath}/db/ipsw.db`,
+                            fileLength: actualDbSize
+                        };
 
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
-                                config: {
-                                    serverMode: 'full',
-                                    requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`
-                                    // Note: Removed cacheBust to enable browser caching
-                                    // Database will be cached by browser's HTTP cache
-                                }
+                                config: lazyFileConfig as any  // Type assertion to bypass TS checking
                             }],
                             workerUrl,
                             wasmUrl,
@@ -161,8 +162,8 @@ export default function Entitlements() {
                                     setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
                                 }
                             } else {
-                                // Fallback: time-based estimation (10 seconds for this 128MB DB)
-                                const estimatedDuration = 10000; // 10 seconds for our 128MB database
+                                // Fallback: time-based estimation (3 seconds for this 31MB DB)
+                                const estimatedDuration = 3000; // 3 seconds for our 31MB database
                                 const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
                                 progress = 20 + timeProgress;
 
