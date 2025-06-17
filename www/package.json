@@ -29,6 +29,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "redocusaurus": "^2.5.0",
+    "sql.js": "^1.13.0",
     "sql.js-httpvfs": "^0.8.12"
   },
   "devDependencies": {
