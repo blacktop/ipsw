@@ -22,7 +22,7 @@ jobs:
       - name: Determine latest IPSW URL
         id: get-ipsw
         run: |
-          # TODO: replace with actual logic to fetch the latest IPSW URL
+          # Get the latest IPSW URL
           echo "CURRENT_IPSW_URL=$(./ipsw dl ipsw --device iPhone17,1 --latest --urls)" >> $GITHUB_ENV
 
       - name: Check for new IPSW
@@ -42,20 +42,36 @@ jobs:
       - name: Download IPSW
         if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
+          echo "Downloading IPSW: $CURRENT_IPSW_URL"
           curl -L "$CURRENT_IPSW_URL" -o latest.ipsw
+          echo "IPSW downloaded: $(ls -lh latest.ipsw)"
 
-      - name: Generate entitlements database
+      - name: Update entitlements database
         if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
-          ./ipsw ent --db www/static/db/ipsw.db --ipsw latest.ipsw
+          echo "Updating Supabase entitlements database..."
+          ./ipsw ent \
+            --pg-host  ${{ secrets.SUPABASE_HOST }} \
+            --pg-port 6543 \
+            --pg-user postgres \
+            --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
+            --pg-database postgres \
+            --pg-sslmode require \
+            --ipsw latest.ipsw
+          echo "Database update completed successfully"
 
-      - name: Commit and push updated DB
+      - name: Update cache and commit
         if: steps.check-ipsw.outputs.should_update == 'true'
         run: |
+          # Update the cache file with the new IPSW URL
           jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw = {"url": $url}' hack/.watch_cache > hack/.watch_cache.tmp
           mv hack/.watch_cache.tmp hack/.watch_cache
+          
+          # Configure git
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git add hack/.watch_cache www/static/db/ipsw.db
-          git commit -m "chore(ents): update to $CURRENT_IPSW_URL [skip ci]" || echo "No changes to commit"
+          
+          # Commit only the cache file (no more SQLite DB to commit)
+          git add hack/.watch_cache
+          git commit -m "chore(ents): update entitlements DB to $CURRENT_IPSW_URL [skip ci]" || echo "No changes to commit"
           git push 

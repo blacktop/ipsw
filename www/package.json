@@ -23,14 +23,13 @@
     "@docusaurus/theme-mermaid": "^3.8.1",
     "@docusaurus/theme-search-algolia": "^3.8.1",
     "@mdx-js/react": "^3.1.0",
+    "@supabase/supabase-js": "^2.50.0",
     "clsx": "^2.1.1",
     "prism-react-renderer": "^2.4.1",
     "prism-themes": "^1.9.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "redocusaurus": "^2.5.0",
-    "sql.js": "^1.13.0",
-    "sql.js-httpvfs": "^0.8.12"
+    "redocusaurus": "^2.5.0"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.8.1",

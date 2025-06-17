@@ -8,6 +8,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 )
 
 // Postgres is a database that stores data in a Postgres database.
@@ -18,6 +19,7 @@ type Postgres struct {
 	User     string
 	Password string
 	Database string
+	SSLMode  string // SSL mode for connection (disable, require, verify-ca, verify-full)
 	// Config
 	BatchSize int
 
@@ -35,24 +37,67 @@ func NewPostgres(host, port, user, password, database string, batchSize int) (Da
 		User:      user,
 		Password:  password,
 		Database:  database,
+		SSLMode:   "disable", // Default to disable for local development
+		BatchSize: batchSize,
+	}, nil
+}
+
+// NewPostgresWithSSL creates a new Postgres database with SSL configuration.
+func NewPostgresWithSSL(host, port, user, password, database, sslMode string, batchSize int) (Database, error) {
+	if host == "" || port == "" || user == "" || database == "" {
+		return nil, fmt.Errorf("'host', 'port', 'user' and 'database' are required")
+	}
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	return &Postgres{
+		Host:      host,
+		Port:      port,
+		User:      user,
+		Password:  password,
+		Database:  database,
+		SSLMode:   sslMode,
 		BatchSize: batchSize,
 	}, nil
 }
 
 // Connect connects to the database.
 func (p *Postgres) Connect() (err error) {
-	p.db, err = gorm.Open(postgres.Open(fmt.Sprintf(
-		"host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
-		p.Host, p.Port, p.User, p.Database, p.Password,
-	)), &gorm.Config{
-		CreateBatchSize:        p.BatchSize,
+	// Use a connection string that disables prepared statements to avoid conflicts
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
+		p.Host, p.Port, p.User, p.Database, p.Password, p.SSLMode,
+	)
+	
+	p.db, err = gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true, // Use simple protocol to avoid prepared statements
+	}), &gorm.Config{
+		CreateBatchSize:        1000, // Larger batch size for bulk operations
 		SkipDefaultTransaction: true,
 		TranslateError:         true,
-		// Logger:                 logger.Default.LogMode(logger.Silent),
+		PrepareStmt:            false, // Disable prepared statements to avoid conflicts
+		Logger:                 logger.Default.LogMode(logger.Silent),
+		// Performance optimizations for bulk operations
+		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
 	}
+	// Check if we already have the main tables (they might have been created manually)
+	var ipswTableCount int64
+	err = p.db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'ipsws' AND table_schema = CURRENT_SCHEMA()").Scan(&ipswTableCount).Error
+	if err != nil {
+		return fmt.Errorf("failed to check table existence: %w", err)
+	}
+	
+	if ipswTableCount > 0 {
+		// Main tables already exist, skip migration
+		// This handles the case where tables were created manually via schema.sql
+		return nil
+	}
+	
+	// Tables don't exist, let GORM create them
 	return p.db.AutoMigrate(
 		&model.Ipsw{},
 		&model.Device{},
@@ -62,6 +107,11 @@ func (p *Postgres) Connect() (err error) {
 		&model.Path{},
 		&model.Symbol{},
 		&model.Name{},
+		// Entitlement models
+		&model.EntitlementUniqueKey{},
+		&model.EntitlementUniqueValue{},
+		&model.EntitlementUniquePath{},
+		&model.EntitlementWebSearch{},
 	)
 }
 
@@ -396,6 +446,11 @@ func convertToNames(names []string) []model.Name {
 func (p *Postgres) Delete(key string) error {
 	p.db.Delete(&model.Ipsw{}, key)
 	return nil
+}
+
+// GetDB returns the underlying GORM database instance.
+func (p *Postgres) GetDB() *gorm.DB {
+	return p.db
 }
 
 // Close closes the database.
