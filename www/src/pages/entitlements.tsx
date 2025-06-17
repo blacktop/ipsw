@@ -69,14 +69,16 @@ export default function Entitlements() {
                             setLoadingPhase('Loading worker files...');
                             setLoadingProgress(10);
 
-                            // Fetch the worker file and create a blob URL
-                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
-                            if (!workerResponse.ok) {
-                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
-                            }
-                            const workerBlob = await workerResponse.blob();
-                            workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
-                            setWorkerBlobUrl(workerUrl); // Store for cleanup
+                            // Fetch the worker file and patch it to force fileLength support for full mode
+                            const workerText = await (await fetch(`${basePath}/sqlite.worker.js`)).text();
+                            // Patch: override the condition that only passes fileLength for 'chunked' mode
+                            const patchedWorkerText = workerText.replace(
+                                /fileLength:"chunked"===e\.serverMode\?e\.databaseLengthBytes:void 0/,
+                                'fileLength:e.fileLength||e.databaseLengthBytes'
+                            );
+                            const workerBlob = new Blob([patchedWorkerText], { type: 'application/javascript' });
+                            workerUrl = URL.createObjectURL(workerBlob);
+                            setWorkerBlobUrl(workerUrl);
 
                             // WASM file can be loaded directly
                             wasmUrl = `${basePath}/sql-wasm.wasm`;
