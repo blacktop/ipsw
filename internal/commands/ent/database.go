@@ -14,6 +14,7 @@ import (
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/pkg/info"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // DatabaseService handles entitlement database operations
@@ -27,8 +28,11 @@ func NewDatabaseService(database db.Database) *DatabaseService {
 	ds := &DatabaseService{db: database}
 	
 	// Try to get GORM database if available
-	if gormDB, ok := database.(*db.Sqlite); ok {
-		ds.gormDB = gormDB.GetDB()
+	switch dbImpl := database.(type) {
+	case *db.Sqlite:
+		ds.gormDB = dbImpl.GetDB()
+	case *db.Postgres:
+		ds.gormDB = dbImpl.GetDB()
 	}
 	
 	return ds
@@ -59,9 +63,34 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 			ipswRecord.Devices = append(ipswRecord.Devices, device)
 		}
 
-		// Create or update IPSW record
-		if err := ds.db.Create(ipswRecord); err != nil {
-			return fmt.Errorf("failed to create IPSW record: %v", err)
+		// Create or update IPSW record (proper upsert)
+		if ds.gormDB != nil {
+			// Check if IPSW record already exists
+			var existingIPSW model.Ipsw
+			result := ds.gormDB.Where("id = ?", ipswRecord.ID).First(&existingIPSW)
+			
+			if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+				return fmt.Errorf("failed to check existing IPSW record: %v", result.Error)
+			}
+			
+			if result.Error == gorm.ErrRecordNotFound {
+				// Record doesn't exist, create it
+				if err := ds.gormDB.Create(ipswRecord).Error; err != nil {
+					return fmt.Errorf("failed to create IPSW record: %v", err)
+				}
+			} else {
+				// Record exists, update it
+				if err := ds.gormDB.Model(&existingIPSW).Updates(ipswRecord).Error; err != nil {
+					return fmt.Errorf("failed to update IPSW record: %v", err)
+				}
+				// Use the existing record for further processing
+				ipswRecord = &existingIPSW
+			}
+		} else {
+			// Fallback for other database types
+			if err := ds.db.Create(ipswRecord); err != nil {
+				return fmt.Errorf("failed to create IPSW record: %v", err)
+			}
 		}
 	} else {
 		// Create a minimal IPSW record for standalone usage
@@ -72,10 +101,268 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 		}
 	}
 
-	// Store entitlements directly to the normalized structure
+	// Store entitlements using bulk operations for better performance
+	if err := ds.storeEntitlementsBulk(ipswRecord, entDB); err != nil {
+		return fmt.Errorf("failed to bulk store entitlements: %v", err)
+	}
+
+	return nil
+}
+
+// storeEntitlementsBulk stores entitlements using bulk operations for much better performance
+func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB map[string]string) error {
+	if ds.gormDB == nil {
+		return fmt.Errorf("GORM database required for bulk entitlement storage")
+	}
+
+	// Collect all unique keys, values, and paths first
+	var allKeys []model.EntitlementUniqueKey
+	var allValues []model.EntitlementUniqueValue
+	var allPaths []model.EntitlementUniquePath
+	var webEntries []model.EntitlementWebSearch
+
+	// Maps to avoid duplicates during collection
+	keySet := make(map[string]bool)
+	valueSet := make(map[string]bool)  // using hash as key
+	pathSet := make(map[string]bool)
+
+	// Build device list string once
+	var deviceNames []string
+	for _, device := range ipswRecord.Devices {
+		deviceNames = append(deviceNames, device.Name)
+	}
+	deviceList := strings.Join(deviceNames, ",")
+
+	// First pass: collect all unique keys, values, and paths
 	for filePath, entPlist := range entDB {
-		if err := ds.storeEntitlement(ipswRecord, filePath, entPlist); err != nil {
-			return fmt.Errorf("failed to store entitlement for %s: %v", filePath, err)
+		if len(entPlist) == 0 {
+			continue
+		}
+
+		// Add path if not seen before
+		if !pathSet[filePath] {
+			allPaths = append(allPaths, model.EntitlementUniquePath{Path: filePath})
+			pathSet[filePath] = true
+		}
+
+		// Parse entitlement plist
+		ents := make(map[string]any)
+		if err := plist.NewDecoder(bytes.NewReader([]byte(entPlist))).Decode(&ents); err != nil {
+			continue // Skip invalid plists
+		}
+
+		for key, value := range ents {
+			// Add key if not seen before
+			if !keySet[key] {
+				allKeys = append(allKeys, model.EntitlementUniqueKey{Key: key})
+				keySet[key] = true
+			}
+
+			// Determine value string and type
+			var valueStr, valueType string
+			switch v := value.(type) {
+			case bool:
+				valueType = "bool"
+				if v {
+					valueStr = "true"
+				} else {
+					valueStr = "false"
+				}
+			case string:
+				valueType = "string"
+				valueStr = v
+			case int, int64, uint64:
+				valueType = "number"
+				if num, ok := v.(int64); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				} else if num, ok := v.(int); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				} else if num, ok := v.(uint64); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				}
+			case []any:
+				valueType = "array"
+				if jsonData, err := json.Marshal(v); err == nil {
+					valueStr = string(jsonData)
+				}
+			case map[string]any:
+				valueType = "dict"
+				if jsonData, err := json.Marshal(v); err == nil {
+					valueStr = string(jsonData)
+				}
+			default:
+				valueType = "unknown"
+				valueStr = fmt.Sprintf("%v", v)
+			}
+
+			// Add value if not seen before
+			valueHash := createValueHash(valueType, valueStr)
+			if !valueSet[valueHash] {
+				allValues = append(allValues, model.EntitlementUniqueValue{
+					Value:     valueStr,
+					ValueType: valueType,
+					ValueHash: valueHash,
+				})
+				valueSet[valueHash] = true
+			}
+		}
+	}
+
+	// Bulk insert unique keys, values, and paths with ON CONFLICT DO NOTHING
+	if len(allKeys) > 0 {
+		if err := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(allKeys, 1000).Error; err != nil {
+			return fmt.Errorf("failed to bulk insert unique keys: %v", err)
+		}
+	}
+
+	if len(allValues) > 0 {
+		if err := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(allValues, 1000).Error; err != nil {
+			return fmt.Errorf("failed to bulk insert unique values: %v", err)
+		}
+	}
+
+	if len(allPaths) > 0 {
+		if err := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(allPaths, 1000).Error; err != nil {
+			return fmt.Errorf("failed to bulk insert unique paths: %v", err)
+		}
+	}
+
+	// Query back only the keys, values, and paths we need to get their IDs
+	keyMap := make(map[string]uint)
+	valueMap := make(map[string]uint) // hash -> ID
+	pathMap := make(map[string]uint)
+
+	// Get key IDs for only the keys we need
+	if len(keySet) > 0 {
+		keyNames := make([]string, 0, len(keySet))
+		for key := range keySet {
+			keyNames = append(keyNames, key)
+		}
+		
+		var dbKeys []model.EntitlementUniqueKey
+		if err := ds.gormDB.Where("key IN ?", keyNames).Find(&dbKeys).Error; err != nil {
+			return fmt.Errorf("failed to query unique keys: %v", err)
+		}
+		for _, key := range dbKeys {
+			keyMap[key.Key] = key.ID
+		}
+	}
+
+	// Get value IDs for only the values we need  
+	if len(valueSet) > 0 {
+		valueHashes := make([]string, 0, len(valueSet))
+		for hash := range valueSet {
+			valueHashes = append(valueHashes, hash)
+		}
+		
+		var dbValues []model.EntitlementUniqueValue
+		if err := ds.gormDB.Where("value_hash IN ?", valueHashes).Find(&dbValues).Error; err != nil {
+			return fmt.Errorf("failed to query unique values: %v", err)
+		}
+		for _, value := range dbValues {
+			valueMap[value.ValueHash] = value.ID
+		}
+	}
+
+	// Get path IDs for only the paths we need
+	if len(pathSet) > 0 {
+		pathNames := make([]string, 0, len(pathSet))
+		for path := range pathSet {
+			pathNames = append(pathNames, path)
+		}
+		
+		var dbPaths []model.EntitlementUniquePath
+		if err := ds.gormDB.Where("path IN ?", pathNames).Find(&dbPaths).Error; err != nil {
+			return fmt.Errorf("failed to query unique paths: %v", err)
+		}
+		for _, path := range dbPaths {
+			pathMap[path.Path] = path.ID
+		}
+	}
+
+	// Second pass: create web entries with resolved IDs
+	for filePath, entPlist := range entDB {
+		if len(entPlist) == 0 {
+			continue
+		}
+
+		pathID, exists := pathMap[filePath]
+		if !exists {
+			continue // Skip if path not found
+		}
+
+		// Parse entitlement plist
+		ents := make(map[string]any)
+		if err := plist.NewDecoder(bytes.NewReader([]byte(entPlist))).Decode(&ents); err != nil {
+			continue // Skip invalid plists
+		}
+
+		for key, value := range ents {
+			keyID, keyExists := keyMap[key]
+			if !keyExists {
+				continue
+			}
+
+			// Determine value string and type (same logic as before)
+			var valueStr, valueType string
+			switch v := value.(type) {
+			case bool:
+				valueType = "bool"
+				if v {
+					valueStr = "true"
+				} else {
+					valueStr = "false"
+				}
+			case string:
+				valueType = "string"
+				valueStr = v
+			case int, int64, uint64:
+				valueType = "number"
+				if num, ok := v.(int64); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				} else if num, ok := v.(int); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				} else if num, ok := v.(uint64); ok {
+					valueStr = fmt.Sprintf("%d", num)
+				}
+			case []any:
+				valueType = "array"
+				if jsonData, err := json.Marshal(v); err == nil {
+					valueStr = string(jsonData)
+				}
+			case map[string]any:
+				valueType = "dict"
+				if jsonData, err := json.Marshal(v); err == nil {
+					valueStr = string(jsonData)
+				}
+			default:
+				valueType = "unknown"
+				valueStr = fmt.Sprintf("%v", v)
+			}
+
+			valueHash := createValueHash(valueType, valueStr)
+			valueID, valueExists := valueMap[valueHash]
+			if !valueExists {
+				continue
+			}
+
+			// Create web entry
+			webEntry := model.EntitlementWebSearch{
+				IOSVersion: ipswRecord.Version,
+				BuildID:    ipswRecord.BuildID,
+				DeviceList: deviceList,
+				PathID:     pathID,
+				KeyID:      keyID,
+				ValueID:    valueID,
+			}
+			webEntries = append(webEntries, webEntry)
+		}
+	}
+
+	// Bulk insert web entries with ON CONFLICT DO NOTHING
+	if len(webEntries) > 0 {
+		if err := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(webEntries, 1000).Error; err != nil {
+			return fmt.Errorf("failed to bulk insert web entries: %v", err)
 		}
 	}
 
@@ -156,7 +443,7 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 					return fmt.Errorf("failed to get unique path ID for '%s': %v", filePath, err)
 				}
 
-				// Create web search entry
+				// Create or update web search entry (idempotent)
 				webEntry := &model.EntitlementWebSearch{
 					IOSVersion: ipswRecord.Version,
 					BuildID:    ipswRecord.BuildID,
@@ -166,9 +453,22 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 					ValueID:    valueID,
 				}
 
-				if err := ds.gormDB.Create(webEntry).Error; err != nil {
-					return fmt.Errorf("failed to create web search entry: %v", err)
+				// Check if this exact combination already exists
+				var existingEntry model.EntitlementWebSearch
+				result := ds.gormDB.Where("ios_version = ? AND build_id = ? AND path_id = ? AND key_id = ? AND value_id = ?",
+					webEntry.IOSVersion, webEntry.BuildID, webEntry.PathID, webEntry.KeyID, webEntry.ValueID).First(&existingEntry)
+
+				if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+					return fmt.Errorf("failed to check existing web search entry: %v", result.Error)
 				}
+
+				if result.Error == gorm.ErrRecordNotFound {
+					// Entry doesn't exist, create it
+					if err := ds.gormDB.Create(webEntry).Error; err != nil {
+						return fmt.Errorf("failed to create web search entry: %v", err)
+					}
+				}
+				// If entry exists, skip it (idempotent behavior)
 			}
 		}
 	}
@@ -361,7 +661,7 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
 		Select("uk.key, COUNT(*) as count").
 		Group("uk.key").
-		Order("count DESC").
+		Order("COUNT(*) DESC").  // Use COUNT(*) instead of alias in ORDER BY
 		Limit(10).
 		Scan(&topKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to get top keys: %v", err)
@@ -377,8 +677,8 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
 		Select("uk.key, COUNT(*) as count").
 		Group("uk.key").
-		Having("count > 1").  // Exclude keys that appear only once
-		Order("count ASC").
+		Having("COUNT(*) > 1").  // Use COUNT(*) instead of alias in HAVING clause
+		Order("COUNT(*) ASC").   // Use COUNT(*) instead of alias in ORDER BY
 		Limit(10).
 		Scan(&leastKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to get least common keys: %v", err)

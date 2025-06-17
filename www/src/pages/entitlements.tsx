@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '@theme/Layout';
-import { createDbWorker } from 'sql.js-httpvfs';
+import { EntitlementsService, EntitlementResult } from '../lib/supabase';
 
 export default function Entitlements() {
-    const [dbWorker, setDbWorker] = useState<any>(null);
     const [iosVersions, setIosVersions] = useState<string[]>([]);
     const [selectedVersion, setSelectedVersion] = useState<string>('');
     const [searchType, setSearchType] = useState<'key' | 'file'>('key');
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<EntitlementResult[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [dbLoading, setDbLoading] = useState<boolean>(true);
-    const [loadingProgress, setLoadingProgress] = useState<number>(0);
-    const [loadingPhase, setLoadingPhase] = useState<string>('Initializing...');
     const [error, setError] = useState<string>('');
-    const [workerBlobUrl, setWorkerBlobUrl] = useState<string | null>(null);
     const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
     const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
     const [selectedExecutablePath, setSelectedExecutablePath] = useState<string>('');
@@ -22,497 +18,46 @@ export default function Entitlements() {
     const [hasSearched, setHasSearched] = useState<boolean>(false);
 
     useEffect(() => {
-        const initDb = async () => {
-            if (!dbWorker) {
-                const timeoutId = setTimeout(() => {
-                    setDbLoading(false);
-                    setError('Database initialization timed out. The database file may be missing or corrupted.');
-                }, 30000); // Increase timeout to 30 seconds for large database
+        const initSupabase = async () => {
+            try {
+                setDbLoading(true);
+                setError('');
 
-                try {
-                    setDbLoading(true);
-                    setLoadingProgress(0);
-                    setLoadingPhase('Initializing...');
-                    setError('');
-
-                    // Get database file size for progress tracking
-                    let dbFileSize = 0;
-                    try {
-                        setLoadingPhase('Checking database size...');
-                        const basePath = process.env.NODE_ENV === 'development'
-                            ? window.location.origin + '/ipsw'
-                            : window.location.origin + '/ipsw';
-
-                        // Try multiple methods to get the actual file size
-                        // Method 1: HEAD with Accept-Encoding: identity and CORS mode
-                        let headResponse = await fetch(`${basePath}/db/ipsw.db`, {
-                            method: 'HEAD',
-                            mode: 'cors',
-                            cache: 'no-cache',
-                            headers: {
-                                'Accept-Encoding': 'identity',
-                                'Cache-Control': 'no-cache'
-                            }
-                        });
-
-                        if (headResponse.ok) {
-                            const contentLength = headResponse.headers.get('content-length');
-                            const contentEncoding = headResponse.headers.get('content-encoding');
-
-                            if (contentLength && !contentEncoding) {
-                                // Got uncompressed size
-                                dbFileSize = parseInt(contentLength, 10);
-                                console.log('Got uncompressed file size from HEAD:', dbFileSize);
-                            } else if (contentLength && contentEncoding === 'gzip') {
-                                // Server returned gzipped size, try Range request to get real size
-                                console.log('HEAD returned gzipped size, trying Range request...');
-                                try {
-                                    const rangeResponse = await fetch(`${basePath}/db/ipsw.db`, {
-                                        mode: 'cors',
-                                        cache: 'no-cache',
-                                        headers: {
-                                            'Range': 'bytes=-1',
-                                            'Accept-Encoding': 'identity',
-                                            'Cache-Control': 'no-cache'
-                                        }
-                                    });
-
-                                    if (rangeResponse.status === 206) {
-                                        const contentRange = rangeResponse.headers.get('content-range');
-                                        if (contentRange) {
-                                            // Parse "bytes start-end/total" format
-                                            const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
-                                            if (match) {
-                                                dbFileSize = parseInt(match[1], 10);
-                                                console.log('Got uncompressed file size from Range:', dbFileSize);
-                                            }
-                                        }
-                                    }
-                                } catch (rangeError) {
-                                    console.warn('Range request failed:', rangeError);
-                                }
-                            }
-                        }
-                    } catch (sizeError) {
-                        console.warn('Could not determine database file size:', sizeError);
-                        // Continue without size info
-                    }
-
-                    let worker;
-                    try {
-                        // Check for WASM support first
-                        if (typeof WebAssembly === 'undefined') {
-                            throw new Error('WebAssembly is not supported in this browser');
-                        }
-
-                        // Determine base URL for development vs production
-                        const isDev = process.env.NODE_ENV === 'development';
-                        const currentPath = window.location.pathname;
-                        let basePath = '';
-
-                        if (isDev) {
-                            // In development, Docusaurus serves static files from /ipsw/ even in dev mode
-                            basePath = window.location.origin + '/ipsw';
-                        } else {
-                            // In production, handle the /ipsw base URL
-                            // GitHub Pages may serve from /ipsw or root depending on configuration
-                            const isGitHubPages = window.location.hostname.includes('github.io');
-                            if (isGitHubPages) {
-                                // For GitHub Pages, try different base path strategies
-                                const pathSegments = window.location.pathname.split('/').filter(s => s);
-                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
-                                    // Already at /ipsw/ path
-                                    basePath = window.location.origin + '/ipsw';
-                                } else if (pathSegments.length > 0) {
-                                    // Might be at /repository-name/
-                                    basePath = window.location.origin + '/' + pathSegments[0];
-                                } else {
-                                    // Fallback to /ipsw
-                                    basePath = window.location.origin + '/ipsw';
-                                }
-                            } else {
-                                basePath = window.location.origin + '/ipsw';
-                            }
-                        }
-
-                        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
-                        console.log(`Current path: ${currentPath}`);
-                        console.log(`Determined base path: ${basePath}`);
-                        console.log(`Will attempt to load database from: ${basePath}/db/ipsw.db`);
-                        console.log(`Will attempt to load worker from: ${basePath}/sqlite.worker.js`);                        // Test file accessibility before proceeding
-                        try {
-                            setLoadingPhase('Verifying file accessibility...');
-                            setLoadingProgress(5);
-                            
-                            // Quick accessibility test for critical files with multiple strategies
-                            const testFile = async (url: string, name: string) => {
-                                const strategies = [
-                                    // Strategy 1: CORS mode with explicit headers
-                                    () => fetch(url, { 
-                                        method: 'HEAD', 
-                                        mode: 'cors',
-                                        cache: 'no-cache',
-                                        headers: {
-                                            'Accept': '*/*',
-                                            'Cache-Control': 'no-cache'
-                                        }
-                                    }),
-                                    // Strategy 2: no-cors mode (limited info but may work)
-                                    () => fetch(url, { 
-                                        method: 'HEAD', 
-                                        mode: 'no-cors',
-                                        cache: 'no-cache'
-                                    }),
-                                    // Strategy 3: GET request with minimal data (as fallback)
-                                    () => fetch(url, { 
-                                        method: 'GET', 
-                                        mode: 'cors',
-                                        headers: {
-                                            'Range': 'bytes=0-0', // Just get the first byte
-                                            'Accept': '*/*'
-                                        }
-                                    })
-                                ];
-                                
-                                for (let i = 0; i < strategies.length; i++) {
-                                    try {
-                                        const response = await strategies[i]();
-                                        if (response.ok || response.type === 'opaque') {
-                                            console.log(`${name} accessible via strategy ${i + 1}`);
-                                            return response;
-                                        }
-                                    } catch (err) {
-                                        console.warn(`${name} strategy ${i + 1} failed:`, err);
-                                        if (i === strategies.length - 1) {
-                                            throw err;
-                                        }
-                                    }
-                                }
-                                throw new Error('All strategies failed');
-                            };
-                            
-                            // Test each required file
-                            await testFile(`${basePath}/sqlite.worker.js`, 'Worker file');
-                            await testFile(`${basePath}/sql-wasm.wasm`, 'WASM file');
-                            await testFile(`${basePath}/db/ipsw.db`, 'Database file');
-                            
-                            console.log('All required files are accessible');
-                        } catch (accessError) {
-                            console.error('File accessibility test failed:', accessError);
-                            throw new Error(`File accessibility test failed: ${accessError.message}\n\nPlease ensure all required files are properly deployed to GitHub Pages.\n\nExpected files:\n- ${basePath}/sqlite.worker.js\n- ${basePath}/sql-wasm.wasm\n- ${basePath}/db/ipsw.db\n\nTip: Try accessing these URLs directly in your browser to verify they're available.`);
-                        }
-
-
-                        // Create blob URL for worker to avoid MIME type issues
-                        let workerUrl, wasmUrl;
-                        try {
-                            setLoadingPhase('Loading worker files...');
-                            setLoadingProgress(10);
-
-                            // Fetch the worker file and create a blob URL with CORS headers and retry logic
-                            const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3) => {
-                                for (let i = 0; i < maxRetries; i++) {
-                                    try {
-                                        const response = await fetch(url, options);
-                                        if (response.ok) {
-                                            return response;
-                                        }
-                                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                                    } catch (err) {
-                                        console.warn(`Fetch attempt ${i + 1}/${maxRetries} failed for ${url}:`, err);
-                                        if (i === maxRetries - 1) {
-                                            throw err;
-                                        }
-                                        // Wait before retry with exponential backoff
-                                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-                                    }
-                                }
-                            };
-
-                            const workerResponse = await fetchWithRetry(`${basePath}/sqlite.worker.js`, {
-                                mode: 'cors',
-                                cache: 'force-cache', // Use browser cache for better performance
-                                headers: {
-                                    'Accept': 'application/javascript, text/javascript, */*'
-                                }
-                            });
-                            
-                            if (!workerResponse.ok) {
-                                throw new Error(`Worker fetch failed: ${workerResponse.status} ${workerResponse.statusText}`);
-                            }
-                            const workerBlob = await workerResponse.blob();
-                            workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
-                            setWorkerBlobUrl(workerUrl); // Store for cleanup
-
-                            // WASM file can be loaded directly with CORS
-                            wasmUrl = `${basePath}/sql-wasm.wasm`;
-
-                        } catch (fetchError) {
-                            console.error('Failed to fetch worker files:', fetchError);
-
-                            // Check if this is a CORS error
-                            if (fetchError.message.includes('CORS') ||
-                                fetchError.message.includes('Cross-Origin') ||
-                                fetchError.message.includes('NetworkError') ||
-                                fetchError.name === 'TypeError') {
-                                throw new Error(`CORS Error: Unable to load worker files. This may be due to GitHub Pages CORS restrictions. Please ensure your database and worker files are properly deployed and accessible. Original error: ${fetchError.message}`);
-                            }
-
-                            throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
-                        }
-
-                        // Detect connection speed and adjust chunk size accordingly
-                        // Base size aligned with optimized SQLite page size (1024 bytes)
-                        const basePageSize = 1024;
-                        let requestChunkSize = basePageSize; // Start with SQLite page size
-
-                        // Use Network Information API if available
-                        const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
-                        if (connection) {
-                            const effectiveType = connection.effectiveType;
-                            const downlink = connection.downlink; // Mbps
-
-                            // Scale chunk size based on connection speed (multiples of page size for efficiency)
-                            if (downlink && downlink > 100) {
-                                // Ultra-fast connections (>100 Mbps): 2MB (2048 pages)
-                                requestChunkSize = basePageSize * 2048;
-                            } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
-                                // Fast connections (>25 Mbps): 1MB (1024 pages)
-                                requestChunkSize = basePageSize * 1024;
-                            } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
-                                // Medium connections (>5 Mbps): 256KB (256 pages)
-                                requestChunkSize = basePageSize * 256;
-                            } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
-                                // Slow connections: 64KB (64 pages)
-                                requestChunkSize = basePageSize * 64;
-                            } else {
-                                // Default to large chunks for unknown but modern connections: 512KB (512 pages)
-                                requestChunkSize = basePageSize * 512;
-                            }
-                        } else {
-                            // No Network Information API, assume modern fast connection: 2MB (2048 pages)
-                            requestChunkSize = basePageSize * 2048;
-                        }
-
-                        console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
-
-                        setLoadingPhase('Creating database connection...');
-                        setLoadingProgress(20);
-
-                        // Set reasonable max bytes to read based on database size
-                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
-
-                        worker = await createDbWorker(
-                            [{
-                                from: 'inline',
-                                config: {
-                                    serverMode: 'full',
-                                    requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`
-                                    // fileLength: dbFileSize // Use the actual calculated file size
-                                    // Note: Removed cacheBust to enable browser caching
-                                    // Database will be cached by browser's HTTP cache
-                                }
-                            }],
-                            workerUrl,
-                            wasmUrl,
-                            maxBytesToRead
-                        );
-
-                        // Start progress monitoring with fallback timing
-                        let progressInterval: NodeJS.Timeout | null = null;
-                        let startTime = Date.now();
-                        let lastProgress = 20;
-
-                        const updateProgress = () => {
-                            const elapsed = Date.now() - startTime;
-                            let progress = lastProgress;
-
-                            // Try to get actual bytes read if available
-                            if ((worker as any).worker?.bytesRead !== undefined && dbFileSize > 0) {
-                                const bytesRead = (worker as any).worker.bytesRead || 0;
-                                if (bytesRead > 0) {
-                                    const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
-                                    progress = Math.min(85, 20 + bytesProgress);
-                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                                }
-                            } else {
-                                // Fallback: time-based estimation (assuming 10 seconds for large DBs)
-                                const estimatedDuration = dbFileSize > 50 * 1024 * 1024 ? 10000 : 5000; // 10s for >50MB, 5s otherwise
-                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
-                                progress = 20 + timeProgress;
-
-                                if (dbFileSize > 0) {
-                                    const estimatedMB = Math.min(
-                                        Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
-                                        Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
-                                    );
-                                    setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                                } else {
-                                    setLoadingPhase('Loading database...');
-                                }
-                            }
-
-                            setLoadingProgress(Math.min(85, progress));
-                            lastProgress = progress;
-                        };
-
-                        progressInterval = setInterval(updateProgress, 200);
-
-                        // Test if database is accessible and prefetch initial data
-                        try {
-                            // Clean up progress interval before final steps
-                            if (progressInterval) {
-                                clearInterval(progressInterval);
-                            }
-
-                            setLoadingPhase('Connecting to database...');
-                            setLoadingProgress(87);
-
-                            // This query will force loading of the SQLite header and schema
-                            await (worker.db as any).exec('SELECT 1;');
-
-                            setLoadingPhase('Initializing database...');
-                            setLoadingProgress(90);
-
-                            // Prefetch the iOS versions to cache the index pages
-                            await (worker.db as any).exec(
-                                `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
-                            );
-                        } catch (connectivityError) {
-                            console.error('Database connectivity test failed:', connectivityError);
-                            throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
-                        }
-
-                    } catch (workerError) {
-                        console.error('Failed to create database worker:', workerError);
-                        clearTimeout(timeoutId);
-
-                        // Provide specific guidance for common CORS issues
-                        if (workerError.message.includes('CORS') ||
-                            workerError.message.includes('Cross-Origin') ||
-                            workerError.message.includes('NetworkError') ||
-                            workerError.name === 'TypeError') {
-                            throw new Error(`CORS Error: Failed to load database worker. This typically happens when:\n\n1. Database files are not properly deployed to GitHub Pages\n2. GitHub Pages is not serving files with correct MIME types\n3. Files are blocked by browser security policies\n\nPlease ensure:\n- The 'db/' directory and 'sqlite.worker.js' + 'sql-wasm.wasm' files are in your GitHub Pages static directory\n- Files are accessible via direct URL\n- Your repository has GitHub Pages enabled\n\nOriginal error: ${workerError.message}`);
-                        }
-
-                        throw new Error(`Failed to load database worker: ${workerError.message}`);
-                    }
-
-                    clearTimeout(timeoutId);
-
-                    // Validate database schema
-                    try {
-                        setLoadingPhase('Validating database schema...');
-                        setLoadingProgress(93);
-                        const tableRes = await (worker.db as any).exec(
-                            `SELECT name FROM sqlite_master WHERE type='table';`
-                        );
-
-                        let tables: string[] = [];
-                        if (tableRes && tableRes.length > 0 && tableRes[0] && tableRes[0].values) {
-                            tables = tableRes[0].values.map((row: any[]) => row[0] as string);
-                        }
-
-                        if (tables.length === 0) {
-                            throw new Error('Database is empty or corrupted. No tables found.');
-                        }
-
-                        if (!tables.includes('entitlement_keys')) {
-                            throw new Error(`Database schema mismatch. Expected 'entitlement_keys' table but found tables: ${tables.join(', ')}`);
-                        }
-
-                        // Check schema for new normalized tables
-                        const requiredTables = ['entitlement_unique_keys', 'entitlement_unique_values', 'entitlement_unique_paths'];
-                        const missingTables = requiredTables.filter(table => !tables.includes(table));
-
-                        if (missingTables.length > 0) {
-                            throw new Error(`Database schema mismatch. Missing required tables: ${missingTables.join(', ')}`);
-                        }
-
-                        // Verify the main table has the expected columns for normalized schema
-                        const schemaRes = await (worker.db as any).exec(
-                            `PRAGMA table_info(entitlement_keys);`
-                        );
-
-                        let columns: string[] = [];
-                        if (schemaRes && schemaRes.length > 0 && schemaRes[0] && schemaRes[0].values) {
-                            columns = schemaRes[0].values.map((row: any[]) => row[1]);
-                        }
-
-                        const requiredColumns = ['ios_version', 'build_id', 'device_list', 'path_id', 'key_id', 'value_id'];
-                        const missingColumns = requiredColumns.filter(col => !columns.includes(col));
-
-                        if (missingColumns.length > 0) {
-                            throw new Error(`Database schema mismatch. Missing required columns in entitlement_keys: ${missingColumns.join(', ')}`);
-                        }
-
-                        // Get available iOS versions
-                        setLoadingPhase('Loading iOS versions...');
-                        setLoadingProgress(97);
-                        const versionsRes = await (worker.db as any).exec(
-                            `SELECT DISTINCT ios_version FROM entitlement_keys ORDER BY ios_version DESC;`
-                        );
-
-                        let versions: string[] = [];
-                        if (versionsRes && versionsRes.length > 0 && versionsRes[0] && versionsRes[0].values) {
-                            versions = versionsRes[0].values.map((row: any[]) => row[0] as string).filter((v: string) => v);
-                        }
-                        setIosVersions(versions);
-
-                        // Test query
-                        const testRes = await (worker.db as any).exec(
-                            `SELECT COUNT(*) FROM entitlement_keys LIMIT 1;`
-                        );
-
-                        let count = 0;
-                        if (testRes && testRes.length > 0 && testRes[0] && testRes[0].values && testRes[0].values.length > 0) {
-                            count = testRes[0].values[0][0] || 0;
-                        }
-
-                        if (count === 0) {
-                            throw new Error('Database contains no data. No entitlement records found.');
-                        }
-
-                    } catch (validationError) {
-                        console.error('Database validation failed:', validationError);
-                        throw new Error(`Database validation failed: ${validationError.message}`);
-                    }
-
-                    setLoadingPhase('Ready!');
-                    setLoadingProgress(100);
-                    setDbWorker(worker);
-                } catch (err) {
-                    console.error('Failed to initialize database:', err);
-                    clearTimeout(timeoutId);
-                    setError(`Failed to initialize database: ${err.message}`);
-                } finally {
-                    setDbLoading(false);
+                // Check if Supabase is configured
+                if (!EntitlementsService.isConfigured()) {
+                    throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
                 }
+
+                const isConnected = await EntitlementsService.testConnection();
+
+                if (!isConnected) {
+                    throw new Error('Failed to connect to Supabase. Please check your configuration.');
+                }
+
+                const versions = await EntitlementsService.getIosVersions();
+                setIosVersions(versions);
+            } catch (err) {
+                console.error('Failed to initialize database:', err);
+                setError(`Failed to initialize database: ${err.message}`);
+            } finally {
+                setDbLoading(false);
             }
         };
-        initDb();
-    }, [dbWorker]);
 
-    // Cleanup blob URL and timeout on unmount
+        initSupabase();
+    }, []);
+
+    // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
-            if (workerBlobUrl) {
-                URL.revokeObjectURL(workerBlobUrl);
-            }
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
         };
-    }, [workerBlobUrl, searchTimeout]);
+    }, [searchTimeout]);
 
     // Debounced search function with optional path parameter
     const debouncedSearchWithPath = useCallback(async (query: string, version: string, type: 'key' | 'file', pathFilter: string = '', forceSearch = false) => {
-        if (!dbWorker) {
-            setError('Database not initialized yet');
-            return;
-        }
-
         if (!query.trim()) {
             setResults([]);
             setError('');
@@ -529,115 +74,24 @@ export default function Entitlements() {
             setLoading(true);
             setError('');
 
-            let sqlQuery = '';
-            let params: any[] = [];
-
-            if (type === 'key') {
-                sqlQuery = `
-                    SELECT DISTINCT 
-                        up.path as file_path,
-                        uk.key,
-                        uv.value_type,
-                        CASE 
-                            WHEN uv.value_type = 'string' THEN uv.value
-                            ELSE NULL
-                        END as string_value,
-                        CASE 
-                            WHEN uv.value_type = 'bool' THEN CASE WHEN uv.value = 'true' THEN 1 ELSE 0 END
-                            ELSE NULL
-                        END as bool_value,
-                        CASE 
-                            WHEN uv.value_type = 'number' THEN CAST(uv.value AS REAL)
-                            ELSE NULL
-                        END as number_value,
-                        CASE 
-                            WHEN uv.value_type = 'array' THEN uv.value
-                            ELSE NULL
-                        END as array_value,
-                        CASE 
-                            WHEN uv.value_type = 'dict' THEN uv.value
-                            ELSE NULL
-                        END as dict_value,
-                        ek.ios_version,
-                        ek.build_id,
-                        ek.device_list
-                    FROM entitlement_keys ek
-                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
-                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
-                    JOIN entitlement_unique_paths up ON up.id = ek.path_id
-                    WHERE uk.key LIKE ?
-                `;
-                params = [`%${query}%`];
-            } else {
-                sqlQuery = `
-                    SELECT DISTINCT 
-                        up.path as file_path,
-                        uk.key,
-                        uv.value_type,
-                        CASE 
-                            WHEN uv.value_type = 'string' THEN uv.value
-                            ELSE NULL
-                        END as string_value,
-                        CASE 
-                            WHEN uv.value_type = 'bool' THEN CASE WHEN uv.value = 'true' THEN 1 ELSE 0 END
-                            ELSE NULL
-                        END as bool_value,
-                        CASE 
-                            WHEN uv.value_type = 'number' THEN CAST(uv.value AS REAL)
-                            ELSE NULL
-                        END as number_value,
-                        CASE 
-                            WHEN uv.value_type = 'array' THEN uv.value
-                            ELSE NULL
-                        END as array_value,
-                        CASE 
-                            WHEN uv.value_type = 'dict' THEN uv.value
-                            ELSE NULL
-                        END as dict_value,
-                        ek.ios_version,
-                        ek.build_id,
-                        ek.device_list
-                    FROM entitlement_keys ek
-                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
-                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
-                    JOIN entitlement_unique_paths up ON up.id = ek.path_id
-                    WHERE up.path LIKE ?
-                `;
-                params = [`%${query}%`];
-            }
-
-            // Add iOS version filter if selected
-            if (version) {
-                sqlQuery += ` AND ios_version = ?`;
-                params.push(version);
-            }
-
-            // Add executable path filter if selected
+            // Use the effective path filter
             const effectivePathFilter = pathFilter || selectedExecutablePath;
-            if (effectivePathFilter) {
-                sqlQuery += ` AND up.path = ?`;
-                params.push(effectivePathFilter);
-            }
 
-            sqlQuery += ` ORDER BY up.path, uk.key LIMIT 200`;
-
-            const res = await (dbWorker.db as any).exec(sqlQuery, params);
-
-            let searchResults: any[] = [];
-            if (res && res.length > 0 && res[0] && res[0].values) {
-                searchResults = res[0].values.map((row: any[]) => ({
-                    file_path: row[0],
-                    key: row[1],
-                    value_type: row[2],
-                    string_value: row[3],
-                    bool_value: row[4],
-                    number_value: row[5],
-                    array_value: row[6],
-                    dict_value: row[7],
-                    ios_version: row[8],
-                    build_id: row[9],
-                    device_list: row[10]
-                }));
+            let searchResults: EntitlementResult[];
+            if (type === 'key') {
+                searchResults = await EntitlementsService.searchByKey(
+                    query,
+                    version || undefined,
+                    effectivePathFilter || undefined,
+                    200
+                );
+            } else {
+                searchResults = await EntitlementsService.searchByFile(
+                    query,
+                    version || undefined,
+                    effectivePathFilter || undefined,
+                    200
+                );
             }
 
             setResults(searchResults);
@@ -655,7 +109,7 @@ export default function Entitlements() {
         } finally {
             setLoading(false);
         }
-    }, [dbWorker, isInputFocused, selectedExecutablePath]);
+    }, [isInputFocused, selectedExecutablePath]);
 
     // Original debouncedSearch function for backward compatibility
     const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
@@ -830,16 +284,7 @@ export default function Entitlements() {
                     <div className="loading-banner">
                         <div className="loading-spinner"></div>
                         <div className="loading-text">
-                            <span>{loadingPhase}</span>
-                            <div className="progress-container">
-                                <div className="progress-bar">
-                                    <div
-                                        className="progress-fill"
-                                        style={{ width: `${loadingProgress}%` }}
-                                    ></div>
-                                </div>
-                                <span className="progress-text">{Math.round(loadingProgress)}%</span>
-                            </div>
+                            <span>Connecting to database...</span>
                         </div>
                     </div>
                 )}
@@ -847,142 +292,23 @@ export default function Entitlements() {
                 {error && !dbLoading && (
                     <div className="error-banner">
                         <strong>Database Error:</strong> {error}
-                        
-                        {/* Show debugging information for CORS issues */}
-                        {(error.includes('CORS') || error.includes('accessibility') || error.includes('fetch')) && (
-                            <div className="debug-info">
-                                <details style={{ marginTop: '1rem' }}>
-                                    <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>🔧 Debug Information</summary>
-                                    <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', fontFamily: 'monospace' }}>
-                                        <p><strong>Current URL:</strong> {window.location.href}</p>
-                                        <p><strong>Environment:</strong> {process.env.NODE_ENV || 'unknown'}</p>
-                                        <p><strong>Expected base path:</strong> {
-                                            (() => {
-                                                const isDev = process.env.NODE_ENV === 'development';
-                                                if (isDev) {
-                                                    return window.location.origin + '/ipsw';
-                                                } else {
-                                                    const isGitHubPages = window.location.hostname.includes('github.io');
-                                                    if (isGitHubPages) {
-                                                        const pathSegments = window.location.pathname.split('/').filter(s => s);
-                                                        if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
-                                                            return window.location.origin + '/ipsw';
-                                                        } else if (pathSegments.length > 0) {
-                                                            return window.location.origin + '/' + pathSegments[0];
-                                                        } else {
-                                                            return window.location.origin + '/ipsw';
-                                                        }
-                                                    } else {
-                                                        return window.location.origin + '/ipsw';
-                                                    }
-                                                }
-                                            })()
-                                        }</p>
-                                        <p><strong>Required files to check:</strong></p>
-                                        <ul style={{ marginLeft: '1rem' }}>
-                                            <li>
-                                                <a 
-                                                    href={(() => {
-                                                        const isDev = process.env.NODE_ENV === 'development';
-                                                        let basePath = '';
-                                                        if (isDev) {
-                                                            basePath = window.location.origin + '/ipsw';
-                                                        } else {
-                                                            const isGitHubPages = window.location.hostname.includes('github.io');
-                                                            if (isGitHubPages) {
-                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
-                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                } else if (pathSegments.length > 0) {
-                                                                    basePath = window.location.origin + '/' + pathSegments[0];
-                                                                } else {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                }
-                                                            } else {
-                                                                basePath = window.location.origin + '/ipsw';
-                                                            }
-                                                        }
-                                                        return `${basePath}/sqlite.worker.js`;
-                                                    })()}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    style={{ color: '#60a5fa' }}
-                                                >
-                                                    sqlite.worker.js
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a 
-                                                    href={(() => {
-                                                        const isDev = process.env.NODE_ENV === 'development';
-                                                        let basePath = '';
-                                                        if (isDev) {
-                                                            basePath = window.location.origin + '/ipsw';
-                                                        } else {
-                                                            const isGitHubPages = window.location.hostname.includes('github.io');
-                                                            if (isGitHubPages) {
-                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
-                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                } else if (pathSegments.length > 0) {
-                                                                    basePath = window.location.origin + '/' + pathSegments[0];
-                                                                } else {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                }
-                                                            } else {
-                                                                basePath = window.location.origin + '/ipsw';
-                                                            }
-                                                        }
-                                                        return `${basePath}/sql-wasm.wasm`;
-                                                    })()}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    style={{ color: '#60a5fa' }}
-                                                >
-                                                    sql-wasm.wasm
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a 
-                                                    href={(() => {
-                                                        const isDev = process.env.NODE_ENV === 'development';
-                                                        let basePath = '';
-                                                        if (isDev) {
-                                                            basePath = window.location.origin + '/ipsw';
-                                                        } else {
-                                                            const isGitHubPages = window.location.hostname.includes('github.io');
-                                                            if (isGitHubPages) {
-                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
-                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                } else if (pathSegments.length > 0) {
-                                                                    basePath = window.location.origin + '/' + pathSegments[0];
-                                                                } else {
-                                                                    basePath = window.location.origin + '/ipsw';
-                                                                }
-                                                            } else {
-                                                                basePath = window.location.origin + '/ipsw';
-                                                            }
-                                                        }
-                                                        return `${basePath}/db/ipsw.db`;
-                                                    })()}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    style={{ color: '#60a5fa' }}
-                                                >
-                                                    db/ipsw.db
-                                                </a>
-                                            </li>
-                                        </ul>
-                                        <p style={{ marginTop: '1rem' }}><strong>💡 Tip:</strong> Click the links above to test if files are accessible. If they return 404 errors, the files aren't properly deployed.</p>
-                                    </div>
-                                </details>
+
+                        {error.includes('Database is not configured') && (
+                            <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+                                <p><strong>Setup Instructions:</strong></p>
+                                <ol style={{ marginLeft: '1rem', lineHeight: '1.6' }}>
+                                    <li>Create a Supabase project at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>supabase.com</a></li>
+                                    <li>Run the schema from <code>supabase/schema.sql</code> in your Supabase SQL editor</li>
+                                    <li>Generate data using: <code>ipsw ent --pg-host db.your-project.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --ipsw your-file.ipsw</code></li>
+                                    <li>Set environment variables: <code>REACT_APP_SUPABASE_URL</code> and <code>REACT_APP_SUPABASE_ANON_KEY</code></li>
+                                </ol>
+                                <p>See <code>README-SUPABASE.md</code> for detailed instructions.</p>
                             </div>
                         )}
                     </div>
                 )}
 
-                {!dbLoading && !error && dbWorker && (
+                {!dbLoading && !error && (
                     <div className="search-wrapper">
                         <div className="search-panel">
                             {/* Top Row: Version Filter and Search Type */}
