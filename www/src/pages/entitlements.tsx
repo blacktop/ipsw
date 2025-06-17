@@ -36,9 +36,25 @@ export default function Entitlements() {
                     setLoadingPhase('Initializing...');
                     setError('');
 
-                    // Use pre-calculated database file size for reliable progress tracking
-                    // Update this size when the database changes using: ./hack/update-db-size.sh
-                    const dbFileSize = 30897152; // Exact size of ipsw.db in bytes
+                    // Get database file size for progress tracking
+                    let dbFileSize = 0;
+                    try {
+                        setLoadingPhase('Checking database size...');
+                        const basePath = process.env.NODE_ENV === 'development'
+                            ? window.location.origin + '/ipsw'
+                            : window.location.origin + '/ipsw';
+
+                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
+                        if (headResponse.ok) {
+                            const contentLength = headResponse.headers.get('content-length');
+                            if (contentLength) {
+                                dbFileSize = parseInt(contentLength, 10);
+                            }
+                        }
+                    } catch (sizeError) {
+                        console.warn('Could not determine database file size:', sizeError);
+                        // Continue without size info
+                    }
 
                     let worker;
                     try {
