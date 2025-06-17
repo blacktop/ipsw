@@ -183,17 +183,23 @@ export default function Entitlements() {
                         console.log('Database URL:', dbUrl);
                         console.log('Database file size:', dbFileSize);
                         
-                        // Use the exact same approach as the working version
+                        // CRITICAL: For GitHub Pages, we MUST provide the file length
+                        // because GitHub Pages doesn't provide reliable Content-Length headers
+                        const config: any = {
+                            serverMode: 'full',
+                            requestChunkSize: requestChunkSize,
+                            url: dbUrl
+                        };
+                        
+                        // Always provide file length - use detected size or fallback
+                        config.fileLength = dbFileSize;
+                        
+                        console.log('Using config:', config);
+                        
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
-                                config: {
-                                    serverMode: 'full',
-                                    requestChunkSize: requestChunkSize,
-                                    url: dbUrl
-                                    // Note: Removed cacheBust to enable browser caching
-                                    // Database will be cached by browser's HTTP cache
-                                }
+                                config: config
                             }],
                             workerUrl,
                             wasmUrl,
