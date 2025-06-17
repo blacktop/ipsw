@@ -43,7 +43,7 @@ export default function Entitlements() {
                             ? window.location.origin + '/ipsw'
                             : window.location.origin + '/ipsw';
 
-                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
+                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD', headers: { 'Accept-Encoding': 'identity' } });
                         if (headResponse.ok) {
                             const contentLength = headResponse.headers.get('content-length');
                             if (contentLength) {
