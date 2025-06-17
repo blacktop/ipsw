@@ -60,7 +60,7 @@ export default function Entitlements() {
                                 from: 'inline',
                                 config: {
                                     serverMode: 'full',
-                                    url: `${basePath}/db/ipsw.db`,
+                                    url: `${basePath}/db/ipsw.db?no-gzip=1`,
                                     requestChunkSize: 512 * 1024, // 512KB chunks for better compatibility
                                     ...{ fileLength: dbFileSize } as any // Use uncompressed size explicitly
                                 }
