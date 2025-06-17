@@ -43,7 +43,7 @@ const (
 	sucatalogs24Cust   = "https://swscan.apple.com/content/catalogs/others/index-15customerseed-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 	sucatalogs24Dev    = "https://swscan.apple.com/content/catalogs/others/index-15seed-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 	sucatalogs24Public = "https://swscan.apple.com/content/catalogs/others/index-15beta-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs26Seed   = "https://swscan.apple.com/content/catalogs/others/index-16seed-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs26Seed   = "https://swscan.apple.com/content/catalogs/others/index-16beta-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 	sucatalogsLatest   = sucatalogs26Seed
 )
 
@@ -249,12 +249,12 @@ func getDestName(url string, removeCommas bool) string {
 }
 
 // GetProductInfo downloads and parses the macOS installer product infos
-func GetProductInfo() (ProductInfos, error) {
+func GetProductInfo(latest bool) (ProductInfos, error) {
 
 	var catData []byte
 	var prods ProductInfos
 
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" && !latest {
 		data, err := os.ReadFile(seedCatalogsPlist)
 		if err != nil {
 			return nil, err
@@ -285,7 +285,11 @@ func GetProductInfo() (ProductInfos, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
 		}
-		gzr.Close()
+		defer func() {
+			if closeErr := gzr.Close(); closeErr != nil {
+				log.WithError(closeErr).Warn("failed to close gzip reader")
+			}
+		}()
 
 		var buff bytes.Buffer
 		if _, err := buff.ReadFrom(gzr); err != nil {
@@ -308,7 +312,11 @@ func GetProductInfo() (ProductInfos, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
 		}
-		gzr.Close()
+		defer func() {
+			if closeErr := gzr.Close(); closeErr != nil {
+				log.WithError(closeErr).Warn("failed to close gzip reader")
+			}
+		}()
 
 		var buff bytes.Buffer
 		if _, err := buff.ReadFrom(gzr); err != nil {
