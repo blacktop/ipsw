@@ -250,7 +250,15 @@ export default function Entitlements() {
                             throw new Error(`Database schema mismatch. Expected 'entitlement_keys' table but found tables: ${tables.join(', ')}`);
                         }
 
-                        // Check schema for new columns
+                        // Check schema for new normalized tables
+                        const requiredTables = ['entitlement_unique_keys', 'entitlement_unique_values', 'entitlement_unique_paths'];
+                        const missingTables = requiredTables.filter(table => !tables.includes(table));
+
+                        if (missingTables.length > 0) {
+                            throw new Error(`Database schema mismatch. Missing required tables: ${missingTables.join(', ')}`);
+                        }
+
+                        // Verify the main table has the expected columns for normalized schema
                         const schemaRes = await (worker.db as any).exec(
                             `PRAGMA table_info(entitlement_keys);`
                         );
@@ -260,11 +268,11 @@ export default function Entitlements() {
                             columns = schemaRes[0].values.map((row: any[]) => row[1]);
                         }
 
-                        const requiredColumns = ['file_path', 'key', 'ios_version'];
+                        const requiredColumns = ['ios_version', 'build_id', 'device_list', 'path_id', 'key_id', 'value_id'];
                         const missingColumns = requiredColumns.filter(col => !columns.includes(col));
 
                         if (missingColumns.length > 0) {
-                            throw new Error(`Database schema mismatch. Missing required columns: ${missingColumns.join(', ')}`);
+                            throw new Error(`Database schema mismatch. Missing required columns in entitlement_keys: ${missingColumns.join(', ')}`);
                         }
 
                         // Get available iOS versions
@@ -354,16 +362,74 @@ export default function Entitlements() {
 
             if (type === 'key') {
                 sqlQuery = `
-                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
-                    FROM entitlement_keys 
-                    WHERE key LIKE ?
+                    SELECT DISTINCT 
+                        up.path as file_path,
+                        uk.key,
+                        uv.value_type,
+                        CASE 
+                            WHEN uv.value_type = 'string' THEN uv.value
+                            ELSE NULL
+                        END as string_value,
+                        CASE 
+                            WHEN uv.value_type = 'bool' THEN CASE WHEN uv.value = 'true' THEN 1 ELSE 0 END
+                            ELSE NULL
+                        END as bool_value,
+                        CASE 
+                            WHEN uv.value_type = 'number' THEN CAST(uv.value AS REAL)
+                            ELSE NULL
+                        END as number_value,
+                        CASE 
+                            WHEN uv.value_type = 'array' THEN uv.value
+                            ELSE NULL
+                        END as array_value,
+                        CASE 
+                            WHEN uv.value_type = 'dict' THEN uv.value
+                            ELSE NULL
+                        END as dict_value,
+                        ek.ios_version,
+                        ek.build_id,
+                        ek.device_list
+                    FROM entitlement_keys ek
+                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                    JOIN entitlement_unique_paths up ON up.id = ek.path_id
+                    WHERE uk.key LIKE ?
                 `;
                 params = [`%${query}%`];
             } else {
                 sqlQuery = `
-                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
-                    FROM entitlement_keys 
-                    WHERE file_path LIKE ?
+                    SELECT DISTINCT 
+                        up.path as file_path,
+                        uk.key,
+                        uv.value_type,
+                        CASE 
+                            WHEN uv.value_type = 'string' THEN uv.value
+                            ELSE NULL
+                        END as string_value,
+                        CASE 
+                            WHEN uv.value_type = 'bool' THEN CASE WHEN uv.value = 'true' THEN 1 ELSE 0 END
+                            ELSE NULL
+                        END as bool_value,
+                        CASE 
+                            WHEN uv.value_type = 'number' THEN CAST(uv.value AS REAL)
+                            ELSE NULL
+                        END as number_value,
+                        CASE 
+                            WHEN uv.value_type = 'array' THEN uv.value
+                            ELSE NULL
+                        END as array_value,
+                        CASE 
+                            WHEN uv.value_type = 'dict' THEN uv.value
+                            ELSE NULL
+                        END as dict_value,
+                        ek.ios_version,
+                        ek.build_id,
+                        ek.device_list
+                    FROM entitlement_keys ek
+                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                    JOIN entitlement_unique_paths up ON up.id = ek.path_id
+                    WHERE up.path LIKE ?
                 `;
                 params = [`%${query}%`];
             }
@@ -377,11 +443,11 @@ export default function Entitlements() {
             // Add executable path filter if selected
             const effectivePathFilter = pathFilter || selectedExecutablePath;
             if (effectivePathFilter) {
-                sqlQuery += ` AND file_path = ?`;
+                sqlQuery += ` AND up.path = ?`;
                 params.push(effectivePathFilter);
             }
 
-            sqlQuery += ` ORDER BY file_path, key LIMIT 200`;
+            sqlQuery += ` ORDER BY up.path, uk.key LIMIT 200`;
 
             const res = await (dbWorker.db as any).exec(sqlQuery, params);
 
