@@ -140,7 +140,7 @@ export default function Entitlements() {
                             }],
                             workerUrl,
                             wasmUrl,
-                            maxBytesToRead
+                            actualDbSize  // Pass the known file size as maxBytesToRead
                         );
 
                         // Start progress monitoring with fallback timing
