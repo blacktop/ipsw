@@ -20,6 +20,7 @@ export default function Entitlements() {
     const [selectedExecutablePath, setSelectedExecutablePath] = useState<string>('');
     const [availableExecutablePaths, setAvailableExecutablePaths] = useState<string[]>([]);
     const [hasSearched, setHasSearched] = useState<boolean>(false);
+    const [filtersCollapsed, setFiltersCollapsed] = useState<boolean>(false);
 
     useEffect(() => {
         const initDb = async () => {
@@ -37,7 +38,7 @@ export default function Entitlements() {
 
                     // Use pre-calculated database file size for reliable progress tracking
                     // Update this size when the database changes using: ./hack/update-db-size.sh
-                    const dbFileSize = 128379904; // Exact size of ipsw.db in bytes
+                    const dbFileSize = 32550912; // Exact size of ipsw.db in bytes
 
                     let worker;
                     try {
@@ -123,7 +124,7 @@ export default function Entitlements() {
 
                         // Use pre-calculated database size since GitHub Pages doesn't always provide Content-Length
                         // Update this size when the database changes using: ./hack/update-db-size.sh
-                        const actualDbSize = 128379904; // Exact size of ipsw.db in bytes
+                        const actualDbSize = 32550912; // Exact size of ipsw.db in bytes
                         const maxBytesToRead = actualDbSize + (10 * 1024 * 1024); // DB size + 10MB buffer
 
                         worker = await createDbWorker(
@@ -242,7 +243,7 @@ export default function Entitlements() {
                             columns = schemaRes[0].values.map((row: any[]) => row[1]);
                         }
 
-                        const requiredColumns = ['file_path', 'key', 'ios_version'];
+                        const requiredColumns = ['file_path', 'key_id', 'value_id', 'ios_version'];
                         const missingColumns = requiredColumns.filter(col => !columns.includes(col));
 
                         if (missingColumns.length > 0) {
@@ -336,34 +337,48 @@ export default function Entitlements() {
 
             if (type === 'key') {
                 sqlQuery = `
-                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
-                    FROM entitlement_keys 
-                    WHERE key LIKE ?
+                    SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value, 
+                           CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
+                           CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
+                           CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
+                           CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
+                           ek.ios_version, ek.build_id, ek.device_list
+                    FROM entitlement_keys ek
+                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                    WHERE uk.key LIKE ?
                 `;
                 params = [`%${query}%`];
             } else {
                 sqlQuery = `
-                    SELECT DISTINCT file_path, key, value_type, string_value, bool_value, number_value, array_value, dict_value, ios_version, build_id, device_list
-                    FROM entitlement_keys 
-                    WHERE file_path LIKE ?
+                    SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value,
+                           CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
+                           CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
+                           CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
+                           CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
+                           ek.ios_version, ek.build_id, ek.device_list
+                    FROM entitlement_keys ek
+                    JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
+                    JOIN entitlement_unique_values uv ON uv.id = ek.value_id
+                    WHERE ek.file_path LIKE ?
                 `;
                 params = [`%${query}%`];
             }
 
             // Add iOS version filter if selected
             if (version) {
-                sqlQuery += ` AND ios_version = ?`;
+                sqlQuery += ` AND ek.ios_version = ?`;
                 params.push(version);
             }
 
             // Add executable path filter if selected
             const effectivePathFilter = pathFilter || selectedExecutablePath;
             if (effectivePathFilter) {
-                sqlQuery += ` AND file_path = ?`;
+                sqlQuery += ` AND ek.file_path = ?`;
                 params.push(effectivePathFilter);
             }
 
-            sqlQuery += ` ORDER BY file_path, key LIMIT 200`;
+            sqlQuery += ` ORDER BY ek.file_path, uk.key LIMIT 200`;
 
             const res = await (dbWorker.db as any).exec(sqlQuery, params);
 
@@ -596,132 +611,150 @@ export default function Entitlements() {
 
                 {!dbLoading && !error && dbWorker && (
                     <div className="search-wrapper">
-                        <div className="search-panel">
-                            {/* Top Row: Version Filter and Search Type */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        iOS Version Filter
-                                    </label>
-                                    <select
-                                        value={selectedVersion}
-                                        onChange={(e) => handleVersionChange(e.target.value)}
-                                        className="form-select"
-                                    >
-                                        <option value="">All versions</option>
-                                        {iosVersions.map(version => (
-                                            <option key={version} value={version}>{version}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        Search Type
-                                    </label>
-                                    <div className="radio-group">
-                                        <label className="radio-option">
-                                            <input
-                                                type="radio"
-                                                value="key"
-                                                checked={searchType === 'key'}
-                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                className="radio-input"
-                                            />
-                                            <span className="radio-label">Entitlement Key</span>
-                                        </label>
-                                        <label className="radio-option">
-                                            <input
-                                                type="radio"
-                                                value="file"
-                                                checked={searchType === 'file'}
-                                                onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
-                                                className="radio-input"
-                                            />
-                                            <span className="radio-label">Executable Path</span>
-                                        </label>
-                                    </div>
-                                </div>
+                        <div className={`search-panel ${filtersCollapsed ? 'filters-collapsed' : ''}`}>
+                            {/* Filter Toggle Button */}
+                            <div className="filter-toggle-container">
+                                <button
+                                    onClick={() => setFiltersCollapsed(!filtersCollapsed)}
+                                    className="filter-toggle-button"
+                                >
+                                    <span className="toggle-icon">
+                                        {filtersCollapsed ? '▼' : '▲'}
+                                    </span>
+                                    <span className="toggle-text">
+                                        {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
+                                    </span>
+                                </button>
                             </div>
 
-                            {/* Executable Path Filter - full width row */}
-                            {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
-                                <div className="form-group form-group--full-width">
-                                    <label className="form-label">
-                                        Executable Filter
-                                    </label>
-                                    <select
-                                        value={selectedExecutablePath}
-                                        onChange={(e) => handleExecutablePathChange(e.target.value)}
-                                        className="form-select form-select--executable"
-                                    >
-                                        <option value="">
-                                            {availableExecutablePaths.length > 0
-                                                ? `All executables (${availableExecutablePaths.length})`
-                                                : 'All executables'
-                                            }
-                                        </option>
-                                        {(() => {
-                                            // If we have a selected path but no available paths, show just the selected one
-                                            if (selectedExecutablePath && availableExecutablePaths.length === 0) {
-                                                const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
-                                                return (
-                                                    <option key={selectedExecutablePath} value={selectedExecutablePath}>
-                                                        {basename}
-                                                    </option>
-                                                );
-                                            }
+                            {/* Collapsible Filters Section */}
+                            <div className={`filters-container ${filtersCollapsed ? 'collapsed' : ''}`}>
+                                {/* Top Row: Version Filter and Search Type */}
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            iOS Version Filter
+                                        </label>
+                                        <select
+                                            value={selectedVersion}
+                                            onChange={(e) => handleVersionChange(e.target.value)}
+                                            className="form-select"
+                                        >
+                                            <option value="">All versions</option>
+                                            {iosVersions.map(version => (
+                                                <option key={version} value={version}>{version}</option>
+                                            ))}
+                                        </select>
+                                    </div>
 
-                                            // Always show full paths to avoid ambiguity
-                                            return availableExecutablePaths.map(path => {
-                                                const basename = path.split('/').pop() || path;
-                                                // Show basename first, then full path for clarity
-                                                const displayName = path.length > 50 ?
-                                                    `${basename} - ${path.substring(0, 47)}...` :
-                                                    `${basename} - ${path}`;
-
-                                                return (
-                                                    <option key={path} value={path}>
-                                                        {displayName}
-                                                    </option>
-                                                );
-                                            });
-                                        })()}
-                                    </select>
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            Search Type
+                                        </label>
+                                        <div className="radio-group">
+                                            <label className="radio-option">
+                                                <input
+                                                    type="radio"
+                                                    value="key"
+                                                    checked={searchType === 'key'}
+                                                    onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                    className="radio-input"
+                                                />
+                                                <span className="radio-label">Entitlement Key</span>
+                                            </label>
+                                            <label className="radio-option">
+                                                <input
+                                                    type="radio"
+                                                    value="file"
+                                                    checked={searchType === 'file'}
+                                                    onChange={(e) => handleSearchTypeChange(e.target.value as 'key' | 'file')}
+                                                    className="radio-input"
+                                                />
+                                                <span className="radio-label">Executable Path</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
 
-                            {/* Search Input */}
-                            <div className="form-group">
-                                <label className="form-label">
-                                    Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
-                                </label>
-                                <div className="search-input-group">
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => handleSearchInput(e.target.value)}
-                                        onFocus={handleInputFocus}
-                                        onBlur={handleInputBlur}
-                                        placeholder={searchType === 'key'
-                                            ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
-                                            : 'Enter executable name (e.g., WebContent, Safari)'
-                                        }
-                                        className="search-input"
-                                        disabled={loading}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !loading && searchQuery.trim()) {
-                                                handleSearch();
+                                {/* Executable Path Filter - full width row */}
+                                {(availableExecutablePaths.length > 1 || selectedExecutablePath) && (
+                                    <div className="form-group form-group--full-width">
+                                        <label className="form-label">
+                                            Executable Filter
+                                        </label>
+                                        <select
+                                            value={selectedExecutablePath}
+                                            onChange={(e) => handleExecutablePathChange(e.target.value)}
+                                            className="form-select form-select--executable"
+                                        >
+                                            <option value="">
+                                                {availableExecutablePaths.length > 0
+                                                    ? `All executables (${availableExecutablePaths.length})`
+                                                    : 'All executables'
+                                                }
+                                            </option>
+                                            {(() => {
+                                                // If we have a selected path but no available paths, show just the selected one
+                                                if (selectedExecutablePath && availableExecutablePaths.length === 0) {
+                                                    const basename = selectedExecutablePath.split('/').pop() || selectedExecutablePath;
+                                                    return (
+                                                        <option key={selectedExecutablePath} value={selectedExecutablePath}>
+                                                            {basename}
+                                                        </option>
+                                                    );
+                                                }
+
+                                                // Always show full paths to avoid ambiguity
+                                                return availableExecutablePaths.map(path => {
+                                                    const basename = path.split('/').pop() || path;
+                                                    // Show basename first, then full path for clarity
+                                                    const displayName = path.length > 50 ?
+                                                        `${basename} - ${path.substring(0, 47)}...` :
+                                                        `${basename} - ${path}`;
+
+                                                    return (
+                                                        <option key={path} value={path}>
+                                                            {displayName}
+                                                        </option>
+                                                    );
+                                                });
+                                            })()}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Search Input */}
+                                <div className="form-group">
+                                    <label className="form-label">
+                                        Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                    </label>
+                                    <div className="search-input-group">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => handleSearchInput(e.target.value)}
+                                            onFocus={handleInputFocus}
+                                            onBlur={handleInputBlur}
+                                            placeholder={searchType === 'key'
+                                                ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
+                                                : 'Enter executable name (e.g., WebContent, Safari)'
                                             }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={handleSearch}
-                                        className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
-                                        disabled={loading || !searchQuery.trim()}
-                                    >
-                                        {loading ? 'Searching...' : 'Search'}
-                                    </button>
+                                            className="search-input"
+                                            disabled={loading}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                    handleSearch();
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            onClick={handleSearch}
+                                            className={`search-button ${(!loading && searchQuery.trim()) ? 'search-button--active' : 'search-button--disabled'}`}
+                                            disabled={loading || !searchQuery.trim()}
+                                        >
+                                            {loading ? 'Searching...' : 'Search'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -993,6 +1026,65 @@ export default function Entitlements() {
                     flex-direction: column;
                 }
 
+                .filter-toggle-container {
+                    margin-bottom: 1rem;
+                    text-align: right;
+                }
+
+                .filter-toggle-button {
+                    background: transparent;
+                    border: 1px solid rgba(75, 85, 99, 0.2);
+                    border-radius: 6px;
+                    padding: 0.4rem 0.8rem;
+                    color: var(--ifm-color-content-secondary);
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-size: 0.8rem;
+                    font-weight: 400;
+                    opacity: 0.7;
+                }
+
+                .filter-toggle-button:hover {
+                    opacity: 1;
+                    color: var(--ifm-color-content);
+                    border-color: rgba(75, 85, 99, 0.4);
+                    background: rgba(75, 85, 99, 0.1);
+                }
+
+                .filter-toggle-button:focus {
+                    outline: none;
+                    opacity: 1;
+                    border-color: rgba(96, 165, 250, 0.3);
+                    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1);
+                }
+
+                .toggle-icon {
+                    font-size: 0.7rem;
+                    transition: transform 0.2s ease;
+                    opacity: 0.8;
+                }
+
+                .toggle-text {
+                    font-size: 0.75rem;
+                    letter-spacing: 0.02em;
+                }
+
+                .filters-container {
+                    overflow: hidden;
+                    transition: max-height 0.3s ease, opacity 0.3s ease;
+                    max-height: 1000px;
+                    opacity: 1;
+                }
+
+                .filters-container.collapsed {
+                    max-height: 0;
+                    opacity: 0;
+                    margin-bottom: 0;
+                }
+
                 .form-row {
                     display: flex;
                     gap: 3rem;
@@ -1213,6 +1305,11 @@ export default function Entitlements() {
                     overflow-y: auto;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                     max-height: calc(100vh - 500px);
+                    transition: max-height 0.3s ease;
+                }
+
+                .search-panel.filters-collapsed .results-container {
+                    max-height: calc(100vh - 300px);
                 }
 
                 .result-item {
@@ -1447,6 +1544,24 @@ export default function Entitlements() {
 
                     .search-panel {
                         padding: 1.5rem;
+                    }
+
+                    .filter-toggle-button {
+                        padding: 0.35rem 0.7rem;
+                        font-size: 0.75rem;
+                    }
+
+                    .filter-toggle-container {
+                        text-align: center;
+                        margin-bottom: 0.8rem;
+                    }
+
+                    .results-container {
+                        max-height: calc(100vh - 450px);
+                    }
+
+                    .search-panel.filters-collapsed .results-container {
+                        max-height: calc(100vh - 250px);
                     }
 
                     .form-row {
