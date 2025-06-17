@@ -296,8 +296,8 @@ github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa h1:RDBNVkRviHZtvD
 github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa/go.mod h1:KnogPXtdwXqoenmZCw6S+25EAm2MkxbG0deNDu4cbSA=
 github.com/gabriel-vasile/mimetype v1.4.9 h1:5k+WDwEsD9eTLL8Tz3L0VnmVh9QxGjRmjBvAG7U/oYY=
 github.com/gabriel-vasile/mimetype v1.4.9/go.mod h1:WnSQhFKJuBlRyLiKohA/2DtIlPFAbguNaG7QCHcyGok=
-github.com/gen2brain/beeep v0.11.0 h1:ScADjlllAwqUIdEgosHXRmS0OEBTDtfGvIuLj2G/mlU=
-github.com/gen2brain/beeep v0.11.0/go.mod h1:jQVvuwnLuwOcdctHn/uyh8horSBNJ8uGb9Cn2W4tvoc=
+github.com/gen2brain/beeep v0.11.1 h1:EbSIhrQZFDj1K2fzlMpAYlFOzV8YuNe721A58XcCTYI=
+github.com/gen2brain/beeep v0.11.1/go.mod h1:jQVvuwnLuwOcdctHn/uyh8horSBNJ8uGb9Cn2W4tvoc=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gin-contrib/sse v1.1.0 h1:n0w2GMuUpWDVp7qSpvze6fAu9iRxJY4Hmj6AmBOU05w=
 github.com/gin-contrib/sse v1.1.0/go.mod h1:hxRZ5gVpWMT7Z0B0gSNYqqsSCNIJMjzvm6fqCz9vjwM=
