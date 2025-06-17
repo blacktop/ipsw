@@ -41,6 +41,7 @@ func init() {
 	pccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
 	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/instances/<NAME>' to create a PCC VM w/o needing to set the csrutil first
 	pccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
+	pccCmd.MarkFlagDirname("output")
 	viper.BindPFlag("download.pcc.info", pccCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.pcc.output", pccCmd.Flags().Lookup("output"))
 
@@ -56,7 +57,6 @@ func init() {
 		c.Parent().HelpFunc()(c, s)
 	})
 
-	pccCmd.MarkFlagDirname("output")
 }
 
 // pccCmd represents the pcc command
@@ -98,14 +98,16 @@ var pccCmd = &cobra.Command{
 
 		if viper.GetBool("download.pcc.info") {
 			log.Infof("Found %d PCC Releases", len(releases))
-			for _, release := range releases {
+			for i := range releases {
+				release := &releases[i]
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				fmt.Println(release)
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 			}
 		} else {
 			var choices []string
-			for _, r := range releases {
+			for i := range releases {
+				r := &releases[i]
 				choices = append(choices, fmt.Sprintf("%04d: %s  [created: %s]",
 					r.Index,
 					hex.EncodeToString(r.GetReleaseHash()),
