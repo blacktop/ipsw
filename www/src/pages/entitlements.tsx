@@ -49,7 +49,7 @@ export default function Entitlements() {
                             method: 'HEAD',
                             mode: 'cors',
                             cache: 'no-cache',
-                            headers: { 
+                            headers: {
                                 'Accept-Encoding': 'identity',
                                 'Cache-Control': 'no-cache'
                             }
@@ -139,39 +139,67 @@ export default function Entitlements() {
                         console.log(`Current path: ${currentPath}`);
                         console.log(`Determined base path: ${basePath}`);
                         console.log(`Will attempt to load database from: ${basePath}/db/ipsw.db`);
-                        console.log(`Will attempt to load worker from: ${basePath}/sqlite.worker.js`);
-
-                        // Test file accessibility before proceeding
+                        console.log(`Will attempt to load worker from: ${basePath}/sqlite.worker.js`);                        // Test file accessibility before proceeding
                         try {
                             setLoadingPhase('Verifying file accessibility...');
                             setLoadingProgress(5);
                             
-                            // Quick accessibility test for critical files
-                            const testRequests = [
-                                fetch(`${basePath}/sqlite.worker.js`, { method: 'HEAD', mode: 'cors' }),
-                                fetch(`${basePath}/sql-wasm.wasm`, { method: 'HEAD', mode: 'cors' }),
-                                fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD', mode: 'cors' })
-                            ];
+                            // Quick accessibility test for critical files with multiple strategies
+                            const testFile = async (url: string, name: string) => {
+                                const strategies = [
+                                    // Strategy 1: CORS mode with explicit headers
+                                    () => fetch(url, { 
+                                        method: 'HEAD', 
+                                        mode: 'cors',
+                                        cache: 'no-cache',
+                                        headers: {
+                                            'Accept': '*/*',
+                                            'Cache-Control': 'no-cache'
+                                        }
+                                    }),
+                                    // Strategy 2: no-cors mode (limited info but may work)
+                                    () => fetch(url, { 
+                                        method: 'HEAD', 
+                                        mode: 'no-cors',
+                                        cache: 'no-cache'
+                                    }),
+                                    // Strategy 3: GET request with minimal data (as fallback)
+                                    () => fetch(url, { 
+                                        method: 'GET', 
+                                        mode: 'cors',
+                                        headers: {
+                                            'Range': 'bytes=0-0', // Just get the first byte
+                                            'Accept': '*/*'
+                                        }
+                                    })
+                                ];
+                                
+                                for (let i = 0; i < strategies.length; i++) {
+                                    try {
+                                        const response = await strategies[i]();
+                                        if (response.ok || response.type === 'opaque') {
+                                            console.log(`${name} accessible via strategy ${i + 1}`);
+                                            return response;
+                                        }
+                                    } catch (err) {
+                                        console.warn(`${name} strategy ${i + 1} failed:`, err);
+                                        if (i === strategies.length - 1) {
+                                            throw err;
+                                        }
+                                    }
+                                }
+                                throw new Error('All strategies failed');
+                            };
                             
-                            const testResults = await Promise.allSettled(testRequests);
-                            const [workerTest, wasmTest, dbTest] = testResults;
-                            
-                            if (workerTest.status === 'rejected' || (workerTest.status === 'fulfilled' && !workerTest.value.ok)) {
-                                throw new Error(`Worker file not accessible: ${basePath}/sqlite.worker.js (Status: ${workerTest.status === 'fulfilled' ? workerTest.value.status : 'Network Error'})`);
-                            }
-                            
-                            if (wasmTest.status === 'rejected' || (wasmTest.status === 'fulfilled' && !wasmTest.value.ok)) {
-                                throw new Error(`WASM file not accessible: ${basePath}/sql-wasm.wasm (Status: ${wasmTest.status === 'fulfilled' ? wasmTest.value.status : 'Network Error'})`);
-                            }
-                            
-                            if (dbTest.status === 'rejected' || (dbTest.status === 'fulfilled' && !dbTest.value.ok)) {
-                                throw new Error(`Database file not accessible: ${basePath}/db/ipsw.db (Status: ${dbTest.status === 'fulfilled' ? dbTest.value.status : 'Network Error'})`);
-                            }
+                            // Test each required file
+                            await testFile(`${basePath}/sqlite.worker.js`, 'Worker file');
+                            await testFile(`${basePath}/sql-wasm.wasm`, 'WASM file');
+                            await testFile(`${basePath}/db/ipsw.db`, 'Database file');
                             
                             console.log('All required files are accessible');
                         } catch (accessError) {
                             console.error('File accessibility test failed:', accessError);
-                            throw new Error(`File accessibility test failed: ${accessError.message}\n\nPlease ensure all required files are properly deployed to GitHub Pages.`);
+                            throw new Error(`File accessibility test failed: ${accessError.message}\n\nPlease ensure all required files are properly deployed to GitHub Pages.\n\nExpected files:\n- ${basePath}/sqlite.worker.js\n- ${basePath}/sql-wasm.wasm\n- ${basePath}/db/ipsw.db\n\nTip: Try accessing these URLs directly in your browser to verify they're available.`);
                         }
 
 
@@ -181,14 +209,34 @@ export default function Entitlements() {
                             setLoadingPhase('Loading worker files...');
                             setLoadingProgress(10);
 
-                            // Fetch the worker file and create a blob URL with CORS headers
-                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`, {
+                            // Fetch the worker file and create a blob URL with CORS headers and retry logic
+                            const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3) => {
+                                for (let i = 0; i < maxRetries; i++) {
+                                    try {
+                                        const response = await fetch(url, options);
+                                        if (response.ok) {
+                                            return response;
+                                        }
+                                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                    } catch (err) {
+                                        console.warn(`Fetch attempt ${i + 1}/${maxRetries} failed for ${url}:`, err);
+                                        if (i === maxRetries - 1) {
+                                            throw err;
+                                        }
+                                        // Wait before retry with exponential backoff
+                                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                                    }
+                                }
+                            };
+
+                            const workerResponse = await fetchWithRetry(`${basePath}/sqlite.worker.js`, {
                                 mode: 'cors',
                                 cache: 'force-cache', // Use browser cache for better performance
                                 headers: {
                                     'Accept': 'application/javascript, text/javascript, */*'
                                 }
                             });
+                            
                             if (!workerResponse.ok) {
                                 throw new Error(`Worker fetch failed: ${workerResponse.status} ${workerResponse.statusText}`);
                             }
@@ -201,15 +249,15 @@ export default function Entitlements() {
 
                         } catch (fetchError) {
                             console.error('Failed to fetch worker files:', fetchError);
-                            
+
                             // Check if this is a CORS error
-                            if (fetchError.message.includes('CORS') || 
+                            if (fetchError.message.includes('CORS') ||
                                 fetchError.message.includes('Cross-Origin') ||
                                 fetchError.message.includes('NetworkError') ||
                                 fetchError.name === 'TypeError') {
                                 throw new Error(`CORS Error: Unable to load worker files. This may be due to GitHub Pages CORS restrictions. Please ensure your database and worker files are properly deployed and accessible. Original error: ${fetchError.message}`);
                             }
-                            
+
                             throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
                         }
 
@@ -339,15 +387,15 @@ export default function Entitlements() {
                     } catch (workerError) {
                         console.error('Failed to create database worker:', workerError);
                         clearTimeout(timeoutId);
-                        
+
                         // Provide specific guidance for common CORS issues
-                        if (workerError.message.includes('CORS') || 
+                        if (workerError.message.includes('CORS') ||
                             workerError.message.includes('Cross-Origin') ||
                             workerError.message.includes('NetworkError') ||
                             workerError.name === 'TypeError') {
                             throw new Error(`CORS Error: Failed to load database worker. This typically happens when:\n\n1. Database files are not properly deployed to GitHub Pages\n2. GitHub Pages is not serving files with correct MIME types\n3. Files are blocked by browser security policies\n\nPlease ensure:\n- The 'db/' directory and 'sqlite.worker.js' + 'sql-wasm.wasm' files are in your GitHub Pages static directory\n- Files are accessible via direct URL\n- Your repository has GitHub Pages enabled\n\nOriginal error: ${workerError.message}`);
                         }
-                        
+
                         throw new Error(`Failed to load database worker: ${workerError.message}`);
                     }
 
@@ -799,6 +847,138 @@ export default function Entitlements() {
                 {error && !dbLoading && (
                     <div className="error-banner">
                         <strong>Database Error:</strong> {error}
+                        
+                        {/* Show debugging information for CORS issues */}
+                        {(error.includes('CORS') || error.includes('accessibility') || error.includes('fetch')) && (
+                            <div className="debug-info">
+                                <details style={{ marginTop: '1rem' }}>
+                                    <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>🔧 Debug Information</summary>
+                                    <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                                        <p><strong>Current URL:</strong> {window.location.href}</p>
+                                        <p><strong>Environment:</strong> {process.env.NODE_ENV || 'unknown'}</p>
+                                        <p><strong>Expected base path:</strong> {
+                                            (() => {
+                                                const isDev = process.env.NODE_ENV === 'development';
+                                                if (isDev) {
+                                                    return window.location.origin + '/ipsw';
+                                                } else {
+                                                    const isGitHubPages = window.location.hostname.includes('github.io');
+                                                    if (isGitHubPages) {
+                                                        const pathSegments = window.location.pathname.split('/').filter(s => s);
+                                                        if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
+                                                            return window.location.origin + '/ipsw';
+                                                        } else if (pathSegments.length > 0) {
+                                                            return window.location.origin + '/' + pathSegments[0];
+                                                        } else {
+                                                            return window.location.origin + '/ipsw';
+                                                        }
+                                                    } else {
+                                                        return window.location.origin + '/ipsw';
+                                                    }
+                                                }
+                                            })()
+                                        }</p>
+                                        <p><strong>Required files to check:</strong></p>
+                                        <ul style={{ marginLeft: '1rem' }}>
+                                            <li>
+                                                <a 
+                                                    href={(() => {
+                                                        const isDev = process.env.NODE_ENV === 'development';
+                                                        let basePath = '';
+                                                        if (isDev) {
+                                                            basePath = window.location.origin + '/ipsw';
+                                                        } else {
+                                                            const isGitHubPages = window.location.hostname.includes('github.io');
+                                                            if (isGitHubPages) {
+                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
+                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                } else if (pathSegments.length > 0) {
+                                                                    basePath = window.location.origin + '/' + pathSegments[0];
+                                                                } else {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                }
+                                                            } else {
+                                                                basePath = window.location.origin + '/ipsw';
+                                                            }
+                                                        }
+                                                        return `${basePath}/sqlite.worker.js`;
+                                                    })()}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={{ color: '#60a5fa' }}
+                                                >
+                                                    sqlite.worker.js
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a 
+                                                    href={(() => {
+                                                        const isDev = process.env.NODE_ENV === 'development';
+                                                        let basePath = '';
+                                                        if (isDev) {
+                                                            basePath = window.location.origin + '/ipsw';
+                                                        } else {
+                                                            const isGitHubPages = window.location.hostname.includes('github.io');
+                                                            if (isGitHubPages) {
+                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
+                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                } else if (pathSegments.length > 0) {
+                                                                    basePath = window.location.origin + '/' + pathSegments[0];
+                                                                } else {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                }
+                                                            } else {
+                                                                basePath = window.location.origin + '/ipsw';
+                                                            }
+                                                        }
+                                                        return `${basePath}/sql-wasm.wasm`;
+                                                    })()}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={{ color: '#60a5fa' }}
+                                                >
+                                                    sql-wasm.wasm
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a 
+                                                    href={(() => {
+                                                        const isDev = process.env.NODE_ENV === 'development';
+                                                        let basePath = '';
+                                                        if (isDev) {
+                                                            basePath = window.location.origin + '/ipsw';
+                                                        } else {
+                                                            const isGitHubPages = window.location.hostname.includes('github.io');
+                                                            if (isGitHubPages) {
+                                                                const pathSegments = window.location.pathname.split('/').filter(s => s);
+                                                                if (pathSegments.length > 0 && pathSegments[0] === 'ipsw') {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                } else if (pathSegments.length > 0) {
+                                                                    basePath = window.location.origin + '/' + pathSegments[0];
+                                                                } else {
+                                                                    basePath = window.location.origin + '/ipsw';
+                                                                }
+                                                            } else {
+                                                                basePath = window.location.origin + '/ipsw';
+                                                            }
+                                                        }
+                                                        return `${basePath}/db/ipsw.db`;
+                                                    })()}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={{ color: '#60a5fa' }}
+                                                >
+                                                    db/ipsw.db
+                                                </a>
+                                            </li>
+                                        </ul>
+                                        <p style={{ marginTop: '1rem' }}><strong>💡 Tip:</strong> Click the links above to test if files are accessible. If they return 404 errors, the files aren't properly deployed.</p>
+                                    </div>
+                                </details>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1094,10 +1274,7 @@ export default function Entitlements() {
                 .entitlements-title {
                     font-size: 3rem;
                     font-weight: 700;
-                    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
-                    background-clip: text;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    color: var(--ifm-color-primary);
                     margin-bottom: 1rem;
                     letter-spacing: -0.025em;
                 }
