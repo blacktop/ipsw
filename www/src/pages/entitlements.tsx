@@ -173,22 +173,66 @@ export default function Entitlements() {
                         // Set reasonable max bytes to read based on database size
                         const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
 
-                        worker = await createDbWorker(
-                            [{
-                                from: 'inline',
-                                config: {
-                                    serverMode: 'full',
-                                    requestChunkSize: requestChunkSize,
-                                    url: `${basePath}/db/ipsw.db`,
-                                    fileLength: dbFileSize // Use detected or fallback file size
-                                    // Note: Removed cacheBust to enable browser caching
-                                    // Database will be cached by browser's HTTP cache
-                                } as any
-                            }],
-                            workerUrl,
-                            wasmUrl,
-                            maxBytesToRead
-                        );
+                        // GitHub Pages often serves files with gzip encoding which breaks range requests
+                        // Try full mode first, fall back to chunked mode if it fails
+                        let serverMode = 'full';
+                        let useFileLength = dbFileSize;
+                        
+                        // Detect if server uses gzip encoding by checking response headers
+                        try {
+                            const testResponse = await fetch(`${basePath}/db/ipsw.db`, { 
+                                method: 'HEAD',
+                                headers: { 'Accept-Encoding': 'identity' } // Request uncompressed
+                            });
+                            const contentEncoding = testResponse.headers.get('content-encoding');
+                            if (contentEncoding && contentEncoding.includes('gzip')) {
+                                console.warn('Server uses gzip encoding, switching to chunked mode');
+                                serverMode = 'chunked';
+                                useFileLength = undefined; // Don't specify file length for chunked mode
+                            }
+                        } catch (headerCheckError) {
+                            console.warn('Could not check content encoding, trying full mode first:', headerCheckError);
+                        }
+
+                        try {
+                            worker = await createDbWorker(
+                                [{
+                                    from: 'inline',
+                                    config: {
+                                        serverMode: serverMode,
+                                        requestChunkSize: requestChunkSize,
+                                        url: `${basePath}/db/ipsw.db`,
+                                        ...(useFileLength && { fileLength: useFileLength })
+                                        // Note: Removed cacheBust to enable browser caching
+                                        // Database will be cached by browser's HTTP cache
+                                    } as any
+                                }],
+                                workerUrl,
+                                wasmUrl,
+                                maxBytesToRead
+                            );
+                        } catch (fullModeError) {
+                            if (serverMode === 'full' && fullModeError.message.includes('malformed')) {
+                                console.warn('Full mode failed with malformed database, trying chunked mode:', fullModeError);
+                                // Retry with chunked mode
+                                worker = await createDbWorker(
+                                    [{
+                                        from: 'inline',
+                                        config: {
+                                            serverMode: 'chunked',
+                                            requestChunkSize: Math.min(requestChunkSize, 512 * 1024), // Smaller chunks for chunked mode
+                                            url: `${basePath}/db/ipsw.db`
+                                            // No fileLength for chunked mode
+                                        } as any
+                                    }],
+                                    workerUrl,
+                                    wasmUrl,
+                                    maxBytesToRead
+                                );
+                            } else {
+                                throw fullModeError;
+                            }
+                        }
 
                         // Start progress monitoring with fallback timing
                         let progressInterval: NodeJS.Timeout | null = null;
