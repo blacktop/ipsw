@@ -312,21 +312,18 @@ export default function Entitlements() {
 
                         // Check for different schema formats
                         const oldSchemaColumns = ['file_path', 'key', 'ios_version'];
-                        const newSchemaColumns = ['file_path', 'key_id', 'value_id', 'ios_version'];
                         const normalizedSchemaColumns = ['path_id', 'key_id', 'value_id', 'ios_version'];
                         
                         const hasOldSchema = oldSchemaColumns.every(col => columns.includes(col));
-                        const hasNewSchema = newSchemaColumns.every(col => columns.includes(col)) && !columns.includes('path_id');
                         const hasNormalizedSchema = normalizedSchemaColumns.every(col => columns.includes(col));
                         
-                        if (!hasOldSchema && !hasNewSchema && !hasNormalizedSchema) {
+                        if (!hasOldSchema && !hasNormalizedSchema) {
                             const missingOldColumns = oldSchemaColumns.filter(col => !columns.includes(col));
-                            const missingNewColumns = newSchemaColumns.filter(col => !columns.includes(col));
                             const missingNormalizedColumns = normalizedSchemaColumns.filter(col => !columns.includes(col));
-                            throw new Error(`Database schema mismatch. Missing columns for old schema: ${missingOldColumns.join(', ')}, new schema: ${missingNewColumns.join(', ')}, or normalized schema: ${missingNormalizedColumns.join(', ')}`);
+                            throw new Error(`Database schema mismatch. Missing columns for old schema: ${missingOldColumns.join(', ')} or normalized schema: ${missingNormalizedColumns.join(', ')}`);
                         }
                         
-                        console.log(hasOldSchema ? 'Using old database schema' : hasNormalizedSchema ? 'Using normalized database schema' : 'Using new database schema');
+                        console.log(hasOldSchema ? 'Using old database schema' : 'Using normalized database schema');
 
                         // Get available iOS versions
                         setLoadingPhase('Loading iOS versions...');
@@ -418,6 +415,8 @@ export default function Entitlements() {
             }
             
             const hasOldSchema = ['file_path', 'key', 'ios_version'].every(col => columns.includes(col));
+            const hasNormalizedSchema = ['path_id', 'key_id', 'value_id', 'ios_version'].every(col => columns.includes(col));
+            
             let sqlQuery = '';
             let params: any[] = [];
 
@@ -481,17 +480,18 @@ export default function Entitlements() {
                     const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
                     setAvailableExecutablePaths(uniquePaths);
                 }
-            } else {
-                // Use new schema format with JOINs
+            } else if (hasNormalizedSchema) {
+                // Use normalized schema format with path JOINs
                 if (type === 'key') {
                     sqlQuery = `
-                        SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value, 
+                        SELECT DISTINCT up.path as file_path, uk.key, uv.value_type, uv.value as string_value, 
                                CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
                                CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
                                CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
                                CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
                                ek.ios_version, ek.build_id, ek.device_list
                         FROM entitlement_keys ek
+                        JOIN entitlement_unique_paths up ON up.id = ek.path_id
                         JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
                         JOIN entitlement_unique_values uv ON uv.id = ek.value_id
                         WHERE uk.key LIKE ?
@@ -499,16 +499,17 @@ export default function Entitlements() {
                     params = [`%${query}%`];
                 } else {
                     sqlQuery = `
-                        SELECT DISTINCT ek.file_path, uk.key, uv.value_type, uv.value as string_value,
+                        SELECT DISTINCT up.path as file_path, uk.key, uv.value_type, uv.value as string_value,
                                CASE WHEN uv.value_type = 'bool' THEN uv.value ELSE NULL END as bool_value,
                                CASE WHEN uv.value_type = 'number' THEN uv.value ELSE NULL END as number_value,
                                CASE WHEN uv.value_type = 'array' THEN uv.value ELSE NULL END as array_value,
                                CASE WHEN uv.value_type = 'dict' THEN uv.value ELSE NULL END as dict_value,
                                ek.ios_version, ek.build_id, ek.device_list
                         FROM entitlement_keys ek
+                        JOIN entitlement_unique_paths up ON up.id = ek.path_id
                         JOIN entitlement_unique_keys uk ON uk.id = ek.key_id
                         JOIN entitlement_unique_values uv ON uv.id = ek.value_id
-                        WHERE ek.file_path LIKE ?
+                        WHERE up.path LIKE ?
                     `;
                     params = [`%${query}%`];
                 }
@@ -522,11 +523,11 @@ export default function Entitlements() {
                 // Add executable path filter if selected
                 const effectivePathFilter = pathFilter || selectedExecutablePath;
                 if (effectivePathFilter) {
-                    sqlQuery += ` AND ek.file_path = ?`;
+                    sqlQuery += ` AND up.path = ?`;
                     params.push(effectivePathFilter);
                 }
 
-                sqlQuery += ` ORDER BY ek.file_path, uk.key LIMIT 200`;
+                sqlQuery += ` ORDER BY up.path, uk.key LIMIT 200`;
 
                 const res = await (dbWorker.db as any).exec(sqlQuery, params);
 
@@ -555,6 +556,8 @@ export default function Entitlements() {
                     const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
                     setAvailableExecutablePaths(uniquePaths);
                 }
+            } else {
+                throw new Error('Unsupported database schema detected');
             }
         } catch (err) {
             console.error('Search failed:', err);
