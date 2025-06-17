@@ -49,157 +49,46 @@ export default function Entitlements() {
 
                         // Determine base URL for development vs production
                         const isDev = process.env.NODE_ENV === 'development';
-                        const currentPath = window.location.pathname;
-                        let basePath = '';
+                        const basePath = isDev ? window.location.origin + '/ipsw' : window.location.origin + '/ipsw';
 
-                        if (isDev) {
-                            // In development, Docusaurus serves static files from /ipsw/ even in dev mode
-                            basePath = window.location.origin + '/ipsw';
-                        } else {
-                            // In production, handle the /ipsw base URL
-                            basePath = window.location.origin + '/ipsw';
-                        }
-
-
-                        // Create blob URL for worker to avoid MIME type issues
-                        let workerUrl, wasmUrl;
-                        try {
-                            setLoadingPhase('Loading worker files...');
-                            setLoadingProgress(10);
-
-                            // Fetch the worker file and create a blob URL
-                            const workerResponse = await fetch(`${basePath}/sqlite.worker.js`);
-                            if (!workerResponse.ok) {
-                                throw new Error(`Worker fetch failed: ${workerResponse.status}`);
-                            }
-                            const workerBlob = await workerResponse.blob();
-                            workerUrl = URL.createObjectURL(new Blob([workerBlob], { type: 'application/javascript' }));
-                            setWorkerBlobUrl(workerUrl); // Store for cleanup
-
-                            // WASM file can be loaded directly
-                            wasmUrl = `${basePath}/sql-wasm.wasm`;
-
-                        } catch (fetchError) {
-                            console.error('Failed to fetch worker files:', fetchError);
-                            throw new Error(`Failed to fetch worker files: ${fetchError.message}`);
-                        }
-
-                        // Detect connection speed and adjust chunk size accordingly
-                        // Base size aligned with optimized SQLite page size (1024 bytes)
-                        const basePageSize = 1024;
-                        let requestChunkSize = basePageSize; // Start with SQLite page size
-
-                        // Use Network Information API if available
-                        const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
-                        if (connection) {
-                            const effectiveType = connection.effectiveType;
-                            const downlink = connection.downlink; // Mbps
-
-                            // Scale chunk size based on connection speed (multiples of page size for efficiency)
-                            if (downlink && downlink > 100) {
-                                // Ultra-fast connections (>100 Mbps): 2MB (2048 pages)
-                                requestChunkSize = basePageSize * 2048;
-                            } else if (effectiveType === '4g' || (downlink && downlink > 25)) {
-                                // Fast connections (>25 Mbps): 1MB (1024 pages)
-                                requestChunkSize = basePageSize * 1024;
-                            } else if (effectiveType === '3g' || (downlink && downlink > 5)) {
-                                // Medium connections (>5 Mbps): 256KB (256 pages)
-                                requestChunkSize = basePageSize * 256;
-                            } else if (effectiveType === '2g' || effectiveType === 'slow-2g') {
-                                // Slow connections: 64KB (64 pages)
-                                requestChunkSize = basePageSize * 64;
-                            } else {
-                                // Default to large chunks for unknown but modern connections: 512KB (512 pages)
-                                requestChunkSize = basePageSize * 512;
-                            }
-                        } else {
-                            // No Network Information API, assume modern fast connection: 2MB (2048 pages)
-                            requestChunkSize = basePageSize * 2048;
-                        }
-
-                        console.log(`Using chunk size: ${Math.round(requestChunkSize / 1024)}KB for connection speed: ${connection?.downlink || 'unknown'} Mbps`);
-
-                        setLoadingPhase('Creating database connection...');
+                        setLoadingPhase('Initializing database worker...');
                         setLoadingProgress(20);
 
-                        // Use pre-calculated database size since GitHub Pages doesn't always provide Content-Length
-                        // Update this size when the database changes using: ./hack/update-db-size.sh
-                        const actualDbSize = 32550912; // Exact size of ipsw.db in bytes
-
-                        // Create a custom lazyFile configuration with known size
-                        const lazyFileConfig = {
-                            serverMode: 'full',
-                            requestChunkSize: requestChunkSize,
-                            url: `${basePath}/db/ipsw.db`,
-                            fileLength: actualDbSize
-                        };
-
+                        // Use full mode with smaller chunk size for better compatibility
                         worker = await createDbWorker(
                             [{
                                 from: 'inline',
-                                config: lazyFileConfig as any  // Type assertion to bypass TS checking
+                                config: {
+                                    serverMode: 'full',
+                                    url: `${basePath}/db/ipsw.db`,
+                                    requestChunkSize: 512 * 1024 // Smaller 512KB chunks for better compatibility
+                                }
                             }],
-                            workerUrl,
-                            wasmUrl,
-                            actualDbSize  // Pass the known file size as maxBytesToRead
+                            `${basePath}/sqlite.worker.js`,
+                            `${basePath}/sql-wasm.wasm`,
+                            50 * 1024 * 1024 // 50MB max memory allocation
                         );
 
-                        // Start progress monitoring with fallback timing
-                        let progressInterval: NodeJS.Timeout | null = null;
-                        let startTime = Date.now();
-                        let lastProgress = 20;
+                        setLoadingProgress(70);
 
-                        const updateProgress = () => {
-                            const elapsed = Date.now() - startTime;
-                            let progress = lastProgress;
+                        // Monitor database loading progress
+                        setLoadingPhase('Loading database schema...');
 
-                            // Try to get actual bytes read if available
-                            if ((worker as any).worker?.bytesRead !== undefined) {
-                                const bytesRead = (worker as any).worker.bytesRead || 0;
-                                if (bytesRead > 0) {
-                                    const bytesProgress = (bytesRead / dbFileSize) * 60; // 60% of total progress
-                                    progress = Math.min(85, 20 + bytesProgress);
-                                    setLoadingPhase(`Loading database... ${Math.round((bytesRead / 1024 / 1024) * 10) / 10}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                                }
-                            } else {
-                                // Fallback: time-based estimation (3 seconds for this 31MB DB)
-                                const estimatedDuration = 3000; // 3 seconds for our 31MB database
-                                const timeProgress = Math.min(65, (elapsed / estimatedDuration) * 65); // 65% max from time
-                                progress = 20 + timeProgress;
+                        // Add a brief delay to allow worker to initialize
+                        await new Promise(resolve => setTimeout(resolve, 1000));
 
-                                const estimatedMB = Math.min(
-                                    Math.round((dbFileSize / 1024 / 1024) * 10) / 10,
-                                    Math.round(((progress - 20) / 65) * (dbFileSize / 1024 / 1024) * 10) / 10
-                                );
-                                setLoadingPhase(`Loading database... ~${estimatedMB}MB / ${Math.round((dbFileSize / 1024 / 1024) * 10) / 10}MB`);
-                            }
+                        setLoadingProgress(85);
 
-                            setLoadingProgress(Math.min(85, progress));
-                            lastProgress = progress;
-                        };
-
-                        progressInterval = setInterval(updateProgress, 200);
-
-                        // Test if database is accessible and prefetch initial data
+                        // Test if database is accessible
                         try {
-                            // Clean up progress interval before final steps
-                            if (progressInterval) {
-                                clearInterval(progressInterval);
-                            }
+                            setLoadingPhase('Testing database connection...');
+                            setLoadingProgress(95);
 
-                            setLoadingPhase('Connecting to database...');
-                            setLoadingProgress(87);
-
-                            // This query will force loading of the SQLite header and schema
+                            // Test basic database functionality
                             await (worker.db as any).exec('SELECT 1;');
 
-                            setLoadingPhase('Initializing database...');
-                            setLoadingProgress(90);
-
-                            // Prefetch the iOS versions to cache the index pages
-                            await (worker.db as any).exec(
-                                `SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`
-                            );
+                            // Prefetch the iOS versions
+                            await (worker.db as any).exec(`SELECT DISTINCT ios_version FROM entitlement_keys LIMIT 1;`);
                         } catch (connectivityError) {
                             console.error('Database connectivity test failed:', connectivityError);
                             throw new Error(`Database connectivity test failed: ${connectivityError.message}`);
