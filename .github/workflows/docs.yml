@@ -26,7 +26,6 @@ jobs:
         run: |
           git lfs uninstall
           rm -Rf .git
-          rm .gitattributes
       - uses: pnpm/action-setup@v4
         with:
           version: 8
