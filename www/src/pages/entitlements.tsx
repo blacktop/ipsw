@@ -35,25 +35,9 @@ export default function Entitlements() {
                     setLoadingPhase('Initializing...');
                     setError('');
 
-                    // Get database file size for progress tracking
-                    let dbFileSize = 0;
-                    try {
-                        setLoadingPhase('Checking database size...');
-                        const basePath = process.env.NODE_ENV === 'development'
-                            ? window.location.origin + '/ipsw'
-                            : window.location.origin + '/ipsw';
-
-                        const headResponse = await fetch(`${basePath}/db/ipsw.db`, { method: 'HEAD' });
-                        if (headResponse.ok) {
-                            const contentLength = headResponse.headers.get('content-length');
-                            if (contentLength) {
-                                dbFileSize = parseInt(contentLength, 10);
-                            }
-                        }
-                    } catch (sizeError) {
-                        console.warn('Could not determine database file size:', sizeError);
-                        // Continue without size info
-                    }
+                    // Hardcoded database file size to avoid issues with GitHub Pages gzip compression
+                    // This value is updated by hack/update-db-size.sh
+                    const dbFileSize = 14630912; // 13.9 MB - actual database size
 
                     let worker;
                     try {
@@ -137,8 +121,9 @@ export default function Entitlements() {
                         setLoadingPhase('Creating database connection...');
                         setLoadingProgress(20);
 
-                        // Set reasonable max bytes to read based on database size
-                        const maxBytesToRead = dbFileSize > 0 ? dbFileSize + (10 * 1024 * 1024) : 500 * 1024 * 1024; // DB size + 10MB buffer, or 500MB default
+                        // Set max bytes to read to exactly the database size
+                        // This is critical for sql.js-httpvfs to work correctly with GitHub Pages
+                        const maxBytesToRead = dbFileSize; // Use exact database size, no buffer
 
                         worker = await createDbWorker(
                             [{
@@ -970,10 +955,7 @@ export default function Entitlements() {
                 .entitlements-title {
                     font-size: 3rem;
                     font-weight: 700;
-                    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
-                    background-clip: text;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    color: var(--ifm-color-primary);
                     margin-bottom: 1rem;
                     letter-spacing: -0.025em;
                 }
