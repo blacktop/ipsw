@@ -52,8 +52,15 @@ CREATE POLICY "Allow anonymous read access on entitlements" ON entitlements
     TO anon
     USING (true);
 
--- Grant access to materialized view for fast searches
-GRANT SELECT ON entitlements_search TO anon, authenticated;
+-- Grant access to materialized view for fast searches (if it exists)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'entitlements_search') THEN
+        GRANT SELECT ON entitlements_search TO anon, authenticated;
+    ELSE
+        RAISE NOTICE 'Materialized view entitlements_search does not exist - skipping grant';
+    END IF;
+END $$;
 
 -- Explicitly deny INSERT, UPDATE, DELETE for anonymous users
 -- Note: When RLS is enabled and no policy exists for an operation, it's denied by default
