@@ -40,6 +40,9 @@ CREATE UNIQUE INDEX idx_entitlement_unique_keys_key ON entitlement_unique_keys(k
 CREATE UNIQUE INDEX idx_entitlement_unique_values_value_hash ON entitlement_unique_values(value_hash);
 CREATE UNIQUE INDEX idx_entitlement_unique_paths_path ON entitlement_unique_paths(path);
 
+-- Create unique constraint to prevent duplicate entries
+CREATE UNIQUE INDEX idx_unique_entitlement ON entitlement_keys(ios_version, path_id, key_id, value_id);
+
 CREATE INDEX idx_entitlement_keys_value_id ON entitlement_keys(value_id);
 CREATE INDEX idx_version_path ON entitlement_keys(path_id);
 CREATE INDEX idx_entitlement_keys_device_list ON entitlement_keys(device_list);
