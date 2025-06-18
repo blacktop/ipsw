@@ -14,13 +14,13 @@ import (
 
 type Tags []string
 
-type Commit string
+type Commits []string
 
 type Function map[string]string
 
 type CacheItem struct {
 	Tags      Tags     `json:"tags,omitempty"`
-	Commit    Commit   `json:"commit,omitempty"`
+	Commits   Commits  `json:"commits,omitempty"`
 	Functions Function `json:"functions,omitempty"`
 	URL       string   `json:"url,omitempty"`
 }
@@ -72,8 +72,12 @@ func (c *MemoryCache) Has(key string, value any) bool {
 					return true
 				}
 			}
-		case Commit:
-			return item.(CacheItem).Commit == v
+		case Commits:
+			for _, commit := range v {
+				if slices.Contains(item.(CacheItem).Commits, commit) {
+					return true
+				}
+			}
 		case Function:
 			for name, commit := range v {
 				if commitVal, ok := item.(CacheItem).Functions[name]; ok && commitVal == commit {
@@ -124,10 +128,12 @@ func (c *FileCache) Add(key string, value any) error {
 					item.Tags = append(item.Tags, tag)
 				}
 			}
-		case Commit:
-			// Update commit if it is not empty
-			if v != "" {
-				item.Commit = v
+		case Commits:
+			// Update commits
+			for _, commit := range v {
+				if !slices.Contains(item.Commits, commit) {
+					item.Commits = append(item.Commits, commit)
+				}
 			}
 		case Function:
 			maps.Copy(item.Functions, v)
@@ -139,8 +145,8 @@ func (c *FileCache) Add(key string, value any) error {
 		switch v := value.(type) {
 		case Tags:
 			cache[key] = CacheItem{Tags: v}
-		case Commit:
-			cache[key] = CacheItem{Commit: v}
+		case Commits:
+			cache[key] = CacheItem{Commits: v}
 		case Function:
 			cache[key] = CacheItem{Functions: v}
 		default:
@@ -190,8 +196,12 @@ func (c *FileCache) Has(key string, value any) bool {
 					return true
 				}
 			}
-		case Commit:
-			return item.Commit == v
+		case Commits:
+			for _, commit := range v {
+				if slices.Contains(item.Commits, commit) {
+					return true
+				}
+			}
 		case Function:
 			for name, commit := range v {
 				if commitVal, ok := item.Functions[name]; ok && commitVal == commit {
