@@ -23,12 +23,13 @@ jobs:
       - name: Check Cache
         run: |
           cat hack/.watch_cache || echo "No cache found"
-      - name: Package Installer
-        run: |
-          sudo snap install ipsw
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
       - name: Run ipsw watch WebKit/WebKit (LOCKDOWN MODE)
         run: |
-          /snap/bin/ipsw watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
@@ -38,7 +39,7 @@ jobs:
       - name: Run ipsw watch WebKit/WebKit tags
         if: ${{ !inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch WebKit/WebKit --tags \
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --tags \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
@@ -48,7 +49,7 @@ jobs:
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS
         if: ${{ !inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          go run ./cmd/ipsw/main.go watch apple-oss-distributions/distribution-macOS --tags --post \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
@@ -62,7 +63,7 @@ jobs:
       - name: Run ipsw watch apple-oss-distributions/distribution-macOS (SKIP MASTODON)
         if: ${{ inputs.skip_post }}
         run: |
-          /snap/bin/ipsw watch apple-oss-distributions/distribution-macOS --tags --post \
+          go run ./cmd/ipsw/main.go watch apple-oss-distributions/distribution-macOS --tags --post \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
