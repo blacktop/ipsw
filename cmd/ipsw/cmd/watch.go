@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -295,7 +296,7 @@ var watchCmd = &cobra.Command{
 				cacheKey := fmt.Sprintf("%s:%s", funcName, relFilePath)
 				cachedValue := cache.Get(repoPath)
 
-				if cachedValue == nil || string(cachedValue.Commit) != latestCommitOID {
+				if cachedValue == nil || !slices.Contains(cachedValue.Commits, latestCommitOID) {
 					if err := cache.Add(repoPath, watch.Function{
 						cacheKey: latestCommitOID,
 					}); err != nil {
@@ -506,8 +507,8 @@ var watchCmd = &cobra.Command{
 				}
 
 				for idx, commit := range commits {
-					if !cache.Has(args[0], watch.Commit(commit.OID)) {
-						if err := cache.Add(args[0], watch.Commit(commit.OID)); err != nil {
+					if !cache.Has(args[0], watch.Commits{string(commit.OID)}) {
+						if err := cache.Add(args[0], watch.Commits{string(commit.OID)}); err != nil {
 							return fmt.Errorf("failed to add commit %s to cache: %v", string(commit.OID), err)
 						}
 
