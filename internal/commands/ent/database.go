@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/db"
@@ -26,7 +25,7 @@ type DatabaseService struct {
 // NewDatabaseService creates a new database service
 func NewDatabaseService(database db.Database) *DatabaseService {
 	ds := &DatabaseService{db: database}
-	
+
 	// Try to get GORM database if available
 	switch dbImpl := database.(type) {
 	case *db.Sqlite:
@@ -34,7 +33,7 @@ func NewDatabaseService(database db.Database) *DatabaseService {
 	case *db.Postgres:
 		ds.gormDB = dbImpl.GetDB()
 	}
-	
+
 	return ds
 }
 
@@ -68,11 +67,11 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 			// Check if IPSW record already exists
 			var existingIPSW model.Ipsw
 			result := ds.gormDB.Where("id = ?", ipswRecord.ID).First(&existingIPSW)
-			
+
 			if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 				return fmt.Errorf("failed to check existing IPSW record: %v", result.Error)
 			}
-			
+
 			if result.Error == gorm.ErrRecordNotFound {
 				// Record doesn't exist, create it
 				if err := ds.gormDB.Create(ipswRecord).Error; err != nil {
@@ -116,22 +115,15 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 	}
 
 	// Collect all unique keys, values, and paths first
-	var allKeys []model.EntitlementUniqueKey
-	var allValues []model.EntitlementUniqueValue
-	var allPaths []model.EntitlementUniquePath
-	var webEntries []model.EntitlementWebSearch
+	var allKeys []model.EntitlementKey
+	var allValues []model.EntitlementValue
+	var allPaths []model.Path
+	var entitlements []model.Entitlement
 
 	// Maps to avoid duplicates during collection
 	keySet := make(map[string]bool)
-	valueSet := make(map[string]bool)  // using hash as key
+	valueSet := make(map[string]bool) // using hash as key
 	pathSet := make(map[string]bool)
-
-	// Build device list string once
-	var deviceNames []string
-	for _, device := range ipswRecord.Devices {
-		deviceNames = append(deviceNames, device.Name)
-	}
-	deviceList := strings.Join(deviceNames, ",")
 
 	// First pass: collect all unique keys, values, and paths
 	for filePath, entPlist := range entDB {
@@ -141,7 +133,7 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 
 		// Add path if not seen before
 		if !pathSet[filePath] {
-			allPaths = append(allPaths, model.EntitlementUniquePath{Path: filePath})
+			allPaths = append(allPaths, model.Path{Path: filePath})
 			pathSet[filePath] = true
 		}
 
@@ -154,7 +146,7 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 		for key, value := range ents {
 			// Add key if not seen before
 			if !keySet[key] {
-				allKeys = append(allKeys, model.EntitlementUniqueKey{Key: key})
+				allKeys = append(allKeys, model.EntitlementKey{Key: key})
 				keySet[key] = true
 			}
 
@@ -198,7 +190,7 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 			// Add value if not seen before
 			valueHash := createValueHash(valueType, valueStr)
 			if !valueSet[valueHash] {
-				allValues = append(allValues, model.EntitlementUniqueValue{
+				allValues = append(allValues, model.EntitlementValue{
 					Value:     valueStr,
 					ValueType: valueType,
 					ValueHash: valueHash,
@@ -238,8 +230,8 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 		for key := range keySet {
 			keyNames = append(keyNames, key)
 		}
-		
-		var dbKeys []model.EntitlementUniqueKey
+
+		var dbKeys []model.EntitlementKey
 		if err := ds.gormDB.Where("key IN ?", keyNames).Find(&dbKeys).Error; err != nil {
 			return fmt.Errorf("failed to query unique keys: %v", err)
 		}
@@ -248,14 +240,14 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 		}
 	}
 
-	// Get value IDs for only the values we need  
+	// Get value IDs for only the values we need
 	if len(valueSet) > 0 {
 		valueHashes := make([]string, 0, len(valueSet))
 		for hash := range valueSet {
 			valueHashes = append(valueHashes, hash)
 		}
-		
-		var dbValues []model.EntitlementUniqueValue
+
+		var dbValues []model.EntitlementValue
 		if err := ds.gormDB.Where("value_hash IN ?", valueHashes).Find(&dbValues).Error; err != nil {
 			return fmt.Errorf("failed to query unique values: %v", err)
 		}
@@ -270,8 +262,8 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 		for path := range pathSet {
 			pathNames = append(pathNames, path)
 		}
-		
-		var dbPaths []model.EntitlementUniquePath
+
+		var dbPaths []model.Path
 		if err := ds.gormDB.Where("path IN ?", pathNames).Find(&dbPaths).Error; err != nil {
 			return fmt.Errorf("failed to query unique paths: %v", err)
 		}
@@ -346,23 +338,22 @@ func (ds *DatabaseService) storeEntitlementsBulk(ipswRecord *model.Ipsw, entDB m
 				continue
 			}
 
-			// Create web entry
-			webEntry := model.EntitlementWebSearch{
-				IOSVersion: ipswRecord.Version,
-				BuildID:    ipswRecord.BuildID,
-				DeviceList: deviceList,
-				PathID:     pathID,
-				KeyID:      keyID,
-				ValueID:    valueID,
+			// Create entitlement entry
+			entitlement := model.Entitlement{
+				IpswID:  ipswRecord.ID,
+				PathID:  pathID,
+				KeyID:   keyID,
+				ValueID: valueID,
 			}
-			webEntries = append(webEntries, webEntry)
+			entitlements = append(entitlements, entitlement)
 		}
 	}
 
-	// Bulk insert web entries with ON CONFLICT DO NOTHING
-	if len(webEntries) > 0 {
-		if err := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(webEntries, 1000).Error; err != nil {
-			return fmt.Errorf("failed to bulk insert web entries: %v", err)
+	// Bulk insert entitlement entries with ON CONFLICT DO NOTHING
+	if len(entitlements) > 0 {
+		result := ds.gormDB.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(entitlements, 1000)
+		if result.Error != nil {
+			return fmt.Errorf("failed to bulk insert entitlement entries: %v", result.Error)
 		}
 	}
 
@@ -379,12 +370,6 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 	if len(entPlist) > 0 {
 		ents := make(map[string]any)
 		if err := plist.NewDecoder(bytes.NewReader([]byte(entPlist))).Decode(&ents); err == nil {
-			// Build device list string
-			var deviceNames []string
-			for _, device := range ipswRecord.Devices {
-				deviceNames = append(deviceNames, device.Name)
-			}
-			deviceList := strings.Join(deviceNames, ",")
 
 			// Process each entitlement key-value pair directly
 			for key, value := range ents {
@@ -443,29 +428,27 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 					return fmt.Errorf("failed to get unique path ID for '%s': %v", filePath, err)
 				}
 
-				// Create or update web search entry (idempotent)
-				webEntry := &model.EntitlementWebSearch{
-					IOSVersion: ipswRecord.Version,
-					BuildID:    ipswRecord.BuildID,
-					DeviceList: deviceList,
-					PathID:     pathID,
-					KeyID:      keyID,
-					ValueID:    valueID,
+				// Create or update entitlement entry (idempotent)
+				entitlement := &model.Entitlement{
+					IpswID:  ipswRecord.ID,
+					PathID:  pathID,
+					KeyID:   keyID,
+					ValueID: valueID,
 				}
 
 				// Check if this exact combination already exists
-				var existingEntry model.EntitlementWebSearch
-				result := ds.gormDB.Where("ios_version = ? AND build_id = ? AND path_id = ? AND key_id = ? AND value_id = ?",
-					webEntry.IOSVersion, webEntry.BuildID, webEntry.PathID, webEntry.KeyID, webEntry.ValueID).First(&existingEntry)
+				var existingEntry model.Entitlement
+				result := ds.gormDB.Where("ipsw_id = ? AND path_id = ? AND key_id = ? AND value_id = ?",
+					entitlement.IpswID, entitlement.PathID, entitlement.KeyID, entitlement.ValueID).First(&existingEntry)
 
 				if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-					return fmt.Errorf("failed to check existing web search entry: %v", result.Error)
+					return fmt.Errorf("failed to check existing entitlement entry: %v", result.Error)
 				}
 
 				if result.Error == gorm.ErrRecordNotFound {
 					// Entry doesn't exist, create it
-					if err := ds.gormDB.Create(webEntry).Error; err != nil {
-						return fmt.Errorf("failed to create web search entry: %v", err)
+					if err := ds.gormDB.Create(entitlement).Error; err != nil {
+						return fmt.Errorf("failed to create entitlement entry: %v", err)
 					}
 				}
 				// If entry exists, skip it (idempotent behavior)
@@ -485,18 +468,20 @@ func generateIPSWID(version, build string) string {
 func createValueHash(valueType, value string) string {
 	hashInput := fmt.Sprintf("%s:%s", valueType, value)
 	hash := sha256.Sum256([]byte(hashInput))
-	return hex.EncodeToString(hash[:])
+	// Return first 16 characters of hex-encoded hash for storage optimization
+	// This provides 99.999% collision safety while fitting in CHAR(16)
+	return hex.EncodeToString(hash[:])[:16]
 }
 
 // getOrCreateUniqueKey ensures a unique key exists and returns its ID
 func (ds *DatabaseService) getOrCreateUniqueKey(key string) (uint, error) {
-	var uniqueKey model.EntitlementUniqueKey
-	
+	var uniqueKey model.EntitlementKey
+
 	// Try to find existing key
 	if err := ds.gormDB.Where("key = ?", key).First(&uniqueKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new unique key
-			uniqueKey = model.EntitlementUniqueKey{Key: key}
+			uniqueKey = model.EntitlementKey{Key: key}
 			if err := ds.gormDB.Create(&uniqueKey).Error; err != nil {
 				return 0, fmt.Errorf("failed to create unique key: %v", err)
 			}
@@ -504,20 +489,20 @@ func (ds *DatabaseService) getOrCreateUniqueKey(key string) (uint, error) {
 			return 0, fmt.Errorf("failed to query unique key: %v", err)
 		}
 	}
-	
+
 	return uniqueKey.ID, nil
 }
 
 // getOrCreateUniqueValue ensures a unique value exists and returns its ID
 func (ds *DatabaseService) getOrCreateUniqueValue(valueType, value string) (uint, error) {
 	valueHash := createValueHash(valueType, value)
-	var uniqueValue model.EntitlementUniqueValue
-	
+	var uniqueValue model.EntitlementValue
+
 	// Try to find existing value
 	if err := ds.gormDB.Where("value_hash = ?", valueHash).First(&uniqueValue).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new unique value
-			uniqueValue = model.EntitlementUniqueValue{
+			uniqueValue = model.EntitlementValue{
 				Value:     value,
 				ValueType: valueType,
 				ValueHash: valueHash,
@@ -529,19 +514,19 @@ func (ds *DatabaseService) getOrCreateUniqueValue(valueType, value string) (uint
 			return 0, fmt.Errorf("failed to query unique value: %v", err)
 		}
 	}
-	
+
 	return uniqueValue.ID, nil
 }
 
 // getOrCreateUniquePath ensures a unique path exists and returns its ID
 func (ds *DatabaseService) getOrCreateUniquePath(path string) (uint, error) {
-	var uniquePath model.EntitlementUniquePath
-	
+	var uniquePath model.Path
+
 	// Try to find existing path
 	if err := ds.gormDB.Where("path = ?", path).First(&uniquePath).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new unique path
-			uniquePath = model.EntitlementUniquePath{Path: path}
+			uniquePath = model.Path{Path: path}
 			if err := ds.gormDB.Create(&uniquePath).Error; err != nil {
 				return 0, fmt.Errorf("failed to create unique path: %v", err)
 			}
@@ -549,7 +534,7 @@ func (ds *DatabaseService) getOrCreateUniquePath(path string) (uint, error) {
 			return 0, fmt.Errorf("failed to query unique path: %v", err)
 		}
 	}
-	
+
 	return uniquePath.ID, nil
 }
 
@@ -560,42 +545,44 @@ func (ds *DatabaseService) GetIOSVersions() ([]string, error) {
 	}
 
 	var versions []string
-	if err := ds.gormDB.Model(&model.EntitlementWebSearch{}).
-		Distinct("ios_version").
-		Order("ios_version DESC").
-		Pluck("ios_version", &versions).Error; err != nil {
+	if err := ds.gormDB.Model(&model.Ipsw{}).
+		Distinct("version").
+		Order("version DESC").
+		Pluck("version", &versions).Error; err != nil {
 		return nil, fmt.Errorf("failed to get iOS versions: %v", err)
 	}
 
 	return versions, nil
 }
 
-// SearchWebEntitlements performs optimized queries for the web UI
-func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePattern string, limit int) ([]*model.EntitlementWebSearch, error) {
+// SearchEntitlements performs optimized queries for the web UI
+func (ds *DatabaseService) SearchEntitlements(version, keyPattern, filePattern string, limit int) ([]*model.Entitlement, error) {
 	if ds.gormDB == nil {
 		return nil, fmt.Errorf("GORM database required for web search")
 	}
 
-	query := ds.gormDB.Model(&model.EntitlementWebSearch{}).
-		Preload("UniquePath").
-		Preload("UniqueKey").
-		Preload("UniqueValue")
+	query := ds.gormDB.Model(&model.Entitlement{}).
+		Preload("Path").
+		Preload("Key").
+		Preload("Value").
+		Preload("Ipsw")
 
-	// Filter by iOS version (required for optimal HTTP_RANGE performance)
+	// Filter by iOS version using JOIN with ipsws table
 	if version != "" {
-		query = query.Where("ios_version = ?", version)
+		query = query.Joins("JOIN ipsws ON ipsws.id = entitlements.ipsw_id").
+			Where("ipsws.version = ?", version)
 	}
 
-	// Filter by key pattern (now requires join with unique keys table)
+	// Filter by key pattern using JOIN with entitlement_keys table
 	if keyPattern != "" {
-		query = query.Joins("JOIN entitlement_unique_keys ON entitlement_unique_keys.id = entitlement_keys.key_id").
-			Where("entitlement_unique_keys.key LIKE ?", "%"+keyPattern+"%")
+		query = query.Joins("JOIN entitlement_keys ON entitlement_keys.id = entitlements.key_id").
+			Where("entitlement_keys.key LIKE ?", "%"+keyPattern+"%")
 	}
 
-	// Filter by file pattern (now requires join with unique paths table)
+	// Filter by file pattern using JOIN with paths table
 	if filePattern != "" {
-		query = query.Joins("JOIN entitlement_unique_paths ON entitlement_unique_paths.id = entitlement_keys.path_id").
-			Where("entitlement_unique_paths.path LIKE ?", "%"+filePattern+"%")
+		query = query.Joins("JOIN paths ON paths.id = entitlements.path_id").
+			Where("paths.path LIKE ?", "%"+filePattern+"%")
 	}
 
 	// Order by path_id for consistent results
@@ -606,7 +593,7 @@ func (ds *DatabaseService) SearchWebEntitlements(version, keyPattern, filePatter
 		query = query.Limit(limit)
 	}
 
-	var results []*model.EntitlementWebSearch
+	var results []*model.Entitlement
 	if err := query.Find(&results).Error; err != nil {
 		return nil, fmt.Errorf("failed to search web entitlements: %v", err)
 	}
@@ -629,25 +616,25 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 	stats["ipsw_count"] = ipswCount
 
 	var mappingCount int64
-	if err := ds.gormDB.Model(&model.EntitlementWebSearch{}).Count(&mappingCount).Error; err != nil {
+	if err := ds.gormDB.Model(&model.Entitlement{}).Count(&mappingCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to count entitlement mappings: %v", err)
 	}
 	stats["entitlement_mapping_count"] = mappingCount
 
 	var uniqueKeyCount int64
-	if err := ds.gormDB.Model(&model.EntitlementUniqueKey{}).Count(&uniqueKeyCount).Error; err != nil {
+	if err := ds.gormDB.Model(&model.EntitlementKey{}).Count(&uniqueKeyCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to count unique keys: %v", err)
 	}
 	stats["unique_key_count"] = uniqueKeyCount
 
 	var uniqueValueCount int64
-	if err := ds.gormDB.Model(&model.EntitlementUniqueValue{}).Count(&uniqueValueCount).Error; err != nil {
+	if err := ds.gormDB.Model(&model.EntitlementValue{}).Count(&uniqueValueCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to count unique values: %v", err)
 	}
 	stats["unique_value_count"] = uniqueValueCount
 
 	var uniquePathCount int64
-	if err := ds.gormDB.Model(&model.EntitlementUniquePath{}).Count(&uniquePathCount).Error; err != nil {
+	if err := ds.gormDB.Model(&model.Path{}).Count(&uniquePathCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to count unique paths: %v", err)
 	}
 	stats["unique_path_count"] = uniquePathCount
@@ -657,11 +644,11 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 		Key   string
 		Count int64
 	}
-	if err := ds.gormDB.Table("entitlement_keys ek").
-		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
-		Select("uk.key, COUNT(*) as count").
-		Group("uk.key").
-		Order("COUNT(*) DESC").  // Use COUNT(*) instead of alias in ORDER BY
+	if err := ds.gormDB.Table("entitlements e").
+		Joins("JOIN entitlement_keys ek ON ek.id = e.key_id").
+		Select("ek.key, COUNT(*) as count").
+		Group("ek.key").
+		Order("COUNT(*) DESC"). // Use COUNT(*) instead of alias in ORDER BY
 		Limit(10).
 		Scan(&topKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to get top keys: %v", err)
@@ -673,12 +660,12 @@ func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
 		Key   string
 		Count int64
 	}
-	if err := ds.gormDB.Table("entitlement_keys ek").
-		Joins("JOIN entitlement_unique_keys uk ON uk.id = ek.key_id").
-		Select("uk.key, COUNT(*) as count").
-		Group("uk.key").
-		Having("COUNT(*) > 1").  // Use COUNT(*) instead of alias in HAVING clause
-		Order("COUNT(*) ASC").   // Use COUNT(*) instead of alias in ORDER BY
+	if err := ds.gormDB.Table("entitlements e").
+		Joins("JOIN entitlement_keys ek ON ek.id = e.key_id").
+		Select("ek.key, COUNT(*) as count").
+		Group("ek.key").
+		Having("COUNT(*) > 1"). // Use COUNT(*) instead of alias in HAVING clause
+		Order("COUNT(*) ASC").  // Use COUNT(*) instead of alias in ORDER BY
 		Limit(10).
 		Scan(&leastKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to get least common keys: %v", err)

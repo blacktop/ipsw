@@ -108,10 +108,9 @@ func (p *Postgres) Connect() (err error) {
 		&model.Symbol{},
 		&model.Name{},
 		// Entitlement models
-		&model.EntitlementUniqueKey{},
-		&model.EntitlementUniqueValue{},
-		&model.EntitlementUniquePath{},
-		&model.EntitlementWebSearch{},
+		&model.EntitlementKey{},
+		&model.EntitlementValue{},
+		&model.Entitlement{},
 	)
 }
 

@@ -69,10 +69,9 @@ func (s *Sqlite) Connect() (err error) {
 		&model.DyldSharedCache{},
 		&model.Macho{},
 		&model.Symbol{},
-		&model.EntitlementUniqueKey{},
-		&model.EntitlementUniqueValue{},
-		&model.EntitlementUniquePath{},
-		&model.EntitlementWebSearch{},
+		&model.EntitlementKey{},
+		&model.EntitlementValue{},
+		&model.Entitlement{},
 	); err != nil {
 		return err
 	}
