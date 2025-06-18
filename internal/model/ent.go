@@ -29,12 +29,12 @@ type EntitlementUniquePath struct {
 // This replaces the denormalized table with foreign key references
 type EntitlementWebSearch struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	IOSVersion  string    `gorm:"index:idx_version_key,priority:1;not null" json:"ios_version"`
+	IOSVersion  string    `gorm:"index:idx_version_key,priority:1;uniqueIndex:idx_unique_entitlement,priority:1;not null" json:"ios_version"`
 	BuildID     string    `gorm:"index;not null" json:"build_id"`
 	DeviceList  string    `gorm:"index" json:"device_list"` // comma-separated device names
-	PathID      uint      `gorm:"index:idx_version_path,priority:2;not null" json:"path_id"`
-	KeyID       uint      `gorm:"index:idx_version_key,priority:2;not null" json:"key_id"`
-	ValueID     uint      `gorm:"index;not null" json:"value_id"`
+	PathID      uint      `gorm:"index:idx_version_path,priority:2;uniqueIndex:idx_unique_entitlement,priority:2;not null" json:"path_id"`
+	KeyID       uint      `gorm:"index:idx_version_key,priority:2;uniqueIndex:idx_unique_entitlement,priority:3;not null" json:"key_id"`
+	ValueID     uint      `gorm:"index;uniqueIndex:idx_unique_entitlement,priority:4;not null" json:"value_id"`
 	ReleaseDate *time.Time `json:"release_date,omitempty"`
 	
 	// Foreign key relationships

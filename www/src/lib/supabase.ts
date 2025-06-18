@@ -225,7 +225,8 @@ export class EntitlementsService {
    * Transform search results from the joined query format to the expected EntitlementResult format
    */
   private static transformSearchResults(data: any[]): EntitlementResult[] {
-    return data.map(row => ({
+    // Transform the raw data
+    const results = data.map(row => ({
       id: row.id,
       ios_version: row.ios_version,
       build_id: row.build_id,
@@ -240,6 +241,22 @@ export class EntitlementsService {
       dict_value: row.entitlement_unique_values?.value_type === 'dict' ? row.entitlement_unique_values?.value : null,
       release_date: row.release_date
     }));
+
+    // Deduplicate based on unique combination of ios_version, file_path, key, and value
+    const seen = new Set<string>();
+    const deduplicated: EntitlementResult[] = [];
+    
+    for (const result of results) {
+      // Create a unique key based on the combination of fields that define uniqueness
+      const uniqueKey = `${result.ios_version}|${result.file_path}|${result.key}|${result.value_type}|${result.string_value || result.bool_value || result.number_value || result.array_value || result.dict_value}`;
+      
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey);
+        deduplicated.push(result);
+      }
+    }
+    
+    return deduplicated;
   }
 
   /**
