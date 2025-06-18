@@ -388,20 +388,20 @@ export class EntitlementsService {
       const value = valueMap.get(row.value_id);
 
       return {
-        id: row.id,
-        ios_version: ipsw?.version || '',
-        build_id: ipsw?.buildid || '',
+        id: row.id as number,
+        ios_version: (ipsw?.version as string) || '',
+        build_id: (ipsw?.buildid as string) || '',
         device_list: '', // Would need separate device query
-        file_path: path?.path || '',
-        key: key?.key || '',
-        value_type: value?.value_type || 'string',
-        string_value: value?.value_type === 'string' ? value.value : undefined,
+        file_path: (path?.path as string) || '',
+        key: (key?.key as string) || '',
+        value_type: (value?.value_type as string) || 'string',
+        string_value: value?.value_type === 'string' ? (value.value as string) : undefined,
         bool_value: value?.value_type === 'bool' ? (value.value === 'true') : undefined,
         number_value: value?.value_type === 'number' && typeof value.value === 'string' ? parseFloat(value.value) : undefined,
-        array_value: value?.value_type === 'array' ? value.value : undefined,
-        dict_value: value?.value_type === 'dict' ? value.value : undefined,
+        array_value: value?.value_type === 'array' ? (value.value as string) : undefined,
+        dict_value: value?.value_type === 'dict' ? (value.value as string) : undefined,
         release_date: undefined
-      };
+      } as EntitlementResult;
     });
 
     // Deduplicate based on unique combination of ios_version, file_path, key, and value
