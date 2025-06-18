@@ -176,7 +176,7 @@ func searchEntitlements(dbConn db.Database, keyPattern, valuePattern, filePatter
 	dbService := NewDatabaseService(dbConn)
 
 	// Use web-optimized search for better performance
-	results, err := dbService.SearchWebEntitlements(versionFilter, keyPattern, filePattern, limit)
+	results, err := dbService.SearchEntitlements(versionFilter, keyPattern, filePattern, limit)
 	if err != nil {
 		return fmt.Errorf("failed to search entitlements: %v", err)
 	}
@@ -196,14 +196,14 @@ func searchEntitlements(dbConn db.Database, keyPattern, valuePattern, filePatter
 
 	for _, result := range results {
 		// Extract key, value, and path from related objects
-		if result.UniqueKey == nil || result.UniqueValue == nil || result.UniquePath == nil {
+		if result.Key == nil || result.Value == nil || result.Path == nil {
 			continue // Skip if relations weren't loaded
 		}
 
-		key := result.UniqueKey.Key
-		value := result.UniqueValue.Value
-		valueType := result.UniqueValue.ValueType
-		filePath := result.UniquePath.Path
+		key := result.Key.Key
+		value := result.Value.Value
+		valueType := result.Value.ValueType
+		filePath := result.Path.Path
 
 		// Check value pattern if specified
 		if valuePattern != "" {
@@ -215,11 +215,17 @@ func searchEntitlements(dbConn db.Database, keyPattern, valuePattern, filePatter
 		if fileOnly {
 			fmt.Fprintf(w, "%s\n", colorBin(filePath))
 		} else {
+			version := "unknown"
+			buildID := "unknown"
+			if result.Ipsw != nil {
+				version = result.Ipsw.Version
+				buildID = result.Ipsw.BuildID
+			}
 			fmt.Fprintf(w, "%s\t%s\t[%s %s]\n",
 				colorKey(key),
 				colorBin(filePath),
-				colorVersion(result.IOSVersion),
-				result.BuildID)
+				colorVersion(version),
+				buildID)
 
 			// Display value based on type
 			switch valueType {
@@ -289,7 +295,7 @@ func showDatabaseStatistics(dbConn db.Database, dbType string, getSizeFunc func(
 	fmt.Printf("Entitlements:  %d\n", stats["entitlement_mapping_count"])
 	fmt.Printf("Unique Keys:   %d\n", stats["unique_key_count"])
 	fmt.Printf("Unique Values: %d\n", stats["unique_value_count"])
-	
+
 	if dbType == "SQLite" {
 		if fileSize, err := getSizeFunc(); err == nil && fileSize > 0 {
 			fmt.Printf("Database Size: %s\n", humanize.Bytes(uint64(fileSize)))

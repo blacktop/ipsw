@@ -1,10 +1,11 @@
 -- Enable Row Level Security on all tables
 ALTER TABLE ipsws ENABLE ROW LEVEL SECURITY;
 ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE entitlement_unique_keys ENABLE ROW LEVEL SECURITY;
-ALTER TABLE entitlement_unique_values ENABLE ROW LEVEL SECURITY;
-ALTER TABLE entitlement_unique_paths ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ipsw_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entitlement_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entitlement_values ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paths ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entitlements ENABLE ROW LEVEL SECURITY;
 
 -- Create read-only policies for anonymous users
 -- These policies allow SELECT operations for the 'anon' role
@@ -21,29 +22,38 @@ CREATE POLICY "Allow anonymous read access on devices" ON devices
     TO anon
     USING (true);
 
--- Entitlement unique keys: Allow anonymous users to read all records
-CREATE POLICY "Allow anonymous read access on entitlement_unique_keys" ON entitlement_unique_keys
+-- IPSW-Devices many-to-many: Allow anonymous users to read all records
+CREATE POLICY "Allow anonymous read access on ipsw_devices" ON ipsw_devices
     FOR SELECT
     TO anon
     USING (true);
 
--- Entitlement unique values: Allow anonymous users to read all records
-CREATE POLICY "Allow anonymous read access on entitlement_unique_values" ON entitlement_unique_values
-    FOR SELECT
-    TO anon
-    USING (true);
-
--- Entitlement unique paths: Allow anonymous users to read all records
-CREATE POLICY "Allow anonymous read access on entitlement_unique_paths" ON entitlement_unique_paths
-    FOR SELECT
-    TO anon
-    USING (true);
-
--- Entitlement keys (main table): Allow anonymous users to read all records
+-- Entitlement keys: Allow anonymous users to read all records
 CREATE POLICY "Allow anonymous read access on entitlement_keys" ON entitlement_keys
     FOR SELECT
     TO anon
     USING (true);
+
+-- Entitlement values: Allow anonymous users to read all records
+CREATE POLICY "Allow anonymous read access on entitlement_values" ON entitlement_values
+    FOR SELECT
+    TO anon
+    USING (true);
+
+-- Paths (reused from main IPSW schema): Allow anonymous users to read all records
+CREATE POLICY "Allow anonymous read access on paths" ON paths
+    FOR SELECT
+    TO anon
+    USING (true);
+
+-- Entitlements (main table): Allow anonymous users to read all records
+CREATE POLICY "Allow anonymous read access on entitlements" ON entitlements
+    FOR SELECT
+    TO anon
+    USING (true);
+
+-- Grant access to materialized view for fast searches
+GRANT SELECT ON entitlements_search TO anon, authenticated;
 
 -- Explicitly deny INSERT, UPDATE, DELETE for anonymous users
 -- Note: When RLS is enabled and no policy exists for an operation, it's denied by default
