@@ -276,7 +276,9 @@ func (i *Info) String() string {
 			}
 			iStr += fmt.Sprintf("\n%s\n", prodName)
 			iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-			iStr += fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST"))
+			if !dt.Timestamp.IsZero() {
+				iStr += fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST"))
+			}
 			if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
 				iStr += fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", "))
 			}
