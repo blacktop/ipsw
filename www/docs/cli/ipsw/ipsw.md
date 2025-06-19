@@ -30,10 +30,11 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
-* [ipsw ent](/docs/cli/ipsw/ent)	 - Manage and search entitlements in SQLite database
+* [ipsw ent](/docs/cli/ipsw/ent)	 - Manage and search entitlements database
 * [ipsw extract](/docs/cli/ipsw/extract)	 - Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
 * [ipsw fw](/docs/cli/ipsw/fw)	 - Firmware commands
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
+* [ipsw img3](/docs/cli/ipsw/img3)	 - Parse and optionally decrypt img3 files
 * [ipsw img4](/docs/cli/ipsw/img4)	 - Parse Img4
 * [ipsw info](/docs/cli/ipsw/info)	 - Display IPSW/OTA Info
 * [ipsw kernel](/docs/cli/ipsw/kernel)	 - Parse kernelcache
