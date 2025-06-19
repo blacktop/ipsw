@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -154,7 +155,34 @@ type wikiParseResults struct {
 	Parse wikiParseData `json:"parse"`
 }
 
-type WikiFWKeys struct {
+type WikiFWKeys map[string]WikiFWKey
+
+func (ks WikiFWKeys) GetKeyByFilename(filename string) (string, error) {
+	for _, wk := range ks {
+		if strings.EqualFold(wk.Filename[0], filepath.Base(filename)) {
+			if len(wk.Iv) > 0 && len(wk.Key) > 0 {
+				return fmt.Sprintf("%s%s", wk.Iv[0], wk.Key[0]), nil
+			} else if len(wk.Key) > 0 {
+				return wk.Key[0], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no key found for file '%s'", filepath.Base(filename))
+}
+func (ks WikiFWKeys) GetKeyByRegex(pattern string) (string, error) {
+	for _, wk := range ks {
+		if matched, _ := regexp.MatchString(pattern, wk.Filename[0]); matched {
+			if len(wk.Iv) > 0 && len(wk.Key) > 0 {
+				return fmt.Sprintf("%s%s", wk.Iv[0], wk.Key[0]), nil
+			} else if len(wk.Key) > 0 {
+				return wk.Key[0], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no key found for pattern '%s'", pattern)
+}
+
+type WikiFWKey struct {
 	Filename []string `json:"filename,omitempty"`
 	Device   []string `json:"device,omitempty"`
 	Key      []string `json:"key,omitempty"`
@@ -163,7 +191,7 @@ type WikiFWKeys struct {
 	Kbag     []string `json:"kbag,omitempty"`
 }
 
-func (k WikiFWKeys) String() string {
+func (k WikiFWKey) String() string {
 	var out string
 	for i, fn := range k.Filename {
 		out += fmt.Sprintf("‣ %s\n", fn)
@@ -1334,8 +1362,8 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, 
 	return otas, nil
 }
 
-func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (map[string]WikiFWKeys, error) {
-	var keys map[string]WikiFWKeys
+func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (WikiFWKeys, error) {
+	var keys WikiFWKeys
 
 	client := &http.Client{
 		Transport: &http.Transport{

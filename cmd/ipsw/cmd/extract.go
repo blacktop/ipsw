@@ -241,7 +241,7 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetBool("extract.dtree") {
 			log.Info("Extracting DeviceTree")
-			config.Pattern = `.*DeviceTree.*im(3|4)p$`
+			config.Pattern = `.*DeviceTree.*(img3|im4p)$`
 			out, err := extract.Search(config)
 			if err != nil {
 				return err

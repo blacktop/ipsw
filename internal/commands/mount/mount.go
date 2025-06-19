@@ -46,11 +46,25 @@ func (c Context) Unmount() error {
 
 // DmgInIPSW will mount a DMG from an IPSW
 func DmgInIPSW(path, typ, pemDbPath string, keys any) (*Context, error) {
+	var err error
+
 	ipswPath := filepath.Clean(path)
 
-	i, err := info.Parse(ipswPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+	var i *info.Info
+	if wkeys, ok := keys.(download.WikiFWKeys); ok {
+		dtkey, err := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get DeviceTree key: %v", err)
+		}
+		i, err = info.Parse(ipswPath, dtkey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+		}
+	} else {
+		i, err = info.Parse(ipswPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+		}
 	}
 
 	var dmgPath string
@@ -120,18 +134,10 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any) (*Context, error) {
 		switch v := keys.(type) {
 		case string:
 			key = v
-		case map[string]download.WikiFWKeys:
-			if len(v) == 0 {
-				return nil, fmt.Errorf("DMG is encrypted, please provide a key")
-			}
-			for _, wk := range v {
-				if strings.EqualFold(wk.Filename[0], filepath.Base(extractedDMG)) {
-					key = wk.Key[0]
-					break
-				}
-			}
-			if key == "" {
-				return nil, fmt.Errorf("key not found for DMG '%s' in theapplewiki lookup results", extractedDMG)
+		case download.WikiFWKeys:
+			key, err = v.GetKeyByFilename(extractedDMG)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get key for DMG '%s': %v", extractedDMG, err)
 			}
 		}
 		log.Info("Decrypting DMG...")

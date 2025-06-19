@@ -3,8 +3,11 @@ package devicetree
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"slices"
 	"time"
@@ -20,6 +23,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img3"
+	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
 // Img4 DeviceTree object
@@ -662,8 +668,44 @@ func ParseData(r io.Reader) (*DeviceTree, error) {
 	return parseDeviceTree(r)
 }
 
+func DecryptIm4pData(data, iv, key []byte) ([]byte, error) {
+	i, err := img4.ParseIm4p(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P: %v", err)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+
+	if len(i.Data) < aes.BlockSize {
+		return nil, fmt.Errorf("im4p data too short")
+	}
+
+	// CBC mode always works in whole blocks.
+	if (len(i.Data) % aes.BlockSize) != 0 {
+		return nil, fmt.Errorf("im4p data is not a multiple of the block size")
+	}
+
+	mode := cipher.NewCBCDecrypter(block, iv)
+
+	mode.CryptBlocks(i.Data, i.Data)
+
+	if bytes.Contains(i.Data[:4], []byte("bvx2")) {
+		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+		dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to lzfse decompress: %v", err)
+		}
+		return dat, nil
+	}
+
+	return i.Data, nil
+}
+
 // Parse parses plist files in a local ipsw file
-func Parse(ipswPath string) (map[string]*DeviceTree, error) {
+func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 	dt := make(map[string]*DeviceTree)
 
 	zr, err := zip.OpenReader(ipswPath)
@@ -678,20 +720,48 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
 			rc.Close()
-
-			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+			if len(keys) > 0 {
+				ivkey, err := hex.DecodeString(keys[0])
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode --iv-key: %v", err)
+				}
+				data, err := DecryptIm4pData(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
+				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+				}
+			} else {
+				dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
 			rc.Close()
-
-			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
+			if len(keys) > 0 {
+				ivkey, err := hex.DecodeString(keys[0])
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode --iv-key: %v", err)
+				}
+				data, err := img3.Decrypt(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
+				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+				}
+			} else {
+				dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
+				}
 			}
 		}
 	}

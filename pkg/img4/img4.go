@@ -14,7 +14,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
 )
 
 // Img4 object
@@ -469,6 +468,14 @@ type KeyBags struct {
 	Files   []im4pKBag
 }
 
+// MetaData contains minimal metadata needed for key bag parsing
+type MetaData struct {
+	Type                  string
+	ProductVersion        string
+	ProductBuildVersion   string
+	SupportedProductTypes []string
+}
+
 func (kbs KeyBags) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		Type    string     `json:"type,omitempty"`
@@ -485,12 +492,12 @@ func (kbs KeyBags) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func ParseZipKeyBags(files []*zip.File, inf *info.Info, pattern string) (*KeyBags, error) {
+func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBags, error) {
 	kbags := &KeyBags{
-		Type:    inf.Plists.Type,
-		Version: inf.Plists.BuildManifest.ProductVersion,
-		Build:   inf.Plists.BuildManifest.ProductBuildVersion,
-		Devices: inf.Plists.Restore.SupportedProductTypes,
+		Type:    meta.Type,
+		Version: meta.ProductVersion,
+		Build:   meta.ProductBuildVersion,
+		Devices: meta.SupportedProductTypes,
 	}
 
 	rePattern := `.*im4p$`
