@@ -24,6 +24,7 @@ ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
       --deps            Dump imported private frameworks as well
   -e, --ext string      Dump extension (regex)
       --extra           Dump all other Swift sections/info
+      --headers         Create separate header files for each Swift type/protocol/extension
   -h, --help            help for swift-dump
   -i, --interface       🚧 Dump Swift Interface
   -o, --output string   🚧 Folder to write interface to

@@ -21,6 +21,7 @@ ipsw info <IPSW> [flags]
       --insecure       do not verify ssl certs
   -j, --json           Output as JSON
   -l, --list           List files in IPSW/OTA
+  -k, --lookup         Lookup DMG keys on theapplewiki.com
       --proxy string   HTTP/HTTPS proxy
   -r, --remote         Extract from URL
 ```
