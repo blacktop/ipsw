@@ -34,7 +34,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw extract](/docs/cli/ipsw/extract)	 - Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
 * [ipsw fw](/docs/cli/ipsw/fw)	 - Firmware commands
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
-* [ipsw img3](/docs/cli/ipsw/img3)	 - Parse and optionally decrypt img3 files
+* [ipsw img3](/docs/cli/ipsw/img3)	 - Parse Img3
 * [ipsw img4](/docs/cli/ipsw/img4)	 - Parse Img4
 * [ipsw info](/docs/cli/ipsw/info)	 - Display IPSW/OTA Info
 * [ipsw kernel](/docs/cli/ipsw/kernel)	 - Parse kernelcache

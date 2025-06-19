@@ -1,23 +1,23 @@
 ---
-id: img3
-title: img3
+id: dec
+title: dec
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: img3
-description: Parse and optionally decrypt img3 files
+sidebar_label: dec
+description: Decrypt img3 files
 ---
-## ipsw img3
+## ipsw img3 dec
 
-Parse and optionally decrypt img3 files
+Decrypt img3 files
 
 ```
-ipsw img3 [flags]
+ipsw img3 dec [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help            help for img3
+  -h, --help            help for dec
       --iv string       IV for decryption (hex string)
   -k, --iv-key string   IV+Key for direct decryption (concatenated hex string)
       --key string      Key for decryption (hex string)
@@ -35,5 +35,5 @@ ipsw img3 [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw img3](/docs/cli/ipsw/img3)	 - Parse Img3
 
