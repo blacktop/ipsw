@@ -36,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/fw"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img3"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
@@ -104,6 +105,7 @@ func init() {
 	rootCmd.AddCommand(frida.FridaCmd)
 	rootCmd.AddCommand(fw.FwCmd)
 	rootCmd.AddCommand(idev.IDevCmd)
+	rootCmd.AddCommand(img3.Img3Cmd)
 	rootCmd.AddCommand(img4.Img4Cmd)
 	rootCmd.AddCommand(kernel.KernelcacheCmd)
 	rootCmd.AddCommand(macho.MachoCmd)

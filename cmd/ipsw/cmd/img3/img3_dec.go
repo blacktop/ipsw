@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package img3
 
 import (
 	"encoding/hex"
@@ -31,26 +31,28 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	rootCmd.AddCommand(img3Cmd)
-	img3Cmd.Flags().StringP("iv-key", "k", "", "IV+Key for direct decryption (concatenated hex string)")
-	img3Cmd.Flags().StringP("iv", "", "", "IV for decryption (hex string)")
-	img3Cmd.Flags().StringP("key", "", "", "Key for decryption (hex string)")
-	img3Cmd.Flags().StringP("output", "o", "", "Output file for decrypted data")
+	Img3Cmd.AddCommand(img3DecCmd)
+
+	img3DecCmd.Flags().StringP("iv-key", "k", "", "IV+Key for direct decryption (concatenated hex string)")
+	img3DecCmd.Flags().StringP("iv", "", "", "IV for decryption (hex string)")
+	img3DecCmd.Flags().StringP("key", "", "", "Key for decryption (hex string)")
+	img3DecCmd.Flags().StringP("output", "o", "", "Output file for decrypted data")
 }
 
-// img3Cmd represents the img3 command
-var img3Cmd = &cobra.Command{
-	Use:           "img3",
-	Short:         "Parse and optionally decrypt img3 files",
+// img3DecCmd represents the dec command
+var img3DecCmd = &cobra.Command{
+	Use:           "dec",
+	Short:         "Decrypt img3 files",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -66,13 +68,6 @@ var img3Cmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to read file %s: %v", infile, err)
 		}
-
-		img3File, err := img3.ParseImg3(data)
-		if err != nil {
-			return fmt.Errorf("failed to parse img3 file %s: %v", infile, err)
-		}
-
-		fmt.Println(img3File)
 
 		// validate flags for decryption
 		methodCount := 0
@@ -97,8 +92,6 @@ var img3Cmd = &cobra.Command{
 		var iv, key []byte
 
 		if ivKeyStr != "" {
-			log.Info("Attempting direct decryption with provided IV+Key...")
-
 			ivKeyStr = strings.ReplaceAll(ivKeyStr, " ", "")
 			ivKeyStr = strings.ReplaceAll(ivKeyStr, ":", "")
 
@@ -150,7 +143,7 @@ var img3Cmd = &cobra.Command{
 			return fmt.Errorf("failed to decrypt IMG3 data: %v", err)
 		}
 
-		log.Infof("Successfully decrypted %d bytes", len(decryptedData))
+		log.Debugf("Successfully decrypted %d bytes", len(decryptedData))
 
 		if outputFile == "" {
 			outputFile = strings.TrimSuffix(infile, ".img3") + ".decrypted"

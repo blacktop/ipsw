@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2025 blacktop
+Copyright © 2025 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,50 +19,39 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package img4
+package img3
 
 import (
-	"path/filepath"
+	"fmt"
+	"os"
 
-	"github.com/apex/log"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
-	Img4Cmd.AddCommand(img4Img3Cmd)
-
-	img4Img3Cmd.Flags().StringP("output", "o", "", "Output folder")
-	img4Img3Cmd.MarkFlagDirname("output")
-	viper.BindPFlag("img4.img3.output", img4Img3Cmd.Flags().Lookup("output"))
-
-	img4Img3Cmd.MarkZshCompPositionalArgumentFile(1)
+	Img3Cmd.AddCommand(showCmd)
 }
 
-// img4Img3Cmd represents the extract command
-var img4Img3Cmd = &cobra.Command{
-	Use:     "img3 <img3>",
-	Aliases: []string{"3"},
-	Short:   "Extract img3 payloads",
-	Args:    cobra.ExactArgs(1),
+// showCmd represents the show command
+var showCmd = &cobra.Command{
+	Use:          "show",
+	Short:        "Print img3 information",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		// flags
-		outputDir := viper.GetString("img4.dec.output")
-
-		outFile := filepath.Clean(args[0]) + ".payload"
-		if outputDir != "" {
-			outFile = filepath.Join(outputDir, outFile)
+		data, err := os.ReadFile(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", args[0], err)
 		}
 
-		log.Infof("Extracting payload to file %s", outFile)
-		return icmd.ParseImg3(filepath.Clean(args[0]), outFile)
+		img3File, err := img3.ParseImg3(data)
+		if err != nil {
+			return fmt.Errorf("failed to parse img3 file %s: %v", args[0], err)
+		}
+
+		fmt.Println(img3File)
+
+		return nil
 	},
 }
