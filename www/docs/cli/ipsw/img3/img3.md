@@ -1,23 +1,23 @@
 ---
-id: img4
-title: img4
+id: img3
+title: img3
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: img4
-description: Parse Img4
+sidebar_label: img3
+description: Parse Img3
 ---
-## ipsw img4
+## ipsw img3
 
-Parse Img4
+Parse Img3
 
 ```
-ipsw img4 [flags]
+ipsw img3 [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for img4
+  -h, --help   help for img3
 ```
 
 ### Options inherited from parent commands
@@ -32,7 +32,7 @@ ipsw img4 [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw img4 dec](/docs/cli/ipsw/img4/dec)	 - Decrypt img4 payloads
-* [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract im4p payloads
-* [ipsw img4 kbag](/docs/cli/ipsw/img4/kbag)	 - Extract kbag from img4
+* [ipsw img3 dec](/docs/cli/ipsw/img3/dec)	 - Decrypt img3 files
+* [ipsw img3 extract](/docs/cli/ipsw/img3/extract)	 - Extract data from img3 files
+* [ipsw img3 show](/docs/cli/ipsw/img3/show)	 - Print img3 information
 
