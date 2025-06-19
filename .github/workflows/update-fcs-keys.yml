@@ -1,0 +1,104 @@
+name: Update FCS Keys
+
+on:
+  schedule:
+    - cron: '0 19 * * *'  # daily at 11:00 PST (19:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  update-fcs-keys:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+      
+      - name: Get current build numbers
+        id: get-builds
+        run: |
+          # Run the command to get beta builds info
+          make update_fcs_keys_beta --dry-run 2>&1 | grep -E "(iOS|macOS|visionOS)" > builds.txt || true
+          
+          # Extract build numbers from the output
+          IOS_BUILD=$(grep -oP 'iOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
+          MACOS_BUILD=$(grep -oP 'macOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
+          VISIONOS_BUILD=$(grep -oP 'visionOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
+          
+          echo "ios_build=$IOS_BUILD" >> $GITHUB_OUTPUT
+          echo "macos_build=$MACOS_BUILD" >> $GITHUB_OUTPUT
+          echo "visionos_build=$VISIONOS_BUILD" >> $GITHUB_OUTPUT
+          
+          # Create build fingerprint
+          BUILD_FINGERPRINT="${IOS_BUILD}_${MACOS_BUILD}_${VISIONOS_BUILD}"
+          echo "build_fingerprint=$BUILD_FINGERPRINT" >> $GITHUB_OUTPUT
+          echo "Current build fingerprint: $BUILD_FINGERPRINT"
+      
+      - name: Check for new builds
+        id: check-builds
+        run: |
+          # Get last cached build fingerprint
+          LAST_FINGERPRINT=$(jq -r '.fcs_keys_beta.build_fingerprint // ""' hack/.watch_cache)
+          CURRENT_FINGERPRINT="${{ steps.get-builds.outputs.build_fingerprint }}"
+          
+          echo "Last cached build fingerprint: $LAST_FINGERPRINT"
+          echo "Current build fingerprint: $CURRENT_FINGERPRINT"
+          
+          if [ "$LAST_FINGERPRINT" = "$CURRENT_FINGERPRINT" ]; then
+            echo "No new builds found; skipping"
+            echo "should_update=false" >> $GITHUB_OUTPUT
+          else
+            echo "New builds found; proceeding with update"
+            echo "should_update=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update FCS keys
+        if: steps.check-builds.outputs.should_update == 'true'
+        run: |
+          echo "Running FCS keys update..."
+          make update_fcs_keys_beta
+      
+      - name: Check for changes
+        if: steps.check-builds.outputs.should_update == 'true'
+        id: check-changes
+        run: |
+          if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz; then
+            echo "No changes to FCS keys files"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "FCS keys files have been updated"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update cache and commit
+        if: steps.check-builds.outputs.should_update == 'true' && steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          # Update the cache file with the new build fingerprint
+          jq --arg fp "${{ steps.get-builds.outputs.build_fingerprint }}" \
+             --arg ios "${{ steps.get-builds.outputs.ios_build }}" \
+             --arg macos "${{ steps.get-builds.outputs.macos_build }}" \
+             --arg visionos "${{ steps.get-builds.outputs.visionos_build }}" \
+             '.fcs_keys_beta = {
+                "build_fingerprint": $fp,
+                "ios_build": $ios,
+                "macos_build": $macos,
+                "visionos_build": $visionos,
+                "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+              }' hack/.watch_cache > hack/.watch_cache.tmp
+          mv hack/.watch_cache.tmp hack/.watch_cache
+          
+          # Configure git
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Commit the changes
+          git add pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz hack/.watch_cache
+          git commit -m "chore(fcs-keys): update beta FCS keys (iOS: ${{ steps.get-builds.outputs.ios_build }}, macOS: ${{ steps.get-builds.outputs.macos_build }}, visionOS: ${{ steps.get-builds.outputs.visionos_build }}) [skip ci]"
+          git push
