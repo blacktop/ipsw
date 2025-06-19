@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -45,12 +46,14 @@ func init() {
 	infoCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
 	infoCmd.Flags().BoolP("list", "l", false, "List files in IPSW/OTA")
 	infoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	infoCmd.Flags().BoolP("lookup", "k", false, "Lookup DMG keys on theapplewiki.com")
 
 	viper.BindPFlag("info.proxy", infoCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("info.insecure", infoCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("info.remote", infoCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("info.list", infoCmd.Flags().Lookup("list"))
 	viper.BindPFlag("info.json", infoCmd.Flags().Lookup("json"))
+	viper.BindPFlag("info.lookup", infoCmd.Flags().Lookup("lookup"))
 
 	infoCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
 	infoCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -117,9 +120,51 @@ var infoCmd = &cobra.Command{
 				w.Flush()
 			} else {
 				var err error
-				i, err = info.Parse(fPath)
-				if err != nil {
-					return fmt.Errorf("failed to parse plists: %w", err)
+				if viper.GetBool("info.lookup") {
+					var (
+						device  string
+						version string
+						build   string
+					)
+					re := regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
+					if re.MatchString(fPath) {
+						matches := re.FindStringSubmatch(fPath)
+						if len(matches) < 4 {
+							return fmt.Errorf("failed to parse IPSW filename: %s", fPath)
+						}
+						device = filepath.Base(matches[1])
+						version = matches[2]
+						build = matches[3]
+					} else {
+						return fmt.Errorf("failed to parse IPSW filename: %s", fPath)
+					}
+					if device == "" || build == "" {
+						return fmt.Errorf("device or build information is missing from IPSW filename (required for key lookup)")
+					}
+					log.Info("Downloading Keys...")
+					wkeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+						Keys:    true,
+						Device:  strings.Replace(device, "ip", "iP", 1),
+						Version: version,
+						Build:   strings.ToUpper(build),
+						// Beta:    viper.GetBool("download.key.beta"),
+					}, "", false)
+					if err != nil {
+						return fmt.Errorf("failed querying theapplewiki.com: %v", err)
+					}
+					dtkey, err := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
+					if err != nil {
+						return fmt.Errorf("failed to get DeviceTree key: %v", err)
+					}
+					i, err = info.Parse(fPath, dtkey)
+					if err != nil {
+						return fmt.Errorf("failed to parse IPSW: %v", err)
+					}
+				} else {
+					i, err = info.Parse(fPath)
+					if err != nil {
+						return fmt.Errorf("failed to parse IPSW: %v", err)
+					}
 				}
 			}
 		}
