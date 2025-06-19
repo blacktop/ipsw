@@ -1144,7 +1144,8 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 		return nil
 	}
 
-	if strings.ContainsAny(typ, "{}") {
+	// Check for outermost braces first
+	if hasOutermostDelimiters(typ, "{", "}") {
 		lTyp, mTyps, _, err := o.contextualSplit(typ, "{", ";", "}")
 		if err != nil {
 			return err
@@ -1155,6 +1156,7 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 		}
 
 		for _, mTyp := range mTyps {
+			mTyp = strings.ReplaceAll(mTyp, `&`, ``)
 			if err := o.fillImportsForType(mTyp, className, protoName, classNames, protoNames, imp); err != nil {
 				return err
 			}
@@ -1163,7 +1165,8 @@ func (o *ObjC) fillImportsForType(typ string, className string, protoName string
 		return nil
 	}
 
-	if strings.ContainsAny(typ, "<>") {
+	// Check for outermost angle brackets
+	if hasOutermostDelimiters(typ, "<", ">") {
 		lTyp, mTyps, _, err := o.contextualSplit(typ, "<", ",", ">")
 		if err != nil {
 			return err
@@ -1245,72 +1248,138 @@ func (o *ObjC) nonBuiltInType(typ string) string {
 }
 
 func (o *ObjC) contextualSplit(typ string, lDelim string, mDelim string, rDelim string) (string, []string, string, error) {
-	lDelimIdx := strings.Index(typ, lDelim)
-	rDelimIdx := strings.Index(typ, rDelim)
+	// Find the outermost (last) left delimiter by scanning backwards
+	lDelimIdx := -1
+	level := 0
+
+	// Scan backwards to find the outermost left delimiter
+	for i := len(typ) - 1; i >= 0; i-- {
+		char := string(typ[i])
+
+		// Handle closing delimiters (going backwards)
+		if char == rDelim || char == ">" || char == "}" || char == ")" || char == "]" {
+			level++
+		}
+		// Handle opening delimiters (going backwards)
+		if char == lDelim || char == "<" || char == "{" || char == "(" || char == "[" {
+			level--
+			// If we're at level 0 and found our target left delimiter, this is the outermost one
+			if level == 0 && char == lDelim {
+				lDelimIdx = i
+				break
+			}
+		}
+	}
 
 	if lDelimIdx == -1 {
 		return "", nil, "", errors.New("contextualSplit failed: left delimiter not found")
 	}
+
+	// Now find the matching right delimiter going forwards from the left delimiter
+	rDelimIdx := -1
+	level = 0
+
+	for i := lDelimIdx; i < len(typ); i++ {
+		char := string(typ[i])
+
+		// Handle opening delimiters
+		if char == lDelim || char == "<" || char == "{" || char == "(" || char == "[" {
+			level++
+		}
+		// Handle closing delimiters
+		if char == rDelim || char == ">" || char == "}" || char == ")" || char == "]" {
+			level--
+			// If we're back to level 0 and this is our target right delimiter, we found the match
+			if level == 0 && char == rDelim {
+				rDelimIdx = i
+				break
+			}
+		}
+	}
+
 	if rDelimIdx == -1 {
-		return "", nil, "", errors.New("contextualSplit failed: right delimiter not found")
-	}
-	if lDelimIdx > rDelimIdx {
-		return "", nil, "", errors.New("contextualSplit failed: found right delimiter before first left delimiter")
-	}
-
-	lDelimIt := lDelimIdx + strings.Index(typ[lDelimIdx+1:], lDelim) + 1
-	for lDelimIt < rDelimIdx {
-		rDelimNext := strings.Index(typ[rDelimIdx+1:], rDelim)
-		rDelimIdx += rDelimNext + 1
-
-		lDelimNext := strings.Index(typ[lDelimIt+1:], lDelim)
-		if lDelimNext == -1 {
-			break
-		}
-		lDelimIt += lDelimNext + 1
-
-		if rDelimNext == -1 {
-			return "", nil, "", errors.New("contextualSplit failed: found no right delimiter after last left delimiter")
-		}
-	}
-	rDelimIdx += 1
-
-	if lDelimIdx > rDelimIdx {
-		return "", nil, "", errors.New("contextualSplit failed: left delimiter after right delimiter")
-	}
-	if lDelimIdx < 0 {
-		return "", nil, "", errors.New("contextualSplit failed: left delimiter out of bounds")
-	}
-	if rDelimIdx > len(typ) {
-		return "", nil, "", errors.New("contextualSplit failed: right delimiter out of bounds")
+		return "", nil, "", errors.New("contextualSplit failed: matching right delimiter not found")
 	}
 
 	l := typ[:lDelimIdx]
-	m := typ[lDelimIdx+1 : rDelimIdx-1]
-	r := typ[rDelimIdx:]
+	m := typ[lDelimIdx+1 : rDelimIdx]
+	r := typ[rDelimIdx+1:]
 
+	// Split the middle part by mDelim, respecting nested delimiters
 	var typs []string
-	{
-		level := 0
-		mDelimIdx := -1
+	level = 0
+	start := 0
 
-		for i, c := range m {
-			switch string(c) {
-			case lDelim:
-				level++
-			case rDelim:
-				level--
-			case mDelim:
-				if level == 0 {
-					typs = append(typs, m[mDelimIdx+1:i])
+	for i := 0; i < len(m); i++ {
+		char := string(m[i])
 
-					mDelimIdx = i
-				}
-			}
+		// Track nesting level for all bracket types
+		if char == "<" || char == "{" || char == "(" || char == "[" {
+			level++
+		} else if char == ">" || char == "}" || char == ")" || char == "]" {
+			level--
+		} else if level == 0 && char == mDelim {
+			// Only split on mDelim when we're at the top level (not inside brackets)
+			typs = append(typs, strings.TrimSpace(m[start:i]))
+			start = i + 1
 		}
+	}
 
-		typs = append(typs, m[mDelimIdx+1:])
+	// Add the last part
+	if start < len(m) {
+		typs = append(typs, strings.TrimSpace(m[start:]))
 	}
 
 	return l, typs, r, nil
+}
+
+// hasOutermostDelimiters checks if the given delimiters exist at the outermost level
+// (not nested inside other delimiters)
+func hasOutermostDelimiters(typ string, lDelim string, rDelim string) bool {
+	lDelimIdx := -1
+	level := 0
+
+	// Scan backwards to find the outermost left delimiter
+	for i := len(typ) - 1; i >= 0; i-- {
+		char := string(typ[i])
+
+		// Handle closing delimiters (going backwards)
+		if char == rDelim || char == ">" || char == "}" || char == ")" || char == "]" {
+			level++
+		}
+		// Handle opening delimiters (going backwards)
+		if char == lDelim || char == "<" || char == "{" || char == "(" || char == "[" {
+			level--
+			// If we're at level 0 and found our target left delimiter, this is the outermost one
+			if level == 0 && char == lDelim {
+				lDelimIdx = i
+				break
+			}
+		}
+	}
+
+	if lDelimIdx == -1 {
+		return false
+	}
+
+	// Now check if there's a matching right delimiter
+	level = 0
+	for i := lDelimIdx; i < len(typ); i++ {
+		char := string(typ[i])
+
+		// Handle opening delimiters
+		if char == lDelim || char == "<" || char == "{" || char == "(" || char == "[" {
+			level++
+		}
+		// Handle closing delimiters
+		if char == rDelim || char == ">" || char == "}" || char == ")" || char == "]" {
+			level--
+			// If we're back to level 0 and this is our target right delimiter, we found the match
+			if level == 0 && char == rDelim {
+				return true
+			}
+		}
+	}
+
+	return false
 }
