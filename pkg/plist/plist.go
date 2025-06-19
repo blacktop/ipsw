@@ -299,7 +299,7 @@ func (p *Plists) GetOSType() string {
 	} else if os, ok := p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]; ok {
 		return os
 	}
-	return ""
+	return "?"
 }
 
 func (p *Plists) GetKernelType(name string) string {
