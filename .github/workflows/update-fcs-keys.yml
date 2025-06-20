@@ -127,6 +127,14 @@ jobs:
       - name: Check for changes and commit
         if: steps.check-builds.outputs.update_any == 'true'
         run: |
+          # Debug: Show file timestamps and git status
+          echo "=== File timestamps ==="
+          ls -la pkg/aea/data/fcs-keys*
+          echo "=== Git status ==="
+          git status pkg/aea/data/fcs-keys*
+          echo "=== Git diff ==="
+          git diff pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz || echo "No diff output"
+          
           # Check if any files actually changed
           if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz; then
             echo "No changes to FCS keys files despite new builds"
