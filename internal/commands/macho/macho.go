@@ -12,10 +12,10 @@ import (
 
 // FatConfig contains configuration options for opening fat/universal MachO files
 type FatConfig struct {
-	Arch        string            // Architecture to select (e.g., "arm64", "x86_64")
-	Interactive bool              // Whether to prompt user for architecture selection
-	FatFile     **macho.FatFile   // Optional: if provided, the fat file will be stored here (caller must close it)
-	FatArch     **macho.FatArch   // Optional: if provided, the selected FatArch will be stored here
+	Arch        string          // Architecture to select (e.g., "arm64", "x86_64")
+	Interactive bool            // Whether to prompt user for architecture selection
+	FatFile     **macho.FatFile // Optional: if provided, the fat file will be stored here (caller must close it)
+	FatArch     **macho.FatArch // Optional: if provided, the selected FatArch will be stored here
 }
 
 // OpenFatMachO opens a MachO file, handling both regular and fat/universal binaries.
@@ -61,8 +61,8 @@ func OpenFatMachOWithConfig(machoPath string, config *FatConfig) (*macho.File, e
 		shortArches = append(shortArches, strings.ToLower(a.SubCPU.String(a.CPU)))
 	}
 
-	var selectedIndex int = -1
-	
+	var selectedIndex = -1
+
 	// If arch is specified, try to find it
 	if len(config.Arch) > 0 {
 		for i, opt := range shortArches {
@@ -81,6 +81,9 @@ func OpenFatMachOWithConfig(machoPath string, config *FatConfig) (*macho.File, e
 		} else {
 			return nil, fmt.Errorf("no architectures found in fat file")
 		}
+	} else if len(fat.Arches) == 1 {
+		// If there's only one architecture, select it automatically
+		selectedIndex = 0
 	} else {
 		// Prompt user to select
 		choice := 0
