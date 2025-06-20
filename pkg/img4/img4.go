@@ -355,47 +355,57 @@ func Parse(r io.Reader) (*Img4, error) {
 		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
 	}
 
-	var m img4Manifest
-	_, err = asn1.Unmarshal(i.Manifest.Bytes, &m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest: %v", err)
-	}
-
-	var mb []manifestBody
-	_, err = asn1.UnmarshalWithParams(m.Body.Bytes, &mb, typeMANB)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest body: %v", err)
-	}
-
-	var mProps []manifestProperties
-	_, err = asn1.UnmarshalWithParams(mb[0].Properties.Bytes, &mProps, typeMANP)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest properties: %v", err)
-	}
-
-	props, err := parseManifestProperties(mProps[0].Properties.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest property: %v", err)
-	}
-
-	gen, _, err := parseDataProp(i.RestoreInfo.Generator.Bytes, typeBNCN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Generator: %v", err)
-	}
-
-	return &Img4{
+	result := &Img4{
 		Name:        i.IM4P.Name,
 		Description: i.IM4P.Description,
-		Manifest: manifest{
+	}
+
+	// Parse manifest if present (optional)
+	if len(i.Manifest.Bytes) > 0 {
+		var m img4Manifest
+		_, err = asn1.Unmarshal(i.Manifest.Bytes, &m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest: %v", err)
+		}
+
+		var mb []manifestBody
+		_, err = asn1.UnmarshalWithParams(m.Body.Bytes, &mb, typeMANB)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest body: %v", err)
+		}
+
+		var mProps []manifestProperties
+		_, err = asn1.UnmarshalWithParams(mb[0].Properties.Bytes, &mProps, typeMANP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest properties: %v", err)
+		}
+
+		props, err := parseManifestProperties(mProps[0].Properties.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest property: %v", err)
+		}
+
+		result.Manifest = manifest{
 			Properties:   *props,
 			ApImg4Ticket: i.Manifest,
 			img4Manifest: m,
-		},
-		RestoreInfo: restoreInfo{
+		}
+	}
+
+	// Parse restore info if present (optional)
+	if i.RestoreInfo.Name != "" {
+		gen, _, err := parseDataProp(i.RestoreInfo.Generator.Bytes, typeBNCN)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Generator: %v", err)
+		}
+
+		result.RestoreInfo = restoreInfo{
 			Generator:       *gen,
 			img4RestoreInfo: i.RestoreInfo,
-		},
-	}, nil
+		}
+	}
+
+	return result, nil
 }
 
 func OpenIm4p(path string) (*Im4p, error) {
@@ -527,4 +537,97 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 	}
 
 	return kbags, nil
+}
+
+// CreateIm4p creates a new IM4P structure
+func CreateIm4p(name, fourcc, description string, data []byte, kbags []Keybag) *Im4p {
+	im4pStruct := &Im4p{
+		im4p: im4p{
+			Name:        name,
+			Type:        fourcc,
+			Description: description,
+			Data:        data,
+		},
+		Kbags: kbags,
+	}
+
+	// If there are keybags, marshal them to KbagData
+	if len(kbags) > 0 {
+		if kbagData, err := asn1.Marshal(kbags); err == nil {
+			im4pStruct.im4p.KbagData = kbagData
+		}
+	}
+
+	return im4pStruct
+}
+
+// MarshalIm4p marshals an IM4P structure to ASN.1 bytes
+func MarshalIm4p(im4p *Im4p) ([]byte, error) {
+	return asn1.Marshal(im4p.im4p)
+}
+
+// CreateIm4pFile creates a complete IM4P file from raw data
+func CreateIm4pFile(fourcc, description string, data []byte) ([]byte, error) {
+	if len(fourcc) != 4 {
+		return nil, fmt.Errorf("FourCC must be exactly 4 characters, got %d: %s", len(fourcc), fourcc)
+	}
+
+	im4pStruct := CreateIm4p("IM4P", fourcc, description, data, nil)
+	return MarshalIm4p(im4pStruct)
+}
+
+// CreateImg4File creates a complete IMG4 file from component files
+func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, error) {
+	if len(im4pData) == 0 {
+		return nil, fmt.Errorf("IM4P payload data is required")
+	}
+
+	img4Struct := img4{
+		Name: "IMG4",
+	}
+
+	// Parse the IM4P data to embed it
+	var im4pParsed im4p
+	if _, err := asn1.Unmarshal(im4pData, &im4pParsed); err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P data: %v", err)
+	}
+	img4Struct.IM4P = im4pParsed
+
+	// Add optional manifest data with explicit tag:0
+	if len(manifestData) > 0 {
+		img4Struct.Manifest = asn1.RawValue{
+			FullBytes: manifestData,
+		}
+	}
+
+	// Add optional restore info data with explicit tag:1
+	if len(restoreInfoData) > 0 {
+		img4Struct.RestoreInfo = img4RestoreInfo{
+			Name: "IM4R",
+			Generator: asn1.RawValue{
+				FullBytes: restoreInfoData,
+			},
+		}
+	}
+
+	return asn1.Marshal(img4Struct)
+}
+
+// DetectFileType attempts to detect if a file is IMG4 or IM4P by examining its structure
+func DetectFileType(r io.Reader) (string, error) {
+	data := new(bytes.Buffer)
+	data.ReadFrom(r)
+	dataBytes := data.Bytes()
+
+	var img4Test img4
+	if _, err := asn1.Unmarshal(dataBytes, &img4Test); err == nil && img4Test.Name == "IMG4" {
+		return "IMG4", nil
+	}
+
+	var im4pTest im4p
+	if _, err := asn1.Unmarshal(dataBytes, &im4pTest); err == nil && im4pTest.Name == "IM4P" {
+		return "IM4P", nil
+	}
+
+	return "", fmt.Errorf("unknown file type - not IMG4 or IM4P")
 }
