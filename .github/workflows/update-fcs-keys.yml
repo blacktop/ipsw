@@ -16,16 +16,19 @@ jobs:
         with:
           go-version: '1.24'
       
-      - name: Get current build numbers
+      - name: Build ipsw CLI
+        run: |
+          go build -o ipsw ./cmd/ipsw
+      
+      - name: Get latest beta builds
         id: get-builds
         run: |
-          # Run the command to get beta builds info
-          make update_fcs_keys_beta --dry-run 2>&1 | grep -E "(iOS|macOS|visionOS)" > builds.txt || true
+          echo "Getting latest beta build numbers..."
           
-          # Extract build numbers from the output
-          IOS_BUILD=$(grep -oP 'iOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
-          MACOS_BUILD=$(grep -oP 'macOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
-          VISIONOS_BUILD=$(grep -oP 'visionOS.*?build \K[0-9A-Za-z]+' builds.txt || echo "")
+          # Get beta builds using ipsw CLI
+          IOS_BUILD=$(./ipsw download ota --platform ios --beta --show-latest-build --device iPhone16,2 --insecure || echo "")
+          MACOS_BUILD=$(./ipsw download ota --platform macos --beta --show-latest-build --device Mac14,7 --insecure || echo "")
+          VISIONOS_BUILD=$(./ipsw download ota --platform visionOS --beta --show-latest-build --device Apple1,1 --insecure || echo "")
           
           echo "ios_build=$IOS_BUILD" >> $GITHUB_OUTPUT
           echo "macos_build=$MACOS_BUILD" >> $GITHUB_OUTPUT
@@ -61,7 +64,6 @@ jobs:
           make update_fcs_keys_beta
       
       - name: Check for changes
-        if: steps.check-builds.outputs.should_update == 'true'
         id: check-changes
         run: |
           if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz; then
@@ -73,7 +75,7 @@ jobs:
           fi
       
       - name: Update cache and commit
-        if: steps.check-builds.outputs.should_update == 'true' && steps.check-changes.outputs.has_changes == 'true'
+        if: steps.check-changes.outputs.has_changes == 'true'
         run: |
           # Update the cache file with the new build fingerprint
           jq --arg fp "${{ steps.get-builds.outputs.build_fingerprint }}" \
