@@ -167,14 +167,8 @@ func GetKexts(kernel *macho.File) ([]CFBundle, error) {
 }
 
 // KextList lists all the kernel extensions in the kernelcache
-func KextList(kernelPath string, diffable bool) ([]string, error) {
+func KextList(m *macho.File, diffable bool) ([]string, error) {
 	var out []string
-
-	m, err := macho.Open(kernelPath)
-	if err != nil {
-		return nil, err
-	}
-	defer m.Close()
 
 	bundles, err := GetKexts(m)
 	if err != nil {

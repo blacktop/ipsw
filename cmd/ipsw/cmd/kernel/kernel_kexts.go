@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -45,10 +44,12 @@ func init() {
 
 // kextsCmd represents the kexts command
 var kextsCmd = &cobra.Command{
-	Use:     "kexts <kernelcache>",
-	Aliases: []string{"k"},
-	Short:   "List kernel extentions",
-	Args:    cobra.MinimumNArgs(1),
+	Use:           "kexts <kernelcache>",
+	Aliases:       []string{"k"},
+	Short:         "List kernel extentions",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -68,11 +69,24 @@ var kextsCmd = &cobra.Command{
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
 
-			kout1, err := kextListWithFatSupport(args[0], selectedArch, true)
+			m1, err := mcmd.OpenFatMachO(args[0], selectedArch)
 			if err != nil {
 				return err
 			}
-			kout2, err := kextListWithFatSupport(args[1], selectedArch, true)
+			defer m1.Close()
+
+			kout1, err := kernelcache.KextList(m1, true)
+			if err != nil {
+				return err
+			}
+
+			m2, err := mcmd.OpenFatMachO(args[1], selectedArch)
+			if err != nil {
+				return err
+			}
+			defer m2.Close()
+
+			kout2, err := kernelcache.KextList(m2, true)
 			if err != nil {
 				return err
 			}
@@ -91,7 +105,13 @@ var kextsCmd = &cobra.Command{
 			log.Info("Differences found")
 			fmt.Println(out)
 		} else {
-			kout, err := kextListWithFatSupport(args[0], selectedArch, false)
+			m, err := mcmd.OpenFatMachO(args[0], selectedArch)
+			if err != nil {
+				return err
+			}
+			defer m.Close()
+
+			kout, err := kernelcache.KextList(m, false)
 			if err != nil {
 				return err
 			}
@@ -103,43 +123,4 @@ var kextsCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-// kextListWithFatSupport wraps kernelcache.KextList to handle fat/universal files
-func kextListWithFatSupport(kernelPath string, arch string, diffable bool) ([]string, error) {
-	// Check if file is fat/universal
-	fat, err := macho.OpenFat(kernelPath)
-	if err != nil && err != macho.ErrNotFat {
-		return nil, err
-	}
-	
-	// If it's not a fat file, just call KextList directly
-	if err == macho.ErrNotFat {
-		return kernelcache.KextList(kernelPath, diffable)
-	}
-	
-	// It's a fat file - need to handle it
-	defer fat.Close()
-	
-	// Use the helper to get the right architecture
-	m, err := mcmd.OpenFatMachO(kernelPath, arch)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Create a temporary file for the extracted architecture
-	tmpFile, err := os.CreateTemp("", "kernelcache-*.macho")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-	
-	// Export the MachO to the temp file
-	if err := m.Export(tmpFile.Name(), nil, m.GetBaseAddress(), nil); err != nil {
-		return nil, fmt.Errorf("failed to export MachO: %v", err)
-	}
-	
-	// Now call KextList with the extracted file
-	return kernelcache.KextList(tmpFile.Name(), diffable)
 }
