@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/download/rootcert"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/types"
@@ -408,44 +410,74 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 			if segs[0] == 0 { // empty version
 				latest := assetAudienceDB.LatestVersion(o.Config.Platform)
 				if latest == "" {
+					if o.Config.Beta {
+						return nil, fmt.Errorf("no beta versions available for platform %s", o.Config.Platform)
+					}
 					return []string{
 						assetAudienceDB[o.Config.Platform].Release,
 						assetAudienceDB[o.Config.Platform].Alternate,
 						assetAudienceDB[o.Config.Platform].Generic,
 					}, nil
 				}
+
+				// Filter audiences based on beta flag
+				if o.Config.Beta {
+					return []string{
+						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
+						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
+						assetAudienceDB[o.Config.Platform].Versions[latest].PublicBeta,
+					}, nil
+				} else {
+					return []string{
+						assetAudienceDB[o.Config.Platform].Release,
+						assetAudienceDB[o.Config.Platform].Alternate,
+						assetAudienceDB[o.Config.Platform].Generic,
+					}, nil
+				}
+			}
+			// looup major version in DB
+			var assetAudiences []string
+
+			if o.Config.Beta {
+				// For beta, only include beta audiences
+				if v, ok := assetAudienceDB[o.Config.Platform].Versions[fmt.Sprintf("%d.%d", segs[0], segs[1])]; ok {
+					assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
+				} else if v, ok := assetAudienceDB[o.Config.Platform].Versions[strconv.Itoa(segs[0])]; ok {
+					assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
+				} else {
+					return nil, fmt.Errorf(
+						"invalid version %s (must be one of %s)",
+						o.Config.Version,
+						strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions(o.Config.Platform), ".x"), ", "))
+				}
+			} else {
+				// For stable, only include stable audiences
+				assetAudiences = []string{
+					assetAudienceDB[o.Config.Platform].Release,
+					assetAudienceDB[o.Config.Platform].Alternate,
+					assetAudienceDB[o.Config.Platform].Generic,
+				}
+			}
+			return assetAudiences, nil
+		} else {
+			if o.Config.Beta {
+				// Get latest version for beta audiences
+				latest := assetAudienceDB.LatestVersion(o.Config.Platform)
+				if latest == "" {
+					return nil, fmt.Errorf("no beta versions available for platform %s", o.Config.Platform)
+				}
 				return []string{
 					assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
 					assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
 					assetAudienceDB[o.Config.Platform].Versions[latest].PublicBeta,
-					assetAudienceDB[o.Config.Platform].Generic,
+				}, nil
+			} else {
+				return []string{
 					assetAudienceDB[o.Config.Platform].Release,
 					assetAudienceDB[o.Config.Platform].Alternate,
+					assetAudienceDB[o.Config.Platform].Generic,
 				}, nil
 			}
-			// looup major version in DB
-			assetAudiences := []string{
-				assetAudienceDB[o.Config.Platform].Release,
-				assetAudienceDB[o.Config.Platform].Alternate,
-				assetAudienceDB[o.Config.Platform].Generic,
-			}
-			if v, ok := assetAudienceDB[o.Config.Platform].Versions[fmt.Sprintf("%d.%d", segs[0], segs[1])]; ok {
-				assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
-			} else if v, ok := assetAudienceDB[o.Config.Platform].Versions[strconv.Itoa(segs[0])]; ok {
-				assetAudiences = append(assetAudiences, v.DeveloperBeta, v.AppleSeedBeta, v.PublicBeta)
-			} else {
-				return nil, fmt.Errorf(
-					"invalid version %s (must be one of %s)",
-					o.Config.Version,
-					strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions(o.Config.Platform), ".x"), ", "))
-			}
-			return assetAudiences, nil
-		} else {
-			return []string{
-				assetAudienceDB[o.Config.Platform].Release,
-				assetAudienceDB[o.Config.Platform].Alternate,
-				assetAudienceDB[o.Config.Platform].Generic,
-			}, nil
 		}
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)
@@ -562,10 +594,16 @@ func sendPostAsync(body []byte, rc chan *http.Response, config *OtaConf) error {
 	req.Header.Add("User-Agent", utils.RandomAgent())
 	// req.Header.Add("User-Agent", "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8")
 
+	certpool := x509.NewCertPool()
+	certpool.AddCert(rootcert.AppleRootCA)
+
 	client := &http.Client{
 		Transport: &http.Transport{
-			Proxy:           GetProxy(config.Proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
+			Proxy: GetProxy(config.Proxy),
+			TLSClientConfig: &tls.Config{
+				RootCAs:    certpool,
+				MinVersion: tls.VersionTLS12,
+			},
 		},
 		Timeout: config.Timeout * time.Second,
 	}
