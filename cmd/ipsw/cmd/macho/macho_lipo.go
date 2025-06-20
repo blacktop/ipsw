@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -53,6 +53,7 @@ var lipoCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var err error
 		var farch macho.FatArch
 
 		if viper.GetBool("verbose") {
@@ -70,44 +71,26 @@ var lipoCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", machoPath)
 		}
 
-		// first check for fat file
-		fat, err := macho.OpenFat(machoPath)
+		// Use the helper to handle fat/universal files
+		var fat *macho.FatFile
+		var farchPtr *macho.FatArch
+		_, err = mcmd.OpenFatMachOWithConfig(machoPath, &mcmd.FatConfig{
+			Arch:        selectedArch,
+			Interactive: true,
+			FatFile:     &fat,
+			FatArch:     &farchPtr,
+		})
 		if err != nil {
-			if err == macho.ErrNotFat {
-				return fmt.Errorf("input file is not a universal/fat MachO")
-			}
-			return fmt.Errorf("failed to open file: %v", err)
+			return err
 		}
 		defer fat.Close()
-
-		var options []string
-		var shortOptions []string
-		for _, arch := range fat.Arches {
-			options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-			shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
+		
+		// Check if we have a fat file (lipo only works on fat files)
+		if fat == nil {
+			return fmt.Errorf("input file is not a universal/fat MachO")
 		}
-
-		if len(selectedArch) > 0 {
-			found := false
-			for i, opt := range shortOptions {
-				if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-					farch = fat.Arches[i]
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
-			}
-		} else {
-			choice := 0
-			prompt := &survey.Select{
-				Message: "Detected a universal MachO file, please select an architecture to extract:",
-				Options: options,
-			}
-			survey.AskOne(prompt, &choice)
-			farch = fat.Arches[choice]
-		}
+		
+		farch = *farchPtr
 
 		f, err := os.Open(machoPath)
 		if err != nil {

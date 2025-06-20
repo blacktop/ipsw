@@ -34,7 +34,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -97,16 +96,12 @@ func init() {
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.RegisterFlagCompletionFunc("fileset-entry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if ok, _ := magic.IsMachO(args[0]); ok {
-			var m *macho.File
-			fat, err := macho.OpenFat(args[0])
-			if err == nil {
-				m = fat.Arches[0].File
-			}
-			if err == macho.ErrNotFat {
-				m, err = macho.Open(args[0])
-				if err != nil {
-					return nil, cobra.ShellCompDirectiveNoFileComp
-				}
+			// Use non-interactive mode for shell completion
+			m, err := mcmd.OpenFatMachOWithConfig(args[0], &mcmd.FatConfig{
+				Interactive: false,
+			})
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 				var filesetEntries []string
@@ -250,46 +245,10 @@ var machoInfoCmd = &cobra.Command{
 			folder = extractPath
 		}
 
-		// first check for fat file
-		fat, err := macho.OpenFat(machoPath)
-		if err != nil && err != macho.ErrNotFat {
+		// Use the helper to handle fat/universal files
+		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		if err != nil {
 			return err
-		}
-		if err == macho.ErrNotFat {
-			m, err = macho.Open(machoPath)
-			if err != nil {
-				return err
-			}
-		} else {
-			defer fat.Close()
-
-			var arches []string
-			var shortArches []string
-			for _, arch := range fat.Arches {
-				arches = append(arches, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-				shortArches = append(shortArches, strings.ToLower(arch.SubCPU.String(arch.CPU)))
-			}
-			if len(selectedArch) > 0 {
-				found := false
-				for i, opt := range shortArches {
-					if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-						m = fat.Arches[i].File
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortArches, ", "))
-				}
-			} else {
-				choice := 0
-				prompt := &survey.Select{
-					Message: "Detected a universal MachO file, please select an architecture to analyze:",
-					Options: arches,
-				}
-				survey.AskOne(prompt, &choice)
-				m = fat.Arches[choice].File
-			}
 		}
 
 		if dumpCert {

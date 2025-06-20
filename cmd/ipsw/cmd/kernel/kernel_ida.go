@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/commands/ida"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
@@ -64,6 +64,7 @@ func init() {
 	kernelIdaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
 	kernelIdaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
 	kernelIdaCmd.Flags().StringP("output", "o", "", "Output folder")
+	kernelIdaCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kernelIdaCmd.MarkFlagDirname("output")
 	// kernelIdaCmd.Flags().String("slide", "", "kernelcache ASLR slide value (hexadecimal)")
 	kernelIdaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
@@ -82,6 +83,7 @@ func init() {
 	// viper.BindPFlag("kernel.ida.slide", kernelIdaCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("kernel.ida.docker", kernelIdaCmd.Flags().Lookup("docker"))
 	viper.BindPFlag("kernel.ida.docker-image", kernelIdaCmd.Flags().Lookup("docker-image"))
+	viper.BindPFlag("kernel.ida.arch", kernelIdaCmd.Flags().Lookup("arch"))
 }
 
 // kernelIdaCmd represents the ida command
@@ -106,6 +108,7 @@ var kernelIdaCmd = &cobra.Command{
 		scriptFile := viper.GetString("kernel.ida.script")
 		logFile := viper.GetString("kernel.ida.log-file")
 		output := viper.GetString("kernel.ida.output")
+		selectedArch := viper.GetString("kernel.ida.arch")
 		// validate args
 		if !viper.GetBool("kernel.ida.enable-gui") && viper.GetBool("kernel.ida.temp-db") {
 			return fmt.Errorf("cannot use '--temp-db' without '--enable-gui'")
@@ -151,7 +154,7 @@ var kernelIdaCmd = &cobra.Command{
 			}
 		}
 
-		m, err := macho.Open(kcPath)
+		m, err := mcmd.OpenFatMachO(kcPath, selectedArch)
 		if err != nil {
 			return fmt.Errorf("failed to open kernelcache %s: %w", kcPath, err)
 		}
