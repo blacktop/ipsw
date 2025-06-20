@@ -22,14 +22,17 @@ THE SOFTWARE.
 package img4
 
 import (
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+
 // Img4Cmd represents the img4 command
 var Img4Cmd = &cobra.Command{
 	Use:   "img4",
-	Short: "Parse Img4",
+	Short: "Parse and manipulate IMG4 files",
 	Args:  cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
