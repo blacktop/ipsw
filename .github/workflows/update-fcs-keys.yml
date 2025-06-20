@@ -28,7 +28,7 @@ jobs:
           # Get beta builds using ipsw CLI
           IOS_BUILD=$(./ipsw download ota --platform ios --beta --show-latest-build --device iPhone16,2 --insecure || echo "")
           MACOS_BUILD=$(./ipsw download ota --platform macos --beta --show-latest-build --device Mac14,7 --insecure || echo "")
-          VISIONOS_BUILD=$(./ipsw download ota --platform visionOS --beta --show-latest-build --device Apple1,1 --insecure || echo "")
+          VISIONOS_BUILD=$(./ipsw download ota --platform visionOS --beta --show-latest-build --device RealityDevice14,1 --insecure || echo "")
           
           echo "ios_build=$IOS_BUILD" >> $GITHUB_OUTPUT
           echo "macos_build=$MACOS_BUILD" >> $GITHUB_OUTPUT
@@ -78,7 +78,7 @@ jobs:
         if: steps.check-changes.outputs.has_changes == 'true'
         run: |
           # Update the cache file with the new build fingerprint
-          jq --arg fp "${{ steps.get-builds.outputs.build_fingerprint }}" \
+          jq -c --arg fp "${{ steps.get-builds.outputs.build_fingerprint }}" \
              --arg ios "${{ steps.get-builds.outputs.ios_build }}" \
              --arg macos "${{ steps.get-builds.outputs.macos_build }}" \
              --arg visionos "${{ steps.get-builds.outputs.visionos_build }}" \
