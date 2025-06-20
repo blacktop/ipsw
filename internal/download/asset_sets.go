@@ -180,6 +180,12 @@ func (a *AssetSets) latest(platform string) (string, string) {
 	}
 
 	sort.Sort(version.Collection(versions))
+	
+	// Check if we have any versions
+	if len(versions) == 0 {
+		return "failed to get latest", "failed to get latest"
+	}
+	
 	if len(v2b[versions[len(versions)-1].Original()]) == 0 {
 		return "failed to get latest", "failed to get latest"
 	}
