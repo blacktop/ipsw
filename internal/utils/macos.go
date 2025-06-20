@@ -17,6 +17,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils/lsof"
 	"github.com/blacktop/ipsw/pkg/aea"
 	semver "github.com/hashicorp/go-version"
@@ -492,16 +493,78 @@ func Mount(image, mountPoint string) error {
 			return fmt.Errorf("%v: %s", err, out)
 		}
 	} else {
-		apfsFusePath, err := execabs.LookPath("apfs-fuse")
-		if err != nil {
-			return fmt.Errorf("failed to find apfs-fuse in $PATH: %v", err)
-		}
-		out, err := exec.Command(apfsFusePath, image, mountPoint).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to mount '%s' via apfs-fuse: %v: cmd output - '%s'", image, err, out)
-		}
+		// On Linux, detect filesystem type and use appropriate FUSE tool
+		return mountLinux(image, mountPoint)
 	}
 
+	return nil
+}
+
+// mountLinux mounts a DMG on Linux using the appropriate FUSE tool based on filesystem type
+func mountLinux(image, mountPoint string) error {
+	// First, try to detect the filesystem type
+	isAPFSFilesystem, err := magic.IsAPFS(image)
+	if err != nil {
+		log.Warnf("failed to detect APFS filesystem: %v", err)
+	}
+
+	isHFSPlusFilesystem, err := magic.IsHFSPlus(image)
+	if err != nil {
+		log.Warnf("failed to detect HFS+ filesystem: %v", err)
+	}
+
+	if isAPFSFilesystem {
+		log.Debugf("detected APFS filesystem, using apfs-fuse")
+		return mountWithAPFSFuse(image, mountPoint)
+	} else if isHFSPlusFilesystem {
+		log.Debugf("detected HFS+ filesystem, using native kernel support")
+		return mountWithHFSPlus(image, mountPoint)
+	} else {
+		// Fallback: try APFS first, then HFS+ if that fails
+		log.Debugf("filesystem type unclear, trying apfs-fuse first")
+		if err := mountWithAPFSFuse(image, mountPoint); err != nil {
+			log.Debugf("apfs-fuse failed (%v), trying native HFS+ support", err)
+			return mountWithHFSPlus(image, mountPoint)
+		}
+		return nil
+	}
+}
+
+// mountWithAPFSFuse mounts using apfs-fuse
+func mountWithAPFSFuse(image, mountPoint string) error {
+	apfsFusePath, err := execabs.LookPath("apfs-fuse")
+	if err != nil {
+		return fmt.Errorf("failed to find apfs-fuse in $PATH: %v", err)
+	}
+	out, err := exec.Command(apfsFusePath, image, mountPoint).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to mount '%s' via apfs-fuse: %v: cmd output - '%s'", image, err, out)
+	}
+	return nil
+}
+
+// mountWithHFSPlus mounts using native Linux HFS+ kernel support
+func mountWithHFSPlus(image, mountPoint string) error {
+	// Set up a loop device for the DMG file
+	out, err := exec.Command("losetup", "-f", "--show", image).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to set up loop device for '%s': %v: cmd output - '%s'", image, err, out)
+	}
+
+	loopDevice := strings.TrimSpace(string(out))
+	log.Debugf("created loop device: %s", loopDevice)
+
+	// Mount the loop device using native HFS+ support
+	err = exec.Command("mount", "-t", "hfsplus", "-o", "ro", loopDevice, mountPoint).Run()
+	if err != nil {
+		// Clean up loop device on mount failure
+		if cleanupErr := exec.Command("losetup", "-d", loopDevice).Run(); cleanupErr != nil {
+			log.Warnf("failed to clean up loop device %s: %v", loopDevice, cleanupErr)
+		}
+		return fmt.Errorf("failed to mount HFS+ filesystem '%s': %v (ensure hfsplus kernel module is loaded)", loopDevice, err)
+	}
+
+	log.Debugf("mounted HFS+ filesystem at %s", mountPoint)
 	return nil
 }
 
@@ -522,7 +585,8 @@ func MountEncrypted(image, mountPoint, password string) error {
 }
 
 func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		info, err := MountInfo()
 		if err != nil {
 			return "", false, err
@@ -537,7 +601,7 @@ func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 				return "", true, nil
 			}
 		}
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		if _, err := os.Stat(filepath.Join(mountPoint, "root")); !os.IsNotExist(err) {
 			return mountPoint, true, nil
 		}
@@ -571,7 +635,8 @@ func MountDMG(image string) (string, bool, error) {
 
 // Unmount unmounts a DMG with hdiutil
 func Unmount(mountPoint string, force bool) error {
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		var cmd *exec.Cmd
 
 		if force {
@@ -595,11 +660,15 @@ func Unmount(mountPoint string, force bool) error {
 			}
 			return fmt.Errorf("failed to unmount %s: %v%s", mountPoint, err, edetail)
 		}
-	} else if runtime.GOOS == "linux" {
+	case "linux":
+		// First unmount the filesystem
 		cmd := exec.Command("umount", mountPoint)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to unmount %s: %v", mountPoint, err)
 		}
+
+		// Note: Loop devices created for HFS+ mounting are automatically cleaned up
+		// by the kernel when the filesystem is unmounted, so no explicit cleanup needed
 	}
 
 	return nil

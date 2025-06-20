@@ -129,6 +129,41 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_li
 tar xzf ipsw_3.1.199_linux_x86_64.tar.gz
 ```
 
+## Required tools for mounting DMGs
+
+To use the `ipsw mount` command on Linux, you'll need:
+
+### For APFS filesystems (iOS 10.3+ and modern iPadOS/macOS)
+
+```bash
+# Install apfs-fuse
+git clone https://github.com/sgan81/apfs-fuse.git
+cd apfs-fuse
+make
+sudo make install
+```
+
+### For HFS+ filesystems (older iOS/iPadOS versions)
+
+HFS+ support uses the native Linux kernel with userspace tools:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install hfsprogs
+
+# RHEL/CentOS/Fedora
+sudo yum install hfsplus-tools
+# or
+sudo dnf install hfsplus-tools
+
+# Arch Linux
+sudo pacman -S hfsprogs
+```
+
+:::info 
+IPSW automatically detects the filesystem type in DMG files and uses the appropriate mounting method. APFS is used in iOS 10.3+ and newer, while HFS+ is used in older firmware.
+:::
+
 ```mdx-code-block
 </TabItem>
 <TabItem value="Docker">

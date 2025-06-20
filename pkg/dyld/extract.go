@@ -34,8 +34,13 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 	var matches []string
 	var re *regexp.Regexp
 
-	if runtime.GOOS == "linux" { // apfs-fuse mounts volume at mountPoint + "/root"
-		mountPoint = filepath.Join(mountPoint, "root")
+	if runtime.GOOS == "linux" {
+		// apfs-fuse mounts volume at mountPoint + "/root", but hfsfuse mounts directly
+		// Check if /root subdirectory exists to determine mount structure
+		rootPath := filepath.Join(mountPoint, "root")
+		if _, err := os.Stat(rootPath); err == nil {
+			mountPoint = rootPath
+		}
 	}
 
 	if driverKit {
