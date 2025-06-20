@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -37,6 +37,7 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kernelVersionCmd)
 	kernelVersionCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	kernelVersionCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kernelVersionCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache.*")
 	// kernelVersionCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// 	return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
@@ -59,10 +60,11 @@ var kernelVersionCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		asJSON, _ := cmd.Flags().GetBool("json")
+		selectedArch, _ := cmd.Flags().GetString("arch")
 
 		machoPath := filepath.Clean(args[0])
 
-		m, err := macho.Open(machoPath)
+		m, err := mcmd.OpenFatMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}

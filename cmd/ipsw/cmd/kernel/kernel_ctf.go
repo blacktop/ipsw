@@ -27,11 +27,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ctf"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -64,6 +63,7 @@ var ctfdumpCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var err error
 		var m *macho.File
 		var m2 *macho.File
 
@@ -84,47 +84,10 @@ var ctfdumpCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", machoPath)
 		}
 
-		// first check for fat file
-		fat, err := macho.OpenFat(machoPath)
-		if err != nil && err != macho.ErrNotFat {
+		// Use the helper to handle fat/universal files
+		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		if err != nil {
 			return err
-		}
-
-		if err == macho.ErrNotFat {
-			m, err = macho.Open(machoPath)
-			if err != nil {
-				return err
-			}
-		} else {
-			var options []string
-			var shortOptions []string
-			for _, arch := range fat.Arches {
-				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-				shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
-			}
-
-			if len(selectedArch) > 0 {
-				found := false
-				for i, opt := range shortOptions {
-					if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-						m = fat.Arches[i].File
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
-				}
-
-			} else {
-				choice := 0
-				prompt := &survey.Select{
-					Message: "Detected a universal MachO file, please select an architecture to analyze:",
-					Options: options,
-				}
-				survey.AskOne(prompt, &choice)
-				m = fat.Arches[choice].File
-			}
 		}
 
 		c, err := ctf.Parse(m)
@@ -153,47 +116,10 @@ var ctfdumpCmd = &cobra.Command{
 				return fmt.Errorf("file %s does not exist", machoPath2)
 			}
 
-			// first check for fat file
-			fat2, err := macho.OpenFat(machoPath2)
-			if err != nil && err != macho.ErrNotFat {
+			// Use the helper to handle fat/universal files
+			m2, err = mcmd.OpenFatMachO(machoPath2, selectedArch)
+			if err != nil {
 				return err
-			}
-
-			if err == macho.ErrNotFat {
-				m2, err = macho.Open(machoPath2)
-				if err != nil {
-					return err
-				}
-			} else {
-				var options []string
-				var shortOptions []string
-				for _, arch := range fat2.Arches {
-					options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-					shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
-				}
-
-				if len(selectedArch) > 0 {
-					found := false
-					for i, opt := range shortOptions {
-						if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-							m2 = fat2.Arches[i].File
-							found = true
-							break
-						}
-					}
-					if !found {
-						return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
-					}
-
-				} else {
-					choice := 0
-					prompt := &survey.Select{
-						Message: "Detected a universal MachO file, please select an architecture to analyze:",
-						Options: options,
-					}
-					survey.AskOne(prompt, &choice)
-					m2 = fat.Arches[choice].File
-				}
 			}
 
 			c2, err := ctf.Parse(m2)

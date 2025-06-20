@@ -32,8 +32,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
@@ -53,9 +53,11 @@ func init() {
 	kernelInfoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	kernelInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	kernelInfoCmd.Flags().StringP("filter", "f", "", "Filter symbols by name")
+	kernelInfoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	viper.BindPFlag("kernel.info.symbols", kernelInfoCmd.Flags().Lookup("symbols"))
 	viper.BindPFlag("kernel.info.strings", kernelInfoCmd.Flags().Lookup("strings"))
 	viper.BindPFlag("kernel.info.filter", kernelInfoCmd.Flags().Lookup("filter"))
+	viper.BindPFlag("kernel.info.arch", kernelInfoCmd.Flags().Lookup("arch"))
 }
 
 // kernelInfoCmd represents the info command
@@ -75,6 +77,7 @@ var kernelInfoCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		filter := viper.GetString("kernel.info.filter")
+		selectedArch := viper.GetString("kernel.info.arch")
 
 		if filter != "" {
 			var err error
@@ -90,7 +93,7 @@ var kernelInfoCmd = &cobra.Command{
 			return err
 		}
 
-		kern, err := macho.Open(kernelPath)
+		kern, err := mcmd.OpenFatMachO(kernelPath, selectedArch)
 		if err != nil {
 			return err
 		}

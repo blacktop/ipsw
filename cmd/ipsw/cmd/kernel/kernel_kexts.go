@@ -27,6 +27,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
@@ -37,6 +39,7 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kextsCmd)
 	kextsCmd.Flags().BoolP("diff", "d", false, "Diff two kernel's kexts")
+	kextsCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kextsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -54,6 +57,7 @@ var kextsCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		diff, _ := cmd.Flags().GetBool("diff")
+		selectedArch, _ := cmd.Flags().GetString("arch")
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
@@ -64,11 +68,11 @@ var kextsCmd = &cobra.Command{
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
 
-			kout1, err := kernelcache.KextList(args[0], true)
+			kout1, err := kextListWithFatSupport(args[0], selectedArch, true)
 			if err != nil {
 				return err
 			}
-			kout2, err := kernelcache.KextList(args[1], true)
+			kout2, err := kextListWithFatSupport(args[1], selectedArch, true)
 			if err != nil {
 				return err
 			}
@@ -87,7 +91,7 @@ var kextsCmd = &cobra.Command{
 			log.Info("Differences found")
 			fmt.Println(out)
 		} else {
-			kout, err := kernelcache.KextList(args[0], false)
+			kout, err := kextListWithFatSupport(args[0], selectedArch, false)
 			if err != nil {
 				return err
 			}
@@ -99,4 +103,43 @@ var kextsCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// kextListWithFatSupport wraps kernelcache.KextList to handle fat/universal files
+func kextListWithFatSupport(kernelPath string, arch string, diffable bool) ([]string, error) {
+	// Check if file is fat/universal
+	fat, err := macho.OpenFat(kernelPath)
+	if err != nil && err != macho.ErrNotFat {
+		return nil, err
+	}
+	
+	// If it's not a fat file, just call KextList directly
+	if err == macho.ErrNotFat {
+		return kernelcache.KextList(kernelPath, diffable)
+	}
+	
+	// It's a fat file - need to handle it
+	defer fat.Close()
+	
+	// Use the helper to get the right architecture
+	m, err := mcmd.OpenFatMachO(kernelPath, arch)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Create a temporary file for the extracted architecture
+	tmpFile, err := os.CreateTemp("", "kernelcache-*.macho")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	
+	// Export the MachO to the temp file
+	if err := m.Export(tmpFile.Name(), nil, m.GetBaseAddress(), nil); err != nil {
+		return nil, fmt.Errorf("failed to export MachO: %v", err)
+	}
+	
+	// Now call KextList with the extracted file
+	return kernelcache.KextList(tmpFile.Name(), diffable)
 }

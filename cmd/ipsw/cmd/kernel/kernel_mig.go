@@ -28,7 +28,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -37,6 +37,7 @@ import (
 
 func init() {
 	KernelcacheCmd.AddCommand(kernelMigCmd)
+	kernelMigCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 }
 
 // kernelMigCmd represents the mig command
@@ -53,7 +54,9 @@ var kernelMigCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		m, err := macho.Open(filepath.Clean(args[0]))
+		selectedArch, _ := cmd.Flags().GetString("arch")
+
+		m, err := mcmd.OpenFatMachO(filepath.Clean(args[0]), selectedArch)
 		if err != nil {
 			return err
 		}

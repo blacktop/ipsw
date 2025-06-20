@@ -28,7 +28,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -39,6 +39,7 @@ func init() {
 	KernelcacheCmd.AddCommand(syscallCmd)
 	syscallCmd.Flags().BoolP("gen", "g", false, "Generate syscall table data gzip file")
 	syscallCmd.Flags().StringP("output", "o", "", "Output gzip file")
+	syscallCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	syscallCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -59,6 +60,7 @@ var syscallCmd = &cobra.Command{
 
 		gen, _ := cmd.Flags().GetBool("gen")
 		output, _ := cmd.Flags().GetString("output")
+		selectedArch, _ := cmd.Flags().GetString("arch")
 
 		if gen {
 			return kernelcache.ParseSyscallFiles(output)
@@ -70,7 +72,7 @@ var syscallCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		m, err := macho.Open(machoPath)
+		m, err := mcmd.OpenFatMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}

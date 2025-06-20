@@ -26,9 +26,9 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
@@ -41,9 +41,11 @@ func init() {
 
 	kerExtractCmd.Flags().BoolP("all", "a", false, "Extract all KEXTs")
 	kerExtractCmd.Flags().String("output", "", "Directory to extract KEXTs to")
+	kerExtractCmd.Flags().StringP("arch", "e", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("kernel.extract.all", kerExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("kernel.extract.output", kerExtractCmd.Flags().Lookup("output"))
+	viper.BindPFlag("kernel.extract.arch", kerExtractCmd.Flags().Lookup("arch"))
 }
 
 // kerExtractCmd represents the kerExtract command
@@ -63,6 +65,7 @@ var kerExtractCmd = &cobra.Command{
 
 		dumpAll := viper.GetBool("kernel.extract.all")
 		extractPath := viper.GetString("kernel.extract.output")
+		selectedArch := viper.GetString("kernel.extract.arch")
 
 		if len(args) == 1 && !dumpAll {
 			return fmt.Errorf("you must specify a KEXT to extract OR use the --all flag")
@@ -71,7 +74,7 @@ var kerExtractCmd = &cobra.Command{
 		kernPath := filepath.Clean(args[0])
 
 		if ok, err := magic.IsMachoOrImg4(kernPath); !ok {
-			return fmt.Errorf(err.Error())
+			return fmt.Errorf("invalid file format: %v", err)
 		}
 
 		folder := filepath.Dir(kernPath)
@@ -79,7 +82,7 @@ var kerExtractCmd = &cobra.Command{
 			folder = extractPath
 		}
 
-		m, err := macho.Open(kernPath)
+		m, err := mcmd.OpenFatMachO(kernPath, selectedArch)
 		if err != nil {
 			return fmt.Errorf("failed to open kernelcache: %v", err)
 		}

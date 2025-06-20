@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
@@ -52,6 +52,7 @@ func init() {
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
 	kernelSymbolicateCmd.Flags().Uint64P("lookup", "l", 0, "Lookup a symbol by address")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
+	kernelSymbolicateCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kernelSymbolicateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("kernel.symbolicate.flat", kernelSymbolicateCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("kernel.symbolicate.json", kernelSymbolicateCmd.Flags().Lookup("json"))
@@ -61,6 +62,7 @@ func init() {
 	viper.BindPFlag("kernel.symbolicate.signatures", kernelSymbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("kernel.symbolicate.lookup", kernelSymbolicateCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("kernel.symbolicate.output", kernelSymbolicateCmd.Flags().Lookup("output"))
+	viper.BindPFlag("kernel.symbolicate.arch", kernelSymbolicateCmd.Flags().Lookup("arch"))
 }
 
 // kernelSymbolicateCmd represents the symbolicate command
@@ -79,6 +81,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		quiet := viper.GetBool("kernel.symbolicate.quiet")
+		selectedArch := viper.GetString("kernel.symbolicate.arch")
 
 		output := viper.GetString("kernel.symbolicate.output")
 		if output == "" {
@@ -140,7 +143,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			match := 0
 			miss := 0
 			log.Warn("Testing symbol matches")
-			m, err := macho.Open(args[0] + ".dSYM/Contents/Resources/DWARF/" + filepath.Base(args[0]))
+			m, err := mcmd.OpenFatMachO(args[0] + ".dSYM/Contents/Resources/DWARF/" + filepath.Base(args[0]), selectedArch)
 			if err != nil {
 				return fmt.Errorf("failed to open kernelcache: %v", err)
 			}
