@@ -13,7 +13,6 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // Img4 object
@@ -346,8 +345,6 @@ func parseManifestProperties(data []byte) (*ManifestProperties, error) {
 
 // Parse parses a Img4
 func Parse(r io.Reader) (*Img4, error) {
-	utils.Indent(log.Info, 2)("Parsing IMG4")
-
 	data := new(bytes.Buffer)
 	data.ReadFrom(r)
 

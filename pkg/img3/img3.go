@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
@@ -112,8 +111,8 @@ func ParseImg3(data []byte) (*Img3, error) {
 	}
 
 	// Verify magic
-	if string(utils.ReverseBytes(i.Magic[:])) != Magic {
-		return nil, fmt.Errorf("invalid IMG3 magic: %s", string(utils.ReverseBytes(i.Magic[:])))
+	if string(reverseBytes(i.Magic[:])) != Magic {
+		return nil, fmt.Errorf("invalid IMG3 magic: %s", string(reverseBytes(i.Magic[:])))
 	}
 
 	for {
@@ -146,7 +145,7 @@ func ParseImg3(data []byte) (*Img3, error) {
 // GetDataTag returns the DATA tag from the IMG3 file
 func (i *Img3) GetDataTag() ([]byte, error) {
 	for _, tag := range i.Tags {
-		if string(utils.ReverseBytes(tag.Magic[:])) == "DATA" {
+		if string(reverseBytes(tag.Magic[:])) == "DATA" {
 			return tag.Data, nil
 		}
 	}
@@ -156,7 +155,7 @@ func (i *Img3) GetDataTag() ([]byte, error) {
 // GetKBagTag returns the KBAG tag from the IMG3 file
 func (i *Img3) GetKBagTag() ([]byte, error) {
 	for _, tag := range i.Tags {
-		if string(utils.ReverseBytes(tag.Magic[:])) == "KBAG" {
+		if string(reverseBytes(tag.Magic[:])) == "KBAG" {
 			return tag.Data, nil
 		}
 	}
@@ -167,7 +166,7 @@ func (i *Img3) GetKBagTag() ([]byte, error) {
 func (i *Img3) GetAllKBagTags() ([][]byte, error) {
 	var kbags [][]byte
 	for _, tag := range i.Tags {
-		if string(utils.ReverseBytes(tag.Magic[:])) == "KBAG" {
+		if string(reverseBytes(tag.Magic[:])) == "KBAG" {
 			kbags = append(kbags, tag.Data)
 		}
 	}
@@ -590,14 +589,14 @@ func (i Img3) String() string {
 			"Identifier   = %s\n\n"+
 			"TAGS\n"+
 			"----\n",
-		utils.ReverseBytes(i.Magic[:]),
-		utils.ReverseBytes(i.Ident[:]),
+		reverseBytes(i.Magic[:]),
+		reverseBytes(i.Ident[:]),
 	)
 	for _, tag := range i.Tags {
-		magic := string(utils.ReverseBytes(tag.Magic[:]))
+		magic := string(reverseBytes(tag.Magic[:]))
 		switch magic {
 		case "TYPE":
-			iStr += fmt.Sprintf("%s: %s\n", magic, utils.ReverseBytes(tag.Data[:]))
+			iStr += fmt.Sprintf("%s: %s\n", magic, reverseBytes(tag.Data[:]))
 		case "DATA":
 			iStr += fmt.Sprintf("%s: %v (length: %d)\n", magic, tag.Data[0:15], len(tag.Data))
 		case "VERS":
@@ -620,4 +619,12 @@ func (i Img3) String() string {
 		}
 	}
 	return iStr
+}
+
+func reverseBytes(a []byte) []byte {
+	for i := len(a)/2 - 1; i >= 0; i-- {
+		opp := len(a) - 1 - i
+		a[i], a[opp] = a[opp], a[i]
+	}
+	return a
 }
