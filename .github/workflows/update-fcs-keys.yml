@@ -6,11 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-fcs-keys:
+  update-all-fcs-keys:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        type: [stable, rc, beta]
     steps:
       - uses: actions/checkout@v4
       
@@ -23,104 +20,195 @@ jobs:
         run: |
           go build -o ipsw ./cmd/ipsw
       
-      - name: Get latest builds
+      - name: Get all latest builds
         id: get-builds
         run: |
-          echo "Getting latest ${{ matrix.type }} build numbers..."
+          echo "Getting all latest build numbers..."
           
-          # Set flags based on type
-          if [ "${{ matrix.type }}" = "beta" ]; then
-            FLAGS="--beta"
-          elif [ "${{ matrix.type }}" = "rc" ]; then
-            FLAGS=""  # RCs use regular OTA endpoint
-          else
-            FLAGS=""  # Stable releases
-          fi
+          # Get stable builds
+          STABLE_IOS=$(./ipsw download ota --platform ios --show-latest-build --device iPhone16,2 --insecure 2>/dev/null || echo "")
+          STABLE_MACOS=$(./ipsw download ota --platform macos --show-latest-build --device Mac14,7 --insecure 2>/dev/null || echo "")
+          STABLE_VISIONOS=$(./ipsw download ota --platform visionOS --show-latest-build --device RealityDevice14,1 --insecure 2>/dev/null || echo "")
           
-          # Get builds using ipsw CLI
-          IOS_BUILD=$(./ipsw download ota --platform ios $FLAGS --show-latest-build --device iPhone16,2 --insecure 2>/dev/null || echo "")
-          MACOS_BUILD=$(./ipsw download ota --platform macos $FLAGS --show-latest-build --device Mac14,7 --insecure 2>/dev/null || echo "")
-          VISIONOS_BUILD=$(./ipsw download ota --platform visionOS $FLAGS --show-latest-build --device RealityDevice14,1 --insecure 2>/dev/null || echo "")
+          # Get beta builds
+          BETA_IOS=$(./ipsw download ota --platform ios --beta --show-latest-build --device iPhone16,2 --insecure 2>/dev/null || echo "")
+          BETA_MACOS=$(./ipsw download ota --platform macos --beta --show-latest-build --device Mac14,7 --insecure 2>/dev/null || echo "")
+          BETA_VISIONOS=$(./ipsw download ota --platform visionOS --beta --show-latest-build --device RealityDevice14,1 --insecure 2>/dev/null || echo "")
           
-          echo "ios_build=$IOS_BUILD" >> $GITHUB_OUTPUT
-          echo "macos_build=$MACOS_BUILD" >> $GITHUB_OUTPUT
-          echo "visionos_build=$VISIONOS_BUILD" >> $GITHUB_OUTPUT
+          # RC builds use same endpoint as stable for now
+          RC_IOS="$STABLE_IOS"
+          RC_MACOS="$STABLE_MACOS"
+          RC_VISIONOS="$STABLE_VISIONOS"
           
-          # Create build fingerprint
-          BUILD_FINGERPRINT="${IOS_BUILD}_${MACOS_BUILD}_${VISIONOS_BUILD}"
-          echo "build_fingerprint=$BUILD_FINGERPRINT" >> $GITHUB_OUTPUT
-          echo "Current ${{ matrix.type }} build fingerprint: $BUILD_FINGERPRINT"
+          # Create fingerprints
+          STABLE_FP="${STABLE_IOS}_${STABLE_MACOS}_${STABLE_VISIONOS}"
+          RC_FP="${RC_IOS}_${RC_MACOS}_${RC_VISIONOS}"
+          BETA_FP="${BETA_IOS}_${BETA_MACOS}_${BETA_VISIONOS}"
+          
+          # Output all builds
+          echo "stable_ios=$STABLE_IOS" >> $GITHUB_OUTPUT
+          echo "stable_macos=$STABLE_MACOS" >> $GITHUB_OUTPUT
+          echo "stable_visionos=$STABLE_VISIONOS" >> $GITHUB_OUTPUT
+          echo "stable_fingerprint=$STABLE_FP" >> $GITHUB_OUTPUT
+          
+          echo "rc_ios=$RC_IOS" >> $GITHUB_OUTPUT
+          echo "rc_macos=$RC_MACOS" >> $GITHUB_OUTPUT
+          echo "rc_visionos=$RC_VISIONOS" >> $GITHUB_OUTPUT
+          echo "rc_fingerprint=$RC_FP" >> $GITHUB_OUTPUT
+          
+          echo "beta_ios=$BETA_IOS" >> $GITHUB_OUTPUT
+          echo "beta_macos=$BETA_MACOS" >> $GITHUB_OUTPUT
+          echo "beta_visionos=$BETA_VISIONOS" >> $GITHUB_OUTPUT
+          echo "beta_fingerprint=$BETA_FP" >> $GITHUB_OUTPUT
+          
+          echo "Current fingerprints:"
+          echo "  Stable: $STABLE_FP"
+          echo "  RC: $RC_FP"
+          echo "  Beta: $BETA_FP"
       
       - name: Check for new builds
         id: check-builds
         run: |
-          # Get last cached build fingerprint
-          CACHE_KEY="fcs_keys_${{ matrix.type }}"
-          LAST_FINGERPRINT=$(jq -r --arg key "$CACHE_KEY" '.[$key].build_fingerprint // ""' hack/.watch_cache)
-          CURRENT_FINGERPRINT="${{ steps.get-builds.outputs.build_fingerprint }}"
+          # Get cached fingerprints
+          LAST_STABLE=$(jq -r '.fcs_keys_stable.build_fingerprint // ""' hack/.watch_cache)
+          LAST_RC=$(jq -r '.fcs_keys_rc.build_fingerprint // ""' hack/.watch_cache)
+          LAST_BETA=$(jq -r '.fcs_keys_beta.build_fingerprint // ""' hack/.watch_cache)
           
-          echo "Last cached ${{ matrix.type }} build fingerprint: $LAST_FINGERPRINT"
-          echo "Current ${{ matrix.type }} build fingerprint: $CURRENT_FINGERPRINT"
+          # Check what needs updating
+          UPDATE_STABLE=false
+          UPDATE_RC=false
+          UPDATE_BETA=false
+          UPDATE_ANY=false
           
-          if [ "$LAST_FINGERPRINT" = "$CURRENT_FINGERPRINT" ]; then
-            echo "No new ${{ matrix.type }} builds found; skipping"
-            echo "should_update=false" >> $GITHUB_OUTPUT
-          else
-            echo "New ${{ matrix.type }} builds found; proceeding with update"
-            echo "should_update=true" >> $GITHUB_OUTPUT
+          if [ "$LAST_STABLE" != "${{ steps.get-builds.outputs.stable_fingerprint }}" ]; then
+            echo "New stable builds found"
+            UPDATE_STABLE=true
+            UPDATE_ANY=true
           fi
-      
-      - name: Update FCS keys
-        if: steps.check-builds.outputs.should_update == 'true'
-        run: |
-          echo "Running FCS keys update for ${{ matrix.type }}..."
-          if [ "${{ matrix.type }}" = "beta" ]; then
-            make update_fcs_keys_beta
-          elif [ "${{ matrix.type }}" = "rc" ]; then
-            make update_fcs_keys_rc
-          else
-            # For stable, use the release target with specific builds
-            make update_fcs_keys_release \
-              FCS_IOS_BUILD="${{ steps.get-builds.outputs.ios_build }}" \
-              FCS_MOS_BUILD="${{ steps.get-builds.outputs.macos_build }}" \
-              FCS_VOS_BUILD="${{ steps.get-builds.outputs.visionos_build }}"
+          
+          if [ "$LAST_RC" != "${{ steps.get-builds.outputs.rc_fingerprint }}" ]; then
+            echo "New RC builds found"
+            UPDATE_RC=true
+            UPDATE_ANY=true
           fi
+          
+          if [ "$LAST_BETA" != "${{ steps.get-builds.outputs.beta_fingerprint }}" ]; then
+            echo "New beta builds found"
+            UPDATE_BETA=true
+            UPDATE_ANY=true
+          fi
+          
+          echo "update_stable=$UPDATE_STABLE" >> $GITHUB_OUTPUT
+          echo "update_rc=$UPDATE_RC" >> $GITHUB_OUTPUT
+          echo "update_beta=$UPDATE_BETA" >> $GITHUB_OUTPUT
+          echo "update_any=$UPDATE_ANY" >> $GITHUB_OUTPUT
       
-      - name: Check for changes
-        id: check-changes
+      - name: Update stable FCS keys
+        if: steps.check-builds.outputs.update_stable == 'true'
         run: |
+          echo "Running FCS keys update for stable..."
+          make update_fcs_keys_release \
+            FCS_IOS_BUILD="${{ steps.get-builds.outputs.stable_ios }}" \
+            FCS_MOS_BUILD="${{ steps.get-builds.outputs.stable_macos }}" \
+            FCS_VOS_BUILD="${{ steps.get-builds.outputs.stable_visionos }}"
+      
+      - name: Update RC FCS keys
+        if: steps.check-builds.outputs.update_rc == 'true'
+        run: |
+          echo "Running FCS keys update for RC..."
+          make update_fcs_keys_rc
+      
+      - name: Update beta FCS keys
+        if: steps.check-builds.outputs.update_beta == 'true'
+        run: |
+          echo "Running FCS keys update for beta..."
+          make update_fcs_keys_beta
+      
+      - name: Check for changes and commit
+        if: steps.check-builds.outputs.update_any == 'true'
+        run: |
+          # Check if any files actually changed
           if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz; then
-            echo "No changes to FCS keys files"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "FCS keys files have been updated"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "No changes to FCS keys files despite new builds"
+            exit 0
           fi
-      
-      - name: Update cache and commit
-        if: steps.check-changes.outputs.has_changes == 'true'
-        run: |
-          # Update the cache file with the new build fingerprint
-          CACHE_KEY="fcs_keys_${{ matrix.type }}"
-          jq -c --arg key "$CACHE_KEY" \
-             --arg fp "${{ steps.get-builds.outputs.build_fingerprint }}" \
-             --arg ios "${{ steps.get-builds.outputs.ios_build }}" \
-             --arg macos "${{ steps.get-builds.outputs.macos_build }}" \
-             --arg visionos "${{ steps.get-builds.outputs.visionos_build }}" \
-             '.[$key] = {
-                "build_fingerprint": $fp,
-                "ios_build": $ios,
-                "macos_build": $macos,
-                "visionos_build": $visionos,
-                "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
-              }' hack/.watch_cache > hack/.watch_cache.tmp
+          
+          # Update the cache file with all new fingerprints
+          cp hack/.watch_cache hack/.watch_cache.tmp
+          
+          # Update stable if needed
+          if [ "${{ steps.check-builds.outputs.update_stable }}" = "true" ]; then
+            jq -c --arg fp "${{ steps.get-builds.outputs.stable_fingerprint }}" \
+               --arg ios "${{ steps.get-builds.outputs.stable_ios }}" \
+               --arg macos "${{ steps.get-builds.outputs.stable_macos }}" \
+               --arg visionos "${{ steps.get-builds.outputs.stable_visionos }}" \
+               '.fcs_keys_stable = {
+                  "build_fingerprint": $fp,
+                  "ios_build": $ios,
+                  "macos_build": $macos,
+                  "visionos_build": $visionos,
+                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+            mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
+          fi
+          
+          # Update RC if needed
+          if [ "${{ steps.check-builds.outputs.update_rc }}" = "true" ]; then
+            jq -c --arg fp "${{ steps.get-builds.outputs.rc_fingerprint }}" \
+               --arg ios "${{ steps.get-builds.outputs.rc_ios }}" \
+               --arg macos "${{ steps.get-builds.outputs.rc_macos }}" \
+               --arg visionos "${{ steps.get-builds.outputs.rc_visionos }}" \
+               '.fcs_keys_rc = {
+                  "build_fingerprint": $fp,
+                  "ios_build": $ios,
+                  "macos_build": $macos,
+                  "visionos_build": $visionos,
+                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+            mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
+          fi
+          
+          # Update beta if needed
+          if [ "${{ steps.check-builds.outputs.update_beta }}" = "true" ]; then
+            jq -c --arg fp "${{ steps.get-builds.outputs.beta_fingerprint }}" \
+               --arg ios "${{ steps.get-builds.outputs.beta_ios }}" \
+               --arg macos "${{ steps.get-builds.outputs.beta_macos }}" \
+               --arg visionos "${{ steps.get-builds.outputs.beta_visionos }}" \
+               '.fcs_keys_beta = {
+                  "build_fingerprint": $fp,
+                  "ios_build": $ios,
+                  "macos_build": $macos,
+                  "visionos_build": $visionos,
+                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+            mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
+          fi
+          
           mv hack/.watch_cache.tmp hack/.watch_cache
           
           # Configure git
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Commit the changes
+          # Build commit message
+          COMMIT_MSG="chore(fcs-keys): update FCS keys"
+          UPDATES=()
+          
+          if [ "${{ steps.check-builds.outputs.update_stable }}" = "true" ]; then
+            UPDATES+=("stable")
+          fi
+          if [ "${{ steps.check-builds.outputs.update_rc }}" = "true" ]; then
+            UPDATES+=("RC")
+          fi
+          if [ "${{ steps.check-builds.outputs.update_beta }}" = "true" ]; then
+            UPDATES+=("beta")
+          fi
+          
+          # Join updates with commas
+          UPDATE_STR=$(IFS=', '; echo "${UPDATES[*]}")
+          COMMIT_MSG="$COMMIT_MSG ($UPDATE_STR) [skip ci]"
+          
+          # Commit all changes at once
           git add pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz hack/.watch_cache
-          git commit -m "chore(fcs-keys): update ${{ matrix.type }} FCS keys (iOS: ${{ steps.get-builds.outputs.ios_build }}, macOS: ${{ steps.get-builds.outputs.macos_build }}, visionOS: ${{ steps.get-builds.outputs.visionos_build }}) [skip ci]"
+          git commit -m "$COMMIT_MSG"
           git push
