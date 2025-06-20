@@ -186,11 +186,11 @@ var img4Im4mExtractCmd = &cobra.Command{
 			}
 		} else {
 			// Extract manifest from IMG4
-			img, err := img4.Parse(f)
+			rawImg4, err := img4.ParseImg4(f)
 			if err != nil {
 				return fmt.Errorf("failed to parse IMG4: %v", err)
 			}
-			manifestData = img.Manifest.ApImg4Ticket.Bytes
+			manifestData = rawImg4.Manifest.Bytes
 		}
 
 		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
