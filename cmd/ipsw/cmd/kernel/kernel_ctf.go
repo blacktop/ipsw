@@ -65,7 +65,6 @@ var ctfdumpCmd = &cobra.Command{
 
 		var err error
 		var m *macho.File
-		var m2 *macho.File
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)

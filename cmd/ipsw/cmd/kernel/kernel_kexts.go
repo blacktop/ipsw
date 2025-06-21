@@ -37,7 +37,11 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kextsCmd)
 	kextsCmd.Flags().BoolP("diff", "d", false, "Diff two kernel's kexts")
+	kextsCmd.Flags().BoolP("json", "j", false, "Output kexts as JSON")
 	kextsCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
+	viper.BindPFlag("kernel.kexts.diff", kextsCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("kernel.kexts.json", kextsCmd.Flags().Lookup("json"))
+	viper.BindPFlag("kernel.kexts.arch", kextsCmd.Flags().Lookup("arch"))
 	kextsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -56,10 +60,14 @@ var kextsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		diff, _ := cmd.Flags().GetBool("diff")
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		// flags
+		selectedArch := viper.GetString("kernel.kexts.arch")
+		// validate flags
+		if viper.GetBool("kernel.kexts.diff") && viper.GetBool("kernel.kexts.json") {
+			return fmt.Errorf("cannot use --diff and --json flags together")
+		}
 
-		if diff {
+		if viper.GetBool("kernel.kexts.diff") {
 			if len(args) < 2 {
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
@@ -68,7 +76,11 @@ var kextsCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			defer m1.Close()
+			defer func() {
+				if err := m1.Close(); err != nil {
+					log.WithError(err).Error("failed to close file: " + args[0])
+				}
+			}()
 
 			kout1, err := kernelcache.KextList(m1.File, true)
 			if err != nil {
@@ -79,7 +91,11 @@ var kextsCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			defer m2.Close()
+			defer func() {
+				if err := m2.Close(); err != nil {
+					log.WithError(err).Error("failed to close file: " + args[1])
+				}
+			}()
 
 			kout2, err := kernelcache.KextList(m2.File, true)
 			if err != nil {
@@ -104,15 +120,27 @@ var kextsCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			defer m.Close()
+			defer func() {
+				if err := m.Close(); err != nil {
+					log.WithError(err).Error("failed to close file: " + args[0])
+				}
+			}()
 
-			kout, err := kernelcache.KextList(m.File, false)
-			if err != nil {
-				return err
-			}
-			log.WithField("count", len(kout)).Info("Kexts")
-			for _, k := range kout {
-				fmt.Println(k)
+			if viper.GetBool("kernel.kexts.json") {
+				kexts, err := kernelcache.KextJSON(m.File)
+				if err != nil {
+					return err
+				}
+				fmt.Println(kexts)
+			} else {
+				kout, err := kernelcache.KextList(m.File, false)
+				if err != nil {
+					return err
+				}
+				log.WithField("count", len(kout)).Info("Kexts")
+				for _, k := range kout {
+					fmt.Println(k)
+				}
 			}
 		}
 
