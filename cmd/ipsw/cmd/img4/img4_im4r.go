@@ -94,7 +94,7 @@ var img4Im4rInfoCmd = &cobra.Command{
 
 func displayIm4rInfo(img *img4.Img4, filePath string, jsonOutput, verbose bool) error {
 	if jsonOutput {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"file":      filepath.Base(filePath),
 			"generator": fmt.Sprintf("%x", img.RestoreInfo.Generator.Data),
 		}
@@ -111,7 +111,7 @@ func displayIm4rInfo(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 	} else {
 		fmt.Printf("%s      %s\n", colorField("File:"), filepath.Base(filePath))
 		fmt.Printf("%s %s\n", colorField("Generator:"), string(img.RestoreInfo.Generator.Data))
-		
+
 		if verbose {
 			fmt.Printf("%s %x\n", colorField("Generator Data:"), img.RestoreInfo.Generator.Data)
 			fmt.Printf("%s       %d bytes\n", colorField("Raw Data:"), len(img.RestoreInfo.Generator.Raw))

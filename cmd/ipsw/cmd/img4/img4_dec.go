@@ -28,8 +28,8 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -103,6 +103,6 @@ var img4DecCmd = &cobra.Command{
 			}
 		}
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", outfile))
-		return icmd.DecryptPayload(infile, outfile, iv, key)
+		return img4.DecryptPayload(infile, outfile, iv, key)
 	},
 }

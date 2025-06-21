@@ -32,7 +32,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	"github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"

@@ -3,6 +3,8 @@ package img4
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +15,8 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
+	"github.com/blacktop/lzfse-cgo"
 )
 
 // Img4 object
@@ -51,7 +55,7 @@ type im4p struct {
 	Raw         asn1.RawContent
 	Name        string `asn1:"ia5"` // IM4P
 	Type        string `asn1:"ia5"`
-	Description string
+	Description string `asn1:"ia5"`
 	Data        []byte
 	KbagData    []byte `asn1:"optional"`
 }
@@ -630,4 +634,244 @@ func DetectFileType(r io.Reader) (string, error) {
 	}
 
 	return "", fmt.Errorf("unknown file type - not IMG4 or IM4P")
+}
+
+// ExtractManifestFromShsh extracts IM4M manifest from SHSH blob with proper ASN.1 parsing
+func ExtractManifestFromShsh(r io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SHSH data: %v", err)
+	}
+
+	// SHSH blobs are typically plist files containing base64-encoded manifests
+	// Look for common patterns in SHSH blob structure
+
+	// Look for direct IM4M signature in the data
+	im4mSig := []byte("IM4M")
+	if idx := bytes.Index(data, im4mSig); idx != -1 {
+		return extractManifestFromRawData(data, idx)
+	}
+
+	// Look for base64-encoded IM4M (common in SHSH blobs)
+	// SHSH blobs often contain "IM4M" base64-encoded as "SU00TQ=="
+	if bytes.Contains(data, []byte("<key>ApImg4Ticket</key>")) {
+		// This is likely a plist with base64-encoded ticket
+		return extractManifestFromPlistShsh(data)
+	}
+
+	// Look for XML plist structure with ApImg4Ticket
+	if bytes.Contains(data, []byte("ApImg4Ticket")) {
+		return extractManifestFromPlistShsh(data)
+	}
+
+	return nil, fmt.Errorf("no recognizable IM4M manifest found in SHSH blob")
+}
+
+func extractManifestFromRawData(data []byte, startIdx int) ([]byte, error) {
+	// Start from the IM4M signature
+	manifestStart := startIdx
+
+	// Parse ASN.1 structure to find the actual end of the manifest
+	// This is more robust than the simple search we had before
+	remainder := data[manifestStart:]
+
+	// Try to parse the ASN.1 structure to determine the correct length
+	var manifest img4Manifest
+	if _, err := asn1.Unmarshal(remainder, &manifest); err == nil {
+		// Successfully parsed - use the Raw content to get the exact bytes
+		return manifest.Raw, nil
+	}
+
+	// Fallback to the simple approach if ASN.1 parsing fails
+	manifestEnd := len(data)
+	for i := manifestStart + 4; i < len(data)-3; i++ {
+		if bytes.Equal(data[i:i+4], []byte("IM4R")) ||
+			bytes.Equal(data[i:i+4], []byte("IM4P")) {
+			manifestEnd = i
+			break
+		}
+	}
+
+	if manifestEnd <= manifestStart+4 {
+		return nil, fmt.Errorf("invalid manifest structure in SHSH blob")
+	}
+
+	return data[manifestStart:manifestEnd], nil
+}
+
+func extractManifestFromPlistShsh(data []byte) ([]byte, error) {
+	// SHSH blobs from TSS are plist files with ApImg4Ticket field
+	var shsh struct {
+		ApImg4Ticket []byte `plist:"ApImg4Ticket"`
+		Generator    string `plist:"generator,omitempty"`
+		BBTicket     []byte `plist:"BBTicket,omitempty"`
+	}
+	
+	// Try to decode as plist
+	decoder := plist.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&shsh); err != nil {
+		return nil, fmt.Errorf("failed to decode SHSH plist: %v", err)
+	}
+	
+	if len(shsh.ApImg4Ticket) == 0 {
+		return nil, fmt.Errorf("no ApImg4Ticket found in SHSH plist")
+	}
+	
+	// The ApImg4Ticket contains the raw IM4M manifest
+	return shsh.ApImg4Ticket, nil
+}
+
+// ValidateImg4Structure performs structural validation on an IMG4 file
+func ValidateImg4Structure(r io.Reader) (*ValidationResult, error) {
+	img, err := Parse(r)
+	if err != nil {
+		return &ValidationResult{
+			IsValid: false,
+			Errors:  []string{fmt.Sprintf("Failed to parse IMG4: %v", err)},
+		}, nil
+	}
+
+	result := &ValidationResult{
+		IsValid:    true,
+		Errors:     []string{},
+		Warnings:   []string{},
+		Structure:  "IMG4",
+		Components: []string{},
+	}
+
+	// Check for required components
+	if img.Name == "" {
+		result.IsValid = false
+		result.Errors = append(result.Errors, "Missing IMG4 name")
+	} else {
+		result.Components = append(result.Components, "name")
+	}
+
+	if img.Description == "" {
+		result.Warnings = append(result.Warnings, "Missing description")
+	}
+
+	// Check manifest properties
+	if len(img.Manifest.Properties) == 0 {
+		result.Warnings = append(result.Warnings, "No manifest properties found")
+	} else {
+		result.Components = append(result.Components, "manifest")
+
+		// Check for critical properties
+		criticalProps := []string{"CHIP", "BORD"}
+		for _, prop := range criticalProps {
+			if _, exists := img.Manifest.Properties[prop]; !exists {
+				result.Warnings = append(result.Warnings, fmt.Sprintf("Missing critical property: %s", prop))
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// ValidationResult holds the results of IMG4 structure validation
+type ValidationResult struct {
+	IsValid    bool
+	Structure  string
+	Components []string
+	Errors     []string
+	Warnings   []string
+}
+
+// DecryptPayload decrypts an IM4P payload using AES-CBC with provided IV and key
+func DecryptPayload(path, output string, iv, key []byte) error {
+	var r io.Reader
+
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("unable to open file %s: %v", path, err)
+	}
+	defer f.Close()
+
+	i, err := ParseIm4p(f)
+	if err != nil {
+		return fmt.Errorf("unable to parse IM4P: %v", err)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+
+	if len(i.Data) < aes.BlockSize {
+		return fmt.Errorf("IM4P data too short")
+	}
+
+	// CBC mode always works in whole blocks
+	if (len(i.Data) % aes.BlockSize) != 0 {
+		return fmt.Errorf("IM4P data is not a multiple of the block size")
+	}
+
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(i.Data, i.Data)
+
+	of, err := os.Create(output)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %v", output, err)
+	}
+	defer of.Close()
+
+	// Check for LZFSE compression and decompress if needed
+	if len(i.Data) >= 4 && bytes.Equal(i.Data[:4], []byte("bvx2")) {
+		log.Debug("Detected LZFSE compression")
+		decompressed := lzfse.DecodeBuffer(i.Data)
+		if len(decompressed) == 0 {
+			return fmt.Errorf("failed to LZFSE decompress %s", path)
+		}
+		r = bytes.NewReader(decompressed)
+	} else {
+		r = bytes.NewReader(i.Data)
+	}
+
+	if _, err = io.Copy(of, r); err != nil {
+		return fmt.Errorf("failed to decompress to file %s: %v", output, err)
+	}
+
+	return nil
+}
+
+// ExtractPayload extracts payload data from IMG4 or IM4P files with optional decompression
+func ExtractPayload(inputPath, outputPath string, isImg4 bool) error {
+	f, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %v", err)
+	}
+	defer f.Close()
+
+	var payloadData []byte
+
+	if isImg4 {
+		i, err := ParseImg4(f)
+		if err != nil {
+			return fmt.Errorf("failed to parse IMG4: %v", err)
+		}
+		payloadData = i.IM4P.Data
+	} else {
+		i, err := ParseIm4p(f)
+		if err != nil {
+			return fmt.Errorf("failed to parse IM4P: %v", err)
+		}
+		payloadData = i.Data
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(outputPath), err)
+	}
+
+	// Check for LZFSE compression and decompress if needed
+	if len(payloadData) >= 4 && bytes.Equal(payloadData[:4], []byte("bvx2")) {
+		log.Debug("Detected LZFSE compression")
+		decompressed := lzfse.DecodeBuffer(payloadData)
+		if len(decompressed) == 0 {
+			return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
+		}
+		payloadData = decompressed
+	}
+
+	return os.WriteFile(outputPath, payloadData, 0o660)
 }

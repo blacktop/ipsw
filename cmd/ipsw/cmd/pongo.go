@@ -35,10 +35,9 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/usb/pongo"
 	"github.com/spf13/cobra"
@@ -219,7 +218,7 @@ var pongoCmd = &cobra.Command{
 			for _, kbag := range kbags.Files {
 				fname := filepath.Join(destPath, kbag.Name)
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", fname+".dec"))
-				if err := icmd.DecryptPayload(fname, fname+".dec", kbag.Keybags[2].IV, kbag.Keybags[2].Key); err != nil {
+				if err := img4.DecryptPayload(fname, fname+".dec", kbag.Keybags[2].IV, kbag.Keybags[2].Key); err != nil {
 					return fmt.Errorf("failed to decrypt payload: %v", err)
 				}
 			}

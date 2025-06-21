@@ -71,7 +71,6 @@ var img4CreateCmd = &cobra.Command{
 		restoreInfoPath := viper.GetString("img4.create.restore-info")
 		outputPath := viper.GetString("img4.create.output")
 
-		// Set default output path if not specified
 		if outputPath == "" {
 			outputPath = filepath.Clean(payloadPath) + ".img4"
 		}
@@ -89,7 +88,6 @@ func createImg4(payloadPath, manifestPath, restoreInfoPath, outputPath string) e
 	var manifestData []byte
 	var restoreInfoData []byte
 
-	// Read manifest file if provided
 	if manifestPath != "" {
 		manifestData, err = os.ReadFile(manifestPath)
 		if err != nil {
@@ -97,7 +95,6 @@ func createImg4(payloadPath, manifestPath, restoreInfoPath, outputPath string) e
 		}
 	}
 
-	// Read restore info file if provided
 	if restoreInfoPath != "" {
 		restoreInfoData, err = os.ReadFile(restoreInfoPath)
 		if err != nil {
