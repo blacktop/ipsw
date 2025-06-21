@@ -27,6 +27,7 @@ import (
 	"archive/zip"
 	"crypto/aes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,9 +36,9 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/usb/pongo"
 	"github.com/spf13/cobra"
@@ -224,7 +225,7 @@ var pongoCmd = &cobra.Command{
 			}
 		}
 
-		kbJSON, err := kbags.MarshalJSON()
+		kbJSON, err := json.Marshal(kbags)
 		if err != nil {
 			return fmt.Errorf("failed to marshal keybags: %v", err)
 		}
