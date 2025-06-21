@@ -3,6 +3,7 @@ package kernelcache
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -186,15 +187,35 @@ func KextList(m *macho.File, diffable bool) ([]string, error) {
 		}
 	} else {
 		for _, bundle := range bundles {
+			var b string
 			if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
-				out = append(out, fmt.Sprintf("%#x: %s (%s)", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version))
+				b = fmt.Sprintf("%#x: %s", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID)
 			} else {
-				out = append(out, fmt.Sprintf("%#x: %s (%s)", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version))
+				b = fmt.Sprintf("%#x: %s", bundle.ExecutableLoadAddr, bundle.ID)
 			}
+			if len(bundle.Version) > 0 {
+				b += fmt.Sprintf(" (%s)", bundle.Version)
+			}
+			out = append(out, b)
 		}
 	}
 
 	sort.Strings(out)
 
 	return out, nil
+}
+
+// KextJSON returns the kernel extensions in the kernelcache as a JSON string
+func KextJSON(m *macho.File) (string, error) {
+	kexts, err := GetKexts(m)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.Marshal(kexts)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
