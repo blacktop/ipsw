@@ -412,7 +412,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to decode --key: %v", err)
 				}
 			}
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting and extracting to %s", outputPath))
+			utils.Indent(log.WithFields(log.Fields{
+				"path": outputPath,
+			}).Info, 2)("Decrypting Payload")
 			return img4.DecryptPayload(filePath, outputPath, iv, key)
 		}
 
@@ -427,7 +429,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 			utils.Indent(log.WithFields(log.Fields{
 				"bytes": im4p.ExtraDataSize,
 				"path":  outputPath,
-			}).Info, 2)("Extracting extra data")
+			}).Info, 2)("Extracting Extra Data")
 
 			extraData := im4p.GetExtraData()
 			if len(extraData) == 0 {
@@ -439,7 +441,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 
 		utils.Indent(log.WithFields(log.Fields{
 			"path": outputPath,
-		}).Info, 2)("Extracting payload")
+		}).Info, 2)("Extracting Payload")
 		if im4p.Encrypted {
 			utils.Indent(log.Warn, 3)("extracting encrypted IM4P payload")
 		}
