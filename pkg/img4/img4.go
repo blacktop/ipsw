@@ -610,7 +610,8 @@ func DetectFileType(r io.Reader) (string, error) {
 	return "", fmt.Errorf("unknown file type - not IMG4 or IM4P")
 }
 
-// SHSH Extraction Functions
+/* SHSH Extraction Functions */
+
 // ExtractManifestFromShsh extracts IM4M manifest from SHSH blob with proper ASN.1 parsing
 func ExtractManifestFromShsh(r io.Reader) ([]byte, error) {
 	data, err := io.ReadAll(r)
