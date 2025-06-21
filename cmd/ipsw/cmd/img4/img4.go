@@ -27,7 +27,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var (
+	colorField    = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+	colorSubField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
+)
 
 // Img4Cmd represents the img4 command
 var Img4Cmd = &cobra.Command{
