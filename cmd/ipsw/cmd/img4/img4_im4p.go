@@ -22,8 +22,6 @@ THE SOFTWARE.
 package img4
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,15 +51,15 @@ func init() {
 
 	// Info command flags
 	img4Im4pInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	img4Im4pInfoCmd.Flags().BoolP("verbose", "v", false, "Show detailed size information")
 	img4Im4pInfoCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4p.info.json", img4Im4pInfoCmd.Flags().Lookup("json"))
-	viper.BindPFlag("img4.im4p.info.verbose", img4Im4pInfoCmd.Flags().Lookup("verbose"))
 
 	// Extract command flags
 	img4Im4pExtractCmd.Flags().StringP("output", "o", "", "Output file path")
+	img4Im4pExtractCmd.Flags().BoolP("extra", "e", false, "Extract extra data")
 	img4Im4pExtractCmd.MarkFlagFilename("output")
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("img4.im4p.extract.extra", img4Im4pExtractCmd.Flags().Lookup("extra"))
 	viper.BindPFlag("img4.im4p.extract.output", img4Im4pExtractCmd.Flags().Lookup("output"))
 
 	// Create command flags
@@ -107,7 +105,6 @@ var img4Im4pInfoCmd = &cobra.Command{
 
 		filePath := args[0]
 		jsonOutput := viper.GetBool("img4.im4p.info.json")
-		verboseOutput := viper.GetBool("img4.im4p.info.verbose")
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -120,14 +117,15 @@ var img4Im4pInfoCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse IM4P: %v", err)
 		}
 
-		return displayDetailedIm4pInfo(im4p, filePath, jsonOutput, verboseOutput)
+		return displayIm4pInfo(im4p, filePath, jsonOutput, viper.GetBool("verbose"))
 	},
 }
 
 // img4Im4pExtractCmd represents the im4p extract command
 var img4Im4pExtractCmd = &cobra.Command{
 	Use:           "extract <IM4P>",
-	Short:         "Extract IM4P payload data",
+	Short:         "Extract IM4P data",
+	Long:          "Extract IM4P payload data or extra metadata.",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -140,9 +138,14 @@ var img4Im4pExtractCmd = &cobra.Command{
 
 		filePath := args[0]
 		outputPath := viper.GetString("img4.im4p.extract.output")
+		extractExtra := viper.GetBool("img4.im4p.extract.extra")
 
 		if outputPath == "" {
-			outputPath = filepath.Clean(filePath) + ".payload"
+			if extractExtra {
+				outputPath = filepath.Clean(filePath) + ".extra"
+			} else {
+				outputPath = filepath.Clean(filePath) + ".payload"
+			}
 		}
 
 		f, err := os.Open(filePath)
@@ -156,142 +159,45 @@ var img4Im4pExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse IM4P: %v", err)
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting payload to %s", outputPath))
-
-		// Auto-decompress if compressed
-		payloadData := im4p.Data
-		if compressionType, _ := detectCompression(im4p.Data); compressionType != "none" && compressionType != "unknown" {
-			utils.Indent(log.Info, 3)(fmt.Sprintf("Detected %s compression, decompressing...", compressionType))
-			switch compressionType {
-			case "lzfse", "lzvn":
-				if decompressed := lzfse.DecodeBuffer(im4p.Data); len(decompressed) > 0 {
-					payloadData = decompressed
-				}
-			case "lzss":
-				if decompressed := lzss.Decompress(im4p.Data); len(decompressed) > 0 {
-					payloadData = decompressed
-				}
+		if extractExtra {
+			if im4p.ExtraDataSize == 0 {
+				return fmt.Errorf("no extra data found in IM4P file")
 			}
-		}
 
-		return os.WriteFile(outputPath, payloadData, 0644)
-	},
-}
+			utils.Indent(log.WithFields(log.Fields{
+				"bytes": im4p.ExtraDataSize,
+				"path":  outputPath,
+			}).Info, 2)("Extracting extra data")
 
-func displayDetailedIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbose bool) error {
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to get file stats: %v", err)
-	}
-
-	compressedSize := len(im4p.Data)
-	fileSize := fileInfo.Size()
-
-	// Try to detect compression and get uncompressed size
-	compressionType := "unknown"
-	var uncompressedSize int64 = -1
-
-	if len(im4p.Data) > 0 {
-		compressionType, uncompressedSize = detectCompression(im4p.Data)
-	}
-
-	if jsonOutput {
-		data := map[string]any{
-			"file":             filepath.Base(filePath),
-			"name":             im4p.Name,
-			"fourcc":           im4p.Type,
-			"description":      im4p.Description,
-			"file_size":        fileSize,
-			"compressed_size":  compressedSize,
-			"compression_type": compressionType,
-		}
-
-		if verbose && uncompressedSize > 0 {
-			data["uncompressed_size"] = uncompressedSize
-		}
-
-		if len(im4p.Kbags) > 0 {
-			data["keybags"] = im4p.Kbags
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal IM4P info: %v", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
-		fmt.Printf("%s             %s\n", colorField("Name:"), im4p.Name)
-		fmt.Printf("%s           %s\n", colorField("FourCC:"), im4p.Type)
-		fmt.Printf("%s      %s\n", colorField("Description:"), im4p.Description)
-		fmt.Printf("%s        %s\n", colorField("File Size:"), humanize.Bytes(uint64(fileSize)))
-		fmt.Printf("%s  %s\n", colorField("Compressed Size:"), humanize.Bytes(uint64(compressedSize)))
-		fmt.Printf("%s      %s\n", colorField("Compression:"), compressionType)
-
-		if verbose && uncompressedSize > 0 {
-			fmt.Printf("%s %s\n", colorField("Uncompressed Size:"), humanize.Bytes(uint64(uncompressedSize)))
-		}
-
-		if len(im4p.Kbags) > 0 {
-			fmt.Printf("%s          %d\n", colorField("Keybags:"), len(im4p.Kbags))
-			for i, kb := range im4p.Kbags {
-				fmt.Printf("  [%d] %s %s\n", i, colorField("Type:"), kb.Type.String())
-				if verbose {
-					fmt.Printf("      %s   %x\n", colorField("IV:"), kb.IV)
-					fmt.Printf("      %s  %x\n", colorField("Key:"), kb.Key)
-				}
+			extraData := im4p.GetExtraData()
+			if len(extraData) == 0 {
+				return fmt.Errorf("extra data is empty")
 			}
+
+			return os.WriteFile(outputPath, extraData, 0644)
 		} else {
-			fmt.Printf("%s          None\n", colorField("Keybags:"))
+			utils.Indent(log.WithFields(log.Fields{
+				"path": outputPath,
+			}).Info, 2)("Extracting payload")
+			// Auto-decompress if compressed
+			payloadData := im4p.Data
+			if compressionType, _ := detectCompression(im4p.Data); compressionType != "none" && compressionType != "unknown" {
+				utils.Indent(log.Info, 3)(fmt.Sprintf("Detected %s compression, decompressing...", compressionType))
+				switch compressionType {
+				case "lzfse", "lzvn":
+					if decompressed := lzfse.DecodeBuffer(im4p.Data); len(decompressed) > 0 {
+						payloadData = decompressed
+					}
+				case "lzss":
+					if decompressed := lzss.Decompress(im4p.Data); len(decompressed) > 0 {
+						payloadData = decompressed
+					}
+				}
+			}
+
+			return os.WriteFile(outputPath, payloadData, 0644)
 		}
-	}
-
-	return nil
-}
-
-func detectCompression(data []byte) (string, int64) {
-	if len(data) < 4 {
-		return "none", -1
-	}
-
-	// Check for LZFSE magic
-	if bytes.Equal(data[:4], []byte("bvx2")) {
-		// Try to decompress to get uncompressed size
-		if decompressed := lzfse.DecodeBuffer(data); len(decompressed) > 0 {
-			return "lzfse", int64(len(decompressed))
-		}
-		return "lzfse", -1
-	}
-
-	// Check for LZVN magic
-	if len(data) >= 4 && bytes.Equal(data[:4], []byte("bvxn")) {
-		// Try to decompress to get uncompressed size
-		if decompressed := lzfse.DecodeBuffer(data); len(decompressed) > 0 {
-			return "lzvn", int64(len(decompressed))
-		}
-		return "lzvn", -1
-	}
-
-	// Check for LZSS compression (complzss magic)
-	if len(data) >= 8 && bytes.Equal(data[:8], []byte("complzss")) {
-		// Try to decompress to get uncompressed size
-		if decompressed := lzss.Decompress(data); len(decompressed) > 0 {
-			return "lzss", int64(len(decompressed))
-		}
-		return "lzss", -1
-	}
-
-	// Check for common uncompressed patterns
-	// Mach-O files start with magic numbers
-	if len(data) >= 4 {
-		magic := uint32(data[0]) | uint32(data[1])<<8 | uint32(data[2])<<16 | uint32(data[3])<<24
-		switch magic {
-		case 0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe:
-			return "none", int64(len(data))
-		}
-	}
-
-	return "unknown", -1
+	},
 }
 
 // img4Im4pCreateCmd represents the im4p create command
