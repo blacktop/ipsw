@@ -84,6 +84,7 @@ type Im4p struct {
 	Properties       map[string]any // Parsed properties like kcep, kclf, etc.
 	ExtraDataSize    int            // Size of extra data (like trailing metadata)
 	ExtraDataBytes   []byte         // The actual extra data bytes that were separated
+	Encrypted        bool           // Whether the IM4P is encrypted
 }
 
 type im4p struct {
@@ -469,6 +470,9 @@ func ParseIm4p(r io.Reader) (*Im4p, error) {
 		if _, err := asn1.Unmarshal(i.KbagData, &i.Kbags); err != nil {
 			return nil, fmt.Errorf("failed to ASN.1 parse Im4p KBAG: %v", err)
 		}
+		if len(i.Kbags) > 0 {
+			i.Encrypted = true
+		}
 	}
 
 	// Parse extra data if present (may contain uncompressed size)
@@ -597,13 +601,6 @@ func detectExtraDataAdvanced(data []byte) int {
 		return extraSize
 	}
 
-	// Strategy 3: Scan for null-padded regions (important for non-aligned extra data)
-	// This technique can find extra data of any size, not just common alignments
-	if extraSize := detectNullPaddedExtraData(data); extraSize > 0 {
-		return extraSize
-	}
-
-	// Strategy 4: Look for page-aligned boundaries (common in Apple firmware)
 	// Apple often aligns extra data to 4KB or 16KB boundaries
 	pageAlignedSizes := []int{
 		// Most common sizes observed in practice
@@ -625,6 +622,13 @@ func detectExtraDataAdvanced(data []byte) int {
 		if isExtraData(candidate) {
 			return size
 		}
+	}
+
+	// Strategy 4: Scan for null-padded regions (conservative approach)
+	// This technique can find extra data of any size, not just common alignments
+	// Made more conservative to reduce false positives
+	if extraSize := detectNullPaddedExtraData(data); extraSize > 0 {
+		return extraSize
 	}
 
 	return 0
@@ -945,7 +949,7 @@ func detectNullPaddedExtraData(data []byte) int {
 	// Scan backwards from the end to find where null padding starts
 	nullStart := -1
 	consecutiveNulls := 0
-	minNullSequence := 512 // Minimum sequence of nulls to consider as padding
+	minNullSequence := 4096 // Minimum sequence of nulls to consider as padding
 
 	for i := len(data) - 1; i >= 0; i-- {
 		if data[i] == 0 {
@@ -1262,14 +1266,32 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 
 // CreateIm4p creates a new IM4P structure
 func CreateIm4p(name, fourcc, description string, data []byte, kbags []Keybag) *Im4p {
+	return CreateIm4pWithExtra(name, fourcc, description, data, kbags, nil)
+}
+
+// CreateIm4pWithExtra creates an IM4P structure with optional extra data
+func CreateIm4pWithExtra(name, fourcc, description string, data []byte, kbags []Keybag, extraData []byte) *Im4p {
+	// If extra data is provided, append it to the main data
+	finalData := data
+	if len(extraData) > 0 {
+		finalData = append(data, extraData...)
+	}
+
 	im4pStruct := &Im4p{
 		im4p: im4p{
 			Name:        name,
 			Type:        fourcc,
 			Description: description,
-			Data:        data,
+			Data:        finalData,
 		},
 		Kbags: kbags,
+	}
+
+	// Store extra data information for reference
+	if len(extraData) > 0 {
+		im4pStruct.ExtraDataSize = len(extraData)
+		im4pStruct.ExtraDataBytes = make([]byte, len(extraData))
+		copy(im4pStruct.ExtraDataBytes, extraData)
 	}
 
 	// If there are keybags, marshal them to KbagData
@@ -1289,11 +1311,16 @@ func MarshalIm4p(im4p *Im4p) ([]byte, error) {
 
 // CreateIm4pFile creates a complete IM4P file from raw data
 func CreateIm4pFile(fourcc, description string, data []byte) ([]byte, error) {
+	return CreateIm4pFileWithExtra(fourcc, description, data, nil)
+}
+
+// CreateIm4pFileWithExtra creates a complete IM4P file from raw data with optional extra data
+func CreateIm4pFileWithExtra(fourcc, description string, data []byte, extraData []byte) ([]byte, error) {
 	if len(fourcc) != 4 {
 		return nil, fmt.Errorf("FourCC must be exactly 4 characters, got %d: %s", len(fourcc), fourcc)
 	}
 
-	im4pStruct := CreateIm4p("IM4P", fourcc, description, data, nil)
+	im4pStruct := CreateIm4pWithExtra("IM4P", fourcc, description, data, nil, extraData)
 	return MarshalIm4p(im4pStruct)
 }
 
