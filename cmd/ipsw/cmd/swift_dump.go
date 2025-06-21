@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -94,7 +95,6 @@ var swiftDumpCmd = &cobra.Command{
 
 		var m *macho.File
 		var s *mcmd.Swift
-		var err error
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -129,7 +129,7 @@ var swiftDumpCmd = &cobra.Command{
 		}
 
 		doDemangle := viper.GetBool("swift-dump.demangle")
-		
+
 		// Auto-enable demangle and interface when headers is specified
 		if viper.GetBool("swift-dump.headers") {
 			doDemangle = true
@@ -152,10 +152,12 @@ var swiftDumpCmd = &cobra.Command{
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
 			machoPath := filepath.Clean(args[0])
-			m, err = mcmd.OpenFatMachO(machoPath, viper.GetString("swift-dump.arch"))
+			mr, err := mcmd.OpenMachO(machoPath, viper.GetString("swift-dump.arch"))
 			if err != nil {
 				return err
 			}
+			defer mr.Close()
+			m = mr.File
 			if viper.GetBool("swift-dump.deps") {
 				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
 			}

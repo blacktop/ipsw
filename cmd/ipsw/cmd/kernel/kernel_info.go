@@ -93,10 +93,12 @@ var kernelInfoCmd = &cobra.Command{
 			return err
 		}
 
-		kern, err := mcmd.OpenFatMachO(kernelPath, selectedArch)
+		kr, err := mcmd.OpenMachO(kernelPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer kr.Close()
+		kern := kr.File
 
 		if kern.FileTOC.FileHeader.Type == types.MH_FILESET {
 			var label string

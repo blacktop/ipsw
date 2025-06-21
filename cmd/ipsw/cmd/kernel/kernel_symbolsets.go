@@ -78,10 +78,12 @@ var symbolsetsCmd = &cobra.Command{
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
 
-		m, err := mcmd.OpenFatMachO(args[0], selectedArch)
+		mr, err := mcmd.OpenMachO(args[0], selectedArch)
 		if err != nil {
 			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
 		}
+		defer mr.Close()
+		m := mr.File
 
 		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 			m, err = m.GetFileSetFileByName("com.apple.kernel")

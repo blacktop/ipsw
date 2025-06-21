@@ -27,9 +27,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"github.com/apex/log"
 
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -111,7 +111,6 @@ var classDumpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var m *macho.File
 		var o *mcmd.ObjC
-		var err error
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -169,10 +168,12 @@ var classDumpCmd = &cobra.Command{
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
 			machoPath := filepath.Clean(args[0])
-			m, err = mcmd.OpenFatMachO(machoPath, viper.GetString("class-dump.arch"))
+			mr, err := mcmd.OpenMachO(machoPath, viper.GetString("class-dump.arch"))
 			if err != nil {
 				return err
 			}
+			defer mr.Close()
+			m = mr.File
 			if viper.GetBool("class-dump.deps") {
 				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
 			}

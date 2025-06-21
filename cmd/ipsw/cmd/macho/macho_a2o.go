@@ -79,10 +79,12 @@ var machoA2oCmd = &cobra.Command{
 		machoPath := filepath.Clean(args[0])
 
 		// Use the helper to handle fat/universal files
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		off, err := m.GetOffset(addr)
 		if err != nil {

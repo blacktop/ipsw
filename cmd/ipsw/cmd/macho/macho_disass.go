@@ -172,10 +172,12 @@ var machoDisassCmd = &cobra.Command{
 			return fmt.Errorf("failed to detect file type: %v", err)
 		}
 
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
 			return fmt.Errorf("can only disassemble arm64 binaries")

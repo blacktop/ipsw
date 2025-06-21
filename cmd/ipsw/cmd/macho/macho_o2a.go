@@ -78,10 +78,12 @@ var machoO2aCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		address, err := m.GetVMAddress(offset)
 		if err != nil {

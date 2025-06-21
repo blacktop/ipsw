@@ -24,10 +24,11 @@ package macho
 import (
 	"fmt"
 	"path/filepath"
+
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/go-macho/types"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
@@ -70,10 +71,12 @@ var machoA2sCmd = &cobra.Command{
 		}
 
 		// Use the helper to handle fat/universal files
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {

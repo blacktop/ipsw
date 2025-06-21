@@ -629,7 +629,7 @@ func (s *Swift) Interface() error {
 	if s.conf.Headers {
 		return s.WriteHeaders()
 	}
-	
+
 	// TODO: Implement single file interface generation
 	return fmt.Errorf("single file interface generation not implemented yet")
 }
@@ -672,13 +672,13 @@ func (s *Swift) WriteHeaders() error {
 						sout = swift.DemangleSimpleBlob(typ.String())
 					}
 				}
-				
+
 				// Create a safe filename from the type name
 				safeName := strings.ReplaceAll(typ.Name, ".", "_")
 				safeName = strings.ReplaceAll(safeName, "<", "_")
 				safeName = strings.ReplaceAll(safeName, ">", "_")
 				safeName = strings.ReplaceAll(safeName, " ", "_")
-				
+
 				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+".swift")
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
@@ -711,13 +711,13 @@ func (s *Swift) WriteHeaders() error {
 						sout = swift.DemangleSimpleBlob(proto.String())
 					}
 				}
-				
+
 				// Create a safe filename from the protocol name
 				safeName := strings.ReplaceAll(proto.Name, ".", "_")
 				safeName = strings.ReplaceAll(safeName, "<", "_")
 				safeName = strings.ReplaceAll(safeName, ">", "_")
 				safeName = strings.ReplaceAll(safeName, " ", "_")
-				
+
 				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Protocol.swift")
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
@@ -750,13 +750,13 @@ func (s *Swift) WriteHeaders() error {
 						sout = swift.DemangleSimpleBlob(ext.String())
 					}
 				}
-				
+
 				// Create a safe filename from the extension info
 				safeName := strings.ReplaceAll(ext.Protocol, ".", "_")
 				safeName = strings.ReplaceAll(safeName, "<", "_")
 				safeName = strings.ReplaceAll(safeName, ">", "_")
 				safeName = strings.ReplaceAll(safeName, " ", "_")
-				
+
 				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Extension.swift")
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
@@ -789,13 +789,13 @@ func (s *Swift) WriteHeaders() error {
 						sout = swift.DemangleSimpleBlob(at.String())
 					}
 				}
-				
+
 				// Create a safe filename from the associated type info
 				safeName := strings.ReplaceAll(at.ConformingTypeName, ".", "_")
 				safeName = strings.ReplaceAll(safeName, "<", "_")
 				safeName = strings.ReplaceAll(safeName, ">", "_")
 				safeName = strings.ReplaceAll(safeName, " ", "_")
-				
+
 				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-AssociatedType.swift")
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
