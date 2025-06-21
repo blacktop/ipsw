@@ -61,8 +61,7 @@ func init() {
 	// Extract command flags
 	img4Im4pExtractCmd.Flags().StringP("output", "o", "", "Output file path")
 	img4Im4pExtractCmd.Flags().BoolP("extra", "e", false, "Extract extra data")
-	img4Im4pExtractCmd.Flags().BoolP("kbag", "b", false, "Extract keybags")
-	img4Im4pExtractCmd.Flags().BoolP("json", "j", false, "Output keybags as JSON")
+	img4Im4pExtractCmd.Flags().BoolP("kbag", "b", false, "Extract keybags as JSON")
 	img4Im4pExtractCmd.Flags().String("iv-key", "", "AES iv+key for decryption")
 	img4Im4pExtractCmd.Flags().StringP("iv", "i", "", "AES iv for decryption")
 	img4Im4pExtractCmd.Flags().StringP("key", "k", "", "AES key for decryption")
@@ -70,7 +69,6 @@ func init() {
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4p.extract.extra", img4Im4pExtractCmd.Flags().Lookup("extra"))
 	viper.BindPFlag("img4.im4p.extract.kbag", img4Im4pExtractCmd.Flags().Lookup("kbag"))
-	viper.BindPFlag("img4.im4p.extract.json", img4Im4pExtractCmd.Flags().Lookup("json"))
 	viper.BindPFlag("img4.im4p.extract.output", img4Im4pExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("img4.im4p.extract.iv-key", img4Im4pExtractCmd.Flags().Lookup("iv-key"))
 	viper.BindPFlag("img4.im4p.extract.iv", img4Im4pExtractCmd.Flags().Lookup("iv"))
@@ -306,16 +304,12 @@ var img4Im4pExtractCmd = &cobra.Command{
 		outputPath := viper.GetString("img4.im4p.extract.output")
 		extractExtra := viper.GetBool("img4.im4p.extract.extra")
 		extractKbag := viper.GetBool("img4.im4p.extract.kbag")
-		asJSON := viper.GetBool("img4.im4p.extract.json")
 		ivkeyStr := viper.GetString("img4.im4p.extract.iv-key")
 		ivStr := viper.GetString("img4.im4p.extract.iv")
 		keyStr := viper.GetString("img4.im4p.extract.key")
 		// validate flags
 		if extractExtra && extractKbag {
 			return fmt.Errorf("cannot specify both --extra and --kbag")
-		}
-		if extractKbag && !asJSON && len(outputPath) > 0 {
-			return fmt.Errorf("cannot specify --output with --kbag when not using --json")
 		}
 		// Check if decryption is requested
 		needsDecryption := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0
@@ -355,32 +349,25 @@ var img4Im4pExtractCmd = &cobra.Command{
 			if len(im4p.Kbags) == 0 {
 				return fmt.Errorf("no keybags found in IM4P")
 			}
-			if asJSON {
-				dat, err := json.Marshal(&struct {
-					Name        string        `json:"name,omitempty"`
-					Description string        `json:"description,omitempty"`
-					Keybags     []img4.Keybag `json:"keybags,omitempty"`
-				}{
-					Name:        filepath.Base(args[0]),
-					Description: im4p.Description,
-					Keybags:     im4p.Kbags,
-				})
-				if err != nil {
-					return fmt.Errorf("failed to marshal im4g kbag: %v", err)
-				}
-				if viper.IsSet("img4.im4p.extract.output") {
-					utils.Indent(log.WithFields(log.Fields{
-						"path": outputPath,
-					}).Info, 2)("Writing keybags JSON to file")
-					return os.WriteFile(outputPath, dat, 0644)
-				} else {
-					fmt.Println(string(dat))
-				}
+			dat, err := json.Marshal(&struct {
+				Name        string        `json:"name,omitempty"`
+				Description string        `json:"description,omitempty"`
+				Keybags     []img4.Keybag `json:"keybags,omitempty"`
+			}{
+				Name:        filepath.Base(args[0]),
+				Description: im4p.Description,
+				Keybags:     im4p.Kbags,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to marshal im4g kbag: %v", err)
+			}
+			if viper.IsSet("img4.im4p.extract.output") {
+				utils.Indent(log.WithFields(log.Fields{
+					"path": outputPath,
+				}).Info, 2)("Writing keybags JSON to file")
+				return os.WriteFile(outputPath, dat, 0644)
 			} else {
-				fmt.Println("Keybags:")
-				for _, kb := range im4p.Kbags {
-					fmt.Println(kb)
-				}
+				fmt.Println(string(dat))
 			}
 			return nil
 		}
