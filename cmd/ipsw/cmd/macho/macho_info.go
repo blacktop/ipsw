@@ -97,15 +97,14 @@ func init() {
 	machoInfoCmd.RegisterFlagCompletionFunc("fileset-entry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if ok, _ := magic.IsMachO(args[0]); ok {
 			// Use non-interactive mode for shell completion
-			m, err := mcmd.OpenFatMachOWithConfig(args[0], &mcmd.FatConfig{
-				Interactive: false,
-			})
+			m, err := mcmd.OpenMachO(args[0], "")
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+			defer m.Close()
+			if m.File.FileTOC.FileHeader.Type == types.MH_FILESET {
 				var filesetEntries []string
-				for _, fe := range m.FileSets() {
+				for _, fe := range m.File.FileSets() {
 					filesetEntries = append(filesetEntries, fe.EntryID)
 				}
 				return filesetEntries, cobra.ShellCompDirectiveNoFileComp
@@ -246,10 +245,12 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		// Use the helper to handle fat/universal files
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		if dumpCert {
 			if cs := m.CodeSignature(); cs != nil {

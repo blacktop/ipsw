@@ -85,10 +85,12 @@ var ctfdumpCmd = &cobra.Command{
 		}
 
 		// Use the helper to handle fat/universal files
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		m1, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer m1.Close()
+		m = m1.File
 
 		c, err := ctf.Parse(m)
 		if err != nil {
@@ -117,12 +119,14 @@ var ctfdumpCmd = &cobra.Command{
 			}
 
 			// Use the helper to handle fat/universal files
-			m2, err = mcmd.OpenFatMachO(machoPath2, selectedArch)
+			mr, err := mcmd.OpenMachO(machoPath2, selectedArch)
 			if err != nil {
 				return err
 			}
+			defer mr.Close()
+			m = mr.File
 
-			c2, err := ctf.Parse(m2)
+			c2, err := ctf.Parse(m)
 			if err != nil {
 				return err
 			}

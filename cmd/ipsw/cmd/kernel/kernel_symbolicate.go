@@ -143,13 +143,13 @@ var kernelSymbolicateCmd = &cobra.Command{
 			match := 0
 			miss := 0
 			log.Warn("Testing symbol matches")
-			m, err := mcmd.OpenFatMachO(args[0] + ".dSYM/Contents/Resources/DWARF/" + filepath.Base(args[0]), selectedArch)
+			m, err := mcmd.OpenMachO(args[0]+".dSYM/Contents/Resources/DWARF/"+filepath.Base(args[0]), selectedArch)
 			if err != nil {
 				return fmt.Errorf("failed to open kernelcache: %v", err)
 			}
 			defer m.Close()
 			for addr, sym := range smap {
-				syms, err := m.FindAddressSymbols(addr)
+				syms, err := m.File.FindAddressSymbols(addr)
 				if err != nil {
 					log.WithError(err).Errorf("symbol '%s' with addr %#x not found in kernelcache", sym, addr)
 					continue
@@ -167,7 +167,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 							log.Infof("✅ Symbol '%s' matches", sym)
 						}
 					default:
-						// log.Debug(s.String(m))
+						// log.Debug(s.String(m.File))
 					}
 				}
 				if matched {

@@ -56,13 +56,13 @@ var kernelMigCmd = &cobra.Command{
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
 
-		m, err := mcmd.OpenFatMachO(filepath.Clean(args[0]), selectedArch)
+		m, err := mcmd.OpenMachO(filepath.Clean(args[0]), selectedArch)
 		if err != nil {
 			return err
 		}
 		defer m.Close()
 
-		migs, err := kernelcache.GetMigSubsystems(m)
+		migs, err := kernelcache.GetMigSubsystems(m.File)
 		if err != nil {
 			return fmt.Errorf("failed to get mig subsystems (only tested on macOS 15.0/iOS 18.0): %v", err)
 		}

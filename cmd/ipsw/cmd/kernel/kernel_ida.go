@@ -154,11 +154,12 @@ var kernelIdaCmd = &cobra.Command{
 			}
 		}
 
-		m, err := mcmd.OpenFatMachO(kcPath, selectedArch)
+		mr, err := mcmd.OpenMachO(kcPath, selectedArch)
 		if err != nil {
 			return fmt.Errorf("failed to open kernelcache %s: %w", kcPath, err)
 		}
-		defer m.Close()
+		defer mr.Close()
+		m := mr.File
 
 		device := filepath.Ext(kcPath)[1:]
 		fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
@@ -244,7 +245,7 @@ var kernelIdaCmd = &cobra.Command{
 			return err
 		}
 
-		m.Close() // close the kernelcache file so IDA can open it
+		mr.Close() // close the kernelcache file so IDA can open it
 
 		if err := ctrlc.Default.Run(ctx, func() error {
 			if viper.GetBool("kernel.ida.docker") {

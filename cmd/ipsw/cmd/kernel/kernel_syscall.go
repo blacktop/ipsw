@@ -72,13 +72,13 @@ var syscallCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		m, err := mcmd.OpenFatMachO(machoPath, selectedArch)
+		m, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
 		defer m.Close()
 
-		syscalls, err := kernelcache.GetSyscallTable(m)
+		syscalls, err := kernelcache.GetSyscallTable(m.File)
 		if err != nil {
 			return err
 		}

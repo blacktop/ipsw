@@ -23,7 +23,6 @@ package kernel
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/apex/log"
@@ -60,33 +59,29 @@ var kextsCmd = &cobra.Command{
 		diff, _ := cmd.Flags().GetBool("diff")
 		selectedArch, _ := cmd.Flags().GetString("arch")
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
-		}
-
 		if diff {
 			if len(args) < 2 {
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
 
-			m1, err := mcmd.OpenFatMachO(args[0], selectedArch)
+			m1, err := mcmd.OpenMachO(args[0], selectedArch)
 			if err != nil {
 				return err
 			}
 			defer m1.Close()
 
-			kout1, err := kernelcache.KextList(m1, true)
+			kout1, err := kernelcache.KextList(m1.File, true)
 			if err != nil {
 				return err
 			}
 
-			m2, err := mcmd.OpenFatMachO(args[1], selectedArch)
+			m2, err := mcmd.OpenMachO(args[1], selectedArch)
 			if err != nil {
 				return err
 			}
 			defer m2.Close()
 
-			kout2, err := kernelcache.KextList(m2, true)
+			kout2, err := kernelcache.KextList(m2.File, true)
 			if err != nil {
 				return err
 			}
@@ -105,13 +100,13 @@ var kextsCmd = &cobra.Command{
 			log.Info("Differences found")
 			fmt.Println(out)
 		} else {
-			m, err := mcmd.OpenFatMachO(args[0], selectedArch)
+			m, err := mcmd.OpenMachO(args[0], selectedArch)
 			if err != nil {
 				return err
 			}
 			defer m.Close()
 
-			kout, err := kernelcache.KextList(m, false)
+			kout, err := kernelcache.KextList(m.File, false)
 			if err != nil {
 				return err
 			}

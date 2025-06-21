@@ -82,29 +82,30 @@ var kerExtractCmd = &cobra.Command{
 			folder = extractPath
 		}
 
-		m, err := mcmd.OpenFatMachO(kernPath, selectedArch)
+		m, err := mcmd.OpenMachO(kernPath, selectedArch)
 		if err != nil {
 			return fmt.Errorf("failed to open kernelcache: %v", err)
 		}
+		defer m.Close()
 
-		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
+		if m.File.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT-xtraction not supported yet)")
 		}
 
 		var dcf *fixupchains.DyldChainedFixups
-		if m.HasFixups() {
-			dcf, err = m.DyldChainedFixups()
+		if m.File.HasFixups() {
+			dcf, err = m.File.DyldChainedFixups()
 			if err != nil {
 				return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
 			}
 		}
 
-		baseAddress := m.GetBaseAddress()
+		baseAddress := m.File.GetBaseAddress()
 
 		if dumpAll {
 			log.Info("Extracting all KEXTs...")
-			for _, fse := range m.FileSets() {
-				mfse, err := m.GetFileSetFileByName(fse.EntryID)
+			for _, fse := range m.File.FileSets() {
+				mfse, err := m.File.GetFileSetFileByName(fse.EntryID)
 				if err != nil {
 					return fmt.Errorf("failed to parse KEXT %s: %v", fse.EntryID, err)
 				}
@@ -114,12 +115,12 @@ var kerExtractCmd = &cobra.Command{
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", filepath.Join(folder, fse.EntryID)))
 			}
 		} else {
-			m, err = m.GetFileSetFileByName(args[1])
+			mfse, err := m.File.GetFileSetFileByName(args[1])
 			if err != nil {
 				return fmt.Errorf("failed to parse KEXT %s: %v", args[1], err)
 			}
 
-			if err := m.Export(filepath.Join(folder, args[1]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
+			if err := mfse.Export(filepath.Join(folder, args[1]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
 				return fmt.Errorf("failed to export KEXT %s; %v", args[1], err)
 			}
 			log.Infof("Created %s", filepath.Join(folder, args[1]))

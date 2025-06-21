@@ -109,10 +109,12 @@ var machoDumpCmd = &cobra.Command{
 
 		var m *macho.File
 
-		m, err = mcmd.OpenFatMachO(machoPath, selectedArch)
+		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer mr.Close()
+		m = mr.File
 
 		if len(filesetEntry) > 0 && m.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("macho is not a MH_FILESET")

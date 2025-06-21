@@ -64,13 +64,13 @@ var kernelMachCmd = &cobra.Command{
 			log.Warn("development kernelcache detected: 'MACH_ASSERT=1' so 'mach_trap_t' has an extra 'const char *mach_trap_name' field which will throw off the parsing of the mach_traps table")
 		}
 
-		m, err := mcmd.OpenFatMachO(machoPath, selectedArch)
+		m, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
 		defer m.Close()
 
-		machTraps, err := kernelcache.GetMachTrapTable(m)
+		machTraps, err := kernelcache.GetMachTrapTable(m.File)
 		if err != nil {
 			return err
 		}

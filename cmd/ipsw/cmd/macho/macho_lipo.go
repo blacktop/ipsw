@@ -72,25 +72,18 @@ var lipoCmd = &cobra.Command{
 		}
 
 		// Use the helper to handle fat/universal files
-		var fat *macho.FatFile
-		var farchPtr *macho.FatArch
-		_, err = mcmd.OpenFatMachOWithConfig(machoPath, &mcmd.FatConfig{
-			Arch:        selectedArch,
-			Interactive: true,
-			FatFile:     &fat,
-			FatArch:     &farchPtr,
-		})
+		m, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
-		defer fat.Close()
-		
+		defer m.Close()
+
 		// Check if we have a fat file (lipo only works on fat files)
-		if fat == nil {
+		if m.FatFile == nil {
 			return fmt.Errorf("input file is not a universal/fat MachO")
 		}
-		
-		farch = *farchPtr
+
+		farch = *m.FatArch
 
 		f, err := os.Open(machoPath)
 		if err != nil {

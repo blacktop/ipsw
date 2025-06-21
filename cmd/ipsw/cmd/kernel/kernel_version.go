@@ -64,12 +64,13 @@ var kernelVersionCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		m, err := mcmd.OpenFatMachO(machoPath, selectedArch)
+		m, err := mcmd.OpenMachO(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
+		defer m.Close()
 
-		kv, err := kernelcache.GetVersion(m)
+		kv, err := kernelcache.GetVersion(m.File)
 		if err != nil {
 			return err
 		}
