@@ -468,7 +468,7 @@ func (p protocolISAFixup) String() string {
 type SelectorReferenceFixup uint32
 
 func (s SelectorReferenceFixup) String() string {
-	return fmt.Sprintf("offset: %#x, %s", s, chainEntry(s))
+	return fmt.Sprintf("offset: %#x, %s", uint32(s), chainEntry(s))
 }
 
 type chainEntry uint32
