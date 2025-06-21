@@ -407,7 +407,11 @@ func OpenIm4p(path string) (*Im4p, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close file: %v", err)
+		}
+	}()
 	return ParseIm4p(f)
 }
 
@@ -422,8 +426,8 @@ func ParseIm4p(r io.Reader) (*Im4p, error) {
 		return nil, fmt.Errorf("failed to ASN.1 parse Im4p: %v", err)
 	}
 
-	if i.im4p.KbagData != nil {
-		if _, err := asn1.Unmarshal(i.im4p.KbagData, &i.Kbags); err != nil {
+	if i.KbagData != nil {
+		if _, err := asn1.Unmarshal(i.KbagData, &i.Kbags); err != nil {
 			return nil, fmt.Errorf("failed to ASN.1 parse Im4p KBAG: %v", err)
 		}
 	}
@@ -436,7 +440,11 @@ func OpenImg4(path string) (*img4, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close file: %v", err)
+		}
+	}()
 	return ParseImg4(f)
 }
 
@@ -509,7 +517,9 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 				Name:    filepath.Base(f.Name),
 				Keybags: im4p.Kbags,
 			})
-			rc.Close()
+			if err := rc.Close(); err != nil {
+				log.Errorf("failed to close zipped file %s: %v", f.Name, err)
+			}
 		}
 	}
 
@@ -531,7 +541,7 @@ func CreateIm4p(name, fourcc, description string, data []byte, kbags []Keybag) *
 	// If there are keybags, marshal them to KbagData
 	if len(kbags) > 0 {
 		if kbagData, err := asn1.Marshal(kbags); err == nil {
-			im4pStruct.im4p.KbagData = kbagData
+			im4pStruct.KbagData = kbagData
 		}
 	}
 
@@ -748,7 +758,11 @@ func DecryptPayload(path, output string, iv, key []byte) error {
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close file: %v", err)
+		}
+	}()
 
 	i, err := ParseIm4p(f)
 	if err != nil {
@@ -776,6 +790,14 @@ func validateDecryptionInputs(data, iv, key []byte) error {
 		return fmt.Errorf("IM4P data is not a multiple of the block size")
 	}
 
+	if len(iv) != aes.BlockSize {
+		return fmt.Errorf("IV must be %d bytes, got %d", aes.BlockSize, len(iv))
+	}
+
+	if len(key) == 0 {
+		return fmt.Errorf("key cannot be empty")
+	}
+
 	return nil
 }
 
@@ -795,7 +817,11 @@ func writeDecryptedOutput(data []byte, output, inputPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %v", output, err)
 	}
-	defer of.Close()
+	defer func() {
+		if err := of.Close(); err != nil {
+			log.Errorf("failed to close file: %v", err)
+		}
+	}()
 
 	var r io.Reader
 
@@ -824,7 +850,11 @@ func ExtractPayload(inputPath, outputPath string, isImg4 bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close file: %v", err)
+		}
+	}()
 
 	payloadData, err := extractPayloadData(f, isImg4)
 	if err != nil {
