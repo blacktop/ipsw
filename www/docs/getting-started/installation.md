@@ -61,17 +61,23 @@ sudo port install ipsw
 ## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_macOS_universal.tar.gz
-tar xzf ipsw_3.1.199_macOS_universal.tar.gz
+# Download latest release (replace VERSION with current version from releases page)
+wget https://github.com/blacktop/ipsw/releases/latest/download/ipsw_$(curl -s https://api.github.com/repos/blacktop/ipsw/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4 | tr -d 'v')_macOS_universal.tar.gz
+tar xzf ipsw_*.tar.gz
 ```
+
+:::tip Quick Install
+You can also visit the [releases page](https://github.com/blacktop/ipsw/releases/latest) to download the latest version directly.
+:::
 
 ### Extras Version
 
 Want to use the `ipsw dyld emu` *(w/ [unicorn](https://www.unicorn-engine.org) emulator)* or the `ipsw idev` cmds that require `libusb` ? *(grab the **extras** version from the [releases](https://github.com/blacktop/ipsw/releases) page)*
 
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.220/ipsw_3.1.221_macOS_arm64_extras.tar.gz
-tar xzf ipsw_3.1.221_macOS_arm64_extras.tar.gz
+# Download latest extras version
+wget https://github.com/blacktop/ipsw/releases/latest/download/ipsw_$(curl -s https://api.github.com/repos/blacktop/ipsw/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4 | tr -d 'v')_macOS_arm64_extras.tar.gz
+tar xzf ipsw_*_extras.tar.gz
 ```
 
 :::info 
@@ -83,8 +89,9 @@ The `extras` version is what is installed via homebrew by default.
 Want to use the `ipsw frida` cmd to trace ObjC methods ? *(grab the **frida** version from the [releases](https://github.com/blacktop/ipsw/releases) page)*
 
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.221/ipsw_3.1.221_macOS_arm64_frida.tar.gz
-tar xzf ipsw_3.1.221_macOS_arm64_frida.tar.gz
+# Download latest frida version  
+wget https://github.com/blacktop/ipsw/releases/latest/download/ipsw_$(curl -s https://api.github.com/repos/blacktop/ipsw/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4 | tr -d 'v')_macOS_arm64_frida.tar.gz
+tar xzf ipsw_*_frida.tar.gz
 ```
 
 :::caution 
@@ -125,8 +132,9 @@ See [github:blacktop/nur](https://github.com/blacktop/nur)
 ## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_linux_x86_64.tar.gz
-tar xzf ipsw_3.1.199_linux_x86_64.tar.gz
+# Download latest Linux release
+wget https://github.com/blacktop/ipsw/releases/latest/download/ipsw_$(curl -s https://api.github.com/repos/blacktop/ipsw/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4 | tr -d 'v')_linux_x86_64.tar.gz
+tar xzf ipsw_*.tar.gz
 ```
 
 ## Required tools for mounting DMGs
@@ -206,8 +214,10 @@ choco install ipsw
 ## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
-wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_windows_x86_64.tar.gz
-tar xzf ipsw_3.1.199_windows_x86_64.tar.gz
+# Download latest Windows release
+# You can also visit https://github.com/blacktop/ipsw/releases/latest to download manually
+curl -L https://github.com/blacktop/ipsw/releases/latest/download/ipsw_$(curl -s https://api.github.com/repos/blacktop/ipsw/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4 | tr -d 'v')_windows_x86_64.tar.gz -o ipsw_windows.tar.gz
+tar xzf ipsw_windows.tar.gz
 ```
 
 ```mdx-code-block

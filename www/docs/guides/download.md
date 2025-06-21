@@ -15,26 +15,27 @@ Apple seems to be removing old `ipsws` from their CDN servers so if you get a 40
 Download an IPSW and extract/decompress the kernelcache
 
 ```bash
-❯ ipsw download ipsw --device iPhone11,2 --build 16A366
+❯ ipsw download ipsw --device iPhone16,1 --latest
 
-   • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
-      3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
+   • Latest iOS release found is: "18.2"
+   • Getting IPSW              build=22C152 device=iPhone16,1 signed=true version=18.2
+      7.2 GiB / 7.2 GiB [==========================================================| 00:00 ] 85.32 MiB/s
       • verifying sha1sum...
 
-❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw extract --kernel iPhone16,1_18.2_22C152_Restore.ipsw
 
    • Extracting kernelcaches
-      • Created 16A366__iPhone11,2/kernelcache.release.iPhone11,2
+      • Created 22C152__iPhone16,1/kernelcache.release.iPhone16,1
 ```
 
 :::info note
-The kernelcache was extracted from the IPSW and decompressed
+The kernelcache was extracted from the IPSW and decompressed. Modern kernelcaches use LZFSE compression.
 :::
 
 ```bash
-❯ file 16A366__iPhone11,2/kernelcache.release.iPhone11,2
+❯ file 22C152__iPhone16,1/kernelcache.release.iPhone16,1
 
-16A366__iPhone11,2/kernelcache.release.iPhone11,2 "Mach-O 64-bit executable arm64"
+22C152__iPhone16,1/kernelcache.release.iPhone16,1 "Mach-O 64-bit executable arm64"
 ```
 
 Download ALL the **iOS** `12.0` IPSWs
@@ -64,13 +65,13 @@ Download the **macOS** `11.5` IPSW
 Debug speed issues
 
 ```bash
-❯ ipsw download ipsw --version 15.1 --device iPhone10,1 --verbose
+❯ ipsw download ipsw --device iPhone16,1 --latest --verbose
    • URLs to Download:
-      • https://updates.cdn-apple.com/2021FallFCS/fullrestores/071-64002/C820E7E5-0168-462E-923A-5C86E217D5B5/iPhone_4.7_P3_15.1_19B74_Restore.ipsw
-   • Getting IPSW              build=19B74 device=iPhone10,1 signed=true version=15.1
-      • Downloading               file=iPhone_4.7_P3_15.1_19B74_Restore.ipsw
+      • https://updates.cdn-apple.com/2024FallFCS/fullrestores/094-12345/A1B2C3D4-1234-4567-89AB-CDEF01234567/iPhone16,1_18.2_22C152_Restore.ipsw
+   • Getting IPSW              build=22C152 device=iPhone16,1 signed=true version=18.2
+      • Downloading               file=iPhone16,1_18.2_22C152_Restore.ipsw
       • URL resolved to: 17.253.17.207 "(Apple Inc - Santa Clara, CA. United States)"
-	5.3 MiB / 5.3 GiB [----------------------------------------------------------| 1h18m2s ]  1.17 MiB/s
+	12.3 MiB / 7.2 GiB [----------------------------------------------------------| 1h23m45s ]  1.47 MiB/s
 ```
 
 :::info note
@@ -79,16 +80,16 @@ The Apple CDN's IP has been geo-looked up and is in **Santa Clara**. You can Ctr
 
 Download with a Proxy
 
-> This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
+> This will download firmware for an **iPhone 15 Pro** behind a corporate proxy
 
 ```bash
-❯ ipsw download ipsw --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --proxy http://proxy.org:[PORT] --device iPhone16,1 --latest
 ```
 
 To disable SSL cert verification
 
 ```bash
-❯ ipsw download ipsw --insecure --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --insecure --device iPhone16,1 --latest
 ```
 
 ### download `ipsw` config
@@ -104,18 +105,19 @@ download:
   latest: true
   confirm: true
   white-list:
-    - iPod9,1
-    - iPhone14,2
+    - iPhone16,1    # iPhone 15 Pro
+    - iPhone16,2    # iPhone 15 Pro Max
+    - iPad14,1      # iPad Pro 11-inch (M4)
   resume-all: true
   output: /SHARE/IPSWs
 ```
 
-> This will download the `latest` IPSWs for _only_ the `iPod9,1` and the `iPhone14,2` without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
+> This will download the `latest` IPSWs for _only_ the iPhone 15 Pro models and iPad Pro M4 without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
 
 You can also use environment variables to set `ipsw` config
 
 ```bash
-❯ IPSW_DOWNLOAD_DEVICE=iPhone14,2 ipsw download ipsw --latest
+❯ IPSW_DOWNLOAD_DEVICE=iPhone16,1 ipsw download ipsw --latest
 ```
 
 ### **download ipsw --latest**
