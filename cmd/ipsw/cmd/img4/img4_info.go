@@ -24,6 +24,7 @@ package img4
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -34,7 +35,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
 
 func init() {
 	Img4Cmd.AddCommand(img4InfoCmd)
@@ -77,7 +77,7 @@ var img4InfoCmd = &cobra.Command{
 		}
 
 		// Reset file pointer and try IM4P
-		f.Seek(0, 0)
+		f.Seek(0, io.SeekStart)
 		if im4p, err := img4.ParseIm4p(f); err == nil {
 			return displayIm4pInfo(im4p, filePath, jsonOutput, verboseOutput)
 		} else {
@@ -88,7 +88,7 @@ var img4InfoCmd = &cobra.Command{
 
 func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) error {
 	if jsonOutput {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"file":        filepath.Base(filePath),
 			"type":        "IMG4",
 			"name":        img.Name,
@@ -136,7 +136,7 @@ func displayIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbose bool)
 	fileSize := fileInfo.Size()
 
 	if jsonOutput {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"file":        filepath.Base(filePath),
 			"type":        "IM4P",
 			"name":        im4p.Name,
@@ -165,7 +165,7 @@ func displayIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbose bool)
 
 		if verbose {
 			fmt.Printf("%s %s\n", colorField("Compressed Size:"), humanize.Bytes(uint64(compressedSize)))
-			
+
 			if len(im4p.Kbags) > 0 {
 				fmt.Printf("\n%s\n", colorField("Keybags:"))
 				for i, kb := range im4p.Kbags {

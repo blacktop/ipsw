@@ -30,7 +30,6 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/lzfse-cgo"
@@ -53,11 +52,11 @@ func init() {
 	})
 	img4ExtractCmd.Flags().Bool("raw", false, "Extract raw data without decompression")
 	img4ExtractCmd.MarkFlagDirname("output")
+	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.extract.img4", img4ExtractCmd.Flags().Lookup("img4"))
 	viper.BindPFlag("img4.extract.output", img4ExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("img4.extract.component", img4ExtractCmd.Flags().Lookup("component"))
 	viper.BindPFlag("img4.extract.raw", img4ExtractCmd.Flags().Lookup("raw"))
-	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // img4ExtractCmd represents the extract command
@@ -105,7 +104,7 @@ var img4ExtractCmd = &cobra.Command{
 			return extractRawPayload(filePath, outFile, isImg4)
 		}
 
-		return icmd.ExtractPayload(filePath, outFile, isImg4)
+		return img4.ExtractPayload(filePath, outFile, isImg4)
 	},
 }
 

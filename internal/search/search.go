@@ -15,7 +15,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
-	icmd "github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
@@ -273,7 +273,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 	}
 
 	for _, im4p := range im4ps {
-		if err := icmd.ExtractPayload(im4p, im4p, false); err != nil {
+		if err := img4.ExtractPayload(im4p, im4p, false); err != nil {
 			return fmt.Errorf("failed to extract im4p payload: %v", err)
 		}
 		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4p) {

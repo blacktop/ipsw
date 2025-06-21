@@ -27,16 +27,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/lzfse-cgo"
+	"github.com/blacktop/lzss"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var compressionTypes = []string{"lzfse", "lzss", "none"}
 
 func init() {
 	Img4Cmd.AddCommand(img4Im4pCmd)
@@ -50,24 +55,26 @@ func init() {
 	img4Im4pInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	img4Im4pInfoCmd.Flags().BoolP("verbose", "v", false, "Show detailed size information")
 	img4Im4pInfoCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("img4.im4p.info.json", img4Im4pInfoCmd.Flags().Lookup("json"))
+	viper.BindPFlag("img4.im4p.info.verbose", img4Im4pInfoCmd.Flags().Lookup("verbose"))
 
 	// Extract command flags
 	img4Im4pExtractCmd.Flags().StringP("output", "o", "", "Output file path")
 	img4Im4pExtractCmd.MarkFlagFilename("output")
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("img4.im4p.extract.output", img4Im4pExtractCmd.Flags().Lookup("output"))
 
 	// Create command flags
 	img4Im4pCreateCmd.Flags().StringP("fourcc", "f", "", "FourCC type (required)")
 	img4Im4pCreateCmd.Flags().StringP("description", "d", "", "Description string")
 	img4Im4pCreateCmd.Flags().StringP("output", "o", "", "Output file path")
-	img4Im4pCreateCmd.Flags().Bool("compress", false, "Compress payload with LZFSE")
+	img4Im4pCreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("Compress payload (%s)", strings.Join(compressionTypes, ", ")))
+	img4Im4pCreateCmd.RegisterFlagCompletionFunc("compress", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return compressionTypes, cobra.ShellCompDirectiveDefault
+	})
 	img4Im4pCreateCmd.MarkFlagRequired("fourcc")
 	img4Im4pCreateCmd.MarkFlagFilename("output")
 	img4Im4pCreateCmd.MarkZshCompPositionalArgumentFile(1)
-
-	viper.BindPFlag("img4.im4p.info.json", img4Im4pInfoCmd.Flags().Lookup("json"))
-	viper.BindPFlag("img4.im4p.info.verbose", img4Im4pInfoCmd.Flags().Lookup("verbose"))
-	viper.BindPFlag("img4.im4p.extract.output", img4Im4pExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("img4.im4p.create.fourcc", img4Im4pCreateCmd.Flags().Lookup("fourcc"))
 	viper.BindPFlag("img4.im4p.create.description", img4Im4pCreateCmd.Flags().Lookup("description"))
 	viper.BindPFlag("img4.im4p.create.output", img4Im4pCreateCmd.Flags().Lookup("output"))
@@ -151,12 +158,27 @@ var img4Im4pExtractCmd = &cobra.Command{
 
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting payload to %s", outputPath))
 
-		return os.WriteFile(outputPath, im4p.Data, 0644)
+		// Auto-decompress if compressed
+		payloadData := im4p.Data
+		if compressionType, _ := detectCompression(im4p.Data); compressionType != "none" && compressionType != "unknown" {
+			utils.Indent(log.Info, 3)(fmt.Sprintf("Detected %s compression, decompressing...", compressionType))
+			switch compressionType {
+			case "lzfse", "lzvn":
+				if decompressed := lzfse.DecodeBuffer(im4p.Data); len(decompressed) > 0 {
+					payloadData = decompressed
+				}
+			case "lzss":
+				if decompressed := lzss.Decompress(im4p.Data); len(decompressed) > 0 {
+					payloadData = decompressed
+				}
+			}
+		}
+
+		return os.WriteFile(outputPath, payloadData, 0644)
 	},
 }
 
 func displayDetailedIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbose bool) error {
-	// Get file stats
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to get file stats: %v", err)
@@ -174,7 +196,7 @@ func displayDetailedIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbo
 	}
 
 	if jsonOutput {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"file":             filepath.Base(filePath),
 			"name":             im4p.Name,
 			"fourcc":           im4p.Type,
@@ -250,6 +272,15 @@ func detectCompression(data []byte) (string, int64) {
 		return "lzvn", -1
 	}
 
+	// Check for LZSS compression (complzss magic)
+	if len(data) >= 8 && bytes.Equal(data[:8], []byte("complzss")) {
+		// Try to decompress to get uncompressed size
+		if decompressed := lzss.Decompress(data); len(decompressed) > 0 {
+			return "lzss", int64(len(decompressed))
+		}
+		return "lzss", -1
+	}
+
 	// Check for common uncompressed patterns
 	// Mach-O files start with magic numbers
 	if len(data) >= 4 {
@@ -281,7 +312,7 @@ var img4Im4pCreateCmd = &cobra.Command{
 		fourcc := viper.GetString("img4.im4p.create.fourcc")
 		description := viper.GetString("img4.im4p.create.description")
 		outputPath := viper.GetString("img4.im4p.create.output")
-		compress := viper.GetBool("img4.im4p.create.compress")
+		compressionType := viper.GetString("img4.im4p.create.compress")
 
 		if len(fourcc) != 4 {
 			return fmt.Errorf("FourCC must be exactly 4 characters, got %d: %s", len(fourcc), fourcc)
@@ -294,12 +325,17 @@ var img4Im4pCreateCmd = &cobra.Command{
 		if description == "" {
 			description = fmt.Sprintf("Generated IM4P for %s", fourcc)
 		}
+		if compressionType == "" {
+			if !slices.Contains(compressionTypes, compressionType) {
+				return fmt.Errorf("unsupported compression type: %s (supported: %s)", compressionType, strings.Join(compressionTypes, ", "))
+			}
+		}
 
-		return createIm4p(inputPath, outputPath, fourcc, description, compress)
+		return createIm4p(inputPath, outputPath, fourcc, description, compressionType)
 	},
 }
 
-func createIm4p(inputPath, outputPath, fourcc, description string, compress bool) error {
+func createIm4p(inputPath, outputPath, fourcc, description, compressionType string) error {
 	inputData, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %v", err)
@@ -307,18 +343,41 @@ func createIm4p(inputPath, outputPath, fourcc, description string, compress bool
 
 	originalSize := len(inputData)
 	payloadData := inputData
+	actualCompressionType := "none"
 
-	if compress {
-		utils.Indent(log.Debug, 2)("Compressing payload with LZFSE...")
-		compressedData := lzfse.EncodeBuffer(inputData)
+	// Normalize compression type input
+	compressionType = strings.ToLower(strings.TrimSpace(compressionType))
+
+	switch compressionType {
+	case "lzss":
+		utils.Indent(log.Debug, 2)("Compressing payload with LZSS...")
+		compressedData := lzss.Compress(inputData)
 		if len(compressedData) > 0 && len(compressedData) < len(inputData) {
 			payloadData = compressedData
+			actualCompressionType = "LZSS"
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Compression: %d → %d bytes (%.1f%% reduction)",
 				originalSize, len(compressedData),
 				float64(originalSize-len(compressedData))/float64(originalSize)*100))
 		} else {
-			utils.Indent(log.Debug, 2)("Compression ineffective, using original data")
+			utils.Indent(log.Debug, 2)("LZSS compression ineffective, using original data")
 		}
+	case "lzfse":
+		utils.Indent(log.Debug, 2)("Compressing payload with LZFSE...")
+		compressedData := lzfse.EncodeBuffer(inputData)
+		if len(compressedData) > 0 && len(compressedData) < len(inputData) {
+			payloadData = compressedData
+			actualCompressionType = "LZFSE"
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Compression: %d → %d bytes (%.1f%% reduction)",
+				originalSize, len(compressedData),
+				float64(originalSize-len(compressedData))/float64(originalSize)*100))
+		} else {
+			utils.Indent(log.Debug, 2)("LZFSE compression ineffective, using original data")
+		}
+	case "none", "":
+		// No compression
+		utils.Indent(log.Debug, 2)("No compression requested")
+	default:
+		return fmt.Errorf("unsupported compression type: %s (supported: lzfse, lzss, none)", compressionType)
 	}
 
 	asn1Data, err := img4.CreateIm4pFile(fourcc, description, payloadData)
@@ -336,9 +395,9 @@ func createIm4p(inputPath, outputPath, fourcc, description string, compress bool
 	fmt.Printf("%s  %s\n", colorField("Description:"), description)
 	fmt.Printf("%s   %s\n", colorField("Input Size:"), humanize.Bytes(uint64(originalSize)))
 
-	if compress {
+	if actualCompressionType != "none" {
 		fmt.Printf("%s %s\n", colorField("Payload Size:"), humanize.Bytes(uint64(len(payloadData))))
-		fmt.Printf("%s  %s\n", colorField("Compression:"), "LZFSE")
+		fmt.Printf("%s  %s\n", colorField("Compression:"), actualCompressionType)
 	}
 
 	fmt.Printf("%s    %s\n", colorField("IM4P Size:"), humanize.Bytes(uint64(len(asn1Data))))
