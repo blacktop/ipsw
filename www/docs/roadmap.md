@@ -50,7 +50,7 @@
 - [ ] **Memory Optimization** - Handle massive firmware files efficiently
 - [ ] **Incremental Analysis** - Smart caching and diff-based updates
 - [ ] **Parallel Downloads** - Faster firmware acquisition with [aria2](https://github.com/ynsgnr/aria2go)
-- [ ] Speed up JSON encode/decode with [simdjson-go](github.com/minio/simdjson-go)
+- [ ] Speed up JSON encode/decode with [simdjson-go](https://github.com/minio/simdjson-go)
 
 ## 🔮 Future Vision
 
