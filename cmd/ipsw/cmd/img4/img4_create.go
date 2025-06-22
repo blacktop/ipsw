@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/MakeNowJust/heredoc"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -88,14 +88,28 @@ var img4CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create an IMG4 file",
 	Example: heredoc.Doc(`
-		# Create IMG4 from IM4P
-		❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore-info.im4r --output output.img4
+		# Create IMG4 from existing IM4P with manifest and restore info
+		❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4
 
-		# Create IMG4 from raw input
-		❯ ipsw img4 create --input payload.bin --fourcc 0x494d4450 --description "Payload" --lzss --output output.img4
+		# Create IMG4 from raw kernel with LZSS compression and manifest
+		❯ ipsw img4 create --input kernelcache --fourcc krnl --description "Kernelcache" --lzss --im4m manifest.im4m --output kernel.img4
 
-		# Create IMG4 from raw input with LZFSE compression
-		❯ ipsw img4 create --input payload.bin --fourcc 0x494d4450 --description "Payload" --lzfse --output output.img4`),
+		# Create IMG4 with boot nonce (generates IM4R automatically)
+		❯ ipsw img4 create --input sep-firmware.bin --fourcc sepi --boot-nonce 1234567890abcdef --im4m manifest.im4m --output sep.img4
+
+		# Create IMG4 with extra data (extra data requires --lzss compression)
+		❯ ipsw img4 create --input payload.bin --fourcc logo --lzss --extra extra.bin --im4m manifest.im4m --output logo.img4
+
+		# Create unsigned IMG4 (no manifest) - for testing only
+		❯ ipsw img4 create --input test.bin --fourcc test --description "Test payload" --output test.img4
+
+		# Create IMG4 from iBoot with specific compression
+		❯ ipsw img4 create --input iboot.raw --fourcc ibot --description "iBoot" --lzfse --im4m iboot.im4m --output iboot.img4
+
+		# Create IMG4 from raw data with common FourCC codes
+		❯ ipsw img4 create --input kernelcache.bin --fourcc krnl --lzss --im4m manifest.im4m --output kernel.img4
+		❯ ipsw img4 create --input devicetree.bin --fourcc dtre --lzss --im4m manifest.im4m --output devicetree.img4
+		❯ ipsw img4 create --input ramdisk.dmg --fourcc rdsk --lzss --im4m manifest.im4m --output ramdisk.img4`),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
