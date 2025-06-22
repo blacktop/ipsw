@@ -26,13 +26,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
@@ -51,46 +54,36 @@ func init() {
 
 	// Info command flags
 	img4Im4mInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	img4Im4mInfoCmd.Flags().BoolP("verbose", "v", false, "Show detailed information")
 	img4Im4mInfoCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4m.info.json", img4Im4mInfoCmd.Flags().Lookup("json"))
-	viper.BindPFlag("img4.im4m.info.verbose", img4Im4mInfoCmd.Flags().Lookup("verbose"))
 
 	// Extract command flags
 	img4Im4mExtractCmd.Flags().StringP("output", "o", "", "Output file path")
-	img4Im4mExtractCmd.Flags().Bool("shsh", false, "Extract from SHSH blob")
+	img4Im4mExtractCmd.Flags().BoolP("update", "u", false, "Extract update Image4 manifest (if available)")
+	img4Im4mExtractCmd.Flags().BoolP("no-nonce", "n", false, "Extract no-nonce Image4 manifest (if available)")
 	img4Im4mExtractCmd.MarkFlagFilename("output")
 	img4Im4mExtractCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4m.extract.output", img4Im4mExtractCmd.Flags().Lookup("output"))
-	viper.BindPFlag("img4.im4m.extract.shsh", img4Im4mExtractCmd.Flags().Lookup("shsh"))
+	viper.BindPFlag("img4.im4m.extract.update", img4Im4mExtractCmd.Flags().Lookup("update"))
+	viper.BindPFlag("img4.im4m.extract.no-nonce", img4Im4mExtractCmd.Flags().Lookup("no-nonce"))
 
 	// Verify command flags
-	img4Im4mVerifyCmd.Flags().StringP("input", "i", "", "Input IM4M manifest file")
 	img4Im4mVerifyCmd.Flags().StringP("build-manifest", "b", "", "Build manifest file for verification")
-	img4Im4mVerifyCmd.Flags().BoolP("verbose", "v", false, "Verbose verification output")
-	img4Im4mVerifyCmd.MarkFlagRequired("input")
+	img4Im4mVerifyCmd.Flags().Bool("allow-extra", false, "Allow IM4M to have properties not in build manifest")
 	img4Im4mVerifyCmd.MarkFlagRequired("build-manifest")
-	img4Im4mVerifyCmd.MarkFlagFilename("input")
 	img4Im4mVerifyCmd.MarkFlagFilename("build-manifest")
-	viper.BindPFlag("img4.im4m.verify.input", img4Im4mVerifyCmd.Flags().Lookup("input"))
 	viper.BindPFlag("img4.im4m.verify.build-manifest", img4Im4mVerifyCmd.Flags().Lookup("build-manifest"))
-	viper.BindPFlag("img4.im4m.verify.verbose", img4Im4mVerifyCmd.Flags().Lookup("verbose"))
+	viper.BindPFlag("img4.im4m.verify.allow-extra", img4Im4mVerifyCmd.Flags().Lookup("allow-extra"))
 
 	// Personalize command flags
-	img4Im4mPersonalizeCmd.Flags().StringP("input", "i", "", "Input IMG4 file")
 	img4Im4mPersonalizeCmd.Flags().StringP("output", "o", "", "Output personalized IMG4 file")
 	img4Im4mPersonalizeCmd.Flags().String("ecid", "", "Device ECID for personalization")
 	img4Im4mPersonalizeCmd.Flags().String("nonce", "", "Device nonce for personalization")
-	img4Im4mPersonalizeCmd.Flags().BoolP("verbose", "v", false, "Verbose personalization output")
-	img4Im4mPersonalizeCmd.MarkFlagRequired("input")
 	img4Im4mPersonalizeCmd.MarkFlagRequired("output")
-	img4Im4mPersonalizeCmd.MarkFlagFilename("input")
 	img4Im4mPersonalizeCmd.MarkFlagFilename("output")
-	viper.BindPFlag("img4.im4m.personalize.input", img4Im4mPersonalizeCmd.Flags().Lookup("input"))
 	viper.BindPFlag("img4.im4m.personalize.output", img4Im4mPersonalizeCmd.Flags().Lookup("output"))
 	viper.BindPFlag("img4.im4m.personalize.ecid", img4Im4mPersonalizeCmd.Flags().Lookup("ecid"))
 	viper.BindPFlag("img4.im4m.personalize.nonce", img4Im4mPersonalizeCmd.Flags().Lookup("nonce"))
-	viper.BindPFlag("img4.im4m.personalize.verbose", img4Im4mPersonalizeCmd.Flags().Lookup("verbose"))
 }
 
 // img4Im4mCmd represents the im4m command group
@@ -105,7 +98,7 @@ var img4Im4mCmd = &cobra.Command{
 
 // img4Im4mInfoCmd represents the im4m info command
 var img4Im4mInfoCmd = &cobra.Command{
-	Use:           "info <IMG4>",
+	Use:           "info <IM4M>",
 	Short:         "Display IM4M manifest information",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
@@ -119,7 +112,6 @@ var img4Im4mInfoCmd = &cobra.Command{
 
 		filePath := args[0]
 		jsonOutput := viper.GetBool("img4.im4m.info.json")
-		verboseOutput := viper.GetBool("img4.im4m.info.verbose")
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -127,63 +119,102 @@ var img4Im4mInfoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		img, err := img4.Parse(f)
+		manifest, err := img4.ParseIm4m(f)
 		if err != nil {
-			return fmt.Errorf("failed to parse IMG4: %v", err)
+			return fmt.Errorf("failed to parse IM4M: %v", err)
 		}
-
-		return displayIm4mInfo(img, filePath, jsonOutput, verboseOutput)
+		return displayIm4mInfoFromManifest(manifest, filePath, jsonOutput, viper.GetBool("verbose"))
 	},
 }
 
-func displayIm4mInfo(img *img4.Img4, filePath string, jsonOutput, verbose bool) error {
+// displayIm4mInfoFromManifest displays info for a standalone IM4M manifest
+func displayIm4mInfoFromManifest(manifest *img4.Manifest, filePath string, jsonOutput, verbose bool) error {
 	if jsonOutput {
 		data := map[string]any{
-			"file":       filepath.Base(filePath),
-			"version":    img.Manifest.Version,
-			"properties": img.Manifest.Properties,
+			"file":           filepath.Base(filePath),
+			"version":        manifest.Version,
+			"properties":     manifest.Properties,
+			"property_count": len(manifest.Properties),
 		}
-
-		if verbose {
-			// Add raw manifest data if available
-			data["raw_manifest"] = fmt.Sprintf("%x", img.Manifest.ApImg4Ticket.Bytes)
+		if len(manifest.ApImg4Ticket.Bytes) > 0 {
+			data["raw_manifest"] = fmt.Sprintf("%x", manifest.ApImg4Ticket.Bytes)
+			data["manifest_size"] = len(manifest.ApImg4Ticket.Bytes)
 		}
-
+		if len(manifest.Images) > 0 {
+			images := make(map[string]any)
+			for _, image := range manifest.Images {
+				images[image.Name] = image.Properties
+			}
+			data["images"] = images
+			data["image_count"] = len(manifest.Images)
+		}
 		jsonData, err := json.MarshalIndent(data, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal IM4M info: %v", err)
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
-		fmt.Printf("%s %d\n", colorField("Manifest Version:"), img.Manifest.Version)
+		fmt.Printf("%s %s\n", colorField("Name:"), manifest.Name)
+		fmt.Printf("%s %d\n", colorField("Manifest Version:"), manifest.Version)
 
-		fmt.Printf("\n%s\n", colorField("Manifest Properties:"))
-		for key, value := range img.Manifest.Properties {
-			switch v := value.(type) {
-			case []byte:
-				if verbose {
-					fmt.Printf("  %s: %x\n", key, v)
-				} else {
-					fmt.Printf("  %s: <data:%d bytes>\n", key, len(v))
+		if len(manifest.ApImg4Ticket.Bytes) > 0 {
+			fmt.Printf("%s %s\n", colorField("Manifest Size:"), humanize.Bytes(uint64(len(manifest.ApImg4Ticket.Bytes))))
+		}
+		fmt.Printf("%s (count=%d)\n", colorField("Manifest Properties:"), len(manifest.Properties))
+		displayManifestProperties(manifest.Properties, verbose)
+		if len(manifest.Images) > 0 {
+			fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(manifest.Images))
+			for _, image := range manifest.Images {
+				fmt.Printf("  %s:\n", colorSubField(image.Name))
+				for propName, propValue := range image.Properties {
+					fmt.Printf("    %s: %v\n", colorField(propName), propValue)
 				}
-			default:
-				fmt.Printf("  %s: %v\n", key, v)
 			}
 		}
-
-		if verbose {
-			fmt.Printf("\n%s %d bytes\n", colorField("Raw Manifest:"), len(img.Manifest.ApImg4Ticket.Bytes))
+		if verbose && len(manifest.ApImg4Ticket.Bytes) > 0 {
+			fmt.Printf("%s %d bytes\n", colorField("Raw Manifest Data:"), len(manifest.ApImg4Ticket.Bytes))
+			if len(manifest.ApImg4Ticket.Bytes) > 0 {
+				previewLen := min(len(manifest.ApImg4Ticket.Bytes), 32)
+				fmt.Printf("%s %x...\n", colorField("Raw Manifest Preview:"), manifest.ApImg4Ticket.Bytes[:previewLen])
+			}
 		}
 	}
 
 	return nil
 }
 
+// displayManifestProperties displays manifest properties in a consistent format
+func displayManifestProperties(properties img4.ManifestProperties, verbose bool) {
+	// Sort properties for consistent output
+	var sortedKeys []string
+	for key := range properties {
+		sortedKeys = append(sortedKeys, key)
+	}
+	slices.Sort(sortedKeys)
+
+	for _, key := range sortedKeys {
+		value := properties[key]
+		switch v := value.(type) {
+		case []byte:
+			if verbose {
+				fmt.Printf("  %s: %x\n", colorSubField(key), v)
+			} else {
+				fmt.Printf("  %s: <data:%d bytes>\n", colorSubField(key), len(v))
+			}
+		case int, int64, uint64:
+			fmt.Printf("  %s: %v (0x%x)\n", colorSubField(key), v, v)
+		case bool:
+			fmt.Printf("  %s: %v\n", colorSubField(key), v)
+		default:
+			fmt.Printf("  %s: %v\n", colorSubField(key), v)
+		}
+	}
+}
+
 // img4Im4mExtractCmd represents the im4m extract command
 var img4Im4mExtractCmd = &cobra.Command{
-	Use:           "extract <IMG4|SHSH>",
-	Short:         "Extract IM4M manifest from IMG4 or SHSH blob",
+	Use:           "extract <IM4M>",
+	Short:         "Extract IM4M manifest from SHSH blob",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -196,10 +227,17 @@ var img4Im4mExtractCmd = &cobra.Command{
 
 		filePath := args[0]
 		outputPath := viper.GetString("img4.im4m.extract.output")
-		isShsh := viper.GetBool("img4.im4m.extract.shsh")
+		extractUpdate := viper.GetBool("img4.im4m.extract.update")
+		extractNoNonce := viper.GetBool("img4.im4m.extract.no-nonce")
 
 		if outputPath == "" {
-			outputPath = filepath.Clean(filePath) + ".im4m"
+			suffix := ".im4m"
+			if extractUpdate {
+				suffix = ".update.im4m"
+			} else if extractNoNonce {
+				suffix = ".no-nonce.im4m"
+			}
+			outputPath = filepath.Clean(filePath) + suffix
 		}
 
 		f, err := os.Open(filePath)
@@ -208,21 +246,9 @@ var img4Im4mExtractCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		var manifestData []byte
-
-		if isShsh {
-			// Extract manifest from SHSH blob using enhanced pkg function
-			manifestData, err = img4.ExtractManifestFromShsh(f)
-			if err != nil {
-				return fmt.Errorf("failed to extract manifest from SHSH blob: %v", err)
-			}
-		} else {
-			// Extract manifest from IMG4
-			rawImg4, err := img4.ParseImg4(f)
-			if err != nil {
-				return fmt.Errorf("failed to parse IMG4: %v", err)
-			}
-			manifestData = rawImg4.Manifest.Bytes
+		manifestData, err := img4.ExtractManifestFromShshWithOptions(f, extractUpdate, extractNoNonce)
+		if err != nil {
+			return fmt.Errorf("failed to extract manifest from SHSH blob: %v", err)
 		}
 
 		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
@@ -235,8 +261,9 @@ var img4Im4mExtractCmd = &cobra.Command{
 
 // img4Im4mVerifyCmd represents the im4m verify command
 var img4Im4mVerifyCmd = &cobra.Command{
-	Use:           "verify",
+	Use:           "verify <IM4M>",
 	Short:         "Verify IM4M manifest against build manifest",
+	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -246,49 +273,56 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		inputPath := viper.GetString("img4.im4m.verify.input")
 		buildManifestPath := viper.GetString("img4.im4m.verify.build-manifest")
-		verboseOutput := viper.GetBool("img4.im4m.verify.verbose")
 
-		fmt.Printf("%s        %s\n", colorField("Input Manifest:"), filepath.Base(inputPath))
-		fmt.Printf("%s     %s\n", colorField("Build Manifest:"), filepath.Base(buildManifestPath))
-
-		// Parse the input IM4M manifest
-		inputFile, err := os.Open(inputPath)
+		inputFile, err := os.Open(args[0])
 		if err != nil {
-			return fmt.Errorf("failed to open input manifest %s: %v", inputPath, err)
+			return fmt.Errorf("failed to open input manifest %s: %v", args[0], err)
 		}
 		defer inputFile.Close()
 
-		inputImg, err := img4.Parse(inputFile)
+		// Try to parse as standalone IM4M first
+		inputManifest, err := img4.ParseIm4m(inputFile)
 		if err != nil {
-			return fmt.Errorf("failed to parse input manifest: %v", err)
+			return fmt.Errorf("failed to parse input IM4M manifest: %v", err)
 		}
 
 		// Parse the build manifest (could be IMG4 or standalone IM4M)
-		buildFile, err := os.Open(buildManifestPath)
+		bm, err := os.Open(buildManifestPath)
 		if err != nil {
 			return fmt.Errorf("failed to open build manifest %s: %v", buildManifestPath, err)
 		}
-		defer buildFile.Close()
+		defer bm.Close()
 
-		// Try to parse as IMG4 first, fall back to direct IM4M parsing
-		var buildManifest *img4.Img4
-		if buildImg, err := img4.Parse(buildFile); err == nil {
-			buildManifest = buildImg
+		// Try to parse as IMG4 first, fall back to BuildManifest.plist
+		var buildProperties img4.ManifestProperties
+
+		if buildImg, err := img4.Parse(bm); err == nil {
+			buildProperties = buildImg.Manifest.Properties
 		} else {
-			// If it's not an IMG4, try to parse it as a PLIST build manifest
-			// For now, we'll return an error indicating unsupported format
-			return fmt.Errorf("build manifest parsing not yet fully implemented - currently supports IMG4 format only")
+			// Try to parse as standalone IM4M
+			bm.Seek(0, io.SeekStart) // Reset file pointer
+			if buildManifest, err := img4.ParseIm4m(bm); err == nil {
+				buildProperties = buildManifest.Properties
+			} else {
+				// Try to parse as BuildManifest.plist
+				bm.Seek(0, io.SeekStart) // Reset file pointer
+				props, err := parseBuildManifestPlist(bm)
+				if err != nil {
+					return fmt.Errorf("failed to parse build manifest: %v", err)
+				}
+				buildProperties = props
+			}
 		}
 
-		// Perform verification
-		result, err := verifyManifestProperties(inputImg, buildManifest, verboseOutput)
+		result, err := verifyManifestProperties(inputManifest, buildProperties, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
 		if err != nil {
 			return fmt.Errorf("verification failed: %v", err)
 		}
 
-		// Display results
+		fmt.Printf("%s           %s\n", colorField("Input Manifest:"), filepath.Base(args[0]))
+		fmt.Printf("%s         %s\n", colorField("Build Manifest:"), filepath.Base(buildManifestPath))
+
 		if result.IsValid {
 			fmt.Printf("\n%s ✓ Manifest verification %s\n",
 				color.New(color.FgGreen).Sprint("SUCCESS:"),
@@ -302,11 +336,12 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		fmt.Printf("%s   %d properties checked\n", colorField("Verified:"), result.PropertiesChecked)
 		if len(result.Mismatches) > 0 {
 			fmt.Printf("%s    %d properties failed\n", colorField("Mismatches:"), len(result.Mismatches))
-			if verboseOutput {
+			if viper.GetBool("verbose") {
+				fmt.Printf("\n%s\n", colorField("Detailed Mismatches:"))
 				for _, mismatch := range result.Mismatches {
-					fmt.Printf("  %s: expected %v, got %v\n",
-						color.New(color.FgYellow).Sprint(mismatch.Property),
-						mismatch.Expected, mismatch.Actual)
+					fmt.Printf("  %s:\n", color.New(color.FgYellow).Sprint(mismatch.Property))
+					fmt.Printf("    BuildManifest: %v\n", mismatch.Expected)
+					fmt.Printf("    IM4M:          %v\n", mismatch.Actual)
 				}
 			}
 		}
@@ -329,14 +364,13 @@ type PropertyMismatch struct {
 	Actual   any
 }
 
-func verifyManifestProperties(input, build *img4.Img4, verbose bool) (*VerificationResult, error) {
+func verifyManifestProperties(inputManifest *img4.Manifest, buildProps img4.ManifestProperties, verbose, allowExtra bool) (*VerificationResult, error) {
 	result := &VerificationResult{
 		IsValid:    true,
 		Mismatches: []PropertyMismatch{},
 	}
 
-	inputProps := input.Manifest.Properties
-	buildProps := build.Manifest.Properties
+	inputProps := inputManifest.Properties
 
 	// Common properties to verify (these are the most critical for firmware validation)
 	criticalProps := []string{"CHIP", "BORD", "CEPO", "SDOM", "ECID"}
@@ -359,6 +393,14 @@ func verifyManifestProperties(input, build *img4.Img4, verbose bool) (*Verificat
 
 		// Property exists in one but not the other
 		if inputExists != buildExists {
+			// If allowExtra is true and property exists in IM4M but not BuildManifest, skip
+			if allowExtra && inputExists && !buildExists {
+				if verbose {
+					log.Debugf("Skipping extra property %s in IM4M (allowExtra=true)", prop)
+				}
+				continue
+			}
+
 			result.IsValid = false
 			result.Mismatches = append(result.Mismatches, PropertyMismatch{
 				Property: prop,
@@ -407,9 +449,69 @@ func compareManifestValues(a, b any) bool {
 	return a == b
 }
 
+// parseBuildManifestPlist extracts manifest properties from a BuildManifest.plist
+func parseBuildManifestPlist(r io.Reader) (img4.ManifestProperties, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read build manifest: %v", err)
+	}
+
+	var buildManifest struct {
+		BuildIdentities []struct {
+			ApBoardID        string `plist:"ApBoardID"`
+			ApChipID         string `plist:"ApChipID"`
+			ApSecurityDomain string `plist:"ApSecurityDomain"`
+		} `plist:"BuildIdentities"`
+	}
+
+	decoder := plist.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&buildManifest); err != nil {
+		return nil, fmt.Errorf("failed to decode build manifest plist: %v", err)
+	}
+
+	props := make(img4.ManifestProperties)
+
+	if len(buildManifest.BuildIdentities) > 0 {
+		identity := buildManifest.BuildIdentities[0]
+
+		// Parse hex strings to integers
+		if identity.ApBoardID != "" {
+			if val, err := parseHexString(identity.ApBoardID); err == nil {
+				props["BORD"] = val
+			}
+		}
+		if identity.ApChipID != "" {
+			if val, err := parseHexString(identity.ApChipID); err == nil {
+				props["CHIP"] = val
+			}
+		}
+		if identity.ApSecurityDomain != "" {
+			if val, err := parseHexString(identity.ApSecurityDomain); err == nil {
+				props["SDOM"] = val
+			}
+		}
+	}
+
+	return props, nil
+}
+
+// parseHexString parses a hex string like "0x08" or "0x6022" to an integer
+func parseHexString(s string) (int, error) {
+	var val int64
+	var err error
+
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		val, err = strconv.ParseInt(s[2:], 16, 64)
+	} else {
+		val, err = strconv.ParseInt(s, 16, 64)
+	}
+
+	return int(val), err
+}
+
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
-	Use:           "personalize",
+	Use:           "🚧 personalize",
 	Short:         "Create personalized IM4M manifest with device-specific values",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -420,18 +522,13 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		inputPath := viper.GetString("img4.im4m.personalize.input")
 		outputPath := viper.GetString("img4.im4m.personalize.output")
 		ecid := viper.GetString("img4.im4m.personalize.ecid")
 		nonce := viper.GetString("img4.im4m.personalize.nonce")
-		verboseOutput := viper.GetBool("img4.im4m.personalize.verbose")
 
-		fmt.Printf("%s        %s\n", colorField("Input IMG4:"), filepath.Base(inputPath))
-		fmt.Printf("%s      %s\n", colorField("Output IMG4:"), filepath.Base(outputPath))
-
-		inputFile, err := os.Open(inputPath)
+		inputFile, err := os.Open(args[0])
 		if err != nil {
-			return fmt.Errorf("failed to open input IMG4 %s: %v", inputPath, err)
+			return fmt.Errorf("failed to open input IMG4 %s: %v", args[0], err)
 		}
 		defer inputFile.Close()
 
@@ -440,7 +537,7 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse input IMG4: %v", err)
 		}
 
-		personalizedImg, err := personalizeImg4(inputImg, ecid, nonce, verboseOutput)
+		personalizedImg, err := personalizeImg4(inputImg, ecid, nonce, viper.GetBool("verbose"))
 		if err != nil {
 			return fmt.Errorf("personalization failed: %v", err)
 		}
