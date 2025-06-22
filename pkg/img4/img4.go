@@ -399,17 +399,36 @@ func parseRestoreInfo(i *img4, result *Img4) error {
 		return nil
 	}
 
-	gen, _, err := parseDataProp(i.RestoreInfo.Generator.Bytes, typeBNCN)
-	if err != nil {
-		return fmt.Errorf("failed to ASN.1 parse Generator: %v", err)
+	// Try the complex parseDataProp approach first (for legacy IM4R files)
+	if gen, _, err := parseDataProp(i.RestoreInfo.Generator.Bytes, typeBNCN); err == nil {
+		result.RestoreInfo = RestoreInfo{
+			Generator:       *gen,
+			img4RestoreInfo: i.RestoreInfo,
+		}
+		return nil
 	}
 
-	result.RestoreInfo = RestoreInfo{
-		Generator:       *gen,
-		img4RestoreInfo: i.RestoreInfo,
+	// If that fails, try parsing our simplified format
+	if len(i.RestoreInfo.Generator.Bytes) > 0 {
+		bootNonce, err := parseStandaloneIm4rGenerator(i.RestoreInfo.Generator.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse IM4R generator data: %v", err)
+		}
+
+		// Create a dataProp structure from the parsed boot nonce
+		gen := &dataProp{
+			Name: "BNCN",
+			Data: bootNonce,
+		}
+
+		result.RestoreInfo = RestoreInfo{
+			Generator:       *gen,
+			img4RestoreInfo: i.RestoreInfo,
+		}
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("no generator data found in restore info")
 }
 
 func OpenIm4p(path string) (*Im4p, error) {
@@ -423,6 +442,89 @@ func OpenIm4p(path string) (*Im4p, error) {
 		}
 	}()
 	return ParseIm4p(f)
+}
+
+// ParseIm4r parses a standalone IM4R file and returns the restore info
+func ParseIm4r(r io.Reader) (*RestoreInfo, error) {
+	data, err := readBuffer(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var restoreInfo img4RestoreInfo
+	if _, err := asn1.Unmarshal(data, &restoreInfo); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse IM4R: %v", err)
+	}
+
+	if restoreInfo.Name != "IM4R" {
+		return nil, fmt.Errorf("invalid IM4R file: expected name 'IM4R', got '%s'", restoreInfo.Name)
+	}
+
+	// For standalone IM4R files, the generator data may be structured differently
+	// than when embedded in IMG4 files. Try multiple parsing approaches.
+	
+	// First, try the standard parseDataProp approach (for IMG4-embedded IM4R)
+	if gen, _, err := parseDataProp(restoreInfo.Generator.Bytes, typeBNCN); err == nil {
+		return &RestoreInfo{
+			Generator:       *gen,
+			img4RestoreInfo: restoreInfo,
+		}, nil
+	}
+
+	// If that fails, try parsing as a raw BNCN structure for standalone IM4R files
+	if len(restoreInfo.Generator.Bytes) > 0 {
+		// Try to parse the generator bytes directly
+		bootNonce, err := parseStandaloneIm4rGenerator(restoreInfo.Generator.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse IM4R generator data: %v", err)
+		}
+
+		// Create a dataProp structure from the parsed boot nonce
+		gen := &dataProp{
+			Name: "BNCN",
+			Data: bootNonce,
+		}
+
+		return &RestoreInfo{
+			Generator:       *gen,
+			img4RestoreInfo: restoreInfo,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("no generator data found in IM4R")
+}
+
+// parseStandaloneIm4rGenerator parses generator data from standalone IM4R files
+func parseStandaloneIm4rGenerator(data []byte) ([]byte, error) {
+	// For standalone IM4R files, the structure might be different
+	// Based on the reference implementations, look for BNCN tag and extract boot nonce
+	
+	// Check if data contains "BNCN" directly (simple format)
+	if bytes.Contains(data, []byte("BNCN")) {
+		// Find BNCN and extract the following data
+		bncnIndex := bytes.Index(data, []byte("BNCN"))
+		if bncnIndex != -1 && len(data) >= bncnIndex+4+8 { // BNCN + 8 bytes boot nonce
+			return data[bncnIndex+4 : bncnIndex+4+8], nil
+		}
+	}
+
+	// Try parsing as ASN.1 OCTET STRING (our created format)
+	var bootNonce []byte
+	if _, err := asn1.Unmarshal(data, &bootNonce); err == nil && len(bootNonce) == 8 {
+		return bootNonce, nil
+	}
+
+	// Try parsing the raw bytes if they look like a boot nonce (8 bytes)
+	if len(data) == 8 {
+		return data, nil
+	}
+
+	// Last resort: if data ends with 8 bytes that could be a boot nonce
+	if len(data) >= 8 {
+		return data[len(data)-8:], nil
+	}
+
+	return nil, fmt.Errorf("could not extract boot nonce from generator data")
 }
 
 func ParseIm4p(r io.Reader) (*Im4p, error) {

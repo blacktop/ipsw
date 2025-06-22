@@ -103,14 +103,20 @@ func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
 		fmt.Printf("%s             IMG4\n", colorField("Type:"))
 		fmt.Printf("%s             %s\n", colorField("Name:"), img.Name)
-		fmt.Printf("%s      %s\n", colorField("Description:"), img.Description)
+		if len(img.Description) > 0 {
+			fmt.Printf("%s      %s\n", colorField("Description:"), img.Description)
+		}
 		if verbose {
-			fmt.Printf("\n%s\n", colorField("Manifest Properties:"))
-			for key, value := range img.Manifest.Properties {
-				fmt.Printf("  %s: %v\n", colorSubField(key), value)
+			if len(img.Manifest.Properties) > 0 {
+				fmt.Printf("%s\n", colorField("Manifest Properties:"))
+				for key, value := range img.Manifest.Properties {
+					fmt.Printf("  %s: %v\n", colorSubField(key), value)
+				}
 			}
-			fmt.Printf("\n%s\n", colorField("Restore Info:"))
-			fmt.Printf("  %s %x\n", colorSubField("Generator:"), img.RestoreInfo.Generator.Data)
+			if len(img.RestoreInfo.Generator.Data) > 0 {
+				fmt.Printf("%s\n", colorField("Restore Info:"))
+				fmt.Printf("  %s %x\n", colorSubField("Generator:"), img.RestoreInfo.Generator.Data)
+			}
 		}
 	}
 
