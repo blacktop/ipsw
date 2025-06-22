@@ -40,6 +40,15 @@ const (
 	typeSnon = "private,tag:1936617326" // snon
 	typeSrvn = "private,tag:1936881262" // srvn
 
+	// Additional manifest property tags  
+	typeAugs = "private,tag:1635084147" // augs
+	typeClas = "private,tag:1668047219" // clas  
+	typeFchp = "private,tag:1717790832" // fchp
+	typePave = "private,tag:1885435493" // pave
+	typeStyp = "private,tag:1937013104" // styp
+	typeType = "private,tag:1954115685" // type
+	typeVnum = "private,tag:1986950509" // vnum
+
 	// SEPI tags
 	typeImpl = "private,tag:1768779884" // impl
 	typeArms = "private,tag:1634889075" // arms
@@ -58,8 +67,15 @@ type Img4 struct {
 
 type Manifest struct {
 	Properties   ManifestProperties
+	Images       []ManifestImage
 	ApImg4Ticket asn1.RawValue
 	img4Manifest
+}
+
+// ManifestImage represents an image entry in the manifest
+type ManifestImage struct {
+	Name       string
+	Properties map[string]any
 }
 
 type RestoreInfo struct {
@@ -281,6 +297,20 @@ var manifestPropertyDefs = []propertyDef{
 	{typeSDOM, parseIDProperty, storeIDProperty},
 	{typeSnon, parseDataProperty, storeDataProperty},
 	{typeSrvn, parseDataProperty, storeDataProperty},
+	// Additional manifest properties
+	{typeAugs, parseIDProperty, storeIDProperty},
+	{typeClas, parseIDProperty, storeIDProperty},
+	{typeFchp, parseIDProperty, storeIDProperty},
+	{typePave, parseDataProperty, storeDataProperty},
+	{typeStyp, parseIDProperty, storeIDProperty},
+	{typeType, parseIDProperty, storeIDProperty},
+	{typeVnum, parseDataProperty, storeDataProperty},
+	// SEPI properties
+	{typeImpl, parseIDProperty, storeIDProperty},
+	{typeArms, parseIDProperty, storeIDProperty},
+	{typeTbmr, parseDataProperty, storeDataProperty},
+	{typeTbms, parseDataProperty, storeDataProperty},
+	{typeTz0s, parseIDProperty, storeIDProperty},
 }
 
 // Property parsers and storage functions
@@ -318,16 +348,56 @@ func parseManifestProperties(data []byte) (*ManifestProperties, error) {
 	mProps := make(ManifestProperties)
 	remaining := data
 
+	// Create a map for quick tag lookup
+	tagToParser := make(map[string]propertyDef)
 	for _, def := range manifestPropertyDefs {
-		value, rest, err := def.parseFunc(remaining, def.tag)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse property %s: %v", def.tag, err)
+		tagToParser[def.tag] = def
+	}
+
+	// Parse properties in the order they appear in the data
+	for len(remaining) > 0 {
+		if len(remaining) < 2 {
+			break // Not enough data for ASN.1 tag and length
 		}
-		def.storeFunc(mProps, def.tag, value)
-		remaining = rest
+
+		// Peek at the ASN.1 structure to determine the tag
+		var rawProp asn1.RawValue
+		rest, err := asn1.Unmarshal(remaining, &rawProp)
+		if err != nil {
+			// If we can't parse any more ASN.1 structures, we're done
+			break
+		}
+
+		// Determine the property tag from the ASN.1 private tag
+		propTag := getTagFromASN1(rawProp.Tag, rawProp.Class)
+		
+		// Look up the parser for this tag
+		if def, exists := tagToParser[propTag]; exists {
+			// Parse this specific property
+			value, nextRest, err := def.parseFunc(remaining, def.tag)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse property %s: %v", def.tag, err)
+			}
+			def.storeFunc(mProps, def.tag, value)
+			remaining = nextRest
+		} else {
+			// Unknown property - skip it gracefully
+			log.Debugf("Skipping unknown manifest property with tag %s", propTag)
+			remaining = rest
+		}
 	}
 
 	return &mProps, nil
+}
+
+// getTagFromASN1 converts ASN.1 tag information back to our string representation
+func getTagFromASN1(tag int, class int) string {
+	// ASN.1 private tags have class 3 (private)
+	if class == 3 {
+		// Convert the tag number back to our string format
+		return fmt.Sprintf("private,tag:%d", tag)
+	}
+	return fmt.Sprintf("class:%d,tag:%d", class, tag)
 }
 
 // Parse parses a Img4
@@ -601,7 +671,7 @@ func ParseIm4p(r io.Reader) (*Im4p, error) {
 		i.Properties = searchForPayloadProperties(data)
 	}
 
-	// Check for extra data at the end of the Data field
+	// Check for extra data at the end of the Data field (non-destructive)
 	if err := detectAndSeparateExtraData(&i); err != nil {
 		log.Debugf("Failed to detect extra data: %v", err)
 	}
@@ -631,7 +701,7 @@ func detectCompressionType(data []byte) string {
 	return "none"
 }
 
-// detectAndSeparateExtraData detects and separates extra metadata
+// detectAndSeparateExtraData detects extra metadata but keeps original data intact
 func detectAndSeparateExtraData(i *Im4p) error {
 	if len(i.Data) == 0 {
 		return nil
@@ -641,15 +711,12 @@ func detectAndSeparateExtraData(i *Im4p) error {
 
 	// First, try to detect extra data using content-based heuristics
 	if extraSize := detectExtraDataAdvanced(i.Data); extraSize > 0 {
-		// Store the extra data before separating it
+		// Copy the suspected extra data (non-destructive)
 		i.ExtraDataBytes = make([]byte, extraSize)
 		copy(i.ExtraDataBytes, i.Data[originalDataLen-extraSize:])
-
-		// Separate the extra data from the main payload
-		i.Data = i.Data[:originalDataLen-extraSize]
 		i.ExtraDataSize = extraSize
 
-		log.Debugf("Detected and separated %d bytes of extra data from payload", extraSize)
+		log.Debugf("Detected %d bytes of potential extra data at end of payload", extraSize)
 		return nil
 	}
 
@@ -666,15 +733,12 @@ func detectAndSeparateExtraData(i *Im4p) error {
 		candidateExtra := i.Data[candidateExtraStart:]
 
 		if isLikelyExtraData(candidateExtra) {
-			// Store the extra data before separating it
+			// Copy the suspected extra data (non-destructive)
 			i.ExtraDataBytes = make([]byte, extraSize)
 			copy(i.ExtraDataBytes, candidateExtra)
-
-			// Separate the extra data from the main payload
-			i.Data = i.Data[:candidateExtraStart]
 			i.ExtraDataSize = extraSize
 
-			log.Debugf("Detected and separated %d bytes of extra data from payload (fallback)", extraSize)
+			log.Debugf("Detected %d bytes of potential extra data at end of payload (fallback)", extraSize)
 			return nil
 		}
 	}
@@ -1089,7 +1153,7 @@ func detectNullPaddedExtraData(data []byte) int {
 	return 0
 }
 
-// GetExtraData returns any extra data that was detected and separated from the payload
+// GetExtraData returns any extra data that was detected from the payload
 func (i *Im4p) GetExtraData() []byte {
 	return i.ExtraDataBytes
 }
@@ -1097,6 +1161,19 @@ func (i *Im4p) GetExtraData() []byte {
 // HasExtraData returns true if extra data was detected in the IM4P
 func (i *Im4p) HasExtraData() bool {
 	return i.ExtraDataSize > 0
+}
+
+// GetCleanPayloadData returns the payload data without the detected extra data
+// This is useful when you want to process only the actual payload without metadata
+func (i *Im4p) GetCleanPayloadData() []byte {
+	if i.ExtraDataSize > 0 && len(i.Data) > i.ExtraDataSize {
+		// Return payload without the detected extra data
+		cleanData := make([]byte, len(i.Data)-i.ExtraDataSize)
+		copy(cleanData, i.Data[:len(i.Data)-i.ExtraDataSize])
+		return cleanData
+	}
+	// If no extra data detected or data is too small, return original data
+	return i.Data
 }
 
 // GetExtraDataInfo returns information about the detected extra data
@@ -1487,6 +1564,11 @@ func DetectFileType(r io.Reader) (string, error) {
 
 // ExtractManifestFromShsh extracts IM4M manifest from SHSH blob with proper ASN.1 parsing
 func ExtractManifestFromShsh(r io.Reader) ([]byte, error) {
+	return ExtractManifestFromShshWithOptions(r, false, false)
+}
+
+// ExtractManifestFromShshWithOptions extracts IM4M manifest from SHSH blob with options
+func ExtractManifestFromShshWithOptions(r io.Reader, extractUpdate, extractNoNonce bool) ([]byte, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SHSH data: %v", err)
@@ -1500,7 +1582,7 @@ func ExtractManifestFromShsh(r io.Reader) ([]byte, error) {
 
 	// Look for plist structure with ApImg4Ticket
 	if bytes.Contains(data, []byte("ApImg4Ticket")) {
-		return extractManifestFromPlistShsh(data)
+		return extractManifestFromPlistShshWithOptions(data, extractUpdate, extractNoNonce)
 	}
 
 	return nil, fmt.Errorf("no recognizable IM4M manifest found in SHSH blob")
@@ -1532,11 +1614,202 @@ func extractManifestFromRawData(data []byte, startIdx int) ([]byte, error) {
 	return data[startIdx:manifestEnd], nil
 }
 
+// ParseIm4m parses a standalone IM4M manifest file and returns the manifest info
+func ParseIm4m(r io.Reader) (*Manifest, error) {
+	data, err := readBuffer(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest img4Manifest
+	if _, err := asn1.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse IM4M: %v", err)
+	}
+
+	if manifest.Name != "IM4M" {
+		return nil, fmt.Errorf("invalid IM4M file: expected name 'IM4M', got '%s'", manifest.Name)
+	}
+
+	// Parse manifest body and properties
+	var mb []manifestBody
+	if _, err := asn1.UnmarshalWithParams(manifest.Body.Bytes, &mb, typeMANB); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse IM4M manifest body: %v", err)
+	}
+
+	var mProps []manifestProperties
+	if _, err := asn1.UnmarshalWithParams(mb[0].Properties.Bytes, &mProps, typeMANP); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse IM4M manifest properties: %v", err)
+	}
+
+	props, err := parseManifestProperties(mProps[0].Properties.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4M manifest properties: %v", err)
+	}
+
+	// Parse manifest images (if any exist beyond the first MANP entry)
+	var images []ManifestImage
+	if len(mb) > 1 {
+		for i := 1; i < len(mb); i++ {
+			// Try to parse as image descriptor
+			image, err := parseManifestImage(mb[i])
+			if err != nil {
+				continue
+			}
+			images = append(images, *image)
+		}
+	} else {
+		// Images are likely stored as additional ASN.1 structures in the manifest body
+		// Let's parse the raw manifest body data looking for image descriptors
+		images = parseManifestImages(manifest.Body.Bytes)
+	}
+
+	result := &Manifest{
+		Properties: *props,
+		Images:     images,
+		ApImg4Ticket: asn1.RawValue{
+			FullBytes: data,
+			Bytes:     data,
+		},
+		img4Manifest: manifest,
+	}
+
+	return result, nil
+}
+
+// parseManifestImage parses a manifest body entry as an image descriptor
+func parseManifestImage(mb manifestBody) (*ManifestImage, error) {
+	// Image name should be 4 characters (like caos, casy, etc.)
+	if len(mb.Name) != 4 {
+		return nil, fmt.Errorf("invalid image name length: %d", len(mb.Name))
+	}
+
+	// Parse image properties
+	imageProps := make(map[string]any)
+	
+	// The Properties field should contain ASN.1 data with image properties
+	// Try to parse as property data
+	remaining := mb.Properties.Bytes
+	for len(remaining) > 0 {
+		// Try to parse each property in the image descriptor
+		var prop struct {
+			Raw  asn1.RawContent
+			Name string
+			Data []byte
+		}
+		
+		rest, err := asn1.Unmarshal(remaining, &prop)
+		if err != nil {
+			// If parsing fails, skip this entry
+			break
+		}
+		
+		// Store the property (like DGST)
+		if len(prop.Data) > 0 {
+			imageProps[prop.Name] = fmt.Sprintf("%x", prop.Data)
+		}
+		
+		remaining = rest
+		if len(remaining) == 0 {
+			break
+		}
+	}
+
+	return &ManifestImage{
+		Name:       mb.Name,
+		Properties: imageProps,
+	}, nil
+}
+
+// parseManifestImages extracts image descriptors from raw manifest data
+func parseManifestImages(data []byte) []ManifestImage {
+	var images []ManifestImage
+	
+	// Look for 4-character strings that could be image names (caos, casy, etc.)
+	imageNames := []string{"caos", "casy", "csos", "cssy", "trca", "trcs"}
+	
+	for _, imageName := range imageNames {
+		// Search for the image name in the data
+		nameBytes := []byte(imageName)
+		idx := bytes.Index(data, nameBytes)
+		if idx == -1 {
+			continue
+		}
+		
+		// Try to parse ASN.1 structure starting before the name
+		// Image descriptors likely start a few bytes before the name
+		for offset := max(0, idx-20); offset <= idx; offset++ {
+			remaining := data[offset:]
+			if len(remaining) < 10 {
+				continue
+			}
+			
+			// Try to parse as an ASN.1 sequence containing the image descriptor
+			var imgDesc struct {
+				Raw  asn1.RawContent
+				Name string
+				Data asn1.RawValue
+			}
+			
+			_, err := asn1.Unmarshal(remaining, &imgDesc)
+			if err != nil {
+				continue
+			}
+			
+			if imgDesc.Name == imageName {
+				// Parse image properties from the Data field
+				imageProps := make(map[string]any)
+				
+				// Try to parse properties from the Data field using private ASN.1 tags
+				propData := imgDesc.Data.Bytes
+				for len(propData) > 0 {
+					// Parse using private tag structure (similar to manifest properties)
+					if len(propData) < 8 {
+						break
+					}
+					
+					// Try to parse as DGST property with private tag
+					var dgstProp []dataProp
+					propRest, err := asn1.UnmarshalWithParams(propData, &dgstProp, "private,tag:1145525076") // DGST
+					if err != nil {
+						break
+					}
+					
+					if len(dgstProp) > 0 && len(dgstProp[0].Data) > 0 {
+						imageProps["DGST"] = fmt.Sprintf("%x", dgstProp[0].Data)
+					}
+					
+					propData = propRest
+					if len(propData) == 0 {
+						break
+					}
+				}
+				
+				if len(imageProps) > 0 {
+					images = append(images, ManifestImage{
+						Name:       imageName,
+						Properties: imageProps,
+					})
+				}
+				
+				break
+			}
+		}
+	}
+	
+	return images
+}
+
 func extractManifestFromPlistShsh(data []byte) ([]byte, error) {
+	return extractManifestFromPlistShshWithOptions(data, false, false)
+}
+
+func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extractNoNonce bool) ([]byte, error) {
 	var shsh struct {
-		ApImg4Ticket []byte `plist:"ApImg4Ticket"`
-		Generator    string `plist:"generator,omitempty"`
-		BBTicket     []byte `plist:"BBTicket,omitempty"`
+		ApImg4Ticket       []byte `plist:"ApImg4Ticket"`
+		ApImg4TicketUpdate []byte `plist:"ApImg4TicketUpdate,omitempty"`
+		ApImg4TicketNoNonce []byte `plist:"ApImg4TicketNoNonce,omitempty"`
+		Generator          string `plist:"generator,omitempty"`
+		BBTicket           []byte `plist:"BBTicket,omitempty"`
 	}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -1544,6 +1817,16 @@ func extractManifestFromPlistShsh(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to decode SHSH plist: %v", err)
 	}
 
+	// Priority: specific manifest types if requested
+	if extractUpdate && len(shsh.ApImg4TicketUpdate) > 0 {
+		return shsh.ApImg4TicketUpdate, nil
+	}
+	
+	if extractNoNonce && len(shsh.ApImg4TicketNoNonce) > 0 {
+		return shsh.ApImg4TicketNoNonce, nil
+	}
+
+	// Fallback to standard manifest
 	if len(shsh.ApImg4Ticket) == 0 {
 		return nil, fmt.Errorf("no ApImg4Ticket found in SHSH plist")
 	}
