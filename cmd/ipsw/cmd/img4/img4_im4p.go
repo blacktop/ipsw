@@ -180,7 +180,6 @@ func displayIm4pInfo(im4p *img4.Im4p, filePath string, jsonOutput, verbose bool)
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		fmt.Printf("%s               %s\n", colorField("File:"), filepath.Base(filePath))
 		fmt.Printf("%s               %s\n", colorField("Name:"), im4p.Name)
 		fmt.Printf("%s             %s\n", colorField("FourCC:"), im4p.Type)
 		fmt.Printf("%s        %s\n", colorField("Description:"), im4p.Description)
