@@ -26,10 +26,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/lzfse-cgo"
@@ -39,31 +39,36 @@ import (
 	"github.com/spf13/viper"
 )
 
-var components = []string{"payload", "manifest", "restore-info"}
+type component string
+
+const (
+	IM4P component = "im4p"
+	IM4M component = "im4m"
+	IM4R component = "im4r"
+)
 
 func init() {
 	Img4Cmd.AddCommand(img4ExtractCmd)
 
-	img4ExtractCmd.Flags().Bool("img4", false, "Input file is an IMG4")
 	img4ExtractCmd.Flags().StringP("output", "o", "", "Output folder")
-	img4ExtractCmd.Flags().String("component", "", "Extract specific component (payload, manifest, restore-info)")
-	img4ExtractCmd.RegisterFlagCompletionFunc("component", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return components, cobra.ShellCompDirectiveDefault
-	})
-	img4ExtractCmd.Flags().Bool("raw", false, "Extract raw data without decompression")
+	img4ExtractCmd.Flags().BoolP("im4p", "p", false, "Extract IM4P payload to path")
+	img4ExtractCmd.Flags().BoolP("im4m", "m", false, "Extract IM4M manifest to path")
+	img4ExtractCmd.Flags().BoolP("im4r", "r", false, "Extract IM4R restore info to path")
+	img4ExtractCmd.Flags().Bool("raw", false, "Extract raw IM4P data without decompression")
 	img4ExtractCmd.MarkFlagDirname("output")
 	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
-	viper.BindPFlag("img4.extract.img4", img4ExtractCmd.Flags().Lookup("img4"))
 	viper.BindPFlag("img4.extract.output", img4ExtractCmd.Flags().Lookup("output"))
-	viper.BindPFlag("img4.extract.component", img4ExtractCmd.Flags().Lookup("component"))
+	viper.BindPFlag("img4.extract.im4p", img4ExtractCmd.Flags().Lookup("im4p"))
+	viper.BindPFlag("img4.extract.im4m", img4ExtractCmd.Flags().Lookup("im4m"))
+	viper.BindPFlag("img4.extract.im4r", img4ExtractCmd.Flags().Lookup("im4r"))
 	viper.BindPFlag("img4.extract.raw", img4ExtractCmd.Flags().Lookup("raw"))
 }
 
 // img4ExtractCmd represents the extract command
 var img4ExtractCmd = &cobra.Command{
-	Use:     "extract <IMG4|IM4P>",
+	Use:     "extract <IMG4>",
 	Aliases: []string{"e"},
-	Short:   "Extract IMG4/IM4P components",
+	Short:   "Extract IMG4 components",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -73,88 +78,74 @@ var img4ExtractCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
-		isImg4 := viper.GetBool("img4.extract.img4")
 		outputDir := viper.GetString("img4.extract.output")
-		component := viper.GetString("img4.extract.component")
+		im4p := viper.GetBool("img4.extract.im4p")
+		im4m := viper.GetBool("img4.extract.im4m")
+		im4r := viper.GetBool("img4.extract.im4r")
 		rawExtract := viper.GetBool("img4.extract.raw")
 
 		filePath := filepath.Clean(args[0])
 
-		// Handle component-specific extraction
-		if component != "" {
-			if !slices.Contains(components, component) {
-				return fmt.Errorf("invalid component '%s'. Valid options: %s", component, strings.Join(components, ", "))
-			}
-			return extractSpecificComponent(filePath, outputDir, component, rawExtract)
+		isImg4, err := magic.IsImg4(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to determine file type: %v", err)
+		}
+		if !isImg4 {
+			return fmt.Errorf("file is not an IMG4 file (for IM4P files, use 'ipsw img4 im4p extract')")
 		}
 
-		// Default behavior - extract payload
-		outFile := filePath + ".payload"
-		if outputDir != "" {
-			if filepath.Ext(outputDir) != "" {
-				outFile = outputDir
-			} else {
-				outFile = filepath.Join(outputDir, filepath.Base(outFile))
+		if im4p {
+			if err := extractSpecificComponent(filePath, outputDir, IM4P, rawExtract); err != nil {
+				return err
 			}
 		}
-
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting payload to file %s", outFile))
-
-		if rawExtract {
-			return extractRawPayload(filePath, outFile, isImg4)
+		if im4m {
+			if err := extractSpecificComponent(filePath, outputDir, IM4M, rawExtract); err != nil {
+				return err
+			}
+		}
+		if im4r {
+			if err := extractSpecificComponent(filePath, outputDir, IM4R, rawExtract); err != nil {
+				return err
+			}
 		}
 
-		return img4.ExtractPayload(filePath, outFile, isImg4)
+		return nil
 	},
 }
 
-func extractSpecificComponent(filePath, outputDir, component string, raw bool) error {
+func extractSpecificComponent(filePath, outputDir string, component component, raw bool) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %v", filePath, err)
 	}
 	defer f.Close()
 
-	baseName := filepath.Base(filePath)
+	baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+
 	var outFile string
 	var data []byte
 
-	// Try to parse as IMG4 first
 	if rawImg4, err := img4.ParseImg4(f); err == nil {
 		switch component {
-		case "payload":
+		case IM4P:
 			data = rawImg4.IM4P.Data
-			outFile = baseName + ".payload"
-		case "manifest":
+			outFile = fmt.Sprintf("%s.%s", baseName, IM4P)
+		case IM4M:
 			data = rawImg4.Manifest.Bytes
-			outFile = baseName + ".im4m"
-		case "restore-info":
+			outFile = fmt.Sprintf("%s.%s", baseName, IM4M)
+		case IM4R:
 			data = rawImg4.RestoreInfo.Generator.Bytes
-			outFile = baseName + ".im4r"
-		default:
-			return fmt.Errorf("invalid component '%s'. Valid options: payload, manifest, restore-info", component)
+			outFile = fmt.Sprintf("%s.%s", baseName, IM4R)
 		}
 	} else {
-		// Fall back to IM4P
-		f.Seek(0, 0)
-		if im4p, err := img4.ParseIm4p(f); err == nil {
-			if component != "payload" {
-				return fmt.Errorf("component '%s' not available in IM4P files. Only 'payload' is supported", component)
-			}
-			data = im4p.Data
-			outFile = baseName + ".payload"
-		} else {
-			return fmt.Errorf("failed to parse file as IMG4 or IM4P: %v", err)
-		}
+		return fmt.Errorf("failed to parse file as IMG4: %v", err)
 	}
 
 	if outputDir != "" {
-		// Check if outputDir is a file path or directory
-		if filepath.Ext(outputDir) != "" {
-			outFile = outputDir
-		} else {
-			outFile = filepath.Join(outputDir, outFile)
-		}
+		outFile = filepath.Join(outputDir, outFile)
+	} else {
+		outFile = filepath.Join(filepath.Dir(filePath), outFile)
 	}
 
 	// Decompress if not raw extraction and it's compressed
@@ -167,36 +158,6 @@ func extractSpecificComponent(filePath, outputDir, component string, raw bool) e
 
 	fmt.Printf("%s             %s\n", colorField("File:"), baseName)
 	fmt.Printf("%s        %s\n", colorField("Component:"), component)
-	fmt.Printf("%s           %s\n", colorField("Output:"), outFile)
-	fmt.Printf("%s             %s\n", colorField("Size:"), humanize.Bytes(uint64(len(data))))
-
-	return os.WriteFile(outFile, data, 0644)
-}
-
-func extractRawPayload(filePath, outFile string, isImg4 bool) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %v", err)
-	}
-	defer f.Close()
-
-	var data []byte
-
-	if isImg4 {
-		i, err := img4.ParseImg4(f)
-		if err != nil {
-			return fmt.Errorf("failed to parse IMG4: %v", err)
-		}
-		data = i.IM4P.Data
-	} else {
-		i, err := img4.ParseIm4p(f)
-		if err != nil {
-			return fmt.Errorf("failed to parse IM4P: %v", err)
-		}
-		data = i.Data
-	}
-
-	fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
 	fmt.Printf("%s           %s\n", colorField("Output:"), outFile)
 	fmt.Printf("%s             %s\n", colorField("Size:"), humanize.Bytes(uint64(len(data))))
 
