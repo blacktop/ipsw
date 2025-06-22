@@ -245,26 +245,22 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 }
 
 // createIm4r creates an IM4R (Image4 Restore Info) structure with the given boot nonce.
-// This creates a valid ASN.1-encoded IM4R that embeds the boot nonce in the generator field.
+// This creates a simplified IM4R that matches the format expected by reference implementations.
 func createIm4r(nonce []byte) []byte {
-	// Create generator data containing the boot nonce as an OCTET STRING
-	generatorData, err := asn1.Marshal(nonce)
-	if err != nil {
-		// Fallback to simple concatenation if ASN.1 encoding fails
-		return append([]byte("IM4RBNCN"), nonce...)
-	}
+	// Create a simplified IM4R structure that contains the boot nonce directly
+	// This matches the format expected by both the C and Rust reference implementations
+	
+	// Create the generator data containing BNCN + boot nonce
+	generatorData := make([]byte, 0, 4+len(nonce))
+	generatorData = append(generatorData, []byte("BNCN")...)
+	generatorData = append(generatorData, nonce...)
 
 	im4rStruct := struct {
-		Name      string        `asn1:"ia5"`
-		Generator asn1.RawValue `asn1:"optional"`
+		Name      string `asn1:"ia5"`
+		Generator []byte
 	}{
-		Name: "IM4R",
-		Generator: asn1.RawValue{
-			Class:      asn1.ClassUniversal,
-			Tag:        asn1.TagOctetString,
-			IsCompound: false,
-			Bytes:      generatorData,
-		},
+		Name:      "IM4R",
+		Generator: generatorData,
 	}
 
 	im4rData, err := asn1.Marshal(im4rStruct)
