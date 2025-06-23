@@ -361,7 +361,7 @@ func createIm4pFromRaw(inputPath, outputPath, fourcc, description, compressionTy
 	utils.Indent(log.WithFields(log.Fields{
 		"path": outputPath,
 		"size": humanize.Bytes(uint64(len(asn1Data))),
-	}).Info, 2)("Created IM4P")
+	}).Debug, 2)("Created IM4P")
 
 	return nil
 }
