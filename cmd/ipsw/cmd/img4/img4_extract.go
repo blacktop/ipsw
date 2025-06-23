@@ -129,13 +129,13 @@ func extractSpecificComponent(filePath, outputDir string, component component, r
 	if rawImg4, err := img4.ParseImg4(f); err == nil {
 		switch component {
 		case IM4P:
-			data = rawImg4.IM4P.Data
+			data = rawImg4.IM4P.Raw
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4P)
 		case IM4M:
-			data = rawImg4.Manifest.Bytes
+			data = rawImg4.Manifest.FullBytes
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4M)
 		case IM4R:
-			data = rawImg4.RestoreInfo.Generator.Bytes
+			data = rawImg4.RestoreInfo.Raw
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4R)
 		}
 	} else {
