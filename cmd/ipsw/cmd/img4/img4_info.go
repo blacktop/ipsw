@@ -100,7 +100,6 @@ func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
 		fmt.Printf("%s             IMG4\n", colorField("Type:"))
 		fmt.Printf("%s             %s\n", colorField("Name:"), img.Name)
 		if len(img.Description) > 0 {

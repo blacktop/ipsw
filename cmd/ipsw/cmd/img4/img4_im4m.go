@@ -511,8 +511,8 @@ func parseHexString(s string) (int, error) {
 
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
-	Use:           "🚧 personalize",
-	Short:         "Create personalized IM4M manifest with device-specific values",
+	Use:           "personalize",
+	Short:         "🚧 Create personalized IM4M manifest with device-specific values",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

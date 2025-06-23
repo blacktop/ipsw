@@ -1523,7 +1523,10 @@ func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, err
 	// Add optional manifest data with explicit tag:0
 	if len(manifestData) > 0 {
 		img4Struct.Manifest = asn1.RawValue{
-			FullBytes: manifestData,
+			Class:      2, // context-specific (for explicit tagging)
+			Tag:        0, // tag:0 as specified in struct
+			IsCompound: true,
+			Bytes:      manifestData,
 		}
 	}
 
