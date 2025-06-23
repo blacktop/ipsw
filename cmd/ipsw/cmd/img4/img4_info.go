@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -109,7 +110,33 @@ func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 			if len(img.Manifest.Properties) > 0 {
 				fmt.Printf("%s\n", colorField("Manifest Properties:"))
 				for key, value := range img.Manifest.Properties {
-					fmt.Printf("  %s: %v\n", colorSubField(key), value)
+					switch v := value.(type) {
+					case int:
+						fmt.Printf("  %s: %d\n", colorSubField(key), v)
+					case bool:
+						fmt.Printf("  %s: %t\n", colorSubField(key), v)
+					case []byte:
+						if utils.IsASCII(string(v)) {
+							fmt.Printf("  %s: %s\n", colorSubField(key), v)
+						} else {
+							if verbose {
+								fmt.Printf("  %s: %x\n", colorSubField(key), v)
+							} else {
+								fmt.Printf("  %s: %d bytes\n", colorSubField(key), len(v))
+							}
+						}
+					default:
+						fmt.Printf("  %s: %v\n", colorSubField(key), value)
+					}
+				}
+			}
+			if len(img.Manifest.Images) > 0 {
+				fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(img.Manifest.Images))
+				for _, image := range img.Manifest.Images {
+					fmt.Printf("  %s:\n", colorSubField(image.Name))
+					for propName, propValue := range image.Properties {
+						fmt.Printf("    %s: %v\n", colorField(propName), propValue)
+					}
 				}
 			}
 			if len(img.RestoreInfo.Generator.Data) > 0 {
