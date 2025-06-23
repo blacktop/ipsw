@@ -40,9 +40,9 @@ const (
 	typeSnon = "private,tag:1936617326" // snon
 	typeSrvn = "private,tag:1936881262" // srvn
 
-	// Additional manifest property tags  
+	// Additional manifest property tags
 	typeAugs = "private,tag:1635084147" // augs
-	typeClas = "private,tag:1668047219" // clas  
+	typeClas = "private,tag:1668047219" // clas
 	typeFchp = "private,tag:1717790832" // fchp
 	typePave = "private,tag:1885435493" // pave
 	typeStyp = "private,tag:1937013104" // styp
@@ -370,7 +370,7 @@ func parseManifestProperties(data []byte) (*ManifestProperties, error) {
 
 		// Determine the property tag from the ASN.1 private tag
 		propTag := getTagFromASN1(rawProp.Tag, rawProp.Class)
-		
+
 		// Look up the parser for this tag
 		if def, exists := tagToParser[propTag]; exists {
 			// Parse this specific property
@@ -532,7 +532,7 @@ func ParseIm4r(r io.Reader) (*RestoreInfo, error) {
 
 	// For standalone IM4R files, the generator data may be structured differently
 	// than when embedded in IMG4 files. Try multiple parsing approaches.
-	
+
 	// First, try the standard parseDataProp approach (for IMG4-embedded IM4R)
 	if gen, _, err := parseDataProp(restoreInfo.Generator.Bytes, typeBNCN); err == nil {
 		return &RestoreInfo{
@@ -568,7 +568,7 @@ func ParseIm4r(r io.Reader) (*RestoreInfo, error) {
 func parseStandaloneIm4rGenerator(data []byte) ([]byte, error) {
 	// For standalone IM4R files, the structure might be different
 	// Based on the reference implementations, look for BNCN tag and extract boot nonce
-	
+
 	// Check if data contains "BNCN" directly (simple format)
 	if bytes.Contains(data, []byte("BNCN")) {
 		// Find BNCN and extract the following data
@@ -1688,7 +1688,7 @@ func parseManifestImage(mb manifestBody) (*ManifestImage, error) {
 
 	// Parse image properties
 	imageProps := make(map[string]any)
-	
+
 	// The Properties field should contain ASN.1 data with image properties
 	// Try to parse as property data
 	remaining := mb.Properties.Bytes
@@ -1699,18 +1699,18 @@ func parseManifestImage(mb manifestBody) (*ManifestImage, error) {
 			Name string
 			Data []byte
 		}
-		
+
 		rest, err := asn1.Unmarshal(remaining, &prop)
 		if err != nil {
 			// If parsing fails, skip this entry
 			break
 		}
-		
+
 		// Store the property (like DGST)
 		if len(prop.Data) > 0 {
 			imageProps[prop.Name] = fmt.Sprintf("%x", prop.Data)
 		}
-		
+
 		remaining = rest
 		if len(remaining) == 0 {
 			break
@@ -1726,10 +1726,10 @@ func parseManifestImage(mb manifestBody) (*ManifestImage, error) {
 // parseManifestImages extracts image descriptors from raw manifest data
 func parseManifestImages(data []byte) []ManifestImage {
 	var images []ManifestImage
-	
+
 	// Look for 4-character strings that could be image names (caos, casy, etc.)
 	imageNames := []string{"caos", "casy", "csos", "cssy", "trca", "trcs"}
-	
+
 	for _, imageName := range imageNames {
 		// Search for the image name in the data
 		nameBytes := []byte(imageName)
@@ -1737,7 +1737,7 @@ func parseManifestImages(data []byte) []ManifestImage {
 		if idx == -1 {
 			continue
 		}
-		
+
 		// Try to parse ASN.1 structure starting before the name
 		// Image descriptors likely start a few bytes before the name
 		for offset := max(0, idx-20); offset <= idx; offset++ {
@@ -1745,23 +1745,23 @@ func parseManifestImages(data []byte) []ManifestImage {
 			if len(remaining) < 10 {
 				continue
 			}
-			
+
 			// Try to parse as an ASN.1 sequence containing the image descriptor
 			var imgDesc struct {
 				Raw  asn1.RawContent
 				Name string
 				Data asn1.RawValue
 			}
-			
+
 			_, err := asn1.Unmarshal(remaining, &imgDesc)
 			if err != nil {
 				continue
 			}
-			
+
 			if imgDesc.Name == imageName {
 				// Parse image properties from the Data field
 				imageProps := make(map[string]any)
-				
+
 				// Try to parse properties from the Data field using private ASN.1 tags
 				propData := imgDesc.Data.Bytes
 				for len(propData) > 0 {
@@ -1769,50 +1769,46 @@ func parseManifestImages(data []byte) []ManifestImage {
 					if len(propData) < 8 {
 						break
 					}
-					
+
 					// Try to parse as DGST property with private tag
 					var dgstProp []dataProp
 					propRest, err := asn1.UnmarshalWithParams(propData, &dgstProp, "private,tag:1145525076") // DGST
 					if err != nil {
 						break
 					}
-					
+
 					if len(dgstProp) > 0 && len(dgstProp[0].Data) > 0 {
 						imageProps["DGST"] = fmt.Sprintf("%x", dgstProp[0].Data)
 					}
-					
+
 					propData = propRest
 					if len(propData) == 0 {
 						break
 					}
 				}
-				
+
 				if len(imageProps) > 0 {
 					images = append(images, ManifestImage{
 						Name:       imageName,
 						Properties: imageProps,
 					})
 				}
-				
+
 				break
 			}
 		}
 	}
-	
-	return images
-}
 
-func extractManifestFromPlistShsh(data []byte) ([]byte, error) {
-	return extractManifestFromPlistShshWithOptions(data, false, false)
+	return images
 }
 
 func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extractNoNonce bool) ([]byte, error) {
 	var shsh struct {
-		ApImg4Ticket       []byte `plist:"ApImg4Ticket"`
-		ApImg4TicketUpdate []byte `plist:"ApImg4TicketUpdate,omitempty"`
+		ApImg4Ticket        []byte `plist:"ApImg4Ticket"`
+		ApImg4TicketUpdate  []byte `plist:"ApImg4TicketUpdate,omitempty"`
 		ApImg4TicketNoNonce []byte `plist:"ApImg4TicketNoNonce,omitempty"`
-		Generator          string `plist:"generator,omitempty"`
-		BBTicket           []byte `plist:"BBTicket,omitempty"`
+		Generator           string `plist:"generator,omitempty"`
+		BBTicket            []byte `plist:"BBTicket,omitempty"`
 	}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -1824,7 +1820,7 @@ func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extract
 	if extractUpdate && len(shsh.ApImg4TicketUpdate) > 0 {
 		return shsh.ApImg4TicketUpdate, nil
 	}
-	
+
 	if extractNoNonce && len(shsh.ApImg4TicketNoNonce) > 0 {
 		return shsh.ApImg4TicketNoNonce, nil
 	}

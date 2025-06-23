@@ -22,11 +22,16 @@ THE SOFTWARE.
 package img4
 
 import (
+	"bytes"
 	"encoding/asn1"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash/adler32"
+	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -39,6 +44,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+	// ComplzssHeaderSize is the size of the complzss header
+	ComplzssHeaderSize = 384
+	// BootNonceLength is the required length of boot nonce in bytes
+	BootNonceLength = 8
 )
 
 func init() {
@@ -138,6 +150,10 @@ var img4CreateCmd = &cobra.Command{
 		if inputPath != "" && fourcc == "" {
 			return fmt.Errorf("--fourcc is required when using --input")
 		}
+		// Validate FourCC format
+		if fourcc != "" && len(fourcc) != 4 {
+			return fmt.Errorf("fourcc must be exactly 4 characters, got %d", len(fourcc))
+		}
 		if extraPath != "" && !useLzss {
 			return fmt.Errorf("extra data requires LZSS compression (--lzss)")
 		}
@@ -146,6 +162,7 @@ var img4CreateCmd = &cobra.Command{
 		}
 
 		if im4pPath != "" {
+			// When using existing IM4P, extra data should be passed to createImg4FromIm4p
 			return createImg4FromIm4p(im4pPath, manifestPath, restoreInfoPath, outputPath, extraPath, bootNonce)
 		}
 
@@ -160,19 +177,22 @@ var img4CreateCmd = &cobra.Command{
 }
 
 func createImg4FromRaw(inputPath, fourcc, description, compressionType, manifestPath, restoreInfoPath, outputPath, extraPath, bootNonce string) error {
-	tempFile, err := os.CreateTemp("", "img4_create_*.im4p")
+	tmp, err := os.CreateTemp("", "img4_create_*.im4p")
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %v", err)
 	}
-	tempPath := tempFile.Name()
-	tempFile.Close()
-	defer os.Remove(tempPath)
+	defer func() {
+		if err := os.Remove(tmp.Name()); err != nil {
+			log.WithError(err).Warnf("Failed to remove temporary file: %s", tmp.Name())
+		}
+	}()
 
-	if err := createIm4pFromRaw(inputPath, tempPath, fourcc, description, compressionType, extraPath); err != nil {
+	if err := createIm4pFromRaw(inputPath, tmp.Name(), fourcc, description, compressionType, extraPath); err != nil {
 		return fmt.Errorf("failed to create IM4P: %v", err)
 	}
 
-	return createImg4FromIm4p(tempPath, manifestPath, restoreInfoPath, outputPath, "", bootNonce)
+	// Extra data already included in IM4P, don't pass it again
+	return createImg4FromIm4p(tmp.Name(), manifestPath, restoreInfoPath, outputPath, "", bootNonce)
 }
 
 func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, extraPath, bootNonce string) error {
@@ -205,12 +225,16 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 			return fmt.Errorf("failed to read restore info file: %v", err)
 		}
 	} else if bootNonce != "" {
+		// Validate boot nonce format
+		if !regexp.MustCompile("^[0-9a-fA-F]{16}$").MatchString(bootNonce) {
+			return fmt.Errorf("boot nonce must be exactly 16 hex characters")
+		}
 		nonce, err := hex.DecodeString(bootNonce)
 		if err != nil {
 			return fmt.Errorf("failed to decode boot nonce: %v", err)
 		}
-		if len(nonce) != 8 {
-			return fmt.Errorf("boot nonce must be exactly 8 bytes (16 hex characters), got %d bytes", len(nonce))
+		if len(nonce) != BootNonceLength {
+			return fmt.Errorf("boot nonce must be exactly %d bytes (%d hex characters), got %d bytes", BootNonceLength, BootNonceLength*2, len(nonce))
 		}
 		restoreInfoData = createIm4r(nonce)
 	}
@@ -224,7 +248,6 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 		return fmt.Errorf("failed to write output file: %v", err)
 	}
 
-	fmt.Printf("%s       %s\n", colorField("Payload:"), filepath.Base(payloadPath))
 	if extraPath != "" {
 		fmt.Printf("%s   %s (%s)\n", colorField("Extra Data:"), filepath.Base(extraPath), humanize.Bytes(uint64(len(extraData))))
 	}
@@ -238,8 +261,11 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 	} else if bootNonce != "" {
 		fmt.Printf("%s  Generated with boot nonce: %s\n", colorField("Restore Info:"), bootNonce)
 	}
-	fmt.Printf("%s        %s\n", colorField("Output:"), outputPath)
-	fmt.Printf("%s      %s\n", colorField("IMG4 Size:"), humanize.Bytes(uint64(len(img4Data))))
+
+	utils.Indent(log.WithFields(log.Fields{
+		"path": outputPath,
+		"size": humanize.Bytes(uint64(len(img4Data))),
+	}).Info, 2)("Created IMG4")
 
 	return nil
 }
@@ -249,7 +275,7 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 func createIm4r(nonce []byte) []byte {
 	// Create a simplified IM4R structure that contains the boot nonce directly
 	// This matches the format expected by both the C and Rust reference implementations
-	
+
 	// Create the generator data containing BNCN + boot nonce
 	generatorData := make([]byte, 0, 4+len(nonce))
 	generatorData = append(generatorData, []byte("BNCN")...)
@@ -295,10 +321,14 @@ func createIm4pFromRaw(inputPath, outputPath, fourcc, description, compressionTy
 		utils.Indent(log.Debug, 2)("Compressing payload with LZSS...")
 		compressedData := lzss.Compress(inputData)
 		if len(compressedData) > 0 && len(compressedData) < len(inputData) {
-			payloadData = compressedData
+			// Create complzss header + compressed data
+			payloadData, err = createComplzssData(inputData, compressedData)
+			if err != nil {
+				return fmt.Errorf("failed to create complzss data: %v", err)
+			}
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Compression: %d → %d bytes (%.1f%% reduction)",
-				originalSize, len(compressedData),
-				float64(originalSize-len(compressedData))/float64(originalSize)*100))
+				originalSize, len(payloadData),
+				float64(originalSize-len(payloadData))/float64(originalSize)*100))
 		} else {
 			utils.Indent(log.Debug, 2)("LZSS compression ineffective, using original data")
 		}
@@ -334,4 +364,38 @@ func createIm4pFromRaw(inputPath, outputPath, fourcc, description, compressionTy
 	}).Info, 2)("Created IM4P")
 
 	return nil
+}
+
+type lzssHeader struct {
+	Magic           [8]byte
+	Adler32         uint32
+	UncompressedLen uint32
+	CompressedLen   uint32
+	Version         uint32
+	Padding         [360]byte
+}
+
+// createComplzssData creates a complete LZSS compressed data structure with complzss header
+func createComplzssData(uncompressedData, compressedData []byte) ([]byte, error) {
+	if len(compressedData) > math.MaxInt-ComplzssHeaderSize {
+		return nil, fmt.Errorf("compressed data too large: %d bytes (max %d bytes)", len(compressedData), math.MaxInt-ComplzssHeaderSize)
+	}
+
+	header := lzssHeader{
+		Adler32:         adler32.Checksum(uncompressedData),
+		UncompressedLen: uint32(len(uncompressedData)),
+		CompressedLen:   uint32(len(compressedData)),
+		Version:         1,
+	}
+	copy(header.Magic[:], "complzss")
+
+	buf := new(bytes.Buffer)
+	if err := binary.Write(buf, binary.BigEndian, header); err != nil {
+		return nil, fmt.Errorf("failed to write complzss header: %v", err)
+	}
+	if _, err := buf.Write(compressedData); err != nil {
+		return nil, fmt.Errorf("failed to write compressed data: %v", err)
+	}
+
+	return buf.Bytes(), nil
 }
