@@ -55,6 +55,15 @@ const (
 	typeTbmr = "private,tag:1952607602" // tbmr
 	typeTbms = "private,tag:1952607603" // tbms
 	typeTz0s = "private,tag:1954164851" // tz0s
+
+	// Additional unknown manifest property tags found in firmware
+	typeApmv = "private,tag:1634758006" // apmv - Apple PMU version
+	typeLove = "private,tag:1819244133" // love - Unknown love tag
+	typePrtp = "private,tag:1886549104" // prtp - Platform type
+	typeSdkp = "private,tag:1935960944" // sdkp - SDK platform
+	typeTagt = "private,tag:1952540532" // tagt - Target tag
+	typeTatp = "private,tag:1952543856" // tatp - Target platform
+	typeTstp = "private,tag:1953723504" // tstp - Timestamp
 )
 
 // Core IMG4 Types
@@ -311,6 +320,14 @@ var manifestPropertyDefs = []propertyDef{
 	{typeTbmr, parseDataProperty, storeDataProperty},
 	{typeTbms, parseDataProperty, storeDataProperty},
 	{typeTz0s, parseIDProperty, storeIDProperty},
+	// Unknown private tags found in firmware
+	{typeApmv, parseDataProperty, storeDataProperty}, // apmv - Apple PMU version
+	{typeLove, parseDataProperty, storeDataProperty}, // love - Unknown love tag
+	{typePrtp, parseDataProperty, storeDataProperty}, // prtp - Platform type
+	{typeSdkp, parseDataProperty, storeDataProperty}, // sdkp - SDK platform
+	{typeTagt, parseDataProperty, storeDataProperty}, // tagt - Target tag
+	{typeTatp, parseDataProperty, storeDataProperty}, // tatp - Target platform
+	{typeTstp, parseIDProperty, storeIDProperty},     // tstp - Timestamp (likely numeric)
 }
 
 // Property parsers and storage functions
