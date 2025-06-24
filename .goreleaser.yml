@@ -43,13 +43,13 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=$GOROOT/misc/ios/clangwrap.sh
+      - CC=$PWD/hack/make/clangwrap
     goos:
       - ios
     goarch:
       - arm64
-    goarm64:
-      - v8.9
+    # goarm64:
+    #   - v8.9
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
