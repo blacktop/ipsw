@@ -69,10 +69,10 @@ jobs:
       - name: Check for new builds
         id: check-builds
         run: |
-          # Get cached fingerprints
-          LAST_STABLE=$(jq -r '.fcs_keys_stable.build_fingerprint // ""' hack/.watch_cache)
-          LAST_RC=$(jq -r '.fcs_keys_rc.build_fingerprint // ""' hack/.watch_cache)
-          LAST_BETA=$(jq -r '.fcs_keys_beta.build_fingerprint // ""' hack/.watch_cache)
+          # Get cached fingerprints from the nested FcsKeys structure
+          LAST_STABLE=$(jq -r '.fcs_keys_stable.fcs_keys.release.fingerprint // ""' hack/.watch_cache)
+          LAST_RC=$(jq -r '.fcs_keys_rc.fcs_keys.rc.fingerprint // ""' hack/.watch_cache)
+          LAST_BETA=$(jq -r '.fcs_keys_beta.fcs_keys.beta.fingerprint // ""' hack/.watch_cache)
           
           # Check what needs updating
           UPDATE_STABLE=false
@@ -150,12 +150,17 @@ jobs:
                --arg ios "${{ steps.get-builds.outputs.stable_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.stable_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.stable_visionos }}" \
+               --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                '.fcs_keys_stable = {
-                  "build_fingerprint": $fp,
-                  "ios_build": $ios,
-                  "macos_build": $macos,
-                  "visionos_build": $visionos,
-                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                  "fcs_keys": {
+                    "release": {
+                      "fingerprint": $fp,
+                      "ios_build": $ios,
+                      "macos_build": $macos,
+                      "visionos_build": $visionos,
+                      "updated_at": $timestamp
+                    }
+                  }
                 }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi
@@ -166,12 +171,17 @@ jobs:
                --arg ios "${{ steps.get-builds.outputs.rc_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.rc_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.rc_visionos }}" \
+               --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                '.fcs_keys_rc = {
-                  "build_fingerprint": $fp,
-                  "ios_build": $ios,
-                  "macos_build": $macos,
-                  "visionos_build": $visionos,
-                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                  "fcs_keys": {
+                    "rc": {
+                      "fingerprint": $fp,
+                      "ios_build": $ios,
+                      "macos_build": $macos,
+                      "visionos_build": $visionos,
+                      "updated_at": $timestamp
+                    }
+                  }
                 }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi
@@ -182,12 +192,17 @@ jobs:
                --arg ios "${{ steps.get-builds.outputs.beta_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.beta_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.beta_visionos }}" \
+               --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                '.fcs_keys_beta = {
-                  "build_fingerprint": $fp,
-                  "ios_build": $ios,
-                  "macos_build": $macos,
-                  "visionos_build": $visionos,
-                  "updated_at": now | strftime("%Y-%m-%dT%H:%M:%SZ")
+                  "fcs_keys": {
+                    "beta": {
+                      "fingerprint": $fp,
+                      "ios_build": $ios,
+                      "macos_build": $macos,
+                      "visionos_build": $visionos,
+                      "updated_at": $timestamp
+                    }
+                  }
                 }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi

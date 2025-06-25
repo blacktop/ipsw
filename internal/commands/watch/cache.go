@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 )
@@ -18,11 +19,25 @@ type Commits []string
 
 type Function map[string]string
 
+type FcsKey struct {
+	Fingerprint   string    `json:"fingerprint,omitempty"`
+	IosBuild      string    `json:"ios_build,omitempty"`
+	MacOsBuild    string    `json:"macos_build,omitempty"`
+	VisionOsBuild string    `json:"visionos_build,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+}
+type FcsKeys struct {
+	Beta    FcsKey `json:"beta,omitempty"`
+	RC      FcsKey `json:"rc,omitempty"`
+	Release FcsKey `json:"release,omitempty"`
+}
+
 type CacheItem struct {
 	Tags      Tags     `json:"tags,omitempty"`
 	Commits   Commits  `json:"commits,omitempty"`
 	Functions Function `json:"functions,omitempty"`
 	URL       string   `json:"url,omitempty"`
+	FcsKeys   FcsKeys  `json:"fcs_keys,omitempty"`
 }
 
 type Cache map[string]CacheItem
