@@ -77,6 +77,7 @@ unicorn2/
 
 # 🤫
 cmd/ipsw/cmd/sb/sb_cmpl.go
+cmd/ipsw/cmd/sb/sb_check.go
 cmd/ipsw/cmd/sb/sb_database.go
 cmd/ipsw/cmd/sb/sb_dec.go
 cmd/ipsw/cmd/sb/sb_opts.go
