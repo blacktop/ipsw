@@ -171,7 +171,6 @@ type IM4P struct {
 	Data        []byte
 	Compression Compression   `asn1:"optional"`
 	Keybag      []byte        `asn1:"optional"`
-	ExtraData   asn1.RawValue `asn1:"optional"`                              // May contain size info
 	Properties  asn1.RawValue `asn1:"optional,tag:0,class:context,explicit"` // PAYP properties
 	Hash        [48]byte      `asn1:"optional"`
 }
@@ -233,6 +232,13 @@ func ParsePayload(data []byte) (*Payload, error) {
 			log.Debugf("Failed to parse PAYP properties: %v", err)
 		}
 		p.Properties = parsedProps
+	}
+
+	// If no properties found, try parsing as direct properties (like SEP firmware)
+	if p.Properties == nil {
+		if directProps, err := parseDirectProperties(data); err == nil && len(directProps) > 0 {
+			p.Properties = directProps
+		}
 	}
 
 	// Check for extra data at the end of the Data field (MachO detection)
@@ -606,25 +612,86 @@ func (i *Payload) GetExtraDataInfo() map[string]any {
 	return info
 }
 
-// parsePayloadProperties parses the PAYP properties section
+// parsePayloadProperties parses the properties section - handles both PAYP containers and direct properties
 func parsePayloadProperties(data []byte) (map[string]any, error) {
-	// Parse the PAYP container
+	// First try to parse as PAYP container
 	var payp struct {
 		Raw  asn1.RawContent
 		Name string        // PAYP
 		Set  asn1.RawValue `asn1:"set"`
 	}
 
-	if _, err := asn1.Unmarshal(data, &payp); err != nil {
-		return nil, fmt.Errorf("failed to parse PAYP container: %w", err)
+	if _, err := asn1.Unmarshal(data, &payp); err == nil && payp.Name == "PAYP" {
+		// Use ParsePropertyMap from property.go to parse the properties
+		return ParsePropertyMap(payp.Set.Bytes)
 	}
 
-	if payp.Name != "PAYP" {
-		return nil, fmt.Errorf("expected PAYP, got %s", payp.Name)
+	// If PAYP parsing fails, try parsing as direct properties (like SEP firmware)
+	// These are properties stored directly as private ASN.1 tags
+	return ParsePropertyMap(data)
+}
+
+// parseDirectProperties parses IM4P files with properties stored as direct private tags
+func parseDirectProperties(data []byte) (map[string]any, error) {
+	// Parse the top-level SEQUENCE to access all fields
+	var seq asn1.RawValue
+	if _, err := asn1.Unmarshal(data, &seq); err != nil {
+		return nil, fmt.Errorf("failed to parse top-level sequence: %w", err)
 	}
 
-	// Use ParsePropertyMap from property.go to parse the properties
-	return ParsePropertyMap(payp.Set.Bytes)
+	if seq.Tag != asn1.TagSequence {
+		return nil, fmt.Errorf("expected SEQUENCE, got tag %d", seq.Tag)
+	}
+
+	properties := make(map[string]any)
+	remaining := seq.Bytes
+
+	// Skip the known fields: tag, type, version, data, compression?, keybag?
+	fieldCount := 0
+	for len(remaining) > 0 {
+		var field asn1.RawValue
+		rest, err := asn1.Unmarshal(remaining, &field)
+		if err != nil {
+			break
+		}
+
+		fieldCount++
+		
+		// Fields 1-4 are tag, type, version, data - skip these
+		// Field 5+ might be compression, keybag, or properties
+		if fieldCount >= 5 && field.Class == 3 { // Private class properties
+			// Parse this property
+			if prop, err := parsePrivateProperty(field); err == nil {
+				for k, v := range prop {
+					properties[k] = v
+				}
+			}
+		}
+
+		remaining = rest
+	}
+
+	return properties, nil
+}
+
+// parsePrivateProperty parses a single private ASN.1 property
+func parsePrivateProperty(field asn1.RawValue) (map[string]any, error) {
+	// Parse the property structure (SEQUENCE with name and value)
+	var prop struct {
+		Name  string
+		Value asn1.RawValue
+	}
+
+	if _, err := asn1.Unmarshal(field.Bytes, &prop); err != nil {
+		return nil, err
+	}
+
+	value := ParsePropertyValueWithTag(prop.Value, field.Tag)
+	if value == nil {
+		return nil, fmt.Errorf("failed to parse property value")
+	}
+
+	return map[string]any{prop.Name: value}, nil
 }
 
 /* Payload Processing Functions */

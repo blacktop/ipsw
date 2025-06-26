@@ -50,9 +50,15 @@ const (
 	// SEPI Properties
 	tagImpl = 1768779884 // impl - Implementation (int)
 	tagArms = 1634889075 // arms - ARM security (int)
+	tagAr1s = 1634888563 // ar1s - ARM1 security (int)
+	tagCons = 1668246131 // cons - Console (int)
+	tagDrmc = 1685287523 // drmc - DRMC (int)
+	tagMmap = 1835099760 // mmap - Memory map ([]byte)
+	tagRddg = 1919181927 // rddg - RD Debug ([]byte)
 	tagTbmr = 1952607602 // tbmr - Trusted boot measurement register ([]byte)
 	tagTbms = 1952607603 // tbms - Trusted boot measurement signature ([]byte)
 	tagTz0s = 1954164851 // tz0s - TrustZone 0 security (int)
+	tagTz1s = 1954165107 // tz1s - TrustZone 1 security (int)
 
 	// Observed Unknown Properties
 	tagApmv = 1634758006 // apmv - Apple PMU version ([]byte - string)
@@ -99,6 +105,8 @@ var propertyTypeMap = map[int]PropType{
 	tagBNCH: PropTypeHash, // BNCH - Boot nonce hash
 	tagTbmr: PropTypeHash, // tbmr - Trusted boot measurement register
 	tagTbms: PropTypeHash, // tbms - Trusted boot measurement signature
+	tagMmap: PropTypeHash, // mmap - Memory map
+	tagRddg: PropTypeHash, // rddg - RD Debug
 
 	// Boolean properties
 	tagCPRO: PropTypeBool, // CPRO - Certificate production status
@@ -123,7 +131,11 @@ var propertyTypeMap = map[int]PropType{
 	tagType: PropTypeInt, // type - Type
 	tagImpl: PropTypeInt, // impl - Implementation
 	tagArms: PropTypeInt, // arms - ARM security
+	tagAr1s: PropTypeInt, // ar1s - ARM1 security
+	tagCons: PropTypeInt, // cons - Console
+	tagDrmc: PropTypeInt, // drmc - DRMC
 	tagTz0s: PropTypeInt, // tz0s - TrustZone 0 security
+	tagTz1s: PropTypeInt, // tz1s - TrustZone 1 security
 }
 
 // getPropertyType returns the expected type for a given property tag
