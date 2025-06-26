@@ -213,10 +213,10 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 
 		// Create property structure
 		propStruct := struct {
-			Tag   string
+			Name  string
 			Value asn1.RawValue
 		}{
-			Tag: name,
+			Name: name,
 			Value: asn1.RawValue{
 				Tag:       tag,
 				FullBytes: valueBytes, // Use full bytes including header
