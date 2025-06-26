@@ -255,12 +255,12 @@ var img4Im4pExtractCmd = &cobra.Command{
 			if im4p.Encrypted {
 				log.Warn("extracting encrypted IM4P extra data")
 			}
-			if im4p.ExtraDataSize == 0 {
+			if len(im4p.ExtraData) == 0 {
 				return fmt.Errorf("no extra data found in IM4P file")
 			}
 
 			utils.Indent(log.WithFields(log.Fields{
-				"bytes": im4p.ExtraDataSize,
+				"bytes": len(im4p.ExtraData),
 				"path":  outputPath,
 			}).Info, 2)("Extracting Extra Data")
 
@@ -279,10 +279,10 @@ var img4Im4pExtractCmd = &cobra.Command{
 			utils.Indent(log.Warn, 3)("extracting encrypted IM4P payload")
 		}
 		payloadData := im4p.Data
-		if im4p.CompressionType != "none" {
+		if im4p.Compression.UncompressedSize > 0 && len(im4p.Data) > 0 {
 			utils.Indent(log.WithFields(log.Fields{
 				"type":         im4p.Compression.Algorithm.String(),
-				"uncompressed": im4p.UncompressedSize,
+				"uncompressed": im4p.Compression.UncompressedSize,
 				"size":         len(im4p.Data),
 			}).Info, 3)("Decompressing payload")
 			switch im4p.Compression.Algorithm {

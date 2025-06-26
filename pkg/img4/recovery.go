@@ -230,7 +230,7 @@ func (r *RestoreInfo) String() string {
 	result.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Properties"), len(r.Properties)))
 
 	for name, value := range r.Properties {
-		result.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(name), FormatPropertyValueTruncated(value)))
+		result.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(name), FormatPropertyValue(value)))
 	}
 
 	// Special highlighting for boot nonce

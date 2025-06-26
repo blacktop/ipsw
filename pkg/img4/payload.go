@@ -163,38 +163,45 @@ type Compression struct {
 	UncompressedSize int                  `asn1:"integer"`
 }
 
+type PAYP struct {
+	Raw asn1.RawContent
+	Tag string        // PAYP
+	Set asn1.RawValue `asn1:"set"`
+}
+
 type IM4P struct {
 	Raw         asn1.RawContent
 	Tag         string `asn1:"ia5"` // IM4P
 	Type        string `asn1:"ia5"`
 	Version     string `asn1:"ia5"`
 	Data        []byte
-	Compression Compression   `asn1:"optional"`
-	Keybag      []byte        `asn1:"optional"`
-	Properties  asn1.RawValue `asn1:"optional,tag:0,class:context,explicit"` // PAYP properties
-	Hash        [48]byte      `asn1:"optional"`
+	Compression Compression `asn1:"optional"`
+	Keybag      []byte      `asn1:"optional"`
+	Properties  PAYP        `asn1:"optional,tag:0,class:context,explicit"` // PAYP properties
+	Hash        []byte      `asn1:"optional"`
 }
 
 type Payload struct {
 	IM4P
-	Keybags          []Keybag
-	CompressionType  string         // LZFSE, LZSS, or none
-	UncompressedSize int            // Size after decompression
-	Properties       map[string]any // Parsed properties like kcep, kclf, etc.
-	ExtraDataSize    int            // Size of extra data (like trailing metadata)
-	ExtraDataBytes   []byte         // The actual extra data bytes that were separated
-	Encrypted        bool           // Whether the IM4P is encrypted
+	Encrypted  bool // Whether the IM4P is encrypted
+	Keybags    []Keybag
+	Properties map[string]any // Parsed properties like kcep, kclf, etc.
+	ExtraData  []byte
 }
 
 func OpenPayload(path string) (*Payload, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
+		return nil, fmt.Errorf("failed to open payload %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close payload %s: %v", path, err)
+		}
+	}()
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
+		return nil, fmt.Errorf("failed to read payload %s: %v", path, err)
 	}
 	return ParsePayload(data)
 }
@@ -203,8 +210,17 @@ func ParsePayload(data []byte) (*Payload, error) {
 	var p Payload
 
 	// Parse using the standard IM4P struct format
-	if _, err := asn1.Unmarshal(data, &p.IM4P); err != nil {
+	rest, err := asn1.Unmarshal(data, &p.IM4P)
+	if err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IM4P: %v", err)
+	}
+
+	if len(rest) > 0 {
+		log.Errorf("unexpected trailing data in payload: %d bytes (please notify author)", len(rest))
+	}
+
+	if p.Tag != "IM4P" {
+		return nil, fmt.Errorf("invalid payload tag: expected 'IM4P', got '%s'", p.Tag)
 	}
 
 	// Parse keybags if present
@@ -217,28 +233,19 @@ func ParsePayload(data []byte) (*Payload, error) {
 		}
 	}
 
-	// Parse compression info from the IM4P structure
-	if p.IM4P.Compression.Algorithm != 0 {
-		p.CompressionType = p.IM4P.Compression.Algorithm.String()
-		p.UncompressedSize = p.IM4P.Compression.UncompressedSize
-	} else {
-		p.CompressionType = "none"
-	}
-
 	// Parse PAYP properties if present
-	if len(p.IM4P.Properties.Bytes) > 0 {
-		parsedProps, err := parsePayloadProperties(p.IM4P.Properties.Bytes)
-		if err != nil {
-			log.Debugf("Failed to parse PAYP properties: %v", err)
+	if len(p.IM4P.Properties.Raw) > 0 {
+		if p.IM4P.Properties.Tag != "PAYP" {
+			return nil, fmt.Errorf("invalid payload properties tag: expected 'PAYP', got '%s'", p.IM4P.Properties.Tag)
 		}
-		p.Properties = parsedProps
+		p.Properties, err = ParsePropertyMap(p.IM4P.Properties.Set.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse payload properties: %v", err)
+		}
 	}
 
-	// If no properties found, try parsing as direct properties (like SEP firmware)
-	if p.Properties == nil {
-		if directProps, err := parseDirectProperties(data); err == nil && len(directProps) > 0 {
-			p.Properties = directProps
-		}
+	if !p.Encrypted && p.Compression.UncompressedSize == 0 {
+		log.Debug("Potential extra data detected (no compression or encryption found)")
 	}
 
 	// Check for extra data at the end of the Data field (MachO detection)
@@ -257,32 +264,29 @@ func (p *Payload) String() string {
 	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Type"), p.Type))
 	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Version"), p.Version))
 	sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Data"), humanize.Bytes(uint64(len(p.Data))), len(p.Data)))
-	if p.CompressionType != "none" {
-		sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Compression"), p.CompressionType))
-		if p.UncompressedSize > 0 {
-			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed Size"), humanize.Bytes(uint64(p.UncompressedSize)), p.UncompressedSize))
+	if p.Compression.UncompressedSize > 0 {
+		sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Compression"), p.Compression.Algorithm.String()))
+		if p.Compression.UncompressedSize > 0 {
+			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed Size"), humanize.Bytes(uint64(p.Compression.UncompressedSize)), p.Compression.UncompressedSize))
 		}
 	}
-	if p.ExtraDataSize > 0 {
-		sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("ExtraData"), p.ExtraDataSize))
+	if len(p.ExtraData) > 0 {
+		sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("ExtraData"), humanize.Bytes(uint64(len(p.ExtraData))), len(p.ExtraData)))
 	}
 	if len(p.Keybags) > 0 {
-		sb.WriteString(fmt.Sprintf("  %s: %t\n", colorField("Encrypted:"), p.Encrypted))
+		sb.WriteString(fmt.Sprintf("  %s: %t\n", colorField("Encrypted"), p.Encrypted))
 		sb.WriteString(fmt.Sprintf("  %s:\n", colorField("Keybags")))
 		for i, kb := range p.Keybags {
-			sb.WriteString(fmt.Sprintf("    [%d] %s %s\n", i, colorField("Type:"), kb.Type.String()))
-			sb.WriteString(fmt.Sprintf("        %s   %x\n", colorField("IV:"), kb.IV))
-			sb.WriteString(fmt.Sprintf("        %s  %x\n", colorField("Key:"), kb.Key))
+			sb.WriteString(fmt.Sprintf("    [%d] %s: %s\n", i, colorField("Type"), kb.Type.String()))
+			sb.WriteString(fmt.Sprintf("        %s:   %x\n", colorField("IV"), kb.IV))
+			sb.WriteString(fmt.Sprintf("        %s:  %x\n", colorField("Key"), kb.Key))
 		}
 	}
 	if p.Properties != nil {
 		sb.WriteString(fmt.Sprintf("  %s:\n", colorField("Properties")))
 		for k, v := range p.Properties {
-			sb.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(k), v))
+			sb.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(k), FormatPropertyValue(v)))
 		}
-	}
-	if p.ExtraDataSize > 0 {
-		sb.WriteString(fmt.Sprintf("  %s    %s (%d bytes)\n", colorField("Extra Data Size:"), humanize.Bytes(uint64(p.ExtraDataSize)), p.ExtraDataSize))
 	}
 	return sb.String()
 }
@@ -297,7 +301,7 @@ func (p *Payload) MarshalJSON() ([]byte, error) {
 		"encrypted":       p.Encrypted,
 		"keybags":         p.Keybags,
 		"properties":      p.Properties,
-		"extra_data_size": p.ExtraDataSize,
+		"extra_data_size": len(p.ExtraData),
 		"compression":     p.Compression,
 		"hash":            p.Hash,
 	}
@@ -457,9 +461,8 @@ func CreateIm4pWithExtra(name, fourcc, description string, data []byte, kbags []
 
 	// Store extra data information for reference
 	if len(extraData) > 0 {
-		im4pStruct.ExtraDataSize = len(extraData)
-		im4pStruct.ExtraDataBytes = make([]byte, len(extraData))
-		copy(im4pStruct.ExtraDataBytes, extraData)
+		im4pStruct.ExtraData = make([]byte, len(extraData))
+		copy(im4pStruct.ExtraData, extraData)
 	}
 
 	// If there are keybags, marshal them to KbagData
@@ -541,9 +544,8 @@ func detectMachOExtraData(i *Payload) error {
 			for _, magic := range machOMagics {
 				if bytes.Equal(i.Data[checkPos:checkPos+4], magic) {
 					// Found MachO magic - this is likely extra data
-					i.ExtraDataSize = offset
-					i.ExtraDataBytes = make([]byte, offset)
-					copy(i.ExtraDataBytes, i.Data[checkPos:])
+					i.ExtraData = make([]byte, offset)
+					copy(i.ExtraData, i.Data[checkPos:])
 
 					log.Debugf("Detected MachO binary at offset %d (%d bytes from end)", checkPos, offset)
 					return nil
@@ -557,21 +559,21 @@ func detectMachOExtraData(i *Payload) error {
 
 // GetExtraData returns any extra data that was detected from the payload
 func (i *Payload) GetExtraData() []byte {
-	return i.ExtraDataBytes
+	return i.ExtraData
 }
 
 // HasExtraData returns true if extra data was detected in the IM4P
 func (i *Payload) HasExtraData() bool {
-	return i.ExtraDataSize > 0
+	return len(i.ExtraData) > 0
 }
 
 // GetCleanPayloadData returns the payload data without the detected extra data
 // This is useful when you want to process only the actual payload without metadata
 func (i *Payload) GetCleanPayloadData() []byte {
-	if i.ExtraDataSize > 0 && len(i.Data) > i.ExtraDataSize {
+	if len(i.ExtraData) > 0 && len(i.Data) > len(i.ExtraData) {
 		// Return payload without the detected extra data
-		cleanData := make([]byte, len(i.Data)-i.ExtraDataSize)
-		copy(cleanData, i.Data[:len(i.Data)-i.ExtraDataSize])
+		cleanData := make([]byte, len(i.Data)-len(i.ExtraData))
+		copy(cleanData, i.Data[:len(i.Data)-len(i.ExtraData)])
 		return cleanData
 	}
 	// If no extra data detected or data is too small, return original data
@@ -580,118 +582,36 @@ func (i *Payload) GetCleanPayloadData() []byte {
 
 // GetExtraDataInfo returns information about the detected extra data
 func (i *Payload) GetExtraDataInfo() map[string]any {
-	if i.ExtraDataSize == 0 {
+	if len(i.ExtraData) == 0 {
 		return nil
 	}
 
 	info := map[string]any{
-		"size":     i.ExtraDataSize,
-		"has_data": len(i.ExtraDataBytes) > 0,
+		"size":     len(i.ExtraData),
+		"has_data": len(i.ExtraData) > 0,
 	}
 
-	if len(i.ExtraDataBytes) > 0 {
+	if len(i.ExtraData) > 0 {
 		// Analyze the extra data to provide more info
 		nullCount := 0
-		for _, b := range i.ExtraDataBytes {
+		for _, b := range i.ExtraData {
 			if b == 0 {
 				nullCount++
 			}
 		}
 
 		info["null_bytes"] = nullCount
-		info["null_percentage"] = float64(nullCount) / float64(len(i.ExtraDataBytes)) * 100
+		info["null_percentage"] = float64(nullCount) / float64(len(i.ExtraData)) * 100
 
 		// Check if it looks like ASN.1 data
-		if len(i.ExtraDataBytes) >= 2 {
-			tag := i.ExtraDataBytes[0]
+		if len(i.ExtraData) >= 2 {
+			tag := i.ExtraData[0]
 			info["likely_asn1"] = (tag == 0x30 || tag == 0x31 || tag == 0x04 || tag == 0x02)
 			info["first_byte"] = fmt.Sprintf("%#02x", tag)
 		}
 	}
 
 	return info
-}
-
-// parsePayloadProperties parses the properties section - handles both PAYP containers and direct properties
-func parsePayloadProperties(data []byte) (map[string]any, error) {
-	// First try to parse as PAYP container
-	var payp struct {
-		Raw  asn1.RawContent
-		Name string        // PAYP
-		Set  asn1.RawValue `asn1:"set"`
-	}
-
-	if _, err := asn1.Unmarshal(data, &payp); err == nil && payp.Name == "PAYP" {
-		// Use ParsePropertyMap from property.go to parse the properties
-		return ParsePropertyMap(payp.Set.Bytes)
-	}
-
-	// If PAYP parsing fails, try parsing as direct properties (like SEP firmware)
-	// These are properties stored directly as private ASN.1 tags
-	return ParsePropertyMap(data)
-}
-
-// parseDirectProperties parses IM4P files with properties stored as direct private tags
-func parseDirectProperties(data []byte) (map[string]any, error) {
-	// Parse the top-level SEQUENCE to access all fields
-	var seq asn1.RawValue
-	if _, err := asn1.Unmarshal(data, &seq); err != nil {
-		return nil, fmt.Errorf("failed to parse top-level sequence: %w", err)
-	}
-
-	if seq.Tag != asn1.TagSequence {
-		return nil, fmt.Errorf("expected SEQUENCE, got tag %d", seq.Tag)
-	}
-
-	properties := make(map[string]any)
-	remaining := seq.Bytes
-
-	// Skip the known fields: tag, type, version, data, compression?, keybag?
-	fieldCount := 0
-	for len(remaining) > 0 {
-		var field asn1.RawValue
-		rest, err := asn1.Unmarshal(remaining, &field)
-		if err != nil {
-			break
-		}
-
-		fieldCount++
-		
-		// Fields 1-4 are tag, type, version, data - skip these
-		// Field 5+ might be compression, keybag, or properties
-		if fieldCount >= 5 && field.Class == 3 { // Private class properties
-			// Parse this property
-			if prop, err := parsePrivateProperty(field); err == nil {
-				for k, v := range prop {
-					properties[k] = v
-				}
-			}
-		}
-
-		remaining = rest
-	}
-
-	return properties, nil
-}
-
-// parsePrivateProperty parses a single private ASN.1 property
-func parsePrivateProperty(field asn1.RawValue) (map[string]any, error) {
-	// Parse the property structure (SEQUENCE with name and value)
-	var prop struct {
-		Name  string
-		Value asn1.RawValue
-	}
-
-	if _, err := asn1.Unmarshal(field.Bytes, &prop); err != nil {
-		return nil, err
-	}
-
-	value := ParsePropertyValueWithTag(prop.Value, field.Tag)
-	if value == nil {
-		return nil, fmt.Errorf("failed to parse property value")
-	}
-
-	return map[string]any{prop.Name: value}, nil
 }
 
 /* Payload Processing Functions */

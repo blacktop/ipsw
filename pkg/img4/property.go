@@ -4,8 +4,11 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 	"unicode"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // Property represents a dynamic IMG4 property with auto-detected type
@@ -173,26 +176,8 @@ func ParsePropertyValueWithTag(rawValue asn1.RawValue, tag int) any {
 func FormatPropertyValue(value any) string {
 	switch v := value.(type) {
 	case []byte:
-		// Always display full hex for binary data - no truncation for hashes
-		return fmt.Sprintf("%x", v)
-	case string:
-		if len(v) > 32 {
-			return fmt.Sprintf("%.32s...", v)
-		}
-		return v
-	case time.Time:
-		return fmt.Sprintf("%s (%d)", v.Format("2006-01-02 15:04:05 UTC"), v.Unix())
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-// FormatPropertyValueTruncated formats property values for display with byte truncation
-func FormatPropertyValueTruncated(value any) string {
-	switch v := value.(type) {
-	case []byte:
-		if len(v) > 16 {
-			return fmt.Sprintf("%x... (%d bytes)", v[:16], len(v))
+		if len(v) > 100 {
+			return "\n" + strings.TrimSpace(utils.HexDump(v, 0))
 		}
 		return fmt.Sprintf("%x", v)
 	case string:
