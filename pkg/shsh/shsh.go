@@ -22,7 +22,12 @@ type SHSH struct {
 func ParseRAW(r io.Reader) error {
 	utils.Indent(log.Info, 2)("Parsing shsh")
 
-	img4, err := img4.Parse(r)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	img4, err := img4.ParseImage(data)
 	if err != nil {
 		return err
 	}
@@ -40,7 +45,7 @@ func ParseRAW(r io.Reader) error {
 	}
 
 	shsh := &SHSH{
-		Generator: fmt.Sprintf("0x%x", binary.LittleEndian.Uint64(img4.RestoreInfo.GeneratorData())),
+		Generator: fmt.Sprintf("0x%x", binary.LittleEndian.Uint64(img4.RestoreInfo.RestoreProperties.Bytes)),
 		// Use the raw manifest data (skip Context Specific header)
 		ApImg4Ticket: img4.Manifest.Raw[4:],
 	}

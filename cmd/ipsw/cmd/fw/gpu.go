@@ -110,7 +110,7 @@ var gpuCmd = &cobra.Command{
 			}
 			for _, f := range out {
 				log.Infof("Parsing %s", f)
-				im4p, err := img4.OpenIm4p(f)
+				im4p, err := img4.OpenPayload(f)
 				if err != nil {
 					return err
 				}
@@ -124,7 +124,7 @@ var gpuCmd = &cobra.Command{
 			}
 		} else if isIm4p, _ := magic.IsIm4p(infile); isIm4p {
 			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}

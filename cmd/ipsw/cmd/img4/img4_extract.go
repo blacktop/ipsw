@@ -115,27 +115,22 @@ var img4ExtractCmd = &cobra.Command{
 }
 
 func extractSpecificComponent(filePath, outputDir string, component component, raw bool) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %v", filePath, err)
-	}
-	defer f.Close()
 
 	baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 
 	var outFile string
 	var data []byte
 
-	if rawImg4, err := img4.ParseImg4(f); err == nil {
+	if rawImg4, err := img4.Open(filePath); err == nil {
 		switch component {
 		case IM4P:
-			data = rawImg4.IM4P.Raw
+			data = rawImg4.Payload.Raw
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4P)
 		case IM4M:
-			data = rawImg4.Manifest.FullBytes
+			data = rawImg4.Manifest.Raw
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4M)
 		case IM4R:
-			data = rawImg4.RestoreInfo.FullBytes
+			data = rawImg4.RestoreInfo.Raw
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4R)
 		}
 	} else {
@@ -156,10 +151,11 @@ func extractSpecificComponent(filePath, outputDir string, component component, r
 		}
 	}
 
-	fmt.Printf("%s             %s\n", colorField("File:"), baseName)
-	fmt.Printf("%s        %s\n", colorField("Component:"), component)
-	fmt.Printf("%s           %s\n", colorField("Output:"), outFile)
-	fmt.Printf("%s             %s\n", colorField("Size:"), humanize.Bytes(uint64(len(data))))
+	utils.Indent(log.WithFields(log.Fields{
+		"component": component,
+		"path":      outFile,
+		"size":      humanize.Bytes(uint64(len(data))),
+	}).Info, 2)("Extracting IMG4 Component")
 
 	return os.WriteFile(outFile, data, 0644)
 }

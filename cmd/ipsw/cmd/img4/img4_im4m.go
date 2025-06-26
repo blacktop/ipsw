@@ -35,6 +35,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
@@ -182,9 +183,10 @@ var img4Im4mExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to extract manifest from SHSH blob: %v", err)
 		}
 
-		fmt.Printf("%s             %s\n", colorField("File:"), filepath.Base(filePath))
-		fmt.Printf("%s      %s\n", colorField("Output:"), outputPath)
-		fmt.Printf("%s        %s\n", colorField("Manifest Size:"), humanize.Bytes(uint64(len(manifestData))))
+		utils.Indent(log.WithFields(log.Fields{
+			"path": outputPath,
+			"size": humanize.Bytes(uint64(len(manifestData))),
+		}).Info, 2)("Extracting IM4M")
 
 		return os.WriteFile(outputPath, manifestData, 0644)
 	},
@@ -233,27 +235,29 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		// Try to parse as IMG4 first, fall back to BuildManifest.plist
 		var buildProperties map[string]any
 
-		if buildImg, err := img4.Parse(bm); err == nil {
-			// Parse manifest body to get properties
-			if err := buildImg.Manifest.ParseBody(); err == nil {
+		// Read file data
+		bmData, err := io.ReadAll(bm)
+		if err == nil {
+			// Try to parse as IMG4 first
+			if buildImg, err := img4.ParseImage(bmData); err == nil && buildImg.Manifest != nil {
 				buildProperties = img4.ConvertPropertySliceToMap(buildImg.Manifest.Properties)
-			}
-		} else {
-			// Try to parse as standalone IM4M
-			bm.Seek(0, io.SeekStart) // Reset file pointer
-			if buildManifest, err := img4.ParseIm4m(bm); err == nil {
-				if err := buildManifest.ParseBody(); err == nil {
+			} else {
+				// Try to parse as standalone IM4M
+				if buildManifest, err := img4.ParseManifest(bmData); err == nil {
 					buildProperties = img4.ConvertPropertySliceToMap(buildManifest.Properties)
 				}
-			} else {
-				// Try to parse as BuildManifest.plist
-				bm.Seek(0, io.SeekStart) // Reset file pointer
-				props, err := parseBuildManifestPlist(bm)
-				if err != nil {
-					return fmt.Errorf("failed to parse build manifest: %v", err)
-				}
-				buildProperties = props
 			}
+		}
+
+		if buildProperties == nil {
+			// Reset file pointer for plist parsing
+			bm.Seek(0, io.SeekStart)
+			// Try to parse as BuildManifest.plist
+			props, err := parseBuildManifestPlist(bm)
+			if err != nil {
+				return fmt.Errorf("failed to parse build manifest: %v", err)
+			}
+			buildProperties = props
 		}
 
 		result, err := verifyManifestProperties(inputManifest, buildProperties, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
@@ -261,8 +265,8 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("verification failed: %v", err)
 		}
 
-		fmt.Printf("%s           %s\n", colorField("Input Manifest:"), filepath.Base(args[0]))
-		fmt.Printf("%s         %s\n", colorField("Build Manifest:"), filepath.Base(buildManifestPath))
+		// fmt.Printf("%s           %s\n", colorField("Input Manifest:"), filepath.Base(args[0]))
+		// fmt.Printf("%s         %s\n", colorField("Build Manifest:"), filepath.Base(buildManifestPath))
 
 		if result.IsValid {
 			fmt.Printf("\n%s ✓ Manifest verification %s\n",
@@ -274,18 +278,18 @@ var img4Im4mVerifyCmd = &cobra.Command{
 				color.New(color.FgRed).Sprint("FAILED"))
 		}
 
-		fmt.Printf("%s   %d properties checked\n", colorField("Verified:"), result.PropertiesChecked)
-		if len(result.Mismatches) > 0 {
-			fmt.Printf("%s    %d properties failed\n", colorField("Mismatches:"), len(result.Mismatches))
-			if viper.GetBool("verbose") {
-				fmt.Printf("\n%s\n", colorField("Detailed Mismatches:"))
-				for _, mismatch := range result.Mismatches {
-					fmt.Printf("  %s:\n", color.New(color.FgYellow).Sprint(mismatch.Property))
-					fmt.Printf("    BuildManifest: %v\n", mismatch.Expected)
-					fmt.Printf("    IM4M:          %v\n", mismatch.Actual)
-				}
-			}
-		}
+		// fmt.Printf("%s   %d properties checked\n", colorField("Verified:"), result.PropertiesChecked)
+		// if len(result.Mismatches) > 0 {
+		// 	fmt.Printf("%s    %d properties failed\n", colorField("Mismatches:"), len(result.Mismatches))
+		// 	if viper.GetBool("verbose") {
+		// 		fmt.Printf("\n%s\n", colorField("Detailed Mismatches:"))
+		// 		for _, mismatch := range result.Mismatches {
+		// 			fmt.Printf("  %s:\n", color.New(color.FgYellow).Sprint(mismatch.Property))
+		// 			fmt.Printf("    BuildManifest: %v\n", mismatch.Expected)
+		// 			fmt.Printf("    IM4M:          %v\n", mismatch.Actual)
+		// 		}
+		// 	}
+		// }
 
 		return nil
 	},
@@ -467,13 +471,9 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 		ecid := viper.GetString("img4.im4m.personalize.ecid")
 		nonce := viper.GetString("img4.im4m.personalize.nonce")
 
-		inputFile, err := os.Open(args[0])
-		if err != nil {
-			return fmt.Errorf("failed to open input IMG4 %s: %v", args[0], err)
-		}
-		defer inputFile.Close()
+		infile := filepath.Clean(args[0])
 
-		inputImg, err := img4.Parse(inputFile)
+		inputImg, err := img4.Open(infile)
 		if err != nil {
 			return fmt.Errorf("failed to parse input IMG4: %v", err)
 		}
@@ -495,10 +495,10 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			return fmt.Errorf("failed to write personalized IMG4: %v", err)
 		}
 
-		fmt.Printf("\n%s ✓ Personalization %s\n",
-			color.New(color.FgGreen).Sprint("SUCCESS:"),
-			color.New(color.FgGreen).Sprint("COMPLETED"))
-		fmt.Printf("%s         %s\n", colorField("Output Size:"), humanize.Bytes(uint64(len(personalizedData))))
+		utils.Indent(log.WithFields(log.Fields{
+			"path": outputPath,
+			"size": humanize.Bytes(uint64(len(personalizedData))),
+		}).Info, 2)("Personalization")
 
 		return nil
 	},
@@ -511,7 +511,7 @@ type PersonalizedImg4 struct {
 	RestoreInfoData []byte
 }
 
-func personalizeImg4(img *img4.Img4, ecid, nonce string, verbose bool) (*PersonalizedImg4, error) {
+func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*PersonalizedImg4, error) {
 	if verbose {
 		log.Debug("Starting personalization process")
 		if ecid != "" {

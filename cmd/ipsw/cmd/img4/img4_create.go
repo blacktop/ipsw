@@ -30,7 +30,6 @@ import (
 	"hash/adler32"
 	"math"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -246,20 +245,6 @@ func createImg4FromIm4p(payloadPath, manifestPath, restoreInfoPath, outputPath, 
 
 	if err := os.WriteFile(outputPath, img4Data, 0644); err != nil {
 		return fmt.Errorf("failed to write output file: %v", err)
-	}
-
-	if extraPath != "" {
-		fmt.Printf("%s   %s (%s)\n", colorField("Extra Data:"), filepath.Base(extraPath), humanize.Bytes(uint64(len(extraData))))
-	}
-	if manifestPath != "" {
-		fmt.Printf("%s      %s\n", colorField("Manifest:"), filepath.Base(manifestPath))
-	} else {
-		fmt.Printf("%s %s\n", color.New(color.FgYellow).Sprint("WARNING:"), "Creating IMG4 without manifest (unsigned)")
-	}
-	if restoreInfoPath != "" {
-		fmt.Printf("%s  %s\n", colorField("Restore Info:"), filepath.Base(restoreInfoPath))
-	} else if bootNonce != "" {
-		fmt.Printf("%s  Generated with boot nonce: %s\n", colorField("Restore Info:"), bootNonce)
 	}
 
 	utils.Indent(log.WithFields(log.Fields{

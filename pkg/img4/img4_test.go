@@ -80,7 +80,7 @@ func TestCreateIm4p(t *testing.T) {
 	tests := []struct {
 		name        string
 		fourcc      string
-		description string
+		version     string
 		data        []byte
 		kbags       []Keybag
 		expectError bool
@@ -88,16 +88,16 @@ func TestCreateIm4p(t *testing.T) {
 		{
 			name:        "ValidIm4p",
 			fourcc:      "test",
-			description: "Test payload",
+			version:     "Test payload",
 			data:        []byte("Hello, World!"),
 			kbags:       nil,
 			expectError: false,
 		},
 		{
-			name:        "Im4pWithKeybags",
-			fourcc:      "krnl",
-			description: "Kernel",
-			data:        []byte("kernel data"),
+			name:    "Im4pWithKeybags",
+			fourcc:  "krnl",
+			version: "Kernel",
+			data:    []byte("kernel data"),
 			kbags: []Keybag{
 				{Type: PRODUCTION, IV: make([]byte, 16), Key: make([]byte, 32)},
 			},
@@ -107,29 +107,29 @@ func TestCreateIm4p(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			im4p := CreateIm4p("IM4P", tt.fourcc, tt.description, tt.data, tt.kbags)
+			im4p := CreateIm4p("IM4P", tt.fourcc, tt.version, tt.data, tt.kbags)
 			if im4p == nil {
 				t.Fatal("Expected IM4P but got nil")
 			}
 
-			if im4p.Name != "IM4P" {
-				t.Errorf("Expected name 'IM4P', got '%s'", im4p.Name)
+			if im4p.Tag != "IM4P" {
+				t.Errorf("Expected name 'IM4P', got '%s'", im4p.Tag)
 			}
 
 			if im4p.Type != tt.fourcc {
 				t.Errorf("Expected fourcc '%s', got '%s'", tt.fourcc, im4p.Type)
 			}
 
-			if im4p.Description != tt.description {
-				t.Errorf("Expected description '%s', got '%s'", tt.description, im4p.Description)
+			if im4p.Version != tt.version {
+				t.Errorf("Expected description '%s', got '%s'", tt.version, im4p.Version)
 			}
 
 			if !bytes.Equal(im4p.Data, tt.data) {
 				t.Error("Data doesn't match expected")
 			}
 
-			if len(tt.kbags) > 0 && len(im4p.Kbags) != len(tt.kbags) {
-				t.Errorf("Expected %d keybags, got %d", len(tt.kbags), len(im4p.Kbags))
+			if len(tt.kbags) > 0 && len(im4p.Keybags) != len(tt.kbags) {
+				t.Errorf("Expected %d keybags, got %d", len(tt.kbags), len(im4p.Keybags))
 			}
 		})
 	}
@@ -137,10 +137,10 @@ func TestCreateIm4p(t *testing.T) {
 
 func TestCreateIm4pFile(t *testing.T) {
 	fourcc := "test"
-	description := "Test payload"
+	version := "Test payload"
 	data := []byte("test data")
 
-	result, err := CreateIm4pFile(fourcc, description, data)
+	result, err := CreateIm4pFile(fourcc, version, data)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -159,8 +159,8 @@ func TestCreateIm4pFile(t *testing.T) {
 		t.Errorf("Expected fourcc '%s', got '%s'", fourcc, im4p.Type)
 	}
 
-	if im4p.Description != description {
-		t.Errorf("Expected description '%s', got '%s'", description, im4p.Description)
+	if im4p.Version != version {
+		t.Errorf("Expected description '%s', got '%s'", version, im4p.Version)
 	}
 
 	if !bytes.Equal(im4p.Data, data) {
@@ -228,13 +228,13 @@ func TestCreateImg4File(t *testing.T) {
 			}
 
 			// Verify we can parse the created IMG4
-			img4, err := Parse(bytes.NewReader(result))
+			img4, err := ParseImage(result)
 			if err != nil {
 				t.Fatalf("Failed to parse created IMG4: %v", err)
 			}
 
-			if img4.Name != "IM4P" { // This is the payload name
-				t.Errorf("Expected name 'IM4P', got '%s'", img4.Name)
+			if img4.Tag != "IMG4" {
+				t.Errorf("Expected name 'IMG4', got '%s'", img4.Tag)
 			}
 		})
 	}
@@ -292,43 +292,6 @@ func TestDetectFileType(t *testing.T) {
 	}
 }
 
-func TestDetectCompressionType(t *testing.T) {
-	tests := []struct {
-		name     string
-		data     []byte
-		expected string
-	}{
-		{
-			name:     "NoCompression",
-			data:     []byte("regular data"),
-			expected: "none",
-		},
-		{
-			name:     "LZFSECompression",
-			data:     []byte("bvx2compressed"),
-			expected: "LZFSE",
-		},
-		{
-			name:     "LZSSCompression",
-			data:     []byte("complzssdata"),
-			expected: "LZSS",
-		},
-		{
-			name:     "TooShort",
-			data:     []byte("hi"),
-			expected: "none",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := detectCompressionType(tt.data)
-			if result != tt.expected {
-				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
 
 func TestKeybagString(t *testing.T) {
 	kbag := Keybag{
@@ -458,7 +421,7 @@ func TestIntegrationWithFileSystem(t *testing.T) {
 		}
 
 		// Read and parse
-		im4p, err := OpenIm4p(im4pPath)
+		im4p, err := OpenPayload(im4pPath)
 		if err != nil {
 			t.Fatalf("Failed to open IM4P file: %v", err)
 		}
@@ -474,14 +437,29 @@ func TestIntegrationWithFileSystem(t *testing.T) {
 }
 
 // Helper function to create test IM4R data
-// For now, skip the complex ASN.1 generation and use a simple approach
-func createTestIm4rData(_ []byte) []byte {
-	// For the test, we'll create a simpler structure that will pass basic parsing
-	// but won't have the complex property structure
-	// This is adequate for testing basic IM4R creation and structure validation
-	
-	// Create a minimal IM4R structure for testing
-	return []byte("IM4R_test_data_placeholder")
+func createTestIm4rData(nonce []byte) []byte {
+	// Use the actual CreateIm4rWithBootNonce function to create valid IM4R data
+	im4rData, err := CreateIm4rWithBootNonce(nonce)
+	if err != nil {
+		// Fallback to creating minimal valid IM4R data for testing
+		// Create a boot nonce value from the provided bytes
+		var nonceValue uint64
+		if len(nonce) >= 8 {
+			nonceValue = uint64(nonce[0])<<56 | uint64(nonce[1])<<48 | uint64(nonce[2])<<40 | uint64(nonce[3])<<32 |
+				uint64(nonce[4])<<24 | uint64(nonce[5])<<16 | uint64(nonce[6])<<8 | uint64(nonce[7])
+		} else {
+			nonceValue = 0x1234567890abcdef // Default test value
+		}
+		
+		restoreInfo := NewWithBootNonce(nonceValue)
+		if data, marshalErr := restoreInfo.Marshal(); marshalErr == nil {
+			return data
+		}
+		
+		// Last resort: return empty byte slice
+		return []byte{}
+	}
+	return im4rData
 }
 
 // detectFileTypeFromData detects IMG4/IM4P file type from raw data using magic detection
@@ -493,22 +471,22 @@ func detectFileTypeFromData(data []byte) string {
 	}
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
-	
+
 	if _, err := tempFile.Write(data); err != nil {
 		return ""
 	}
 	tempFile.Sync()
-	
+
 	// Check for IMG4
 	if isImg4, err := magic.IsImg4(tempFile.Name()); err == nil && isImg4 {
 		return "IMG4"
 	}
-	
+
 	// Check for IM4P
 	if isIm4p, err := magic.IsIm4p(tempFile.Name()); err == nil && isIm4p {
 		return "IM4P"
 	}
-	
+
 	return ""
 }
 

@@ -8,19 +8,15 @@ import (
 )
 
 type IM4R struct {
-	Name      string        `asn1:"ia5"`
-	Generator asn1.RawValue // Dictionary of properties
+	Raw               asn1.RawContent
+	Tag               string `asn1:"ia5"`
+	RestoreProperties asn1.RawValue
 }
 
 // RestoreInfo represents an IM4R (Image4 Restore Info) structure
 type RestoreInfo struct {
 	IM4R
-	Properties map[string]any // Parsed properties indexed by name for fast lookup
-}
-
-// GeneratorData returns the raw generator data for compatibility
-func (r *RestoreInfo) GeneratorData() []byte {
-	return r.Generator.Bytes
+	Properties map[string]any
 }
 
 // RestoreInfoError represents parsing errors with context
@@ -44,11 +40,11 @@ func ParseRestoreInfo(data []byte) (*RestoreInfo, error) {
 		return nil, &RestoreInfoError{"parse", err}
 	}
 
-	if ri.Name != "IM4R" {
-		return nil, &RestoreInfoError{"validate", fmt.Errorf("invalid magic: expected 'IM4R', got '%s'", ri.Name)}
+	if ri.Tag != "IM4R" {
+		return nil, &RestoreInfoError{"validate", fmt.Errorf("invalid magic: expected 'IM4R', got '%s'", ri.Tag)}
 	}
 
-	properties, err := ParsePropertyMap(ri.Generator.Bytes)
+	properties, err := ParsePropertyMap(ri.RestoreProperties.Bytes)
 	if err != nil {
 		return nil, &RestoreInfoError{"parse properties", err}
 	}
@@ -57,8 +53,6 @@ func ParseRestoreInfo(data []byte) (*RestoreInfo, error) {
 
 	return &ri, nil
 }
-
-
 
 // BootNonce returns the boot nonce (BNCN) value if present
 func (r *RestoreInfo) BootNonce() (uint64, bool) {
@@ -111,7 +105,7 @@ func New(properties map[string]any) *RestoreInfo {
 // CreateIm4rWithBootNonce creates IM4R data with a boot nonce (legacy function for compatibility)
 func CreateIm4rWithBootNonce(nonce any) ([]byte, error) {
 	var nonceValue uint64
-	
+
 	switch v := nonce.(type) {
 	case uint64:
 		nonceValue = v
@@ -125,7 +119,7 @@ func CreateIm4rWithBootNonce(nonce any) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported nonce type: %T", nonce)
 	}
-	
+
 	restoreInfo := NewWithBootNonce(nonceValue)
 	return restoreInfo.Marshal()
 }
@@ -133,19 +127,19 @@ func CreateIm4rWithBootNonce(nonce any) ([]byte, error) {
 // Marshal marshals the RestoreInfo to ASN.1 bytes (IM4R format)
 func (r *RestoreInfo) Marshal() ([]byte, error) {
 	// Create generator data from properties
-	generatorData, err := r.marshalProperties()
+	restorePropertiesData, err := r.marshalProperties()
 	if err != nil {
 		return nil, &RestoreInfoError{"marshal properties", err}
 	}
 
 	// Create IM4R structure
 	im4r := struct {
-		Name      string        // "IM4R"
-		Generator asn1.RawValue // Property data
+		Tag               string        // "IM4R"
+		RestoreProperties asn1.RawValue // Property data
 	}{
-		Name: "IM4R",
-		Generator: asn1.RawValue{
-			Bytes: generatorData,
+		Tag: "IM4R",
+		RestoreProperties: asn1.RawValue{
+			Bytes: restorePropertiesData,
 		},
 	}
 
@@ -196,10 +190,10 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 
 		// Create property structure
 		propStruct := struct {
-			Name  string
+			Tag   string
 			Value asn1.RawValue
 		}{
-			Name: name,
+			Tag: name,
 			Value: asn1.RawValue{
 				Tag:       tag,
 				FullBytes: valueBytes, // Use full bytes including header
@@ -255,4 +249,3 @@ func (r *RestoreInfo) MarshalJSON() ([]byte, error) {
 	}
 	return json.MarshalIndent(data, "", "  ")
 }
-

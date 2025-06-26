@@ -107,7 +107,7 @@ var ibootimCmd = &cobra.Command{
 			for _, f := range out {
 				if ok, _ := magic.IsIm4p(f); ok {
 					log.Infof("Processing IM4P file: %s", filepath.Base(f))
-					im4p, err := img4.OpenIm4p(f)
+					im4p, err := img4.OpenPayload(f)
 					if err != nil {
 						return err
 					}
@@ -131,7 +131,7 @@ var ibootimCmd = &cobra.Command{
 			}
 		} else if ok, _ := magic.IsIm4p(infile); ok {
 			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}

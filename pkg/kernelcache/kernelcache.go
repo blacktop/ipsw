@@ -173,7 +173,7 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 		return errors.Wrap(err, "failed to read Kernelcache")
 	}
 
-	km, err := img4.ParseImg4(bytes.NewReader(content))
+	km, err := img4.ParseImage(content)
 	if err != nil {
 		return fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
@@ -181,9 +181,9 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 	kcache = filepath.Join(outputDir, kcache+".decompressed")
 	os.MkdirAll(filepath.Dir(kcache), 0755)
 
-	if bytes.Contains(km.IM4P.Data[:4], []byte("bvx2")) {
+	if bytes.Contains(km.Payload.Data[:4], []byte("bvx2")) {
 		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-		dat, err := lzfse.NewDecoder(km.IM4P.Data).DecodeBuffer()
+		dat, err := lzfse.NewDecoder(km.Payload.Data).DecodeBuffer()
 		if err != nil {
 			return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 		}
@@ -192,7 +192,7 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
 		}
 	} else {
-		if err = os.WriteFile(kcache, km.IM4P.Data, 0660); err != nil {
+		if err = os.WriteFile(kcache, km.Payload.Data, 0660); err != nil {
 			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
 		}
 	}
@@ -207,17 +207,17 @@ func DecompressKernelManagementData(kcache string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read kernelcache: %v", err)
 	}
 
-	km, err := img4.ParseImg4(bytes.NewReader(content))
+	km, err := img4.ParseImage(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
 
-	if bytes.Contains(km.IM4P.Data[:4], []byte("bvx2")) {
+	if bytes.Contains(km.Payload.Data[:4], []byte("bvx2")) {
 		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-		return lzfse.NewDecoder(km.IM4P.Data).DecodeBuffer()
+		return lzfse.NewDecoder(km.Payload.Data).DecodeBuffer()
 	}
 
-	return km.IM4P.Data, nil
+	return km.Payload.Data, nil
 }
 
 // DecompressData decompresses compressed kernelcache []byte data

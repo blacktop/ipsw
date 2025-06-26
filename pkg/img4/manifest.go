@@ -8,11 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/fatih/color"
 )
 
 // Core ASN.1 Private Tag Constants (stable tags that won't change)
@@ -135,9 +135,9 @@ func getPropertyType(tag int) PropType {
 }
 
 // Manifest represents a unified IM4M manifest structure
-type Img4Manifest struct {
+type IM4M struct {
 	Raw       asn1.RawContent
-	Name      string // IM4M
+	Tag       string // IM4M
 	Version   int
 	Body      asn1.RawValue `asn1:"set"`      // Manifest body as SET - parsed dynamically
 	Signature []byte        `asn1:"optional"` // Optional signature data
@@ -157,14 +157,27 @@ type ManifestBody struct {
 
 // Manifest represents the complete IM4M manifest structure
 type Manifest struct {
-	Img4Manifest
+	IM4M
 	ManifestBody
+}
+
+func OpenManifest(path string) (*Manifest, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
+	}
+	return ParseManifest(data)
 }
 
 // ParseManifest parses a raw IM4M manifest from bytes
 func ParseManifest(data []byte) (*Manifest, error) {
 	var manifest Manifest
-	rest, err := asn1.Unmarshal(data, &manifest.Img4Manifest)
+	rest, err := asn1.Unmarshal(data, &manifest.IM4M)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
@@ -173,8 +186,8 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		return nil, fmt.Errorf("unexpected trailing data in manifest")
 	}
 
-	if manifest.Name != "IM4M" {
-		return nil, fmt.Errorf("invalid manifest magic: expected 'IM4M', got '%s'", manifest.Name)
+	if manifest.Tag != "IM4M" {
+		return nil, fmt.Errorf("invalid manifest magic: expected 'IM4M', got '%s'", manifest.Tag)
 	}
 
 	if err := manifest.ParseBody(); err != nil {
@@ -223,34 +236,6 @@ func (m *Manifest) ParseBody() error {
 	}
 
 	return nil
-}
-
-func (m *Manifest) MarshalJSON() ([]byte, error) {
-	data := map[string]any{
-		"name":    m.Name,
-		"version": m.Version,
-	}
-	if len(m.Properties) > 0 {
-		data["properties"] = ConvertPropertySliceToMap(m.Properties)
-	}
-	if len(m.Images) > 0 {
-		images := make(map[string]any)
-		for _, image := range m.Images {
-			imageProps := make(map[string]any)
-			for _, prop := range image.Properties {
-				imageProps[prop.Name] = prop.Value
-			}
-			images[image.Name] = imageProps
-		}
-		data["images"] = images
-	}
-	if len(m.Signature) > 0 {
-		data["signature"] = m.Signature
-	}
-	if len(m.CertChain.Bytes) > 0 {
-		data["certificate_chain"] = m.CertChain.Bytes
-	}
-	return json.Marshal(data)
 }
 
 // parseMANB parses the MANB container which contains MANP properties and image descriptors
@@ -364,10 +349,8 @@ func (m *Manifest) parseImageDescriptor(data []byte) (*ManifestImage, error) {
 // String returns a formatted string representation of the manifest
 func (m *Manifest) String() string {
 	var sb strings.Builder
-	colorField := color.New(color.Bold, color.FgHiBlue).SprintFunc()
-
-	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4M (IMG4 Manifest)")))
-	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Name"), m.Name))
+	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4M (Manifest)")))
+	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Tag"), m.Tag))
 	sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Version"), m.Version))
 	sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("Body Size"), len(m.Body.Bytes)))
 
@@ -414,6 +397,34 @@ func (m *Manifest) String() string {
 	}
 
 	return sb.String()
+}
+
+func (m *Manifest) MarshalJSON() ([]byte, error) {
+	data := map[string]any{
+		"tag":     m.Tag,
+		"version": m.Version,
+	}
+	if len(m.Properties) > 0 {
+		data["properties"] = ConvertPropertySliceToMap(m.Properties)
+	}
+	if len(m.Images) > 0 {
+		images := make(map[string]any)
+		for _, image := range m.Images {
+			imageProps := make(map[string]any)
+			for _, prop := range image.Properties {
+				imageProps[prop.Name] = prop.Value
+			}
+			images[image.Name] = imageProps
+		}
+		data["images"] = images
+	}
+	if len(m.Signature) > 0 {
+		data["signature"] = m.Signature
+	}
+	if len(m.CertChain.Bytes) > 0 {
+		data["certificate_chain"] = m.CertChain.Bytes
+	}
+	return json.Marshal(data)
 }
 
 // analyzeSignature determines the signature algorithm based on signature size
@@ -503,7 +514,7 @@ func extractManifestFromRawData(data []byte, startIdx int) ([]byte, error) {
 
 	// Try to parse the ASN.1 structure to determine the correct length
 	var manifest Manifest
-	if _, err := asn1.Unmarshal(remainder, &manifest.Img4Manifest); err == nil {
+	if _, err := asn1.Unmarshal(remainder, &manifest.IM4M); err == nil {
 		return manifest.Raw, nil
 	}
 

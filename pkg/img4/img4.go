@@ -2,9 +2,11 @@ package img4
 
 import (
 	"encoding/asn1"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/fatih/color"
@@ -17,23 +19,22 @@ var (
 	colorSubField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
 )
 
-// Core IMG4 Types
-type Img4 struct {
-	Name        string
-	Description string
-	Manifest    *Manifest
-	RestoreInfo *RestoreInfo
-}
-
-type img4 struct {
+type IMG4 struct {
 	Raw         asn1.RawContent
-	Name        string // IMG4
-	IM4P        im4p
+	Tag         string // IMG4
+	Payload     asn1.RawValue
 	Manifest    asn1.RawValue `asn1:"explicit,tag:0,optional"`
 	RestoreInfo asn1.RawValue `asn1:"explicit,tag:1,optional"`
 }
 
-func Open(path string) (*img4, error) {
+type Image struct {
+	IMG4
+	Payload     *Payload
+	Manifest    *Manifest
+	RestoreInfo *RestoreInfo
+}
+
+func Open(path string) (*Image, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
@@ -47,108 +48,69 @@ func Open(path string) (*img4, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
 	}
-	return ParseImg4Raw(data)
+	return ParseImage(data)
 }
 
-// readBuffer reads all data from an io.Reader into a byte slice
-func readBuffer(r io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read data: %v", err)
-	}
-	return data, nil
-}
-
-// ParseImg4 parses an IMG4 from an io.Reader
-func ParseImg4(r io.Reader) (*img4, error) {
-	data, err := readBuffer(r)
-	if err != nil {
-		return nil, err
-	}
-	return ParseImg4Raw(data)
-}
-
-// ParseImg4Raw parses an IMG4 from raw bytes
-func ParseImg4Raw(data []byte) (*img4, error) {
-	var img img4
-	if _, err := asn1.Unmarshal(data, &img); err != nil {
+func ParseImage(data []byte) (*Image, error) {
+	img := &Image{}
+	
+	if _, err := asn1.Unmarshal(data, &img.IMG4); err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IMG4: %v", err)
 	}
-	return &img, nil
-}
 
-// ParseIm4m parses a standalone IM4M manifest file
-func ParseIm4m(r io.Reader) (*Manifest, error) {
-	data, err := readBuffer(r)
-	if err != nil {
-		return nil, err
-	}
-	return ParseManifest(data)
-}
-
-// OpenImg4 opens and parses an IMG4 file
-func OpenImg4(path string) (*img4, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Errorf("failed to close file: %v", err)
+	if len(img.IMG4.Payload.Bytes) > 0 {
+		payload, err := ParsePayload(img.IMG4.Payload.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse payload: %w", err)
 		}
-	}()
-	return ParseImg4(f)
-}
-
-// Parse parses a Img4 from io.Reader
-func Parse(r io.Reader) (i *Img4, err error) {
-	data, err := readBuffer(r)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRaw(data)
-}
-
-// ParseRaw parses a Img4 from raw bytes
-func ParseRaw(data []byte) (i *Img4, err error) {
-	var img img4
-	if _, err := asn1.Unmarshal(data, &img); err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
+		img.Payload = payload
 	}
 
-	i = &Img4{
-		Name:        img.IM4P.Name,
-		Description: img.IM4P.Description,
-	}
-
-	if len(img.Manifest.Bytes) > 0 {
-		i.Manifest, err = ParseManifest(img.Manifest.Bytes)
+	if len(img.IMG4.Manifest.Bytes) > 0 {
+		manifest, err := ParseManifest(img.IMG4.Manifest.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse manifest: %w", err)
 		}
+		img.Manifest = manifest
 	}
 
-	if len(img.RestoreInfo.Bytes) > 0 {
-		i.RestoreInfo, err = ParseRestoreInfo(img.RestoreInfo.Bytes)
+	if len(img.IMG4.RestoreInfo.Bytes) > 0 {
+		restoreInfo, err := ParseRestoreInfo(img.IMG4.RestoreInfo.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse restore info: %w", err)
 		}
+		img.RestoreInfo = restoreInfo
 	}
 
-	return i, nil
+	return img, nil
 }
 
-func OpenIm4p(path string) (*Im4p, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
+// String returns a formatted string representation of the image
+func (i *Image) String() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IMG4 (Image)")))
+	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Tag"), i.Tag))
+	if i.Payload != nil {
+		sb.WriteString(i.Payload.String())
 	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Errorf("failed to close file: %v", err)
-		}
-	}()
-	return ParseIm4p(f)
+	if i.Manifest != nil {
+		sb.WriteString(i.Manifest.String())
+	}
+	if i.RestoreInfo != nil {
+		sb.WriteString(i.RestoreInfo.String())
+	}
+	return sb.String()
+}
+
+// MarshalJSON returns a JSON representation of the image
+func (i *Image) MarshalJSON() ([]byte, error) {
+	data := map[string]any{
+		"tag":          i.Tag,
+		"payload":      i.Payload.Version,
+		"manifest":     i.Manifest,
+		"restore_info": i.RestoreInfo,
+	}
+	return json.Marshal(data)
 }
 
 // CreateImg4File creates a complete IMG4 file from component files
@@ -157,16 +119,21 @@ func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, err
 		return nil, fmt.Errorf("IM4P payload data is required")
 	}
 
-	img4Struct := img4{
-		Name: "IMG4",
+	img4Struct := IMG4{
+		Tag: "IMG4",
 	}
 
 	// Parse the IM4P data to embed it
-	var im4pParsed im4p
+	var im4pParsed IM4P
 	if _, err := asn1.Unmarshal(im4pData, &im4pParsed); err != nil {
 		return nil, fmt.Errorf("failed to parse IM4P data: %v", err)
 	}
-	img4Struct.IM4P = im4pParsed
+	img4Struct.Payload = asn1.RawValue{
+		Class:      2, // context-specific (for explicit tagging)
+		Tag:        0, // tag:0 as specified in struct
+		IsCompound: true,
+		Bytes:      im4pData,
+	}
 
 	// Add optional manifest data with explicit tag:0
 	if len(manifestData) > 0 {
@@ -178,15 +145,15 @@ func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, err
 		}
 	}
 
-	// TODO: Add optional restore info data with explicit tag:1
-	// if len(restoreInfoData) > 0 {
-	// 	img4Struct.RestoreInfo = img4RestoreInfo{
-	// 		Name: "IM4R",
-	// 		Generator: asn1.RawValue{
-	// 			FullBytes: restoreInfoData,
-	// 		},
-	// 	}
-	// }
+	// Add optional restore info data with explicit tag:1
+	if len(restoreInfoData) > 0 {
+		img4Struct.RestoreInfo = asn1.RawValue{
+			Class:      2, // context-specific (for explicit tagging)
+			Tag:        1, // tag:1 as specified in struct
+			IsCompound: true,
+			Bytes:      restoreInfoData,
+		}
+	}
 
 	return asn1.Marshal(img4Struct)
 }
@@ -199,7 +166,7 @@ func ValidateImg4Structure(r io.Reader) (*ValidationResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read IMG4 data: %v", err)
 	}
-	img, err := ParseRaw(data)
+	img, err := ParseImage(data)
 	if err != nil {
 		return &ValidationResult{
 			IsValid: false,
@@ -219,16 +186,16 @@ func ValidateImg4Structure(r io.Reader) (*ValidationResult, error) {
 	return result, nil
 }
 
-func validateComponents(img *Img4, result *ValidationResult) {
-	if img.Name == "" {
+func validateComponents(img *Image, result *ValidationResult) {
+	if img.Tag == "" {
 		result.IsValid = false
 		result.Errors = append(result.Errors, "Missing IMG4 name")
 	} else {
 		result.Components = append(result.Components, "name")
 	}
 
-	if img.Description == "" {
-		result.Warnings = append(result.Warnings, "Missing description")
+	if img.Payload.Version == "" {
+		result.Warnings = append(result.Warnings, "Missing IM4P version")
 	}
 
 	// Parse manifest body to validate properties

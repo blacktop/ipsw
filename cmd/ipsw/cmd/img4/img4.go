@@ -22,14 +22,8 @@ THE SOFTWARE.
 package img4
 
 import (
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
-
-var (
-	colorField    = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-	colorSubField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
 )
 
 // Img4Cmd represents the img4 command
