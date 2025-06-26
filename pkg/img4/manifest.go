@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -369,11 +370,71 @@ func (m *Manifest) String() string {
 	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Tag"), m.Tag))
 	sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Version"), m.Version))
 	sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("Body Size"), len(m.Body.Bytes)))
+	sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("Raw Size"), len(m.Raw)))
+
+	// Categorize properties for better organization
+	deviceProps := []string{"CHIP", "BORD", "ECID", "SDOM", "CEPO"}
+	securityProps := []string{"CPRO", "CSEC", "srvn", "snon", "BNCH"}
+	versionProps := []string{"pave", "vnum", "love", "prtp", "sdkp"}
+	otherProps := []string{}
+
+	devicePropCount := 0
+	securityPropCount := 0
+	versionPropCount := 0
+
+	// Count properties by category
+	propMap := make(map[string]any)
+	for _, prop := range m.Properties {
+		propMap[prop.Name] = prop.Value
+		switch {
+		case slices.Contains(deviceProps, prop.Name):
+			devicePropCount++
+		case slices.Contains(securityProps, prop.Name):
+			securityPropCount++
+		case slices.Contains(versionProps, prop.Name):
+			versionPropCount++
+		default:
+			otherProps = append(otherProps, prop.Name)
+		}
+	}
 
 	sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Properties"), len(m.Properties)))
 
-	for _, prop := range m.Properties {
-		sb.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(prop.Name), FormatPropertyValue(prop.Value)))
+	// Display properties by category
+	if devicePropCount > 0 {
+		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Device Properties")))
+		for _, propName := range deviceProps {
+			if val, exists := propMap[propName]; exists {
+				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+			}
+		}
+	}
+
+	if securityPropCount > 0 {
+		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Security Properties")))
+		for _, propName := range securityProps {
+			if val, exists := propMap[propName]; exists {
+				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+			}
+		}
+	}
+
+	if versionPropCount > 0 {
+		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Version Properties")))
+		for _, propName := range versionProps {
+			if val, exists := propMap[propName]; exists {
+				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+			}
+		}
+	}
+
+	if len(otherProps) > 0 {
+		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Other Properties")))
+		for _, propName := range otherProps {
+			if val, exists := propMap[propName]; exists {
+				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+			}
+		}
 	}
 
 	if len(m.Images) > 0 {
@@ -385,6 +446,7 @@ func (m *Manifest) String() string {
 			}
 		}
 	}
+
 	if len(m.Signature) > 0 {
 		sb.WriteString(fmt.Sprintf("  %s: %d bytes", colorField("Signature"), len(m.Signature)))
 		if sigInfo := analyzeSignature(m.Signature); sigInfo != "" {
@@ -406,6 +468,10 @@ func (m *Manifest) String() string {
 
 			if rsaPubKey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
 				sb.WriteString(fmt.Sprintf("    %s: %d bits\n", colorField("RSA Key Size"), rsaPubKey.N.BitLen()))
+			}
+			sb.WriteString(fmt.Sprintf("    %s: %x\n", colorField("Serial Number"), cert.SerialNumber))
+			if len(cert.Subject.Organization) > 0 {
+				sb.WriteString(fmt.Sprintf("    %s: %s\n", colorField("Organization"), cert.Subject.Organization[0]))
 			}
 		}
 	} else {
