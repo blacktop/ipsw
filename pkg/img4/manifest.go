@@ -178,7 +178,11 @@ func OpenManifest(path string) (*Manifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close manifest %s: %v", path, err)
+		}
+	}()
 	data, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", path, err)

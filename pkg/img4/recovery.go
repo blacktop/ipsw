@@ -4,7 +4,11 @@ import (
 	"encoding/asn1"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
+
+	"github.com/apex/log"
 )
 
 type IM4R struct {
@@ -31,6 +35,25 @@ func (e *RestoreInfoError) Error() string {
 
 func (e *RestoreInfoError) Unwrap() error {
 	return e.Err
+}
+
+func OpenRestoreInfo(path string) (*RestoreInfo, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open restore info %s: %v", path, err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close restore info %s: %v", path, err)
+		}
+	}()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read restore info %s: %v", path, err)
+	}
+
+	return ParseRestoreInfo(data)
 }
 
 // ParseRestoreInfo parses a standalone IM4R file and returns the restore info

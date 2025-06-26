@@ -416,7 +416,15 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 			if err != nil {
 				return nil, fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
 			}
-			im4p, err := ParseIm4p(rc)
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				log.Errorf("failed to read zipped file %s: %v", f.Name, err)
+				if err := rc.Close(); err != nil {
+					log.Errorf("failed to close zipped file %s: %v", f.Name, err)
+				}
+				continue
+			}
+			im4p, err := ParsePayload(data)
 			if err != nil {
 				log.Errorf("failed to parse im4p %s: %v", f.Name, err)
 			}
@@ -493,16 +501,6 @@ func CreateIm4pFileWithExtra(fourcc, description string, data []byte, extraData 
 
 	im4pStruct := CreateIm4pWithExtra("IM4P", fourcc, description, data, nil, extraData)
 	return MarshalIm4p(im4pStruct)
-}
-
-func ParseIm4p(r io.Reader) (*Payload, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read data: %w", err)
-	}
-
-	// Use ParsePayload which has all the updated logic
-	return ParsePayload(data)
 }
 
 // detectMachOExtraData specifically looks for MachO binaries at the end of the payload
@@ -618,17 +616,7 @@ func (i *Payload) GetExtraDataInfo() map[string]any {
 
 // DecryptPayload decrypts an IM4P payload using AES-CBC with provided IV and key
 func DecryptPayload(path, output string, iv, key []byte) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("unable to open file %s: %v", path, err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Errorf("failed to close file: %v", err)
-		}
-	}()
-
-	i, err := ParseIm4p(f)
+	i, err := OpenPayload(path)
 	if err != nil {
 		return fmt.Errorf("unable to parse IM4P: %v", err)
 	}
@@ -649,19 +637,15 @@ func validateDecryptionInputs(data, iv, key []byte) error {
 	if len(data) < aes.BlockSize {
 		return fmt.Errorf("IM4P data too short")
 	}
-
 	if len(data)%aes.BlockSize != 0 {
 		return fmt.Errorf("IM4P data is not a multiple of the block size")
 	}
-
 	if len(iv) != aes.BlockSize {
 		return fmt.Errorf("IV must be %d bytes, got %d", aes.BlockSize, len(iv))
 	}
-
 	if len(key) == 0 {
 		return fmt.Errorf("key cannot be empty")
 	}
-
 	return nil
 }
 
@@ -670,7 +654,6 @@ func decryptData(data, iv, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
 	}
-
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(data, data)
 	return data, nil

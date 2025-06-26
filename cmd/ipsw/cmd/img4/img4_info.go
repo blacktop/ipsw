@@ -23,6 +23,7 @@ package img4
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -55,10 +56,9 @@ var img4InfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		filePath := args[0]
-		asJSON := viper.GetBool("img4.info.json")
+		infile := filepath.Clean(args[0])
 
-		isImg4, err := magic.IsImg4(filePath)
+		isImg4, err := magic.IsImg4(infile)
 		if err != nil {
 			return fmt.Errorf("failed to determine file type: %v", err)
 		}
@@ -67,12 +67,12 @@ var img4InfoCmd = &cobra.Command{
 			return fmt.Errorf("file is not an IMG4 file (for IM4P files, use 'ipsw img4 im4p info')")
 		}
 
-		img, err := img4.Open(filePath)
+		img, err := img4.Open(infile)
 		if err != nil {
 			return fmt.Errorf("failed to parse IMG4 file: %v", err)
 		}
 
-		if asJSON {
+		if viper.GetBool("img4.info.json") {
 			json, err := img.MarshalJSON()
 			if err != nil {
 				return fmt.Errorf("failed to marshal IMG4 file: %v", err)

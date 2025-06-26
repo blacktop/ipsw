@@ -110,26 +110,12 @@ var img4Im4mInfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		filePath := args[0]
-		asJSON := viper.GetBool("img4.im4m.info.json")
-
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", filePath, err)
-		}
-		defer f.Close()
-
-		data, err := io.ReadAll(f)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", filePath, err)
-		}
-
-		manifest, err := img4.ParseManifest(data)
+		manifest, err := img4.OpenManifest(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4M: %v", err)
 		}
 
-		if asJSON {
+		if viper.GetBool("img4.im4m.info.json") {
 			jsonData, err := json.Marshal(manifest)
 			if err != nil {
 				return fmt.Errorf("failed to marshal IM4M to JSON: %v", err)

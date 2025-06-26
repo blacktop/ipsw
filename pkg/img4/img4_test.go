@@ -150,7 +150,7 @@ func TestCreateIm4pFile(t *testing.T) {
 	}
 
 	// Verify we can parse the created IM4P
-	im4p, err := ParseIm4p(bytes.NewReader(result))
+	im4p, err := ParsePayload(result)
 	if err != nil {
 		t.Fatalf("Failed to parse created IM4P: %v", err)
 	}
@@ -291,7 +291,6 @@ func TestDetectFileType(t *testing.T) {
 		})
 	}
 }
-
 
 func TestKeybagString(t *testing.T) {
 	kbag := Keybag{
@@ -450,12 +449,12 @@ func createTestIm4rData(nonce []byte) []byte {
 		} else {
 			nonceValue = 0x1234567890abcdef // Default test value
 		}
-		
+
 		restoreInfo := NewWithBootNonce(nonceValue)
 		if data, marshalErr := restoreInfo.Marshal(); marshalErr == nil {
 			return data
 		}
-		
+
 		// Last resort: return empty byte slice
 		return []byte{}
 	}

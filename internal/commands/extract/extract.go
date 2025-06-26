@@ -233,7 +233,7 @@ func SPTM(c *Config) ([]string, error) {
 			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
 		}
 
-		im4p, err := img4.ParseIm4p(bytes.NewReader(dat))
+		im4p, err := img4.ParsePayload(dat)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
@@ -299,7 +299,7 @@ func Exclave(c *Config) ([]string, error) {
 			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
 		}
 
-		im4p, err := img4.ParseIm4p(bytes.NewReader(dat))
+		im4p, err := img4.ParsePayload(dat)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}

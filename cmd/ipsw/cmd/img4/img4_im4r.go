@@ -25,8 +25,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
@@ -84,26 +84,12 @@ var img4Im4rInfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		filePath := args[0]
-		asJSON := viper.GetBool("img4.im4r.info.json")
-
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", filePath, err)
-		}
-		defer f.Close()
-
-		data, err := io.ReadAll(f)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %v", filePath, err)
-		}
-
-		restoreInfo, err := img4.ParseRestoreInfo(data)
+		restoreInfo, err := img4.OpenRestoreInfo(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4R: %v", err)
 		}
 
-		if asJSON {
+		if viper.GetBool("img4.im4r.info.json") {
 			jdata, err := json.MarshalIndent(restoreInfo, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal IM4R info: %v", err)
