@@ -30,7 +30,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -111,7 +110,7 @@ var img4Im4mInfoCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		filePath := args[0]
-		jsonOutput := viper.GetBool("img4.im4m.info.json")
+		asJSON := viper.GetBool("img4.im4m.info.json")
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -119,96 +118,28 @@ var img4Im4mInfoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		manifest, err := img4.ParseIm4m(f)
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", filePath, err)
+		}
+
+		manifest, err := img4.ParseManifest(data)
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4M: %v", err)
 		}
-		return displayIm4mInfoFromManifest(manifest, filePath, jsonOutput, viper.GetBool("verbose"))
+
+		if asJSON {
+			jsonData, err := json.Marshal(manifest)
+			if err != nil {
+				return fmt.Errorf("failed to marshal IM4M to JSON: %v", err)
+			}
+			fmt.Println(string(jsonData))
+		} else {
+			fmt.Println(manifest)
+		}
+
+		return nil
 	},
-}
-
-// displayIm4mInfoFromManifest displays info for a standalone IM4M manifest
-func displayIm4mInfoFromManifest(manifest *img4.Manifest, filePath string, jsonOutput, verbose bool) error {
-	if jsonOutput {
-		data := map[string]any{
-			"file":           filepath.Base(filePath),
-			"version":        manifest.Version,
-			"properties":     manifest.Properties,
-			"property_count": len(manifest.Properties),
-		}
-		if len(manifest.ApImg4Ticket.Bytes) > 0 {
-			data["raw_manifest"] = fmt.Sprintf("%x", manifest.ApImg4Ticket.Bytes)
-			data["manifest_size"] = len(manifest.ApImg4Ticket.Bytes)
-		}
-		if len(manifest.Images) > 0 {
-			images := make(map[string]any)
-			for _, image := range manifest.Images {
-				images[image.Name] = image.Properties
-			}
-			data["images"] = images
-			data["image_count"] = len(manifest.Images)
-		}
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal IM4M info: %v", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		fmt.Printf("%s %s\n", colorField("Name:"), manifest.Name)
-		fmt.Printf("%s %d\n", colorField("Manifest Version:"), manifest.Version)
-
-		if len(manifest.ApImg4Ticket.Bytes) > 0 {
-			fmt.Printf("%s %s\n", colorField("Manifest Size:"), humanize.Bytes(uint64(len(manifest.ApImg4Ticket.Bytes))))
-		}
-		fmt.Printf("%s (count=%d)\n", colorField("Manifest Properties:"), len(manifest.Properties))
-		displayManifestProperties(manifest.Properties, verbose)
-		if len(manifest.Images) > 0 {
-			fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(manifest.Images))
-			for _, image := range manifest.Images {
-				fmt.Printf("  %s:\n", colorSubField(image.Name))
-				for propName, propValue := range image.Properties {
-					fmt.Printf("    %s: %v\n", colorField(propName), propValue)
-				}
-			}
-		}
-		if verbose && len(manifest.ApImg4Ticket.Bytes) > 0 {
-			fmt.Printf("%s %d bytes\n", colorField("Raw Manifest Data:"), len(manifest.ApImg4Ticket.Bytes))
-			if len(manifest.ApImg4Ticket.Bytes) > 0 {
-				previewLen := min(len(manifest.ApImg4Ticket.Bytes), 32)
-				fmt.Printf("%s %x...\n", colorField("Raw Manifest Preview:"), manifest.ApImg4Ticket.Bytes[:previewLen])
-			}
-		}
-	}
-
-	return nil
-}
-
-// displayManifestProperties displays manifest properties in a consistent format
-func displayManifestProperties(properties img4.ManifestProperties, verbose bool) {
-	// Sort properties for consistent output
-	var sortedKeys []string
-	for key := range properties {
-		sortedKeys = append(sortedKeys, key)
-	}
-	slices.Sort(sortedKeys)
-
-	for _, key := range sortedKeys {
-		value := properties[key]
-		switch v := value.(type) {
-		case []byte:
-			if verbose {
-				fmt.Printf("  %s: %x\n", colorSubField(key), v)
-			} else {
-				fmt.Printf("  %s: <data:%d bytes>\n", colorSubField(key), len(v))
-			}
-		case int, int64, uint64:
-			fmt.Printf("  %s: %v (0x%x)\n", colorSubField(key), v, v)
-		case bool:
-			fmt.Printf("  %s: %v\n", colorSubField(key), v)
-		default:
-			fmt.Printf("  %s: %v\n", colorSubField(key), v)
-		}
-	}
 }
 
 // img4Im4mExtractCmd represents the im4m extract command
@@ -281,8 +212,13 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		}
 		defer inputFile.Close()
 
+		data, err := io.ReadAll(inputFile)
+		if err != nil {
+			return fmt.Errorf("failed to read input manifest %s: %v", args[0], err)
+		}
+
 		// Try to parse as standalone IM4M first
-		inputManifest, err := img4.ParseIm4m(inputFile)
+		inputManifest, err := img4.ParseManifest(data)
 		if err != nil {
 			return fmt.Errorf("failed to parse input IM4M manifest: %v", err)
 		}
@@ -295,15 +231,20 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		defer bm.Close()
 
 		// Try to parse as IMG4 first, fall back to BuildManifest.plist
-		var buildProperties img4.ManifestProperties
+		var buildProperties map[string]any
 
 		if buildImg, err := img4.Parse(bm); err == nil {
-			buildProperties = buildImg.Manifest.Properties
+			// Parse manifest body to get properties
+			if err := buildImg.Manifest.ParseBody(); err == nil {
+				buildProperties = img4.ConvertPropertySliceToMap(buildImg.Manifest.Properties)
+			}
 		} else {
 			// Try to parse as standalone IM4M
 			bm.Seek(0, io.SeekStart) // Reset file pointer
 			if buildManifest, err := img4.ParseIm4m(bm); err == nil {
-				buildProperties = buildManifest.Properties
+				if err := buildManifest.ParseBody(); err == nil {
+					buildProperties = img4.ConvertPropertySliceToMap(buildManifest.Properties)
+				}
 			} else {
 				// Try to parse as BuildManifest.plist
 				bm.Seek(0, io.SeekStart) // Reset file pointer
@@ -364,13 +305,13 @@ type PropertyMismatch struct {
 	Actual   any
 }
 
-func verifyManifestProperties(inputManifest *img4.Manifest, buildProps img4.ManifestProperties, verbose, allowExtra bool) (*VerificationResult, error) {
+func verifyManifestProperties(inputManifest *img4.Manifest, buildProps map[string]any, verbose, allowExtra bool) (*VerificationResult, error) {
 	result := &VerificationResult{
 		IsValid:    true,
 		Mismatches: []PropertyMismatch{},
 	}
 
-	inputProps := inputManifest.Properties
+	inputProps := img4.ConvertPropertySliceToMap(inputManifest.Properties)
 
 	// Common properties to verify (these are the most critical for firmware validation)
 	criticalProps := []string{"CHIP", "BORD", "CEPO", "SDOM", "ECID"}
@@ -450,7 +391,7 @@ func compareManifestValues(a, b any) bool {
 }
 
 // parseBuildManifestPlist extracts manifest properties from a BuildManifest.plist
-func parseBuildManifestPlist(r io.Reader) (img4.ManifestProperties, error) {
+func parseBuildManifestPlist(r io.Reader) (map[string]any, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read build manifest: %v", err)
@@ -469,7 +410,7 @@ func parseBuildManifestPlist(r io.Reader) (img4.ManifestProperties, error) {
 		return nil, fmt.Errorf("failed to decode build manifest plist: %v", err)
 	}
 
-	props := make(img4.ManifestProperties)
+	props := make(map[string]any)
 
 	if len(buildManifest.BuildIdentities) > 0 {
 		identity := buildManifest.BuildIdentities[0]
@@ -621,8 +562,12 @@ func personalizeImg4(img *img4.Img4, ecid, nonce string, verbose bool) (*Persona
 	// Create a personalized manifest by modifying the existing manifest properties
 	personalizedProperties := make(map[string]any)
 
-	// Copy existing properties
-	maps.Copy(personalizedProperties, img.Manifest.Properties)
+	// Parse manifest body to get existing properties
+	if err := img.Manifest.ParseBody(); err == nil {
+		// Copy existing properties
+		existingProps := img4.ConvertPropertySliceToMap(img.Manifest.Properties)
+		maps.Copy(personalizedProperties, existingProps)
+	}
 
 	// Update with device-specific values
 	personalizedProperties["ECID"] = ecidValue
@@ -635,7 +580,7 @@ func personalizeImg4(img *img4.Img4, ecid, nonce string, verbose bool) (*Persona
 	}
 
 	// Create a new manifest with personalized properties
-	personalizedManifest, err := createPersonalizedManifest(img.Manifest.ApImg4Ticket.Bytes, personalizedProperties)
+	personalizedManifest, err := createPersonalizedManifest(img.Manifest.Raw, personalizedProperties)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create personalized manifest: %w", err)
 	}

@@ -107,9 +107,11 @@ func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 			fmt.Printf("%s      %s\n", colorField("Description:"), img.Description)
 		}
 		if verbose {
+			// Parse manifest body once for both properties and images
 			if len(img.Manifest.Properties) > 0 {
 				fmt.Printf("%s\n", colorField("Manifest Properties:"))
-				for key, value := range img.Manifest.Properties {
+				for _, prop := range img.Manifest.Properties {
+					key, value := prop.Name, prop.Value
 					switch v := value.(type) {
 					case int:
 						fmt.Printf("  %s: %d\n", colorSubField(key), v)
@@ -129,19 +131,21 @@ func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) 
 						fmt.Printf("  %s: %v\n", colorSubField(key), value)
 					}
 				}
-			}
-			if len(img.Manifest.Images) > 0 {
-				fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(img.Manifest.Images))
-				for _, image := range img.Manifest.Images {
-					fmt.Printf("  %s:\n", colorSubField(image.Name))
-					for propName, propValue := range image.Properties {
-						fmt.Printf("    %s: %v\n", colorField(propName), propValue)
+				// Display images if available
+				if len(img.Manifest.Images) > 0 {
+					fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(img.Manifest.Images))
+					for _, image := range img.Manifest.Images {
+						fmt.Printf("  %s:\n", colorSubField(image.Name))
+						for _, prop := range image.Properties {
+							propName, propValue := prop.Name, prop.Value
+							fmt.Printf("    %s: %v\n", colorField(propName), propValue)
+						}
 					}
 				}
 			}
-			if len(img.RestoreInfo.Generator.Data) > 0 {
+			if len(img.RestoreInfo.GeneratorData()) > 0 {
 				fmt.Printf("%s\n", colorField("Restore Info:"))
-				fmt.Printf("  %s %x\n", colorSubField("Generator:"), img.RestoreInfo.Generator.Data)
+				fmt.Printf("  %s %x\n", colorSubField("Generator:"), img.RestoreInfo.GeneratorData())
 			}
 		}
 	}

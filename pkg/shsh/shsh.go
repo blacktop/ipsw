@@ -27,17 +27,29 @@ func ParseRAW(r io.Reader) error {
 		return err
 	}
 
+	// Find ECID property
+	var ecid any
+	for _, prop := range img4.Manifest.Properties {
+		if prop.Name == "ECID" {
+			ecid = prop.Value
+			break
+		}
+	}
+	if ecid == nil {
+		ecid = "unknown"
+	}
+
 	shsh := &SHSH{
-		Generator: fmt.Sprintf("0x%x", binary.LittleEndian.Uint64(img4.RestoreInfo.Generator.Data)),
-		// TODO: this is gross (I'm skipping past the Context Specific type to get to the Im4m)
-		ApImg4Ticket: img4.Manifest.ApImg4Ticket.FullBytes[4:],
+		Generator: fmt.Sprintf("0x%x", binary.LittleEndian.Uint64(img4.RestoreInfo.GeneratorData())),
+		// Use the raw manifest data (skip Context Specific header)
+		ApImg4Ticket: img4.Manifest.Raw[4:],
 	}
 
 	pDatam, err := plist.MarshalIndent(shsh, plist.XMLFormat, "\t")
 	if err != nil {
 		return err
 	}
-	name := fmt.Sprintf("%d.dumped.shsh", img4.Manifest.Properties["ECID"])
+	name := fmt.Sprintf("%v.dumped.shsh", ecid)
 	err = os.WriteFile(name, pDatam, 0660)
 	if err != nil {
 		return err

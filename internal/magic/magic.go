@@ -16,7 +16,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/ftab"
 	"github.com/blacktop/ipsw/pkg/img3"
-	"github.com/blacktop/ipsw/pkg/img4"
 )
 
 type Magic uint32
@@ -76,14 +75,14 @@ func IsMachoOrImg4(filePath string) (bool, error) {
 		return true, nil
 	default:
 		f.Seek(0, io.SeekStart)
-		if _, err := img4.ParseIm4p(f); err == nil {
+		if isIm4p, err := IsIm4p(filePath); isIm4p && err == nil {
 			if strings.Contains(filePath, "kernelcache") {
 				return false, fmt.Errorf("im4p file detected (run `ipsw kernel dec`)")
 			}
 			return false, fmt.Errorf("im4p file detected (run `ipsw img4 extract`)")
 		}
 		f.Seek(0, io.SeekStart)
-		if _, err := img4.ParseImg4(f); err == nil {
+		if isImg4, err := IsImg4(filePath); isImg4 && err == nil {
 			if strings.Contains(filePath, "kernelcache") {
 				return false, fmt.Errorf("img4 file detected (run `ipsw kernel dec --km`)")
 			}

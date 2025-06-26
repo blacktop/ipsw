@@ -22,10 +22,10 @@ THE SOFTWARE.
 package img4
 
 import (
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -85,7 +85,7 @@ var img4Im4rInfoCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		filePath := args[0]
-		jsonOutput := viper.GetBool("img4.im4r.info.json")
+		asJSON := viper.GetBool("img4.im4r.info.json")
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -93,38 +93,28 @@ var img4Im4rInfoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		restoreInfo, err := img4.ParseIm4r(f)
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %v", filePath, err)
+		}
+
+		restoreInfo, err := img4.ParseRestoreInfo(data)
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4R: %v", err)
 		}
 
-		return displayIm4rInfo(restoreInfo, filePath, jsonOutput, viper.GetBool("verbose"))
+		if asJSON {
+			jdata, err := json.MarshalIndent(restoreInfo, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal IM4R info: %v", err)
+			}
+			fmt.Println(string(jdata))
+		} else {
+			fmt.Println(restoreInfo)
+		}
+
+		return nil
 	},
-}
-
-func displayIm4rInfo(restoreInfo *img4.RestoreInfo, filePath string, jsonOutput, verbose bool) error {
-	if jsonOutput {
-		data := map[string]any{
-			"name":             restoreInfo.Name,
-			"boot_nonce":       fmt.Sprintf("%x", restoreInfo.Generator.Data),
-			"raw_restore_info": restoreInfo.Generator.Raw,
-		}
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal IM4R info: %v", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-
-		fmt.Printf("%s       %s\n", colorField("Name:"), restoreInfo.Name)
-		fmt.Printf("%s %x\n", colorField("Boot Nonce:"), restoreInfo.Generator.Data)
-		if verbose {
-			fmt.Printf("%s %d bytes\n", colorField("Generator Data:"), len(restoreInfo.Generator.Data))
-			fmt.Printf("%s       %d bytes\n", colorField("Raw Data:"), len(restoreInfo.Generator.Raw))
-		}
-	}
-
-	return nil
 }
 
 // img4Im4rCreateCmd represents the im4r create command
@@ -154,7 +144,10 @@ var img4Im4rCreateCmd = &cobra.Command{
 			return fmt.Errorf("boot nonce must be exactly 8 bytes (16 hex characters), got %d bytes", len(nonce))
 		}
 
-		im4rData := createIm4rWithBootNonce(nonce)
+		im4rData, err := img4.CreateIm4rWithBootNonce(nonce)
+		if err != nil {
+			return fmt.Errorf("failed to create IM4R: %v", err)
+		}
 
 		utils.Indent(log.WithFields(log.Fields{
 			"path": outputPath,
@@ -163,38 +156,4 @@ var img4Im4rCreateCmd = &cobra.Command{
 
 		return os.WriteFile(outputPath, im4rData, 0644)
 	},
-}
-
-// createIm4rWithBootNonce creates an IM4R structure with a boot nonce
-// This creates the same IM4R format as the create command for consistency.
-func createIm4rWithBootNonce(nonce []byte) []byte {
-	// Use the same implementation as createIm4r in the create command
-	return createIm4rData(nonce)
-}
-
-// createIm4rData creates IM4R data with the boot nonce - shared implementation
-func createIm4rData(nonce []byte) []byte {
-	// Create a simplified IM4R structure that contains the boot nonce directly
-	// This matches the format expected by both the C and Rust reference implementations
-
-	// Create the generator data containing BNCN + boot nonce
-	generatorData := make([]byte, 0, 4+len(nonce))
-	generatorData = append(generatorData, []byte("BNCN")...)
-	generatorData = append(generatorData, nonce...)
-
-	im4rStruct := struct {
-		Name      string `asn1:"ia5"`
-		Generator []byte
-	}{
-		Name:      "IM4R",
-		Generator: generatorData,
-	}
-
-	im4rData, err := asn1.Marshal(im4rStruct)
-	if err != nil {
-		// Fallback to simple format if marshaling fails
-		return append([]byte("IM4RBNCN"), nonce...)
-	}
-
-	return im4rData
 }

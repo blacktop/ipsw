@@ -135,7 +135,7 @@ func extractSpecificComponent(filePath, outputDir string, component component, r
 			data = rawImg4.Manifest.FullBytes
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4M)
 		case IM4R:
-			data = rawImg4.RestoreInfo.Raw
+			data = rawImg4.RestoreInfo.FullBytes
 			outFile = fmt.Sprintf("%s.%s", baseName, IM4R)
 		}
 	} else {
