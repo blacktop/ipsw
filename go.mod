@@ -61,7 +61,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/ollama/ollama v0.9.2
-	github.com/openai/openai-go v1.7.0
+	github.com/openai/openai-go v1.8.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.4.0
