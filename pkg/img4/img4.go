@@ -171,6 +171,8 @@ func Create(conf *CreateConfig) (*Image, error) {
 			comp = CompressionAlgorithmLZSS
 		case "lzfse":
 			comp = CompressionAlgorithmLZFSE
+		case "none", "":
+			comp = CompressionAlgorithmMAX // No compression
 		}
 		img.Payload, err = CreatePayload(&CreatePayloadConfig{
 			Type:        conf.PayloadType,
