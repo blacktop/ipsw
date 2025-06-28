@@ -134,6 +134,10 @@ type CreateConfig struct {
 func Create(conf *CreateConfig) (*Image, error) {
 	var err error
 
+	if conf.InputData == nil && conf.PayloadData == nil {
+		return nil, fmt.Errorf("config must contain either InputData or PayloadData")
+	}
+
 	img := Image{
 		IMG4: IMG4{
 			Tag: "IMG4",

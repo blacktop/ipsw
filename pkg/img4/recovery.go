@@ -112,6 +112,9 @@ func (r *RestoreInfo) Has(name string) bool {
 // NewWithBootNonce creates a new RestoreInfo with only a boot nonce
 func NewWithBootNonce(nonce uint64) *RestoreInfo {
 	return &RestoreInfo{
+		IM4R: IM4R{
+			Tag: "IM4R",
+		},
 		Properties: map[string]any{"BNCN": nonce},
 	}
 }
@@ -123,7 +126,12 @@ func New(properties map[string]any) *RestoreInfo {
 	for k, v := range properties {
 		props[k] = v
 	}
-	return &RestoreInfo{Properties: props}
+	return &RestoreInfo{
+		IM4R: IM4R{
+			Tag: "IM4R",
+		},
+		Properties: props,
+	}
 }
 
 // CreateRestoreInfo creates RestoreInfo from a boot nonce value
@@ -235,7 +243,16 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 		})
 	}
 
-	return asn1.Marshal(entries)
+	// Concatenate all entries directly (no outer SEQUENCE wrapper)
+	var result []byte
+	for _, entry := range entries {
+		entryBytes, err := asn1.Marshal(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property entry: %v", err)
+		}
+		result = append(result, entryBytes...)
+	}
+	return result, nil
 }
 
 // String returns a formatted string representation of the restore info

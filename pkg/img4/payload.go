@@ -359,7 +359,9 @@ func (p *Payload) Decompress() ([]byte, error) {
 		if len(p.Data) < int(hdr.CompressedSize)+binary.Size(hdr) {
 			return nil, fmt.Errorf("data too short to contain valid LZSS compressed payload")
 		}
-		decompressed := lzss.Decompress(p.Data[binary.Size(hdr):])
+		// Only decompress the compressed payload part, not any extra data
+		compressedData := p.Data[binary.Size(hdr):binary.Size(hdr)+int(hdr.CompressedSize)]
+		decompressed := lzss.Decompress(compressedData)
 		if len(decompressed) == 0 {
 			return nil, fmt.Errorf("failed to decompress LZSS payload: got empty result")
 		}
@@ -675,7 +677,7 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		)
 		pdata = append(compressedData, conf.ExtraData...)
 	default:
-		pdata = conf.Data
+		pdata = append(conf.Data, conf.ExtraData...)
 	}
 
 	var comp Compression

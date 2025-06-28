@@ -34,9 +34,9 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -217,36 +217,16 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("failed to open build manifest %s: %v", buildManifestPath, err)
 		}
 		defer bm.Close()
-
-		// Try to parse as IMG4 first, fall back to BuildManifest.plist
-		var buildProperties map[string]any
-
-		// Read file data
 		bmData, err := io.ReadAll(bm)
-		if err == nil {
-			// Try to parse as IMG4 first
-			if buildImg, err := img4.Parse(bmData); err == nil && buildImg.Manifest != nil {
-				buildProperties = img4.ConvertPropertySliceToMap(buildImg.Manifest.Properties)
-			} else {
-				// Try to parse as standalone IM4M
-				if buildManifest, err := img4.ParseManifest(bmData); err == nil {
-					buildProperties = img4.ConvertPropertySliceToMap(buildManifest.Properties)
-				}
-			}
+		if err != nil {
+			return fmt.Errorf("failed to read build manifest %s: %v", buildManifestPath, err)
+		}
+		buildManifest, err := plist.ParseBuildManifest(bmData)
+		if err != nil {
+			return fmt.Errorf("failed to parse build manifest: %v", err)
 		}
 
-		if buildProperties == nil {
-			// Reset file pointer for plist parsing
-			bm.Seek(0, io.SeekStart)
-			// Try to parse as BuildManifest.plist
-			props, err := parseBuildManifestPlist(bm)
-			if err != nil {
-				return fmt.Errorf("failed to parse build manifest: %v", err)
-			}
-			buildProperties = props
-		}
-
-		result, err := verifyManifestProperties(inputManifest, buildProperties, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
+		result, err := verifyManifestProperties(inputManifest, buildManifest, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
 		if err != nil {
 			return fmt.Errorf("verification failed: %v", err)
 		}
@@ -295,7 +275,7 @@ type PropertyMismatch struct {
 	Actual   any
 }
 
-func verifyManifestProperties(inputManifest *img4.Manifest, buildProps map[string]any, verbose, allowExtra bool) (*VerificationResult, error) {
+func verifyManifestProperties(inputManifest *img4.Manifest, buildProps *plist.BuildManifest, verbose, allowExtra bool) (*VerificationResult, error) {
 	result := &VerificationResult{
 		IsValid:    true,
 		Mismatches: []PropertyMismatch{},
@@ -380,66 +360,6 @@ func compareManifestValues(a, b any) bool {
 	return a == b
 }
 
-// parseBuildManifestPlist extracts manifest properties from a BuildManifest.plist
-func parseBuildManifestPlist(r io.Reader) (map[string]any, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read build manifest: %v", err)
-	}
-
-	var buildManifest struct {
-		BuildIdentities []struct {
-			ApBoardID        string `plist:"ApBoardID"`
-			ApChipID         string `plist:"ApChipID"`
-			ApSecurityDomain string `plist:"ApSecurityDomain"`
-		} `plist:"BuildIdentities"`
-	}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&buildManifest); err != nil {
-		return nil, fmt.Errorf("failed to decode build manifest plist: %v", err)
-	}
-
-	props := make(map[string]any)
-
-	if len(buildManifest.BuildIdentities) > 0 {
-		identity := buildManifest.BuildIdentities[0]
-
-		// Parse hex strings to integers
-		if identity.ApBoardID != "" {
-			if val, err := parseHexString(identity.ApBoardID); err == nil {
-				props["BORD"] = val
-			}
-		}
-		if identity.ApChipID != "" {
-			if val, err := parseHexString(identity.ApChipID); err == nil {
-				props["CHIP"] = val
-			}
-		}
-		if identity.ApSecurityDomain != "" {
-			if val, err := parseHexString(identity.ApSecurityDomain); err == nil {
-				props["SDOM"] = val
-			}
-		}
-	}
-
-	return props, nil
-}
-
-// parseHexString parses a hex string like "0x08" or "0x6022" to an integer
-func parseHexString(s string) (int, error) {
-	var val int64
-	var err error
-
-	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
-		val, err = strconv.ParseInt(s[2:], 16, 64)
-	} else {
-		val, err = strconv.ParseInt(s, 16, 64)
-	}
-
-	return int(val), err
-}
-
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
 	Use:           "personalize",
@@ -453,6 +373,9 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
+
+		// NOTE: this is experimental and the IMG4 will not be valid without a proper TSS response
+		log.Warn("This is an experimental command and the created IMG4 will NOT be valid")
 
 		outputPath := viper.GetString("img4.im4m.personalize.output")
 		ecid := viper.GetString("img4.im4m.personalize.ecid")
@@ -470,17 +393,14 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			return fmt.Errorf("personalization failed: %v", err)
 		}
 
-		_ = personalizedImg // Use this to avoid unused variable error
-		var img *img4.Image
-
-		// img, err := img4.Create(&img4.CreateConfig{
-		// 	PayloadPath: personalizedImg.PayloadData,
-		// 	Manifest:    &img4.Manifest{Body: img4.ManifestBody{Properties: personalizedImg.ManifestData}},
-		// 	RestoreInfo: &img4.RestoreInfo{Body: img4.RestoreInfoBody{Properties: personalizedImg.RestoreInfoData}},
-		// })
-		// if err != nil {
-		// 	return fmt.Errorf("failed to create personalized IMG4: %v", err)
-		// }
+		img, err := img4.Create(&img4.CreateConfig{
+			PayloadData:     personalizedImg.PayloadData,
+			ManifestData:    personalizedImg.ManifestData,
+			RestoreInfoData: personalizedImg.RestoreInfoData,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create personalized IMG4: %v", err)
+		}
 
 		personalizedData, err := img.Marshal()
 		if err != nil {
