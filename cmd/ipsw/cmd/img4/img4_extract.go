@@ -22,7 +22,6 @@ THE SOFTWARE.
 package img4
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,7 +31,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/blacktop/lzfse-cgo"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -148,14 +146,6 @@ var img4ExtractCmd = &cobra.Command{
 				} else {
 					// Default to same directory as the input file
 					outFile = filepath.Join(filepath.Dir(filePath), outFile)
-				}
-
-				// Decompress if not raw extraction and it's compressed
-				if !rawExtract && len(data) > 4 && bytes.Equal(data[:4], []byte("bvx2")) {
-					utils.Indent(log.Debug, 2)("Detected LZFSE compression, decompressing...")
-					if decompressed := lzfse.DecodeBuffer(data); len(decompressed) > 0 {
-						data = decompressed
-					}
 				}
 
 				utils.Indent(log.WithFields(log.Fields{
