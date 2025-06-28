@@ -487,8 +487,8 @@ func (i *Payload) calculateLzfseTotalSize(data []byte) (int, error) {
 		return endOffset + 4, nil
 	}
 
-	// No end-of-stream marker found, assume the entire data is the LZFSE stream
-	return len(data), nil
+	// If no end-of-stream marker is found, it's an invalid LZFSE stream
+	return 0, fmt.Errorf("LZFSE end-of-stream marker (bvx$) not found")
 }
 
 /* PAYLOAD KEYBAGS */
@@ -749,8 +749,19 @@ func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
 
 	var r io.Reader
 
-	// Check for LZFSE compression and decompress if needed
-	if len(data) >= 4 && bytes.Equal(data[:4], []byte("bvx2")) {
+	// Check for LZSS compression and decompress if needed
+	if isLzss, err := magic.IsLZSS(data); err != nil {
+		return fmt.Errorf("failed to check if data is LZSS: %v", err)
+	} else if isLzss {
+		log.Debug("Detected LZSS compression")
+		decompressed := lzss.Decompress(data)
+		if len(decompressed) == 0 {
+			return fmt.Errorf("failed to LZSS decompress %s", inputPath)
+		}
+		r = bytes.NewReader(decompressed)
+	} else if isLzfse, err := magic.IsLZFSE(data); err != nil { // Check for LZFSE compression and decompress if needed
+		return fmt.Errorf("failed to check if data is LZFSE: %v", err)
+	} else if isLzfse {
 		log.Debug("Detected LZFSE compression")
 		decompressed := lzfse.DecodeBuffer(data)
 		if len(decompressed) == 0 {
