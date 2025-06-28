@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -87,9 +88,10 @@ func init() {
 
 // img4Im4mCmd represents the im4m command group
 var img4Im4mCmd = &cobra.Command{
-	Use:   "im4m",
-	Short: "IM4M manifest operations",
-	Args:  cobra.NoArgs,
+	Use:     "im4m",
+	Aliases: []string{"m"},
+	Short:   "IM4M manifest operations",
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -97,8 +99,15 @@ var img4Im4mCmd = &cobra.Command{
 
 // img4Im4mInfoCmd represents the im4m info command
 var img4Im4mInfoCmd = &cobra.Command{
-	Use:           "info <IM4M>",
-	Short:         "Display IM4M manifest information",
+	Use:     "info <IM4M>",
+	Aliases: []string{"i"},
+	Short:   "Display IM4M manifest information",
+	Example: heredoc.Doc(`
+		# Display IM4M manifest information
+		❯ ipsw img4 im4m info manifest.im4m
+
+		# Output as JSON
+		❯ ipsw img4 im4m info --json manifest.im4m`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -125,8 +134,21 @@ var img4Im4mInfoCmd = &cobra.Command{
 
 // img4Im4mExtractCmd represents the im4m extract command
 var img4Im4mExtractCmd = &cobra.Command{
-	Use:           "extract <IM4M>",
-	Short:         "Extract IM4M manifest from SHSH blob",
+	Use:     "extract <IM4M>",
+	Aliases: []string{"e"},
+	Short:   "Extract IM4M manifest from SHSH blob",
+	Example: heredoc.Doc(`
+		# Extract IM4M from SHSH blob
+		❯ ipsw img4 im4m extract shsh.blob
+
+		# Extract update manifest (if available)
+		❯ ipsw img4 im4m extract --update shsh.blob
+
+		# Extract no-nonce manifest (if available)
+		❯ ipsw img4 im4m extract --no-nonce shsh.blob
+
+		# Extract to specific output file
+		❯ ipsw img4 im4m extract --output custom.im4m shsh.blob`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -169,8 +191,14 @@ var img4Im4mExtractCmd = &cobra.Command{
 
 // img4Im4mVerifyCmd represents the im4m verify command
 var img4Im4mVerifyCmd = &cobra.Command{
-	Use:           "verify <IM4M>",
-	Short:         "🚧 Verify IM4M manifest against build manifest",
+	Use:     "verify <IM4M>",
+	Short:   "🚧 Verify IM4M manifest against build manifest",
+	Example: heredoc.Doc(`
+		# Verify IM4M against build manifest
+		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
+
+		# Allow extra properties in IM4M
+		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --allow-extra manifest.im4m`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -227,8 +255,14 @@ var img4Im4mVerifyCmd = &cobra.Command{
 
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
-	Use:           "personalize",
-	Short:         "🚧 Create personalized IM4M manifest with device-specific values",
+	Use:     "personalize",
+	Short:   "🚧 Create personalized IM4M manifest with device-specific values",
+	Example: heredoc.Doc(`
+		# Personalize IMG4 with device ECID and nonce (experimental)
+		❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
+
+		# Personalize with custom output path
+		❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4`),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true, // Hidden until fully implemented
