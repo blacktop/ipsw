@@ -14,6 +14,22 @@ Extract IMG4 components
 ipsw img4 extract <IMG4> [flags]
 ```
 
+### Examples
+
+```bash
+# Extract IM4P payload from IMG4 file
+❯ ipsw img4 extract --im4p kernel.img4
+
+# Extract manifest and restore info
+❯ ipsw img4 extract --im4m --im4r kernel.img4
+
+# Extract all components to a specific directory
+❯ ipsw img4 extract --im4p --im4m --im4r --output /tmp/extracted kernel.img4
+
+# Extract raw (compressed) IM4P data without decompression
+❯ ipsw img4 extract --im4p --raw kernel.img4
+```
+
 ### Options
 
 ```

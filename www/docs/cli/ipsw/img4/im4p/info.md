@@ -14,6 +14,16 @@ Display detailed IM4P information
 ipsw img4 im4p info <IM4P> [flags]
 ```
 
+### Examples
+
+```bash
+# Display IM4P information
+❯ ipsw img4 im4p info kernelcache.im4p
+
+# Output as JSON
+❯ ipsw img4 im4p info --json kernelcache.im4p
+```
+
 ### Options
 
 ```

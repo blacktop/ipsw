@@ -14,6 +14,16 @@ Display IM4M manifest information
 ipsw img4 im4m info <IM4M> [flags]
 ```
 
+### Examples
+
+```bash
+# Display IM4M manifest information
+❯ ipsw img4 im4m info manifest.im4m
+
+# Output as JSON
+❯ ipsw img4 im4m info --json manifest.im4m
+```
+
 ### Options
 
 ```

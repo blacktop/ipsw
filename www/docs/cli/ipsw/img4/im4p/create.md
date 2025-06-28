@@ -14,6 +14,22 @@ Create IM4P payload from raw data
 ipsw img4 im4p create <input-file> [flags]
 ```
 
+### Examples
+
+```bash
+# Create IM4P from kernel with LZSS compression
+❯ ipsw img4 im4p create --type krnl --compress lzss kernelcache.bin
+
+# Create IM4P with version and extra data
+❯ ipsw img4 im4p create --type rkrn --version "RestoreKernel" --compress lzss --extra extra.bin kernel.bin
+
+# Create uncompressed IM4P
+❯ ipsw img4 im4p create --type logo --compress none logo.png
+
+# Create with custom output path
+❯ ipsw img4 im4p create --type dtre --output devicetree.im4p devicetree.bin
+```
+
 ### Options
 
 ```

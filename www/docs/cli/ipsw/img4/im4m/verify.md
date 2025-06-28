@@ -14,6 +14,16 @@ description: 🚧 Verify IM4M manifest against build manifest
 ipsw img4 im4m verify <IM4M> [flags]
 ```
 
+### Examples
+
+```bash
+# Verify IM4M against build manifest
+❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
+
+# Allow extra properties in IM4M
+❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --allow-extra manifest.im4m
+```
+
 ### Options
 
 ```
