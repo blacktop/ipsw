@@ -38,8 +38,6 @@ import (
 )
 
 const (
-	// ComplzssHeaderSize is the size of the complzss header
-	ComplzssHeaderSize = 384
 	// BootNonceLength is the required length of boot nonce in bytes
 	BootNonceLength = 8
 )
@@ -50,9 +48,9 @@ func init() {
 	img4CreateCmd.Flags().StringP("input", "i", "", "Input file for IM4P payload data (raw data, not IM4P file)")
 	img4CreateCmd.Flags().StringP("type", "t", "", "IM4P type to set")
 	img4CreateCmd.Flags().StringP("version", "v", "", "IM4P version to set")
-	img4CreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("IM4P compression to use (%s)", strings.Join(compressionTypes, ", ")))
+	img4CreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("IM4P compression to use (%s)", strings.Join(img4.CompressionTypes, ", ")))
 	img4CreateCmd.RegisterFlagCompletionFunc("compress", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return compressionTypes, cobra.ShellCompDirectiveDefault
+		return img4.CompressionTypes, cobra.ShellCompDirectiveDefault
 	})
 	// Common flags
 	img4CreateCmd.Flags().StringP("im4p", "p", "", "Input Img4 payload file")

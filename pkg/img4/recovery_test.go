@@ -37,7 +37,7 @@ func TestRestoreInfoCreation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var restoreInfo *RestoreInfo
-			
+
 			if tt.properties != nil {
 				props := make(map[string]any)
 				props["BNCN"] = tt.nonce
@@ -224,6 +224,74 @@ func TestRestoreInfoString(t *testing.T) {
 	}
 }
 
+func TestCreateRestoreInfoFromBytes(t *testing.T) {
+	// Test CreateRestoreInfo with []byte nonce
+	testCases := []struct {
+		name          string
+		nonceBytes    []byte
+		expectedNonce uint64
+		expectError   bool
+	}{
+		{
+			name:          "valid 8-byte nonce",
+			nonceBytes:    []byte{0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef},
+			expectedNonce: 0x1234567890abcdef,
+			expectError:   false,
+		},
+		{
+			name:          "zero nonce bytes",
+			nonceBytes:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			expectedNonce: 0x0000000000000000,
+			expectError:   false,
+		},
+		{
+			name:          "max value nonce bytes",
+			nonceBytes:    []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			expectedNonce: 0xffffffffffffffff,
+			expectError:   false,
+		},
+		{
+			name:        "invalid short nonce",
+			nonceBytes:  []byte{0x12, 0x34, 0x56, 0x78},
+			expectError: true,
+		},
+		{
+			name:        "invalid long nonce",
+			nonceBytes:  []byte{0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef, 0x12, 0x34},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			restoreInfo, err := CreateRestoreInfo(tt.nonceBytes)
+			if (err != nil) != tt.expectError {
+				t.Fatalf("CreateRestoreInfo() error = %v, expectError %v", err, tt.expectError)
+			}
+
+			if tt.expectError {
+				return // No further validation needed for error cases
+			}
+
+			if restoreInfo == nil {
+				t.Fatal("Expected RestoreInfo but got nil")
+			}
+
+			if restoreInfo.Tag != "IM4R" {
+				t.Errorf("Expected tag 'IM4R', got '%s'", restoreInfo.Tag)
+			}
+
+			// Verify the boot nonce was correctly read from bytes
+			bootNonce, hasNonce := restoreInfo.BootNonce()
+			if !hasNonce {
+				t.Error("Expected boot nonce to be present")
+			} else if bootNonce != tt.expectedNonce {
+				t.Errorf("Expected nonce 0x%x, got 0x%x", tt.expectedNonce, bootNonce)
+			}
+		})
+	}
+}
+
 func TestRestoreInfoErrors(t *testing.T) {
 	// Test parsing invalid data
 	errorTests := []struct {
@@ -277,4 +345,3 @@ func BenchmarkRestoreInfoParsing(b *testing.B) {
 		_, _ = ParseRestoreInfo(data)
 	}
 }
-

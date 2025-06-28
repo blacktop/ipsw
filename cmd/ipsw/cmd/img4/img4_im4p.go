@@ -40,8 +40,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var compressionTypes = []string{"lzfse", "lzss", "none"}
-
 func init() {
 	Img4Cmd.AddCommand(img4Im4pCmd)
 
@@ -75,9 +73,9 @@ func init() {
 	img4Im4pCreateCmd.Flags().StringP("type", "t", "", "Type string (required)")
 	img4Im4pCreateCmd.Flags().StringP("version", "v", "", "Version string")
 	img4Im4pCreateCmd.Flags().StringP("output", "o", "", "Output file path")
-	img4Im4pCreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("Compress payload (%s)", strings.Join(compressionTypes, ", ")))
+	img4Im4pCreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("Compress payload (%s)", strings.Join(img4.CompressionTypes, ", ")))
 	img4Im4pCreateCmd.RegisterFlagCompletionFunc("compress", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return compressionTypes, cobra.ShellCompDirectiveDefault
+		return img4.CompressionTypes, cobra.ShellCompDirectiveDefault
 	})
 	img4Im4pCreateCmd.Flags().StringP("extra", "e", "", "Extra data file to append")
 	img4Im4pCreateCmd.MarkFlagRequired("type")
@@ -321,8 +319,8 @@ var img4Im4pCreateCmd = &cobra.Command{
 		if outputPath == "" {
 			outputPath = filepath.Clean(inputPath) + ".im4p"
 		}
-		if !slices.Contains(compressionTypes, compressionType) {
-			return fmt.Errorf("unsupported compression type: %s (supported: %s)", compressionType, strings.Join(compressionTypes, ", "))
+		if !slices.Contains(img4.CompressionTypes, compressionType) {
+			return fmt.Errorf("unsupported compression type: %s (supported: %s)", compressionType, strings.Join(img4.CompressionTypes, ", "))
 		}
 
 		var comp img4.CompressionAlgorithm

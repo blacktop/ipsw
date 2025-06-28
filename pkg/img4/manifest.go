@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -168,7 +169,7 @@ type ManifestBody struct {
 	Images     []ManifestImage // Parsed images from the manifest body
 }
 
-// Manifest represents the complete IM4M manifest structure
+// Manifest represents the manifest structure
 type Manifest struct {
 	IM4M
 	ManifestBody
@@ -509,7 +510,122 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+// Marshal generates ASN.1 bytes for the manifest
 func (m *Manifest) Marshal() ([]byte, error) {
+	var manpSetEntries []asn1.RawValue
+	for _, p := range m.Properties {
+		var valueBytes []byte
+		var err error
+
+		switch v := p.Value.(type) {
+		case int:
+			valueBytes, err = asn1.Marshal(v)
+		case int64:
+			valueBytes, err = asn1.Marshal(v)
+		case uint64:
+			valueBytes, err = asn1.Marshal(int64(v))
+		case bool:
+			valueBytes, err = asn1.Marshal(v)
+		case []byte:
+			valueBytes, err = asn1.Marshal(v)
+		case string:
+			valueBytes, err = asn1.Marshal(v)
+		case time.Time:
+			valueBytes, err = asn1.Marshal(v.Unix())
+		default:
+			return nil, fmt.Errorf("unsupported property value type for marshaling: %T", p.Value)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property value %s: %v", p.Name, err)
+		}
+
+		propSeq := struct {
+			Name  string
+			Value asn1.RawValue `asn1:"set"`
+		}{
+			Name: p.Name,
+			Value: asn1.RawValue{
+				Tag:        asn1.TagSet,
+				IsCompound: true,
+				Bytes:      valueBytes,
+			},
+		}
+
+		propSeqBytes, err := asn1.Marshal(propSeq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property sequence %s: %v", p.Name, err)
+		}
+
+		// NOTE: Uses generic private tag 0x1000 instead of Apple's specific tags
+		// This produces simplified ASN.1 for testing only - not compatible with Apple tools
+		manpSetEntries = append(manpSetEntries, asn1.RawValue{
+			Class:      asn1.ClassPrivate,
+			Tag:        0x1000, // Generic tag - NOT Apple-compatible
+			IsCompound: true,
+			Bytes:      propSeqBytes,
+		})
+	}
+
+	manpSetBytes, err := asn1.Marshal(manpSetEntries)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal MANP SET: %v", err)
+	}
+
+	manpStruct := struct {
+		Name string
+		Set  asn1.RawValue `asn1:"set"`
+	}{
+		Name: "MANP",
+		Set: asn1.RawValue{
+			Tag:        asn1.TagSet,
+			IsCompound: true,
+			Bytes:      manpSetBytes,
+		},
+	}
+	manpBytes, err := asn1.Marshal(manpStruct)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal MANP: %v", err)
+	}
+
+	// Combine MANP and images into the MANB structure
+	var manbSetEntries []asn1.RawValue
+	if len(m.Properties) > 0 { // Only add MANP if there are properties
+		manbSetEntries = append(manbSetEntries, asn1.RawValue{
+			Class:      asn1.ClassPrivate,
+			Tag:        tagMANP,
+			IsCompound: true,
+			Bytes:      manpBytes,
+		})
+	}
+	// Add images here if implemented
+
+	manbSetBytes, err := asn1.Marshal(manbSetEntries)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal MANB SET: %v", err)
+	}
+
+	manbStruct := struct {
+		Name string
+		Set  asn1.RawValue `asn1:"set"`
+	}{
+		Name: "MANB",
+		Set: asn1.RawValue{
+			Tag:        asn1.TagSet,
+			IsCompound: true,
+			Bytes:      manbSetBytes,
+		},
+	}
+	manbBytes, err := asn1.Marshal(manbStruct)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal MANB: %v", err)
+	}
+
+	m.Body = asn1.RawValue{
+		Tag:        asn1.TagSet,
+		IsCompound: true,
+		Bytes:      manbBytes,
+	}
+
 	return asn1.Marshal(m.IM4M)
 }
 

@@ -272,12 +272,17 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 		return fmt.Errorf("failed to unzip im4p: %v", err)
 	}
 
-	for _, im4p := range im4ps {
-		if err := img4.ExtractPayload(im4p, im4p, true); err != nil {
-			return fmt.Errorf("failed to extract im4p payload: %v", err)
-		}
-		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4p) {
-			ftab, err := ftab.Open(im4p)
+	for _, im4pFile := range im4ps {
+		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4pFile) {
+			im4p, err := img4.OpenPayload(im4pFile)
+			if err != nil {
+				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
+			}
+			im4pData, err := im4p.GetData()
+			if err != nil {
+				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile, err)
+			}
+			ftab, err := ftab.Parse(bytes.NewReader(im4pData))
 			if err != nil {
 				return fmt.Errorf("failed to parse ftab: %v", err)
 			}
@@ -294,8 +299,8 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 				}
 			}
 			ftab.Close()
-		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4p) {
-			out, err := fwcmd.ExtractExclaveCores(im4p, os.TempDir())
+		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4pFile) {
+			out, err := fwcmd.ExtractExclaveCores(im4pFile, os.TempDir())
 			if err != nil {
 				return fmt.Errorf("failed to split exclave apps FW: %v", err)
 			}
@@ -308,9 +313,9 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 				}
 			}
 		} else {
-			if m, err := macho.Open(im4p); err == nil {
-				if err := handler(filepath.Base(im4p), m); err != nil {
-					return fmt.Errorf("failed to handle macho %s: %v", im4p, err)
+			if m, err := macho.Open(im4pFile); err == nil {
+				if err := handler(filepath.Base(im4pFile), m); err != nil {
+					return fmt.Errorf("failed to handle macho %s: %v", im4pFile, err)
 				}
 				m.Close()
 			}

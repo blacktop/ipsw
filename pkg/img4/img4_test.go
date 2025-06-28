@@ -2,6 +2,7 @@ package img4
 
 import (
 	"bytes"
+	"crypto/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,7 +66,7 @@ func TestImageCreation(t *testing.T) {
 			expectPayload: true,
 		},
 		{
-			name: "empty config should error",
+			name:   "empty config should error",
 			config: CreateConfig{
 				// No payload data
 			},
@@ -122,7 +123,7 @@ func TestImageCreation(t *testing.T) {
 func TestImageParsing(t *testing.T) {
 	// Test parsing valid IMG4 data
 	validImg4 := createTestImg4Data(t)
-	
+
 	img, err := Parse(validImg4)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
@@ -183,7 +184,7 @@ func TestImageOpen(t *testing.T) {
 // TestImageWithRealData tests with real test files if available (CI-friendly)
 func TestImageWithRealData(t *testing.T) {
 	testDataDir := "../../test-caches/TEST/22L572__AppleTV5,3"
-	
+
 	// Check if test data exists (fail quietly for CI)
 	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
 		t.Skip("Test data not available, skipping real data test")
@@ -317,7 +318,6 @@ func createTestPayloadData(t testing.TB) []byte {
 	return data
 }
 
-
 func createTestImg4Data(t testing.TB) []byte {
 	img, err := Create(&CreateConfig{
 		InputData:          []byte("test img4 data"),
@@ -334,5 +334,120 @@ func createTestImg4Data(t testing.TB) []byte {
 		t.Fatalf("Failed to marshal test IMG4: %v", err)
 	}
 
+	return data
+}
+
+// TestFullRoundtrip tests the complete create -> marshal -> parse -> extract cycle
+// for IMG4, IM4P, IM4M, and IM4R components.
+func TestFullRoundtrip(t *testing.T) {
+	// 1. Create original components
+	// Create IM4P
+	originalPayloadData := generateRandomData(1024)
+	originalExtraData := generateRandomData(256)
+	im4p, err := CreatePayload(&CreatePayloadConfig{
+		Type:        "test",
+		Version:     "Test Payload",
+		Data:        originalPayloadData,
+		ExtraData:   originalExtraData,
+		Compression: CompressionAlgorithmLZSS,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create original IM4P: %v", err)
+	}
+	originalIm4pBytes, err := im4p.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal original IM4P: %v", err)
+	}
+
+	// Create IM4M (using the programmatic helper)
+	originalManifestBytes := createTestManifestData(t)
+
+	// Create IM4R
+	originalNonce := uint64(0x1234567890abcdef)
+	im4r, err := CreateRestoreInfo(originalNonce)
+	if err != nil {
+		t.Fatalf("Failed to create original IM4R: %v", err)
+	}
+	originalIm4rBytes, err := im4r.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal original IM4R: %v", err)
+	}
+
+	// 2. Create full IMG4 from original components
+	img4Config := &CreateConfig{
+		PayloadData:     originalIm4pBytes,
+		ManifestData:    originalManifestBytes,
+		RestoreInfoData: originalIm4rBytes,
+	}
+	img, err := Create(img4Config)
+	if err != nil {
+		t.Fatalf("Failed to create IMG4: %v", err)
+	}
+
+	// 3. Marshal the full IMG4
+	fullImg4Bytes, err := img.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal full IMG4: %v", err)
+	}
+
+	// 4. Parse the full IMG4 back
+	parsedImg, err := Parse(fullImg4Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse full IMG4: %v", err)
+	}
+
+	// 5. Verify extracted components against original bytes
+	// Verify Payload
+	if parsedImg.Payload == nil {
+		t.Fatal("Parsed IMG4 has no payload")
+	}
+	if !bytes.Equal(parsedImg.Payload.Raw, originalIm4pBytes) {
+		t.Errorf("Payload raw bytes mismatch\nExpected: %x\nGot:      %x", originalIm4pBytes, parsedImg.Payload.Raw)
+	}
+
+	// Verify Manifest
+	if parsedImg.Manifest == nil {
+		t.Fatal("Parsed IMG4 has no manifest")
+	}
+	if !bytes.Equal(parsedImg.Manifest.Raw, originalManifestBytes) {
+		t.Errorf("Manifest raw bytes mismatch\nExpected: %x\nGot:      %x", originalManifestBytes, parsedImg.Manifest.Raw)
+	}
+
+	// Verify RestoreInfo
+	if parsedImg.RestoreInfo == nil {
+		t.Fatal("Parsed IMG4 has no restore info")
+	}
+	if !bytes.Equal(parsedImg.RestoreInfo.Raw, originalIm4rBytes) {
+		t.Errorf("RestoreInfo raw bytes mismatch\nExpected: %x\nGot:      %x", originalIm4rBytes, parsedImg.RestoreInfo.Raw)
+	}
+
+	// Verify payload data integrity (decompressed)
+	decompressedPayload, err := parsedImg.Payload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress parsed payload: %v", err)
+	}
+	if !bytes.Equal(decompressedPayload, originalPayloadData) {
+		t.Errorf("Decompressed payload data mismatch\nExpected: %x\nGot:      %x", originalPayloadData, decompressedPayload)
+	}
+
+	// Verify extra data integrity
+	if !parsedImg.Payload.HasExtraData() {
+		t.Error("Parsed payload missing extra data")
+	}
+	extractedExtraData := parsedImg.Payload.GetExtraData()
+	if !bytes.Equal(extractedExtraData, originalExtraData) {
+		t.Errorf("Extracted extra data mismatch\nExpected: %x\nGot:      %x", originalExtraData, extractedExtraData)
+	}
+}
+
+// Helper function to generate random data for testing
+func generateRandomData(size int) []byte {
+	data := make([]byte, size)
+	if _, err := rand.Read(data); err != nil {
+		// Fallback to deterministic data if random fails
+		for i := range data {
+			data[i] = byte(i % 256)
+		}
+	}
 	return data
 }

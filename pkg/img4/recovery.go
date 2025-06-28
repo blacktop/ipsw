@@ -145,7 +145,7 @@ func CreateRestoreInfo(nonce any) (*RestoreInfo, error) {
 		if len(v) != 8 {
 			return nil, fmt.Errorf("boot nonce bytes must be exactly 8 bytes, got %d", len(v))
 		}
-		binary.BigEndian.PutUint64(v, nonceValue)
+		nonceValue = binary.BigEndian.Uint64(v)
 	default:
 		return nil, fmt.Errorf("unsupported nonce type: %T", nonce)
 	}

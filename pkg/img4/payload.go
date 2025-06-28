@@ -146,6 +146,9 @@ const (
 
 var ErrNotCompressed = fmt.Errorf("payload is not compressed")
 
+// CompressionTypes is a list of supported compression algorithms
+var CompressionTypes = []string{"lzfse", "lzss", "none"}
+
 type CompressionAlgorithm int
 
 const (
@@ -360,7 +363,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 			return nil, fmt.Errorf("data too short to contain valid LZSS compressed payload")
 		}
 		// Only decompress the compressed payload part, not any extra data
-		compressedData := p.Data[binary.Size(hdr):binary.Size(hdr)+int(hdr.CompressedSize)]
+		compressedData := p.Data[binary.Size(hdr) : binary.Size(hdr)+int(hdr.CompressedSize)]
 		decompressed := lzss.Decompress(compressedData)
 		if len(decompressed) == 0 {
 			return nil, fmt.Errorf("failed to decompress LZSS payload: got empty result")
@@ -781,58 +784,4 @@ func decryptData(data, iv, key []byte) ([]byte, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(data, data)
 	return data, nil
-}
-
-// ExtractPayload extracts payload data from IMG4 or IM4P files with optional decompression
-func ExtractPayload(inputPath, outputPath string, decompress bool) error {
-	f, err := os.Open(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %v", err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Errorf("failed to close file: %v", err)
-		}
-	}()
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %v", err)
-	}
-
-	i, err := ParsePayload(data)
-	if err != nil {
-		return fmt.Errorf("failed to parse IM4P: %v", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
-		return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(outputPath), err)
-	}
-
-	if decompress {
-		if isLzss, err := magic.IsLZSS(i.Data); err != nil {
-			return fmt.Errorf("failed to check LZSS magic: %v", err)
-		} else if isLzss {
-			log.Debug("Detected LZSS compression")
-			var hdr lzss.Header
-			if err := binary.Read(bytes.NewReader(i.Data), binary.BigEndian, &hdr); err != nil {
-				return fmt.Errorf("failed to read LZSS header: %v", err)
-			}
-			decompressed := lzss.Decompress(i.Data)
-			if len(decompressed) == 0 {
-				return fmt.Errorf("failed to LZSS decompress %s: no data", inputPath)
-			}
-			i.Data = decompressed
-		}
-		if len(i.Data) >= 4 && bytes.Equal(i.Data[:4], []byte("bvx2")) {
-			log.Debug("Detected LZFSE compression")
-			decompressed := lzfse.DecodeBuffer(i.Data)
-			if len(decompressed) == 0 {
-				return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
-			}
-			i.Data = decompressed
-		}
-	}
-
-	return os.WriteFile(outputPath, i.Data, 0o660)
 }

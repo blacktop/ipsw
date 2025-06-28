@@ -41,7 +41,7 @@ func TestManifestParsing(t *testing.T) {
 func TestManifestMarshal(t *testing.T) {
 	// Create test manifest data
 	testData := createTestManifestData(t)
-	
+
 	manifest, err := ParseManifest(testData)
 	if err != nil {
 		t.Fatalf("ParseManifest() error = %v", err)
@@ -95,19 +95,27 @@ func BenchmarkManifestParsing(b *testing.B) {
 }
 
 // Helper function to create test manifest data
-func createTestManifestData(testing.TB) []byte {
-	// For manifest testing, we'll create a minimal valid IM4M structure manually
-	// This avoids the complex property marshaling issues while still testing the basic parsing
-	
-	// Create minimal IM4M ASN.1 structure
-	// SEQUENCE { IA5String("IM4M"), INTEGER(1), SET { } }
-	im4mData := []byte{
-		0x30, 0x0f,                         // SEQUENCE (15 bytes)
-		0x16, 0x04, 0x49, 0x4d, 0x34, 0x4d, // IA5String "IM4M"
-		0x02, 0x01, 0x01,                   // INTEGER 1 (version)
-		0x31, 0x04,                         // SET (4 bytes) - empty manifest body for testing
-		0x04, 0x02, 0x00, 0x00,             // OCTET STRING (empty placeholder)
+func createTestManifestData(t testing.TB) []byte {
+	// Create a manifest with a few properties programmatically
+	manifest := Manifest{
+		IM4M: IM4M{
+			Tag:     "IM4M",
+			Version: 1,
+		},
+		ManifestBody: ManifestBody{
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x8010},
+				{Name: "BORD", Value: 0x01},
+				{Name: "ECID", Value: uint64(0x1234567890ABCDEF)},
+				{Name: "CPRO", Value: true},
+			},
+		},
 	}
-	
-	return im4mData
+
+	data, err := manifest.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal manifest: %v", err)
+	}
+
+	return data
 }
