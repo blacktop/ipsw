@@ -106,11 +106,51 @@ func (i *Image) String() string {
 // MarshalJSON returns a JSON representation of the image
 func (i *Image) MarshalJSON() ([]byte, error) {
 	data := map[string]any{
-		"tag":          i.Tag,
-		"payload":      i.Payload.Version,
-		"manifest":     i.Manifest,
-		"restore_info": i.RestoreInfo,
+		"tag": i.Tag,
 	}
+
+	if i.Payload != nil {
+		payloadJSON, err := json.Marshal(i.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload to JSON: %v", err)
+		}
+		var p map[string]any
+		if err := json.Unmarshal(payloadJSON, &p); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal payload JSON: %v", err)
+		}
+		data["payload"] = p
+	} else {
+		data["payload"] = nil
+	}
+
+	if i.Manifest != nil {
+		manifestJSON, err := json.Marshal(i.Manifest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal manifest to JSON: %v", err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(manifestJSON, &m); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal manifest JSON: %v", err)
+		}
+		data["manifest"] = m
+	} else {
+		data["manifest"] = nil
+	}
+
+	if i.RestoreInfo != nil {
+		restoreInfoJSON, err := json.Marshal(i.RestoreInfo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal restore info to JSON: %v", err)
+		}
+		var r map[string]any
+		if err := json.Unmarshal(restoreInfoJSON, &r); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal restore info JSON: %v", err)
+		}
+		data["restore_info"] = r
+	} else {
+		data["restore_info"] = nil
+	}
+
 	return json.Marshal(data)
 }
 
