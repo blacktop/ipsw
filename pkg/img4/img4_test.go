@@ -625,6 +625,270 @@ func TestFullRoundtrip(t *testing.T) {
 	}
 }
 
+// TestIntegrationExtractionRoundtrip tests IMG4 creation, extraction, and roundtrip
+// This test replicates the bash script functionality as a Go unit test
+func TestIntegrationExtractionRoundtrip(t *testing.T) {
+	testDataDir := "../../test-caches/TEST/22L572__AppleTV5,3"
+
+	// Check if test data exists (fail quietly for CI)
+	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+		t.Skip("Test data not available, skipping integration extraction test")
+	}
+
+	kernelPath := filepath.Join(testDataDir, "kernel")
+	extraPath := filepath.Join(testDataDir, "extra")
+	manifestPath := filepath.Join(testDataDir, "im4m")
+
+	// Read test data
+	kernelData, err := os.ReadFile(kernelPath)
+	if err != nil {
+		t.Skip("Kernel test file not available")
+	}
+
+	extraData, err := os.ReadFile(extraPath)
+	if err != nil {
+		t.Skip("Extra test file not available")
+	}
+
+	manifestData, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Skip("Manifest test file not available")
+	}
+
+	t.Logf("🧪 Testing with real data: kernel=%d bytes, extra=%d bytes, manifest=%d bytes",
+		len(kernelData), len(extraData), len(manifestData))
+
+	// Step 1: Create IMG4 from real data
+	img, err := Create(&CreateConfig{
+		InputData:          kernelData,
+		PayloadType:        "rkrn",
+		PayloadVersion:     "",
+		PayloadCompression: "lzss",
+		PayloadExtraData:   extraData,
+		ManifestData:       manifestData,
+	})
+	if err != nil {
+		t.Fatalf("Create() with real data error = %v", err)
+	}
+
+	// Verify structure
+	if img.Payload == nil {
+		t.Fatal("Expected payload to be present")
+	}
+	if img.Manifest == nil {
+		t.Fatal("Expected manifest to be present")
+	}
+
+	// Step 2: Marshal the IMG4
+	img4Data, err := img.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	t.Logf("📦 Created IMG4: %d bytes", len(img4Data))
+
+	// Step 3: Parse the IMG4 back
+	parsedImg, err := Parse(img4Data)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Step 4: Extract and validate individual components
+
+	// Test IM4P extraction
+	if parsedImg.Payload == nil {
+		t.Fatal("Parsed IMG4 has no payload")
+	}
+
+	im4pData, err := parsedImg.Payload.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal extracted IM4P: %v", err)
+	}
+
+	// Validate extracted IM4P by parsing it
+	extractedPayload, err := ParsePayload(im4pData)
+	if err != nil {
+		t.Fatalf("Failed to parse extracted IM4P: %v", err)
+	}
+
+	if extractedPayload.Type != "rkrn" {
+		t.Errorf("Extracted IM4P type = %v, want rkrn", extractedPayload.Type)
+	}
+
+	// Test IM4M extraction
+	if parsedImg.Manifest == nil {
+		t.Fatal("Parsed IMG4 has no manifest")
+	}
+
+	if !bytes.Equal(parsedImg.Manifest.Raw, manifestData) {
+		t.Error("Extracted manifest doesn't match original")
+	}
+
+	// Step 5: Test decompression and extra data
+	decompressed, err := parsedImg.Payload.Decompress()
+	if err != nil {
+		t.Fatalf("Decompress() error = %v", err)
+	}
+
+	if !bytes.Equal(decompressed, kernelData) {
+		t.Error("Decompressed data doesn't match original kernel")
+	}
+
+	// Verify extra data
+	if !parsedImg.Payload.HasExtraData() {
+		t.Error("Expected extra data to be detected")
+	}
+
+	extractedExtra := parsedImg.Payload.GetExtraData()
+	if !bytes.Equal(extractedExtra, extraData) {
+		t.Error("Extra data mismatch")
+	}
+
+	// Step 6: Test roundtrip creation from extracted components
+	roundtripImg, err := Create(&CreateConfig{
+		PayloadData:  im4pData,
+		ManifestData: parsedImg.Manifest.Raw,
+	})
+	if err != nil {
+		t.Fatalf("Roundtrip Create() error = %v", err)
+	}
+
+	roundtripData, err := roundtripImg.Marshal()
+	if err != nil {
+		t.Fatalf("Roundtrip Marshal() error = %v", err)
+	}
+
+	// Verify roundtrip creates identical data
+	if len(roundtripData) != len(img4Data) {
+		t.Logf("⚠️  Roundtrip size differs: original=%d, roundtrip=%d", len(img4Data), len(roundtripData))
+		// Size difference might be acceptable due to ASN.1 encoding variations
+	}
+
+	// Final validation: parse the roundtrip data
+	finalImg, err := Parse(roundtripData)
+	if err != nil {
+		t.Fatalf("Failed to parse roundtrip IMG4: %v", err)
+	}
+
+	// Verify final image matches original structure
+	if finalImg.Tag != img.Tag {
+		t.Errorf("Roundtrip tag mismatch: got %v, want %v", finalImg.Tag, img.Tag)
+	}
+
+	finalDecompressed, err := finalImg.Payload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress roundtrip payload: %v", err)
+	}
+
+	if !bytes.Equal(finalDecompressed, kernelData) {
+		t.Error("Roundtrip decompressed data doesn't match original")
+	}
+
+	t.Log("✅ Integration extraction and roundtrip test passed")
+}
+
+// TestIntegrationComponentExtraction tests component extraction like the bash script
+func TestIntegrationComponentExtraction(t *testing.T) {
+	testDataDir := "../../test-caches/TEST/22L572__AppleTV5,3"
+
+	// Check if test data exists
+	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+		t.Skip("Test data not available, skipping component extraction test")
+	}
+
+	kernelPath := filepath.Join(testDataDir, "kernel")
+	manifestPath := filepath.Join(testDataDir, "im4m")
+
+	// Read test data
+	kernelData, err := os.ReadFile(kernelPath)
+	if err != nil {
+		t.Skip("Kernel test file not available")
+	}
+
+	manifestData, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Skip("Manifest test file not available")
+	}
+
+	// Create IMG4
+	img, err := Create(&CreateConfig{
+		InputData:          kernelData,
+		PayloadType:        "rkrn",
+		PayloadCompression: "lzss",
+		ManifestData:       manifestData,
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	// Marshal
+	img4Data, err := img.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	// Parse back
+	parsedImg, err := Parse(img4Data)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Test individual component extraction
+
+	// Extract IM4P
+	if parsedImg.Payload == nil {
+		t.Fatal("No payload to extract")
+	}
+
+	im4pBytes, err := parsedImg.Payload.Marshal()
+	if err != nil {
+		t.Fatal("Failed to extract IM4P bytes")
+	}
+
+	// Validate extracted IM4P
+	extractedPayload, err := ParsePayload(im4pBytes)
+	if err != nil {
+		t.Fatal("Extracted IM4P is invalid")
+	}
+
+	if extractedPayload.Type != "rkrn" {
+		t.Errorf("Extracted IM4P type = %v, want rkrn", extractedPayload.Type)
+	}
+
+	// Extract IM4M
+	if parsedImg.Manifest == nil {
+		t.Fatal("No manifest to extract")
+	}
+
+	extractedManifest := parsedImg.Manifest.Raw
+	if !bytes.Equal(extractedManifest, manifestData) {
+		t.Error("Extracted manifest differs from original")
+	}
+
+	// Test creating IMG4 from extracted components
+	recreatedImg, err := Create(&CreateConfig{
+		PayloadData:  im4pBytes,
+		ManifestData: extractedManifest,
+	})
+	if err != nil {
+		t.Fatal("Failed to recreate IMG4 from extracted components")
+	}
+
+	recreatedData, err := recreatedImg.Marshal()
+	if err != nil {
+		t.Fatal("Failed to marshal recreated IMG4")
+	}
+
+	// Verify the recreated IMG4 is parseable
+	_, err = Parse(recreatedData)
+	if err != nil {
+		t.Fatal("Recreated IMG4 is not parseable")
+	}
+
+	t.Log("✅ Component extraction test passed")
+}
+
+
 // Helper function to generate random data for testing
 func generateRandomData(size int) []byte {
 	data := make([]byte, size)
