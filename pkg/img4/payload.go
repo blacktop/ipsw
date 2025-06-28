@@ -321,7 +321,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 	// confirm that the payload is compressed
 	isCompressed := false
 	hasCompressField := false
-	if !p.Encrypted && p.Compression.UncompressedSize > 0 {
+	if p.Compression.UncompressedSize > 0 {
 		isCompressed = true
 		hasCompressField = true
 	} else if isLzss, err := magic.IsLZSS(p.Data); err != nil {
@@ -346,7 +346,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 		if err := binary.Read(bytes.NewReader(p.Data[:binary.Size(hdr)]), binary.BigEndian, &hdr); err != nil {
 			return nil, fmt.Errorf("failed to read LZSS header: %v", err)
 		}
-		if hdr.CompressedSize != lzss.CompressionType && hdr.Signature != lzss.Signature {
+		if hdr.Signature != lzss.Signature || hdr.CompressionType != lzss.CompressionType {
 			return nil, fmt.Errorf("invalid LZSS header magic: %x", string(p.Data[:8]))
 		}
 		if hdr.CompressedSize == 0 {
