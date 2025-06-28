@@ -218,8 +218,12 @@ func OpenPayload(path string) (*Payload, error) {
 }
 
 func ParsePayload(data []byte) (*Payload, error) {
-	var p Payload
 
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty payload data")
+	}
+
+	var p Payload
 	rest, err := asn1.Unmarshal(data, &p.IM4P)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IM4P: %v", err)

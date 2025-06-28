@@ -91,11 +91,10 @@ const (
 	PropTypeTimestamp
 )
 
-
 // Manifest represents a unified IM4M manifest structure
 type IM4M struct {
 	Raw       asn1.RawContent
-	Tag       string // IM4M
+	Tag       string `asn1:"ia5"` // IM4M
 	Version   int
 	Body      asn1.RawValue `asn1:"set"`      // Manifest body as SET - parsed dynamically
 	Signature []byte        `asn1:"optional"` // Optional signature data
@@ -568,7 +567,6 @@ func (m *Manifest) Marshal() ([]byte, error) {
 func marshalPropertiesToSet(props []Property) ([]asn1.RawValue, error) {
 	return MarshalPropertiesSlice(props, ManifestFormat)
 }
-
 
 // analyzeSignature determines the signature algorithm based on signature size
 func analyzeSignature(signature []byte) string {
