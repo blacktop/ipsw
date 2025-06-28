@@ -22,8 +22,8 @@ var (
 
 type IMG4 struct {
 	Raw         asn1.RawContent
-	Tag         string        // IMG4
-	Payload     asn1.RawValue `asn1:"explicit,tag:0,optional"`
+	Tag         string        `asn1:"ia5"` // IMG4
+	Payload     asn1.RawValue `asn1:"optional"`
 	Manifest    asn1.RawValue `asn1:"explicit,tag:0,optional"`
 	RestoreInfo asn1.RawValue `asn1:"explicit,tag:1,optional"`
 }
@@ -225,8 +225,7 @@ func (i *Image) Marshal() ([]byte, error) {
 			return nil, fmt.Errorf("failed to marshal payload: %v", err)
 		}
 		i.IMG4.Payload = asn1.RawValue{
-			Class:      2, // context-specific (for explicit tagging)
-			Tag:        0, // tag:0 as specified in struct
+			Tag:        asn1.TagSequence,
 			IsCompound: true,
 			Bytes:      payloadData,
 		}
