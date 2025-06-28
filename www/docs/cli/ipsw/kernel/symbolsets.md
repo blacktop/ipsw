@@ -17,7 +17,8 @@ ipsw kernel symbolsets <kernelcache> [flags]
 ### Options
 
 ```
-  -h, --help   help for symbolsets
+  -a, --arch string   Which architecture to use for fat/universal MachO
+  -h, --help          help for symbolsets
 ```
 
 ### Options inherited from parent commands

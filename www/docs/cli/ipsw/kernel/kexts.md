@@ -17,8 +17,10 @@ ipsw kernel kexts <kernelcache> [flags]
 ### Options
 
 ```
-  -d, --diff   Diff two kernel's kexts
-  -h, --help   help for kexts
+  -a, --arch string   Which architecture to use for fat/universal MachO
+  -d, --diff          Diff two kernel's kexts
+  -h, --help          help for kexts
+  -j, --json          Output kexts as JSON
 ```
 
 ### Options inherited from parent commands

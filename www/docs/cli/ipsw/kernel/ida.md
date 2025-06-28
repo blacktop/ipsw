@@ -17,6 +17,7 @@ ipsw kernel ida <KC> [KEXT] [flags]
 ### Options
 
 ```
+  -a, --arch string           Which architecture to use for fat/universal MachO
   -c, --delete-db             Disassemble a new file (delete the old database)
       --diaphora-db string    Path to Diaphora database
   -k, --docker                Run IDA Pro in a docker container

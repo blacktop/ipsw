@@ -1,24 +1,24 @@
 ---
-id: mach
-title: mach
+id: info
+title: info
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: mach
-description: Dump kernelcache mach_traps
+sidebar_label: info
+description: Display detailed IM4P information
 ---
-## ipsw kernel mach
+## ipsw img4 im4p info
 
-Dump kernelcache mach_traps
+Display detailed IM4P information
 
 ```
-ipsw kernel mach [flags]
+ipsw img4 im4p info <IM4P> [flags]
 ```
 
 ### Options
 
 ```
-  -a, --arch string   Which architecture to use for fat/universal MachO
-  -h, --help          help for mach
+  -h, --help   help for info
+  -j, --json   Output as JSON
 ```
 
 ### Options inherited from parent commands
@@ -32,5 +32,5 @@ ipsw kernel mach [flags]
 
 ### SEE ALSO
 
-* [ipsw kernel](/docs/cli/ipsw/kernel)	 - Parse kernelcache
+* [ipsw img4 im4p](/docs/cli/ipsw/img4/im4p)	 - IM4P payload operations
 

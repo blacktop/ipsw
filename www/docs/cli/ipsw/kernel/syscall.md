@@ -17,6 +17,7 @@ ipsw kernel syscall [flags]
 ### Options
 
 ```
+  -a, --arch string     Which architecture to use for fat/universal MachO
   -g, --gen             Generate syscall table data gzip file
   -h, --help            help for syscall
   -o, --output string   Output gzip file

@@ -4,23 +4,23 @@ title: extract
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: extract
-description: Extract KEXT(s) from kernelcache
+description: Extract IM4M manifest from SHSH blob
 ---
-## ipsw kernel extract
+## ipsw img4 im4m extract
 
-Extract KEXT(s) from kernelcache
+Extract IM4M manifest from SHSH blob
 
 ```
-ipsw kernel extract <KERNELCACHE> <KEXT> [flags]
+ipsw img4 im4m extract <IM4M> [flags]
 ```
 
 ### Options
 
 ```
-  -a, --all             Extract all KEXTs
-  -e, --arch string     Which architecture to use for fat/universal MachO
   -h, --help            help for extract
-      --output string   Directory to extract KEXTs to
+  -n, --no-nonce        Extract no-nonce Image4 manifest (if available)
+  -o, --output string   Output file path
+  -u, --update          Extract update Image4 manifest (if available)
 ```
 
 ### Options inherited from parent commands
@@ -34,5 +34,5 @@ ipsw kernel extract <KERNELCACHE> <KEXT> [flags]
 
 ### SEE ALSO
 
-* [ipsw kernel](/docs/cli/ipsw/kernel)	 - Parse kernelcache
+* [ipsw img4 im4m](/docs/cli/ipsw/img4/im4m)	 - IM4M manifest operations
 
