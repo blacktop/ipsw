@@ -14,6 +14,16 @@ Display IMG4 file information
 ipsw img4 info <IMG4> [flags]
 ```
 
+### Examples
+
+```bash
+# Display information about an IMG4 file
+❯ ipsw img4 info kernel.img4
+
+# Output information as JSON
+❯ ipsw img4 info --json kernel.img4
+```
+
 ### Options
 
 ```

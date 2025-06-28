@@ -14,6 +14,16 @@ Display IM4R restore information
 ipsw img4 im4r info <IMG4> [flags]
 ```
 
+### Examples
+
+```bash
+# Display IM4R restore info from IMG4 file
+❯ ipsw img4 im4r info kernel.img4
+
+# Output as JSON
+❯ ipsw img4 im4r info --json kernel.img4
+```
+
 ### Options
 
 ```

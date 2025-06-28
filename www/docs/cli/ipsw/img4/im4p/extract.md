@@ -18,6 +18,25 @@ Extract IM4P payload data or extra metadata.
 ipsw img4 im4p extract <IM4P> [flags]
 ```
 
+### Examples
+
+```bash
+# Extract decompressed payload data
+❯ ipsw img4 im4p extract kernelcache.im4p
+
+# Extract extra data (if present)
+❯ ipsw img4 im4p extract --extra kernelcache.im4p
+
+# Extract keybags as JSON
+❯ ipsw img4 im4p extract --kbag encrypted.im4p
+
+# Decrypt and extract payload
+❯ ipsw img4 im4p extract --iv 1234... --key 5678... encrypted.im4p
+
+# Extract to specific output file
+❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p
+```
+
 ### Options
 
 ```

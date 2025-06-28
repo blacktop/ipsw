@@ -14,6 +14,22 @@ Extract IM4M manifest from SHSH blob
 ipsw img4 im4m extract <IM4M> [flags]
 ```
 
+### Examples
+
+```bash
+# Extract IM4M from SHSH blob
+❯ ipsw img4 im4m extract shsh.blob
+
+# Extract update manifest (if available)
+❯ ipsw img4 im4m extract --update shsh.blob
+
+# Extract no-nonce manifest (if available)
+❯ ipsw img4 im4m extract --no-nonce shsh.blob
+
+# Extract to specific output file
+❯ ipsw img4 im4m extract --output custom.im4m shsh.blob
+```
+
 ### Options
 
 ```
