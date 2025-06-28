@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	bm "github.com/blacktop/ipsw/pkg/plist"
 )
 
 // Core ASN.1 Private Tag Constants (stable tags that won't change)
@@ -792,4 +794,145 @@ func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extract
 	return shsh.ApImg4Ticket, nil
 }
 
-/* utilities */
+/* VERIFICATION */
+
+// VerificationResult holds the results of manifest verification
+type VerificationResult struct {
+	IsValid           bool
+	PropertiesChecked int
+	Mismatches        []PropertyMismatch
+}
+
+// PropertyMismatch represents a property that doesn't match between manifests
+type PropertyMismatch struct {
+	Property string
+	Expected any
+	Actual   any
+}
+
+// VerifyManifestProperties verifies an IM4M manifest against a build manifest
+func VerifyManifestProperties(im4m *Manifest, bm *bm.BuildManifest, verbose, allowExtra bool) (*VerificationResult, error) {
+	result := &VerificationResult{
+		IsValid:    true,
+		Mismatches: []PropertyMismatch{},
+	}
+
+	im4mProps := ConvertPropertySliceToMap(im4m.Properties)
+
+	if len(bm.BuildIdentities) == 0 {
+		return nil, fmt.Errorf("no build identities found in build manifest")
+	}
+	// TODO: support multiple build identities
+	buildIdentity := bm.BuildIdentities[0]
+
+	// Map build manifest fields to IM4M property names and convert hex strings to integers
+	bmProps := make(map[string]any)
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApBoardID, "0x"), 16, 64); err == nil {
+		bmProps["BORD"] = int(val)
+	}
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApChipID, "0x"), 16, 64); err == nil {
+		bmProps["CHIP"] = int(val)
+	}
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApSecurityDomain, "0x"), 16, 64); err == nil {
+		bmProps["SDOM"] = int(val)
+	}
+
+	// Add more mappings from BuildManifest to IM4M properties
+	bmProps["love"] = buildIdentity.ApOSLongVersion
+	// Always parse ProductMarketingVersion as float64 for consistent comparison
+	if val, err := strconv.ParseFloat(buildIdentity.ProductMarketingVersion, 64); err == nil {
+		bmProps["apmv"] = val
+	} else {
+		// Fallback to string if parsing fails
+		bmProps["apmv"] = buildIdentity.ProductMarketingVersion
+	}
+	bmProps["prtp"] = buildIdentity.ApProductType
+	bmProps["sdkp"] = buildIdentity.ApSDKPlatform
+	bmProps["tagt"] = buildIdentity.ApTarget
+	bmProps["tatp"] = buildIdentity.ApTargetType
+
+	// Handle Ap,Timestamp from Info dictionary
+	if buildIdentity.Info.ApTimestamp != 0 {
+		bmProps["tstp"] = time.Unix(int64(buildIdentity.Info.ApTimestamp), 0).UTC()
+	}
+
+	// Verify all properties from the build manifest are present and correct in the IM4M
+	for bmKey, bmVal := range bmProps {
+		result.PropertiesChecked++
+
+		im4mVal, im4mExists := im4mProps[bmKey]
+
+		if !im4mExists {
+			result.IsValid = false
+			result.Mismatches = append(result.Mismatches, PropertyMismatch{
+				Property: bmKey,
+				Expected: bmVal,
+				Actual:   "(missing)",
+			})
+			continue
+		}
+
+		if !CompareManifestValues(im4mVal, bmVal) {
+			result.IsValid = false
+			result.Mismatches = append(result.Mismatches, PropertyMismatch{
+				Property: bmKey,
+				Expected: bmVal,
+				Actual:   im4mVal,
+			})
+		}
+	}
+
+	// If not allowing extra properties, check for properties in IM4M that are not in the build manifest
+	if !allowExtra {
+		for im4mKey := range im4mProps {
+			if _, bmExists := bmProps[im4mKey]; !bmExists {
+				// Ignore ECID and snon as they are often unique to the manifest
+				if im4mKey == "ECID" || im4mKey == "snon" {
+					continue
+				}
+				result.IsValid = false
+				result.Mismatches = append(result.Mismatches, PropertyMismatch{
+					Property: im4mKey,
+					Expected: "(not present in build manifest)",
+					Actual:   im4mProps[im4mKey],
+				})
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// CompareManifestValues compares two manifest property values
+func CompareManifestValues(a, b any) bool {
+	// Handle different types that might represent the same value
+	switch va := a.(type) {
+	case []byte:
+		if vb, ok := b.([]byte); ok {
+			return bytes.Equal(va, vb)
+		}
+	case int:
+		if vb, ok := b.(int); ok {
+			return va == vb
+		} else if vb, ok := b.(float64); ok {
+			return float64(va) == vb
+		}
+	case float64:
+		if vb, ok := b.(float64); ok {
+			return va == vb
+		} else if vb, ok := b.(int); ok {
+			return va == float64(vb)
+		}
+	case bool:
+		if vb, ok := b.(bool); ok {
+			return va == vb
+		}
+	case string:
+		if vb, ok := b.(string); ok {
+			return va == vb
+		}
+	}
+
+	// Fallback to basic equality check
+	return a == b
+}

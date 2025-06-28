@@ -138,7 +138,6 @@ var img4CreateCmd = &cobra.Command{
 		if inputPath != "" && im4pType == "" {
 			return fmt.Errorf("--type is required when using --input")
 		}
-		// Validate FourCC format
 		if im4pType != "" && len(im4pType) != 4 {
 			return fmt.Errorf("--type must be exactly 4 characters, got %d", len(im4pType))
 		}

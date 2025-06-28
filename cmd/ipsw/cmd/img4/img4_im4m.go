@@ -219,7 +219,7 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse build manifest: %v", err)
 		}
 
-		result, err := verifyManifestProperties(inputManifest, buildManifest, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
+		result, err := img4.VerifyManifestProperties(inputManifest, buildManifest, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
 		if err != nil {
 			return fmt.Errorf("verification failed: %v", err)
 		}
@@ -232,122 +232,13 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			fmt.Printf("\n%s ✗ Manifest verification %s\n",
 				color.New(color.FgRed).Sprint("FAILED:"),
 				color.New(color.FgRed).Sprint("FAILED"))
+			for _, mismatch := range result.Mismatches {
+				fmt.Printf("  Property: %s, Expected: %v, Actual: %v\n", mismatch.Property, mismatch.Expected, mismatch.Actual)
+			}
 		}
 
 		return nil
 	},
-}
-
-// VerificationResult holds the results of manifest verification
-type VerificationResult struct {
-	IsValid           bool
-	PropertiesChecked int
-	Mismatches        []PropertyMismatch
-}
-
-// PropertyMismatch represents a property that doesn't match between manifests
-type PropertyMismatch struct {
-	Property string
-	Expected any
-	Actual   any
-}
-
-func verifyManifestProperties(im4m *img4.Manifest, bm *plist.BuildManifest, verbose, allowExtra bool) (*VerificationResult, error) {
-	result := &VerificationResult{
-		IsValid:    true,
-		Mismatches: []PropertyMismatch{},
-	}
-
-	im4mProps := img4.ConvertPropertySliceToMap(im4m.Properties)
-
-	if len(bm.BuildIdentities) == 0 {
-		return nil, fmt.Errorf("no build identities found in build manifest")
-	}
-	// TODO: support multiple build identities
-	buildIdentity := bm.BuildIdentities[0]
-
-	// Map build manifest fields to IM4M property names and convert hex strings to integers
-	bmProps := make(map[string]any)
-	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApBoardID, "0x"), 16, 64); err == nil {
-		bmProps["BORD"] = int(val)
-	}
-	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApChipID, "0x"), 16, 64); err == nil {
-		bmProps["CHIP"] = int(val)
-	}
-	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApSecurityDomain, "0x"), 16, 64); err == nil {
-		bmProps["SDOM"] = int(val)
-	}
-
-	// Verify all properties from the build manifest are present and correct in the IM4M
-	for bmKey, bmVal := range bmProps {
-		result.PropertiesChecked++
-
-		im4mVal, im4mExists := im4mProps[bmKey]
-
-		if !im4mExists {
-			result.IsValid = false
-			result.Mismatches = append(result.Mismatches, PropertyMismatch{
-				Property: bmKey,
-				Expected: bmVal,
-				Actual:   "(missing)",
-			})
-			continue
-		}
-
-		if !compareManifestValues(im4mVal, bmVal) {
-			result.IsValid = false
-			result.Mismatches = append(result.Mismatches, PropertyMismatch{
-				Property: bmKey,
-				Expected: bmVal,
-				Actual:   im4mVal,
-			})
-		}
-	}
-
-	// If not allowing extra properties, check for properties in IM4M that are not in the build manifest
-	if !allowExtra {
-		for im4mKey := range im4mProps {
-			if _, bmExists := bmProps[im4mKey]; !bmExists {
-				// Ignore ECID and snon as they are often unique to the manifest
-				if im4mKey == "ECID" || im4mKey == "snon" {
-					continue
-				}
-				result.IsValid = false
-				result.Mismatches = append(result.Mismatches, PropertyMismatch{
-					Property: im4mKey,
-					Expected: "(not present in build manifest)",
-					Actual:   im4mProps[im4mKey],
-				})
-			}
-		}
-	}
-
-	return result, nil
-}
-
-func compareManifestValues(a, b any) bool {
-	// Handle different types that might represent the same value
-	switch va := a.(type) {
-	case []byte:
-		if vb, ok := b.([]byte); ok {
-			return bytes.Equal(va, vb)
-		}
-	case int:
-		if vb, ok := b.(int); ok {
-			return va == vb
-		}
-	case bool:
-		if vb, ok := b.(bool); ok {
-			return va == vb
-		}
-	case string:
-		if vb, ok := b.(string); ok {
-			return va == vb
-		}
-	}
-
-	// Fallback to basic equality check
-	return a == b
 }
 
 // img4Im4mPersonalizeCmd represents the im4m personalize command

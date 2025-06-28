@@ -34,18 +34,22 @@ func (b *BuildManifest) String() string {
 
 type buildIdentity struct {
 	ApOSLongVersion               string                      `plist:"Ap,OSLongVersion,omitempty" json:"ap_os_long_version,omitempty"`
-	ApBoardID                     string                      `json:"ap_board_id,omitempty"`
-	ApChipID                      string                      `json:"ap_chip_id,omitempty"`
-	ApSecurityDomain              string                      `json:"ap_security_domain,omitempty"`
-	BbActivationManifestKeyHash   []byte                      `json:"bb_activation_manifest_key_hash,omitempty"`
-	BbChipID                      string                      `json:"bb_chip_id,omitempty"`
-	BbFDRSecurityKeyHash          []byte                      `json:"bb_fdr_security_key_hash,omitempty"`
-	BbProvisioningManifestKeyHash []byte                      `json:"bb_provisioning_manifest_key_hash,omitempty"`
+	ApBoardID                     string                      `plist:"ApBoardID,omitempty" json:"ap_board_id,omitempty"`
+	ApChipID                      string                      `plist:"ApChipID,omitempty" json:"ap_chip_id,omitempty"`
+	ApSecurityDomain              string                      `plist:"ApSecurityDomain,omitempty" json:"ap_security_domain,omitempty"`
+	ApProductType                 string                      `plist:"Ap,ProductType,omitempty" json:"ap_product_type,omitempty"`
+	ApSDKPlatform                 string                      `plist:"Ap,SDKPlatform,omitempty" json:"ap_sdk_platform,omitempty"`
+	ApTarget                      string                      `plist:"Ap,Target,omitempty" json:"ap_target,omitempty"`
+	ApTargetType                  string                      `plist:"Ap,TargetType,omitempty" json:"ap_target_type,omitempty"`
+	BbActivationManifestKeyHash   []byte                      `plist:"BbActivationManifestKeyHash,omitempty" json:"bb_activation_manifest_key_hash,omitempty"`
+	BbChipID                      string                      `plist:"BbChipID,omitempty" json:"bb_chip_id,omitempty"`
+	BbFDRSecurityKeyHash          []byte                      `plist:"BbFDRSecurityKeyHash,omitempty" json:"bb_fdr_security_key_hash,omitempty"`
+	BbProvisioningManifestKeyHash []byte                      `plist:"BbProvisioningManifestKeyHash,omitempty" json:"bb_provisioning_manifest_key_hash,omitempty"`
 	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info"`
 	Manifest                      map[string]IdentityManifest `json:"manifest,omitempty"`
-	PearlCertificationRootPub     []byte                      `json:"pearl_certification_root_pub,omitempty"`
-	ProductMarketingVersion       string                      `json:"product_marketing_version,omitempty"`
-	UniqueBuildID                 []byte                      `json:"unique_build_id,omitempty"`
+	PearlCertificationRootPub     []byte                      `plist:"PearlCertificationRootPub,omitempty" json:"pearl_certification_root_pub,omitempty"`
+	ProductMarketingVersion       string                      `plist:"Ap,ProductMarketingVersion,omitempty" json:"product_marketing_version,omitempty"`
+	UniqueBuildID                 []byte                      `plist:"UniqueBuildID,omitempty" json:"unique_build_id,omitempty"`
 }
 
 func (i buildIdentity) String() string {
@@ -85,6 +89,7 @@ type IdentityInfo struct {
 	SystemPartitionPadding map[string]int    `json:"system_partition_padding,omitempty"`
 	Variant                string            `json:"variant,omitempty"`
 	VariantContents        map[string]string `json:"variant_contents,omitempty"`
+	ApTimestamp            int               `plist:"Ap,Timestamp,omitempty" json:"ap_timestamp,omitempty"`
 }
 
 func (i IdentityInfo) String() string {
