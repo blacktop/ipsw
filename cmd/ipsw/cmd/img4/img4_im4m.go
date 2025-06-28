@@ -105,11 +105,6 @@ var img4Im4mInfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		manifest, err := img4.OpenManifest(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4M: %v", err)
@@ -137,11 +132,6 @@ var img4Im4mExtractCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		filePath := args[0]
 		outputPath := viper.GetString("img4.im4m.extract.output")
@@ -186,11 +176,6 @@ var img4Im4mVerifyCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		buildManifestPath := viper.GetString("img4.im4m.verify.build-manifest")
 
@@ -249,11 +234,6 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true, // Hidden until fully implemented
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// NOTE: this is experimental and the IMG4 will not be valid without a proper TSS response
 		log.Warn("This is an experimental command and the created IMG4 will NOT be valid")
