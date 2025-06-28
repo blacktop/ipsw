@@ -158,6 +158,9 @@ var img4CreateCmd = &cobra.Command{
 		}
 
 		if im4pExtraDataPath != "" {
+			if strings.ToLower(im4pCompression) == "none" || im4pCompression == "" {
+				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse') to detect --extra data boundaries during extraction")
+			}
 			data, err := os.ReadFile(im4pExtraDataPath)
 			if err != nil {
 				return fmt.Errorf("failed to read extra data file: %v", err)
