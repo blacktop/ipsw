@@ -361,8 +361,12 @@ func (p *Payload) Decompress() ([]byte, error) {
 		if len(decompressed) == 0 {
 			return nil, fmt.Errorf("failed to decompress LZSS payload: got empty result")
 		}
-		if len(decompressed) != int(hdr.UncompressedSize) {
-			log.Warnf("decompressed size (%d) does not match expected size (%d) from LZSS header", len(decompressed), hdr.UncompressedSize)
+		// Trim decompressed data to the expected uncompressed size
+		if len(decompressed) > int(hdr.UncompressedSize) {
+			log.Warnf("trimming decompressed LZSS data from %d to expected size %d", len(decompressed), hdr.UncompressedSize)
+			decompressed = decompressed[:hdr.UncompressedSize]
+		} else if len(decompressed) < int(hdr.UncompressedSize) {
+			return nil, fmt.Errorf("decompressed LZSS size (%d) is less than expected size (%d)", len(decompressed), hdr.UncompressedSize)
 		}
 		p.decompressedData = decompressed
 		if len(p.Data) > int(hdr.CompressedSize)+binary.Size(hdr) {
@@ -456,48 +460,31 @@ func (i *Payload) extractExtraDataFromLzfse(data []byte) []byte {
 
 // calculateLzfseTotalSize parses LZFSE blocks to determine total compressed stream size
 func (i *Payload) calculateLzfseTotalSize(data []byte) (int, error) {
-	offset := 0
-
-	for offset < len(data) {
-		if offset+4 > len(data) {
-			// This can happen if there's trailing data that isn't a full block.
-			// We'll consider the stream ended here.
-			return offset, nil
-		}
-
-		// Read block magic (little endian)
-		magic := binary.LittleEndian.Uint32(data[offset : offset+4])
-
-		switch magic {
-		case 0x24787662: // bvx$ (end of stream)
-			return offset + 4, nil
-
-		case 0x2d787662, // bvx- (uncompressed block)
-			0x31787662, // bvx1 (lzfse compressed, uncompressed tables)
-			0x32787662, // bvx2 (lzfse compressed, compressed tables)
-			0x6e787662: // bvxn (lzvn compressed)
-
-			if offset+12 > len(data) {
-				return 0, fmt.Errorf("incomplete LZFSE block header at offset %d for magic %#08x", offset, magic)
-			}
-
-			payloadBytes := binary.LittleEndian.Uint32(data[offset+8 : offset+12])
-			blockSize := 12 + int(payloadBytes)
-
-			if offset+blockSize > len(data) {
-				return 0, fmt.Errorf("LZFSE block size (%d) exceeds available data (%d) at offset %d", blockSize, len(data)-offset, offset)
-			}
-
-			offset += blockSize
-
-		default:
-			return 0, fmt.Errorf("unknown LZFSE block magic %#08x at offset %d", magic, offset)
-		}
+	if len(data) < 4 {
+		return 0, fmt.Errorf("data too short to contain LZFSE block magic")
 	}
 
-	// Reached end of data without an explicit end-of-stream block.
-	// This is valid for some LZFSE streams.
-	return offset, nil
+	// Verify that data starts with valid LZFSE block magic
+	firstMagic := binary.LittleEndian.Uint32(data[0:4])
+	switch firstMagic {
+	case 0x2d787662, // bvx- (uncompressed block)
+		0x31787662, // bvx1 (lzfse compressed, uncompressed tables)
+		0x32787662, // bvx2 (lzfse compressed, compressed tables)
+		0x6e787662: // bvxn (lzvn compressed)
+		// Valid starting block magic
+	default:
+		return 0, fmt.Errorf("data does not start with valid LZFSE block magic: %#08x", firstMagic)
+	}
+
+	// Search for the end-of-stream marker (bvx$)
+	endMarker := []byte{'b', 'v', 'x', '$'}
+	endOffset := bytes.Index(data, endMarker)
+	if endOffset != -1 {
+		return endOffset + 4, nil
+	}
+
+	// No end-of-stream marker found, assume the entire data is the LZFSE stream
+	return len(data), nil
 }
 
 /* PAYLOAD KEYBAGS */

@@ -337,6 +337,191 @@ func createTestImg4Data(t testing.TB) []byte {
 	return data
 }
 
+// TestLZFSECompressionWithExtraData tests LZFSE compression specifically with extra data
+func TestLZFSECompressionWithExtraData(t *testing.T) {
+	// Use larger data for better LZFSE compression efficiency
+	originalPayloadData := generateRandomData(8192)
+	originalExtraData := generateRandomData(1024)
+
+	// Create IM4P with LZFSE compression
+	im4p, err := CreatePayload(&CreatePayloadConfig{
+		Type:        "rkrn",
+		Version:     "LZFSE Test Kernel",
+		Data:        originalPayloadData,
+		ExtraData:   originalExtraData,
+		Compression: CompressionAlgorithmLZFSE,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create LZFSE IM4P: %v", err)
+	}
+
+	// Marshal the IM4P
+	im4pBytes, err := im4p.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal LZFSE IM4P: %v", err)
+	}
+
+	// Parse the marshaled IM4P back
+	parsedPayload, err := ParsePayload(im4pBytes)
+	if err != nil {
+		t.Fatalf("Failed to parse LZFSE IM4P: %v", err)
+	}
+
+	// Verify compression type
+	if parsedPayload.Compression.Algorithm.String() != "LZFSE" {
+		t.Errorf("Expected LZFSE compression, got %s", parsedPayload.Compression.Algorithm.String())
+	}
+
+	// Decompress first to trigger extra data detection
+	decompressedData, err := parsedPayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZFSE payload: %v", err)
+	}
+
+	// Debug extra data detection
+	t.Logf("Original extra data: %d bytes", len(originalExtraData))
+	t.Logf("Compressed IM4P: %d bytes", len(im4pBytes))
+	t.Logf("Raw payload data: %d bytes", len(parsedPayload.Data))
+	extraData := parsedPayload.GetExtraData()
+	t.Logf("Detected extra data: %d bytes", len(extraData))
+
+	// Verify extra data presence (LZFSE does not support extra data extraction with current library)
+	if !parsedPayload.HasExtraData() {
+		t.Fatalf("Expected extra data to be present. Original: %d bytes, Detected: %d bytes",
+			len(originalExtraData), len(extraData))
+	}
+
+	// Extract and verify extra data (LZFSE does not support extra data extraction with current library)
+	extractedExtraData := parsedPayload.GetExtraData()
+	if !bytes.Equal(extractedExtraData, originalExtraData) {
+		t.Errorf("Extra data mismatch after LZFSE roundtrip\nExpected: %x\nGot:      %x",
+			originalExtraData, extractedExtraData)
+	}
+
+	// Verify payload data (already decompressed above)
+	if !bytes.Equal(decompressedData, originalPayloadData) {
+		t.Errorf("Payload data mismatch after LZFSE roundtrip\nExpected: %x\nGot:      %x",
+			originalPayloadData, decompressedData)
+	}
+
+	t.Logf("✅ LZFSE test passed: payload=%d bytes, extra=%d bytes, compressed=%d bytes",
+		len(originalPayloadData), len(originalExtraData), len(im4pBytes))
+}
+
+// TestLZFSEVsLZSSComparison compares LZFSE and LZSS compression with same data
+func TestLZFSEVsLZSSComparison(t *testing.T) {
+	// Use real test data if available
+	testDataDir := "../../test-caches/TEST/22L572__AppleTV5,3"
+	kernelPath := filepath.Join(testDataDir, "kernel")
+	extraPath := filepath.Join(testDataDir, "extra")
+
+	var kernelData, extraData []byte
+	var err error
+
+	// Try to use real data, fallback to synthetic data
+	if kernelData, err = os.ReadFile(kernelPath); err != nil {
+		t.Log("Using synthetic data for test (real kernel not available)")
+		kernelData = generateRandomData(16384) // 16KB synthetic kernel
+	}
+	if extraData, err = os.ReadFile(extraPath); err != nil {
+		t.Log("Using synthetic extra data (real extra not available)")
+		extraData = generateRandomData(2048) // 2KB synthetic extra
+	}
+
+	// Test LZSS compression
+	lzssPayload, err := CreatePayload(&CreatePayloadConfig{
+		Type:        "rkrn",
+		Version:     "LZSS Test",
+		Data:        kernelData,
+		ExtraData:   extraData,
+		Compression: CompressionAlgorithmLZSS,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create LZSS payload: %v", err)
+	}
+
+	lzssBytes, err := lzssPayload.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal LZSS payload: %v", err)
+	}
+
+	// Test LZFSE compression
+	lzfsePayload, err := CreatePayload(&CreatePayloadConfig{
+		Type:        "rkrn",
+		Version:     "LZFSE Test",
+		Data:        kernelData,
+		ExtraData:   extraData,
+		Compression: CompressionAlgorithmLZFSE,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create LZFSE payload: %v", err)
+	}
+
+	lzfseBytes, err := lzfsePayload.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal LZFSE payload: %v", err)
+	}
+
+	// Verify both payloads decompress to same data
+	lzssDecomp, err := lzssPayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZSS: %v", err)
+	}
+
+	lzfseDecomp, err := lzfsePayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZFSE: %v", err)
+	}
+
+	if !bytes.Equal(lzssDecomp, lzfseDecomp) {
+		t.Fatal("LZSS and LZFSE decompressed data don't match")
+	}
+
+	if !bytes.Equal(lzssDecomp, kernelData) {
+		t.Fatal("Decompressed data doesn't match original")
+	}
+
+	// Decompress both to ensure extra data is detected
+	_, err = lzssPayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZSS for extra data: %v", err)
+	}
+	_, err = lzfsePayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZFSE for extra data: %v", err)
+	}
+
+	// Verify both have same extra data
+	lzssExtra := lzssPayload.GetExtraData()
+	lzfseExtra := lzfsePayload.GetExtraData()
+
+	if !bytes.Equal(lzssExtra, lzfseExtra) {
+		t.Fatal("LZSS and LZFSE extra data don't match")
+	}
+
+	if !bytes.Equal(lzssExtra, extraData) {
+		t.Fatal("Extra data doesn't match original")
+	}
+
+	// Compare compression efficiency
+	t.Logf("📊 Compression comparison for %d bytes + %d extra bytes:",
+		len(kernelData), len(extraData))
+	t.Logf("  LZSS:  %d bytes (%.1f%% ratio)",
+		len(lzssBytes), float64(len(lzssBytes))/float64(len(kernelData))*100)
+	t.Logf("  LZFSE: %d bytes (%.1f%% ratio)",
+		len(lzfseBytes), float64(len(lzfseBytes))/float64(len(kernelData))*100)
+
+	if len(lzfseBytes) < len(lzssBytes) {
+		t.Logf("✅ LZFSE achieved better compression (%d bytes saved)",
+			len(lzssBytes)-len(lzfseBytes))
+	} else if len(lzssBytes) < len(lzfseBytes) {
+		t.Logf("ℹ️  LZSS achieved better compression (%d bytes saved)",
+			len(lzfseBytes)-len(lzssBytes))
+	} else {
+		t.Log("ℹ️  Both algorithms achieved same compression ratio")
+	}
+}
+
 // TestFullRoundtrip tests the complete create -> marshal -> parse -> extract cycle
 // for IMG4, IM4P, IM4M, and IM4R components.
 func TestFullRoundtrip(t *testing.T) {

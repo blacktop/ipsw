@@ -170,7 +170,7 @@ var img4Im4mExtractCmd = &cobra.Command{
 // img4Im4mVerifyCmd represents the im4m verify command
 var img4Im4mVerifyCmd = &cobra.Command{
 	Use:           "verify <IM4M>",
-	Short:         "Verify IM4M manifest against build manifest",
+	Short:         "🚧 Verify IM4M manifest against build manifest",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
