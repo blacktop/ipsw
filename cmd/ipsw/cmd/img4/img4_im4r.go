@@ -62,9 +62,10 @@ func init() {
 
 // img4Im4rCmd represents the im4r command group
 var img4Im4rCmd = &cobra.Command{
-	Use:   "im4r",
-	Short: "IM4R restore info operations",
-	Args:  cobra.NoArgs,
+	Use:     "im4r",
+	Aliases: []string{"r"},
+	Short:   "IM4R restore info operations",
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -72,8 +73,15 @@ var img4Im4rCmd = &cobra.Command{
 
 // img4Im4rInfoCmd represents the im4r info command
 var img4Im4rInfoCmd = &cobra.Command{
-	Use:           "info <IMG4>",
-	Short:         "Display IM4R restore information",
+	Use:     "info <IMG4>",
+	Aliases: []string{"i"},
+	Short:   "Display IM4R restore information",
+	Example: heredoc.Doc(`
+		# Display IM4R restore info from IMG4 file
+		❯ ipsw img4 im4r info kernel.img4
+
+		# Output as JSON
+		❯ ipsw img4 im4r info --json kernel.img4`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -100,8 +108,9 @@ var img4Im4rInfoCmd = &cobra.Command{
 
 // img4Im4rCreateCmd represents the im4r create command
 var img4Im4rCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create IM4R restore info with boot nonce",
+	Use:     "create",
+	Aliases: []string{"c"},
+	Short:   "Create IM4R restore info with boot nonce",
 	Example: heredoc.Doc(`
 		# Create IM4R with boot nonce for iOS restore
 		❯ ipsw img4 im4r create --boot-nonce 1234567890abcdef --output restore.im4r`),

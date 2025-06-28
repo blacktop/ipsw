@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/spf13/cobra"
@@ -41,9 +42,15 @@ func init() {
 
 // img4InfoCmd represents the info command
 var img4InfoCmd = &cobra.Command{
-	Use:           "info <IMG4>",
-	Aliases:       []string{"i"},
-	Short:         "Display IMG4 file information",
+	Use:     "info <IMG4>",
+	Aliases: []string{"i"},
+	Short:   "Display IMG4 file information",
+	Example: heredoc.Doc(`
+		# Display information about an IMG4 file
+		❯ ipsw img4 info kernel.img4
+
+		# Output information as JSON
+		❯ ipsw img4 info --json kernel.img4`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

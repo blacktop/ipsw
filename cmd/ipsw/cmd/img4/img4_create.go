@@ -80,8 +80,9 @@ func init() {
 
 // img4CreateCmd represents the create command
 var img4CreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create an IMG4 file",
+	Use:     "create",
+	Aliases: []string{"c"},
+	Short:   "Create an IMG4 file",
 	Example: heredoc.Doc(`
 		# Create IMG4 from existing IM4P with manifest and restore info
 		❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4

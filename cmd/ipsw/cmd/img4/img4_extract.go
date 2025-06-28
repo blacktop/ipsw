@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -65,7 +66,19 @@ var img4ExtractCmd = &cobra.Command{
 	Use:     "extract <IMG4>",
 	Aliases: []string{"e"},
 	Short:   "Extract IMG4 components",
-	Args:    cobra.ExactArgs(1),
+	Example: heredoc.Doc(`
+		# Extract IM4P payload from IMG4 file
+		❯ ipsw img4 extract --im4p kernel.img4
+
+		# Extract manifest and restore info
+		❯ ipsw img4 extract --im4m --im4r kernel.img4
+
+		# Extract all components to a specific directory
+		❯ ipsw img4 extract --im4p --im4m --im4r --output /tmp/extracted kernel.img4
+
+		# Extract raw (compressed) IM4P data without decompression
+		❯ ipsw img4 extract --im4p --raw kernel.img4`),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
