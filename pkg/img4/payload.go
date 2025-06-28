@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -253,12 +252,6 @@ func ParsePayload(data []byte) (*Payload, error) {
 		}
 	}
 
-	if _, err := p.Decompress(); err != nil {
-		if !errors.Is(err, ErrNotCompressed) {
-			return nil, fmt.Errorf("failed to decompress payload data: %v", err)
-		}
-	}
-
 	return &p, nil
 }
 
@@ -431,6 +424,12 @@ func (i *Payload) HasExtraData() bool {
 
 // GetExtraData returns any extra data appended after the compressed payload
 func (i *Payload) GetExtraData() []byte {
+	if i.decompressedData == nil {
+		if _, err := i.Decompress(); err != nil && err != ErrNotCompressed {
+			log.Errorf("failed to decompress payload to get extra data: %v", err)
+			return nil
+		}
+	}
 	return i.extraData
 }
 
