@@ -24,8 +24,8 @@ type IMG4 struct {
 	Raw         asn1.RawContent
 	Tag         string        // IMG4
 	Payload     asn1.RawValue `asn1:"explicit,tag:0,optional"`
-	Manifest    asn1.RawValue `asn1:"explicit,tag:1,optional"`
-	RestoreInfo asn1.RawValue `asn1:"explicit,tag:2,optional"`
+	Manifest    asn1.RawValue `asn1:"explicit,tag:0,optional"`
+	RestoreInfo asn1.RawValue `asn1:"explicit,tag:1,optional"`
 }
 
 type Image struct {
@@ -239,7 +239,7 @@ func (i *Image) Marshal() ([]byte, error) {
 		}
 		i.IMG4.Manifest = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
-			Tag:        1, // tag:1 as specified in struct
+			Tag:        0, // tag:0 as specified in struct
 			IsCompound: true,
 			Bytes:      manifestData,
 		}
@@ -252,7 +252,7 @@ func (i *Image) Marshal() ([]byte, error) {
 		}
 		i.IMG4.RestoreInfo = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
-			Tag:        2, // tag:2 as specified in struct
+			Tag:        1, // tag:1 as specified in struct
 			IsCompound: true,
 			Bytes:      restoreInfoData,
 		}
