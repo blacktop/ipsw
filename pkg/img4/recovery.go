@@ -182,10 +182,10 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 func (r *RestoreInfo) String() string {
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4R (Restore Info)")))
-	result.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Properties"), len(r.Properties)))
 	if nonce, found := r.BootNonce(); found {
 		result.WriteString(fmt.Sprintf("  %s: %d (0x%x)\n", colorField("Boot Nonce"), nonce, nonce))
 	}
+	result.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Properties"), len(r.Properties)))
 	for name, value := range r.Properties {
 		result.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(name), FormatPropertyValue(value)))
 	}
