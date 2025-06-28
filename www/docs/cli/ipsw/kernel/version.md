@@ -17,8 +17,9 @@ ipsw kernel version [flags]
 ### Options
 
 ```
-  -h, --help   help for version
-  -j, --json   Output as JSON
+  -a, --arch string   Which architecture to use for fat/universal MachO
+  -h, --help          help for version
+  -j, --json          Output as JSON
 ```
 
 ### Options inherited from parent commands

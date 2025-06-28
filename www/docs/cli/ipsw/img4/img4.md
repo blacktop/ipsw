@@ -4,11 +4,11 @@ title: img4
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: img4
-description: Parse Img4
+description: Parse and manipulate IMG4 files
 ---
 ## ipsw img4
 
-Parse Img4
+Parse and manipulate IMG4 files
 
 ```
 ipsw img4 [flags]
@@ -32,7 +32,10 @@ ipsw img4 [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw img4 dec](/docs/cli/ipsw/img4/dec)	 - Decrypt img4 payloads
-* [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract im4p payloads
-* [ipsw img4 kbag](/docs/cli/ipsw/img4/kbag)	 - Extract kbag from img4
+* [ipsw img4 create](/docs/cli/ipsw/img4/create)	 - Create an IMG4 file
+* [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract IMG4 components
+* [ipsw img4 im4m](/docs/cli/ipsw/img4/im4m)	 - IM4M manifest operations
+* [ipsw img4 im4p](/docs/cli/ipsw/img4/im4p)	 - IM4P payload operations
+* [ipsw img4 im4r](/docs/cli/ipsw/img4/im4r)	 - IM4R restore info operations
+* [ipsw img4 info](/docs/cli/ipsw/img4/info)	 - Display IMG4 file information
 

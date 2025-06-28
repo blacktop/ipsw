@@ -17,7 +17,8 @@ ipsw kernel mig <kernelcache> [flags]
 ### Options
 
 ```
-  -h, --help   help for mig
+  -a, --arch string   Which architecture to use for fat/universal MachO
+  -h, --help          help for mig
 ```
 
 ### Options inherited from parent commands

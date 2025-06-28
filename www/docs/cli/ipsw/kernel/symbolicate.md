@@ -17,6 +17,7 @@ ipsw kernel symbolicate [flags]
 ### Options
 
 ```
+  -a, --arch string         Which architecture to use for fat/universal MachO
   -f, --flat                Output results in flat file '.syms' format
   -h, --help                help for symbolicate
   -j, --json                Output results in JSON format
