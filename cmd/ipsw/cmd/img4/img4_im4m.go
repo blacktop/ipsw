@@ -205,19 +205,12 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("failed to read input manifest %s: %v", args[0], err)
 		}
 
-		// Try to parse as standalone IM4M first
 		inputManifest, err := img4.ParseManifest(data)
 		if err != nil {
 			return fmt.Errorf("failed to parse input IM4M manifest: %v", err)
 		}
 
-		// Parse the build manifest (could be IMG4 or standalone IM4M)
-		bm, err := os.Open(buildManifestPath)
-		if err != nil {
-			return fmt.Errorf("failed to open build manifest %s: %v", buildManifestPath, err)
-		}
-		defer bm.Close()
-		bmData, err := io.ReadAll(bm)
+		bmData, err := os.ReadFile(buildManifestPath)
 		if err != nil {
 			return fmt.Errorf("failed to read build manifest %s: %v", buildManifestPath, err)
 		}
@@ -231,9 +224,6 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("verification failed: %v", err)
 		}
 
-		// fmt.Printf("%s           %s\n", colorField("Input Manifest:"), filepath.Base(args[0]))
-		// fmt.Printf("%s         %s\n", colorField("Build Manifest:"), filepath.Base(buildManifestPath))
-
 		if result.IsValid {
 			fmt.Printf("\n%s ✓ Manifest verification %s\n",
 				color.New(color.FgGreen).Sprint("SUCCESS:"),
@@ -243,19 +233,6 @@ var img4Im4mVerifyCmd = &cobra.Command{
 				color.New(color.FgRed).Sprint("FAILED:"),
 				color.New(color.FgRed).Sprint("FAILED"))
 		}
-
-		// fmt.Printf("%s   %d properties checked\n", colorField("Verified:"), result.PropertiesChecked)
-		// if len(result.Mismatches) > 0 {
-		// 	fmt.Printf("%s    %d properties failed\n", colorField("Mismatches:"), len(result.Mismatches))
-		// 	if viper.GetBool("verbose") {
-		// 		fmt.Printf("\n%s\n", colorField("Detailed Mismatches:"))
-		// 		for _, mismatch := range result.Mismatches {
-		// 			fmt.Printf("  %s:\n", color.New(color.FgYellow).Sprint(mismatch.Property))
-		// 			fmt.Printf("    BuildManifest: %v\n", mismatch.Expected)
-		// 			fmt.Printf("    IM4M:          %v\n", mismatch.Actual)
-		// 		}
-		// 	}
-		// }
 
 		return nil
 	},
@@ -275,60 +252,73 @@ type PropertyMismatch struct {
 	Actual   any
 }
 
-func verifyManifestProperties(inputManifest *img4.Manifest, buildProps *plist.BuildManifest, verbose, allowExtra bool) (*VerificationResult, error) {
+func verifyManifestProperties(im4m *img4.Manifest, bm *plist.BuildManifest, verbose, allowExtra bool) (*VerificationResult, error) {
 	result := &VerificationResult{
 		IsValid:    true,
 		Mismatches: []PropertyMismatch{},
 	}
 
-	inputProps := img4.ConvertPropertySliceToMap(inputManifest.Properties)
+	im4mProps := img4.ConvertPropertySliceToMap(im4m.Properties)
 
-	// Common properties to verify (these are the most critical for firmware validation)
-	criticalProps := []string{"CHIP", "BORD", "CEPO", "SDOM", "ECID"}
+	if len(bm.BuildIdentities) == 0 {
+		return nil, fmt.Errorf("no build identities found in build manifest")
+	}
+	// TODO: support multiple build identities
+	buildIdentity := bm.BuildIdentities[0]
 
-	for _, prop := range criticalProps {
+	// Map build manifest fields to IM4M property names and convert hex strings to integers
+	bmProps := make(map[string]any)
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApBoardID, "0x"), 16, 64); err == nil {
+		bmProps["BORD"] = int(val)
+	}
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApChipID, "0x"), 16, 64); err == nil {
+		bmProps["CHIP"] = int(val)
+	}
+	if val, err := strconv.ParseInt(strings.TrimPrefix(buildIdentity.ApSecurityDomain, "0x"), 16, 64); err == nil {
+		bmProps["SDOM"] = int(val)
+	}
+
+	// Verify all properties from the build manifest are present and correct in the IM4M
+	for bmKey, bmVal := range bmProps {
 		result.PropertiesChecked++
 
-		inputVal, inputExists := inputProps[prop]
-		buildVal, buildExists := buildProps[prop]
+		im4mVal, im4mExists := im4mProps[bmKey]
 
-		if verbose {
-			log.Debugf("Checking property %s: input=%v (exists=%v), build=%v (exists=%v)",
-				prop, inputVal, inputExists, buildVal, buildExists)
-		}
-
-		// Skip verification if property doesn't exist in either manifest
-		if !inputExists && !buildExists {
+		if !im4mExists {
+			result.IsValid = false
+			result.Mismatches = append(result.Mismatches, PropertyMismatch{
+				Property: bmKey,
+				Expected: bmVal,
+				Actual:   "(missing)",
+			})
 			continue
 		}
 
-		// Property exists in one but not the other
-		if inputExists != buildExists {
-			// If allowExtra is true and property exists in IM4M but not BuildManifest, skip
-			if allowExtra && inputExists && !buildExists {
-				if verbose {
-					log.Debugf("Skipping extra property %s in IM4M (allowExtra=true)", prop)
+		if !compareManifestValues(im4mVal, bmVal) {
+			result.IsValid = false
+			result.Mismatches = append(result.Mismatches, PropertyMismatch{
+				Property: bmKey,
+				Expected: bmVal,
+				Actual:   im4mVal,
+			})
+		}
+	}
+
+	// If not allowing extra properties, check for properties in IM4M that are not in the build manifest
+	if !allowExtra {
+		for im4mKey := range im4mProps {
+			if _, bmExists := bmProps[im4mKey]; !bmExists {
+				// Ignore ECID and snon as they are often unique to the manifest
+				if im4mKey == "ECID" || im4mKey == "snon" {
+					continue
 				}
-				continue
+				result.IsValid = false
+				result.Mismatches = append(result.Mismatches, PropertyMismatch{
+					Property: im4mKey,
+					Expected: "(not present in build manifest)",
+					Actual:   im4mProps[im4mKey],
+				})
 			}
-
-			result.IsValid = false
-			result.Mismatches = append(result.Mismatches, PropertyMismatch{
-				Property: prop,
-				Expected: buildVal,
-				Actual:   inputVal,
-			})
-			continue
-		}
-
-		// Both exist - compare values (handling different types)
-		if !compareManifestValues(inputVal, buildVal) {
-			result.IsValid = false
-			result.Mismatches = append(result.Mismatches, PropertyMismatch{
-				Property: prop,
-				Expected: buildVal,
-				Actual:   inputVal,
-			})
 		}
 	}
 
@@ -478,7 +468,7 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 	// Create a personalized manifest by modifying the existing manifest properties
 	personalizedProperties := make(map[string]any)
 
-	if len(img.Manifest.Properties) > 0 {
+	if img.Manifest.Properties != nil {
 		// Copy existing properties
 		existingProps := img4.ConvertPropertySliceToMap(img.Manifest.Properties)
 		maps.Copy(personalizedProperties, existingProps)

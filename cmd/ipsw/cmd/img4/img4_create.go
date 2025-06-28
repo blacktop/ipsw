@@ -50,8 +50,8 @@ func init() {
 	img4CreateCmd.Flags().StringP("input", "i", "", "Input file for IM4P payload data (raw data, not IM4P file)")
 	img4CreateCmd.Flags().StringP("type", "t", "", "IM4P type to set")
 	img4CreateCmd.Flags().StringP("version", "v", "", "IM4P version to set")
-	img4CreateCmd.Flags().StringP("compression", "c", "none", fmt.Sprintf("IM4P compression to use (%s)", strings.Join(compressionTypes, ", ")))
-	img4CreateCmd.RegisterFlagCompletionFunc("compression", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	img4CreateCmd.Flags().StringP("compress", "c", "none", fmt.Sprintf("IM4P compression to use (%s)", strings.Join(compressionTypes, ", ")))
+	img4CreateCmd.RegisterFlagCompletionFunc("compress", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return compressionTypes, cobra.ShellCompDirectiveDefault
 	})
 	// Common flags
@@ -77,7 +77,7 @@ func init() {
 	viper.BindPFlag("img4.create.input", img4CreateCmd.Flags().Lookup("input"))
 	viper.BindPFlag("img4.create.type", img4CreateCmd.Flags().Lookup("type"))
 	viper.BindPFlag("img4.create.version", img4CreateCmd.Flags().Lookup("version"))
-	viper.BindPFlag("img4.create.compression", img4CreateCmd.Flags().Lookup("compression"))
+	viper.BindPFlag("img4.create.compress", img4CreateCmd.Flags().Lookup("compress"))
 	viper.BindPFlag("img4.create.im4p", img4CreateCmd.Flags().Lookup("im4p"))
 	viper.BindPFlag("img4.create.im4m", img4CreateCmd.Flags().Lookup("im4m"))
 	viper.BindPFlag("img4.create.im4r", img4CreateCmd.Flags().Lookup("im4r"))
@@ -95,24 +95,24 @@ var img4CreateCmd = &cobra.Command{
 		❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4
 
 		# Create IMG4 from raw kernel with LZSS compression and manifest
-		❯ ipsw img4 create --input kernelcache --fourcc krnl --description "Kernelcache" --lzss --im4m manifest.im4m --output kernel.img4
+		❯ ipsw img4 create --input kernelcache --type krnl --description "Kernelcache" --compress lzss --im4m manifest.im4m --output kernel.img4
 
 		# Create IMG4 with boot nonce (generates IM4R automatically)
-		❯ ipsw img4 create --input sep-firmware.bin --fourcc sepi --boot-nonce 1234567890abcdef --im4m manifest.im4m --output sep.img4
+		❯ ipsw img4 create --input sep-firmware.bin --type sepi --boot-nonce 1234567890abcdef --im4m manifest.im4m --output sep.img4
 
-		# Create IMG4 with extra data (extra data requires --lzss compression)
-		❯ ipsw img4 create --input payload.bin --fourcc logo --lzss --extra extra.bin --im4m manifest.im4m --output logo.img4
+		# Create IMG4 with extra data (extra data requires --compress lzss)
+		❯ ipsw img4 create --input payload.bin --type logo --compress lzss --extra extra.bin --im4m manifest.im4m --output logo.img4
 
 		# Create unsigned IMG4 (no manifest) - for testing only
-		❯ ipsw img4 create --input test.bin --fourcc test --description "Test payload" --output test.img4
+		❯ ipsw img4 create --input test.bin --type test --description "Test payload" --output test.img4
 
 		# Create IMG4 from iBoot with specific compression
-		❯ ipsw img4 create --input iboot.raw --fourcc ibot --description "iBoot" --lzfse --im4m iboot.im4m --output iboot.img4
+		❯ ipsw img4 create --input iboot.raw --type ibot --description "iBoot" --compress lzfse --im4m iboot.im4m --output iboot.img4
 
 		# Create IMG4 from raw data with common FourCC codes
-		❯ ipsw img4 create --input kernelcache.bin --fourcc krnl --lzss --im4m manifest.im4m --output kernel.img4
-		❯ ipsw img4 create --input devicetree.bin --fourcc dtre --lzss --im4m manifest.im4m --output devicetree.img4
-		❯ ipsw img4 create --input ramdisk.dmg --fourcc rdsk --lzss --im4m manifest.im4m --output ramdisk.img4`),
+		❯ ipsw img4 create --input kernelcache.bin --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
+		❯ ipsw img4 create --input devicetree.bin --type dtre --compress lzss --im4m manifest.im4m --output devicetree.img4
+		❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4`),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -126,7 +126,7 @@ var img4CreateCmd = &cobra.Command{
 		inputPath := viper.GetString("img4.create.input")
 		im4pType := viper.GetString("img4.create.type")
 		im4pVersion := viper.GetString("img4.create.version")
-		im4pCompression := viper.GetString("img4.create.compression")
+		im4pCompression := viper.GetString("img4.create.compress")
 		im4pExtraDataPath := viper.GetString("img4.create.extra")
 		im4pPath := viper.GetString("img4.create.im4p")
 		im4mPath := viper.GetString("img4.create.im4m")
