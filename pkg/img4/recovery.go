@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 )
@@ -179,7 +180,6 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 	var entries []asn1.RawValue
 
 	for name, value := range r.Properties {
-		// Marshal property value
 		var valueBytes []byte
 		var tag int
 		var err error
@@ -192,7 +192,6 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 			valueBytes, err = asn1.Marshal(v)
 			tag = asn1.TagInteger
 		case uint64:
-			// Convert uint64 to int64 for ASN.1 marshaling
 			valueBytes, err = asn1.Marshal(int64(v))
 			tag = asn1.TagInteger
 		case bool:
@@ -204,6 +203,9 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 		case []byte:
 			valueBytes, err = asn1.Marshal(v)
 			tag = asn1.TagOctetString
+		case time.Time:
+			valueBytes, err = asn1.Marshal(v.Unix())
+			tag = asn1.TagInteger
 		default:
 			return nil, fmt.Errorf("unsupported property type: %T", v)
 		}
@@ -229,15 +231,9 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 			return nil, fmt.Errorf("failed to marshal property %s: %v", name, err)
 		}
 
-		// Determine private tag (use BNCN tag for boot nonce, generic for others)
-		privateTag := 0x1000 // generic
-		if name == "BNCN" {
-			privateTag = tagBNCN
-		}
-
 		entries = append(entries, asn1.RawValue{
 			Class:      3, // private class
-			Tag:        privateTag,
+			Tag:        fourCCtoInt(name),
 			IsCompound: true,
 			Bytes:      propBytes,
 		})

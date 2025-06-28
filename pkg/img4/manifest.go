@@ -94,52 +94,61 @@ const (
 // propertyTypeMap provides a centralized lookup for property types based on their ASN.1 tags
 var propertyTypeMap = map[int]PropType{
 	// String properties (stored as OCTET STRING but should be displayed as text)
-	tagLove: PropTypeString, // love - Version string
-	tagPrtp: PropTypeString, // prtp - Platform type
-	tagSdkp: PropTypeString, // sdkp - SDK platform
-	tagTagt: PropTypeString, // tagt - Target tag
-	tagTatp: PropTypeString, // tatp - Target platform
-	tagPave: PropTypeString, // pave - Platform version
-	tagVnum: PropTypeString, // vnum - Version number
-	tagApmv: PropTypeString, // apmv - Apple PMU version
+	fourCCtoInt("love"): PropTypeString, // love - Version string
+	fourCCtoInt("prtp"): PropTypeString, // prtp - Platform type
+	fourCCtoInt("sdkp"): PropTypeString, // sdkp - SDK platform
+	fourCCtoInt("tagt"): PropTypeString, // tagt - Target tag
+	fourCCtoInt("tatp"): PropTypeString, // tatp - Target platform
+	fourCCtoInt("pave"): PropTypeString, // pave - Platform version
+	fourCCtoInt("vnum"): PropTypeString, // vnum - Version number
+	fourCCtoInt("apmv"): PropTypeString, // apmv - Apple PMU version
 
 	// Hash/binary properties (stored as OCTET STRING, display as hex)
-	tagSrvn: PropTypeHash, // srvn - Security revision number
-	tagSnon: PropTypeHash, // snon - Security nonce
-	tagBNCH: PropTypeHash, // BNCH - Boot nonce hash
-	tagTbmr: PropTypeHash, // tbmr - Trusted boot measurement register
-	tagTbms: PropTypeHash, // tbms - Trusted boot measurement signature
-	tagMmap: PropTypeHash, // mmap - Memory map
-	tagRddg: PropTypeHash, // rddg - RD Debug
+	fourCCtoInt("srvn"): PropTypeHash, // srvn - Security revision number
+	fourCCtoInt("snon"): PropTypeHash, // snon - Security nonce
+	fourCCtoInt("BNCH"): PropTypeHash, // BNCH - Boot nonce hash
+	fourCCtoInt("tbmr"): PropTypeHash, // tbmr - Trusted boot measurement register
+	fourCCtoInt("tbms"): PropTypeHash, // tbms - Trusted boot measurement signature
+	fourCCtoInt("mmap"): PropTypeHash, // mmap - Memory map
+	fourCCtoInt("rddg"): PropTypeHash, // rddg - RD Debug
 
 	// Boolean properties
-	tagCPRO: PropTypeBool, // CPRO - Certificate production status
-	tagCSEC: PropTypeBool, // CSEC - Certificate security mode
-	tagEKEY: PropTypeBool, // EKEY - Encryption key required
-	tagEPRO: PropTypeBool, // EPRO - Encryption production
-	tagESEC: PropTypeBool, // ESEC - Encryption security
+	fourCCtoInt("CPRO"): PropTypeBool, // CPRO - Certificate production status
+	fourCCtoInt("CSEC"): PropTypeBool, // CSEC - Certificate security mode
+	fourCCtoInt("EKEY"): PropTypeBool, // EKEY - Encryption key required
+	fourCCtoInt("EPRO"): PropTypeBool, // EPRO - Encryption production
+	fourCCtoInt("ESEC"): PropTypeBool, // ESEC - Encryption security
 
 	// Timestamp properties (stored as INTEGER, display as time)
-	tagTstp: PropTypeTimestamp, // tstp - Timestamp
+	fourCCtoInt("tstp"): PropTypeTimestamp, // tstp - Timestamp
 
 	// Integer properties
-	tagBORD: PropTypeInt, // BORD - Board ID
-	tagCEPO: PropTypeInt, // CEPO - Certificate epoch
-	tagCHIP: PropTypeInt, // CHIP - Chip ID
-	tagECID: PropTypeInt, // ECID - Exclusive chip identifier
-	tagSDOM: PropTypeInt, // SDOM - Security domain
-	tagAugs: PropTypeInt, // augs - Augmented security
-	tagClas: PropTypeInt, // clas - Device class
-	tagFchp: PropTypeInt, // fchp - Firmware chip
-	tagStyp: PropTypeInt, // styp - Security type
-	tagType: PropTypeInt, // type - Type
-	tagImpl: PropTypeInt, // impl - Implementation
-	tagArms: PropTypeInt, // arms - ARM security
-	tagAr1s: PropTypeInt, // ar1s - ARM1 security
-	tagCons: PropTypeInt, // cons - Console
-	tagDrmc: PropTypeInt, // drmc - DRMC
-	tagTz0s: PropTypeInt, // tz0s - TrustZone 0 security
-	tagTz1s: PropTypeInt, // tz1s - TrustZone 1 security
+	fourCCtoInt("BORD"): PropTypeInt, // BORD - Board ID
+	fourCCtoInt("CEPO"): PropTypeInt, // CEPO - Certificate epoch
+	fourCCtoInt("CHIP"): PropTypeInt, // CHIP - Chip ID
+	fourCCtoInt("ECID"): PropTypeInt, // ECID - Exclusive chip identifier
+	fourCCtoInt("SDOM"): PropTypeInt, // SDOM - Security domain
+	fourCCtoInt("augs"): PropTypeInt, // augs - Augmented security
+	fourCCtoInt("clas"): PropTypeInt, // clas - Device class
+	fourCCtoInt("fchp"): PropTypeInt, // fchp - Firmware chip
+	fourCCtoInt("styp"): PropTypeInt, // styp - Security type
+	fourCCtoInt("type"): PropTypeInt, // type - Type
+	fourCCtoInt("impl"): PropTypeInt, // impl - Implementation
+	fourCCtoInt("arms"): PropTypeInt, // arms - ARM security
+	fourCCtoInt("ar1s"): PropTypeInt, // ar1s - ARM1 security
+	fourCCtoInt("cons"): PropTypeInt, // cons - Console
+	fourCCtoInt("drmc"): PropTypeInt, // drmc - DRMC
+	fourCCtoInt("tz0s"): PropTypeInt, // tz0s - TrustZone 0 security
+	fourCCtoInt("tz1s"): PropTypeInt, // tz1s - TrustZone 1 security
+}
+
+// fourCCtoInt converts a 4-character string (FourCC) to an integer.
+// This is used for ASN.1 private tags which are often represented as FourCC codes.
+func fourCCtoInt(fourCC string) int {
+	if len(fourCC) != 4 {
+		return 0 // Or handle error as appropriate
+	}
+	return int(fourCC[0])<<24 | int(fourCC[1])<<16 | int(fourCC[2])<<8 | int(fourCC[3])
 }
 
 // getPropertyType returns the expected type for a given property tag
@@ -558,11 +567,9 @@ func (m *Manifest) Marshal() ([]byte, error) {
 			return nil, fmt.Errorf("failed to marshal property sequence %s: %v", p.Name, err)
 		}
 
-		// NOTE: Uses generic private tag 0x1000 instead of Apple's specific tags
-		// This produces simplified ASN.1 for testing only - not compatible with Apple tools
 		manpSetEntries = append(manpSetEntries, asn1.RawValue{
 			Class:      asn1.ClassPrivate,
-			Tag:        0x1000, // Generic tag - NOT Apple-compatible
+			Tag:        fourCCtoInt(p.Name),
 			IsCompound: true,
 			Bytes:      propSeqBytes,
 		})
