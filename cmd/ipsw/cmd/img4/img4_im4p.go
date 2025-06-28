@@ -314,7 +314,7 @@ var img4Im4pCreateCmd = &cobra.Command{
 		case "lzfse":
 			comp = img4.CompressionAlgorithmLZFSE
 		case "none", "":
-			comp = img4.CompressionAlgorithmMAX
+			comp = img4.CompressionAlgorithmMAX // No compression
 		}
 
 		data, err := os.ReadFile(inputPath)
