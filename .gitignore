@@ -14,13 +14,16 @@
 *.out
 
 # IDE
-.claude
-CLAUDE.md
 .idea
 .vscode
 debug
 __debug_*
 .env
+
+# AI
+.claude
+CLAUDE.md
+GEMINI.md
 
 # Go Work
 *.work
