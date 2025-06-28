@@ -262,20 +262,20 @@ func ParsePayload(data []byte) (*Payload, error) {
 func (p *Payload) String() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4P (Payload)")))
-	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Tag"), p.Tag))
-	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Type"), p.Type))
-	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Version"), p.Version))
-	sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Data"), humanize.Bytes(uint64(len(p.Data))), len(p.Data)))
+	sb.WriteString(fmt.Sprintf("  %s:          %s\n", colorField("Tag"), p.Tag))
+	sb.WriteString(fmt.Sprintf("  %s:         %s\n", colorField("Type"), p.Type))
+	sb.WriteString(fmt.Sprintf("  %s:      %s\n", colorField("Version"), p.Version))
+	sb.WriteString(fmt.Sprintf("  %s:         %s (%d bytes)\n", colorField("Data"), humanize.Bytes(uint64(len(p.Data))), len(p.Data)))
 	if p.Compression.UncompressedSize > 0 {
-		sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Compression"), p.Compression.Algorithm.String()))
+		sb.WriteString(fmt.Sprintf("  %s:  %s\n", colorField("Compression"), p.Compression.Algorithm.String()))
 		if p.Compression.UncompressedSize > 0 {
-			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed Size"), humanize.Bytes(uint64(p.Compression.UncompressedSize)), p.Compression.UncompressedSize))
+			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed"), humanize.Bytes(uint64(p.Compression.UncompressedSize)), p.Compression.UncompressedSize))
 		}
 	}
 	if p.HasExtraData() {
 		extraData := p.GetExtraData()
 		if len(extraData) > 0 {
-			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("ExtraData"), humanize.Bytes(uint64(len(extraData))), len(extraData)))
+			sb.WriteString(fmt.Sprintf("  %s:    %s (%d bytes)\n", colorField("ExtraData"), humanize.Bytes(uint64(len(extraData))), len(extraData)))
 		}
 	}
 	if len(p.Keybags) > 0 {
@@ -322,8 +322,22 @@ func (p *Payload) Decompress() ([]byte, error) {
 	if p.decompressedData != nil {
 		return p.decompressedData, nil
 	}
-
-	if p.Encrypted || p.Compression.UncompressedSize == 0 {
+	// confirm that the payload is compressed
+	isCompressed := false
+	hasCompressField := false
+	if !p.Encrypted && p.Compression.UncompressedSize > 0 {
+		isCompressed = true
+		hasCompressField = true
+	} else if isLzss, err := magic.IsLZSS(p.Data); err != nil {
+		return nil, fmt.Errorf("failed to check if data is LZSS: %v", err)
+	} else if isLzss {
+		isCompressed = true
+	} else if isLzfse, err := magic.IsLZFSE(p.Data); err != nil {
+		return nil, fmt.Errorf("failed to check if data is LZFSE: %v", err)
+	} else if isLzfse {
+		isCompressed = true
+	}
+	if !isCompressed {
 		return nil, ErrNotCompressed
 	}
 
@@ -333,7 +347,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 			return nil, fmt.Errorf("data too short to contain valid LZSS header")
 		}
 		var hdr lzss.Header
-		if err := binary.Read(bytes.NewReader(p.Data[:binary.Size(hdr)]), binary.LittleEndian, &hdr); err != nil {
+		if err := binary.Read(bytes.NewReader(p.Data[:binary.Size(hdr)]), binary.BigEndian, &hdr); err != nil {
 			return nil, fmt.Errorf("failed to read LZSS header: %v", err)
 		}
 		if hdr.CompressedSize != lzss.CompressionType && hdr.Signature != lzss.Signature {
@@ -360,12 +374,16 @@ func (p *Payload) Decompress() ([]byte, error) {
 				log.Debugf("extracted %d bytes of extra data after LZSS payload", len(p.extraData))
 			}
 		}
+		if !hasCompressField {
+			p.Compression.Algorithm = CompressionAlgorithmLZSS
+			p.Compression.UncompressedSize = len(decompressed)
+		}
 		return decompressed, nil
 	case CompressionAlgorithmLZFSE:
 		if len(p.Data) < 4 {
 			return nil, fmt.Errorf("data too short to contain valid LZFSE header")
 		}
-		if isLzfse, err := magic.IsLzfse(p.Data); err != nil {
+		if isLzfse, err := magic.IsLZFSE(p.Data); err != nil {
 			return nil, fmt.Errorf("failed to check if data is LZFSE: %v", err)
 		} else if !isLzfse {
 			return nil, fmt.Errorf("data is not LZFSE compressed")
@@ -379,6 +397,10 @@ func (p *Payload) Decompress() ([]byte, error) {
 		p.extraData = p.extractExtraDataFromLzfse(p.Data)
 		if len(p.extraData) > 0 {
 			log.Debugf("extracted %d bytes of extra data after LZFSE payload", len(p.extraData))
+		}
+		if !hasCompressField {
+			p.Compression.Algorithm = CompressionAlgorithmLZFSE
+			p.Compression.UncompressedSize = len(decompressed)
 		}
 		return decompressed, nil
 	}
@@ -434,58 +456,44 @@ func (i *Payload) calculateLzfseTotalSize(data []byte) (int, error) {
 
 	for offset < len(data) {
 		if offset+4 > len(data) {
-			return 0, fmt.Errorf("incomplete block header at offset %d", offset)
+			// This can happen if there's trailing data that isn't a full block.
+			// We'll consider the stream ended here.
+			return offset, nil
 		}
 
 		// Read block magic (little endian)
-		magic := uint32(data[offset]) | uint32(data[offset+1])<<8 | uint32(data[offset+2])<<16 | uint32(data[offset+3])<<24
+		magic := binary.LittleEndian.Uint32(data[offset : offset+4])
 
 		switch magic {
 		case 0x24787662: // bvx$ (end of stream)
 			return offset + 4, nil
 
-		case 0x2d787662: // bvx- (uncompressed block)
-			if offset+12 > len(data) {
-				return 0, fmt.Errorf("incomplete uncompressed block header at offset %d", offset)
-			}
-			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] + payload
-			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
-			offset += 12 + int(payloadBytes)
+		case 0x2d787662, // bvx- (uncompressed block)
+			0x31787662, // bvx1 (lzfse compressed, uncompressed tables)
+			0x32787662, // bvx2 (lzfse compressed, compressed tables)
+			0x6e787662: // bvxn (lzvn compressed)
 
-		case 0x31787662: // bvx1 (lzfse compressed, uncompressed tables)
-			// This format has a large fixed header size (approx 1040 bytes)
-			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] then read payload size
 			if offset+12 > len(data) {
-				return 0, fmt.Errorf("incomplete v1 block header at offset %d", offset)
+				return 0, fmt.Errorf("incomplete LZFSE block header at offset %d for magic %#08x", offset, magic)
 			}
-			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
-			// V1 header is large (~1040 bytes) but we can calculate it as: header + n_payload_bytes
-			headerSize := 1040 // approximate fixed size for v1 headers
-			offset += headerSize + int(payloadBytes)
 
-		case 0x32787662: // bvx2 (lzfse compressed, compressed tables)
-			if offset+28 > len(data) { // minimum header size
-				return 0, fmt.Errorf("incomplete v2 block header at offset %d", offset)
-			}
-			// Read header_size from packed field 3 (offset 24, bits 0-31)
-			headerSizeBytes := data[offset+24 : offset+28]
-			headerSize := uint32(headerSizeBytes[0]) | uint32(headerSizeBytes[1])<<8 | uint32(headerSizeBytes[2])<<16 | uint32(headerSizeBytes[3])<<24
-			offset += int(headerSize)
+			payloadBytes := binary.LittleEndian.Uint32(data[offset+8 : offset+12])
+			blockSize := 12 + int(payloadBytes)
 
-		case 0x6e787662: // bvxn (lzvn compressed)
-			if offset+12 > len(data) {
-				return 0, fmt.Errorf("incomplete lzvn block header at offset %d", offset)
+			if offset+blockSize > len(data) {
+				return 0, fmt.Errorf("LZFSE block size (%d) exceeds available data (%d) at offset %d", blockSize, len(data)-offset, offset)
 			}
-			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] + payload
-			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
-			offset += 12 + int(payloadBytes)
+
+			offset += blockSize
 
 		default:
 			return 0, fmt.Errorf("unknown LZFSE block magic %#08x at offset %d", magic, offset)
 		}
 	}
 
-	return 0, fmt.Errorf("reached end of data without finding end-of-stream block")
+	// Reached end of data without an explicit end-of-stream block.
+	// This is valid for some LZFSE streams.
+	return offset, nil
 }
 
 /* PAYLOAD KEYBAGS */

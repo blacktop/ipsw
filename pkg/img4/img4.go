@@ -116,15 +116,15 @@ func (i *Image) MarshalJSON() ([]byte, error) {
 
 type CreateConfig struct {
 	// raw IM4P data
-	InputPath            string
-	PayloadType          string
-	PayloadVersion       string
-	PayloadCompression   string
-	PayloadExtraDataPath string
+	InputData          []byte
+	PayloadType        string
+	PayloadVersion     string
+	PayloadCompression string
+	PayloadExtraData   []byte
 
-	PayloadPath     string
-	ManifestPath    string
-	RestoreInfoPath string
+	PayloadData     []byte
+	ManifestData    []byte
+	RestoreInfoData []byte
 
 	// IM4R specific
 	BootNonce string
@@ -140,18 +140,7 @@ func Create(conf *CreateConfig) (*Image, error) {
 		},
 	}
 
-	if len(conf.InputPath) > 0 {
-		data, err := os.ReadFile(conf.InputPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read input file %s: %v", conf.InputPath, err)
-		}
-		var extraData []byte
-		if len(conf.PayloadExtraDataPath) > 0 {
-			extraData, err = os.ReadFile(conf.PayloadExtraDataPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read extra data file %s: %v", conf.PayloadExtraDataPath, err)
-			}
-		}
+	if len(conf.InputData) > 0 {
 		var comp CompressionAlgorithm
 		switch strings.ToLower(conf.PayloadCompression) {
 		case "lzss":
@@ -162,31 +151,31 @@ func Create(conf *CreateConfig) (*Image, error) {
 		img.Payload, err = CreatePayload(&CreatePayloadConfig{
 			Type:        conf.PayloadType,
 			Version:     conf.PayloadVersion,
-			Data:        data,
-			ExtraData:   extraData,
+			Data:        conf.InputData,
+			ExtraData:   conf.PayloadExtraData,
 			Compression: comp,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create IM4P payload from input file: %v", err)
+			return nil, fmt.Errorf("failed to create IM4P payload from input data: %v", err)
 		}
-	} else {
-		img.Payload, err = OpenPayload(conf.PayloadPath)
+	} else if len(conf.PayloadData) > 0 {
+		img.Payload, err = ParsePayload(conf.PayloadData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open IM4P payload from path %s: %v", conf.PayloadPath, err)
-		}
-	}
-
-	if len(conf.ManifestPath) > 0 {
-		img.Manifest, err = OpenManifest(conf.ManifestPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open IM4M manifest from path %s: %v", conf.ManifestPath, err)
+			return nil, fmt.Errorf("failed to parse IM4P payload data: %v", err)
 		}
 	}
 
-	if len(conf.RestoreInfoPath) > 0 {
-		img.RestoreInfo, err = OpenRestoreInfo(conf.RestoreInfoPath)
+	if len(conf.ManifestData) > 0 {
+		img.Manifest, err = ParseManifest(conf.ManifestData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open IM4R restore info from path %s: %v", conf.RestoreInfoPath, err)
+			return nil, fmt.Errorf("failed to parse IM4M manifest data: %v", err)
+		}
+	}
+
+	if len(conf.RestoreInfoData) > 0 {
+		img.RestoreInfo, err = ParseRestoreInfo(conf.RestoreInfoData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse IM4R restore info data: %v", err)
 		}
 	}
 	if len(conf.BootNonce) > 0 {

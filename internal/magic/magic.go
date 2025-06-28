@@ -413,7 +413,7 @@ func IsLZSS(data []byte) (bool, error) {
 	return false, nil
 }
 
-func IsLzfse(data []byte) (bool, error) {
+func IsLZFSE(data []byte) (bool, error) {
 	if len(data) > 4 &&
 		(string(data[:4]) == "bvx2" ||
 			string(data[:4]) == "bvxn" ||
