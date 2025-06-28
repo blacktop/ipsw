@@ -513,11 +513,11 @@ func Keybags(c *Config) (fname string, err error) {
 			return "", fmt.Errorf("failed to open IPSW: %v", err)
 		}
 		defer zr.Close()
-		kbags, err = img4.ParseZipKeyBags(zr.File, &img4.MetaData{
-			Type:                  i.Plists.Type,
-			ProductVersion:        i.Plists.BuildManifest.ProductVersion,
-			ProductBuildVersion:   i.Plists.BuildManifest.ProductBuildVersion,
-			SupportedProductTypes: i.Plists.Restore.SupportedProductTypes,
+		kbags, err = img4.GetKeybagsFromIPSW(zr.File, img4.KeybagMetaData{
+			Type:    i.Plists.Type,
+			Version: i.Plists.BuildManifest.ProductVersion,
+			Build:   i.Plists.BuildManifest.ProductBuildVersion,
+			Devices: i.Plists.Restore.SupportedProductTypes,
 		}, c.Pattern)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse im4p kbags: %v", err)
@@ -531,11 +531,11 @@ func Keybags(c *Config) (fname string, err error) {
 		if err != nil {
 			return "", err
 		}
-		kbags, err = img4.ParseZipKeyBags(zr.File, &img4.MetaData{
-			Type:                  i.Plists.Type,
-			ProductVersion:        i.Plists.BuildManifest.ProductVersion,
-			ProductBuildVersion:   i.Plists.BuildManifest.ProductBuildVersion,
-			SupportedProductTypes: i.Plists.Restore.SupportedProductTypes,
+		kbags, err = img4.GetKeybagsFromIPSW(zr.File, img4.KeybagMetaData{
+			Type:    i.Plists.Type,
+			Version: i.Plists.BuildManifest.ProductVersion,
+			Build:   i.Plists.BuildManifest.ProductBuildVersion,
+			Devices: i.Plists.Restore.SupportedProductTypes,
 		}, c.Pattern)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse im4p kbags: %v", err)

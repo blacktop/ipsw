@@ -2,6 +2,7 @@ package img4
 
 import (
 	"encoding/asn1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,8 +22,8 @@ var (
 
 type IMG4 struct {
 	Raw         asn1.RawContent
-	Tag         string // IMG4
-	Payload     asn1.RawValue
+	Tag         string        // IMG4
+	Payload     asn1.RawValue `asn1:"explicit,tag:0,optional"`
 	Manifest    asn1.RawValue `asn1:"explicit,tag:0,optional"`
 	RestoreInfo asn1.RawValue `asn1:"explicit,tag:1,optional"`
 }
@@ -48,12 +49,12 @@ func Open(path string) (*Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
 	}
-	return ParseImage(data)
+	return Parse(data)
 }
 
-func ParseImage(data []byte) (*Image, error) {
+func Parse(data []byte) (*Image, error) {
 	img := &Image{}
-	
+
 	if _, err := asn1.Unmarshal(data, &img.IMG4); err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IMG4: %v", err)
 	}
@@ -113,31 +114,118 @@ func (i *Image) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// CreateImg4File creates a complete IMG4 file from component files
-func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, error) {
-	if len(im4pData) == 0 {
-		return nil, fmt.Errorf("IM4P payload data is required")
+type CreateConfig struct {
+	// raw IM4P data
+	InputPath            string
+	PayloadType          string
+	PayloadVersion       string
+	PayloadCompression   string
+	PayloadExtraDataPath string
+
+	PayloadPath     string
+	ManifestPath    string
+	RestoreInfoPath string
+
+	// IM4R specific
+	BootNonce string
+}
+
+// Create creates a complete IMG4 file from component files
+func Create(conf *CreateConfig) (*Image, error) {
+	var err error
+
+	img := Image{
+		IMG4: IMG4{
+			Tag: "IMG4",
+		},
 	}
 
-	img4Struct := IMG4{
-		Tag: "IMG4",
+	if len(conf.InputPath) > 0 {
+		data, err := os.ReadFile(conf.InputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read input file %s: %v", conf.InputPath, err)
+		}
+		var extraData []byte
+		if len(conf.PayloadExtraDataPath) > 0 {
+			extraData, err = os.ReadFile(conf.PayloadExtraDataPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read extra data file %s: %v", conf.PayloadExtraDataPath, err)
+			}
+		}
+		var comp CompressionAlgorithm
+		switch strings.ToLower(conf.PayloadCompression) {
+		case "lzss":
+			comp = CompressionAlgorithmLZSS
+		case "lzfse":
+			comp = CompressionAlgorithmLZFSE
+		}
+		img.Payload, err = CreatePayload(&CreatePayloadConfig{
+			Type:        conf.PayloadType,
+			Version:     conf.PayloadVersion,
+			Data:        data,
+			ExtraData:   extraData,
+			Compression: comp,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create IM4P payload from input file: %v", err)
+		}
+	} else {
+		img.Payload, err = OpenPayload(conf.PayloadPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IM4P payload from path %s: %v", conf.PayloadPath, err)
+		}
 	}
 
-	// Parse the IM4P data to embed it
-	var im4pParsed IM4P
-	if _, err := asn1.Unmarshal(im4pData, &im4pParsed); err != nil {
-		return nil, fmt.Errorf("failed to parse IM4P data: %v", err)
-	}
-	img4Struct.Payload = asn1.RawValue{
-		Class:      2, // context-specific (for explicit tagging)
-		Tag:        0, // tag:0 as specified in struct
-		IsCompound: true,
-		Bytes:      im4pData,
+	if len(conf.ManifestPath) > 0 {
+		img.Manifest, err = OpenManifest(conf.ManifestPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IM4M manifest from path %s: %v", conf.ManifestPath, err)
+		}
 	}
 
-	// Add optional manifest data with explicit tag:0
-	if len(manifestData) > 0 {
-		img4Struct.Manifest = asn1.RawValue{
+	if len(conf.RestoreInfoPath) > 0 {
+		img.RestoreInfo, err = OpenRestoreInfo(conf.RestoreInfoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IM4R restore info from path %s: %v", conf.RestoreInfoPath, err)
+		}
+	}
+	if len(conf.BootNonce) > 0 {
+		nonce, err := hex.DecodeString(conf.BootNonce)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode boot nonce: %v", err)
+		}
+		if len(nonce) != 8 {
+			return nil, fmt.Errorf("boot nonce must be exactly %d bytes (%d hex characters), got %d bytes", 8, 16, len(nonce))
+		}
+		img.RestoreInfo, err = CreateRestoreInfo(nonce)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create IM4R restore info with boot nonce: %v", err)
+		}
+	}
+
+	return &img, nil
+}
+
+func (i *Image) Marshal() ([]byte, error) {
+	if i.Payload != nil {
+		payloadData, err := i.Payload.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload: %v", err)
+		}
+		i.IMG4.Payload = asn1.RawValue{
+			Class:      2, // context-specific (for explicit tagging)
+			Tag:        0, // tag:0 as specified in struct
+			IsCompound: true,
+			Bytes:      payloadData,
+		}
+	}
+
+	if i.Manifest != nil {
+		manifestData, err := i.Manifest.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal manifest: %v", err)
+		}
+		i.IMG4.Manifest = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
 			Tag:        0, // tag:0 as specified in struct
 			IsCompound: true,
@@ -145,9 +233,12 @@ func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, err
 		}
 	}
 
-	// Add optional restore info data with explicit tag:1
-	if len(restoreInfoData) > 0 {
-		img4Struct.RestoreInfo = asn1.RawValue{
+	if i.RestoreInfo != nil {
+		restoreInfoData, err := i.RestoreInfo.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal restore info: %v", err)
+		}
+		i.IMG4.RestoreInfo = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
 			Tag:        1, // tag:1 as specified in struct
 			IsCompound: true,
@@ -155,7 +246,7 @@ func CreateImg4File(im4pData, manifestData, restoreInfoData []byte) ([]byte, err
 		}
 	}
 
-	return asn1.Marshal(img4Struct)
+	return asn1.Marshal(i.IMG4)
 }
 
 /* Validation Functions */
@@ -166,7 +257,7 @@ func ValidateImg4Structure(r io.Reader) (*ValidationResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read IMG4 data: %v", err)
 	}
-	img, err := ParseImage(data)
+	img, err := Parse(data)
 	if err != nil {
 		return &ValidationResult{
 			IsValid: false,

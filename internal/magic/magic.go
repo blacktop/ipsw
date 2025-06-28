@@ -16,6 +16,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/ftab"
 	"github.com/blacktop/ipsw/pkg/img3"
+	"github.com/blacktop/lzss"
 )
 
 type Magic uint32
@@ -400,4 +401,24 @@ func IsAEAData(rc io.Reader) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func IsLZSS(data []byte) (bool, error) {
+	if len(data) > 8 && string(data[:8]) == lzss.Magic {
+		if len(data) < binary.Size(lzss.Header{}) {
+			return true, fmt.Errorf("data too short to contain valid LZSS header")
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func IsLzfse(data []byte) (bool, error) {
+	if len(data) > 4 &&
+		(string(data[:4]) == "bvx2" ||
+			string(data[:4]) == "bvxn" ||
+			string(data[:4]) == "bvx1") {
+		return true, nil
+	}
+	return false, nil
 }

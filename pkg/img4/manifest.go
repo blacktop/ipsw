@@ -207,15 +207,15 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		return nil, fmt.Errorf("invalid manifest magic: expected 'IM4M', got '%s'", manifest.Tag)
 	}
 
-	if err := manifest.ParseBody(); err != nil {
+	if err := manifest.parseBody(); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest body: %w", err)
 	}
 
 	return &manifest, nil
 }
 
-// ParseBody parses the manifest body to extract properties and images dynamically
-func (m *Manifest) ParseBody() error {
+// parseBody parses the manifest body to extract properties and images dynamically
+func (m *Manifest) parseBody() error {
 	if len(m.Body.Bytes) == 0 {
 		return fmt.Errorf("manifest body is empty")
 	}
@@ -509,6 +509,10 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+func (m *Manifest) Marshal() ([]byte, error) {
+	return asn1.Marshal(m.IM4M)
+}
+
 // analyzeSignature determines the signature algorithm based on signature size
 func analyzeSignature(signature []byte) string {
 	switch len(signature) {
@@ -561,6 +565,30 @@ func parseCertificateFromChain(certChainData []byte) (*x509.Certificate, error) 
 	}
 
 	return nil, fmt.Errorf("failed to parse certificate from chain data")
+}
+
+func CreateManifest() (*Manifest, error) {
+	// Create an empty manifest with default values
+	manifest := &Manifest{
+		IM4M: IM4M{
+			Tag:     "IM4M",
+			Version: 1,
+			Body: asn1.RawValue{
+				Class: 3,
+				Tag:   tagMANB,
+				// Bytes: asn1.RawValue{
+				// 	Class: 3,        // Private class
+				// 	Tag:   tagMANP,  // MANB - Manifest Body
+				// 	Bytes: []byte{}, // Will be filled later
+				// },
+			},
+		},
+	}
+
+	// Initialize the body with an empty property set
+	// manifest.Body.Properties = []Property{}
+
+	return manifest, nil
 }
 
 /* SHSH Extraction Functions */

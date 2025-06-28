@@ -27,7 +27,7 @@ func ParseRAW(r io.Reader) error {
 		return err
 	}
 
-	img4, err := img4.ParseImage(data)
+	img4, err := img4.Parse(data)
 	if err != nil {
 		return err
 	}

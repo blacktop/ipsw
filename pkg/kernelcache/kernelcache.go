@@ -173,7 +173,7 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 		return errors.Wrap(err, "failed to read Kernelcache")
 	}
 
-	km, err := img4.ParseImage(content)
+	km, err := img4.Parse(content)
 	if err != nil {
 		return fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
@@ -207,7 +207,7 @@ func DecompressKernelManagementData(kcache string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read kernelcache: %v", err)
 	}
 
-	km, err := img4.ParseImage(content)
+	km, err := img4.Parse(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}

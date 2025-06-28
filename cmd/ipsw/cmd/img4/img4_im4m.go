@@ -225,7 +225,7 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		bmData, err := io.ReadAll(bm)
 		if err == nil {
 			// Try to parse as IMG4 first
-			if buildImg, err := img4.ParseImage(bmData); err == nil && buildImg.Manifest != nil {
+			if buildImg, err := img4.Parse(bmData); err == nil && buildImg.Manifest != nil {
 				buildProperties = img4.ConvertPropertySliceToMap(buildImg.Manifest.Properties)
 			} else {
 				// Try to parse as standalone IM4M
@@ -446,6 +446,7 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 	Short:         "🚧 Create personalized IM4M manifest with device-specific values",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true, // Hidden until fully implemented
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -469,12 +470,21 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			return fmt.Errorf("personalization failed: %v", err)
 		}
 
-		personalizedData, err := img4.CreateImg4File(
-			personalizedImg.PayloadData,
-			personalizedImg.ManifestData,
-			personalizedImg.RestoreInfoData)
+		_ = personalizedImg // Use this to avoid unused variable error
+		var img *img4.Image
+
+		// img, err := img4.Create(&img4.CreateConfig{
+		// 	PayloadPath: personalizedImg.PayloadData,
+		// 	Manifest:    &img4.Manifest{Body: img4.ManifestBody{Properties: personalizedImg.ManifestData}},
+		// 	RestoreInfo: &img4.RestoreInfo{Body: img4.RestoreInfoBody{Properties: personalizedImg.RestoreInfoData}},
+		// })
+		// if err != nil {
+		// 	return fmt.Errorf("failed to create personalized IMG4: %v", err)
+		// }
+
+		personalizedData, err := img.Marshal()
 		if err != nil {
-			return fmt.Errorf("failed to create personalized IMG4: %v", err)
+			return fmt.Errorf("failed to marshal personalized IMG4: %v", err)
 		}
 
 		if err := os.WriteFile(outputPath, personalizedData, 0644); err != nil {
@@ -548,8 +558,7 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 	// Create a personalized manifest by modifying the existing manifest properties
 	personalizedProperties := make(map[string]any)
 
-	// Parse manifest body to get existing properties
-	if err := img.Manifest.ParseBody(); err == nil {
+	if len(img.Manifest.Properties) > 0 {
 		// Copy existing properties
 		existingProps := img4.ConvertPropertySliceToMap(img.Manifest.Properties)
 		maps.Copy(personalizedProperties, existingProps)

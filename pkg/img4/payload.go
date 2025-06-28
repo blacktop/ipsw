@@ -6,8 +6,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/asn1"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,7 +18,10 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/lzfse-cgo"
+	"github.com/blacktop/lzss"
 	"github.com/dustin/go-humanize"
 )
 
@@ -139,6 +144,8 @@ const (
 	IM4P_RCIO = "rcio" // Unknown
 )
 
+var ErrNotCompressed = fmt.Errorf("payload is not compressed")
+
 type CompressionAlgorithm int
 
 const (
@@ -159,13 +166,13 @@ func (c CompressionAlgorithm) String() string {
 }
 
 type Compression struct {
-	Algorithm        CompressionAlgorithm `asn1:"integer"`
-	UncompressedSize int                  `asn1:"integer"`
+	Algorithm        CompressionAlgorithm `asn1:"integer" json:"algorithm,omitempty"`
+	UncompressedSize int                  `asn1:"integer" json:"uncompressed_size,omitempty"`
 }
 
 type PAYP struct {
 	Raw asn1.RawContent
-	Tag string        // PAYP
+	Tag string        `asn1:"ia5"` // PAYP
 	Set asn1.RawValue `asn1:"set"`
 }
 
@@ -177,16 +184,18 @@ type IM4P struct {
 	Data        []byte
 	Compression Compression `asn1:"optional"`
 	Keybag      []byte      `asn1:"optional"`
-	Properties  PAYP        `asn1:"optional,tag:0,class:context,explicit"` // PAYP properties
+	Properties  PAYP        `asn1:"optional,tag:0,class:context,explicit"`
 	Hash        []byte      `asn1:"optional"`
 }
 
 type Payload struct {
 	IM4P
-	Encrypted  bool // Whether the IM4P is encrypted
+	Encrypted  bool
 	Keybags    []Keybag
-	Properties map[string]any // Parsed properties like kcep, kclf, etc.
-	ExtraData  []byte
+	Properties map[string]any
+
+	decompressedData []byte
+	extraData        []byte // Any extra data appended after the compressed payload
 }
 
 func OpenPayload(path string) (*Payload, error) {
@@ -209,7 +218,6 @@ func OpenPayload(path string) (*Payload, error) {
 func ParsePayload(data []byte) (*Payload, error) {
 	var p Payload
 
-	// Parse using the standard IM4P struct format
 	rest, err := asn1.Unmarshal(data, &p.IM4P)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IM4P: %v", err)
@@ -223,7 +231,6 @@ func ParsePayload(data []byte) (*Payload, error) {
 		return nil, fmt.Errorf("invalid payload tag: expected 'IM4P', got '%s'", p.Tag)
 	}
 
-	// Parse keybags if present
 	if p.Keybag != nil {
 		if _, err := asn1.Unmarshal(p.Keybag, &p.Keybags); err != nil {
 			return nil, fmt.Errorf("failed to ASN.1 parse IM4P KBAG: %v", err)
@@ -233,7 +240,6 @@ func ParsePayload(data []byte) (*Payload, error) {
 		}
 	}
 
-	// Parse PAYP properties if present
 	if len(p.IM4P.Properties.Raw) > 0 {
 		if p.IM4P.Properties.Tag != "PAYP" {
 			return nil, fmt.Errorf("invalid payload properties tag: expected 'PAYP', got '%s'", p.IM4P.Properties.Tag)
@@ -244,19 +250,15 @@ func ParsePayload(data []byte) (*Payload, error) {
 		}
 	}
 
-	if !p.Encrypted && p.Compression.UncompressedSize == 0 {
-		log.Debug("Potential extra data detected (no compression or encryption found)")
-	}
-
-	// Check for extra data at the end of the Data field (MachO detection)
-	if err := detectMachOExtraData(&p); err != nil {
-		log.Debugf("Failed to detect MachO extra data: %v", err)
+	if _, err := p.Decompress(); err != nil {
+		if !errors.Is(err, ErrNotCompressed) {
+			return nil, fmt.Errorf("failed to decompress payload data: %v", err)
+		}
 	}
 
 	return &p, nil
 }
 
-// String returns a formatted string representation of the payload
 func (p *Payload) String() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4P (Payload)")))
@@ -270,8 +272,11 @@ func (p *Payload) String() string {
 			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed Size"), humanize.Bytes(uint64(p.Compression.UncompressedSize)), p.Compression.UncompressedSize))
 		}
 	}
-	if len(p.ExtraData) > 0 {
-		sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("ExtraData"), humanize.Bytes(uint64(len(p.ExtraData))), len(p.ExtraData)))
+	if p.HasExtraData() {
+		extraData := p.GetExtraData()
+		if len(extraData) > 0 {
+			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("ExtraData"), humanize.Bytes(uint64(len(extraData))), len(extraData)))
+		}
 	}
 	if len(p.Keybags) > 0 {
 		sb.WriteString(fmt.Sprintf("  %s: %t\n", colorField("Encrypted"), p.Encrypted))
@@ -291,33 +296,209 @@ func (p *Payload) String() string {
 	return sb.String()
 }
 
-// MarshalJSON returns a JSON representation of the payload
 func (p *Payload) MarshalJSON() ([]byte, error) {
 	data := map[string]any{
-		"tag":             p.Tag,
-		"type":            p.Type,
-		"version":         p.Version,
-		"data":            p.Data,
-		"encrypted":       p.Encrypted,
-		"keybags":         p.Keybags,
-		"properties":      p.Properties,
-		"extra_data_size": len(p.ExtraData),
-		"compression":     p.Compression,
-		"hash":            p.Hash,
+		"tag":         p.Tag,
+		"type":        p.Type,
+		"version":     p.Version,
+		"data_size":   len(p.Data),
+		"encrypted":   p.Encrypted,
+		"keybags":     p.Keybags,
+		"properties":  p.Properties,
+		"compression": p.Compression,
+		"hash":        p.Hash,
+	}
+	if p.HasExtraData() {
+		data["extra_data_size"] = len(p.GetExtraData())
 	}
 	return json.Marshal(data)
 }
 
-// Keybag Types
-type kbagType int
+func (p *Payload) Marshal() ([]byte, error) {
+	return asn1.Marshal(p.IM4P)
+}
+
+func (p *Payload) Decompress() ([]byte, error) {
+	if p.decompressedData != nil {
+		return p.decompressedData, nil
+	}
+
+	if p.Encrypted || p.Compression.UncompressedSize == 0 {
+		return nil, ErrNotCompressed
+	}
+
+	switch p.Compression.Algorithm {
+	case CompressionAlgorithmLZSS:
+		if len(p.Data) < binary.Size(lzss.Header{}) {
+			return nil, fmt.Errorf("data too short to contain valid LZSS header")
+		}
+		var hdr lzss.Header
+		if err := binary.Read(bytes.NewReader(p.Data[:binary.Size(hdr)]), binary.LittleEndian, &hdr); err != nil {
+			return nil, fmt.Errorf("failed to read LZSS header: %v", err)
+		}
+		if hdr.CompressedSize != lzss.CompressionType && hdr.Signature != lzss.Signature {
+			return nil, fmt.Errorf("invalid LZSS header magic: %x", string(p.Data[:8]))
+		}
+		if hdr.CompressedSize == 0 {
+			return nil, fmt.Errorf("LZSS header indicates zero compressed size")
+		}
+		if len(p.Data) < int(hdr.CompressedSize)+binary.Size(hdr) {
+			return nil, fmt.Errorf("data too short to contain valid LZSS compressed payload")
+		}
+		decompressed := lzss.Decompress(p.Data[binary.Size(hdr):])
+		if len(decompressed) == 0 {
+			return nil, fmt.Errorf("failed to decompress LZSS payload: got empty result")
+		}
+		if len(decompressed) != int(hdr.UncompressedSize) {
+			log.Warnf("decompressed size (%d) does not match expected size (%d) from LZSS header", len(decompressed), hdr.UncompressedSize)
+		}
+		p.decompressedData = decompressed
+		if len(p.Data) > int(hdr.CompressedSize)+binary.Size(hdr) {
+			// Extract any extra data after the LZSS payload
+			p.extraData = p.Data[int(hdr.CompressedSize)+binary.Size(hdr):]
+			if len(p.extraData) > 0 {
+				log.Debugf("extracted %d bytes of extra data after LZSS payload", len(p.extraData))
+			}
+		}
+		return decompressed, nil
+	case CompressionAlgorithmLZFSE:
+		if len(p.Data) < 4 {
+			return nil, fmt.Errorf("data too short to contain valid LZFSE header")
+		}
+		if isLzfse, err := magic.IsLzfse(p.Data); err != nil {
+			return nil, fmt.Errorf("failed to check if data is LZFSE: %v", err)
+		} else if !isLzfse {
+			return nil, fmt.Errorf("data is not LZFSE compressed")
+		}
+		decompressed := lzfse.DecodeBuffer(p.Data)
+		if len(decompressed) == 0 {
+			return nil, fmt.Errorf("failed to decompress LZFSE payload")
+		}
+		p.decompressedData = decompressed
+		// Extract any extra data after the LZFSE payload
+		p.extraData = p.extractExtraDataFromLzfse(p.Data)
+		if len(p.extraData) > 0 {
+			log.Debugf("extracted %d bytes of extra data after LZFSE payload", len(p.extraData))
+		}
+		return decompressed, nil
+	}
+
+	return nil, fmt.Errorf("unsupported compression algorithm: %v", p.Compression.Algorithm)
+}
+
+func (i *Payload) GetData() ([]byte, error) {
+	data, err := i.Decompress()
+	if err != nil {
+		if err == ErrNotCompressed {
+			return i.Data, nil // Return original data if not compressed
+		}
+		return nil, fmt.Errorf("failed to get decompressed data: %v", err)
+	}
+	return data, nil
+}
+
+// HasExtraData returns true if extra data was detected in the IM4P
+func (i *Payload) HasExtraData() bool {
+	return len(i.GetExtraData()) > 0
+}
+
+// GetExtraData returns any extra data appended after the compressed payload
+func (i *Payload) GetExtraData() []byte {
+	return i.extraData
+}
+
+// extractExtraDataFromLzfse extracts extra data from LZFSE compressed format
+// LZFSE uses block-based format, so we need to parse all blocks to find total size
+func (i *Payload) extractExtraDataFromLzfse(data []byte) []byte {
+	// Parse LZFSE blocks to determine total compressed size
+	totalCompressedSize, err := i.calculateLzfseTotalSize(data)
+	if err != nil {
+		return nil
+	}
+
+	// Check if there's extra data after the LZFSE stream
+	if totalCompressedSize >= len(data) {
+		// No extra data
+		return nil
+	}
+
+	// Return the extra data portion
+	extraData := make([]byte, len(data)-totalCompressedSize)
+	copy(extraData, data[totalCompressedSize:])
+	return extraData
+}
+
+// calculateLzfseTotalSize parses LZFSE blocks to determine total compressed stream size
+func (i *Payload) calculateLzfseTotalSize(data []byte) (int, error) {
+	offset := 0
+
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			return 0, fmt.Errorf("incomplete block header at offset %d", offset)
+		}
+
+		// Read block magic (little endian)
+		magic := uint32(data[offset]) | uint32(data[offset+1])<<8 | uint32(data[offset+2])<<16 | uint32(data[offset+3])<<24
+
+		switch magic {
+		case 0x24787662: // bvx$ (end of stream)
+			return offset + 4, nil
+
+		case 0x2d787662: // bvx- (uncompressed block)
+			if offset+12 > len(data) {
+				return 0, fmt.Errorf("incomplete uncompressed block header at offset %d", offset)
+			}
+			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] + payload
+			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
+			offset += 12 + int(payloadBytes)
+
+		case 0x31787662: // bvx1 (lzfse compressed, uncompressed tables)
+			// This format has a large fixed header size (approx 1040 bytes)
+			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] then read payload size
+			if offset+12 > len(data) {
+				return 0, fmt.Errorf("incomplete v1 block header at offset %d", offset)
+			}
+			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
+			// V1 header is large (~1040 bytes) but we can calculate it as: header + n_payload_bytes
+			headerSize := 1040 // approximate fixed size for v1 headers
+			offset += headerSize + int(payloadBytes)
+
+		case 0x32787662: // bvx2 (lzfse compressed, compressed tables)
+			if offset+28 > len(data) { // minimum header size
+				return 0, fmt.Errorf("incomplete v2 block header at offset %d", offset)
+			}
+			// Read header_size from packed field 3 (offset 24, bits 0-31)
+			headerSizeBytes := data[offset+24 : offset+28]
+			headerSize := uint32(headerSizeBytes[0]) | uint32(headerSizeBytes[1])<<8 | uint32(headerSizeBytes[2])<<16 | uint32(headerSizeBytes[3])<<24
+			offset += int(headerSize)
+
+		case 0x6e787662: // bvxn (lzvn compressed)
+			if offset+12 > len(data) {
+				return 0, fmt.Errorf("incomplete lzvn block header at offset %d", offset)
+			}
+			// Skip magic[4] + n_raw_bytes[4] + n_payload_bytes[4] + payload
+			payloadBytes := uint32(data[offset+8]) | uint32(data[offset+9])<<8 | uint32(data[offset+10])<<16 | uint32(data[offset+11])<<24
+			offset += 12 + int(payloadBytes)
+
+		default:
+			return 0, fmt.Errorf("unknown LZFSE block magic %#08x at offset %d", magic, offset)
+		}
+	}
+
+	return 0, fmt.Errorf("reached end of data without finding end-of-stream block")
+}
+
+/* PAYLOAD KEYBAGS */
+
+type keybagType int
 
 const (
-	PRODUCTION  kbagType = 1
-	DEVELOPMENT kbagType = 2
-	DECRYPTED   kbagType = 3
+	PRODUCTION  keybagType = 1
+	DEVELOPMENT keybagType = 2
+	DECRYPTED   keybagType = 3
 )
 
-func (t kbagType) String() string {
+func (t keybagType) String() string {
 	switch t {
 	case PRODUCTION:
 		return "PRODUCTION"
@@ -330,7 +511,7 @@ func (t kbagType) String() string {
 	}
 }
 
-func (t kbagType) Short() string {
+func (t keybagType) Short() string {
 	switch t {
 	case PRODUCTION:
 		return "prod"
@@ -344,7 +525,7 @@ func (t kbagType) Short() string {
 }
 
 type Keybag struct {
-	Type kbagType
+	Type keybagType
 	IV   []byte
 	Key  []byte
 }
@@ -372,35 +553,25 @@ func (k Keybag) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// KeyBag Related Types
-type im4pKBag struct {
+type Im4pKeybag struct {
 	Name    string   `json:"name,omitempty"`
 	Keybags []Keybag `json:"kbags,omitempty"`
 }
 
+type KeybagMetaData struct {
+	Type    string   `json:"type,omitempty"`
+	Version string   `json:"product_version,omitempty"`
+	Build   string   `json:"product_build_version,omitempty"`
+	Devices []string `json:"supported_product_types,omitempty"`
+}
+
 type KeyBags struct {
-	Type    string     `json:"type,omitempty"`
-	Version string     `json:"version,omitempty"`
-	Build   string     `json:"build,omitempty"`
-	Devices []string   `json:"devices,omitempty"`
-	Files   []im4pKBag `json:"files,omitempty"`
+	KeybagMetaData
+	Files []Im4pKeybag `json:"files,omitempty"`
 }
 
-// MetaData contains minimal metadata needed for key bag parsing
-type MetaData struct {
-	Type                  string
-	ProductVersion        string
-	ProductBuildVersion   string
-	SupportedProductTypes []string
-}
-
-func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBags, error) {
-	kbags := &KeyBags{
-		Type:    meta.Type,
-		Version: meta.ProductVersion,
-		Build:   meta.ProductBuildVersion,
-		Devices: meta.SupportedProductTypes,
-	}
+func GetKeybagsFromIPSW(files []*zip.File, meta KeybagMetaData, pattern string) (*KeyBags, error) {
+	kbags := &KeyBags{KeybagMetaData: meta}
 
 	rePattern := `.*im4p$`
 	if len(pattern) > 0 {
@@ -431,7 +602,7 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 			if im4p.Keybags == nil { // kbags are optional
 				continue
 			}
-			kbags.Files = append(kbags.Files, im4pKBag{
+			kbags.Files = append(kbags.Files, Im4pKeybag{
 				Name:    filepath.Base(f.Name),
 				Keybags: im4p.Keybags,
 			})
@@ -444,200 +615,109 @@ func ParseZipKeyBags(files []*zip.File, meta *MetaData, pattern string) (*KeyBag
 	return kbags, nil
 }
 
-// CreateIm4p creates a new IM4P structure
-func CreateIm4p(name, fourcc, description string, data []byte, kbags []Keybag) *Payload {
-	return CreateIm4pWithExtra(name, fourcc, description, data, kbags, nil)
+/* CREATE PAYLOAD */
+
+type CreatePayloadConfig struct {
+	Type        string
+	Version     string
+	Data        []byte
+	ExtraData   []byte // Optional extra data to append after the main data
+	Compression CompressionAlgorithm
+	Keybags     []Keybag
 }
 
-// CreateIm4pWithExtra creates an IM4P structure with optional extra data
-func CreateIm4pWithExtra(name, fourcc, description string, data []byte, kbags []Keybag, extraData []byte) *Payload {
-	// If extra data is provided, append it to the main data
-	finalData := data
-	if len(extraData) > 0 {
-		finalData = append(data, extraData...)
+// CreatePayload creates a new IM4P structure
+func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
+	var pdata []byte
+
+	switch conf.Compression {
+	case CompressionAlgorithmLZSS:
+		compressedData := lzss.Compress(conf.Data)
+		if len(compressedData) == 0 {
+			return nil, fmt.Errorf("failed to LZSS compress data")
+		}
+		utils.Indent(log.Debug, 2)(
+			fmt.Sprintf("LZSS compression: %d → %d bytes (%.1f%% reduction)",
+				len(conf.Data), len(compressedData),
+				float64(len(conf.Data)-len(compressedData))/float64(len(conf.Data))*100),
+		)
+		hdr := lzss.Header{
+			Signature:        lzss.Signature,
+			CompressionType:  lzss.CompressionType,
+			UncompressedSize: uint32(len(conf.Data)),
+			CompressedSize:   uint32(len(compressedData)),
+		}
+		buf := new(bytes.Buffer)
+		if err := binary.Write(buf, binary.BigEndian, hdr); err != nil {
+			return nil, fmt.Errorf("failed to write LZSS header: %v", err)
+		}
+		if _, err := buf.Write(compressedData); err != nil {
+			return nil, fmt.Errorf("failed to write LZSS compressed data: %v", err)
+		}
+		pdata = append(buf.Bytes(), conf.ExtraData...) // Append any extra data after the compressed payload
+	case CompressionAlgorithmLZFSE:
+		compressedData := lzfse.EncodeBuffer(conf.Data)
+		if len(compressedData) == 0 {
+			return nil, fmt.Errorf("failed to LZFSE compress data")
+		}
+		utils.Indent(log.Debug, 2)(
+			fmt.Sprintf("LZFSE compression: %d → %d bytes (%.1f%% reduction)",
+				len(conf.Data), len(compressedData),
+				float64(len(conf.Data)-len(compressedData))/float64(len(conf.Data))*100),
+		)
+		pdata = append(compressedData, conf.ExtraData...)
+	default:
+		pdata = conf.Data
 	}
 
-	im4pStruct := &Payload{
+	var comp Compression
+	switch conf.Compression {
+	case CompressionAlgorithmLZSS:
+		comp = Compression{
+			Algorithm:        CompressionAlgorithmLZSS,
+			UncompressedSize: len(conf.Data),
+		}
+	case CompressionAlgorithmLZFSE:
+		comp = Compression{
+			Algorithm:        CompressionAlgorithmLZFSE,
+			UncompressedSize: len(conf.Data),
+		}
+	}
+
+	im4p := &Payload{
 		IM4P: IM4P{
-			Tag:     name,
-			Type:    fourcc,
-			Version: description,
-			Data:    finalData,
+			Tag:         "IM4P",
+			Type:        conf.Type,
+			Version:     conf.Version,
+			Data:        pdata,
+			Compression: comp,
 		},
-		Keybags: kbags,
 	}
 
-	// Store extra data information for reference
-	if len(extraData) > 0 {
-		im4pStruct.ExtraData = make([]byte, len(extraData))
-		copy(im4pStruct.ExtraData, extraData)
-	}
-
-	// If there are keybags, marshal them to KbagData
-	if len(kbags) > 0 {
-		if kbagData, err := asn1.Marshal(kbags); err == nil {
-			im4pStruct.Keybag = kbagData
+	if len(conf.Keybags) > 0 {
+		if data, err := asn1.Marshal(conf.Keybags); err == nil {
+			im4p.Keybag = data
+		} else {
+			log.Errorf("create payload: failed to marshal keybags: %v", err)
 		}
 	}
 
-	return im4pStruct
-}
-
-// MarshalIm4p marshals an IM4P structure to ASN.1 bytes
-func MarshalIm4p(im4p *Payload) ([]byte, error) {
-	return asn1.Marshal(im4p.IM4P)
-}
-
-// CreateIm4pFile creates a complete IM4P file from raw data
-func CreateIm4pFile(fourcc, description string, data []byte) ([]byte, error) {
-	return CreateIm4pFileWithExtra(fourcc, description, data, nil)
-}
-
-// CreateIm4pFileWithExtra creates a complete IM4P file from raw data with optional extra data
-func CreateIm4pFileWithExtra(fourcc, description string, data []byte, extraData []byte) ([]byte, error) {
-	if len(fourcc) != 4 {
-		return nil, fmt.Errorf("FourCC must be exactly 4 characters, got %d: %s", len(fourcc), fourcc)
-	}
-
-	im4pStruct := CreateIm4pWithExtra("IM4P", fourcc, description, data, nil, extraData)
-	return MarshalIm4p(im4pStruct)
-}
-
-// detectMachOExtraData specifically looks for MachO binaries at the end of the payload
-func detectMachOExtraData(i *Payload) error {
-	if len(i.Data) == 0 {
-		return nil
-	}
-
-	// MachO magic numbers to look for
-	machOMagics := [][]byte{
-		{0xce, 0xfa, 0xed, 0xfe}, // MH_MAGIC (32-bit little endian)
-		{0xfe, 0xed, 0xfa, 0xce}, // MH_MAGIC (32-bit big endian)
-		{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64 (64-bit little endian)
-		{0xfe, 0xed, 0xfa, 0xcf}, // MH_MAGIC_64 (64-bit big endian)
-		{0xca, 0xfe, 0xba, 0xbe}, // FAT_MAGIC (universal binary)
-		{0xbe, 0xba, 0xfe, 0xca}, // FAT_MAGIC (universal binary, swapped)
-	}
-
-	// Scan backwards for MachO magic numbers
-	// Start from end and look for page-aligned positions
-	dataLen := len(i.Data)
-
-	// Common alignment sizes where MachO might start
-	alignments := []int{4096, 8192, 16384, 32768}
-
-	for _, alignment := range alignments {
-		if dataLen <= alignment {
-			continue
-		}
-
-		// Check at aligned positions from the end
-		for offset := alignment; offset < dataLen; offset += alignment {
-			checkPos := dataLen - offset
-			if checkPos < 0 || checkPos+4 > dataLen {
-				continue
-			}
-
-			// Check for MachO magic at this position
-			for _, magic := range machOMagics {
-				if bytes.Equal(i.Data[checkPos:checkPos+4], magic) {
-					// Found MachO magic - this is likely extra data
-					i.ExtraData = make([]byte, offset)
-					copy(i.ExtraData, i.Data[checkPos:])
-
-					log.Debugf("Detected MachO binary at offset %d (%d bytes from end)", checkPos, offset)
-					return nil
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// GetExtraData returns any extra data that was detected from the payload
-func (i *Payload) GetExtraData() []byte {
-	return i.ExtraData
-}
-
-// HasExtraData returns true if extra data was detected in the IM4P
-func (i *Payload) HasExtraData() bool {
-	return len(i.ExtraData) > 0
-}
-
-// GetCleanPayloadData returns the payload data without the detected extra data
-// This is useful when you want to process only the actual payload without metadata
-func (i *Payload) GetCleanPayloadData() []byte {
-	if len(i.ExtraData) > 0 && len(i.Data) > len(i.ExtraData) {
-		// Return payload without the detected extra data
-		cleanData := make([]byte, len(i.Data)-len(i.ExtraData))
-		copy(cleanData, i.Data[:len(i.Data)-len(i.ExtraData)])
-		return cleanData
-	}
-	// If no extra data detected or data is too small, return original data
-	return i.Data
-}
-
-// GetExtraDataInfo returns information about the detected extra data
-func (i *Payload) GetExtraDataInfo() map[string]any {
-	if len(i.ExtraData) == 0 {
-		return nil
-	}
-
-	info := map[string]any{
-		"size":     len(i.ExtraData),
-		"has_data": len(i.ExtraData) > 0,
-	}
-
-	if len(i.ExtraData) > 0 {
-		// Analyze the extra data to provide more info
-		nullCount := 0
-		for _, b := range i.ExtraData {
-			if b == 0 {
-				nullCount++
-			}
-		}
-
-		info["null_bytes"] = nullCount
-		info["null_percentage"] = float64(nullCount) / float64(len(i.ExtraData)) * 100
-
-		// Check if it looks like ASN.1 data
-		if len(i.ExtraData) >= 2 {
-			tag := i.ExtraData[0]
-			info["likely_asn1"] = (tag == 0x30 || tag == 0x31 || tag == 0x04 || tag == 0x02)
-			info["first_byte"] = fmt.Sprintf("%#02x", tag)
-		}
-	}
-
-	return info
+	return im4p, nil
 }
 
 /* Payload Processing Functions */
 
 // DecryptPayload decrypts an IM4P payload using AES-CBC with provided IV and key
-func DecryptPayload(path, output string, iv, key []byte) error {
-	i, err := OpenPayload(path)
+func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
+	i, err := OpenPayload(inputPath)
 	if err != nil {
 		return fmt.Errorf("unable to parse IM4P: %v", err)
 	}
 
-	if err := validateDecryptionInputs(i.Data, iv, key); err != nil {
-		return err
-	}
-
-	decryptedData, err := decryptData(i.Data, iv, key)
-	if err != nil {
-		return err
-	}
-
-	return writeDecryptedOutput(decryptedData, output, path)
-}
-
-func validateDecryptionInputs(data, iv, key []byte) error {
-	if len(data) < aes.BlockSize {
+	if len(i.Data) < aes.BlockSize {
 		return fmt.Errorf("IM4P data too short")
 	}
-	if len(data)%aes.BlockSize != 0 {
+	if len(i.Data)%aes.BlockSize != 0 {
 		return fmt.Errorf("IM4P data is not a multiple of the block size")
 	}
 	if len(iv) != aes.BlockSize {
@@ -646,23 +726,15 @@ func validateDecryptionInputs(data, iv, key []byte) error {
 	if len(key) == 0 {
 		return fmt.Errorf("key cannot be empty")
 	}
-	return nil
-}
 
-func decryptData(data, iv, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+	data, err := decryptData(i.Data, iv, key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+		return err
 	}
-	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(data, data)
-	return data, nil
-}
 
-func writeDecryptedOutput(data []byte, output, inputPath string) error {
-	of, err := os.Create(output)
+	of, err := os.Create(outputPath)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s: %v", output, err)
+		return fmt.Errorf("failed to create file %s: %v", outputPath, err)
 	}
 	defer func() {
 		if err := of.Close(); err != nil {
@@ -685,14 +757,24 @@ func writeDecryptedOutput(data []byte, output, inputPath string) error {
 	}
 
 	if _, err := io.Copy(of, r); err != nil {
-		return fmt.Errorf("failed to write decrypted data to file %s: %v", output, err)
+		return fmt.Errorf("failed to write decrypted data to file %s: %v", outputPath, err)
 	}
 
 	return nil
 }
 
+func decryptData(data, iv, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(data, data)
+	return data, nil
+}
+
 // ExtractPayload extracts payload data from IMG4 or IM4P files with optional decompression
-func ExtractPayload(inputPath, outputPath string, isImg4 bool) error {
+func ExtractPayload(inputPath, outputPath string, decompress bool) error {
 	f, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
@@ -703,47 +785,44 @@ func ExtractPayload(inputPath, outputPath string, isImg4 bool) error {
 		}
 	}()
 
-	payloadData, err := extractPayloadData(f, isImg4)
+	data, err := io.ReadAll(f)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read file: %v", err)
+	}
+
+	i, err := ParsePayload(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse IM4P: %v", err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(outputPath), err)
 	}
 
-	// Check for LZFSE compression and decompress if needed
-	if len(payloadData) >= 4 && bytes.Equal(payloadData[:4], []byte("bvx2")) {
-		log.Debug("Detected LZFSE compression")
-		decompressed := lzfse.DecodeBuffer(payloadData)
-		if len(decompressed) == 0 {
-			return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
+	if decompress {
+		if isLzss, err := magic.IsLZSS(i.Data); err != nil {
+			return fmt.Errorf("failed to check LZSS magic: %v", err)
+		} else if isLzss {
+			log.Debug("Detected LZSS compression")
+			var hdr lzss.Header
+			if err := binary.Read(bytes.NewReader(i.Data), binary.BigEndian, &hdr); err != nil {
+				return fmt.Errorf("failed to read LZSS header: %v", err)
+			}
+			decompressed := lzss.Decompress(i.Data)
+			if len(decompressed) == 0 {
+				return fmt.Errorf("failed to LZSS decompress %s: no data", inputPath)
+			}
+			i.Data = decompressed
 		}
-		payloadData = decompressed
-	}
-
-	return os.WriteFile(outputPath, payloadData, 0o660)
-}
-
-func extractPayloadData(f *os.File, isImg4 bool) ([]byte, error) {
-	// Read the file data
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %v", err)
-	}
-
-	if isImg4 {
-		i, err := ParseImage(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse IMG4: %v", err)
+		if len(i.Data) >= 4 && bytes.Equal(i.Data[:4], []byte("bvx2")) {
+			log.Debug("Detected LZFSE compression")
+			decompressed := lzfse.DecodeBuffer(i.Data)
+			if len(decompressed) == 0 {
+				return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
+			}
+			i.Data = decompressed
 		}
-		return i.Payload.Data, nil
 	}
 
-	// For IM4P, use ParsePayload directly
-	i, err := ParsePayload(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse IM4P: %v", err)
-	}
-	return i.Data, nil
+	return os.WriteFile(outputPath, i.Data, 0o660)
 }

@@ -2,6 +2,7 @@ package img4
 
 import (
 	"encoding/asn1"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -125,8 +126,8 @@ func New(properties map[string]any) *RestoreInfo {
 	return &RestoreInfo{Properties: props}
 }
 
-// CreateIm4rWithBootNonce creates IM4R data with a boot nonce (legacy function for compatibility)
-func CreateIm4rWithBootNonce(nonce any) ([]byte, error) {
+// CreateRestoreInfo creates RestoreInfo from a boot nonce value
+func CreateRestoreInfo(nonce any) (*RestoreInfo, error) {
 	var nonceValue uint64
 
 	switch v := nonce.(type) {
@@ -136,30 +137,22 @@ func CreateIm4rWithBootNonce(nonce any) ([]byte, error) {
 		if len(v) != 8 {
 			return nil, fmt.Errorf("boot nonce bytes must be exactly 8 bytes, got %d", len(v))
 		}
-		// Convert bytes to uint64 (big endian)
-		nonceValue = uint64(v[0])<<56 | uint64(v[1])<<48 | uint64(v[2])<<40 | uint64(v[3])<<32 |
-			uint64(v[4])<<24 | uint64(v[5])<<16 | uint64(v[6])<<8 | uint64(v[7])
+		binary.BigEndian.PutUint64(v, nonceValue)
 	default:
 		return nil, fmt.Errorf("unsupported nonce type: %T", nonce)
 	}
 
-	restoreInfo := NewWithBootNonce(nonceValue)
-	return restoreInfo.Marshal()
+	return NewWithBootNonce(nonceValue), nil
 }
 
 // Marshal marshals the RestoreInfo to ASN.1 bytes (IM4R format)
 func (r *RestoreInfo) Marshal() ([]byte, error) {
-	// Create generator data from properties
 	restorePropertiesData, err := r.marshalProperties()
 	if err != nil {
 		return nil, &RestoreInfoError{"marshal properties", err}
 	}
 
-	// Create IM4R structure
-	im4r := struct {
-		Tag               string        // "IM4R"
-		RestoreProperties asn1.RawValue // Property data
-	}{
+	im4r := IM4R{
 		Tag: "IM4R",
 		RestoreProperties: asn1.RawValue{
 			Bytes: restorePropertiesData,
@@ -248,19 +241,14 @@ func (r *RestoreInfo) marshalProperties() ([]byte, error) {
 // String returns a formatted string representation of the restore info
 func (r *RestoreInfo) String() string {
 	var result strings.Builder
-
 	result.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4R (Restore Info)")))
 	result.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Properties"), len(r.Properties)))
-
-	for name, value := range r.Properties {
-		result.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(name), FormatPropertyValue(value)))
-	}
-
-	// Special highlighting for boot nonce
 	if nonce, found := r.BootNonce(); found {
 		result.WriteString(fmt.Sprintf("  %s: %d (0x%x)\n", colorField("Boot Nonce"), nonce, nonce))
 	}
-
+	for name, value := range r.Properties {
+		result.WriteString(fmt.Sprintf("    %s: %v\n", colorSubField(name), FormatPropertyValue(value)))
+	}
 	return result.String()
 }
 

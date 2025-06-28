@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
@@ -52,8 +53,8 @@ func init() {
 
 	// Create command flags
 	img4Im4rCreateCmd.Flags().StringP("boot-nonce", "n", "", "Boot nonce to set (8-byte hex string)")
-	img4Im4rCreateCmd.Flags().StringP("output", "o", "", "Output IM4R file path")
 	img4Im4rCreateCmd.MarkFlagRequired("boot-nonce")
+	img4Im4rCreateCmd.Flags().StringP("output", "o", "", "Output IM4R file path")
 	img4Im4rCreateCmd.MarkFlagRequired("output")
 	img4Im4rCreateCmd.MarkFlagFilename("output")
 	viper.BindPFlag("img4.im4r.create.boot-nonce", img4Im4rCreateCmd.Flags().Lookup("boot-nonce"))
@@ -84,19 +85,19 @@ var img4Im4rInfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		restoreInfo, err := img4.OpenRestoreInfo(filepath.Clean(args[0]))
+		im4r, err := img4.OpenRestoreInfo(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4R: %v", err)
 		}
 
 		if viper.GetBool("img4.im4r.info.json") {
-			jdata, err := json.MarshalIndent(restoreInfo, "", "  ")
+			jdata, err := json.MarshalIndent(im4r, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal IM4R info: %v", err)
 			}
 			fmt.Println(string(jdata))
 		} else {
-			fmt.Println(restoreInfo)
+			fmt.Println(im4r)
 		}
 
 		return nil
@@ -119,8 +120,15 @@ var img4Im4rCreateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		// flags
 		bootNonce := viper.GetString("img4.im4r.create.boot-nonce")
 		outputPath := viper.GetString("img4.im4r.create.output")
+		// validate flags
+		if bootNonce != "" {
+			if !regexp.MustCompile("^[0-9a-fA-F]{16}$").MatchString(bootNonce) {
+				return fmt.Errorf("--boot-nonce must be exactly 16 hex characters")
+			}
+		}
 
 		nonce, err := hex.DecodeString(bootNonce)
 		if err != nil {
@@ -130,9 +138,14 @@ var img4Im4rCreateCmd = &cobra.Command{
 			return fmt.Errorf("boot nonce must be exactly 8 bytes (16 hex characters), got %d bytes", len(nonce))
 		}
 
-		im4rData, err := img4.CreateIm4rWithBootNonce(nonce)
+		im4r, err := img4.CreateRestoreInfo(nonce)
 		if err != nil {
 			return fmt.Errorf("failed to create IM4R: %v", err)
+		}
+
+		im4rData, err := im4r.Marshal()
+		if err != nil {
+			return fmt.Errorf("failed to marshal IM4R: %v", err)
 		}
 
 		utils.Indent(log.WithFields(log.Fields{
@@ -140,6 +153,6 @@ var img4Im4rCreateCmd = &cobra.Command{
 			"size": humanize.Bytes(uint64(len(im4rData))),
 		}).Info, 2)("Created IM4R")
 
-		return os.WriteFile(outputPath, im4rData, 0644)
+		return os.WriteFile(filepath.Clean(outputPath), im4rData, 0644)
 	},
 }
