@@ -60,7 +60,8 @@ func Parse(data []byte) (*Image, error) {
 	}
 
 	if len(img.IMG4.Payload.Bytes) > 0 {
-		payload, err := ParsePayload(img.IMG4.Payload.Bytes)
+		// ParsePayload expects a full SEQUENCE, so we use FullBytes
+		payload, err := ParsePayload(img.IMG4.Payload.FullBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse payload: %w", err)
 		}
@@ -224,10 +225,8 @@ func (i *Image) Marshal() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal payload: %v", err)
 		}
-		i.IMG4.Payload = asn1.RawValue{
-			Tag:        asn1.TagSequence,
-			IsCompound: true,
-			Bytes:      payloadData,
+		if _, err = asn1.Unmarshal(payloadData, &i.IMG4.Payload); err != nil {
+			return nil, fmt.Errorf("failed to parse payload: %v", err)
 		}
 	}
 
