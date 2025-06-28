@@ -363,6 +363,7 @@ var propertyTypeMap = map[int]PropType{
 	fourCCtoInt("srvn"): PropTypeHash, // srvn - Security revision number
 	fourCCtoInt("snon"): PropTypeHash, // snon - Security nonce
 	fourCCtoInt("BNCH"): PropTypeHash, // BNCH - Boot nonce hash
+	fourCCtoInt("DGST"): PropTypeHash, // DGST - Digest (hash value)
 	fourCCtoInt("tbmr"): PropTypeHash, // tbmr - Trusted boot measurement register
 	fourCCtoInt("tbms"): PropTypeHash, // tbms - Trusted boot measurement signature
 	fourCCtoInt("mmap"): PropTypeHash, // mmap - Memory map
@@ -390,12 +391,28 @@ var propertyTypeMap = map[int]PropType{
 	fourCCtoInt("styp"): PropTypeInt, // styp - Security type
 	fourCCtoInt("type"): PropTypeInt, // type - Type
 	fourCCtoInt("impl"): PropTypeInt, // impl - Implementation
+	fourCCtoInt("iocv"): PropTypeInt, // iocv - IO coprocessor version
 	fourCCtoInt("arms"): PropTypeInt, // arms - ARM security
 	fourCCtoInt("ar1s"): PropTypeInt, // ar1s - ARM1 security
-	fourCCtoInt("cons"): PropTypeInt, // cons - Console
-	fourCCtoInt("drmc"): PropTypeInt, // drmc - DRMC
+	fourCCtoInt("cons"): PropTypeHash, // cons - Console (binary data)
+	fourCCtoInt("drmc"): PropTypeHash, // drmc - DRMC (binary data)
 	fourCCtoInt("tz0s"): PropTypeInt, // tz0s - TrustZone 0 security
 	fourCCtoInt("tz1s"): PropTypeInt, // tz1s - TrustZone 1 security
+	fourCCtoInt("kcbf"): PropTypeInt, // kcbf - Kernel cache B offset (TXM)
+	fourCCtoInt("kcbz"): PropTypeInt, // kcbz - Kernel cache B size (TXM)
+	fourCCtoInt("kcep"): PropTypeInt, // kcep - Kernel cache epoch
+	fourCCtoInt("kclf"): PropTypeInt, // kclf - Kernel cache L offset
+	fourCCtoInt("kclo"): PropTypeInt, // kclo - Kernel cache L origin
+	fourCCtoInt("kclz"): PropTypeInt, // kclz - Kernel cache L size
+	fourCCtoInt("kcmf"): PropTypeInt, // kcmf - Kernel cache M offset (SPTM)
+	fourCCtoInt("kcmz"): PropTypeInt, // kcmz - Kernel cache M size (SPTM)
+	fourCCtoInt("kcrf"): PropTypeInt, // kcrf - Kernel cache R offset
+	fourCCtoInt("kcrz"): PropTypeInt, // kcrz - Kernel cache R size
+	fourCCtoInt("kcsz"): PropTypeInt, // kcsz - Kernel cache S size
+	fourCCtoInt("kcwf"): PropTypeInt, // kcwf - Kernel cache W offset
+	fourCCtoInt("kcwz"): PropTypeInt, // kcwz - Kernel cache W size
+	fourCCtoInt("kcxf"): PropTypeInt, // kcxf - Kernel cache X offset
+	fourCCtoInt("kcxz"): PropTypeInt, // kcxz - Kernel cache X size
 }
 
 // getPropertyType returns the expected type for a given property tag

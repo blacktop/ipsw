@@ -1,5 +1,4 @@
 (version 1)
 (allow default)
 (deny file-read* (regex "libunicorn.dylib")
-                 (regex "libusb.*.dylib")
-                 (regex "libheif.*.dylib"))
+                 (regex "libusb.*.dylib"))
