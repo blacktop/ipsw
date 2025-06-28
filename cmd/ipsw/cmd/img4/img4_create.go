@@ -150,17 +150,52 @@ var img4CreateCmd = &cobra.Command{
 			}
 		}
 
-		img, err := img4.Create(&img4.CreateConfig{
-			InputPath:            inputPath,
-			PayloadType:          im4pType,
-			PayloadVersion:       im4pVersion,
-			PayloadCompression:   im4pCompression,
-			PayloadExtraDataPath: im4pExtraDataPath,
-			PayloadPath:          im4pPath,
-			ManifestPath:         im4mPath,
-			RestoreInfoPath:      im4rPath,
-			BootNonce:            bootNonce,
-		})
+		conf := &img4.CreateConfig{
+			PayloadType:        im4pType,
+			PayloadVersion:     im4pVersion,
+			PayloadCompression: im4pCompression,
+			BootNonce:          bootNonce,
+		}
+
+		if inputPath != "" {
+			data, err := os.ReadFile(inputPath)
+			if err != nil {
+				return fmt.Errorf("failed to read input file: %v", err)
+			}
+			conf.InputData = data
+		} else if im4pPath != "" {
+			data, err := os.ReadFile(im4pPath)
+			if err != nil {
+				return fmt.Errorf("failed to read im4p file: %v", err)
+			}
+			conf.PayloadData = data
+		}
+
+		if im4pExtraDataPath != "" {
+			data, err := os.ReadFile(im4pExtraDataPath)
+			if err != nil {
+				return fmt.Errorf("failed to read extra data file: %v", err)
+			}
+			conf.PayloadExtraData = data
+		}
+
+		if im4mPath != "" {
+			data, err := os.ReadFile(im4mPath)
+			if err != nil {
+				return fmt.Errorf("failed to read im4m file: %v", err)
+			}
+			conf.ManifestData = data
+		}
+
+		if im4rPath != "" {
+			data, err := os.ReadFile(im4rPath)
+			if err != nil {
+				return fmt.Errorf("failed to read im4r file: %v", err)
+			}
+			conf.RestoreInfoData = data
+		}
+
+		img, err := img4.Create(conf)
 		if err != nil {
 			return fmt.Errorf("failed to create IMG4: %v", err)
 		}
