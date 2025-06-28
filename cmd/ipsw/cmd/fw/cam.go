@@ -96,7 +96,7 @@ var camCmd = &cobra.Command{
 				}
 			}
 			for _, f := range out {
-				im4p, err := img4.OpenIm4p(f)
+				im4p, err := img4.OpenPayload(f)
 				if err != nil {
 					return fmt.Errorf("failed to open im4p: %v", err)
 				}
@@ -121,7 +121,7 @@ var camCmd = &cobra.Command{
 			return nil
 		} else if ok, _ := magic.IsIm4p(args[0]); ok {
 			log.Info("Processing IM4P file")
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}

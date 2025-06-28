@@ -94,18 +94,18 @@ var tcCmd = &cobra.Command{
 			for _, f := range out {
 				if ok, _ := magic.IsImg4(f); ok {
 					log.WithField("file", f).Debug("Processing IMG4 file")
-					img4, err := img4.OpenImg4(f)
+					img4, err := img4.Open(f)
 					if err != nil {
 						return fmt.Errorf("failed to open img4: %v", err)
 					}
-					tc, err := fwcmd.ParseTrustCache(img4.IM4P.Data)
+					tc, err := fwcmd.ParseTrustCache(img4.Payload.Data)
 					if err != nil {
 						return fmt.Errorf("failed to parse trust cache: %v", err)
 					}
 					tcs[f] = tc
 				} else if ok, _ := magic.IsIm4p(f); ok {
 					log.WithField("file", f).Debug("Processing IM4P file")
-					im4p, err := img4.OpenIm4p(f)
+					im4p, err := img4.OpenPayload(f)
 					if err != nil {
 						return err
 					}
@@ -125,18 +125,18 @@ var tcCmd = &cobra.Command{
 		} else {
 			if ok, _ := magic.IsImg4(filepath.Clean(args[0])); ok {
 				log.WithField("file", filepath.Clean(args[0])).Debug("Processing IMG4 file")
-				img4, err := img4.OpenImg4(filepath.Clean(args[0]))
+				img4, err := img4.Open(filepath.Clean(args[0]))
 				if err != nil {
 					return fmt.Errorf("failed to open img4: %v", err)
 				}
-				tc, err := fwcmd.ParseTrustCache(img4.IM4P.Data)
+				tc, err := fwcmd.ParseTrustCache(img4.Payload.Data)
 				if err != nil {
 					return fmt.Errorf("failed to parse trust cache: %v", err)
 				}
 				tcs[filepath.Clean(args[0])] = tc
 			} else if ok, _ := magic.IsIm4p(filepath.Clean(args[0])); ok {
 				log.WithField("file", filepath.Clean(args[0])).Debug("Processing IM4P file")
-				im4p, err := img4.OpenIm4p(filepath.Clean(args[0]))
+				im4p, err := img4.OpenPayload(filepath.Clean(args[0]))
 				if err != nil {
 					return err
 				}

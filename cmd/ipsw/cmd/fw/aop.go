@@ -97,7 +97,7 @@ var aopCmd = &cobra.Command{
 			}
 			for _, f := range out {
 				if ok, _ := magic.IsIm4p(f); ok {
-					im4p, err := img4.OpenIm4p(f)
+					im4p, err := img4.OpenPayload(f)
 					if err != nil {
 						return err
 					}
@@ -146,7 +146,7 @@ var aopCmd = &cobra.Command{
 			}
 			return nil
 		} else if ok, _ := magic.IsIm4p(infile); ok {
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}

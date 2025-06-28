@@ -31,6 +31,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
@@ -84,7 +85,12 @@ var createCmd = &cobra.Command{
 
 		var m *macho.File
 
-		if isImg4(kcpath) {
+		isImg4, err := magic.IsImg4(kcpath)
+		if err != nil {
+			return fmt.Errorf("failed to check if kernelcache is img4: %w", err)
+		}
+
+		if isImg4 {
 			log.Info("Decompressing KernelManagement kernelcache")
 			data, err := kernelcache.DecompressKernelManagementData(kcpath)
 			if err != nil {

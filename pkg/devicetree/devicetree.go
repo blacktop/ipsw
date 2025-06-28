@@ -669,7 +669,7 @@ func ParseData(r io.Reader) (*DeviceTree, error) {
 }
 
 func DecryptIm4pData(data, iv, key []byte) ([]byte, error) {
-	i, err := img4.ParseIm4p(bytes.NewReader(data))
+	i, err := img4.ParsePayload(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IM4P: %v", err)
 	}

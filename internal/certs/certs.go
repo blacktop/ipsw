@@ -36,6 +36,7 @@ var (
 	OIDMacOsDevelopmentLeaf                asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 12}
 	OIDDeveloperIdApplicationLeaf          asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 13}
 	OIDDeveloperIdInstallerLeaf            asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 14}
+	OIDItemAppleImg4Manifest               asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 15}
 	OIDDeveloperIdKernelExtensionLeaf      asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 18}
 	OIDTestFlightLeaf                      asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 25, 1}
 	OIDInternalReleaseLeaf                 asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 25, 2}
@@ -45,6 +46,11 @@ var (
 	// Intermediate CA
 	OIDWorldwideDeveloperRelationsWdrIntermediateCA asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 2, 1}
 	OIDDeveloperIdIntermediateCA                    asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 2, 6}
+	//
+	OIDItemAppleDeviceAttestationNonce               asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 8, 2}
+	OIDItemAppleDeviceAttestationHardwareProperties  asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 8, 4}
+	OIDItemAppleDeviceAttestationKeyUsageProperties  asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 8, 5}
+	OIDItemAppleDeviceAttestationDeviceOSInformation asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 8, 7}
 	//
 	OIDCodeSigningEKU                   asn1.ObjectIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 3, 3}
 	OIDSafariDeveloperEKU               asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 4, 8}

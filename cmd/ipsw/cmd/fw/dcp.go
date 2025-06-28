@@ -75,7 +75,7 @@ var dcpCmd = &cobra.Command{
 		infile := filepath.Clean(args[0])
 
 		dowork := func(input, output string) error {
-			im4p, err := img4.OpenIm4p(input)
+			im4p, err := img4.OpenPayload(input)
 			if err != nil {
 				return fmt.Errorf("failed to open im4p: %v", err)
 			}

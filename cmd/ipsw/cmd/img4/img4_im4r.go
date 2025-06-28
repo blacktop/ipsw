@@ -22,18 +22,18 @@ THE SOFTWARE.
 package img4
 
 import (
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,8 +52,8 @@ func init() {
 
 	// Create command flags
 	img4Im4rCreateCmd.Flags().StringP("boot-nonce", "n", "", "Boot nonce to set (8-byte hex string)")
-	img4Im4rCreateCmd.Flags().StringP("output", "o", "", "Output IM4R file path")
 	img4Im4rCreateCmd.MarkFlagRequired("boot-nonce")
+	img4Im4rCreateCmd.Flags().StringP("output", "o", "", "Output IM4R file path")
 	img4Im4rCreateCmd.MarkFlagRequired("output")
 	img4Im4rCreateCmd.MarkFlagFilename("output")
 	viper.BindPFlag("img4.im4r.create.boot-nonce", img4Im4rCreateCmd.Flags().Lookup("boot-nonce"))
@@ -79,52 +79,23 @@ var img4Im4rInfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		filePath := args[0]
-		jsonOutput := viper.GetBool("img4.im4r.info.json")
-
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", filePath, err)
-		}
-		defer f.Close()
-
-		restoreInfo, err := img4.ParseIm4r(f)
+		im4r, err := img4.OpenRestoreInfo(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4R: %v", err)
 		}
 
-		return displayIm4rInfo(restoreInfo, filePath, jsonOutput, viper.GetBool("verbose"))
+		if viper.GetBool("img4.im4r.info.json") {
+			jdata, err := json.MarshalIndent(im4r, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal IM4R info: %v", err)
+			}
+			fmt.Println(string(jdata))
+		} else {
+			fmt.Println(im4r)
+		}
+
+		return nil
 	},
-}
-
-func displayIm4rInfo(restoreInfo *img4.RestoreInfo, filePath string, jsonOutput, verbose bool) error {
-	if jsonOutput {
-		data := map[string]any{
-			"name":             restoreInfo.Name,
-			"boot_nonce":       fmt.Sprintf("%x", restoreInfo.Generator.Data),
-			"raw_restore_info": restoreInfo.Generator.Raw,
-		}
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal IM4R info: %v", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-
-		fmt.Printf("%s       %s\n", colorField("Name:"), restoreInfo.Name)
-		fmt.Printf("%s %x\n", colorField("Boot Nonce:"), restoreInfo.Generator.Data)
-		if verbose {
-			fmt.Printf("%s %d bytes\n", colorField("Generator Data:"), len(restoreInfo.Generator.Data))
-			fmt.Printf("%s       %d bytes\n", colorField("Raw Data:"), len(restoreInfo.Generator.Raw))
-		}
-	}
-
-	return nil
 }
 
 // img4Im4rCreateCmd represents the im4r create command
@@ -138,13 +109,15 @@ var img4Im4rCreateCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
+		// flags
 		bootNonce := viper.GetString("img4.im4r.create.boot-nonce")
 		outputPath := viper.GetString("img4.im4r.create.output")
+		// validate flags
+		if bootNonce != "" {
+			if !regexp.MustCompile("^[0-9a-fA-F]{16}$").MatchString(bootNonce) {
+				return fmt.Errorf("--boot-nonce must be exactly 16 hex characters")
+			}
+		}
 
 		nonce, err := hex.DecodeString(bootNonce)
 		if err != nil {
@@ -154,47 +127,21 @@ var img4Im4rCreateCmd = &cobra.Command{
 			return fmt.Errorf("boot nonce must be exactly 8 bytes (16 hex characters), got %d bytes", len(nonce))
 		}
 
-		im4rData := createIm4rWithBootNonce(nonce)
+		im4r, err := img4.CreateRestoreInfo(nonce)
+		if err != nil {
+			return fmt.Errorf("failed to create IM4R: %v", err)
+		}
+
+		im4rData, err := im4r.Marshal()
+		if err != nil {
+			return fmt.Errorf("failed to marshal IM4R: %v", err)
+		}
 
 		utils.Indent(log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(im4rData))),
 		}).Info, 2)("Created IM4R")
 
-		return os.WriteFile(outputPath, im4rData, 0644)
+		return os.WriteFile(filepath.Clean(outputPath), im4rData, 0644)
 	},
-}
-
-// createIm4rWithBootNonce creates an IM4R structure with a boot nonce
-// This creates the same IM4R format as the create command for consistency.
-func createIm4rWithBootNonce(nonce []byte) []byte {
-	// Use the same implementation as createIm4r in the create command
-	return createIm4rData(nonce)
-}
-
-// createIm4rData creates IM4R data with the boot nonce - shared implementation
-func createIm4rData(nonce []byte) []byte {
-	// Create a simplified IM4R structure that contains the boot nonce directly
-	// This matches the format expected by both the C and Rust reference implementations
-
-	// Create the generator data containing BNCN + boot nonce
-	generatorData := make([]byte, 0, 4+len(nonce))
-	generatorData = append(generatorData, []byte("BNCN")...)
-	generatorData = append(generatorData, nonce...)
-
-	im4rStruct := struct {
-		Name      string `asn1:"ia5"`
-		Generator []byte
-	}{
-		Name:      "IM4R",
-		Generator: generatorData,
-	}
-
-	im4rData, err := asn1.Marshal(im4rStruct)
-	if err != nil {
-		// Fallback to simple format if marshaling fails
-		return append([]byte("IM4RBNCN"), nonce...)
-	}
-
-	return im4rData
 }

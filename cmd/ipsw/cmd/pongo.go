@@ -100,11 +100,11 @@ var pongoCmd = &cobra.Command{
 			destPath = filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
 
 			log.Info("Extracting im4p kbags")
-			kbags, err = img4.ParseZipKeyBags(zr.File, &img4.MetaData{
-				Type:                  i.Plists.Type,
-				ProductVersion:        i.Plists.BuildManifest.ProductVersion,
-				ProductBuildVersion:   i.Plists.BuildManifest.ProductBuildVersion,
-				SupportedProductTypes: i.Plists.Restore.SupportedProductTypes,
+			kbags, err = img4.GetKeybagsFromIPSW(zr.File, img4.KeybagMetaData{
+				Type:    i.Plists.Type,
+				Version: i.Plists.BuildManifest.ProductVersion,
+				Build:   i.Plists.BuildManifest.ProductBuildVersion,
+				Devices: i.Plists.Restore.SupportedProductTypes,
 			}, "")
 			if err != nil {
 				return fmt.Errorf("failed to parse im4p kbags: %v", err)
@@ -141,11 +141,11 @@ var pongoCmd = &cobra.Command{
 			defer zr.Close()
 
 			log.Info("Extracting im4p kbags")
-			kbags, err = img4.ParseZipKeyBags(zr.File, &img4.MetaData{
-				Type:                  i.Plists.Type,
-				ProductVersion:        i.Plists.BuildManifest.ProductVersion,
-				ProductBuildVersion:   i.Plists.BuildManifest.ProductBuildVersion,
-				SupportedProductTypes: i.Plists.Restore.SupportedProductTypes,
+			kbags, err = img4.GetKeybagsFromIPSW(zr.File, img4.KeybagMetaData{
+				Type:    i.Plists.Type,
+				Version: i.Plists.BuildManifest.ProductVersion,
+				Build:   i.Plists.BuildManifest.ProductBuildVersion,
+				Devices: i.Plists.Restore.SupportedProductTypes,
 			}, "")
 			if err != nil {
 				return fmt.Errorf("failed to parse IPSW im4p kbags: %v", err)

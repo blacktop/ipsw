@@ -27,24 +27,12 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-func isImg4(kcpath string) bool {
-	f, err := os.Open(kcpath)
-	if err != nil {
-		log.Fatalf("failed to open kernelcache %s: %w", kcpath, err)
-	}
-	defer f.Close()
-	if _, err := img4.ParseImg4(f); err == nil {
-		return true
-	}
-	return false
-}
 
 func init() {
 	KernelcacheCmd.AddCommand(kernelDecCmd)
@@ -74,7 +62,12 @@ var kernelDecCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", kcpath)
 		}
 
-		if isImg4(kcpath) {
+		isImg4, err := magic.IsImg4(kcpath)
+		if err != nil {
+			return fmt.Errorf("failed to check if kernelcache is img4: %w", err)
+		}
+
+		if isImg4 {
 			log.Info("Decompressing KernelManagement kernelcache")
 			return kernelcache.DecompressKernelManagement(kcpath, outputDir)
 		}

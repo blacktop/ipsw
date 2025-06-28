@@ -22,16 +22,11 @@ THE SOFTWARE.
 package img4
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -54,15 +49,9 @@ var img4InfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
+		infile := filepath.Clean(args[0])
 
-		filePath := args[0]
-		jsonOutput := viper.GetBool("img4.info.json")
-
-		isImg4, err := magic.IsImg4(filePath)
+		isImg4, err := magic.IsImg4(infile)
 		if err != nil {
 			return fmt.Errorf("failed to determine file type: %v", err)
 		}
@@ -71,80 +60,21 @@ var img4InfoCmd = &cobra.Command{
 			return fmt.Errorf("file is not an IMG4 file (for IM4P files, use 'ipsw img4 im4p info')")
 		}
 
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", filePath, err)
-		}
-		defer f.Close()
-
-		img, err := img4.Parse(f)
+		img, err := img4.Open(infile)
 		if err != nil {
 			return fmt.Errorf("failed to parse IMG4 file: %v", err)
 		}
-		return displayImg4Info(img, filePath, jsonOutput, viper.GetBool("verbose"))
+
+		if viper.GetBool("img4.info.json") {
+			json, err := img.MarshalJSON()
+			if err != nil {
+				return fmt.Errorf("failed to marshal IMG4 file: %v", err)
+			}
+			fmt.Println(string(json))
+		} else {
+			fmt.Println(img)
+		}
+
+		return nil
 	},
-}
-
-func displayImg4Info(img *img4.Img4, filePath string, jsonOutput, verbose bool) error {
-	if jsonOutput {
-		data := map[string]any{
-			"file":         filepath.Base(filePath),
-			"type":         "IMG4",
-			"name":         img.Name,
-			"description":  img.Description,
-			"manifest":     img.Manifest,
-			"restore_info": img.RestoreInfo,
-		}
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal IMG4 info: %v", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		fmt.Printf("%s             IMG4\n", colorField("Type:"))
-		fmt.Printf("%s             %s\n", colorField("Name:"), img.Name)
-		if len(img.Description) > 0 {
-			fmt.Printf("%s      %s\n", colorField("Description:"), img.Description)
-		}
-		if verbose {
-			if len(img.Manifest.Properties) > 0 {
-				fmt.Printf("%s\n", colorField("Manifest Properties:"))
-				for key, value := range img.Manifest.Properties {
-					switch v := value.(type) {
-					case int:
-						fmt.Printf("  %s: %d\n", colorSubField(key), v)
-					case bool:
-						fmt.Printf("  %s: %t\n", colorSubField(key), v)
-					case []byte:
-						if utils.IsASCII(string(v)) {
-							fmt.Printf("  %s: %s\n", colorSubField(key), v)
-						} else {
-							if verbose {
-								fmt.Printf("  %s: %x\n", colorSubField(key), v)
-							} else {
-								fmt.Printf("  %s: %d bytes\n", colorSubField(key), len(v))
-							}
-						}
-					default:
-						fmt.Printf("  %s: %v\n", colorSubField(key), value)
-					}
-				}
-			}
-			if len(img.Manifest.Images) > 0 {
-				fmt.Printf("%s (count=%d)\n", colorField("Manifest Images:"), len(img.Manifest.Images))
-				for _, image := range img.Manifest.Images {
-					fmt.Printf("  %s:\n", colorSubField(image.Name))
-					for propName, propValue := range image.Properties {
-						fmt.Printf("    %s: %v\n", colorField(propName), propValue)
-					}
-				}
-			}
-			if len(img.RestoreInfo.Generator.Data) > 0 {
-				fmt.Printf("%s\n", colorField("Restore Info:"))
-				fmt.Printf("  %s %x\n", colorSubField("Generator:"), img.RestoreInfo.Generator.Data)
-			}
-		}
-	}
-
-	return nil
 }

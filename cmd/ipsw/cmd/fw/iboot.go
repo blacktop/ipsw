@@ -94,7 +94,7 @@ var ibootCmd = &cobra.Command{
 			}
 		}
 
-		dowork := func(im4p *img4.Im4p, outputDir string) error {
+		dowork := func(im4p *img4.Payload, outputDir string) error {
 			iboot, err := iboot.Parse(im4p.Data)
 			if err != nil {
 				return fmt.Errorf("failed to parse iboot data: %v", err)
@@ -174,7 +174,7 @@ var ibootCmd = &cobra.Command{
 				}
 			}
 			for _, f := range out {
-				im4p, err := img4.OpenIm4p(f)
+				im4p, err := img4.OpenPayload(f)
 				if err != nil {
 					return fmt.Errorf("failed to open im4p: %v", err)
 				}
@@ -184,7 +184,7 @@ var ibootCmd = &cobra.Command{
 				os.Remove(f) // cleanup the extracted im4p file
 			}
 		} else if ok, _ := magic.IsIm4p(args[0]); ok {
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}
