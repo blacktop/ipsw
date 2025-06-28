@@ -36,11 +36,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	// BootNonceLength is the required length of boot nonce in bytes
-	BootNonceLength = 8
-)
-
 func init() {
 	Img4Cmd.AddCommand(img4CreateCmd)
 	// Create from raw input file as payload data

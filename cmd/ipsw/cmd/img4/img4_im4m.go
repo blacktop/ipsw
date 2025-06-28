@@ -324,15 +324,16 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 	}
 
 	// Extract payload data from IMG4
-	// Check if the input contains IM4P data that we can extract
 	var payloadData []byte
-
-	// For a complete IMG4 personalization, we would need the IM4P data
-	// This is a limitation of the current implementation - production TSS
-	// personalization works with the complete IPSW bundle containing IM4P files
-	if verbose {
-		log.Debug("Note: Personalization requires IM4P payload data")
-		log.Debug("In production, this would extract from the IPSW/OTA bundle")
+	if img.Payload != nil {
+		payloadData = img.Payload.IM4P.Raw // Use the raw ASN.1 bytes of the payload
+		if verbose {
+			log.Debugf("Extracted %d bytes of payload data", len(payloadData))
+		}
+	} else {
+		if verbose {
+			log.Debug("No payload data found in input IMG4")
+		}
 	}
 
 	// Create a personalized manifest by modifying the existing manifest properties
