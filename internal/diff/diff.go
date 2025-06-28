@@ -725,7 +725,7 @@ func (d *Diff) parseIBoot() (err error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to unzip iBoot im4p: %v", err)
 		}
-		im4p, err := img4.OpenIm4p(iBootIm4ps[0])
+		im4p, err := img4.OpenPayload(iBootIm4ps[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to open im4p: %v", err)
 		}

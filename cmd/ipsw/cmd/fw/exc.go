@@ -97,7 +97,7 @@ var excCmd = &cobra.Command{
 				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		} else if ok, _ := magic.IsIm4p(infile); ok {
-			im4p, err := img4.OpenIm4p(infile)
+			im4p, err := img4.OpenPayload(infile)
 			if err != nil {
 				return err
 			}
