@@ -24,8 +24,8 @@ type IMG4 struct {
 	Raw         asn1.RawContent
 	Tag         string        // IMG4
 	Payload     asn1.RawValue `asn1:"explicit,tag:0,optional"`
-	Manifest    asn1.RawValue `asn1:"explicit,tag:0,optional"`
-	RestoreInfo asn1.RawValue `asn1:"explicit,tag:1,optional"`
+	Manifest    asn1.RawValue `asn1:"explicit,tag:1,optional"`
+	RestoreInfo asn1.RawValue `asn1:"explicit,tag:2,optional"`
 }
 
 type Image struct {
@@ -153,6 +153,9 @@ func Create(conf *CreateConfig) (*Image, error) {
 	if conf.InputData == nil && conf.PayloadData == nil {
 		return nil, fmt.Errorf("config must contain either InputData or PayloadData")
 	}
+	if len(conf.RestoreInfoData) > 0 && len(conf.BootNonce) > 0 {
+		return nil, fmt.Errorf("cannot specify both RestoreInfoData and BootNonce")
+	}
 
 	img := Image{
 		IMG4: IMG4{
@@ -236,7 +239,7 @@ func (i *Image) Marshal() ([]byte, error) {
 		}
 		i.IMG4.Manifest = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
-			Tag:        0, // tag:0 as specified in struct
+			Tag:        1, // tag:1 as specified in struct
 			IsCompound: true,
 			Bytes:      manifestData,
 		}
@@ -249,7 +252,7 @@ func (i *Image) Marshal() ([]byte, error) {
 		}
 		i.IMG4.RestoreInfo = asn1.RawValue{
 			Class:      2, // context-specific (for explicit tagging)
-			Tag:        1, // tag:1 as specified in struct
+			Tag:        2, // tag:2 as specified in struct
 			IsCompound: true,
 			Bytes:      restoreInfoData,
 		}
@@ -294,7 +297,7 @@ func validateComponents(img *Image, result *ValidationResult) {
 		result.Components = append(result.Components, "name")
 	}
 
-	if img.Payload.Version == "" {
+	if img.Payload != nil && img.Payload.Version == "" {
 		result.Warnings = append(result.Warnings, "Missing IM4P version")
 	}
 

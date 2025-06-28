@@ -22,7 +22,6 @@ THE SOFTWARE.
 package img4
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -356,7 +355,7 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 	}
 
 	// Create a new manifest with personalized properties
-	personalizedManifest, err := createPersonalizedManifest(img.Manifest.Raw, personalizedProperties)
+	personalizedManifest, err := createPersonalizedManifest(personalizedProperties)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create personalized manifest: %w", err)
 	}
@@ -378,71 +377,21 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 	return result, nil
 }
 
-func createPersonalizedManifest(originalManifestData []byte, personalizedProperties map[string]any) ([]byte, error) {
-	// Create a personalized IM4M manifest with the device-specific ECID and nonce
-	// This creates a new manifest structure with the personalized values
-
-	// Create manifest properties structure with personalized values
-	var props []byte
-	var err error
-
-	// Encode the personalized properties as a simple structure
-	// In production, this would be a full ASN.1 IM4M structure
-	propBuffer := bytes.NewBuffer(nil)
-
-	// Write ECID property (if provided)
-	if ecid, exists := personalizedProperties["ECID"]; exists {
-		if ecidVal, ok := ecid.(uint64); ok {
-			// Create a simple property structure: [tag][length][value]
-			ecidBytes := make([]byte, 8)
-			for i := range 8 {
-				ecidBytes[7-i] = byte(ecidVal >> (i * 8))
-			}
-			propBuffer.WriteString("ECID")
-			propBuffer.Write([]byte{0x08}) // length
-			propBuffer.Write(ecidBytes)
-		}
+func createPersonalizedManifest(personalizedProperties map[string]any) ([]byte, error) {
+	newManifest := &img4.Manifest{
+		IM4M: img4.IM4M{
+			Tag:     "IM4M",
+			Version: 1, // Assuming version 1 for personalized manifests
+		},
 	}
 
-	// Write nonce property (if provided)
-	if nonce, exists := personalizedProperties["ApNonce"]; exists {
-		if nonceBytes, ok := nonce.([]byte); ok {
-			propBuffer.WriteString("APNC")                  // ApNonce tag
-			propBuffer.Write([]byte{byte(len(nonceBytes))}) // length
-			propBuffer.Write(nonceBytes)
-		}
+	// Convert the personalizedProperties map to a slice of img4.Property
+	newManifest.ManifestBody.Properties = img4.PropertiesMapToSlice(personalizedProperties)
+
+	personalizedManifestData, err := newManifest.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal personalized manifest: %w", err)
 	}
 
-	props = propBuffer.Bytes()
-
-	// Create a basic IM4M structure with personalized data
-	// This is a simplified version - production would use proper ASN.1 encoding
-	manifestBuffer := bytes.NewBuffer(nil)
-
-	// IM4M header
-	manifestBuffer.WriteString("IM4M") // Magic
-
-	// Version (simplified)
-	manifestBuffer.Write([]byte{0x00, 0x00, 0x00, 0x01}) // Version 1
-
-	// Properties length
-	propsLen := len(props)
-	manifestBuffer.Write([]byte{
-		byte(propsLen >> 24),
-		byte(propsLen >> 16),
-		byte(propsLen >> 8),
-		byte(propsLen),
-	})
-
-	// Properties data
-	manifestBuffer.Write(props)
-
-	// Add original certificate data if available (simplified)
-	if len(originalManifestData) > 16 {
-		// Append some of the original signing data to maintain structure
-		// In production, this would be properly reconstructed and re-signed
-		manifestBuffer.Write(originalManifestData[16:])
-	}
-
-	return manifestBuffer.Bytes(), err
+	return personalizedManifestData, nil
 }

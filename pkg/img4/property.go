@@ -204,7 +204,7 @@ func marshalSingleProperty(name string, value any, format PropertyMarshalFormat)
 		valueBytes, err = asn1.Marshal(v)
 		tag = asn1.TagInteger
 	case uint64:
-		valueBytes, err = asn1.Marshal(int64(v))
+		valueBytes, err = asn1.Marshal(new(big.Int).SetUint64(v))
 		tag = asn1.TagInteger
 	case bool:
 		valueBytes, err = asn1.Marshal(v)
