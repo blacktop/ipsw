@@ -707,11 +707,13 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 	}
 
 	if len(conf.Keybags) > 0 {
-		if data, err := asn1.Marshal(conf.Keybags); err == nil {
-			im4p.Keybag = data
-		} else {
-			log.Errorf("create payload: failed to marshal keybags: %v", err)
+		data, err := asn1.Marshal(conf.Keybags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal keybags: %v", err)
 		}
+		im4p.Keybag = data
+		im4p.Keybags = conf.Keybags
+		im4p.Encrypted = true
 	}
 
 	return im4p, nil

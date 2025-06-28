@@ -20,87 +20,13 @@ type Property struct {
 // ParsePropertySet parses a SET of properties dynamically into []Property format
 // Used by both manifest MANP and image descriptors
 func ParsePropertySet(data []byte) ([]Property, error) {
-	var properties []Property
-
-	// Parse the SET of property entries - these are raw private tag entries
-	remaining := data
-	for len(remaining) > 0 {
-		var entry asn1.RawValue
-		rest, err := asn1.Unmarshal(remaining, &entry)
-		if err != nil {
-			break // No more entries to parse
-		}
-
-		// Only process private class entries (class 3)
-		if entry.Class != 3 {
-			remaining = rest
-			continue
-		}
-
-		// Parse the property entry which contains a SEQUENCE with name and value
-		var prop struct {
-			Name  string
-			Value asn1.RawValue
-		}
-
-		if _, err := asn1.Unmarshal(entry.Bytes, &prop); err != nil {
-			remaining = rest
-			continue // Skip malformed properties
-		}
-
-		// Detect and parse the value based on its ASN.1 type and known property types
-		value := ParsePropertyValueWithTag(prop.Value, entry.Tag)
-		if value != nil {
-			properties = append(properties, Property{
-				Name:  prop.Name,
-				Value: value,
-			})
-		}
-
-		remaining = rest
-	}
-
-	return properties, nil
+	return ParsePropertiesAs[[]Property](data)
 }
 
 // ParsePropertyMap parses ASN.1 property data into a map[string]any format
 // Used by restore info for direct property access
 func ParsePropertyMap(data []byte) (map[string]any, error) {
-	properties := make(map[string]any)
-
-	remaining := data
-	for len(remaining) > 0 {
-		var entry asn1.RawValue
-		rest, err := asn1.Unmarshal(remaining, &entry)
-		if err != nil {
-			break // No more entries
-		}
-
-		// Only process private class entries (class 3)
-		if entry.Class != 3 {
-			remaining = rest
-			continue
-		}
-
-		// Parse property (SEQUENCE with name and value)
-		var prop struct {
-			Name  string
-			Value asn1.RawValue
-		}
-
-		if _, err := asn1.Unmarshal(entry.Bytes, &prop); err != nil {
-			remaining = rest
-			continue
-		}
-
-		if value := ParsePropertyValueWithTag(prop.Value, entry.Tag); value != nil {
-			properties[prop.Name] = value
-		}
-
-		remaining = rest
-	}
-
-	return properties, nil
+	return ParsePropertiesAs[map[string]any](data)
 }
 
 // ParsePropertyValueWithTag dynamically detects and parses property values based on ASN.1 type and known tag
@@ -192,18 +118,18 @@ func FormatPropertyValue(value any) string {
 	}
 }
 
-// ConvertPropertySliceToMap converts []Property format to map[string]any format
-func ConvertPropertySliceToMap(props []Property) map[string]any {
-	result := make(map[string]any)
+// PropertiesSliceToMap converts []Property to map[string]any
+func PropertiesSliceToMap(props []Property) map[string]any {
+	result := make(map[string]any, len(props))
 	for _, prop := range props {
 		result[prop.Name] = prop.Value
 	}
 	return result
 }
 
-// ConvertPropertyMapToSlice converts map[string]any format to []Property format
-func ConvertPropertyMapToSlice(props map[string]any) []Property {
-	var result []Property
+// PropertiesMapToSlice converts map[string]any to []Property
+func PropertiesMapToSlice(props map[string]any) []Property {
+	result := make([]Property, 0, len(props))
 	for name, value := range props {
 		result = append(result, Property{
 			Name:  name,
@@ -211,6 +137,273 @@ func ConvertPropertyMapToSlice(props map[string]any) []Property {
 		})
 	}
 	return result
+}
+
+// PropertyMarshalFormat specifies the ASN.1 structure format for property marshaling
+type PropertyMarshalFormat int
+
+const (
+	// RestoreInfoFormat - used by IM4R, has SEQUENCE with name and value
+	RestoreInfoFormat PropertyMarshalFormat = iota
+	// ManifestFormat - used by IM4M, has SEQUENCE with name and SET containing value
+	ManifestFormat
+)
+
+// MarshalProperties marshals properties to ASN.1 format
+// Supports both RestoreInfo format (SEQUENCE with name+value) and Manifest format (SEQUENCE with name+SET)
+func MarshalProperties(props map[string]any, format PropertyMarshalFormat) ([]byte, error) {
+	var entries []asn1.RawValue
+
+	for name, value := range props {
+		entry, err := marshalSingleProperty(name, value, format)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property %s: %v", name, err)
+		}
+		entries = append(entries, entry)
+	}
+
+	// Concatenate all entries directly (no outer wrapper)
+	var result []byte
+	for _, entry := range entries {
+		entryBytes, err := asn1.Marshal(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property entry: %v", err)
+		}
+		result = append(result, entryBytes...)
+	}
+	return result, nil
+}
+
+// MarshalPropertiesSlice marshals []Property format to ASN.1 RawValues
+func MarshalPropertiesSlice(props []Property, format PropertyMarshalFormat) ([]asn1.RawValue, error) {
+	var entries []asn1.RawValue
+
+	for _, prop := range props {
+		entry, err := marshalSingleProperty(prop.Name, prop.Value, format)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal property %s: %v", prop.Name, err)
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+// marshalSingleProperty marshals a single property name/value pair to ASN.1 format
+func marshalSingleProperty(name string, value any, format PropertyMarshalFormat) (asn1.RawValue, error) {
+	// First, marshal the value itself
+	var valueBytes []byte
+	var tag int
+	var err error
+
+	switch v := value.(type) {
+	case int:
+		valueBytes, err = asn1.Marshal(v)
+		tag = asn1.TagInteger
+	case int64:
+		valueBytes, err = asn1.Marshal(v)
+		tag = asn1.TagInteger
+	case uint64:
+		valueBytes, err = asn1.Marshal(int64(v))
+		tag = asn1.TagInteger
+	case bool:
+		valueBytes, err = asn1.Marshal(v)
+		tag = asn1.TagBoolean
+	case string:
+		valueBytes, err = asn1.Marshal(v)
+		tag = asn1.TagIA5String
+	case []byte:
+		valueBytes, err = asn1.Marshal(v)
+		tag = asn1.TagOctetString
+	case time.Time:
+		valueBytes, err = asn1.Marshal(v.Unix())
+		tag = asn1.TagInteger
+	default:
+		return asn1.RawValue{}, fmt.Errorf("unsupported property type: %T", v)
+	}
+
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("failed to marshal value: %v", err)
+	}
+
+	// Create the property structure based on format
+	var propBytes []byte
+	switch format {
+	case RestoreInfoFormat:
+		// RestoreInfo format: SEQUENCE with name and value
+		propStruct := struct {
+			Name  string
+			Value asn1.RawValue
+		}{
+			Name: name,
+			Value: asn1.RawValue{
+				Tag:       tag,
+				FullBytes: valueBytes,
+			},
+		}
+		propBytes, err = asn1.Marshal(propStruct)
+
+	case ManifestFormat:
+		// Manifest format: SEQUENCE with name and SET containing value
+		propStruct := struct {
+			Name  string
+			Value asn1.RawValue `asn1:"set"`
+		}{
+			Name: name,
+			Value: asn1.RawValue{
+				Tag:        asn1.TagSet,
+				IsCompound: true,
+				Bytes:      valueBytes,
+			},
+		}
+		propBytes, err = asn1.Marshal(propStruct)
+
+	default:
+		return asn1.RawValue{}, fmt.Errorf("unsupported marshal format: %v", format)
+	}
+
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("failed to marshal property structure: %v", err)
+	}
+
+	// Return the private class entry
+	return asn1.RawValue{
+		Class:      asn1.ClassPrivate,
+		Tag:        fourCCtoInt(name),
+		IsCompound: true,
+		Bytes:      propBytes,
+	}, nil
+}
+
+// ParsePropertiesAs parses properties from ASN.1 data and returns the specified type
+func ParsePropertiesAs[T []Property | map[string]any](data []byte) (T, error) {
+	var zero T
+	remaining := data
+
+	// Determine return type and initialize accordingly
+	var properties []Property
+	var propertyMap map[string]any
+	var returnSlice bool
+
+	switch any(zero).(type) {
+	case []Property:
+		returnSlice = true
+	case map[string]any:
+		propertyMap = make(map[string]any)
+	default:
+		return zero, fmt.Errorf("unsupported return type")
+	}
+
+	for len(remaining) > 0 {
+		var entry asn1.RawValue
+		rest, err := asn1.Unmarshal(remaining, &entry)
+		if err != nil {
+			break // No more entries
+		}
+
+		// Only process private class entries (class 3)
+		if entry.Class != asn1.ClassPrivate {
+			remaining = rest
+			continue
+		}
+
+		// Parse property (SEQUENCE with name and value)
+		var prop struct {
+			Name  string
+			Value asn1.RawValue
+		}
+
+		if _, err := asn1.Unmarshal(entry.Bytes, &prop); err != nil {
+			remaining = rest
+			continue
+		}
+
+		value := ParsePropertyValueWithTag(prop.Value, entry.Tag)
+		if value != nil {
+			if returnSlice {
+				properties = append(properties, Property{
+					Name:  prop.Name,
+					Value: value,
+				})
+			} else {
+				propertyMap[prop.Name] = value
+			}
+		}
+
+		remaining = rest
+	}
+
+	if returnSlice {
+		return any(properties).(T), nil
+	}
+	return any(propertyMap).(T), nil
+}
+
+// fourCCtoInt converts a 4-character string to an integer
+func fourCCtoInt(fourCC string) int {
+	if len(fourCC) != 4 {
+		return 0
+	}
+	return int(fourCC[0])<<24 | int(fourCC[1])<<16 | int(fourCC[2])<<8 | int(fourCC[3])
+}
+
+// propertyTypeMap provides a centralized lookup for property types based on their ASN.1 tags
+var propertyTypeMap = map[int]PropType{
+	// String properties (stored as OCTET STRING but should be displayed as text)
+	fourCCtoInt("love"): PropTypeString, // love - Version string
+	fourCCtoInt("prtp"): PropTypeString, // prtp - Platform type
+	fourCCtoInt("sdkp"): PropTypeString, // sdkp - SDK platform
+	fourCCtoInt("tagt"): PropTypeString, // tagt - Target tag
+	fourCCtoInt("tatp"): PropTypeString, // tatp - Target platform
+	fourCCtoInt("pave"): PropTypeString, // pave - Platform version
+	fourCCtoInt("vnum"): PropTypeString, // vnum - Version number
+	fourCCtoInt("apmv"): PropTypeString, // apmv - Apple PMU version
+
+	// Hash/binary properties (stored as OCTET STRING, display as hex)
+	fourCCtoInt("srvn"): PropTypeHash, // srvn - Security revision number
+	fourCCtoInt("snon"): PropTypeHash, // snon - Security nonce
+	fourCCtoInt("BNCH"): PropTypeHash, // BNCH - Boot nonce hash
+	fourCCtoInt("tbmr"): PropTypeHash, // tbmr - Trusted boot measurement register
+	fourCCtoInt("tbms"): PropTypeHash, // tbms - Trusted boot measurement signature
+	fourCCtoInt("mmap"): PropTypeHash, // mmap - Memory map
+	fourCCtoInt("rddg"): PropTypeHash, // rddg - RD Debug
+
+	// Boolean properties
+	fourCCtoInt("CPRO"): PropTypeBool, // CPRO - Certificate production status
+	fourCCtoInt("CSEC"): PropTypeBool, // CSEC - Certificate security mode
+	fourCCtoInt("EKEY"): PropTypeBool, // EKEY - Encryption key required
+	fourCCtoInt("EPRO"): PropTypeBool, // EPRO - Encryption production
+	fourCCtoInt("ESEC"): PropTypeBool, // ESEC - Encryption security
+
+	// Timestamp properties (stored as INTEGER, display as time)
+	fourCCtoInt("tstp"): PropTypeTimestamp, // tstp - Timestamp
+
+	// Integer properties
+	fourCCtoInt("BORD"): PropTypeInt, // BORD - Board ID
+	fourCCtoInt("CEPO"): PropTypeInt, // CEPO - Certificate epoch
+	fourCCtoInt("CHIP"): PropTypeInt, // CHIP - Chip ID
+	fourCCtoInt("ECID"): PropTypeInt, // ECID - Exclusive chip identifier
+	fourCCtoInt("SDOM"): PropTypeInt, // SDOM - Security domain
+	fourCCtoInt("augs"): PropTypeInt, // augs - Augmented security
+	fourCCtoInt("clas"): PropTypeInt, // clas - Device class
+	fourCCtoInt("fchp"): PropTypeInt, // fchp - Firmware chip
+	fourCCtoInt("styp"): PropTypeInt, // styp - Security type
+	fourCCtoInt("type"): PropTypeInt, // type - Type
+	fourCCtoInt("impl"): PropTypeInt, // impl - Implementation
+	fourCCtoInt("arms"): PropTypeInt, // arms - ARM security
+	fourCCtoInt("ar1s"): PropTypeInt, // ar1s - ARM1 security
+	fourCCtoInt("cons"): PropTypeInt, // cons - Console
+	fourCCtoInt("drmc"): PropTypeInt, // drmc - DRMC
+	fourCCtoInt("tz0s"): PropTypeInt, // tz0s - TrustZone 0 security
+	fourCCtoInt("tz1s"): PropTypeInt, // tz1s - TrustZone 1 security
+}
+
+// getPropertyType returns the expected type for a given property tag
+func getPropertyType(tag int) PropType {
+	if propType, exists := propertyTypeMap[tag]; exists {
+		return propType
+	}
+	return PropTypeAuto // Auto-detect for unknown properties
 }
 
 // isPrintableString checks if a string contains only printable characters

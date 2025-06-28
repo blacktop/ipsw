@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 )
@@ -124,9 +124,7 @@ func NewWithBootNonce(nonce uint64) *RestoreInfo {
 func New(properties map[string]any) *RestoreInfo {
 	// Make a copy to avoid external modifications
 	props := make(map[string]any, len(properties))
-	for k, v := range properties {
-		props[k] = v
-	}
+	maps.Copy(props, properties)
 	return &RestoreInfo{
 		IM4R: IM4R{
 			Tag: "IM4R",
@@ -177,78 +175,7 @@ func (r *RestoreInfo) Marshal() ([]byte, error) {
 
 // marshalProperties marshals the properties map to ASN.1 format
 func (r *RestoreInfo) marshalProperties() ([]byte, error) {
-	var entries []asn1.RawValue
-
-	for name, value := range r.Properties {
-		var valueBytes []byte
-		var tag int
-		var err error
-
-		switch v := value.(type) {
-		case int:
-			valueBytes, err = asn1.Marshal(v)
-			tag = asn1.TagInteger
-		case int64:
-			valueBytes, err = asn1.Marshal(v)
-			tag = asn1.TagInteger
-		case uint64:
-			valueBytes, err = asn1.Marshal(int64(v))
-			tag = asn1.TagInteger
-		case bool:
-			valueBytes, err = asn1.Marshal(v)
-			tag = asn1.TagBoolean
-		case string:
-			valueBytes, err = asn1.Marshal(v)
-			tag = asn1.TagIA5String
-		case []byte:
-			valueBytes, err = asn1.Marshal(v)
-			tag = asn1.TagOctetString
-		case time.Time:
-			valueBytes, err = asn1.Marshal(v.Unix())
-			tag = asn1.TagInteger
-		default:
-			return nil, fmt.Errorf("unsupported property type: %T", v)
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal property %s: %v", name, err)
-		}
-
-		// Create property structure
-		propStruct := struct {
-			Name  string
-			Value asn1.RawValue
-		}{
-			Name: name,
-			Value: asn1.RawValue{
-				Tag:       tag,
-				FullBytes: valueBytes, // Use full bytes including header
-			},
-		}
-
-		propBytes, err := asn1.Marshal(propStruct)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal property %s: %v", name, err)
-		}
-
-		entries = append(entries, asn1.RawValue{
-			Class:      3, // private class
-			Tag:        fourCCtoInt(name),
-			IsCompound: true,
-			Bytes:      propBytes,
-		})
-	}
-
-	// Concatenate all entries directly (no outer SEQUENCE wrapper)
-	var result []byte
-	for _, entry := range entries {
-		entryBytes, err := asn1.Marshal(entry)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal property entry: %v", err)
-		}
-		result = append(result, entryBytes...)
-	}
-	return result, nil
+	return MarshalProperties(r.Properties, RestoreInfoFormat)
 }
 
 // String returns a formatted string representation of the restore info

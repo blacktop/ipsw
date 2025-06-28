@@ -91,73 +91,6 @@ const (
 	PropTypeTimestamp
 )
 
-// propertyTypeMap provides a centralized lookup for property types based on their ASN.1 tags
-var propertyTypeMap = map[int]PropType{
-	// String properties (stored as OCTET STRING but should be displayed as text)
-	fourCCtoInt("love"): PropTypeString, // love - Version string
-	fourCCtoInt("prtp"): PropTypeString, // prtp - Platform type
-	fourCCtoInt("sdkp"): PropTypeString, // sdkp - SDK platform
-	fourCCtoInt("tagt"): PropTypeString, // tagt - Target tag
-	fourCCtoInt("tatp"): PropTypeString, // tatp - Target platform
-	fourCCtoInt("pave"): PropTypeString, // pave - Platform version
-	fourCCtoInt("vnum"): PropTypeString, // vnum - Version number
-	fourCCtoInt("apmv"): PropTypeString, // apmv - Apple PMU version
-
-	// Hash/binary properties (stored as OCTET STRING, display as hex)
-	fourCCtoInt("srvn"): PropTypeHash, // srvn - Security revision number
-	fourCCtoInt("snon"): PropTypeHash, // snon - Security nonce
-	fourCCtoInt("BNCH"): PropTypeHash, // BNCH - Boot nonce hash
-	fourCCtoInt("tbmr"): PropTypeHash, // tbmr - Trusted boot measurement register
-	fourCCtoInt("tbms"): PropTypeHash, // tbms - Trusted boot measurement signature
-	fourCCtoInt("mmap"): PropTypeHash, // mmap - Memory map
-	fourCCtoInt("rddg"): PropTypeHash, // rddg - RD Debug
-
-	// Boolean properties
-	fourCCtoInt("CPRO"): PropTypeBool, // CPRO - Certificate production status
-	fourCCtoInt("CSEC"): PropTypeBool, // CSEC - Certificate security mode
-	fourCCtoInt("EKEY"): PropTypeBool, // EKEY - Encryption key required
-	fourCCtoInt("EPRO"): PropTypeBool, // EPRO - Encryption production
-	fourCCtoInt("ESEC"): PropTypeBool, // ESEC - Encryption security
-
-	// Timestamp properties (stored as INTEGER, display as time)
-	fourCCtoInt("tstp"): PropTypeTimestamp, // tstp - Timestamp
-
-	// Integer properties
-	fourCCtoInt("BORD"): PropTypeInt, // BORD - Board ID
-	fourCCtoInt("CEPO"): PropTypeInt, // CEPO - Certificate epoch
-	fourCCtoInt("CHIP"): PropTypeInt, // CHIP - Chip ID
-	fourCCtoInt("ECID"): PropTypeInt, // ECID - Exclusive chip identifier
-	fourCCtoInt("SDOM"): PropTypeInt, // SDOM - Security domain
-	fourCCtoInt("augs"): PropTypeInt, // augs - Augmented security
-	fourCCtoInt("clas"): PropTypeInt, // clas - Device class
-	fourCCtoInt("fchp"): PropTypeInt, // fchp - Firmware chip
-	fourCCtoInt("styp"): PropTypeInt, // styp - Security type
-	fourCCtoInt("type"): PropTypeInt, // type - Type
-	fourCCtoInt("impl"): PropTypeInt, // impl - Implementation
-	fourCCtoInt("arms"): PropTypeInt, // arms - ARM security
-	fourCCtoInt("ar1s"): PropTypeInt, // ar1s - ARM1 security
-	fourCCtoInt("cons"): PropTypeInt, // cons - Console
-	fourCCtoInt("drmc"): PropTypeInt, // drmc - DRMC
-	fourCCtoInt("tz0s"): PropTypeInt, // tz0s - TrustZone 0 security
-	fourCCtoInt("tz1s"): PropTypeInt, // tz1s - TrustZone 1 security
-}
-
-// fourCCtoInt converts a 4-character string (FourCC) to an integer.
-// This is used for ASN.1 private tags which are often represented as FourCC codes.
-func fourCCtoInt(fourCC string) int {
-	if len(fourCC) != 4 {
-		return 0 // Or handle error as appropriate
-	}
-	return int(fourCC[0])<<24 | int(fourCC[1])<<16 | int(fourCC[2])<<8 | int(fourCC[3])
-}
-
-// getPropertyType returns the expected type for a given property tag
-func getPropertyType(tag int) PropType {
-	if propType, exists := propertyTypeMap[tag]; exists {
-		return propType
-	}
-	return PropTypeAuto // Auto-detect for unknown properties
-}
 
 // Manifest represents a unified IM4M manifest structure
 type IM4M struct {
@@ -499,7 +432,7 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 		"version": m.Version,
 	}
 	if len(m.Properties) > 0 {
-		data["properties"] = ConvertPropertySliceToMap(m.Properties)
+		data["properties"] = PropertiesSliceToMap(m.Properties)
 	}
 	if len(m.Images) > 0 {
 		images := make(map[string]any)
@@ -524,55 +457,12 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 // Marshal generates ASN.1 bytes for the manifest
 func (m *Manifest) Marshal() ([]byte, error) {
 	var manpSetEntries []asn1.RawValue
-	for _, p := range m.Properties {
-		var valueBytes []byte
+	if len(m.Properties) > 0 {
 		var err error
-
-		switch v := p.Value.(type) {
-		case int:
-			valueBytes, err = asn1.Marshal(v)
-		case int64:
-			valueBytes, err = asn1.Marshal(v)
-		case uint64:
-			valueBytes, err = asn1.Marshal(int64(v))
-		case bool:
-			valueBytes, err = asn1.Marshal(v)
-		case []byte:
-			valueBytes, err = asn1.Marshal(v)
-		case string:
-			valueBytes, err = asn1.Marshal(v)
-		case time.Time:
-			valueBytes, err = asn1.Marshal(v.Unix())
-		default:
-			return nil, fmt.Errorf("unsupported property value type for marshaling: %T", p.Value)
-		}
+		manpSetEntries, err = marshalPropertiesToSet(m.Properties)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal property value %s: %v", p.Name, err)
+			return nil, fmt.Errorf("failed to marshal manifest properties: %v", err)
 		}
-
-		propSeq := struct {
-			Name  string
-			Value asn1.RawValue `asn1:"set"`
-		}{
-			Name: p.Name,
-			Value: asn1.RawValue{
-				Tag:        asn1.TagSet,
-				IsCompound: true,
-				Bytes:      valueBytes,
-			},
-		}
-
-		propSeqBytes, err := asn1.Marshal(propSeq)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal property sequence %s: %v", p.Name, err)
-		}
-
-		manpSetEntries = append(manpSetEntries, asn1.RawValue{
-			Class:      asn1.ClassPrivate,
-			Tag:        fourCCtoInt(p.Name),
-			IsCompound: true,
-			Bytes:      propSeqBytes,
-		})
 	}
 
 	manpSetBytes, err := asn1.Marshal(manpSetEntries)
@@ -606,7 +496,43 @@ func (m *Manifest) Marshal() ([]byte, error) {
 			Bytes:      manpBytes,
 		})
 	}
-	// Add images here if implemented
+
+	// Add images
+	for _, img := range m.Images {
+		imagePropSetEntries, err := marshalPropertiesToSet(img.Properties)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal image properties for %s: %v", img.Name, err)
+		}
+
+		imagePropSetBytes, err := asn1.Marshal(imagePropSetEntries)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal image property set for %s: %v", img.Name, err)
+		}
+
+		imageDescStruct := struct {
+			Name string
+			Set  asn1.RawValue `asn1:"set"`
+		}{
+			Name: img.Name,
+			Set: asn1.RawValue{
+				Tag:        asn1.TagSet,
+				IsCompound: true,
+				Bytes:      imagePropSetBytes,
+			},
+		}
+
+		imageDescBytes, err := asn1.Marshal(imageDescStruct)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal image descriptor for %s: %v", img.Name, err)
+		}
+
+		manbSetEntries = append(manbSetEntries, asn1.RawValue{
+			Class:      asn1.ClassPrivate,
+			Tag:        fourCCtoInt(img.Name), // The tag for the image entry is its FourCC name
+			IsCompound: true,
+			Bytes:      imageDescBytes,
+		})
+	}
 
 	manbSetBytes, err := asn1.Marshal(manbSetEntries)
 	if err != nil {
@@ -637,6 +563,12 @@ func (m *Manifest) Marshal() ([]byte, error) {
 
 	return asn1.Marshal(m.IM4M)
 }
+
+// marshalPropertiesToSet marshals a slice of Properties into ASN.1 RawValues
+func marshalPropertiesToSet(props []Property) ([]asn1.RawValue, error) {
+	return MarshalPropertiesSlice(props, ManifestFormat)
+}
+
 
 // analyzeSignature determines the signature algorithm based on signature size
 func analyzeSignature(signature []byte) string {
@@ -824,7 +756,7 @@ func VerifyManifestProperties(im4m *Manifest, bm *bm.BuildManifest, verbose, all
 		Mismatches: []PropertyMismatch{},
 	}
 
-	im4mProps := ConvertPropertySliceToMap(im4m.Properties)
+	im4mProps := PropertiesSliceToMap(im4m.Properties)
 
 	if len(bm.BuildIdentities) == 0 {
 		return nil, fmt.Errorf("no build identities found in build manifest")

@@ -341,7 +341,7 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 
 	if img.Manifest.Properties != nil {
 		// Copy existing properties
-		existingProps := img4.ConvertPropertySliceToMap(img.Manifest.Properties)
+		existingProps := img4.PropertiesSliceToMap(img.Manifest.Properties)
 		maps.Copy(personalizedProperties, existingProps)
 	}
 
