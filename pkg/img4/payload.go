@@ -20,7 +20,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/lzfse-cgo"
+	"github.com/blacktop/ipsw/pkg/comp"
 	"github.com/blacktop/lzss"
 	"github.com/dustin/go-humanize"
 )
@@ -147,7 +147,7 @@ const (
 var ErrNotCompressed = fmt.Errorf("payload is not compressed")
 
 // CompressionTypes is a list of supported compression algorithms
-var CompressionTypes = []string{"lzfse", "lzss", "none"}
+var CompressionTypes = []string{"none", "lzss", "lzfse", "lzfse_iboot"}
 
 type CompressionAlgorithm int
 
@@ -401,9 +401,25 @@ func (p *Payload) Decompress() ([]byte, error) {
 		} else if !isLzfse {
 			return nil, fmt.Errorf("data is not LZFSE compressed")
 		}
-		decompressed := lzfse.DecodeBuffer(p.Data)
+		// Use the comp package for decompression
+		var algo comp.Algorithm
+		if p.Type == IM4P_IBOOT ||
+			p.Type == IM4P_IBOOT_DATA ||
+			p.Type == IM4P_IBOOT_TEST ||
+			p.Type == IM4P_IBEC ||
+			p.Type == IM4P_IBSS ||
+			p.Type == IM4P_LLB ||
+			p.Type == IM4P_CFE_LOADER {
+			algo = comp.LZFSE_IBOOT
+		} else {
+			algo = comp.LZFSE
+		}
+		decompressed, err := comp.Decompress(p.Data, algo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompress %s payload: %v", detectedAlgorithm.String(), err)
+		}
 		if len(decompressed) == 0 {
-			return nil, fmt.Errorf("failed to decompress LZFSE payload")
+			return nil, fmt.Errorf("failed to decompress %s payload", detectedAlgorithm.String())
 		}
 		p.decompressedData = decompressed
 		// Extract any extra data after the LZFSE payload
@@ -632,7 +648,7 @@ type CreatePayloadConfig struct {
 	Version     string
 	Data        []byte
 	ExtraData   []byte // Optional extra data to append after the main data
-	Compression CompressionAlgorithm
+	Compression string
 	Keybags     []Keybag
 }
 
@@ -640,7 +656,17 @@ type CreatePayloadConfig struct {
 func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 	var pdata []byte
 
-	switch conf.Compression {
+	var compAlgo CompressionAlgorithm
+	switch strings.ToLower(conf.Compression) {
+	case "lzss":
+		compAlgo = CompressionAlgorithmLZSS
+	case "lzfse", "lzfse_iboot":
+		compAlgo = CompressionAlgorithmLZFSE
+	case "none", "":
+		compAlgo = CompressionAlgorithmMAX // No compression
+	}
+
+	switch compAlgo {
 	case CompressionAlgorithmLZSS:
 		compressedData := lzss.Compress(conf.Data)
 		if len(compressedData) == 0 {
@@ -668,12 +694,22 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		}
 		pdata = append(buf.Bytes(), conf.ExtraData...) // Append any extra data after the compressed payload
 	case CompressionAlgorithmLZFSE:
-		compressedData := lzfse.EncodeBuffer(conf.Data)
+		var algo comp.Algorithm
+		if strings.ToLower(conf.Compression) == "lzfse_iboot" {
+			algo = comp.LZFSE_IBOOT
+		} else {
+			algo = comp.LZFSE
+		}
+		compressedData, err := comp.Compress(conf.Data, algo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to %s compress data: %v", conf.Compression, err)
+		}
 		if len(compressedData) == 0 {
-			return nil, fmt.Errorf("failed to LZFSE compress data")
+			return nil, fmt.Errorf("failed to %s compress data", conf.Compression)
 		}
 		utils.Indent(log.Debug, 2)(
-			fmt.Sprintf("LZFSE compression: %d → %d bytes (%.1f%% reduction)",
+			fmt.Sprintf("%s compression: %d → %d bytes (%.1f%% reduction)",
+				conf.Compression,
 				len(conf.Data), len(compressedData),
 				float64(len(conf.Data)-len(compressedData))/float64(len(conf.Data))*100),
 		)
@@ -693,10 +729,10 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 
 	// Add the compression block if a compression algorithm was used and there's no extra data.
 	if len(conf.ExtraData) == 0 {
-		switch conf.Compression {
+		switch compAlgo {
 		case CompressionAlgorithmLZSS, CompressionAlgorithmLZFSE:
 			im4p.Compression = Compression{
-				Algorithm:        conf.Compression,
+				Algorithm:        compAlgo,
 				UncompressedSize: len(conf.Data),
 			}
 		}
@@ -768,7 +804,18 @@ func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
 		return fmt.Errorf("failed to check if data is LZFSE: %v", err)
 	} else if isLzfse {
 		log.Debug("Detected LZFSE compression")
-		decompressed := lzfse.DecodeBuffer(data)
+		// Determine if it's LZFSE_IBOOT based on the payload type
+		// TODO: this is an assumption that Apple uses LZFSE_IBOOT for iBoot-related payloads (might be dumb)
+		var algo comp.Algorithm
+		if i.Type == IM4P_IBOOT || i.Type == IM4P_IBEC || i.Type == IM4P_IBSS || i.Type == IM4P_LLB {
+			algo = comp.LZFSE_IBOOT
+		} else {
+			algo = comp.LZFSE
+		}
+		decompressed, err := comp.Decompress(data, algo)
+		if err != nil {
+			return fmt.Errorf("failed to decompress %s: %v", inputPath, err)
+		}
 		if len(decompressed) == 0 {
 			return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
 		}

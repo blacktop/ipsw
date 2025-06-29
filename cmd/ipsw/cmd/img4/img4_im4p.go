@@ -493,16 +493,6 @@ var img4Im4pCreateCmd = &cobra.Command{
 			return fmt.Errorf("unsupported compression type: %s (supported: %s)", compressionType, strings.Join(img4.CompressionTypes, ", "))
 		}
 
-		var comp img4.CompressionAlgorithm
-		switch strings.ToLower(compressionType) {
-		case "lzss":
-			comp = img4.CompressionAlgorithmLZSS
-		case "lzfse":
-			comp = img4.CompressionAlgorithmLZFSE
-		case "none", "":
-			comp = img4.CompressionAlgorithmMAX // No compression
-		}
-
 		data, err := os.ReadFile(inputPath)
 		if err != nil {
 			return fmt.Errorf("failed to read input file: %v", err)
@@ -511,10 +501,11 @@ var img4Im4pCreateCmd = &cobra.Command{
 		var extraData []byte
 		if len(extraPath) > 0 {
 			if strings.ToLower(compressionType) == "lzfse" {
-				log.Warn("'lzfse' compressed --extra data does NOT seem to be bootable by iBoot ('lzss' compression is recommended for bootable images)")
+				log.Warn("'lzfse' compressed --extra data does NOT seem to be bootable by iBoot ('lzfse_iboot' compression is recommended for bootable images)")
+				utils.Indent(log.Warn, 2)("NOTE: 'lzfse_iboot' currently only available on macOS")
 			}
 			if strings.ToLower(compressionType) == "none" || compressionType == "" {
-				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse') to detect --extra data boundaries during extraction")
+				return fmt.Errorf("--extra requires compression (--compress 'lzss', 'lzfse', or 'lzfse_iboot') to detect --extra data boundaries during extraction")
 			}
 			extraData, err = os.ReadFile(extraPath)
 			if err != nil {
@@ -527,7 +518,7 @@ var img4Im4pCreateCmd = &cobra.Command{
 			Version:     version,
 			Data:        data,
 			ExtraData:   extraData,
-			Compression: comp,
+			Compression: compressionType,
 			// TODO: add keybags support for IM4P creation
 			Keybags: nil,
 		})

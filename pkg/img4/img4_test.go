@@ -304,7 +304,7 @@ func createTestPayloadData(t testing.TB) []byte {
 		Type:        "test",
 		Version:     "Test Payload",
 		Data:        []byte("test payload data"),
-		Compression: CompressionAlgorithmLZSS,
+		Compression: "lzss",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test payload: %v", err)
@@ -349,7 +349,7 @@ func TestLZFSECompressionWithExtraData(t *testing.T) {
 		Version:     "LZFSE Test Kernel",
 		Data:        originalPayloadData,
 		ExtraData:   originalExtraData,
-		Compression: CompressionAlgorithmLZFSE,
+		Compression: "lzfse",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create LZFSE IM4P: %v", err)
@@ -408,6 +408,57 @@ func TestLZFSECompressionWithExtraData(t *testing.T) {
 		len(originalPayloadData), len(originalExtraData), len(im4pBytes))
 }
 
+// TestLZFSE_IBOOT_Compression tests LZFSE_IBOOT compression specifically
+func TestLZFSE_IBOOT_Compression(t *testing.T) {
+	// Test data for iBoot
+	originalPayloadData := generateRandomData(4096)
+	originalExtraData := generateRandomData(512)
+
+	// Create IM4P with LZFSE_IBOOT compression for iBoot
+	im4p, err := CreatePayload(&CreatePayloadConfig{
+		Type:        IM4P_IBOOT, // Use iBoot type to trigger LZFSE_IBOOT
+		Version:     "LZFSE_IBOOT Test",
+		Data:        originalPayloadData,
+		ExtraData:   originalExtraData,
+		Compression: "lzfse_iboot", // Use LZFSE_IBOOT compression
+	})
+	if err != nil {
+		t.Fatalf("Failed to create LZFSE_IBOOT IM4P: %v", err)
+	}
+
+	// Marshal the IM4P
+	im4pBytes, err := im4p.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal LZFSE_IBOOT IM4P: %v", err)
+	}
+
+	// Parse the marshaled IM4P back
+	parsedPayload, err := ParsePayload(im4pBytes)
+	if err != nil {
+		t.Fatalf("Failed to parse LZFSE_IBOOT IM4P: %v", err)
+	}
+
+	// Decompress to verify it works
+	decompressedData, err := parsedPayload.Decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress LZFSE_IBOOT payload: %v", err)
+	}
+
+	// Verify the decompressed data matches the original
+	if !bytes.Equal(decompressedData, originalPayloadData) {
+		t.Errorf("Decompressed data mismatch after LZFSE_IBOOT roundtrip")
+	}
+
+	// Verify extra data
+	extractedExtraData := parsedPayload.GetExtraData()
+	if !bytes.Equal(extractedExtraData, originalExtraData) {
+		t.Errorf("Extra data mismatch after LZFSE_IBOOT roundtrip")
+	}
+
+	t.Logf("✅ LZFSE_IBOOT test passed: payload=%d bytes, extra=%d bytes, compressed=%d bytes",
+		len(originalPayloadData), len(originalExtraData), len(im4pBytes))
+}
+
 // TestLZFSEVsLZSSComparison compares LZFSE and LZSS compression with same data
 func TestLZFSEVsLZSSComparison(t *testing.T) {
 	// Use real test data if available
@@ -434,7 +485,7 @@ func TestLZFSEVsLZSSComparison(t *testing.T) {
 		Version:     "LZSS Test",
 		Data:        kernelData,
 		ExtraData:   extraData,
-		Compression: CompressionAlgorithmLZSS,
+		Compression: "lzss",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create LZSS payload: %v", err)
@@ -451,7 +502,7 @@ func TestLZFSEVsLZSSComparison(t *testing.T) {
 		Version:     "LZFSE Test",
 		Data:        kernelData,
 		ExtraData:   extraData,
-		Compression: CompressionAlgorithmLZFSE,
+		Compression: "lzfse",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create LZFSE payload: %v", err)
@@ -534,7 +585,7 @@ func TestFullRoundtrip(t *testing.T) {
 		Version:     "Test Payload",
 		Data:        originalPayloadData,
 		ExtraData:   originalExtraData,
-		Compression: CompressionAlgorithmLZSS,
+		Compression: "lzss",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create original IM4P: %v", err)
@@ -887,7 +938,6 @@ func TestIntegrationComponentExtraction(t *testing.T) {
 
 	t.Log("✅ Component extraction test passed")
 }
-
 
 // Helper function to generate random data for testing
 func generateRandomData(size int) []byte {

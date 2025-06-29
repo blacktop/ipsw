@@ -435,6 +435,24 @@ func (m *Manifest) parseImageDescriptor(data []byte) (*ManifestImage, error) {
 	}, nil
 }
 
+func (m *Manifest) GetTicket(name string) (*ManifestImage, error) {
+	for _, image := range m.Images {
+		if image.Name == name {
+			return &image, nil
+		}
+	}
+	return nil, fmt.Errorf("ticket %s not found in manifest", name)
+}
+
+func (m *Manifest) HasTicket(name string) bool {
+	for _, image := range m.Images {
+		if image.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // String returns a formatted string representation of the manifest
 func (m *Manifest) String() string {
 	var sb strings.Builder

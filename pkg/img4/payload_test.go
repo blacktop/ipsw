@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ func TestPayloadCreation(t *testing.T) {
 				Type:        "krnl",
 				Version:     "Compressed Test",
 				Data:        bytes.Repeat([]byte("test data "), 100),
-				Compression: CompressionAlgorithmLZSS,
+				Compression: "lzss",
 			},
 			expectError: false,
 		},
@@ -38,7 +39,7 @@ func TestPayloadCreation(t *testing.T) {
 				Type:        "logo",
 				Version:     "LZFSE Test",
 				Data:        bytes.Repeat([]byte("image data "), 100),
-				Compression: CompressionAlgorithmLZFSE,
+				Compression: "lzfse",
 			},
 			expectError: false,
 		},
@@ -49,7 +50,7 @@ func TestPayloadCreation(t *testing.T) {
 				Version:     "Kernel with Extra",
 				Data:        bytes.Repeat([]byte("kernel "), 200),
 				ExtraData:   []byte("extra kernel metadata"),
-				Compression: CompressionAlgorithmLZSS,
+				Compression: "lzss",
 			},
 			expectError: false,
 		},
@@ -94,9 +95,17 @@ func TestPayloadCreation(t *testing.T) {
 				if payload.Compression.Algorithm != 0 || payload.Compression.UncompressedSize != 0 {
 					t.Errorf("Compression block should not be present when ExtraData is used")
 				}
-			} else if tt.config.Compression != 0 {
-				if payload.Compression.Algorithm != tt.config.Compression {
-					t.Errorf("Compression.Algorithm = %v, want %v", payload.Compression.Algorithm, tt.config.Compression)
+			} else if tt.config.Compression != "none" && tt.config.Compression != "" {
+				// Map string compression to enum for comparison
+				var expectedAlgo CompressionAlgorithm
+				switch strings.ToLower(tt.config.Compression) {
+				case "lzss":
+					expectedAlgo = CompressionAlgorithmLZSS
+				case "lzfse", "lzfse_iboot":
+					expectedAlgo = CompressionAlgorithmLZFSE
+				}
+				if payload.Compression.Algorithm != expectedAlgo {
+					t.Errorf("Compression.Algorithm = %v, want %v", payload.Compression.Algorithm, expectedAlgo)
 				}
 				if payload.Compression.UncompressedSize != len(tt.config.Data) {
 					t.Errorf("Compression.UncompressedSize = %v, want %v", payload.Compression.UncompressedSize, len(tt.config.Data))
@@ -133,7 +142,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 				Type:        "krnl",
 				Version:     "LZSS Kernel",
 				Data:        bytes.Repeat([]byte("kernel data "), 50),
-				Compression: CompressionAlgorithmLZSS,
+				Compression: "lzss",
 			},
 		},
 		{
@@ -142,7 +151,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 				Type:        "logo",
 				Version:     "LZFSE Logo",
 				Data:        bytes.Repeat([]byte("image data "), 50),
-				Compression: CompressionAlgorithmLZFSE,
+				Compression: "lzfse",
 			},
 		},
 		{
@@ -152,7 +161,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 				Version:     "Kernel+Extra",
 				Data:        bytes.Repeat([]byte("kernel "), 100),
 				ExtraData:   []byte("kernel extra data"),
-				Compression: CompressionAlgorithmLZSS,
+				Compression: "lzss",
 			},
 		},
 	}
@@ -186,7 +195,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 			}
 
 			// Step 5: Test decompression and data integrity
-			if tt.config.Compression != 0 {
+			if tt.config.Compression != "none" && tt.config.Compression != "" {
 				// For compressed data, test decompression
 				decompressed, err := parsed.Decompress()
 				if err != nil {
@@ -267,7 +276,7 @@ func TestPayloadWithRealData(t *testing.T) {
 		Version:     "Real Kernel Test",
 		Data:        kernelData,
 		ExtraData:   extraData,
-		Compression: CompressionAlgorithmLZSS,
+		Compression: "lzss",
 	})
 	if err != nil {
 		t.Fatalf("CreatePayload() with real data error = %v", err)
@@ -344,7 +353,7 @@ func BenchmarkPayloadCreation(b *testing.B) {
 				Type:        "test",
 				Version:     "Benchmark",
 				Data:        data,
-				Compression: CompressionAlgorithmLZSS,
+				Compression: "lzss",
 			})
 		}
 	})
@@ -355,7 +364,7 @@ func BenchmarkPayloadCreation(b *testing.B) {
 				Type:        "test",
 				Version:     "Benchmark",
 				Data:        data,
-				Compression: CompressionAlgorithmLZFSE,
+				Compression: "lzfse",
 			})
 		}
 	})

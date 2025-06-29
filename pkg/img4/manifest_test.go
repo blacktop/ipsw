@@ -252,7 +252,7 @@ func TestAppleManifestInIMG4(t *testing.T) {
 		Type:        "krnl",
 		Version:     "1.0.0",
 		Data:        testPayload,
-		Compression: CompressionAlgorithmLZSS,
+		Compression: "lzss",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test payload: %v", err)
