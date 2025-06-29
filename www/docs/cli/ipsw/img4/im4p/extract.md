@@ -33,6 +33,12 @@ ipsw img4 im4p extract <IM4P> [flags]
 # Decrypt and extract payload
 ❯ ipsw img4 im4p extract --iv 1234... --key 5678... encrypted.im4p
 
+# Auto-lookup key and decrypt
+❯ ipsw img4 im4p extract --lookup --lookup-device iPhone14,2 --lookup-build 20H71 RestoreRamDisk.im4p
+
+# Auto-detect device/build from folder structure (e.g., 22F76__iPhone11,8/...)
+❯ ipsw img4 im4p extract --lookup /path/to/22F76__iPhone11,8/sep-firmware.n841.RELEASE.im4p
+
 # Extract to specific output file
 ❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p
 ```
@@ -40,13 +46,16 @@ ipsw img4 im4p extract <IM4P> [flags]
 ### Options
 
 ```
-  -e, --extra           Extract extra data
-  -h, --help            help for extract
-  -i, --iv string       AES iv for decryption
-      --iv-key string   AES iv+key for decryption
-  -b, --kbag            Extract keybags as JSON
-  -k, --key string      AES key for decryption
-  -o, --output string   Output file path
+  -e, --extra                  Extract extra data
+  -h, --help                   help for extract
+  -i, --iv string              AES iv for decryption
+      --iv-key string          AES iv+key for decryption
+  -b, --kbag                   Extract keybags as JSON
+  -k, --key string             AES key for decryption
+      --lookup                 Auto-lookup IV/key on theapplewiki.com
+      --lookup-build string    Build number for key lookup (e.g., 20H71)
+      --lookup-device string   Device identifier for key lookup (e.g., iPhone14,2)
+  -o, --output string          Output file path
 ```
 
 ### Options inherited from parent commands
