@@ -22,6 +22,7 @@ import (
 	"github.com/blacktop/lzfse-cgo"
 	"github.com/blacktop/lzss"
 	"github.com/dustin/go-humanize"
+	"hash/adler32"
 )
 
 // IM4P Types - these are the four-character codes used to identify different payload types in IMG4 containers
@@ -646,6 +647,7 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		hdr := lzss.Header{
 			Signature:        lzss.Signature,
 			CompressionType:  lzss.CompressionType,
+			CheckSum:         adler32.Checksum(conf.Data), // Calculate Adler32 of uncompressed data
 			UncompressedSize: uint32(len(conf.Data)),
 			CompressedSize:   uint32(len(compressedData)),
 		}
