@@ -56,6 +56,7 @@ ipsw img4 im4p extract <IM4P> [flags]
       --lookup-build string    Build number for key lookup (e.g., 20H71)
       --lookup-device string   Device identifier for key lookup (e.g., iPhone14,2)
   -o, --output string          Output file path
+  -r, --raw                    Extract raw data (compressed/encrypted)
 ```
 
 ### Options inherited from parent commands

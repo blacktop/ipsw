@@ -20,6 +20,122 @@ var (
 	colorSubField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
 )
 
+// ComponentFourCCs is a map of component names to their four-character codes.
+var ComponentFourCCs = map[string]string{
+	"ACIBT":                             "acib",
+	"ACIBTLPEM":                         "lpbt",
+	"ACIWIFI":                           "aciw",
+	"ANE":                               "anef",
+	"ANS":                               "ansf",
+	"AOP":                               "aopf",
+	"AVE":                               "avef",
+	"Alamo":                             "almo",
+	"Ap,ANE1":                           "ane1",
+	"Ap,ANE2":                           "ane2",
+	"Ap,ANE3":                           "ane3",
+	"Ap,AudioAccessibilityBootChime":    "auac",
+	"Ap,AudioBootChime":                 "aubt",
+	"Ap,AudioPowerAttachChime":          "aupr",
+	"Ap,BootabilityBrainTrustCache":     "trbb",
+	"Ap,CIO":                            "ciof",
+	"Ap,HapticAssets":                   "hpas",
+	"Ap,LocalBoot":                      "lobo",
+	"Ap,LocalPolicy":                    "lpol",
+	"Ap,NextStageIM4MHash":              "nsih",
+	"Ap,RecoveryOSPolicyNonceHash":      "ronh",
+	"Ap,RestoreANE1":                    "ran1",
+	"Ap,RestoreANE2":                    "ran2",
+	"Ap,RestoreANE3":                    "ran3",
+	"Ap,RestoreCIO":                     "rcio",
+	"Ap,RestoreTMU":                     "rtmu",
+	"Ap,Scorpius":                       "scpf",
+	"Ap,SystemVolumeCanonicalMetadata":  "msys",
+	"Ap,TMU":                            "tmuf",
+	"Ap,VolumeUUID":                     "vuid",
+	"Ap,rOSLogo1":                       "rlg1",
+	"Ap,rOSLogo2":                       "rlg2",
+	"AppleLogo":                         "logo",
+	"AudioCodecFirmware":                "acfw",
+	"BatteryCharging":                   "glyC",
+	"BatteryCharging0":                  "chg0",
+	"BatteryCharging1":                  "chg1",
+	"BatteryFull":                       "batF",
+	"BatteryLow0":                       "bat0",
+	"BatteryLow1":                       "bat1",
+	"BatteryPlugin":                     "glyP",
+	"CFELoader":                         "cfel",
+	"CrownFirmware":                     "crwn",
+	"DCP":                               "dcpf",
+	"Dali":                              "dali",
+	"DeviceTree":                        "dtre",
+	"Diags":                             "diag",
+	"EngineeringTrustCache":             "dtrs",
+	"ExtDCP":                            "edcp",
+	"GFX":                               "gfxf",
+	"Hamm":                              "hamf",
+	"Homer":                             "homr",
+	"ISP":                               "ispf",
+	"InputDevice":                       "ipdf",
+	"KernelCache":                       "krnl",
+	"LLB":                               "illb",
+	"LeapHaptics":                       "lphp",
+	"Liquid":                            "liqd",
+	"LoadableTrustCache":                "ltrs",
+	"LowPowerWallet0":                   "lpw0",
+	"LowPowerWallet1":                   "lpw1",
+	"LowPowerWallet2":                   "lpw2",
+	"MacEFI":                            "mefi",
+	"MtpFirmware":                       "mtpf",
+	"Multitouch":                        "mtfw",
+	"NeedService":                       "nsrv",
+	"OS":                                "OS\x00\x00",
+	"OSRamdisk":                         "osrd",
+	"PEHammer":                          "hmmr",
+	"PERTOS":                            "pert",
+	"PHLEET":                            "phlt",
+	"PMP":                               "pmpf",
+	"PersonalizedDMG":                   "pdmg",
+	"RBM":                               "rmbt",
+	"RTP":                               "rtpf",
+	"Rap,SoftwareBinaryDsp1":            "sbd1",
+	"Rap,RTKitOS":                       "rkos",
+	"Rap,RestoreRTKitOS":                "rrko",
+	"RecoveryMode":                      "recm",
+	"RestoreANS":                        "rans",
+	"RestoreDCP":                        "rdcp",
+	"RestoreDeviceTree":                 "rdtr",
+	"RestoreExtDCP":                     "recp",
+	"RestoreKernelCache":                "rkrn",
+	"RestoreLogo":                       "rlgo",
+	"RestoreRTP":                        "rrtp",
+	"RestoreRamDisk":                    "rdsk",
+	"RestoreSEP":                        "rsep",
+	"RestoreTrustCache":                 "rtsc",
+	"SCE":                               "scef",
+	"SCE1Firmware":                      "sc1f",
+	"SEP":                               "sepi",
+	"SIO":                               "siof",
+	"StaticTrustCache":                  "trst",
+	"SystemLocker":                      "lckr",
+	"SystemVolume":                      "isys",
+	"WCHFirmwareUpdater":                "wchf",
+	"ftap":                              "ftap",
+	"ftsp":                              "ftsp",
+	"iBEC":                              "ibec",
+	"iBSS":                              "ibss",
+	"iBoot":                             "ibot",
+	"iBootData":                         "ibdt",
+	"iBootDataStage1":                   "ibd1",
+	"iBootTest":                         "itst",
+	"rfta":                              "rfta",
+	"rfts":                              "rfts",
+	"Ap,DCP2":                           "dcp2",
+	"Ap,RestoreSecureM3Firmware":        "rsm3",
+	"Ap,RestoreSecurePageTableMonitor":  "rspt",
+	"Ap,RestoreTrustedExecutionMonitor": "rtrx",
+	"Ap,RestorecL4":                     "rxcl",
+}
+
 type IMG4 struct {
 	Raw         asn1.RawContent
 	Tag         string        `asn1:"ia5"` // IMG4
@@ -169,21 +285,12 @@ func Create(conf *CreateConfig) (*Image, error) {
 	}
 
 	if len(conf.InputData) > 0 {
-		var comp CompressionAlgorithm
-		switch strings.ToLower(conf.PayloadCompression) {
-		case "lzss":
-			comp = CompressionAlgorithmLZSS
-		case "lzfse":
-			comp = CompressionAlgorithmLZFSE
-		case "none", "":
-			comp = CompressionAlgorithmMAX // No compression
-		}
 		img.Payload, err = CreatePayload(&CreatePayloadConfig{
 			Type:        conf.PayloadType,
 			Version:     conf.PayloadVersion,
 			Data:        conf.InputData,
 			ExtraData:   conf.PayloadExtraData,
-			Compression: comp,
+			Compression: conf.PayloadCompression,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create IM4P payload from input data: %v", err)
@@ -340,4 +447,123 @@ type ValidationResult struct {
 	Components []string
 	Errors     []string
 	Warnings   []string
+}
+
+/* PERSONALIZATION FUNCTIONS */
+
+type PersonalizeConfig struct {
+	PayloadData   []byte
+	ManifestData  []byte
+	Component     string
+	APParameters  map[string]any // AP parameters for nonce slot handling
+	BuildIdentity map[string]any // Build identity information for nonce requirements
+}
+
+// Personalize creates a personalized IMG4 file from component files
+func Personalize(conf *PersonalizeConfig) (*Image, error) {
+	var err error
+
+	if conf.PayloadData == nil {
+		return nil, fmt.Errorf("config must contain PayloadData")
+	}
+	if conf.ManifestData == nil {
+		return nil, fmt.Errorf("config must contain ManifestData")
+	}
+
+	img := Image{
+		IMG4: IMG4{
+			Tag: "IMG4",
+		},
+	}
+
+	img.Payload, err = ParsePayload(conf.PayloadData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P payload data: %v", err)
+	}
+
+	if conf.Component != "" {
+		if fourcc, ok := ComponentFourCCs[conf.Component]; ok {
+			img.Payload.Type = fourcc
+		} else {
+			log.Warnf("unknown component: %s", conf.Component)
+		}
+	}
+
+	img.Manifest, err = ParseManifest(conf.ManifestData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4M manifest data: %v", err)
+	}
+
+	// Create IM4R from component-specific ticket in manifest
+	if ticketName := conf.Component + "-TBM"; img.Manifest.HasTicket(ticketName) {
+		ticket, err := img.Manifest.GetTicket(ticketName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ticket %s from manifest: %v", ticketName, err)
+		}
+		props := make(map[string]any)
+
+		// Add all ticket properties
+		for _, p := range ticket.Properties {
+			props[p.Name] = p.Value
+		}
+
+		// Handle nonce slot requirements based on component and build identity
+		if conf.BuildIdentity != nil {
+			if info, ok := conf.BuildIdentity["Info"]; ok {
+				if infoMap, ok := info.(map[string]any); ok {
+					requiresNonceSlot, _ := infoMap["RequiresNonceSlot"].(bool)
+
+					if requiresNonceSlot && (conf.Component == "SEP" || conf.Component == "SepStage1" || conf.Component == "LLB") {
+						log.Debugf("%s: RequiresNonceSlot for %s", conf.Component, conf.Component)
+
+						switch conf.Component {
+						case "SEP", "SepStage1":
+							// Handle SEP nonce slot ID
+							var snid = 2 // default value
+							if conf.APParameters != nil {
+								if val, ok := conf.APParameters["SepNonceSlotID"]; ok {
+									if intVal, ok := val.(int); ok {
+										snid = intVal
+									}
+								}
+							}
+							if val, ok := infoMap["SepNonceSlotID"]; ok {
+								if intVal, ok := val.(int); ok {
+									snid = intVal
+								}
+							}
+							log.Debugf("snid: %d", snid)
+							props["snid"] = snid
+						case "LLB":
+							// Handle AP nonce slot ID
+							var anid = 0 // default value
+							if conf.APParameters != nil {
+								if val, ok := conf.APParameters["ApNonceSlotID"]; ok {
+									if intVal, ok := val.(int); ok {
+										anid = intVal
+									}
+								}
+							}
+							if val, ok := infoMap["ApNonceSlotID"]; ok {
+								if intVal, ok := val.(int); ok {
+									anid = intVal
+								}
+							}
+							log.Debugf("anid: %d", anid)
+							props["anid"] = anid
+						}
+					}
+				}
+			}
+		}
+
+		img.RestoreInfo = &RestoreInfo{
+			IM4R: IM4R{
+				Tag: "IM4R",
+			},
+			Properties: props,
+		}
+	}
+
+	return &img, nil
 }
