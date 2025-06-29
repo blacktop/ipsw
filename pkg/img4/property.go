@@ -47,7 +47,7 @@ func ParsePropertyValueWithTag(rawValue asn1.RawValue, tag int) any {
 			}
 
 			// Check if it fits in int
-			if intVal >= int64(^uint(0)>>1) || intVal <= -int64(^uint(0)>>1)-1 {
+			if intVal > int64(^uint(0)>>1) || intVal < -int64(^uint(0)>>1)-1 {
 				return intVal
 			}
 			return int(intVal)
@@ -342,7 +342,8 @@ func ParsePropertiesAs[T []Property | map[string]any](data []byte) (T, error) {
 // fourCCtoInt converts a 4-character string to an integer
 func fourCCtoInt(fourCC string) int {
 	if len(fourCC) != 4 {
-		return 0
+		// Return an error value that can be detected rather than masking errors with zero
+		return -1
 	}
 	return int(fourCC[0])<<24 | int(fourCC[1])<<16 | int(fourCC[2])<<8 | int(fourCC[3])
 }

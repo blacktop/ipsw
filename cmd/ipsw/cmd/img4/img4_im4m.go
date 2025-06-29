@@ -382,12 +382,13 @@ func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*Person
 
 	// Update with device-specific values
 	personalizedProperties["ECID"] = ecidValue
-	personalizedProperties["ApNonce"] = nonceBytes
+	// Use the correct property name for nonce (snon = security nonce)
+	personalizedProperties["snon"] = nonceBytes
 
 	if verbose {
 		log.Debug("Updating manifest with personalization values:")
 		log.Debugf("  ECID: 0x%x", ecidValue)
-		log.Debugf("  ApNonce: %x", nonceBytes)
+		log.Debugf("  snon (security nonce): %x", nonceBytes)
 	}
 
 	// Create a new manifest with personalized properties
