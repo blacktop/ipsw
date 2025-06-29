@@ -28,9 +28,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -166,6 +169,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 		# Auto-lookup key and decrypt
 		❯ ipsw img4 im4p extract --lookup --lookup-device iPhone14,2 --lookup-build 20H71 RestoreRamDisk.im4p
 
+		# Auto-detect device/build from folder structure (e.g., 22F76__iPhone11,8/...)
+		❯ ipsw img4 im4p extract --lookup /path/to/22F76__iPhone11,8/sep-firmware.n841.RELEASE.im4p
+
 		# Extract to specific output file
 		❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p`),
 	Args:          cobra.ExactArgs(1),
@@ -194,6 +200,52 @@ var img4Im4pExtractCmd = &cobra.Command{
 		if lookupKeys {
 			if len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 {
 				return fmt.Errorf("cannot use --lookup with manual --iv-key, --iv, or --key flags")
+			}
+
+			// If device/build not provided, try to extract from folder structure
+			if lookupDevice == "" || lookupBuild == "" {
+				// Get absolute path of the file's directory
+				absPath, err := filepath.Abs(filePath)
+				if err != nil {
+					return fmt.Errorf("failed to get absolute path: %v", err)
+				}
+
+				// Walk up the directory tree looking for the pattern
+				dir := filepath.Dir(absPath)
+				folderPattern := regexp.MustCompile(`^(?P<build>[A-Za-z0-9]+)__(?P<device>(AppleTV|AudioAccessory|iBridge|iP(hone|ad|od)|Mac(Book(Air|Pro)?|mini)?|RealityDevice|StudioDisplay|Watch)[0-9]+,[0-9]+)$`)
+
+				for dir != "/" && dir != "." {
+					baseName := filepath.Base(dir)
+					if matches := folderPattern.FindStringSubmatch(baseName); matches != nil {
+						detectedBuild := matches[1]
+						detectedDevice := matches[2]
+
+						log.Infof("Detected firmware folder: %s", baseName)
+						utils.Indent(log.WithFields(log.Fields{
+							"build":  detectedBuild,
+							"device": detectedDevice,
+						}).Info, 2)("Parsed firmware information")
+
+						if lookupDevice == "" && lookupBuild == "" {
+							useDetected := false
+							prompt := &survey.Confirm{
+								Message: fmt.Sprintf("Use detected build '%s' and device '%s' for key --lookup?", detectedBuild, detectedDevice),
+								Default: true,
+							}
+							if err := survey.AskOne(prompt, &useDetected); err == terminal.InterruptErr {
+								log.Warn("Exiting...")
+								return nil
+							}
+							if useDetected {
+								lookupDevice = detectedDevice
+								lookupBuild = detectedBuild
+							}
+						}
+						break
+					}
+					// Move up one directory
+					dir = filepath.Dir(dir)
+				}
 			}
 			if lookupDevice == "" || lookupBuild == "" {
 				return fmt.Errorf("--lookup requires both --lookup-device and --lookup-build")
