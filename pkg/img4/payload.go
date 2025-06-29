@@ -185,7 +185,7 @@ type IM4P struct {
 	Type        string `asn1:"ia5"`
 	Version     string `asn1:"ia5"`
 	Data        []byte
-	Compression Compression `asn1:"optional"`
+	Compression Compression `asn1:"optional,omitempty"`
 	Keybag      []byte      `asn1:"optional"`
 	Properties  PAYP        `asn1:"optional,tag:0,class:context,explicit"`
 	Hash        []byte      `asn1:"optional"`
@@ -264,7 +264,9 @@ func (p *Payload) String() string {
 	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4P (Payload)")))
 	sb.WriteString(fmt.Sprintf("  %s:          %s\n", colorField("Tag"), p.Tag))
 	sb.WriteString(fmt.Sprintf("  %s:         %s\n", colorField("Type"), p.Type))
-	sb.WriteString(fmt.Sprintf("  %s:      %s\n", colorField("Version"), p.Version))
+	if len(p.Version) > 0 {
+		sb.WriteString(fmt.Sprintf("  %s:      %s\n", colorField("Version"), p.Version))
+	}
 	sb.WriteString(fmt.Sprintf("  %s:         %s (%d bytes)\n", colorField("Data"), humanize.Bytes(uint64(len(p.Data))), len(p.Data)))
 	if p.Compression.UncompressedSize > 0 {
 		sb.WriteString(fmt.Sprintf("  %s:  %s\n", colorField("Compression"), p.Compression.Algorithm.String()))
@@ -322,26 +324,31 @@ func (p *Payload) Decompress() ([]byte, error) {
 	if p.decompressedData != nil {
 		return p.decompressedData, nil
 	}
-	// confirm that the payload is compressed
+	// confirm that the payload is compressed and detect compression type
 	isCompressed := false
 	hasCompressField := false
+
+	var detectedAlgorithm CompressionAlgorithm
 	if p.Compression.UncompressedSize > 0 {
 		isCompressed = true
 		hasCompressField = true
+		detectedAlgorithm = p.Compression.Algorithm
 	} else if isLzss, err := magic.IsLZSS(p.Data); err != nil {
 		return nil, fmt.Errorf("failed to check if data is LZSS: %v", err)
 	} else if isLzss {
 		isCompressed = true
+		detectedAlgorithm = CompressionAlgorithmLZSS
 	} else if isLzfse, err := magic.IsLZFSE(p.Data); err != nil {
 		return nil, fmt.Errorf("failed to check if data is LZFSE: %v", err)
 	} else if isLzfse {
 		isCompressed = true
+		detectedAlgorithm = CompressionAlgorithmLZFSE
 	}
 	if !isCompressed {
 		return nil, ErrNotCompressed
 	}
 
-	switch p.Compression.Algorithm {
+	switch detectedAlgorithm {
 	case CompressionAlgorithmLZSS:
 		if len(p.Data) < binary.Size(lzss.Header{}) {
 			return nil, fmt.Errorf("data too short to contain valid LZSS header")
@@ -381,7 +388,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 			}
 		}
 		if !hasCompressField {
-			p.Compression.Algorithm = CompressionAlgorithmLZSS
+			p.Compression.Algorithm = detectedAlgorithm
 			p.Compression.UncompressedSize = len(decompressed)
 		}
 		return decompressed, nil
@@ -405,13 +412,13 @@ func (p *Payload) Decompress() ([]byte, error) {
 			log.Debugf("extracted %d bytes of extra data after LZFSE payload", len(p.extraData))
 		}
 		if !hasCompressField {
-			p.Compression.Algorithm = CompressionAlgorithmLZFSE
+			p.Compression.Algorithm = detectedAlgorithm
 			p.Compression.UncompressedSize = len(decompressed)
 		}
 		return decompressed, nil
 	}
 
-	return nil, fmt.Errorf("unsupported compression algorithm: %v", p.Compression.Algorithm)
+	return nil, fmt.Errorf("unsupported compression algorithm: %v", detectedAlgorithm)
 }
 
 func (i *Payload) GetData() ([]byte, error) {
@@ -675,28 +682,40 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		pdata = append(conf.Data, conf.ExtraData...)
 	}
 
-	var comp Compression
-	switch conf.Compression {
-	case CompressionAlgorithmLZSS:
-		comp = Compression{
-			Algorithm:        CompressionAlgorithmLZSS,
-			UncompressedSize: len(conf.Data),
+	var im4p *Payload
+	if len(conf.ExtraData) == 0 {
+		im4p = &Payload{
+			IM4P: IM4P{
+				Tag:     "IM4P",
+				Type:    conf.Type,
+				Version: conf.Version,
+				Data:    pdata,
+			},
 		}
-	case CompressionAlgorithmLZFSE:
-		comp = Compression{
-			Algorithm:        CompressionAlgorithmLZFSE,
-			UncompressedSize: len(conf.Data),
-		}
-	}
 
-	im4p := &Payload{
-		IM4P: IM4P{
-			Tag:         "IM4P",
-			Type:        conf.Type,
-			Version:     conf.Version,
-			Data:        pdata,
-			Compression: comp,
-		},
+	} else {
+		var comp Compression
+		switch conf.Compression {
+		case CompressionAlgorithmLZSS:
+			comp = Compression{
+				Algorithm:        CompressionAlgorithmLZSS,
+				UncompressedSize: len(conf.Data),
+			}
+		case CompressionAlgorithmLZFSE:
+			comp = Compression{
+				Algorithm:        CompressionAlgorithmLZFSE,
+				UncompressedSize: len(conf.Data),
+			}
+		}
+		im4p = &Payload{
+			IM4P: IM4P{
+				Tag:         "IM4P",
+				Type:        conf.Type,
+				Version:     conf.Version,
+				Data:        pdata,
+				Compression: comp,
+			},
+		}
 	}
 
 	if len(conf.Keybags) > 0 {
