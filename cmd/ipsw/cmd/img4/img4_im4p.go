@@ -67,7 +67,6 @@ func init() {
 	img4Im4pExtractCmd.Flags().Bool("lookup", false, "Auto-lookup IV/key on theapplewiki.com")
 	img4Im4pExtractCmd.Flags().String("lookup-device", "", "Device identifier for key lookup (e.g., iPhone14,2)")
 	img4Im4pExtractCmd.Flags().String("lookup-build", "", "Build number for key lookup (e.g., 20H71)")
-	img4Im4pExtractCmd.Flags().String("lookup-version", "", "iOS version for key lookup (optional)")
 	img4Im4pExtractCmd.MarkFlagFilename("output")
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4p.extract.extra", img4Im4pExtractCmd.Flags().Lookup("extra"))
@@ -79,7 +78,6 @@ func init() {
 	viper.BindPFlag("img4.im4p.extract.lookup", img4Im4pExtractCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("img4.im4p.extract.lookup-device", img4Im4pExtractCmd.Flags().Lookup("lookup-device"))
 	viper.BindPFlag("img4.im4p.extract.lookup-build", img4Im4pExtractCmd.Flags().Lookup("lookup-build"))
-	viper.BindPFlag("img4.im4p.extract.lookup-version", img4Im4pExtractCmd.Flags().Lookup("lookup-version"))
 
 	// Create command flags
 	img4Im4pCreateCmd.Flags().StringP("type", "t", "", "Type string (required)")
@@ -190,7 +188,6 @@ var img4Im4pExtractCmd = &cobra.Command{
 		lookupKeys := viper.GetBool("img4.im4p.extract.lookup")
 		lookupDevice := viper.GetString("img4.im4p.extract.lookup-device")
 		lookupBuild := viper.GetString("img4.im4p.extract.lookup-build")
-		lookupVersion := viper.GetString("img4.im4p.extract.lookup-version")
 		// validate flags
 		if extractExtra && extractKbag {
 			return fmt.Errorf("cannot specify both --extra and --kbag")
@@ -320,10 +317,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 				// Lookup keys from theapplewiki.com
 				log.Info("Looking up decryption keys...")
 				wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
-					Keys:    true,
-					Device:  lookupDevice,
-					Version: lookupVersion,
-					Build:   strings.ToUpper(lookupBuild),
+					Keys:   true,
+					Device: lookupDevice,
+					Build:  strings.ToUpper(lookupBuild),
 				}, "", false)
 				if err != nil {
 					return fmt.Errorf("failed to lookup keys from theapplewiki.com: %v", err)
