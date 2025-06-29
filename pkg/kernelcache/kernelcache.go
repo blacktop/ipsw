@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/comp"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/lzss"
 	"github.com/pkg/errors"
 )
@@ -168,82 +168,71 @@ func Decompress(kcache, outputDir string) error {
 
 // DecompressKernelManagement decompresses a compressed KernelManagement_host kernelcache
 func DecompressKernelManagement(kcache, outputDir string) error {
-	content, err := os.ReadFile(kcache)
-	if err != nil {
-		return errors.Wrap(err, "failed to read Kernelcache")
-	}
-
-	km, err := img4.Parse(content)
+	km, err := img4.Open(kcache)
 	if err != nil {
 		return fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
 
-	kcache = filepath.Join(outputDir, kcache+".decompressed")
-	os.MkdirAll(filepath.Dir(kcache), 0755)
-
-	if bytes.Contains(km.Payload.Data[:4], []byte("bvx2")) {
-		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-		dat, err := lzfse.NewDecoder(km.Payload.Data).DecodeBuffer()
-		if err != nil {
-			return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
-		}
-
-		if err = os.WriteFile(kcache, dat, 0660); err != nil {
-			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
-		}
-	} else {
-		if err = os.WriteFile(kcache, km.Payload.Data, 0660); err != nil {
-			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
-		}
+	data, err := km.Payload.GetData()
+	if err != nil {
+		return fmt.Errorf("failed to get kernelmanagement data: %v", err)
 	}
+
+	kcache = filepath.Join(outputDir, kcache+".decompressed")
+	if err := os.MkdirAll(filepath.Dir(kcache), 0755); err != nil {
+		return fmt.Errorf("failed to create output directory for %s: %v", kcache, err)
+	}
+
+	if err = os.WriteFile(kcache, data, 0660); err != nil {
+		return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
+	}
+
 	utils.Indent(log.Info, 2)("Created " + kcache)
 	return nil
 }
 
 // DecompressKernelManagementData decompresses a compressed KernelManagement_host kernelcache's data
 func DecompressKernelManagementData(kcache string) ([]byte, error) {
-	content, err := os.ReadFile(kcache)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read kernelcache: %v", err)
-	}
-
-	km, err := img4.Parse(content)
+	km, err := img4.Open(kcache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
 
-	if bytes.Contains(km.Payload.Data[:4], []byte("bvx2")) {
-		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-		return lzfse.NewDecoder(km.Payload.Data).DecodeBuffer()
+	if km.Payload == nil {
+		return nil, fmt.Errorf("kernelmanagement img4 payload is nil")
 	}
 
-	return km.Payload.Data, nil
+	data, err := km.Payload.GetData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kernelmanagement data: %v", err)
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf("kernelmanagement img4 payload data is empty")
+	}
+
+	return data, nil
 }
 
 // DecompressData decompresses compressed kernelcache []byte data
 func DecompressData(cc *CompressedCache) ([]byte, error) {
 	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 
-	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
-		utils.Indent(log.Debug, 3)("Kernelcache is LZFSE compressed")
-
-		// dat := lzfse.DecodeBuffer(cc.Data)
-		// buf := new(bytes.Buffer)
-
-		// _, err := buf.ReadFrom(lr)
-		// if err != nil {
-		// 	return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
-		// }
-
-		dat, err := lzfse.NewDecoder(cc.Data).DecodeBuffer()
+	if isLZFSE, err := magic.IsLZFSE(cc.Data); err != nil {
+		return nil, fmt.Errorf("failed to check if kernelcache is lzfse compressed: %v", err)
+	} else if isLZFSE {
+		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+		decompressed, err := comp.Decompress(cc.Data, comp.LZFSE)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
+			return nil, fmt.Errorf("failed to decompress kernelcache: %v", err)
 		}
-
+		if len(decompressed) == 0 {
+			return nil, fmt.Errorf("failed to LZFSE decompress kernelcache")
+		}
 		// check if kernelcache is fat/universal
-		fat, err := macho.NewFatFile(bytes.NewReader(dat))
+		fat, err := macho.NewFatFile(bytes.NewReader(decompressed))
 		if errors.Is(err, macho.ErrNotFat) {
-			return dat, nil
+			return decompressed, nil
 		}
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse fat mach-o")
@@ -257,8 +246,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 		// Essentially: lipo -thin arm64e
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting arch '%s, %s' from single slice fat MachO file", fat.Arches[0].CPU, fat.Arches[0].SubCPU.String(fat.Arches[0].CPU)))
-		return dat[fat.Arches[0].Offset:], nil
-
+		return decompressed[fat.Arches[0].Offset:], nil
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
 		utils.Indent(log.Debug, 3)("kernelcache is LZSS compressed")
 		buffer := bytes.NewBuffer(cc.Data)
