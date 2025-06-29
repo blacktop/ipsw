@@ -22,6 +22,7 @@ __debug_*
 
 # AI
 .claude
+.gemini
 CLAUDE.md
 GEMINI.md
 
