@@ -79,6 +79,133 @@ const (
 	tagESEC = 1163154515 // ESEC - Encryption security (bool)
 )
 
+// ComponentFourCC maps BuildManifest component names to their corresponding FourCC values
+// This map is used to translate component names from BuildManifest.plist to the 4-character
+// identifiers used in IMG4 manifest image entries and IM4P payloads.
+var ComponentFourCC = map[string]string{
+	"ACIBT":                             "acib",
+	"ACIBTLPEM":                         "lpbt",
+	"ACIWIFI":                           "aciw",
+	"ANE":                               "anef",
+	"ANS":                               "ansf",
+	"AOP":                               "aopf",
+	"AVE":                               "avef",
+	"Alamo":                             "almo",
+	"Ap,ANE1":                           "ane1",
+	"Ap,ANE2":                           "ane2",
+	"Ap,ANE3":                           "ane3",
+	"Ap,AudioAccessibilityBootChime":    "auac",
+	"Ap,AudioBootChime":                 "aubt",
+	"Ap,AudioPowerAttachChime":          "aupr",
+	"Ap,BootabilityBrainTrustCache":     "trbb",
+	"Ap,CIO":                            "ciof",
+	"Ap,DCP2":                           "dcp2",
+	"Ap,HapticAssets":                   "hpas",
+	"Ap,LocalBoot":                      "lobo",
+	"Ap,LocalPolicy":                    "lpol",
+	"Ap,NextStageIM4MHash":              "nsih",
+	"Ap,RecoveryOSPolicyNonceHash":      "ronh",
+	"Ap,RestoreANE1":                    "ran1",
+	"Ap,RestoreANE2":                    "ran2",
+	"Ap,RestoreANE3":                    "ran3",
+	"Ap,RestoreCIO":                     "rcio",
+	"Ap,RestoreSecureM3Firmware":        "rsm3",
+	"Ap,RestoreSecurePageTableMonitor":  "rspt",
+	"Ap,RestoreTMU":                     "rtmu",
+	"Ap,RestoreTrustedExecutionMonitor": "rtrx",
+	"Ap,RestorecL4":                     "rxcl",
+	"Ap,Scorpius":                       "scpf",
+	"Ap,SystemVolumeCanonicalMetadata":  "msys",
+	"Ap,TMU":                            "tmuf",
+	"Ap,VolumeUUID":                     "vuid",
+	"Ap,rOSLogo1":                       "rlg1",
+	"Ap,rOSLogo2":                       "rlg2",
+	"AppleLogo":                         "logo",
+	"AudioCodecFirmware":                "acfw",
+	"BatteryCharging":                   "glyC",
+	"BatteryCharging0":                  "chg0",
+	"BatteryCharging1":                  "chg1",
+	"BatteryFull":                       "batF",
+	"BatteryLow0":                       "bat0",
+	"BatteryLow1":                       "bat1",
+	"BatteryPlugin":                     "glyP",
+	"CFELoader":                         "cfel",
+	"CrownFirmware":                     "crwn",
+	"DCP":                               "dcpf",
+	"Dali":                              "dali",
+	"DeviceTree":                        "dtre",
+	"Diags":                             "diag",
+	"EngineeringTrustCache":             "dtrs",
+	"ExtDCP":                            "edcp",
+	"GFX":                               "gfxf",
+	"Hamm":                              "hamf",
+	"Homer":                             "homr",
+	"ISP":                               "ispf",
+	"InputDevice":                       "ipdf",
+	"KernelCache":                       "krnl",
+	"LLB":                               "illb",
+	"LeapHaptics":                       "lphp",
+	"Liquid":                            "liqd",
+	"LoadableTrustCache":                "ltrs",
+	"LowPowerWallet0":                   "lpw0",
+	"LowPowerWallet1":                   "lpw1",
+	"LowPowerWallet2":                   "lpw2",
+	"MacEFI":                            "mefi",
+	"MtpFirmware":                       "mtpf",
+	"Multitouch":                        "mtfw",
+	"NeedService":                       "nsrv",
+	"OS":                                "OS\x00\x00", // OS with null padding
+	"OSRamdisk":                         "osrd",
+	"PEHammer":                          "hmmr",
+	"PERTOS":                            "pert",
+	"PHLEET":                            "phlt",
+	"PMP":                               "pmpf",
+	"PersonalizedDMG":                   "pdmg",
+	"RBM":                               "rmbt",
+	"RTP":                               "rtpf",
+	"Rap,RTKitOS":                       "rkos",
+	"Rap,RestoreRTKitOS":                "rrko",
+	"Rap,SoftwareBinaryDsp1":            "sbd1",
+	"RecoveryMode":                      "recm",
+	"RestoreANS":                        "rans",
+	"RestoreDCP":                        "rdcp",
+	"RestoreDeviceTree":                 "rdtr",
+	"RestoreExtDCP":                     "recp",
+	"RestoreKernelCache":                "rkrn",
+	"RestoreLogo":                       "rlgo",
+	"RestoreRTP":                        "rrtp",
+	"RestoreRamDisk":                    "rdsk",
+	"RestoreSEP":                        "rsep",
+	"RestoreTrustCache":                 "rtsc",
+	"SCE":                               "scef",
+	"SCE1Firmware":                      "sc1f",
+	"SEP":                               "sepi",
+	"SIO":                               "siof",
+	"StaticTrustCache":                  "trst",
+	"SystemLocker":                      "lckr",
+	"SystemVolume":                      "isys",
+	"WCHFirmwareUpdater":                "wchf",
+	"ftap":                              "ftap",
+	"ftsp":                              "ftsp",
+	"iBEC":                              "ibec",
+	"iBSS":                              "ibss",
+	"iBoot":                             "ibot",
+	"iBootData":                         "ibdt",
+	"iBootDataStage1":                   "ibd1",
+	"iBootTest":                         "itst",
+	"rfta":                              "rfta",
+	"rfts":                              "rfts",
+}
+
+func getComponentNameByFourCC(fourCC string) (string, bool) {
+	if len(fourCC) == 4 {
+		if name, exists := ComponentFourCC[fourCC]; exists {
+			return name, true
+		}
+	}
+	return "", false
+}
+
 // PropType represents the expected type for a property
 type PropType int
 
@@ -385,7 +512,11 @@ func (m *Manifest) String() string {
 	if len(m.Images) > 0 {
 		sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Images"), len(m.Images)))
 		for _, img := range m.Images {
-			sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField(img.Name)))
+			if componentName, exists := getComponentNameByFourCC(img.Name); exists && !strings.EqualFold(img.Name, componentName) {
+				sb.WriteString(fmt.Sprintf("    %s (%s):\n", colorSubField(img.Name), componentName))
+			} else {
+				sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField(img.Name)))
+			}
 			for _, prop := range img.Properties {
 				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(prop.Name), FormatPropertyValue(prop.Value)))
 			}
