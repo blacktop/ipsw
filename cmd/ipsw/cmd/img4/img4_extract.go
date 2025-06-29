@@ -155,6 +155,10 @@ var img4ExtractCmd = &cobra.Command{
 					outFile = filepath.Join(filepath.Dir(filePath), outFile)
 				}
 
+				if err := os.MkdirAll(filepath.Dir(outFile), 0755); err != nil {
+					return fmt.Errorf("failed to create output directory for component %s: %v", c.name, err)
+				}
+
 				utils.Indent(log.WithFields(log.Fields{
 					"component": c.name,
 					"path":      outFile,

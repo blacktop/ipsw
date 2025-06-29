@@ -93,7 +93,7 @@ var img4Im4rInfoCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("img4.im4r.info.json") {
-			jdata, err := json.MarshalIndent(im4r, "", "  ")
+			jdata, err := json.Marshal(im4r)
 			if err != nil {
 				return fmt.Errorf("failed to marshal IM4R info: %v", err)
 			}

@@ -122,7 +122,7 @@ var img4Im4pInfoCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("img4.im4p.info.json") {
-			jsonData, err := json.MarshalIndent(im4p, "", "  ")
+			jsonData, err := json.Marshal(im4p)
 			if err != nil {
 				return fmt.Errorf("failed to marshal IM4P info: %v", err)
 			}
@@ -244,8 +244,8 @@ var img4Im4pExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to decode --iv-key: %v", err)
 				}
 				// ivkey must contain IV (aes.BlockSize bytes) and key
-				if len(ivkey) <= aes.BlockSize {
-					return fmt.Errorf("--iv-key must be at least %d bytes (IV + key), got %d", aes.BlockSize, len(ivkey))
+				if len(ivkey) < aes.BlockSize {
+					return fmt.Errorf("--iv-key too short for IV: need at least %d bytes, got %d", aes.BlockSize, len(ivkey))
 				}
 				iv = ivkey[:aes.BlockSize]
 				key = ivkey[aes.BlockSize:]

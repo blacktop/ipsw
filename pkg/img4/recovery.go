@@ -199,8 +199,24 @@ func (r *RestoreInfo) String() string {
 func (r *RestoreInfo) MarshalJSON() ([]byte, error) {
 	data := map[string]any{
 		"name":       "IM4R",
-		"boot_nonce": fmt.Sprintf("%x", r.Properties["BNCN"]),
 		"properties": r.Properties,
 	}
+	
+	// Safely handle boot nonce formatting
+	if bncn, exists := r.Properties["BNCN"]; exists {
+		switch v := bncn.(type) {
+		case []byte:
+			data["boot_nonce"] = fmt.Sprintf("%x", v)
+		case int:
+			data["boot_nonce"] = fmt.Sprintf("%x", v)
+		case int64:
+			data["boot_nonce"] = fmt.Sprintf("%x", v)
+		case uint64:
+			data["boot_nonce"] = fmt.Sprintf("%x", v)
+		default:
+			data["boot_nonce"] = fmt.Sprintf("%v", v)
+		}
+	}
+	
 	return json.MarshalIndent(data, "", "  ")
 }

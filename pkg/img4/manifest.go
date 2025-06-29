@@ -239,6 +239,7 @@ func (m *Manifest) parseMANB(data []byte) error {
 			image, err := m.parseImageDescriptor(entry.Bytes)
 			if err != nil {
 				// Skip if not a valid image descriptor
+				log.Debugf("skipping entry with tag=%d, not a valid image descriptor: %v", entry.Tag, err)
 				remaining = rest
 				continue
 			}
@@ -568,7 +569,7 @@ func marshalPropertiesToSet(props []Property) ([]asn1.RawValue, error) {
 	return MarshalPropertiesSlice(props, ManifestFormat)
 }
 
-// analyzeSignature determines the signature algorithm based on signature size
+// analyzeSignature determines the signature algorithm based on signature size and format
 func analyzeSignature(signature []byte) string {
 	switch len(signature) {
 	case 256:
@@ -578,10 +579,14 @@ func analyzeSignature(signature []byte) string {
 	case 512:
 		return "RSA-4096"
 	case 64:
-		return "ECDSA P-256"
+		return "ECDSA P-256 (or DER-encoded variable length)"
 	case 96:
-		return "ECDSA P-384"
+		return "ECDSA P-384 (or DER-encoded variable length)"
 	default:
+		// For DER-encoded ECDSA signatures, try to detect the format
+		if len(signature) > 6 && signature[0] == 0x30 {
+			return fmt.Sprintf("DER-encoded signature (%d bytes)", len(signature))
+		}
 		return fmt.Sprintf("Unknown (%d bytes)", len(signature))
 	}
 }
@@ -606,15 +611,25 @@ func parseCertificateFromChain(certChainData []byte) (*x509.Certificate, error) 
 		}
 	}
 
-	// Scan for certificate patterns in the data
+	// Only try more advanced parsing if the data is large enough to contain a certificate
+	if len(certChainData) < 100 { // Minimum reasonable certificate size
+		return nil, fmt.Errorf("certificate chain data too small: %d bytes", len(certChainData))
+	}
+
+	// Scan for certificate patterns in the data (more robust approach)
 	for i := 0; i < len(certChainData)-10; i++ {
 		if certChainData[i] == 0x30 && certChainData[i+1] == 0x82 {
 			// Found a potential certificate (SEQUENCE with long form length)
+			if i+4 >= len(certChainData) {
+				continue
+			}
 			certLen := int(certChainData[i+2])<<8 | int(certChainData[i+3])
-			if i+4+certLen <= len(certChainData) {
-				if cert, err := x509.ParseCertificate(certChainData[i : i+4+certLen]); err == nil {
-					return cert, nil
-				}
+			// Validate certificate length is reasonable
+			if certLen < 50 || certLen > 4096 || i+4+certLen > len(certChainData) {
+				continue
+			}
+			if cert, err := x509.ParseCertificate(certChainData[i : i+4+certLen]); err == nil {
+				return cert, nil
 			}
 		}
 	}
