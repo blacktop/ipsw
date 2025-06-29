@@ -11,6 +11,7 @@ import (
 	"io"
 
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/pkg/comp"
 	"github.com/blacktop/lzfse-cgo"
 )
 
@@ -215,7 +216,11 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 					out.Write(dec[:n])
 				}
 			case LZFSE:
-				out.Write(lzfse.DecodeBuffer(data))
+				decompressed, err := comp.Decompress(data, comp.LZFSE)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
+				}
+				out.Write(decompressed)
 			default:
 				return nil, fmt.Errorf("unknown encoding: %s", bm.Encoding)
 			}
@@ -245,7 +250,11 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				out.Write(dec[:n])
 			}
 		case LZFSE:
-			out.Write(lzfse.DecodeBuffer(data))
+			decompressed, err := comp.Decompress(data, comp.LZFSE)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
+			}
+			out.Write(decompressed)
 		case Deepmap2:
 			// os.WriteFile(fmt.Sprintf("%s.compressed.%s", string(bytes.Trim(ci.Metadata.Name[:], "\x00")), bm.Encoding), data, 0644)
 			dmr := bytes.NewReader(data)
@@ -263,7 +272,11 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
 					return nil, err
 				}
-				out.Write(lzfse.DecodeBuffer(chunck))
+				decompressed, err := comp.Decompress(chunck, comp.LZFSE)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
+				}
+				out.Write(decompressed)
 				var size uint32
 				if err := binary.Read(dmr, binary.LittleEndian, &size); err != nil {
 					return nil, err
@@ -272,7 +285,11 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
 					return nil, err
 				}
-				out.Write(lzfse.DecodeBuffer(chunck))
+				decompressed, err = comp.Decompress(chunck, comp.LZFSE)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
+				}
+				out.Write(decompressed)
 			} else {
 				return nil, fmt.Errorf("unsupported deepmap2 encoding: %s", cdm2.Encoding)
 			}
