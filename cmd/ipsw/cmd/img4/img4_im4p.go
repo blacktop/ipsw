@@ -33,6 +33,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
@@ -60,6 +61,10 @@ func init() {
 	img4Im4pExtractCmd.Flags().String("iv-key", "", "AES iv+key for decryption")
 	img4Im4pExtractCmd.Flags().StringP("iv", "i", "", "AES iv for decryption")
 	img4Im4pExtractCmd.Flags().StringP("key", "k", "", "AES key for decryption")
+	img4Im4pExtractCmd.Flags().Bool("lookup", false, "Auto-lookup IV/key on theapplewiki.com")
+	img4Im4pExtractCmd.Flags().String("lookup-device", "", "Device identifier for key lookup (e.g., iPhone14,2)")
+	img4Im4pExtractCmd.Flags().String("lookup-build", "", "Build number for key lookup (e.g., 20H71)")
+	img4Im4pExtractCmd.Flags().String("lookup-version", "", "iOS version for key lookup (optional)")
 	img4Im4pExtractCmd.MarkFlagFilename("output")
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
 	viper.BindPFlag("img4.im4p.extract.extra", img4Im4pExtractCmd.Flags().Lookup("extra"))
@@ -68,6 +73,10 @@ func init() {
 	viper.BindPFlag("img4.im4p.extract.iv-key", img4Im4pExtractCmd.Flags().Lookup("iv-key"))
 	viper.BindPFlag("img4.im4p.extract.iv", img4Im4pExtractCmd.Flags().Lookup("iv"))
 	viper.BindPFlag("img4.im4p.extract.key", img4Im4pExtractCmd.Flags().Lookup("key"))
+	viper.BindPFlag("img4.im4p.extract.lookup", img4Im4pExtractCmd.Flags().Lookup("lookup"))
+	viper.BindPFlag("img4.im4p.extract.lookup-device", img4Im4pExtractCmd.Flags().Lookup("lookup-device"))
+	viper.BindPFlag("img4.im4p.extract.lookup-build", img4Im4pExtractCmd.Flags().Lookup("lookup-build"))
+	viper.BindPFlag("img4.im4p.extract.lookup-version", img4Im4pExtractCmd.Flags().Lookup("lookup-version"))
 
 	// Create command flags
 	img4Im4pCreateCmd.Flags().StringP("type", "t", "", "Type string (required)")
@@ -154,6 +163,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 		# Decrypt and extract payload
 		❯ ipsw img4 im4p extract --iv 1234... --key 5678... encrypted.im4p
 
+		# Auto-lookup key and decrypt
+		❯ ipsw img4 im4p extract --lookup --lookup-device iPhone14,2 --lookup-build 20H71 RestoreRamDisk.im4p
+
 		# Extract to specific output file
 		❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p`),
 	Args:          cobra.ExactArgs(1),
@@ -169,13 +181,27 @@ var img4Im4pExtractCmd = &cobra.Command{
 		ivkeyStr := viper.GetString("img4.im4p.extract.iv-key")
 		ivStr := viper.GetString("img4.im4p.extract.iv")
 		keyStr := viper.GetString("img4.im4p.extract.key")
+		lookupKeys := viper.GetBool("img4.im4p.extract.lookup")
+		lookupDevice := viper.GetString("img4.im4p.extract.lookup-device")
+		lookupBuild := viper.GetString("img4.im4p.extract.lookup-build")
+		lookupVersion := viper.GetString("img4.im4p.extract.lookup-version")
 		// validate flags
 		if extractExtra && extractKbag {
 			return fmt.Errorf("cannot specify both --extra and --kbag")
 		}
 		// Check if decryption is requested
-		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0
-		if decrypt {
+		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys
+		if lookupKeys {
+			if len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 {
+				return fmt.Errorf("cannot use --lookup with manual --iv-key, --iv, or --key flags")
+			}
+			if lookupDevice == "" || lookupBuild == "" {
+				return fmt.Errorf("--lookup requires both --lookup-device and --lookup-build")
+			}
+			if extractExtra {
+				return fmt.Errorf("cannot use --extra with decryption")
+			}
+		} else if decrypt {
 			if extractExtra {
 				return fmt.Errorf("cannot use --extra with decryption")
 			}
@@ -189,11 +215,11 @@ var img4Im4pExtractCmd = &cobra.Command{
 		if outputPath == "" {
 			baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 			if extractExtra {
-				outputPath = baseName + ".extra"
+				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".extra")
 			} else if decrypt {
-				outputPath = baseName + ".dec"
+				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".dec")
 			} else {
-				outputPath = baseName + ".payload"
+				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".payload")
 			}
 		}
 
@@ -238,7 +264,61 @@ var img4Im4pExtractCmd = &cobra.Command{
 			var iv []byte
 			var key []byte
 
-			if len(ivkeyStr) != 0 {
+			if lookupKeys {
+				// Lookup keys from theapplewiki.com
+				log.Info("Looking up decryption keys...")
+				wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+					Keys:    true,
+					Device:  lookupDevice,
+					Version: lookupVersion,
+					Build:   strings.ToUpper(lookupBuild),
+				}, "", false)
+				if err != nil {
+					return fmt.Errorf("failed to lookup keys from theapplewiki.com: %v", err)
+				}
+
+				// Try to find key by exact filename match
+				ivkeyStr, err = wikiKeys.GetKeyByFilename(filepath.Base(filePath))
+				if err != nil {
+					// If exact match fails, try to match by IM4P type
+					if im4p.Type != "" {
+						// Try patterns based on IM4P type
+						patterns := []string{
+							fmt.Sprintf("(?i)%s", im4p.Type),            // Match type case-insensitive
+							fmt.Sprintf("(?i).*%s.*\\.im4p", im4p.Type), // Match type in filename
+						}
+
+						for _, pattern := range patterns {
+							if ivkeyStr, err = wikiKeys.GetKeyByRegex(pattern); err == nil {
+								break
+							}
+						}
+
+						if err != nil {
+							return fmt.Errorf("no key found for file '%s' (type: %s)", filepath.Base(filePath), im4p.Type)
+						}
+					} else {
+						return fmt.Errorf("no key found for file '%s'", filepath.Base(filePath))
+					}
+				}
+
+				// Decode the looked up key
+				ivkey, err := hex.DecodeString(ivkeyStr)
+				if err != nil {
+					return fmt.Errorf("failed to decode looked up key: %v", err)
+				}
+				// ivkey must contain IV (aes.BlockSize bytes) and key
+				if len(ivkey) < aes.BlockSize {
+					return fmt.Errorf("looked up key too short for IV: need at least %d bytes, got %d", aes.BlockSize, len(ivkey))
+				}
+				iv = ivkey[:aes.BlockSize]
+				key = ivkey[aes.BlockSize:]
+
+				utils.Indent(log.WithFields(log.Fields{
+					"iv":  fmt.Sprintf("%x", iv),
+					"key": fmt.Sprintf("%x", key),
+				}).Info, 2)("Found decryption keys")
+			} else if len(ivkeyStr) != 0 {
 				ivkey, err := hex.DecodeString(ivkeyStr)
 				if err != nil {
 					return fmt.Errorf("failed to decode --iv-key: %v", err)
