@@ -89,8 +89,12 @@ func TestPayloadCreation(t *testing.T) {
 				t.Errorf("Version = %v, want %v", payload.Version, tt.config.Version)
 			}
 
-			// Verify compression
-			if tt.config.Compression != 0 {
+			// Verify compression (should NOT be present with extra data)
+			if len(tt.config.ExtraData) > 0 {
+				if payload.Compression.Algorithm != 0 || payload.Compression.UncompressedSize != 0 {
+					t.Errorf("Compression block should not be present when ExtraData is used")
+				}
+			} else if tt.config.Compression != 0 {
 				if payload.Compression.Algorithm != tt.config.Compression {
 					t.Errorf("Compression.Algorithm = %v, want %v", payload.Compression.Algorithm, tt.config.Compression)
 				}
