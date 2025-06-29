@@ -30,7 +30,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -159,11 +158,11 @@ var img4ExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to create output directory for component %s: %v", c.name, err)
 				}
 
-				utils.Indent(log.WithFields(log.Fields{
+				log.WithFields(log.Fields{
 					"component": c.name,
 					"path":      outFile,
 					"size":      humanize.Bytes(uint64(len(data))),
-				}).Info, 2)("Extracting IMG4 Component")
+				}).Info("Extracting IMG4 Component")
 
 				if err := os.WriteFile(outFile, data, 0644); err != nil {
 					return fmt.Errorf("failed to write component %s: %v", c.name, err)

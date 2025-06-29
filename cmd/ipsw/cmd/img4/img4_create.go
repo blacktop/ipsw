@@ -29,7 +29,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -159,6 +158,9 @@ var img4CreateCmd = &cobra.Command{
 		}
 
 		if im4pExtraDataPath != "" {
+			if strings.ToLower(im4pCompression) == "lzfse" {
+				log.Warn("'lzfse' compressed --extra data does NOT seem to be bootable by iBoot ('lzss' compression is recommended for bootable images)")
+			}
 			if strings.ToLower(im4pCompression) == "none" || im4pCompression == "" {
 				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse') to detect --extra data boundaries during extraction")
 			}
@@ -199,10 +201,10 @@ var img4CreateCmd = &cobra.Command{
 			return fmt.Errorf("failed to write output file: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(img4Data))),
-		}).Info, 2)("Created IMG4")
+		}).Info("Created IMG4")
 
 		return nil
 	},

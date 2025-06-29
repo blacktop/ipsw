@@ -59,6 +59,7 @@ func init() {
 
 	// Extract command flags
 	img4Im4pExtractCmd.Flags().StringP("output", "o", "", "Output file path")
+	img4Im4pExtractCmd.Flags().BoolP("raw", "r", false, "Extract raw data (compressed/encrypted)")
 	img4Im4pExtractCmd.Flags().BoolP("extra", "e", false, "Extract extra data")
 	img4Im4pExtractCmd.Flags().BoolP("kbag", "b", false, "Extract keybags as JSON")
 	img4Im4pExtractCmd.Flags().String("iv-key", "", "AES iv+key for decryption")
@@ -69,6 +70,7 @@ func init() {
 	img4Im4pExtractCmd.Flags().String("lookup-build", "", "Build number for key lookup (e.g., 20H71)")
 	img4Im4pExtractCmd.MarkFlagFilename("output")
 	img4Im4pExtractCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("img4.im4p.extract.raw", img4Im4pExtractCmd.Flags().Lookup("raw"))
 	viper.BindPFlag("img4.im4p.extract.extra", img4Im4pExtractCmd.Flags().Lookup("extra"))
 	viper.BindPFlag("img4.im4p.extract.kbag", img4Im4pExtractCmd.Flags().Lookup("kbag"))
 	viper.BindPFlag("img4.im4p.extract.output", img4Im4pExtractCmd.Flags().Lookup("output"))
@@ -180,6 +182,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 		filePath := filepath.Clean(args[0])
 		// flags
 		outputPath := viper.GetString("img4.im4p.extract.output")
+		rawExtract := viper.GetBool("img4.im4p.extract.raw")
 		extractExtra := viper.GetBool("img4.im4p.extract.extra")
 		extractKbag := viper.GetBool("img4.im4p.extract.kbag")
 		ivkeyStr := viper.GetString("img4.im4p.extract.iv-key")
@@ -193,7 +196,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 			return fmt.Errorf("cannot specify both --extra and --kbag")
 		}
 		// Check if decryption is requested
-		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys
+		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys || !rawExtract
 		if lookupKeys {
 			if len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 {
 				return fmt.Errorf("cannot use --lookup with manual --iv-key, --iv, or --key flags")
@@ -263,7 +266,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 
 		if outputPath == "" {
 			baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
-			if extractExtra {
+			if rawExtract {
+				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".raw")
+			} else if extractExtra {
 				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".extra")
 			} else if decrypt {
 				outputPath = filepath.Join(filepath.Dir(filePath), baseName+".dec")
@@ -275,6 +280,15 @@ var img4Im4pExtractCmd = &cobra.Command{
 		im4p, err := img4.OpenPayload(filePath)
 		if err != nil {
 			return fmt.Errorf("failed to parse IM4P: %v", err)
+		}
+
+		if rawExtract {
+			log.WithFields(log.Fields{
+				"bytes": len(im4p.Data),
+				"path":  outputPath,
+			}).Info("Extracting Raw Data")
+
+			return os.WriteFile(outputPath, im4p.Data, 0644)
 		}
 
 		if extractKbag {
@@ -294,9 +308,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 				return fmt.Errorf("failed to marshal im4g kbag: %v", err)
 			}
 			if viper.IsSet("img4.im4p.extract.output") {
-				utils.Indent(log.WithFields(log.Fields{
+				log.WithFields(log.Fields{
 					"path": outputPath,
-				}).Info, 2)("Writing keybags JSON to file")
+				}).Info("Writing keybags JSON to file")
 				return os.WriteFile(outputPath, dat, 0644)
 			} else {
 				fmt.Println(string(dat))
@@ -388,9 +402,11 @@ var img4Im4pExtractCmd = &cobra.Command{
 					return fmt.Errorf("failed to decode --key: %v", err)
 				}
 			}
-			utils.Indent(log.WithFields(log.Fields{
+
+			log.WithFields(log.Fields{
 				"path": outputPath,
-			}).Info, 2)("Decrypting Payload")
+			}).Info("Decrypting Payload")
+
 			return img4.DecryptPayload(filePath, outputPath, iv, key)
 		}
 
@@ -407,16 +423,16 @@ var img4Im4pExtractCmd = &cobra.Command{
 				return fmt.Errorf("extra data is empty")
 			}
 
-			utils.Indent(log.WithFields(log.Fields{
+			log.WithFields(log.Fields{
 				"bytes": len(extraData),
 				"path":  outputPath,
-			}).Info, 2)("Extracting Extra Data")
+			}).Info("Extracting Extra Data")
 
 			return os.WriteFile(outputPath, extraData, 0644)
 		}
 
 		if im4p.Encrypted {
-			utils.Indent(log.Warn, 3)("extracting encrypted IM4P payload")
+			utils.Indent(log.Warn, 2)("extracting encrypted IM4P payload")
 		}
 
 		payloadData, err := im4p.GetData()
@@ -428,9 +444,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 			return fmt.Errorf("payload data is empty")
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
-		}).Info, 2)("Extracting Payload")
+		}).Info("Extracting Payload")
 
 		return os.WriteFile(outputPath, payloadData, 0644)
 	},
@@ -494,6 +510,9 @@ var img4Im4pCreateCmd = &cobra.Command{
 
 		var extraData []byte
 		if len(extraPath) > 0 {
+			if strings.ToLower(compressionType) == "lzfse" {
+				log.Warn("'lzfse' compressed --extra data does NOT seem to be bootable by iBoot ('lzss' compression is recommended for bootable images)")
+			}
 			if strings.ToLower(compressionType) == "none" || compressionType == "" {
 				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse') to detect --extra data boundaries during extraction")
 			}
@@ -521,19 +540,14 @@ var img4Im4pCreateCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal IM4P payload: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
-			"path": outputPath,
-			"size": humanize.Bytes(uint64(len(im4pData))),
-		}).Info, 2)("Creating IM4P")
-
 		if err := os.WriteFile(outputPath, im4pData, 0644); err != nil {
 			return fmt.Errorf("failed to write IM4P file: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(im4pData))),
-		}).Info, 2)("Created IM4P")
+		}).Info("Created IM4P")
 
 		return nil
 	},

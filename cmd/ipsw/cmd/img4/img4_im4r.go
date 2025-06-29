@@ -31,7 +31,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -146,10 +145,10 @@ var img4Im4rCreateCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal IM4R: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(im4rData))),
-		}).Info, 2)("Created IM4R")
+		}).Info("Created IM4R")
 
 		return os.WriteFile(filepath.Clean(outputPath), im4rData, 0644)
 	},
