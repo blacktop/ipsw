@@ -417,7 +417,8 @@ func IsLZFSE(data []byte) (bool, error) {
 	if len(data) > 4 &&
 		(string(data[:4]) == "bvx2" ||
 			string(data[:4]) == "bvxn" ||
-			string(data[:4]) == "bvx1") {
+			string(data[:4]) == "bvx1" ||
+			string(data[:4]) == "bvx-") {
 		return true, nil
 	}
 	return false, nil
