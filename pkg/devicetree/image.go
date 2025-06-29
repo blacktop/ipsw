@@ -2,16 +2,12 @@ package devicetree
 
 import (
 	"bytes"
-	"encoding/asn1"
 	"errors"
 	"fmt"
-	"io"
-
-	// lzfse "github.com/blacktop/go-lzfse"
 
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
-	"github.com/blacktop/ipsw/pkg/lzfse"
+	"github.com/blacktop/ipsw/pkg/img4"
 )
 
 var ErrEncryptedDeviceTree = errors.New("encrypted device tree")
@@ -47,25 +43,19 @@ func ParseImg3Data(data []byte) (*DeviceTree, error) {
 // ParseImg4Data parses a img4 data containing a DeviceTree
 func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
-	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in DEVICETREE.im4p
-	if _, err := asn1.Unmarshal(data, &i); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal ans1 Img4 device tree: %v", err)
+	var i Img4
+
+	im4p, err := img4.ParsePayload(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Img4 payload: %v", err)
+	}
+	data, err = im4p.GetData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Img4 data: %v", err)
 	}
 
-	var r io.Reader
-	if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-		dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
-		if err != nil {
-			return nil, fmt.Errorf("failed to lzfse decompress DeviceTree: %v", err)
-		}
-		// r = bytes.NewReader(lzfse.DecodeBuffer(i.Data))
-		r = bytes.NewReader(dat)
-	} else {
-		r = bytes.NewReader(i.Data)
-	}
-
-	dtree, err := parseDeviceTree(r)
+	dtree, err := parseDeviceTree(bytes.NewReader(data))
 	if err != nil {
 		if len(i.KbagData) > 0 {
 			return nil, ErrEncryptedDeviceTree
