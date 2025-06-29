@@ -4,41 +4,58 @@ description: Parse img4, im4p, im4m etc.
 
 # Parse Img4
 
-## **img4 dec**
+The `ipsw img4` command provides comprehensive tools for parsing, manipulating, and creating IMG4 files and their components (IM4P, IM4M, IM4R).
 
-### Decrypt an `Im4p` file
+## `ipsw img4 info`
 
-Download _just_ iBoot
-
-```bash
-❯ ipsw download pattern -v 13.4 -d iPhone12,3 iBoot
-```
-
-Decrypt it with things from tweets 😏
+Display detailed information about an IMG4 file.
 
 ```bash
-❯ ipsw img4 dec --iv-key <IVKEY> iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p
-   • Parsing Im4p
-      • Detected LZFSE compression
-      • Decrypting file to iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
+# Display information about an IMG4 file
+❯ ipsw img4 info kernel.img4
+
+# Output information as JSON
+❯ ipsw img4 info --json kernel.img4
 ```
 
-It's a thing of beauty 😍
+## `ipsw img4 create`
+
+Create an IMG4 file from various components. This is a powerful new feature allowing you to assemble IMG4 files from raw data or existing IM4P, IM4M, and IM4R files.
 
 ```bash
-❯ hexdump -C -s 512 -n 144 iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
+# Create IMG4 from existing IM4P with manifest and restore info
+❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4
 
-00000200  69 42 6f 6f 74 20 66 6f  72 20 64 34 32 31 2c 20  |iBoot for d421, |
-00000210  43 6f 70 79 72 69 67 68  74 20 32 30 30 37 2d 32  |Copyright 2007-2|
-00000220  30 31 39 2c 20 41 70 70  6c 65 20 49 6e 63 2e 00  |019, Apple Inc..|
-00000230  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-00000240  52 45 4c 45 41 53 45 00  00 00 00 00 00 00 00 00  |RELEASE.........|
-00000250  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-*
-00000280  69 42 6f 6f 74 2d 35 35  34 30 2e 31 30 32 2e 34  |iBoot-5540.102.4|
+# Create IMG4 from raw kernel with LZSS compression and manifest
+❯ ipsw img4 create --input kernelcache --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
+
+# Create IMG4 with boot nonce (generates IM4R automatically)
+❯ ipsw img4 create --input sep-firmware.bin --type sepi --boot-nonce 1234567890abcdef --im4m manifest.im4m --output sep.img4
+
+# Create IMG4 with extra data (extra data requires --compress lzss or lzfse)
+❯ ipsw img4 create --input payload.bin --type logo --compress lzss --extra extra.bin --im4m manifest.im4m --output logo.img4
+
+# Create unsigned IMG4 (no manifest) - for testing only
+❯ ipsw img4 create --input test.bin --type test --output test.img4
 ```
 
-## **img4 extract**
+## `ipsw img4 extract`
+
+Extract components (IM4P, IM4M, IM4R) from an IMG4 file.
+
+```bash
+# Extract IM4P payload from IMG4 file
+❯ ipsw img4 extract --im4p kernel.img4
+
+# Extract manifest and restore info
+❯ ipsw img4 extract --im4m --im4r kernel.img4
+
+# Extract all components to a specific directory
+❯ ipsw img4 extract --im4p --im4m --im4r --output /tmp/extracted kernel.img4
+
+# Extract raw (compressed) IM4P data without decompression
+❯ ipsw img4 extract --im4p --raw kernel.img4
+```
 
 ### Ever wonder how to mount the RAM disks in the IPSW ?
 
@@ -65,21 +82,21 @@ You can now extract the Img4 payloads with the following command:
 ❯ unzip -p iPhone15,2_16.3_20D47_Restore.ipsw 098-25526-064.dmg > 098-25526-064.dmg
 ```
 ```bash
-❯ ipsw img4 extract 098-25526-064.dmg
+# Extract IM4P payload from IMG4 file
+❯ ipsw img4 extract --im4p 098-25526-064.dmg
    • Parsing Im4p
-      • Exracting payload to file 098-25526-064.dmg.payload
+      • Exracting payload to file 098-25526-064.dmg.im4p
 ```
 
 Rename the `payload` back to a _DMG_
-
 ```bash
-❯ mv 098-25526-064.dmg.payload 098-25526-064.dmg.payload.dmg
+❯ mv 098-25526-064.dmg.im4p 098-25526-064.dmg.im4p.dmg
 ```
 
 And now you can open the 🆕 _DMG_ to mount the RAM disk image.
 
 ```bash
-❯ open 098-25526-064.dmg.payload.dmg
+❯ open 098-25526-064.dmg.im4p.dmg
 ```
 ```bash
 ❯ ls -l /Volumes/SydneyD20D47.arm64eUpdateRamDisk/
@@ -123,21 +140,250 @@ drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 SystemConfiguration.framework
 ```
 :::
 
-## **img4 kbags**
+## `ipsw img4 im4p`
 
-### Extract keybags from im4p
+Operations specifically for IM4P (Image4 Payload) files.
+
+### `ipsw img4 im4p info`
+
+Display detailed IM4P information.
 
 ```bash
-❯ ipsw img4 kbag iBoot.ipad6f.RELEASE.im4p
-   • Parsing Im4p
+# Display IM4P information
+❯ ipsw img4 im4p info kernelcache.im4p
 
-Keybags:
--
-  type: PRODUCTION
-    iv: e59e7976e1f88c7a3e76c22c75f518ff
-   key: 9daae21aeb6189554aa9acb67e229dfc67ec3d04f2f881c2929ff58663cece96
--
-  type: DEVELOPMENT
-    iv: 510a264622ca1f66909f57fd65405c9c
-   key: 7a65aeb58f7900283539388f12ca0930170747ffbe4db10f8a775aaf25636bbb
+# Output as JSON
+❯ ipsw img4 im4p info --json kernelcache.im4p
+```
+
+### `ipsw img4 im4p extract`
+
+Extract IM4P data, including decryption and keybag extraction.
+
+```bash
+# Extract decompressed payload data
+❯ ipsw img4 im4p extract kernelcache.im4p
+
+# Extract extra data (if present)
+❯ ipsw img4 im4p extract --extra kernelcache.im4p
+
+# Extract keybags as JSON
+❯ ipsw img4 im4p extract --kbag encrypted.im4p | jq .
+
+{
+  "tag": "sep-firmware.d93.RELEASE.im4p",
+  "version": "1",
+  "keybags": [
+    {
+      "type": "prod",
+      "iv": "6cfaeef036e382c2fe916172d43aeb6c",
+      "key": "9e34c941c4fa95d61f852904f9f7fd1d88021d05fbc4e16eabbe82b6ebd49a79"
+    },
+    {
+      "type": "dev",
+      "iv": "912810a723dca6744329a2f0aaedea6b",
+      "key": "b154955fe870b603ab3d4d6d673ee329339afb1bcaeab6ea7edacff1e62dc969"
+    }
+  ]
+}
+
+# Decrypt and extract payload
+❯ ipsw img4 im4p extract --iv 1234... --key 5678... encrypted.im4p
+
+# Auto-lookup key and decrypt from theapplewiki.com
+❯ ipsw img4 im4p extract --lookup --lookup-device iPhone14,2 --lookup-build 20H71 RestoreRamDisk.im4p
+
+# Auto-detect device/build from folder structure (e.g., 22F76__iPhone11,8/...)
+❯ ipsw img4 im4p extract --lookup /path/to/22F76__iPhone11,8/sep-firmware.n841.RELEASE.im4p
+
+# Extract to specific output file
+❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p
+```
+
+#### Ever wonder how to mount the RAM disks in the IPSW ?
+
+```bash
+❱ ipsw info iPhone17,1_26.0_23A5276f_Restore.ipsw
+
+[IPSW Info]
+===========
+Version        = 26.0
+BuildVersion   = 23A5276f
+OS Type        = Development
+FileSystem     = 044-45969-087.dmg.aea
+SystemOS       = 044-47047-089.dmg.aea
+AppOS          = 044-45681-131.dmg
+ExclaveOS      = 044-76152-123.dmg.aea
+RestoreRamDisk = [044-45855-131.dmg 044-45501-128.dmg]
+
+<SNIP>
+```
+
+The RestoreRamDisk DMGs `044-45855-131.dmg` and `044-45501-128.dmg` are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, however, you cannot mount them as they are actually **im4p** files. 😕
+
+You can now extract the Img4 payloads with the following command:
+
+```bash
+❱ ipsw extract --pattern '044-45855-131.dmg' iPhone17,1_26.0_23A5276f_Restore.ipsw
+   • Extracting files matching pattern "044-45855-131.dmg"
+      • Created 23A5276f__iPhone17,1/044-45855-131.dmg
+      • Created 23A5276f__iPhone17,1/Firmware/044-45855-131.dmg.trustcache
+```
+```bash
+# Extract IM4P payload from IMG4 file
+❱ ipsw img4 im4p extract 23A5276f__iPhone17,1/044-45855-131.dmg \
+    --output 23A5276f__iPhone17,1/044-45855-131.ramdisk.dmg
+      • Extracting Payload        path=23A5276f__iPhone17,1/044-45855-131.ramdisk.dmg
+```
+
+And now you can open the 🆕 _DMG_ to mount the RAM disk image.
+
+```bash
+❱ open 23A5276f__iPhone17,1/044-45855-131.ramdisk.dmg
+```
+```bash
+❱ ls -l /Volumes/ramdisk/
+total 0
+drwxr-xr-x   8 blacktop  staff  256 Jun 20 22:05 bin
+dr-xr-xr-x   2 blacktop  staff   64 Jun 10 12:35 dev
+lrwxr-xr-x   1 blacktop  staff   11 Jun 20 22:05 etc -> private/etc
+drwxr-xr-x   3 blacktop  staff   96 Jun 20 22:05 mnt1
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt10
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt11
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt2
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt3
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt4
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt5
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt6
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt7
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt8
+drwxr-xr-x   2 blacktop  staff   64 Nov 30  2023 mnt9
+drwxr-xr-x   4 blacktop  staff  128 Jun 20 22:05 private
+drwxr-xr-x  15 blacktop  staff  480 Jun 20 22:05 sbin
+drwxr-xr-x   6 blacktop  staff  192 Jun 20 22:05 System
+drwxr-xr-x  10 blacktop  staff  320 Jun 20 22:06 usr
+lrwxr-xr-x   1 blacktop  staff   11 Jun 20 22:06 var -> private/var
+```
+
+:::info note
+This is one of the last places you can find the individual framework dylibs in the IPSW
+```bash
+❱ ls -l /Volumes/ramdisk/System/Library/Frameworks/
+total 0
+drwxr-xr-x  5 blacktop  staff  160 Jun 20 22:05 CFNetwork.framework
+drwxr-xr-x  4 blacktop  staff  128 Jun 20 22:05 Combine.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 CoreFoundation.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 CoreServices.framework
+drwxr-xr-x  4 blacktop  staff  128 Jun 20 22:05 CryptoKit.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 CryptoTokenKit.framework
+drwxr-xr-x  4 blacktop  staff  128 Jun 20 22:05 Foundation.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 IOKit.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 IOSurface.framework
+drwxr-xr-x  4 blacktop  staff  128 Jun 20 22:05 LocalAuthentication.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 MobileCoreServices.framework
+drwxr-xr-x  4 blacktop  staff  128 Jun 20 22:05 Network.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 Security.framework
+drwxr-xr-x  3 blacktop  staff   96 Jun 20 22:05 SystemConfiguration.framework
+```
+:::
+
+### `ipsw img4 im4p create`
+
+Create an IM4P payload from raw data.
+
+```bash
+# Create IM4P from kernel with LZSS compression
+❯ ipsw img4 im4p create --type krnl --compress lzss kernelcache.bin
+
+# Create IM4P with version and extra data
+❯ ipsw img4 im4p create --type rkrn --version "RestoreKernel" --compress lzss --extra extra.bin kernel.bin
+
+# Create uncompressed IM4P
+❯ ipsw img4 im4p create --type logo --compress none logo.png
+
+# Create with custom output path
+❯ ipsw img4 im4p create --type dtre --output devicetree.im4p devicetree.bin
+```
+
+## `ipsw img4 im4m`
+
+Operations specifically for IM4M (Image4 Manifest) files.
+
+### `ipsw img4 im4m info`
+
+Display IM4M manifest information.
+
+```bash
+# Display IM4M manifest information
+❯ ipsw img4 im4m info manifest.im4m
+
+# Output as JSON
+❯ ipsw img4 im4m info --json manifest.im4m
+```
+
+### `ipsw img4 im4m extract`
+
+Extract IM4M manifest from SHSH blob.
+
+```bash
+# Extract IM4M from SHSH blob
+❯ ipsw img4 im4m extract shsh.blob
+
+# Extract update manifest (if available)
+❯ ipsw img4 im4m extract --update shsh.blob
+
+# Extract no-nonce manifest (if available)
+❯ ipsw img4 im4m extract --no-nonce shsh.blob
+
+# Extract to specific output file
+❯ ipsw img4 im4m extract --output custom.im4m shsh.blob
+```
+
+### `🚧 ipsw img4 im4m verify`
+
+Verify IM4M manifest against a build manifest.
+
+```bash
+# Verify IM4M against build manifest
+❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
+
+# Allow extra properties in IM4M
+❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --allow-extra manifest.im4m
+```
+
+### `🚧 ipsw img4 im4m personalize`
+
+Create personalized IM4M manifest with device-specific values (experimental).
+
+```bash
+# Personalize IMG4 with device ECID and nonce (experimental)
+❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
+
+# Personalize with custom output path
+❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4
+```
+
+## `ipsw img4 im4r`
+
+Operations specifically for IM4R (Image4 Restore Info) files.
+
+### `ipsw img4 im4r info`
+
+Display IM4R restore information.
+
+```bash
+# Display IM4R restore info from IMG4 file
+❯ ipsw img4 im4r info kernel.img4
+
+# Output as JSON
+❯ ipsw img4 im4r info --json kernel.img4
+```
+
+### `ipsw img4 im4r create`
+
+Create IM4R restore info with a boot nonce.
+
+```bash
+# Create IM4R with boot nonce for iOS restore
+❯ ipsw img4 im4r create --boot-nonce 1234567890abcdef --output restore.im4r
 ```
