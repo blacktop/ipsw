@@ -22,19 +22,14 @@ THE SOFTWARE.
 package img4
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/dustin/go-humanize"
@@ -77,13 +72,16 @@ func init() {
 
 	// Personalize command flags
 	img4Im4mPersonalizeCmd.Flags().StringP("output", "o", "", "Output personalized IMG4 file")
-	img4Im4mPersonalizeCmd.Flags().String("ecid", "", "Device ECID for personalization")
-	img4Im4mPersonalizeCmd.Flags().String("nonce", "", "Device nonce for personalization")
+	img4Im4mPersonalizeCmd.Flags().StringP("manifest", "m", "", "IM4M manifest file (from TSS response)")
+	img4Im4mPersonalizeCmd.Flags().StringP("restore-info", "r", "", "IM4R restore info file (optional)")
 	img4Im4mPersonalizeCmd.MarkFlagRequired("output")
+	img4Im4mPersonalizeCmd.MarkFlagRequired("manifest")
 	img4Im4mPersonalizeCmd.MarkFlagFilename("output")
+	img4Im4mPersonalizeCmd.MarkFlagFilename("manifest")
+	img4Im4mPersonalizeCmd.MarkFlagFilename("restore-info")
 	viper.BindPFlag("img4.im4m.personalize.output", img4Im4mPersonalizeCmd.Flags().Lookup("output"))
-	viper.BindPFlag("img4.im4m.personalize.ecid", img4Im4mPersonalizeCmd.Flags().Lookup("ecid"))
-	viper.BindPFlag("img4.im4m.personalize.nonce", img4Im4mPersonalizeCmd.Flags().Lookup("nonce"))
+	viper.BindPFlag("img4.im4m.personalize.manifest", img4Im4mPersonalizeCmd.Flags().Lookup("manifest"))
+	viper.BindPFlag("img4.im4m.personalize.restore-info", img4Im4mPersonalizeCmd.Flags().Lookup("restore-info"))
 }
 
 // img4Im4mCmd represents the im4m command group
@@ -180,10 +178,10 @@ var img4Im4mExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to extract manifest from SHSH blob: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(manifestData))),
-		}).Info, 2)("Extracting IM4M")
+		}).Info("Extracting IM4M")
 
 		return os.WriteFile(outputPath, manifestData, 0644)
 	},
@@ -256,48 +254,64 @@ var img4Im4mVerifyCmd = &cobra.Command{
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
 	Use:   "personalize <IMG4>",
-	Short: "🚧 Create personalized IM4M manifest with device-specific values",
+	Short: "Create personalized IMG4 with TSS manifest",
 	Example: heredoc.Doc(`
-	# Personalize IMG4 with device ECID and nonce (experimental)
-	❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
+	# Personalize IMG4 with TSS manifest
+	❯ ipsw img4 im4m personalize --manifest tss_manifest.im4m --output personalized.img4 kernel.img4
 	
-	# Personalize with custom output path
-	❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4`),
+	# Personalize with TSS manifest and restore info
+	❯ ipsw img4 im4m personalize --manifest tss_manifest.im4m --restore-info restore.im4r --output personalized.img4 kernel.img4`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true, // Hidden until fully implemented
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// NOTE: this is experimental and the IMG4 will not be valid without a proper TSS response
-		log.Warn("This is an experimental command and the created IMG4 will NOT be valid")
-
 		outputPath := viper.GetString("img4.im4m.personalize.output")
-		ecid := viper.GetString("img4.im4m.personalize.ecid")
-		nonce := viper.GetString("img4.im4m.personalize.nonce")
+		manifestPath := viper.GetString("img4.im4m.personalize.manifest")
+		restoreInfoPath := viper.GetString("img4.im4m.personalize.restore-info")
 
 		infile := filepath.Clean(args[0])
 
+		// Read the input IMG4
 		inputImg, err := img4.Open(infile)
 		if err != nil {
 			return fmt.Errorf("failed to parse input IMG4: %v", err)
 		}
 
-		personalizedImg, err := personalizeImg4(inputImg, ecid, nonce, viper.GetBool("verbose"))
+		// Read the TSS manifest
+		manifestData, err := os.ReadFile(manifestPath)
 		if err != nil {
-			return fmt.Errorf("personalization failed: %v", err)
+			return fmt.Errorf("failed to read manifest file: %v", err)
 		}
 
-		img, err := img4.Create(&img4.CreateConfig{
-			PayloadData:     personalizedImg.PayloadData,
-			ManifestData:    personalizedImg.ManifestData,
-			RestoreInfoData: personalizedImg.RestoreInfoData,
+		// Optionally read restore info
+		var restoreInfoData []byte
+		if restoreInfoPath != "" {
+			restoreInfoData, err = os.ReadFile(restoreInfoPath)
+			if err != nil {
+				return fmt.Errorf("failed to read restore info file: %v", err)
+			}
+		}
+
+		// Get payload data from the input IMG4
+		var payloadData []byte
+		if inputImg.Payload != nil {
+			payloadData = inputImg.Payload.IM4P.Raw
+		} else {
+			return fmt.Errorf("input IMG4 has no payload")
+		}
+
+		// Create personalized IMG4
+		personalizedImg, err := img4.Create(&img4.CreateConfig{
+			PayloadData:     payloadData,
+			ManifestData:    manifestData,
+			RestoreInfoData: restoreInfoData,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create personalized IMG4: %v", err)
 		}
 
-		personalizedData, err := img.Marshal()
+		personalizedData, err := personalizedImg.Marshal()
 		if err != nil {
 			return fmt.Errorf("failed to marshal personalized IMG4: %v", err)
 		}
@@ -306,129 +320,11 @@ var img4Im4mPersonalizeCmd = &cobra.Command{
 			return fmt.Errorf("failed to write personalized IMG4: %v", err)
 		}
 
-		utils.Indent(log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(personalizedData))),
-		}).Info, 2)("Personalization")
+		}).Info("Personalized IMG4 created successfully")
 
 		return nil
 	},
-}
-
-// PersonalizedImg4 holds the components of a personalized IMG4
-type PersonalizedImg4 struct {
-	PayloadData     []byte
-	ManifestData    []byte
-	RestoreInfoData []byte
-}
-
-func personalizeImg4(img *img4.Image, ecid, nonce string, verbose bool) (*PersonalizedImg4, error) {
-	if verbose {
-		log.Debug("Starting personalization process")
-		if ecid != "" {
-			log.Debugf("Using ECID: %s", ecid)
-		}
-		if nonce != "" {
-			log.Debugf("Using nonce: %s", nonce)
-		}
-	}
-
-	// Validate required parameters
-	if ecid == "" {
-		return nil, fmt.Errorf("ECID is required for personalization")
-	}
-	if nonce == "" {
-		return nil, fmt.Errorf("nonce is required for personalization")
-	}
-
-	// Parse ECID
-	ecidValue, err := strconv.ParseUint(ecid, 0, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ECID format: %w", err)
-	}
-
-	// Parse nonce (expected as hex string)
-	nonceBytes, err := hex.DecodeString(strings.TrimPrefix(nonce, "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid nonce format (expected hex): %w", err)
-	}
-
-	if verbose {
-		log.Debugf("Parsed ECID: 0x%x", ecidValue)
-		log.Debugf("Parsed nonce: %x", nonceBytes)
-	}
-
-	// Extract payload data from IMG4
-	var payloadData []byte
-	if img.Payload != nil {
-		payloadData = img.Payload.IM4P.Raw // Use the raw ASN.1 bytes of the payload
-		if verbose {
-			log.Debugf("Extracted %d bytes of payload data", len(payloadData))
-		}
-	} else {
-		if verbose {
-			log.Debug("No payload data found in input IMG4")
-		}
-	}
-
-	// Create a personalized manifest by modifying the existing manifest properties
-	personalizedProperties := make(map[string]any)
-
-	if img.Manifest.Properties != nil {
-		// Copy existing properties
-		existingProps := img4.PropertiesSliceToMap(img.Manifest.Properties)
-		maps.Copy(personalizedProperties, existingProps)
-	}
-
-	// Update with device-specific values
-	personalizedProperties["ECID"] = ecidValue
-	// Use the correct property name for nonce (snon = security nonce)
-	personalizedProperties["snon"] = nonceBytes
-
-	if verbose {
-		log.Debug("Updating manifest with personalization values:")
-		log.Debugf("  ECID: 0x%x", ecidValue)
-		log.Debugf("  snon (security nonce): %x", nonceBytes)
-	}
-
-	// Create a new manifest with personalized properties
-	personalizedManifest, err := createPersonalizedManifest(personalizedProperties)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create personalized manifest: %w", err)
-	}
-
-	result := &PersonalizedImg4{
-		PayloadData:     payloadData,
-		ManifestData:    personalizedManifest,
-		RestoreInfoData: []byte{}, // Would be populated with TSS response in full implementation
-	}
-
-	if verbose {
-		log.Debug("Personalization complete with device-specific values")
-		log.Info("Note: For production use with Apple's TSS servers:")
-		log.Info("  1. Use 'ipsw tss' command for official TSS blob requests")
-		log.Info("  2. Use 'ipsw ssh shsh' for extracting SHSH blobs from devices")
-		log.Info("  3. Use 'ipsw device' to get additional device parameters")
-	}
-
-	return result, nil
-}
-
-func createPersonalizedManifest(personalizedProperties map[string]any) ([]byte, error) {
-	newManifest := &img4.Manifest{
-		IM4M: img4.IM4M{
-			Tag:     "IM4M",
-			Version: 1, // Assuming version 1 for personalized manifests
-		},
-	}
-
-	// Convert the personalizedProperties map to a slice of img4.Property
-	newManifest.ManifestBody.Properties = img4.PropertiesMapToSlice(personalizedProperties)
-
-	personalizedManifestData, err := newManifest.Marshal()
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal personalized manifest: %w", err)
-	}
-
-	return personalizedManifestData, nil
 }
