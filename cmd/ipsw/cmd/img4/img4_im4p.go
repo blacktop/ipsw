@@ -243,6 +243,10 @@ var img4Im4pExtractCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to decode --iv-key: %v", err)
 				}
+				// ivkey must contain IV (aes.BlockSize bytes) and key
+				if len(ivkey) <= aes.BlockSize {
+					return fmt.Errorf("--iv-key must be at least %d bytes (IV + key), got %d", aes.BlockSize, len(ivkey))
+				}
 				iv = ivkey[:aes.BlockSize]
 				key = ivkey[aes.BlockSize:]
 			} else {

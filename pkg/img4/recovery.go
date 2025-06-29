@@ -61,8 +61,12 @@ func OpenRestoreInfo(path string) (*RestoreInfo, error) {
 // ParseRestoreInfo parses a standalone IM4R file and returns the restore info
 func ParseRestoreInfo(data []byte) (*RestoreInfo, error) {
 	var ri RestoreInfo
-	if _, err := asn1.Unmarshal(data, &ri.IM4R); err != nil {
+	rest, err := asn1.Unmarshal(data, &ri.IM4R)
+	if err != nil {
 		return nil, &RestoreInfoError{"parse", err}
+	}
+	if len(rest) > 0 {
+		log.Warnf("trailing data after IM4R structure: %d bytes", len(rest))
 	}
 
 	if ri.Tag != "IM4R" {

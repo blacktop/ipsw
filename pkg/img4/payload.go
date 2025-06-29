@@ -228,9 +228,8 @@ func ParsePayload(data []byte) (*Payload, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IM4P: %v", err)
 	}
-
 	if len(rest) > 0 {
-		log.Errorf("unexpected trailing data in payload: %d bytes (please notify author)", len(rest))
+		log.Warnf("trailing data after IM4P structure: %d bytes", len(rest))
 	}
 
 	if p.Tag != "IM4P" {
