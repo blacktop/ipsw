@@ -367,15 +367,15 @@ func TestLZFSECompressionWithExtraData(t *testing.T) {
 		t.Fatalf("Failed to parse LZFSE IM4P: %v", err)
 	}
 
-	// Verify compression type
-	if parsedPayload.Compression.Algorithm.String() != "LZFSE" {
-		t.Errorf("Expected LZFSE compression, got %s", parsedPayload.Compression.Algorithm.String())
-	}
-
-	// Decompress first to trigger extra data detection
+	// Decompress first to trigger compression type detection and extra data detection
 	decompressedData, err := parsedPayload.Decompress()
 	if err != nil {
 		t.Fatalf("Failed to decompress LZFSE payload: %v", err)
+	}
+
+	// Verify compression type (after decompression which sets the compression info)
+	if parsedPayload.Compression.Algorithm.String() != "LZFSE" {
+		t.Errorf("Expected LZFSE compression, got %s", parsedPayload.Compression.Algorithm.String())
 	}
 
 	// Debug extra data detection

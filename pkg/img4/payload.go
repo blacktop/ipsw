@@ -682,39 +682,23 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		pdata = append(conf.Data, conf.ExtraData...)
 	}
 
-	var im4p *Payload
-	if len(conf.ExtraData) == 0 {
-		im4p = &Payload{
-			IM4P: IM4P{
-				Tag:     "IM4P",
-				Type:    conf.Type,
-				Version: conf.Version,
-				Data:    pdata,
-			},
-		}
+	im4p := &Payload{
+		IM4P: IM4P{
+			Tag:     "IM4P",
+			Type:    conf.Type,
+			Version: conf.Version,
+			Data:    pdata,
+		},
+	}
 
-	} else {
-		var comp Compression
+	// Add the compression block if a compression algorithm was used and there's no extra data.
+	if len(conf.ExtraData) == 0 {
 		switch conf.Compression {
-		case CompressionAlgorithmLZSS:
-			comp = Compression{
-				Algorithm:        CompressionAlgorithmLZSS,
+		case CompressionAlgorithmLZSS, CompressionAlgorithmLZFSE:
+			im4p.Compression = Compression{
+				Algorithm:        conf.Compression,
 				UncompressedSize: len(conf.Data),
 			}
-		case CompressionAlgorithmLZFSE:
-			comp = Compression{
-				Algorithm:        CompressionAlgorithmLZFSE,
-				UncompressedSize: len(conf.Data),
-			}
-		}
-		im4p = &Payload{
-			IM4P: IM4P{
-				Tag:         "IM4P",
-				Type:        conf.Type,
-				Version:     conf.Version,
-				Data:        pdata,
-				Compression: comp,
-			},
 		}
 	}
 
