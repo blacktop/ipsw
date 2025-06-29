@@ -55,8 +55,12 @@ func Open(path string) (*Image, error) {
 func Parse(data []byte) (*Image, error) {
 	img := &Image{}
 
-	if _, err := asn1.Unmarshal(data, &img.IMG4); err != nil {
+	rest, err := asn1.Unmarshal(data, &img.IMG4)
+	if err != nil {
 		return nil, fmt.Errorf("failed to ASN.1 parse IMG4: %v", err)
+	}
+	if len(rest) > 0 {
+		log.Warnf("trailing data after IMG4 structure: %d bytes", len(rest))
 	}
 
 	if len(img.IMG4.Payload.Bytes) > 0 {

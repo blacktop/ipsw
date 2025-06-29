@@ -191,8 +191,8 @@ var img4Im4mExtractCmd = &cobra.Command{
 
 // img4Im4mVerifyCmd represents the im4m verify command
 var img4Im4mVerifyCmd = &cobra.Command{
-	Use:     "verify <IM4M>",
-	Short:   "🚧 Verify IM4M manifest against build manifest",
+	Use:   "verify <IM4M>",
+	Short: "🚧 Verify IM4M manifest against build manifest",
 	Example: heredoc.Doc(`
 		# Verify IM4M against build manifest
 		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
@@ -255,14 +255,15 @@ var img4Im4mVerifyCmd = &cobra.Command{
 
 // img4Im4mPersonalizeCmd represents the im4m personalize command
 var img4Im4mPersonalizeCmd = &cobra.Command{
-	Use:     "personalize",
-	Short:   "🚧 Create personalized IM4M manifest with device-specific values",
+	Use:   "personalize <IMG4>",
+	Short: "🚧 Create personalized IM4M manifest with device-specific values",
 	Example: heredoc.Doc(`
-		# Personalize IMG4 with device ECID and nonce (experimental)
-		❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
-
-		# Personalize with custom output path
-		❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4`),
+	# Personalize IMG4 with device ECID and nonce (experimental)
+	❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
+	
+	# Personalize with custom output path
+	❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4`),
+	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true, // Hidden until fully implemented
