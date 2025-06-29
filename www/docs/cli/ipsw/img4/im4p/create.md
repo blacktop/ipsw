@@ -33,7 +33,7 @@ ipsw img4 im4p create <input-file> [flags]
 ### Options
 
 ```
-  -c, --compress string   Compress payload (lzfse, lzss, none) (default "none")
+  -c, --compress string   Compress payload (none, lzss, lzfse, lzfse_iboot) (default "none")
   -e, --extra string      Extra data file to append
   -h, --help              help for create
   -o, --output string     Output file path

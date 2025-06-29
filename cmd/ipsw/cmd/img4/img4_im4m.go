@@ -45,7 +45,6 @@ func init() {
 	img4Im4mCmd.AddCommand(img4Im4mInfoCmd)
 	img4Im4mCmd.AddCommand(img4Im4mExtractCmd)
 	img4Im4mCmd.AddCommand(img4Im4mVerifyCmd)
-	img4Im4mCmd.AddCommand(img4Im4mPersonalizeCmd)
 
 	// Info command flags
 	img4Im4mInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -70,18 +69,6 @@ func init() {
 	viper.BindPFlag("img4.im4m.verify.build-manifest", img4Im4mVerifyCmd.Flags().Lookup("build-manifest"))
 	viper.BindPFlag("img4.im4m.verify.allow-extra", img4Im4mVerifyCmd.Flags().Lookup("allow-extra"))
 
-	// Personalize command flags
-	img4Im4mPersonalizeCmd.Flags().StringP("output", "o", "", "Output personalized IMG4 file")
-	img4Im4mPersonalizeCmd.Flags().StringP("manifest", "m", "", "IM4M manifest file (from TSS response)")
-	img4Im4mPersonalizeCmd.Flags().StringP("restore-info", "r", "", "IM4R restore info file (optional)")
-	img4Im4mPersonalizeCmd.MarkFlagRequired("output")
-	img4Im4mPersonalizeCmd.MarkFlagRequired("manifest")
-	img4Im4mPersonalizeCmd.MarkFlagFilename("output")
-	img4Im4mPersonalizeCmd.MarkFlagFilename("manifest")
-	img4Im4mPersonalizeCmd.MarkFlagFilename("restore-info")
-	viper.BindPFlag("img4.im4m.personalize.output", img4Im4mPersonalizeCmd.Flags().Lookup("output"))
-	viper.BindPFlag("img4.im4m.personalize.manifest", img4Im4mPersonalizeCmd.Flags().Lookup("manifest"))
-	viper.BindPFlag("img4.im4m.personalize.restore-info", img4Im4mPersonalizeCmd.Flags().Lookup("restore-info"))
 }
 
 // img4Im4mCmd represents the im4m command group
@@ -200,6 +187,7 @@ var img4Im4mVerifyCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		buildManifestPath := viper.GetString("img4.im4m.verify.build-manifest")
@@ -246,84 +234,6 @@ var img4Im4mVerifyCmd = &cobra.Command{
 				fmt.Printf("  Property: %s, Expected: %v, Actual: %v\n", mismatch.Property, mismatch.Expected, mismatch.Actual)
 			}
 		}
-
-		return nil
-	},
-}
-
-// img4Im4mPersonalizeCmd represents the im4m personalize command
-var img4Im4mPersonalizeCmd = &cobra.Command{
-	Use:   "personalize <IMG4>",
-	Short: "Create personalized IMG4 with TSS manifest",
-	Example: heredoc.Doc(`
-	# Personalize IMG4 with TSS manifest
-	❯ ipsw img4 im4m personalize --manifest tss_manifest.im4m --output personalized.img4 kernel.img4
-	
-	# Personalize with TSS manifest and restore info
-	❯ ipsw img4 im4m personalize --manifest tss_manifest.im4m --restore-info restore.im4r --output personalized.img4 kernel.img4`),
-	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		outputPath := viper.GetString("img4.im4m.personalize.output")
-		manifestPath := viper.GetString("img4.im4m.personalize.manifest")
-		restoreInfoPath := viper.GetString("img4.im4m.personalize.restore-info")
-
-		infile := filepath.Clean(args[0])
-
-		// Read the input IMG4
-		inputImg, err := img4.Open(infile)
-		if err != nil {
-			return fmt.Errorf("failed to parse input IMG4: %v", err)
-		}
-
-		// Read the TSS manifest
-		manifestData, err := os.ReadFile(manifestPath)
-		if err != nil {
-			return fmt.Errorf("failed to read manifest file: %v", err)
-		}
-
-		// Optionally read restore info
-		var restoreInfoData []byte
-		if restoreInfoPath != "" {
-			restoreInfoData, err = os.ReadFile(restoreInfoPath)
-			if err != nil {
-				return fmt.Errorf("failed to read restore info file: %v", err)
-			}
-		}
-
-		// Get payload data from the input IMG4
-		var payloadData []byte
-		if inputImg.Payload != nil {
-			payloadData = inputImg.Payload.IM4P.Raw
-		} else {
-			return fmt.Errorf("input IMG4 has no payload")
-		}
-
-		// Create personalized IMG4
-		personalizedImg, err := img4.Create(&img4.CreateConfig{
-			PayloadData:     payloadData,
-			ManifestData:    manifestData,
-			RestoreInfoData: restoreInfoData,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create personalized IMG4: %v", err)
-		}
-
-		personalizedData, err := personalizedImg.Marshal()
-		if err != nil {
-			return fmt.Errorf("failed to marshal personalized IMG4: %v", err)
-		}
-
-		if err := os.WriteFile(outputPath, personalizedData, 0644); err != nil {
-			return fmt.Errorf("failed to write personalized IMG4: %v", err)
-		}
-
-		log.WithFields(log.Fields{
-			"path": outputPath,
-			"size": humanize.Bytes(uint64(len(personalizedData))),
-		}).Info("Personalized IMG4 created successfully")
 
 		return nil
 	},

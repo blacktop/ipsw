@@ -45,7 +45,7 @@ ipsw img4 create [flags]
 
 ```
   -g, --boot-nonce string   Boot nonce to set in Img4 restore info
-  -c, --compress string     IM4P compression to use (lzfse, lzss, none) (default "none")
+  -c, --compress string     IM4P compression to use (none, lzss, lzfse, lzfse_iboot) (default "none")
   -e, --extra string        Extra IM4P payload data to set
   -h, --help                help for create
   -m, --im4m string         Input Img4 manifest file
