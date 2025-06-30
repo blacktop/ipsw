@@ -313,11 +313,21 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 				}
 			}
 		} else {
-			if m, err := macho.Open(im4pFile); err == nil {
+			im4p, err := img4.OpenPayload(im4pFile)
+			if err != nil {
+				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
+			}
+			data, err := im4p.GetData()
+			if err != nil {
+				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile, err)
+			}
+			if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
 				if err := handler(filepath.Base(im4pFile), m); err != nil {
 					return fmt.Errorf("failed to handle macho %s: %v", im4pFile, err)
 				}
 				m.Close()
+			} else {
+				log.Debugf("failed to parse %s data as macho: %v", im4pFile, err)
 			}
 		}
 	}
