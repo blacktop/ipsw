@@ -36,7 +36,6 @@ func init() {
 	Img4Cmd.AddCommand(img4InfoCmd)
 	img4InfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	img4InfoCmd.MarkZshCompPositionalArgumentFile(1)
-
 	viper.BindPFlag("img4.info.json", img4InfoCmd.Flags().Lookup("json"))
 }
 
@@ -52,7 +51,6 @@ var img4InfoCmd = &cobra.Command{
 		# Output information as JSON
 		❯ ipsw img4 info --json kernel.img4`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

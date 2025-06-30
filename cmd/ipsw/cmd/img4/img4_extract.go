@@ -77,9 +77,9 @@ var img4ExtractCmd = &cobra.Command{
 
 		# Extract raw (compressed) IM4P data without decompression
 		❯ ipsw img4 extract --im4p --raw kernel.img4`),
-	Args: cobra.ExactArgs(1),
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		// flags
 		outputDir := viper.GetString("img4.extract.output")
 		rawExtract := viper.GetBool("img4.extract.raw")
