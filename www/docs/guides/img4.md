@@ -24,9 +24,8 @@ Create an IMG4 file from various components. This is a powerful new feature allo
 
 ### Supported Compression Types
 
-- **`none`** - No compression (bootable)
-- **`lzss`** - LZSS compression (bootable on iOS/macOS)
-- **`lzfse`** - LZFSE compression (bootable on iOS/macOS)  
+- **`lzss`**
+- **`lzfse`**
 - **`lzfse_iboot`** - LZFSE compression optimized for iBoot (macOS only)
 
 ```bash
