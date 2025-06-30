@@ -63,11 +63,10 @@ var img4PersonalizeCmd = &cobra.Command{
 		# Personalize with specific component name for FourCC patching
 		❯ ipsw img4 person --component KernelCache --manifest tss.im4m --output kernel.img4 kernel.im4p`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
+		// flags
 		outputPath := viper.GetString("img4.person.output")
 		manifestPath := viper.GetString("img4.person.manifest")
 		component := viper.GetString("img4.person.component")

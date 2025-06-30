@@ -82,7 +82,6 @@ var img4Im4rInfoCmd = &cobra.Command{
 		# Output as JSON
 		❯ ipsw img4 im4r info --json kernel.img4`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -113,10 +112,8 @@ var img4Im4rCreateCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 		# Create IM4R with boot nonce for iOS restore
 		❯ ipsw img4 im4r create --boot-nonce 1234567890abcdef --output restore.im4r`),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		// flags
 		bootNonce := viper.GetString("img4.im4r.create.boot-nonce")
 		outputPath := viper.GetString("img4.im4r.create.output")

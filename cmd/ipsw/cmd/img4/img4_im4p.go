@@ -124,7 +124,6 @@ var img4Im4pInfoCmd = &cobra.Command{
 		# Output as JSON
 		❯ ipsw img4 im4p info --json kernelcache.im4p`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -175,11 +174,8 @@ var img4Im4pExtractCmd = &cobra.Command{
 		# Extract to specific output file
 		❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		filePath := filepath.Clean(args[0])
 		// flags
 		outputPath := viper.GetString("img4.im4p.extract.output")
 		rawExtract := viper.GetBool("img4.im4p.extract.raw")
@@ -195,6 +191,9 @@ var img4Im4pExtractCmd = &cobra.Command{
 		if extractExtra && extractKbag {
 			return fmt.Errorf("cannot specify both --extra and --kbag")
 		}
+
+		filePath := filepath.Clean(args[0])
+
 		// Check if decryption is requested
 		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys
 		if lookupKeys {
@@ -470,12 +469,8 @@ var img4Im4pCreateCmd = &cobra.Command{
 		# Create with custom output path
 		❯ ipsw img4 im4p create --type dtre --output devicetree.im4p devicetree.bin`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		inputPath := filepath.Clean(args[0])
-
 		// flags
 		typ := viper.GetString("img4.im4p.create.type")
 		version := viper.GetString("img4.im4p.create.version")
@@ -486,6 +481,9 @@ var img4Im4pCreateCmd = &cobra.Command{
 		if len(typ) != 4 {
 			return fmt.Errorf("--type must be exactly 4 characters, got %d: %s", len(typ), typ)
 		}
+
+		inputPath := filepath.Clean(args[0])
+
 		if outputPath == "" {
 			outputPath = filepath.Clean(inputPath) + ".im4p"
 		}

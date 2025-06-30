@@ -105,10 +105,8 @@ var img4CreateCmd = &cobra.Command{
 		❯ ipsw img4 create --input kernelcache.bin --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
 		❯ ipsw img4 create --input devicetree.bin --type dtre --compress lzss --im4m manifest.im4m --output devicetree.img4
 		❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4`),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		// flags
 		inputPath := viper.GetString("img4.create.input")
 		im4pType := viper.GetString("img4.create.type")

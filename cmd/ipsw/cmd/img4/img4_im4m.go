@@ -133,14 +133,14 @@ var img4Im4mExtractCmd = &cobra.Command{
 		# Extract to specific output file
 		❯ ipsw img4 im4m extract --output custom.im4m shsh.blob`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		filePath := args[0]
+		//flags
 		outputPath := viper.GetString("img4.im4m.extract.output")
 		extractUpdate := viper.GetBool("img4.im4m.extract.update")
 		extractNoNonce := viper.GetBool("img4.im4m.extract.no-nonce")
+
+		filePath := filepath.Clean(args[0])
 
 		if outputPath == "" {
 			suffix := ".im4m"
@@ -183,10 +183,9 @@ var img4Im4mVerifyCmd = &cobra.Command{
 		# Strict verification (requires all BuildManifest components)
 		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --strict manifest.im4m`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
+		// flags
 		buildManifestPath := viper.GetString("img4.im4m.verify.build-manifest")
 
 		im4m, err := img4.OpenManifest(filepath.Clean(args[0]))
