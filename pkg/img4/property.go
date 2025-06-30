@@ -432,9 +432,9 @@ var PropertyFourCCs = map[string]string{
 	"sdkp": "ApSDKPlatform", // SDK platform (e.g., "macosx")
 
 	// Hardware Identifiers
-	"BORD": "ApBoardID", // Board ID
-	"CHIP": "ApChipID",  // Chip ID
-	"ECID": "ECID",      // Exclusive Chip ID
+	"BORD": "ApBoardID",       // Board ID
+	"CHIP": "ApChipID",        // Chip ID
+	"ECID": "ExclusiveChipID", // Exclusive Chip ID
 
 	// Security Properties
 	"SDOM": "ApSecurityDomain",  // Security domain

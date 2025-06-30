@@ -360,10 +360,10 @@ func (m *Manifest) HasTicket(name string) bool {
 func (m *Manifest) String() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%s:\n", colorTitle("IM4M (Manifest)")))
-	sb.WriteString(fmt.Sprintf("  %s: %s\n", colorField("Tag"), m.Tag))
-	sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Version"), m.Version))
-	sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("Body Size"), len(m.Body.Bytes)))
-	sb.WriteString(fmt.Sprintf("  %s: %d bytes\n", colorField("Raw Size"), len(m.Raw)))
+	sb.WriteString(fmt.Sprintf("  %s:        %s\n", colorField("Tag"), m.Tag))
+	sb.WriteString(fmt.Sprintf("  %s:    %d\n", colorField("Version"), m.Version))
+	sb.WriteString(fmt.Sprintf("  %s:  %d bytes\n", colorField("Body Size"), len(m.Body.Bytes)))
+	sb.WriteString(fmt.Sprintf("  %s:   %d bytes\n", colorField("Raw Size"), len(m.Raw)))
 
 	// Categorize properties for better organization
 	deviceProps := []string{"CHIP", "BORD", "ECID", "SDOM", "CEPO"}
@@ -449,17 +449,13 @@ func (m *Manifest) String() string {
 	if len(m.Images) > 0 {
 		sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Images"), len(m.Images)))
 		for _, img := range m.Images {
-			if componentName, exists := getComponentNameByFourCC(img.Name); exists && !strings.EqualFold(img.Name, componentName) {
+			if componentName, exists := getComponentNameByFourCC(img.Name); exists && img.Name != componentName {
 				sb.WriteString(fmt.Sprintf("    %s (%s):\n", colorSubField(img.Name), colorLongName(componentName)))
 			} else {
 				sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField(img.Name)))
 			}
 			for _, prop := range img.Properties {
-				if longName, hasLongName := PropertyFourCCs[prop.Name]; hasLongName && !strings.EqualFold(prop.Name, longName) {
-					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(prop.Name), colorLongName(longName), FormatPropertyValue(prop.Value)))
-				} else {
-					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(prop.Name), FormatPropertyValue(prop.Value)))
-				}
+				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(prop.Name), FormatPropertyValue(prop.Value)))
 			}
 		}
 	}
@@ -788,65 +784,49 @@ func extractManifestFromRawData(data []byte, startIdx int) ([]byte, error) {
 }
 
 func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extractNoNonce bool) ([]byte, error) {
-	// First try the flat format (our current implementation)
-	var flatShsh struct {
-		ApImg4Ticket        []byte `plist:"ApImg4Ticket"`
-		ApImg4TicketUpdate  []byte `plist:"ApImg4TicketUpdate,omitempty"`
-		ApImg4TicketNoNonce []byte `plist:"ApImg4TicketNoNonce,omitempty"`
-		Generator           string `plist:"generator,omitempty"`
-		BBTicket            []byte `plist:"BBTicket,omitempty"`
-	}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&flatShsh); err != nil {
-		return nil, fmt.Errorf("failed to decode SHSH plist: %v", err)
-	}
-
-	// Check flat format first - specific manifest types if requested
-	if extractUpdate && len(flatShsh.ApImg4TicketUpdate) > 0 {
-		return flatShsh.ApImg4TicketUpdate, nil
-	}
-
-	if extractNoNonce && len(flatShsh.ApImg4TicketNoNonce) > 0 {
-		return flatShsh.ApImg4TicketNoNonce, nil
-	}
-
-	// If flat format variants not found, try nested format
-	var nestedShsh struct {
-		ApImg4Ticket  []byte `plist:"ApImg4Ticket"`
-		UpdateInstall struct {
-			ApImg4Ticket []byte `plist:"ApImg4Ticket"`
+	var shsh struct {
+		ServerVersion    string         `plist:"@ServerVersion,omitempty"`
+		ApImg4Ticket     []byte         `plist:"ApImg4Ticket"`
+		BBTicket         []byte         `plist:"BBTicket,omitempty"`
+		BasebandFirmware map[string]any `plist:"BasebandFirmware,omitempty"`
+		Generator        string         `plist:"generator,omitempty"`
+		UpdateInstall    struct {
+			ServerVersion string `plist:"@ServerVersion,omitempty"`
+			ApImg4Ticket  []byte `plist:"ApImg4Ticket"`
 		} `plist:"updateInstall,omitempty"`
 		NoNonce struct {
 			ApImg4Ticket []byte `plist:"ApImg4Ticket"`
 		} `plist:"noNonce,omitempty"`
-		Generator string `plist:"generator,omitempty"`
-		BBTicket  []byte `plist:"BBTicket,omitempty"`
 	}
 
-	decoder = plist.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&nestedShsh); err == nil {
-		// Check nested format - specific manifest types if requested
-		if extractUpdate && len(nestedShsh.UpdateInstall.ApImg4Ticket) > 0 {
-			return nestedShsh.UpdateInstall.ApImg4Ticket, nil
-		}
+	decoder := plist.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&shsh); err != nil {
+		return nil, fmt.Errorf("failed to decode SHSH plist: %v", err)
+	}
 
-		if extractNoNonce && len(nestedShsh.NoNonce.ApImg4Ticket) > 0 {
-			return nestedShsh.NoNonce.ApImg4Ticket, nil
-		}
-
-		// If nested format has standard manifest, use it if flat format doesn't
-		if len(flatShsh.ApImg4Ticket) == 0 && len(nestedShsh.ApImg4Ticket) > 0 {
-			return nestedShsh.ApImg4Ticket, nil
+	// Check for specific manifest types if requested
+	if extractUpdate {
+		if len(shsh.UpdateInstall.ApImg4Ticket) > 0 {
+			return shsh.UpdateInstall.ApImg4Ticket, nil
+		} else {
+			return nil, fmt.Errorf("no ApImg4Ticket found in updateInstall section of SHSH plist")
 		}
 	}
 
-	// Fallback to flat format standard manifest
-	if len(flatShsh.ApImg4Ticket) == 0 {
+	if extractNoNonce {
+		if len(shsh.NoNonce.ApImg4Ticket) > 0 {
+			return shsh.NoNonce.ApImg4Ticket, nil
+		} else {
+			return nil, fmt.Errorf("no ApImg4Ticket found in noNonce section of SHSH plist")
+		}
+	}
+
+	// Return the standard manifest
+	if len(shsh.ApImg4Ticket) == 0 {
 		return nil, fmt.Errorf("no ApImg4Ticket found in SHSH plist")
 	}
 
-	return flatShsh.ApImg4Ticket, nil
+	return shsh.ApImg4Ticket, nil
 }
 
 /* VERIFICATION */
