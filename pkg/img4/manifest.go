@@ -475,16 +475,16 @@ func (m *Manifest) String() string {
 
 		if cert, err := parseCertificateFromChain(m.CertChain.Bytes); err == nil && cert != nil {
 			sb.WriteString(fmt.Sprintf("    %s: %s\n", colorField("Subject"), cert.Subject.CommonName))
-			sb.WriteString(fmt.Sprintf("    %s: %s\n", colorField("Issuer"), cert.Issuer.CommonName))
-			sb.WriteString(fmt.Sprintf("    %s: %s to %s\n",
+			sb.WriteString(fmt.Sprintf("    %s:  %s\n", colorField("Issuer"), cert.Issuer.CommonName))
+			sb.WriteString(fmt.Sprintf("    %s:   %s to %s\n",
 				colorField("Valid"), cert.NotBefore.Format("2006-01-02"), cert.NotAfter.Format("2006-01-02")))
 
 			if rsaPubKey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
-				sb.WriteString(fmt.Sprintf("    %s: %d bits\n", colorField("RSA Key Size"), rsaPubKey.N.BitLen()))
+				sb.WriteString(fmt.Sprintf("    %s:  %d bits\n", colorField("RSA Key Size"), rsaPubKey.N.BitLen()))
 			}
 			sb.WriteString(fmt.Sprintf("    %s: %x\n", colorField("Serial Number"), cert.SerialNumber))
 			if len(cert.Subject.Organization) > 0 {
-				sb.WriteString(fmt.Sprintf("    %s: %s\n", colorField("Organization"), cert.Subject.Organization[0]))
+				sb.WriteString(fmt.Sprintf("    %s:  %s\n", colorField("Organization"), cert.Subject.Organization[0]))
 			}
 		}
 	} else {
