@@ -4,11 +4,11 @@ title: shsh
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: shsh
-description: Get shsh blobs from device
+description: Get SHSH blobs from device
 ---
 ## ipsw ssh shsh
 
-Get shsh blobs from device
+Get SHSH blobs from device
 
 ```
 ipsw ssh shsh [flags]
