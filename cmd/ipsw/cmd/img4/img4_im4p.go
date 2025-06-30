@@ -196,7 +196,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 			return fmt.Errorf("cannot specify both --extra and --kbag")
 		}
 		// Check if decryption is requested
-		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys || !rawExtract
+		decrypt := len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys
 		if lookupKeys {
 			if len(ivkeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 {
 				return fmt.Errorf("cannot use --lookup with manual --iv-key, --iv, or --key flags")
