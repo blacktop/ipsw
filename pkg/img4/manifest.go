@@ -788,7 +788,8 @@ func extractManifestFromRawData(data []byte, startIdx int) ([]byte, error) {
 }
 
 func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extractNoNonce bool) ([]byte, error) {
-	var shsh struct {
+	// First try the flat format (our current implementation)
+	var flatShsh struct {
 		ApImg4Ticket        []byte `plist:"ApImg4Ticket"`
 		ApImg4TicketUpdate  []byte `plist:"ApImg4TicketUpdate,omitempty"`
 		ApImg4TicketNoNonce []byte `plist:"ApImg4TicketNoNonce,omitempty"`
@@ -797,25 +798,55 @@ func extractManifestFromPlistShshWithOptions(data []byte, extractUpdate, extract
 	}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&shsh); err != nil {
+	if err := decoder.Decode(&flatShsh); err != nil {
 		return nil, fmt.Errorf("failed to decode SHSH plist: %v", err)
 	}
 
-	// Priority: specific manifest types if requested
-	if extractUpdate && len(shsh.ApImg4TicketUpdate) > 0 {
-		return shsh.ApImg4TicketUpdate, nil
+	// Check flat format first - specific manifest types if requested
+	if extractUpdate && len(flatShsh.ApImg4TicketUpdate) > 0 {
+		return flatShsh.ApImg4TicketUpdate, nil
 	}
 
-	if extractNoNonce && len(shsh.ApImg4TicketNoNonce) > 0 {
-		return shsh.ApImg4TicketNoNonce, nil
+	if extractNoNonce && len(flatShsh.ApImg4TicketNoNonce) > 0 {
+		return flatShsh.ApImg4TicketNoNonce, nil
 	}
 
-	// Fallback to standard manifest
-	if len(shsh.ApImg4Ticket) == 0 {
+	// If flat format variants not found, try nested format
+	var nestedShsh struct {
+		ApImg4Ticket  []byte `plist:"ApImg4Ticket"`
+		UpdateInstall struct {
+			ApImg4Ticket []byte `plist:"ApImg4Ticket"`
+		} `plist:"updateInstall,omitempty"`
+		NoNonce struct {
+			ApImg4Ticket []byte `plist:"ApImg4Ticket"`
+		} `plist:"noNonce,omitempty"`
+		Generator string `plist:"generator,omitempty"`
+		BBTicket  []byte `plist:"BBTicket,omitempty"`
+	}
+
+	decoder = plist.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&nestedShsh); err == nil {
+		// Check nested format - specific manifest types if requested
+		if extractUpdate && len(nestedShsh.UpdateInstall.ApImg4Ticket) > 0 {
+			return nestedShsh.UpdateInstall.ApImg4Ticket, nil
+		}
+
+		if extractNoNonce && len(nestedShsh.NoNonce.ApImg4Ticket) > 0 {
+			return nestedShsh.NoNonce.ApImg4Ticket, nil
+		}
+
+		// If nested format has standard manifest, use it if flat format doesn't
+		if len(flatShsh.ApImg4Ticket) == 0 && len(nestedShsh.ApImg4Ticket) > 0 {
+			return nestedShsh.ApImg4Ticket, nil
+		}
+	}
+
+	// Fallback to flat format standard manifest
+	if len(flatShsh.ApImg4Ticket) == 0 {
 		return nil, fmt.Errorf("no ApImg4Ticket found in SHSH plist")
 	}
 
-	return shsh.ApImg4Ticket, nil
+	return flatShsh.ApImg4Ticket, nil
 }
 
 /* VERIFICATION */
