@@ -11,6 +11,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/bundle"
+	"github.com/blacktop/ipsw/pkg/img4"
 )
 
 func ShowExclaveCores(input string) {
@@ -31,9 +32,19 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 	var m *macho.File
 	var outfiles []string
 
-	bn, err := bundle.Open(input)
+	im4p, err := img4.OpenPayload(input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open bundle: %v", err)
+		return nil, fmt.Errorf("failed to open exclave img4 payload: %v", err)
+	}
+
+	data, err := im4p.GetData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data from exclave img4 payload: %v", err)
+	}
+
+	bn, err := bundle.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open exclave bundle: %v", err)
 	}
 	defer bn.Close()
 
