@@ -156,11 +156,11 @@ var img4CreateCmd = &cobra.Command{
 		}
 
 		if im4pExtraDataPath != "" {
-			if strings.ToLower(im4pCompression) == "lzfse" {
-				log.Warn("'lzfse' compressed --extra data does NOT seem to be bootable by iBoot ('lzss' compression is recommended for bootable images)")
+			if strings.ToLower(im4pCompression) != "lzss" {
+				log.Warn("booting IMG4s with --extra data seems to work best with 'lzss' compression")
 			}
 			if strings.ToLower(im4pCompression) == "none" || im4pCompression == "" {
-				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse') to detect --extra data boundaries during extraction")
+				return fmt.Errorf("--extra requires compression (--compress 'lzss' or 'lzfse_iboot') to detect --extra data boundaries during extraction")
 			}
 			data, err := os.ReadFile(im4pExtraDataPath)
 			if err != nil {
