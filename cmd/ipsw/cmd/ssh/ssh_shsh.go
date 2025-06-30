@@ -41,7 +41,7 @@ func init() {
 var sshShshBlobCmd = &cobra.Command{
 	Use:           "shsh",
 	Aliases:       []string{"sh"},
-	Short:         "Get shsh blobs from device",
+	Short:         "Get SHSH blobs from device",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
