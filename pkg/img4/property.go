@@ -381,39 +381,85 @@ var propertyTypeMap = map[int]PropType{
 	fourCCtoInt("tstp"): PropTypeTimestamp, // tstp - Timestamp
 
 	// Integer properties
-	fourCCtoInt("BORD"): PropTypeInt, // BORD - Board ID
-	fourCCtoInt("CEPO"): PropTypeInt, // CEPO - Certificate epoch
-	fourCCtoInt("CHIP"): PropTypeInt, // CHIP - Chip ID
-	fourCCtoInt("ECID"): PropTypeInt, // ECID - Exclusive chip identifier
-	fourCCtoInt("SDOM"): PropTypeInt, // SDOM - Security domain
-	fourCCtoInt("augs"): PropTypeInt, // augs - Augmented security
-	fourCCtoInt("clas"): PropTypeInt, // clas - Device class
-	fourCCtoInt("fchp"): PropTypeInt, // fchp - Firmware chip
-	fourCCtoInt("styp"): PropTypeInt, // styp - Security type
-	fourCCtoInt("type"): PropTypeInt, // type - Type
-	fourCCtoInt("impl"): PropTypeInt, // impl - Implementation
-	fourCCtoInt("iocv"): PropTypeInt, // iocv - IO coprocessor version
-	fourCCtoInt("arms"): PropTypeInt, // arms - ARM security
-	fourCCtoInt("ar1s"): PropTypeInt, // ar1s - ARM1 security
+	fourCCtoInt("BORD"): PropTypeInt,  // BORD - Board ID
+	fourCCtoInt("CEPO"): PropTypeInt,  // CEPO - Certificate epoch
+	fourCCtoInt("CHIP"): PropTypeInt,  // CHIP - Chip ID
+	fourCCtoInt("ECID"): PropTypeInt,  // ECID - Exclusive chip identifier
+	fourCCtoInt("SDOM"): PropTypeInt,  // SDOM - Security domain
+	fourCCtoInt("augs"): PropTypeInt,  // augs - Augmented security
+	fourCCtoInt("clas"): PropTypeInt,  // clas - Device class
+	fourCCtoInt("fchp"): PropTypeInt,  // fchp - Firmware chip
+	fourCCtoInt("styp"): PropTypeInt,  // styp - Security type
+	fourCCtoInt("type"): PropTypeInt,  // type - Type
+	fourCCtoInt("impl"): PropTypeInt,  // impl - Implementation
+	fourCCtoInt("iocv"): PropTypeInt,  // iocv - IO coprocessor version
+	fourCCtoInt("arms"): PropTypeInt,  // arms - ARM security
+	fourCCtoInt("ar1s"): PropTypeInt,  // ar1s - ARM1 security
 	fourCCtoInt("cons"): PropTypeHash, // cons - Console (binary data)
 	fourCCtoInt("drmc"): PropTypeHash, // drmc - DRMC (binary data)
-	fourCCtoInt("tz0s"): PropTypeInt, // tz0s - TrustZone 0 security
-	fourCCtoInt("tz1s"): PropTypeInt, // tz1s - TrustZone 1 security
-	fourCCtoInt("kcbf"): PropTypeInt, // kcbf - Kernel cache B offset (TXM)
-	fourCCtoInt("kcbz"): PropTypeInt, // kcbz - Kernel cache B size (TXM)
-	fourCCtoInt("kcep"): PropTypeInt, // kcep - Kernel cache epoch
-	fourCCtoInt("kclf"): PropTypeInt, // kclf - Kernel cache L offset
-	fourCCtoInt("kclo"): PropTypeInt, // kclo - Kernel cache L origin
-	fourCCtoInt("kclz"): PropTypeInt, // kclz - Kernel cache L size
-	fourCCtoInt("kcmf"): PropTypeInt, // kcmf - Kernel cache M offset (SPTM)
-	fourCCtoInt("kcmz"): PropTypeInt, // kcmz - Kernel cache M size (SPTM)
-	fourCCtoInt("kcrf"): PropTypeInt, // kcrf - Kernel cache R offset
-	fourCCtoInt("kcrz"): PropTypeInt, // kcrz - Kernel cache R size
-	fourCCtoInt("kcsz"): PropTypeInt, // kcsz - Kernel cache S size
-	fourCCtoInt("kcwf"): PropTypeInt, // kcwf - Kernel cache W offset
-	fourCCtoInt("kcwz"): PropTypeInt, // kcwz - Kernel cache W size
-	fourCCtoInt("kcxf"): PropTypeInt, // kcxf - Kernel cache X offset
-	fourCCtoInt("kcxz"): PropTypeInt, // kcxz - Kernel cache X size
+	fourCCtoInt("tz0s"): PropTypeInt,  // tz0s - TrustZone 0 security
+	fourCCtoInt("tz1s"): PropTypeInt,  // tz1s - TrustZone 1 security
+	fourCCtoInt("kcbf"): PropTypeInt,  // kcbf - Kernel cache B offset (TXM)
+	fourCCtoInt("kcbz"): PropTypeInt,  // kcbz - Kernel cache B size (TXM)
+	fourCCtoInt("kcep"): PropTypeInt,  // kcep - Kernel cache epoch
+	fourCCtoInt("kclf"): PropTypeInt,  // kclf - Kernel cache L offset
+	fourCCtoInt("kclo"): PropTypeInt,  // kclo - Kernel cache L origin
+	fourCCtoInt("kclz"): PropTypeInt,  // kclz - Kernel cache L size
+	fourCCtoInt("kcmf"): PropTypeInt,  // kcmf - Kernel cache M offset (SPTM)
+	fourCCtoInt("kcmz"): PropTypeInt,  // kcmz - Kernel cache M size (SPTM)
+	fourCCtoInt("kcrf"): PropTypeInt,  // kcrf - Kernel cache R offset
+	fourCCtoInt("kcrz"): PropTypeInt,  // kcrz - Kernel cache R size
+	fourCCtoInt("kcsz"): PropTypeInt,  // kcsz - Kernel cache S size
+	fourCCtoInt("kcwf"): PropTypeInt,  // kcwf - Kernel cache W offset
+	fourCCtoInt("kcwz"): PropTypeInt,  // kcwz - Kernel cache W size
+	fourCCtoInt("kcxf"): PropTypeInt,  // kcxf - Kernel cache X offset
+	fourCCtoInt("kcxz"): PropTypeInt,  // kcxz - Kernel cache X size
+}
+
+// PropertyFourCCs maps property fourCC codes to their BuildManifest field names
+// This mapping was discovered through comprehensive analysis of IM4M manifests
+var PropertyFourCCs = map[string]string{
+	// Version and Build Properties
+	"love": "ApOSLongVersion",         // Long version string (e.g., "25.1.279.5.13,0")
+	"pave": "ApOSLongVersion",         // Platform version (same as love)
+	"apmv": "ProductMarketingVersion", // Marketing version (e.g., "26.0")
+	"vnum": "VersionNumber",           // Version number
+
+	// Device and Platform Properties
+	"prtp": "ApProductType", // Product type (e.g., "Mac14,8")
+	"tagt": "ApTarget",      // Target (e.g., "J180dAP")
+	"tatp": "ApTargetType",  // Target type (e.g., "j180d")
+	"sdkp": "ApSDKPlatform", // SDK platform (e.g., "macosx")
+
+	// Hardware Identifiers
+	"BORD": "ApBoardID", // Board ID
+	"CHIP": "ApChipID",  // Chip ID
+	"ECID": "ECID",      // Exclusive Chip ID
+
+	// Security Properties
+	"SDOM": "ApSecurityDomain",  // Security domain
+	"CEPO": "CertificateEpoch",  // Certificate epoch
+	"augs": "AugmentedSecurity", // Augmented security
+	"styp": "SecurityType",      // Security type
+	"type": "Type",              // Type
+	"clas": "DeviceClass",       // Device class
+	"fchp": "FirmwareChip",      // Firmware chip
+
+	// Cryptographic Properties
+	"srvn": "SecurityRevisionNumber", // Security revision number
+	"snon": "SecurityNonce",          // Security nonce
+	"BNCH": "BootNonceHash",          // Boot nonce hash
+	"DGST": "Digest",                 // Digest value
+
+	// Status Properties
+	"CPRO": "CertificateProductionStatus", // Certificate production status
+	"CSEC": "CertificateSecurityMode",     // Certificate security mode
+	"EKEY": "EncryptionKeyRequired",       // Encryption key required
+	"EPRO": "EncryptionProduction",        // Encryption production
+	"ESEC": "EncryptionSecurity",          // Encryption security
+
+	// Timestamp Properties
+	"tstp": "Timestamp", // Timestamp
 }
 
 // getPropertyType returns the expected type for a given property tag
