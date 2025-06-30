@@ -163,10 +163,18 @@ var img4Im4mExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to extract manifest from SHSH blob: %v", err)
 		}
 
+		var typ string
+		switch {
+		case extractUpdate:
+			typ = "(Update) "
+		case extractNoNonce:
+			typ = "(No Nonce) "
+		}
+
 		log.WithFields(log.Fields{
 			"path": outputPath,
 			"size": humanize.Bytes(uint64(len(manifestData))),
-		}).Info("Extracting IM4M")
+		}).Infof("Extracting %sIM4M", typ)
 
 		return os.WriteFile(outputPath, manifestData, 0644)
 	},
