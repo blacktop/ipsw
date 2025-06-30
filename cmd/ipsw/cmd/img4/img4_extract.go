@@ -87,6 +87,11 @@ var img4ExtractCmd = &cobra.Command{
 		if rawExtract && !viper.IsSet("img4.extract.im4p") {
 			return fmt.Errorf("raw extraction is only supported for IM4P payloads, please also set --im4p flag")
 		}
+		if !viper.IsSet("img4.extract.im4p") &&
+			!viper.IsSet("img4.extract.im4m") &&
+			!viper.IsSet("img4.extract.im4r") {
+			return fmt.Errorf("at least one extraction flag must be set (--im4p, --im4m, --im4r)")
+		}
 
 		filePath := filepath.Clean(args[0])
 
@@ -143,8 +148,10 @@ var img4ExtractCmd = &cobra.Command{
 
 				outFile := fmt.Sprintf("%s.%s", baseName, c.name)
 
+				var raw string
 				if rawExtract {
 					outFile += ".raw" // Append .raw for raw extraction
+					raw = "RAW "
 				}
 
 				if outputDir != "" {
@@ -162,7 +169,7 @@ var img4ExtractCmd = &cobra.Command{
 					"component": c.name,
 					"path":      outFile,
 					"size":      humanize.Bytes(uint64(len(data))),
-				}).Info("Extracting IMG4 Component")
+				}).Infof("Extracting %sIMG4 Component", raw)
 
 				if err := os.WriteFile(outFile, data, 0644); err != nil {
 					return fmt.Errorf("failed to write component %s: %v", c.name, err)
