@@ -22,6 +22,13 @@ Display detailed information about an IMG4 file.
 
 Create an IMG4 file from various components. This is a powerful new feature allowing you to assemble IMG4 files from raw data or existing IM4P, IM4M, and IM4R files.
 
+### Supported Compression Types
+
+- **`none`** - No compression (bootable)
+- **`lzss`** - LZSS compression (bootable on iOS/macOS)
+- **`lzfse`** - LZFSE compression (bootable on iOS/macOS)  
+- **`lzfse_iboot`** - LZFSE compression optimized for iBoot (macOS only)
+
 ```bash
 # Create IMG4 from existing IM4P with manifest and restore info
 ❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4
@@ -160,6 +167,10 @@ Display detailed IM4P information.
 
 Extract IM4P data, including decryption and keybag extraction.
 
+### Automatic Key Lookup
+
+The `--lookup` feature can automatically retrieve decryption keys from theapplewiki.com and supports auto-detection from folder structures like `22F76__iPhone11,8/` for various device types including iPhone, iPad, iPod, AppleTV, AudioAccessory, iBridge, and Mac devices.
+
 ```bash
 # Extract decompressed payload data
 ❯ ipsw img4 im4p extract kernelcache.im4p
@@ -195,6 +206,9 @@ Extract IM4P data, including decryption and keybag extraction.
 
 # Auto-detect device/build from folder structure (e.g., 22F76__iPhone11,8/...)
 ❯ ipsw img4 im4p extract --lookup /path/to/22F76__iPhone11,8/sep-firmware.n841.RELEASE.im4p
+
+# Use combined IV+key for decryption (alternative to separate --iv and --key)
+❯ ipsw img4 im4p extract --iv-key 1234567890abcdef:5678901234abcdef encrypted.im4p
 
 # Extract to specific output file
 ❯ ipsw img4 im4p extract --output kernel.bin kernelcache.im4p
@@ -295,6 +309,9 @@ Create an IM4P payload from raw data.
 # Create IM4P from kernel with LZSS compression
 ❯ ipsw img4 im4p create --type krnl --compress lzss kernelcache.bin
 
+# Create IM4P with LZFSE compression for iBoot (macOS only)
+❯ ipsw img4 im4p create --type ibot --compress lzfse_iboot iboot.bin
+
 # Create IM4P with version and extra data
 ❯ ipsw img4 im4p create --type rkrn --version "RestoreKernel" --compress lzss --extra extra.bin kernel.bin
 
@@ -339,7 +356,7 @@ Extract IM4M manifest from SHSH blob.
 ❯ ipsw img4 im4m extract --output custom.im4m shsh.blob
 ```
 
-### `🚧 ipsw img4 im4m verify`
+### `ipsw img4 im4m verify`
 
 Verify IM4M manifest against a build manifest.
 
@@ -347,20 +364,20 @@ Verify IM4M manifest against a build manifest.
 # Verify IM4M against build manifest
 ❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
 
-# Allow extra properties in IM4M
-❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --allow-extra manifest.im4m
+# Strict mode verification (requires all BuildManifest components)
+❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --strict manifest.im4m
 ```
 
-### `🚧 ipsw img4 im4m personalize`
+### `🚧 ipsw img4 person`
 
-Create personalized IM4M manifest with device-specific values (experimental).
+Create personalized IMG4 with TSS manifest for device-specific firmware (experimental).
 
 ```bash
 # Personalize IMG4 with device ECID and nonce (experimental)
-❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
+❯ ipsw img4 person --ecid 1234567890ABCDEF --nonce FEEDFACE kernel.img4
 
 # Personalize with custom output path
-❯ ipsw img4 im4m personalize --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4
+❯ ipsw img4 person --ecid 1234567890ABCDEF --nonce FEEDFACE --output personalized.img4 kernel.img4
 ```
 
 ## `ipsw img4 im4r`
