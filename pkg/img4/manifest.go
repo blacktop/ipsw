@@ -17,6 +17,16 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	bm "github.com/blacktop/ipsw/pkg/plist"
+	"github.com/fatih/color"
+)
+
+// Color functions for verification output
+var (
+	colorSuccess  = color.New(color.FgGreen).SprintFunc()
+	colorError    = color.New(color.FgRed).SprintFunc()
+	colorWarning  = color.New(color.FgYellow).SprintFunc()
+	colorInfo     = color.New(color.FgCyan).SprintFunc()
+	colorLongName = color.New(color.FgHiYellow).SprintFunc()
 )
 
 // Core ASN.1 Private Tag Constants (stable tags that won't change)
@@ -79,13 +89,24 @@ const (
 	tagESEC = 1163154515 // ESEC - Encryption security (bool)
 )
 
-func getComponentNameByFourCC(fourCC string) (string, bool) {
-	if len(fourCC) == 4 {
-		if name, exists := ComponentFourCCs[fourCC]; exists {
-			return name, true
-		}
+// FourCCToComponent is a reverse map of ComponentFourCCs for efficient lookups
+var FourCCToComponent map[string]string
+
+// initFourCCToComponent initializes the reverse map
+func initFourCCToComponent() {
+	if FourCCToComponent != nil {
+		return // Already initialized
 	}
-	return "", false
+	FourCCToComponent = make(map[string]string)
+	for componentName, fourCC := range ComponentFourCCs {
+		FourCCToComponent[fourCC] = componentName
+	}
+}
+
+func getComponentNameByFourCC(fourCC string) (string, bool) {
+	initFourCCToComponent()
+	componentName, exists := FourCCToComponent[fourCC]
+	return componentName, exists
 }
 
 // PropType represents the expected type for a property
@@ -377,7 +398,11 @@ func (m *Manifest) String() string {
 		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Device Properties")))
 		for _, propName := range deviceProps {
 			if val, exists := propMap[propName]; exists {
-				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				if longName, hasLongName := PropertyFourCCs[propName]; hasLongName && !strings.EqualFold(propName, longName) {
+					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(propName), colorLongName(longName), FormatPropertyValue(val)))
+				} else {
+					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				}
 			}
 		}
 	}
@@ -386,7 +411,11 @@ func (m *Manifest) String() string {
 		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Security Properties")))
 		for _, propName := range securityProps {
 			if val, exists := propMap[propName]; exists {
-				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				if longName, hasLongName := PropertyFourCCs[propName]; hasLongName && !strings.EqualFold(propName, longName) {
+					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(propName), colorLongName(longName), FormatPropertyValue(val)))
+				} else {
+					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				}
 			}
 		}
 	}
@@ -395,7 +424,11 @@ func (m *Manifest) String() string {
 		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Version Properties")))
 		for _, propName := range versionProps {
 			if val, exists := propMap[propName]; exists {
-				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				if longName, hasLongName := PropertyFourCCs[propName]; hasLongName && !strings.EqualFold(propName, longName) {
+					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(propName), colorLongName(longName), FormatPropertyValue(val)))
+				} else {
+					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				}
 			}
 		}
 	}
@@ -404,7 +437,11 @@ func (m *Manifest) String() string {
 		sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField("Other Properties")))
 		for _, propName := range otherProps {
 			if val, exists := propMap[propName]; exists {
-				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				if longName, hasLongName := PropertyFourCCs[propName]; hasLongName && !strings.EqualFold(propName, longName) {
+					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(propName), colorLongName(longName), FormatPropertyValue(val)))
+				} else {
+					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(propName), FormatPropertyValue(val)))
+				}
 			}
 		}
 	}
@@ -413,12 +450,16 @@ func (m *Manifest) String() string {
 		sb.WriteString(fmt.Sprintf("  %s: %d\n", colorField("Images"), len(m.Images)))
 		for _, img := range m.Images {
 			if componentName, exists := getComponentNameByFourCC(img.Name); exists && !strings.EqualFold(img.Name, componentName) {
-				sb.WriteString(fmt.Sprintf("    %s (%s):\n", colorSubField(img.Name), componentName))
+				sb.WriteString(fmt.Sprintf("    %s (%s):\n", colorSubField(img.Name), colorLongName(componentName)))
 			} else {
 				sb.WriteString(fmt.Sprintf("    %s:\n", colorSubField(img.Name)))
 			}
 			for _, prop := range img.Properties {
-				sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(prop.Name), FormatPropertyValue(prop.Value)))
+				if longName, hasLongName := PropertyFourCCs[prop.Name]; hasLongName && !strings.EqualFold(prop.Name, longName) {
+					sb.WriteString(fmt.Sprintf("      %s (%s): %v\n", colorField(prop.Name), colorLongName(longName), FormatPropertyValue(prop.Value)))
+				} else {
+					sb.WriteString(fmt.Sprintf("      %s: %v\n", colorField(prop.Name), FormatPropertyValue(prop.Value)))
+				}
 			}
 		}
 	}
@@ -918,4 +959,225 @@ func CompareManifestValues(a, b any) bool {
 
 	// Fallback to basic equality check
 	return a == b
+}
+
+// DigestVerificationResult holds the results of digest-based manifest verification
+type DigestVerificationResult struct {
+	IsValid           bool
+	MatchedIdentity   *bm.BuildIdentity
+	IdentityIndex     int
+	ComponentsChecked int
+	MissingComponents []string
+}
+
+// VerifyManifestDigests verifies an IM4M manifest against a build manifest using digest comparison
+// This matches the Python pyimg4 im4m_verify logic
+// In non-strict mode (default), passes if all IM4M images have verified digests
+// In strict mode, passes only if all BuildManifest components are present AND verified
+func VerifyManifestDigests(im4m *Manifest, buildManifest *bm.BuildManifest, verbose, strict bool) (*DigestVerificationResult, error) {
+	result := &DigestVerificationResult{
+		IsValid:           false,
+		MissingComponents: []string{},
+	}
+
+	// Get board_id and chip_id from IM4M properties
+	im4mProps := PropertiesSliceToMap(im4m.Properties)
+
+	var boardID, chipID int
+	var ok bool
+
+	if boardID, ok = im4mProps["BORD"].(int); !ok {
+		return nil, fmt.Errorf("BORD (board ID) not found in IM4M manifest")
+	}
+
+	if chipID, ok = im4mProps["CHIP"].(int); !ok {
+		return nil, fmt.Errorf("CHIP (chip ID) not found in IM4M manifest")
+	}
+
+	if verbose {
+
+	}
+
+	// Create a map of image names to their digests from IM4M
+	im4mDigests := make(map[string][]byte)
+	for _, img := range im4m.Images {
+		for _, prop := range img.Properties {
+			if prop.Name == "DGST" {
+				if digestBytes, ok := prop.Value.([]byte); ok {
+					im4mDigests[img.Name] = digestBytes
+				}
+				break
+			}
+		}
+	}
+
+	// Loop through build identities to find matching one
+	for i, identity := range buildManifest.BuildIdentities {
+		// Parse hex values from build identity
+		bmBoardID, err := strconv.ParseInt(strings.TrimPrefix(identity.ApBoardID, "0x"), 16, 64)
+		if err != nil {
+			continue
+		}
+
+		bmChipID, err := strconv.ParseInt(strings.TrimPrefix(identity.ApChipID, "0x"), 16, 64)
+		if err != nil {
+			continue
+		}
+
+		// Check if this build identity matches the IM4M
+		if int(bmBoardID) != boardID || int(bmChipID) != chipID {
+			continue
+		}
+
+		if verbose {
+			fmt.Printf("\n  %s => %s\n", colorField("Found Matching Identity"), colorInfo(fmt.Sprintf("%d", i+1)))
+			fmt.Printf("  %s:      %s\n", colorField("Chip ID"), colorInfo(fmt.Sprintf("0x%x", chipID)))
+			fmt.Printf("  %s:     %s\n", colorField("Board ID"), colorInfo(fmt.Sprintf("0x%x", boardID)))
+			fmt.Printf("  %s: %s\n", colorField("Board Config"), colorInfo(identity.Info.DeviceClass))
+			fmt.Printf("  %s:     %s\n", colorField("Build ID"), colorInfo(identity.Info.BuildNumber))
+			fmt.Printf("  %s: %s\n", colorField("Restore Type"), colorInfo(identity.Info.RestoreBehavior))
+			fmt.Printf("\n%s:\n", colorTitle("Image4 Digest Verification"))
+		}
+
+		result.MatchedIdentity = &identity
+		result.IdentityIndex = i + 1
+
+		// Categorize components by verification status
+		var foundComponents []string
+		var missingComponents []string
+		var mismatchComponents []string
+		var unmappedComponents []string
+
+		// Track IM4M images that don't have matching BuildManifest entries
+		var im4mOnlyImages []string
+
+		// Verify each component in the build manifest
+		for componentName, imageInfo := range identity.Manifest {
+			// Skip components without digest
+			if len(imageInfo.Digest) == 0 {
+				continue
+			}
+
+			result.ComponentsChecked++
+
+			// Get the FourCC for this component
+			fourCC, hasFourCC := ComponentFourCCs[componentName]
+			if !hasFourCC {
+				// Component doesn't have a known FourCC mapping
+				unmappedComponents = append(unmappedComponents, componentName)
+				result.MissingComponents = append(result.MissingComponents, componentName)
+				continue
+			}
+
+			// Check if the IM4M has this component's digest
+			if im4mDigest, ok := im4mDigests[fourCC]; ok {
+				if bytes.Equal(im4mDigest, imageInfo.Digest) {
+					foundComponents = append(foundComponents, componentName)
+				} else {
+					// Digest mismatch
+					mismatchComponents = append(mismatchComponents, componentName)
+					result.MissingComponents = append(result.MissingComponents, componentName)
+				}
+			} else {
+				// Component not found in IM4M
+				missingComponents = append(missingComponents, componentName)
+				result.MissingComponents = append(result.MissingComponents, componentName)
+			}
+		}
+
+		if verbose {
+			// Display results organized by status
+			if len(foundComponents) > 0 {
+				fmt.Printf("  %s: %d\n", colorSubField("Found Components"), len(foundComponents))
+				for _, comp := range foundComponents {
+					fmt.Printf("    %s: %s\n", colorField(comp), colorSuccess("✓ digest verified"))
+				}
+			}
+
+			if len(missingComponents) > 0 {
+				fmt.Printf("  %s: %d\n", colorSubField("Missing Components"), len(missingComponents))
+				for _, comp := range missingComponents {
+					fmt.Printf("    %s: %s\n", colorField(comp), colorError("✗ not found"))
+				}
+			}
+
+			if len(mismatchComponents) > 0 {
+				fmt.Printf("  %s: %d\n", colorSubField("Digest Mismatches"), len(mismatchComponents))
+				for _, comp := range mismatchComponents {
+					fmt.Printf("    %s: %s\n", colorField(comp), colorError("✗ digest mismatch"))
+				}
+			}
+
+			if len(unmappedComponents) > 0 {
+				fmt.Printf("  %s: %d\n", colorSubField("Unmapped Components"), len(unmappedComponents))
+				for _, comp := range unmappedComponents {
+					fmt.Printf("    %s: %s\n", colorField(comp), colorWarning("? no FourCC mapping"))
+				}
+			}
+		}
+
+		// Check for IM4M images that don't have corresponding BuildManifest entries
+		for fourCC := range im4mDigests {
+			componentName := ""
+			if name, exists := FourCCToComponent[fourCC]; exists {
+				componentName = name
+				// Check if this component was found in the BuildManifest
+				found := false
+				for _, foundComp := range foundComponents {
+					if foundComp == componentName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					im4mOnlyImages = append(im4mOnlyImages, componentName)
+				}
+			} else {
+				im4mOnlyImages = append(im4mOnlyImages, fourCC+" (unknown)")
+			}
+		}
+
+		// Set the final result based on mode
+		if strict {
+			// Strict mode: All BuildManifest components must be present and verified
+			result.IsValid = len(result.MissingComponents) == 0
+		} else {
+			// Non-strict mode: All IM4M images must have verified digests
+			// (i.e., no mismatches, but missing BuildManifest components are OK)
+			result.IsValid = len(mismatchComponents) == 0 && len(foundComponents) > 0
+		}
+
+		if verbose {
+			componentsFound := len(foundComponents)
+			fmt.Printf("\n%s:\n", colorTitle("Verification Summary"))
+			fmt.Printf("  %s: %d\n", colorField("Total Components"), result.ComponentsChecked)
+			fmt.Printf("  %s: %s\n", colorField("Found (Verified)"), colorSuccess(fmt.Sprintf("%d", componentsFound)))
+			fmt.Printf("  %s: %s\n", colorField("Missing"), colorError(fmt.Sprintf("%d", len(missingComponents))))
+			if len(mismatchComponents) > 0 {
+				fmt.Printf("  %s: %s\n", colorField("Digest Mismatches"), colorError(fmt.Sprintf("%d", len(mismatchComponents))))
+			}
+			if len(unmappedComponents) > 0 {
+				fmt.Printf("  %s: %s\n", colorField("Unmapped"), colorWarning(fmt.Sprintf("%d", len(unmappedComponents))))
+			}
+
+			modeStr := "Standard"
+			if strict {
+				modeStr = "Strict"
+			}
+			fmt.Printf("\n%s (%s): ", colorField("Verification Status"), modeStr)
+			if result.IsValid {
+				fmt.Printf("%s\n", colorSuccess("✓ PASSED"))
+			} else {
+				fmt.Printf("%s\n", colorError("✗ FAILED"))
+				if strict {
+					fmt.Printf("   %s Strict mode requires all BuildManifest components to be present\n", colorError("ℹ️"))
+				} else {
+					fmt.Printf("\n%s Some IM4M images failed verification\n", colorError("ℹ️"))
+				}
+			}
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("no matching build identity found for board ID 0x%x and chip ID 0x%x", boardID, chipID)
 }

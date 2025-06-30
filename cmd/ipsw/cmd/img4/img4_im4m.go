@@ -24,7 +24,6 @@ package img4
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -33,7 +32,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -63,11 +61,11 @@ func init() {
 
 	// Verify command flags
 	img4Im4mVerifyCmd.Flags().StringP("build-manifest", "b", "", "Build manifest file for verification")
-	img4Im4mVerifyCmd.Flags().Bool("allow-extra", false, "Allow IM4M to have properties not in build manifest")
+	img4Im4mVerifyCmd.Flags().BoolP("strict", "s", false, "Strict mode: fail if any BuildManifest components are missing from IM4M")
 	img4Im4mVerifyCmd.MarkFlagRequired("build-manifest")
 	img4Im4mVerifyCmd.MarkFlagFilename("build-manifest")
 	viper.BindPFlag("img4.im4m.verify.build-manifest", img4Im4mVerifyCmd.Flags().Lookup("build-manifest"))
-	viper.BindPFlag("img4.im4m.verify.allow-extra", img4Im4mVerifyCmd.Flags().Lookup("allow-extra"))
+	viper.BindPFlag("img4.im4m.verify.strict", img4Im4mVerifyCmd.Flags().Lookup("strict"))
 
 }
 
@@ -177,33 +175,21 @@ var img4Im4mExtractCmd = &cobra.Command{
 // img4Im4mVerifyCmd represents the im4m verify command
 var img4Im4mVerifyCmd = &cobra.Command{
 	Use:   "verify <IM4M>",
-	Short: "🚧 Verify IM4M manifest against build manifest",
+	Short: "Verify IM4M manifest against build manifest",
 	Example: heredoc.Doc(`
-		# Verify IM4M against build manifest
+		# Verify IM4M against build manifest (standard mode)
 		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist manifest.im4m
-
-		# Allow extra properties in IM4M
-		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --allow-extra manifest.im4m`),
+		
+		# Strict verification (requires all BuildManifest components)
+		❯ ipsw img4 im4m verify --build-manifest BuildManifest.plist --strict manifest.im4m`),
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		buildManifestPath := viper.GetString("img4.im4m.verify.build-manifest")
 
-		inputFile, err := os.Open(args[0])
-		if err != nil {
-			return fmt.Errorf("failed to open input manifest %s: %v", args[0], err)
-		}
-		defer inputFile.Close()
-
-		data, err := io.ReadAll(inputFile)
-		if err != nil {
-			return fmt.Errorf("failed to read input manifest %s: %v", args[0], err)
-		}
-
-		inputManifest, err := img4.ParseManifest(data)
+		im4m, err := img4.OpenManifest(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to parse input IM4M manifest: %v", err)
 		}
@@ -217,22 +203,13 @@ var img4Im4mVerifyCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse build manifest: %v", err)
 		}
 
-		result, err := img4.VerifyManifestProperties(inputManifest, buildManifest, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.allow-extra"))
+		result, err := img4.VerifyManifestDigests(im4m, buildManifest, viper.GetBool("verbose"), viper.GetBool("img4.im4m.verify.strict"))
 		if err != nil {
-			return fmt.Errorf("verification failed: %v", err)
+			return fmt.Errorf("IM4M verification failed: %v", err)
 		}
 
-		if result.IsValid {
-			fmt.Printf("\n%s ✓ Manifest verification %s\n",
-				color.New(color.FgGreen).Sprint("SUCCESS:"),
-				color.New(color.FgGreen).Sprint("PASSED"))
-		} else {
-			fmt.Printf("\n%s ✗ Manifest verification %s\n",
-				color.New(color.FgRed).Sprint("FAILED:"),
-				color.New(color.FgRed).Sprint("FAILED"))
-			for _, mismatch := range result.Mismatches {
-				fmt.Printf("  Property: %s, Expected: %v, Actual: %v\n", mismatch.Property, mismatch.Expected, mismatch.Actual)
-			}
+		if !result.IsValid {
+			return fmt.Errorf("IM4M verification failed")
 		}
 
 		return nil

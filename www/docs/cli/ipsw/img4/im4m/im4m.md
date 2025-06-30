@@ -34,4 +34,5 @@ ipsw img4 im4m [flags]
 * [ipsw img4](/docs/cli/ipsw/img4)	 - Parse and manipulate IMG4 files
 * [ipsw img4 im4m extract](/docs/cli/ipsw/img4/im4m/extract)	 - Extract IM4M manifest from SHSH blob
 * [ipsw img4 im4m info](/docs/cli/ipsw/img4/im4m/info)	 - Display IM4M manifest information
+* [ipsw img4 im4m verify](/docs/cli/ipsw/img4/im4m/verify)	 - Verify IM4M manifest against build manifest
 

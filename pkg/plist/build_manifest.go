@@ -10,7 +10,7 @@ import (
 
 // BuildManifest is the BuildManifest.plist object found in IPSWs/OTAs
 type BuildManifest struct {
-	BuildIdentities       []buildIdentity `plist:"BuildIdentities,omitempty" json:"build_identities,omitempty"`
+	BuildIdentities       []BuildIdentity `plist:"BuildIdentities,omitempty" json:"build_identities,omitempty"`
 	ManifestVersion       int             `plist:"ManifestVersion,omitempty" json:"manifest_version,omitempty"`
 	ProductBuildVersion   string          `plist:"ProductBuildVersion,omitempty" json:"product_build_version,omitempty"`
 	ProductVersion        string          `plist:"ProductVersion,omitempty" json:"product_version,omitempty"`
@@ -32,7 +32,7 @@ func (b *BuildManifest) String() string {
 	return out
 }
 
-type buildIdentity struct {
+type BuildIdentity struct {
 	ApOSLongVersion               string                      `plist:"Ap,OSLongVersion,omitempty" json:"ap_os_long_version,omitempty"`
 	ApBoardID                     string                      `plist:"ApBoardID,omitempty" json:"ap_board_id,omitempty"`
 	ApChipID                      string                      `plist:"ApChipID,omitempty" json:"ap_chip_id,omitempty"`
@@ -52,7 +52,7 @@ type buildIdentity struct {
 	UniqueBuildID                 []byte                      `plist:"UniqueBuildID,omitempty" json:"unique_build_id,omitempty"`
 }
 
-func (i buildIdentity) String() string {
+func (i BuildIdentity) String() string {
 	var out string
 	if len(i.ProductMarketingVersion) > 0 {
 		out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ProductMarketingVersion)

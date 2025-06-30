@@ -88,7 +88,7 @@ var ComponentFourCCs = map[string]string{
 	"MtpFirmware":                       "mtpf",
 	"Multitouch":                        "mtfw",
 	"NeedService":                       "nsrv",
-	"OS":                                "OS\x00\x00",
+	"OS":                                "rosi",
 	"OSRamdisk":                         "osrd",
 	"PEHammer":                          "hmmr",
 	"PERTOS":                            "pert",
@@ -134,6 +134,19 @@ var ComponentFourCCs = map[string]string{
 	"Ap,RestoreSecurePageTableMonitor":  "rspt",
 	"Ap,RestoreTrustedExecutionMonitor": "rtrx",
 	"Ap,RestorecL4":                     "rxcl",
+	"BaseSystem":                        "bsys",
+	"Ap,SecurePageTableMonitor":         "sptm",
+	"Ap,TrustedExecutionMonitor":        "trxm",
+	"Ap,BaseSystemTrustCache":           "bstc",
+	"Ap,SCodec":                         "strc",
+	"BaseSystemVolume":                  "csys",
+	"Cryptex1,AppTrustCache":            "trca",
+	"Cryptex1,AppOS":                    "caos",
+	"Cryptex1,AppVolume":                "casy",
+	"Cryptex1,SystemOS":                 "csos",
+	"Cryptex1,SystemTrustCache":         "trcs",
+	"Cryptex1,SystemVolume":             "cssy",
+	"Ap,RestoreDCP2":                    "rdc2",
 }
 
 type IMG4 struct {
