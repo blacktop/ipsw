@@ -36,31 +36,31 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(pccCmd)
+	DownloadCmd.AddCommand(downloadPccCmd)
 	// Download behavior flags
-	pccCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	pccCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	pccCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	pccCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
-	pccCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	downloadPccCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadPccCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadPccCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	downloadPccCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadPccCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
-	pccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
+	downloadPccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
 	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/instances/<NAME>' to create a PCC VM w/o needing to set the csrutil first
-	pccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
-	pccCmd.MarkFlagDirname("output")
+	downloadPccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
+	downloadPccCmd.MarkFlagDirname("output")
 	// Bind persistent flags
-	viper.BindPFlag("download.pcc.proxy", pccCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.pcc.insecure", pccCmd.Flags().Lookup("insecure"))
-	viper.BindPFlag("download.pcc.skip-all", pccCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.pcc.resume-all", pccCmd.Flags().Lookup("resume-all"))
-	viper.BindPFlag("download.pcc.restart-all", pccCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.pcc.proxy", downloadPccCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.pcc.insecure", downloadPccCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.pcc.skip-all", downloadPccCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.pcc.resume-all", downloadPccCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.pcc.restart-all", downloadPccCmd.Flags().Lookup("restart-all"))
 	// Bind command-specific flags
-	viper.BindPFlag("download.pcc.info", pccCmd.Flags().Lookup("info"))
-	viper.BindPFlag("download.pcc.output", pccCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.pcc.info", downloadPccCmd.Flags().Lookup("info"))
+	viper.BindPFlag("download.pcc.output", downloadPccCmd.Flags().Lookup("output"))
 }
 
-// pccCmd represents the pcc command
-var pccCmd = &cobra.Command{
+// downloadPccCmd represents the pcc command
+var downloadPccCmd = &cobra.Command{
 	Use:           "pcc",
 	Aliases:       []string{"p", "vre", "pccvre"},
 	Short:         "Download PCC VM files",

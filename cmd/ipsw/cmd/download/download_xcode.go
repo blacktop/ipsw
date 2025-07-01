@@ -39,27 +39,27 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(xcodeCmd)
+	DownloadCmd.AddCommand(downloadXcodeCmd)
 	// Download behavior flags
-	xcodeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	xcodeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	xcodeCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	xcodeCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
-	xcodeCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	downloadXcodeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadXcodeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadXcodeCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	downloadXcodeCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadXcodeCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
-	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")
-	xcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
-	xcodeCmd.Flags().StringP("runtime", "r", "", "Name of simulator runtime to download")
+	downloadXcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")
+	downloadXcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
+	downloadXcodeCmd.Flags().StringP("runtime", "r", "", "Name of simulator runtime to download")
 	// Bind persistent flags
-	viper.BindPFlag("download.xcode.proxy", xcodeCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.xcode.insecure", xcodeCmd.Flags().Lookup("insecure"))
-	viper.BindPFlag("download.xcode.skip-all", xcodeCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.xcode.resume-all", xcodeCmd.Flags().Lookup("resume-all"))
-	viper.BindPFlag("download.xcode.restart-all", xcodeCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.xcode.proxy", downloadXcodeCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.xcode.insecure", downloadXcodeCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.xcode.skip-all", downloadXcodeCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.xcode.resume-all", downloadXcodeCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.xcode.restart-all", downloadXcodeCmd.Flags().Lookup("restart-all"))
 }
 
-// xcodeCmd represents the xcode command
-var xcodeCmd = &cobra.Command{
+// downloadXcodeCmd represents the xcode command
+var downloadXcodeCmd = &cobra.Command{
 	Use:           "xcode",
 	Short:         "🚧 Download Xcode 🚧",
 	SilenceErrors: true,

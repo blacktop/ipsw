@@ -33,10 +33,10 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(wpCmd)
+	DownloadCmd.AddCommand(downloadWpCmd)
 }
 
-var wpCmd = &cobra.Command{
+var downloadWpCmd = &cobra.Command{
 	Use:   "wp",
 	Short: "Download and browse Apple wallpapers",
 	Args:  cobra.NoArgs,

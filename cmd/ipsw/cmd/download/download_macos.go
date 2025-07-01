@@ -23,7 +23,6 @@ package download
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -35,42 +34,42 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(macosCmd)
+	DownloadCmd.AddCommand(downloadMacosCmd)
 	// Download behavior flags
-	macosCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	macosCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	macosCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	macosCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	macosCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
-	macosCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	downloadMacosCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadMacosCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadMacosCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	downloadMacosCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	downloadMacosCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadMacosCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Filter flags
-	macosCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
-	macosCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	downloadMacosCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	downloadMacosCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
 	// Command-specific flags
-	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
-	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
-	macosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
-	macosCmd.Flags().Bool("latest", false, "Download latest macOS installer")
-	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
+	downloadMacosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
+	downloadMacosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
+	downloadMacosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
+	downloadMacosCmd.Flags().Bool("latest", false, "Download latest macOS installer")
+	// downloadMacosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
 	// Bind persistent flags
-	viper.BindPFlag("download.macos.proxy", macosCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.macos.insecure", macosCmd.Flags().Lookup("insecure"))
-	viper.BindPFlag("download.macos.confirm", macosCmd.Flags().Lookup("confirm"))
-	viper.BindPFlag("download.macos.skip-all", macosCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.macos.resume-all", macosCmd.Flags().Lookup("resume-all"))
-	viper.BindPFlag("download.macos.restart-all", macosCmd.Flags().Lookup("restart-all"))
-	viper.BindPFlag("download.macos.version", macosCmd.Flags().Lookup("version"))
-	viper.BindPFlag("download.macos.build", macosCmd.Flags().Lookup("build"))
+	viper.BindPFlag("download.macos.proxy", downloadMacosCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.macos.insecure", downloadMacosCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.macos.confirm", downloadMacosCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.macos.skip-all", downloadMacosCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.macos.resume-all", downloadMacosCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.macos.restart-all", downloadMacosCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.macos.version", downloadMacosCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.macos.build", downloadMacosCmd.Flags().Lookup("build"))
 	// Bind command-specific flags
-	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
-	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
-	viper.BindPFlag("download.macos.assistant", macosCmd.Flags().Lookup("assistant"))
-	viper.BindPFlag("download.macos.latest", macosCmd.Flags().Lookup("latest"))
-	// viper.BindPFlag("download.macos.kernel", macosCmd.Flags().Lookup("kernel"))
+	viper.BindPFlag("download.macos.list", downloadMacosCmd.Flags().Lookup("list"))
+	viper.BindPFlag("download.macos.work-dir", downloadMacosCmd.Flags().Lookup("work-dir"))
+	viper.BindPFlag("download.macos.assistant", downloadMacosCmd.Flags().Lookup("assistant"))
+	viper.BindPFlag("download.macos.latest", downloadMacosCmd.Flags().Lookup("latest"))
+	// viper.BindPFlag("download.macos.kernel", downloadMacosCmd.Flags().Lookup("kernel"))
 }
 
-// macosCmd represents the macos command
-var macosCmd = &cobra.Command{
+// downloadMacosCmd represents the macos command
+var downloadMacosCmd = &cobra.Command{
 	Use:           "macos",
 	Aliases:       []string{"m", "mac"},
 	Short:         "Download macOS installers",
@@ -162,7 +161,7 @@ var macosCmd = &cobra.Command{
 			if err := survey.AskOne(prompt, &choices); err != nil {
 				if err == terminal.InterruptErr {
 					log.Warn("Exiting...")
-					os.Exit(0)
+					return nil
 				}
 				return err
 			}
@@ -185,7 +184,7 @@ var macosCmd = &cobra.Command{
 			if err := survey.AskOne(prompt, &cont); err != nil {
 				if err == terminal.InterruptErr {
 					log.Warn("Exiting...")
-					os.Exit(0)
+					return nil
 				}
 				return err
 			}
