@@ -1,40 +1,47 @@
 ---
-id: pcc
-title: pcc
+id: kdk
+title: kdk
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: pcc
-description: Download PCC VM files
+sidebar_label: kdk
+description: Download KDKs
 ---
-## ipsw download pcc
+## ipsw download kdk
 
-Download PCC VM files
+Download KDKs
 
 ```
-ipsw download pcc [flags]
+ipsw download kdk [flags]
 ```
 
 ### Examples
 
 ```bash
-# Show available PCC releases info
-❯ ipsw download pcc --info
+# Download KDK for current host OS
+❯ ipsw download kdk --host
 
-# Download PCC VM files interactively
-❯ ipsw download pcc
+# Download KDK for specific build
+❯ ipsw download kdk --build 20G75
 
-# Download to specific directory
-❯ ipsw download pcc --output ./pcc-vms
+# Download latest KDK and install
+❯ ipsw download kdk --latest --install
+
+# Download all available KDKs
+❯ ipsw download kdk --all
 
 ```
 
 ### Options
 
 ```
-  -h, --help            help for pcc
-  -i, --info            Show PCC Release info
+  -a, --all             Download all KDKs
+  -b, --build string    Download KDK for build
+  -h, --help            help for kdk
+      --host            Download KDK for current host OS
       --insecure        do not verify ssl certs
-  -o, --output string   Output directory to save files to
+  -i, --install         Install KDK after download
+  -l, --latest          Download latest KDK
+  -o, --output string   Folder to download files to
       --proxy string    HTTP/HTTPS proxy
       --restart-all     always restart resumable IPSWs
       --resume-all      always resume resumable IPSWs

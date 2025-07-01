@@ -14,13 +14,34 @@ Download old(er) IPSWs from theiphonewiki.com
 ipsw download wiki [flags]
 ```
 
+### Examples
+
+```bash
+# Download older IPSWs for specific device
+❯ ipsw download wiki --ipsw --device iPhone10,6 --version 12.0
+
+# Download OTA updates with prerequisites
+❯ ipsw download wiki --ota --device iPhone14,2 --version 17.1 --pv 17.0
+
+# Extract kernelcache from remote IPSW
+❯ ipsw download wiki --ipsw --device iPhone14,2 --build 21A329 --kernel
+
+# Build JSON database of firmware metadata
+❯ ipsw download wiki --ipsw --device iPhone14,2 --json
+
+```
+
 ### Options
 
 ```
       --beta             Download beta IPSWs/OTAs
+  -b, --build string     iOS BuildID (i.e. 16F203)
+  -y, --confirm          do not prompt user for confirmation
       --db string        Path to local JSON database (will use CWD by default) (default "wiki_db.json")
+  -d, --device string    iOS Device (i.e. iPhone11,2)
   -f, --flat             Do NOT perserve directory structure when downloading with --pattern
   -h, --help             help for wiki
+      --insecure         do not verify ssl certs
       --ipsw             Download IPSWs
       --json             Parse URLs and store metadata in local JSON database
       --kernel           Extract kernelcache from remote IPSW
@@ -28,29 +49,22 @@ ipsw download wiki [flags]
   -o, --output string    Folder to download files to
       --pattern string   Download remote files that match regex
       --pb string        OTA prerequisite build
+      --proxy string     HTTP/HTTPS proxy
       --pv string        OTA prerequisite version
+  -_, --remove-commas    replace commas in IPSW filename with underscores
+      --restart-all      always restart resumable IPSWs
+      --resume-all       always resume resumable IPSWs
+      --skip-all         always skip resumable IPSWs
+  -v, --version string   iOS Version (i.e. 12.3.1)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-      --color                    colorize output
-      --config string            config file (default is $HOME/.config/ipsw/config.yaml)
-  -y, --confirm                  do not prompt user for confirmation
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --insecure                 do not verify ssl certs
-  -m, --model string             iOS Model (i.e. D321AP)
-      --no-color                 disable colorize output
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
-      --skip-all                 always skip resumable IPSWs
-  -V, --verbose                  verbose output
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
 ```
 
 ### SEE ALSO

@@ -14,12 +14,31 @@ Download App Packages from the iOS App Store
 ipsw download ipa [flags]
 ```
 
+### Examples
+
+```bash
+# Download specific app by bundle ID
+❯ ipsw download ipa com.zhiliaoapp.musically
+
+# Search for apps and download interactively
+❯ ipsw download ipa --search twitter
+
+# Download from different store front
+❯ ipsw download ipa --store-front UK com.zhiliaoapp.musically
+
+# Download to specific directory
+❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
+
+```
+
 ### Options
 
 ```
   -h, --help                    help for ipa
+      --insecure                do not verify ssl certs
   -o, --output string           Folder to download files to
       --password string         Password for authentication
+      --proxy string            HTTP/HTTPS proxy
       --search                  Search for app to download
       --sms                     Prefer SMS Two-factor authentication
   -s, --store-front string      The country code for the App Store to download from (default "US")
@@ -30,23 +49,10 @@ ipsw download ipa [flags]
 ### Options inherited from parent commands
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-      --color                    colorize output
-      --config string            config file (default is $HOME/.config/ipsw/config.yaml)
-  -y, --confirm                  do not prompt user for confirmation
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --insecure                 do not verify ssl certs
-  -m, --model string             iOS Model (i.e. D321AP)
-      --no-color                 disable colorize output
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
-      --skip-all                 always skip resumable IPSWs
-  -V, --verbose                  verbose output
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
 ```
 
 ### SEE ALSO

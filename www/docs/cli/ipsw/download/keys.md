@@ -14,34 +14,43 @@ Download FW keys from The iPhone Wiki
 ipsw download keys [flags]
 ```
 
+### Examples
+
+```bash
+# Download firmware keys for specific device/version
+❯ ipsw download keys --device iPhone14,2 --version 17.0
+
+# Download keys for specific build
+❯ ipsw download keys --device iPhone14,2 --build 21A329
+
+# Save keys as JSON file
+❯ ipsw download keys --device iPhone14,2 --build 21A329 --output ./keys
+
+# Output keys as JSON to stdout
+❯ ipsw download keys --device iPhone14,2 --build 21A329 --json
+
+```
+
 ### Options
 
 ```
-  -h, --help            help for keys
-      --json            Output as JSON
-  -o, --output string   Folder to download keys to
+  -b, --build string     iOS BuildID (i.e. 16F203)
+  -d, --device string    iOS Device (i.e. iPhone11,2)
+  -h, --help             help for keys
+      --insecure         do not verify ssl certs
+      --json             Output as JSON
+  -o, --output string    Folder to download keys to
+      --proxy string     HTTP/HTTPS proxy
+  -v, --version string   iOS Version (i.e. 12.3.1)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-      --color                    colorize output
-      --config string            config file (default is $HOME/.config/ipsw/config.yaml)
-  -y, --confirm                  do not prompt user for confirmation
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --insecure                 do not verify ssl certs
-  -m, --model string             iOS Model (i.e. D321AP)
-      --no-color                 disable colorize output
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
-      --skip-all                 always skip resumable IPSWs
-  -V, --verbose                  verbose output
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
 ```
 
 ### SEE ALSO
