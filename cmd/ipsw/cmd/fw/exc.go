@@ -58,7 +58,6 @@ var excCmd = &cobra.Command{
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
