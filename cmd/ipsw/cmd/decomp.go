@@ -1,3 +1,5 @@
+//go:build darwin && cgo
+
 /*
 Copyright © 2025 blacktop
 
@@ -52,9 +54,8 @@ func init() {
 var decompCmd = &cobra.Command{
 	Use:           "decomp",
 	Short:         "Decompress files using libcompression",
-	SilenceUsage:  true,
+	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
