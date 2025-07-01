@@ -32,6 +32,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -131,14 +132,20 @@ var downloadAppledbCmd = &cobra.Command{
 	Use:     "appledb",
 	Aliases: []string{"db"},
 	Short:   "Download IPSWs from appledb",
-	Example: `  # Download the iOS 16.5 beta 4 kernelcache from remote IPSW
-  ❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
-   • Querying AppleDB...
-   • Parsing remote IPSW       build=20F5059a devices=iPhone15,2 version=16.5
-   • Extracting remote kernelcache
-      • Writing 20F5059a__iPhone15,2/kernelcache.release.iPhone15,2`,
+	Example: heredoc.Doc(`
+		# Download the iOS 16.5 beta 4 kernelcache from remote IPSW
+		❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
+
+		# Download latest release iOS IPSWs for multiple devices
+		❯ ipsw download appledb --os iOS --latest --release
+
+		# Get URLs only for beta macOS IPSWs
+		❯ ipsw download appledb --os macOS --beta --urls --json
+
+		# Download OTA deltas for specific build
+		❯ ipsw download appledb --os iOS --type ota --deltas --prereq-build 20G75
+	`),
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

@@ -30,6 +30,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -64,11 +65,23 @@ func init() {
 
 // downloadGitCmd represents the git command
 var downloadGitCmd = &cobra.Command{
-	Use:           "git",
-	Aliases:       []string{"g", "github"},
-	Short:         "Download github.com/orgs/apple-oss-distributions tarballs",
-	SilenceUsage:  false,
-	SilenceErrors: false,
+	Use:     "git",
+	Aliases: []string{"g", "github"},
+	Short:   "Download github.com/orgs/apple-oss-distributions tarballs",
+	Example: heredoc.Doc(`
+		# Download latest dyld source tarballs
+		❯ ipsw download git --product dyld --latest
+
+		# Get all available tarballs as JSON
+		❯ ipsw download git --json --output ~/sources
+
+		# Download WebKit tags (not Apple OSS)
+		❯ ipsw download git --webkit --json
+
+		# Download specific product with API token
+		❯ ipsw download git --product xnu --api YOUR_TOKEN
+	`),
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {

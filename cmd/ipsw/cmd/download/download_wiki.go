@@ -32,6 +32,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
@@ -99,11 +100,23 @@ func init() {
 
 // downloadWikiCmd represents the wiki command
 var downloadWikiCmd = &cobra.Command{
-	Use:           "wiki",
-	Aliases:       []string{"w"},
-	Short:         "Download old(er) IPSWs from theiphonewiki.com",
+	Use:     "wiki",
+	Aliases: []string{"w"},
+	Short:   "Download old(er) IPSWs from theiphonewiki.com",
+	Example: heredoc.Doc(`
+		# Download older IPSWs for specific device
+		❯ ipsw download wiki --ipsw --device iPhone10,6 --version 12.0
+
+		# Download OTA updates with prerequisites
+		❯ ipsw download wiki --ota --device iPhone14,2 --version 17.1 --pv 17.0
+
+		# Extract kernelcache from remote IPSW
+		❯ ipsw download wiki --ipsw --device iPhone14,2 --build 21A329 --kernel
+
+		# Build JSON database of firmware metadata
+		❯ ipsw download wiki --ipsw --device iPhone14,2 --json
+	`),
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

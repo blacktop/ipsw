@@ -30,6 +30,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -70,9 +71,22 @@ func init() {
 
 // downloadIpaCmd represents the dev command
 var downloadIpaCmd = &cobra.Command{
-	Use:           "ipa",
-	Aliases:       []string{"app"},
-	Short:         "Download App Packages from the iOS App Store",
+	Use:     "ipa",
+	Aliases: []string{"app"},
+	Short:   "Download App Packages from the iOS App Store",
+	Example: heredoc.Doc(`
+		# Download specific app by bundle ID
+		❯ ipsw download ipa com.zhiliaoapp.musically
+
+		# Search for apps and download interactively
+		❯ ipsw download ipa --search twitter
+
+		# Download from different store front
+		❯ ipsw download ipa --store-front UK com.zhiliaoapp.musically
+
+		# Download to specific directory
+		❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
+	`),
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

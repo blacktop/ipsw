@@ -30,6 +30,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -72,11 +73,22 @@ func init() {
 
 // downloadKdkCmd represents the kdk command
 var downloadKdkCmd = &cobra.Command{
-	Use:           "kdk",
-	Short:         "Download KDKs",
-	SilenceUsage:  true,
+	Use:   "kdk",
+	Short: "Download KDKs",
+	Example: heredoc.Doc(`
+		# Download KDK for current host OS
+		❯ ipsw download kdk --host
+
+		# Download KDK for specific build
+		❯ ipsw download kdk --build 20G75
+
+		# Download latest KDK and install
+		❯ ipsw download kdk --latest --install
+
+		# Download all available KDKs
+		❯ ipsw download kdk --all
+	`),
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

@@ -34,6 +34,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
@@ -105,10 +106,22 @@ func init() {
 
 // downloadDevCmd represents the dev command
 var downloadDevCmd = &cobra.Command{
-	Use:           "dev",
-	Aliases:       []string{"d", "developer"},
-	Short:         "Download IPSWs (and more) from https://developer.apple.com/download",
-	SilenceUsage:  true,
+	Use:     "dev",
+	Aliases: []string{"d", "developer"},
+	Short:   "Download IPSWs (and more) from the Apple Developer Portal",
+	Example: heredoc.Doc(`
+		# Download all available OSes interactively
+		❯ ipsw download dev --os
+
+		# Download logging profiles as JSON
+		❯ ipsw download dev --profile --json --pretty
+
+		# Watch for new releases matching pattern
+		❯ ipsw download dev --watch "^iOS.*beta$"
+
+		# Download more items (Xcode, KDKs, etc.)
+		❯ ipsw download dev --more --output ~/Downloads
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -26,6 +26,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -70,10 +71,22 @@ func init() {
 
 // downloadMacosCmd represents the macos command
 var downloadMacosCmd = &cobra.Command{
-	Use:           "macos",
-	Aliases:       []string{"m", "mac"},
-	Short:         "Download macOS installers",
-	SilenceUsage:  false,
+	Use:     "macos",
+	Aliases: []string{"m", "mac"},
+	Short:   "Download macOS installers",
+	Example: heredoc.Doc(`
+		# List available macOS installers
+		❯ ipsw download macos --list
+
+		# Download latest macOS installer
+		❯ ipsw download macos --latest
+
+		# Download specific macOS version
+		❯ ipsw download macos --version 14.0
+
+		# Download only InstallAssistant.pkg
+		❯ ipsw download macos --version 14.0 --assistant
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

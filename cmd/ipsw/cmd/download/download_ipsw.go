@@ -31,6 +31,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
@@ -120,10 +121,19 @@ func init() {
 
 // downloadIpswCmd represents the ipsw command
 var downloadIpswCmd = &cobra.Command{
-	Use:           "ipsw",
-	Aliases:       []string{"i"},
-	Short:         "Download and parse IPSW(s) from the internets",
-	SilenceUsage:  true,
+	Use:     "ipsw",
+	Aliases: []string{"i"},
+	Short:   "Download and parse IPSW(s) from ipsw.me",
+	Example: heredoc.Doc(`
+		# Download latest iOS IPSWs for iPhone15,2
+		❯ ipsw download ipsw --device iPhone15,2 --latest
+
+		# Download specific iOS build with kernelcache extraction
+		❯ ipsw download ipsw --device iPhone14,2 --build 20G75 --kernel
+
+		# Get URLs only without downloading
+		❯ ipsw download ipsw --device iPhone15,2 --version 17.0 --urls
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
