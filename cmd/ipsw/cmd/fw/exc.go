@@ -68,6 +68,7 @@ var excCmd = &cobra.Command{
 		// flags
 		showInfo := viper.GetBool("fw.exclave.info")
 		output := viper.GetString("fw.exclave.output")
+
 		infile := filepath.Clean(args[0])
 
 		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.exclave.remote") {
@@ -101,23 +102,16 @@ var excCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			tf, err := os.CreateTemp("", "exclave")
+			data, err := im4p.GetData()
 			if err != nil {
-				return fmt.Errorf("failed to create temp file: %v", err)
-			}
-			defer os.Remove(tf.Name())
-			if _, err := tf.Write(im4p.Data); err != nil {
-				return fmt.Errorf("failed to write temp file: %v", err)
-			}
-			if err := tf.Close(); err != nil {
-				return fmt.Errorf("failed to close temp file: %v", err)
+				return fmt.Errorf("failed to get data from exclave img4 payload: %v", err)
 			}
 			if showInfo {
-				fwcmd.ShowExclaveCores(tf.Name())
+				fwcmd.ShowExclaveCores(data)
 				return nil
 			}
 			log.Info("Extracting Exclave Bundle")
-			out, err := fwcmd.ExtractExclaveCores(tf.Name(), output)
+			out, err := fwcmd.ExtractExclaveCores(data, output)
 			if err != nil {
 				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 			}
@@ -125,12 +119,16 @@ var excCmd = &cobra.Command{
 				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		} else {
+			data, err := os.ReadFile(infile)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %v", infile, err)
+			}
 			if showInfo {
-				fwcmd.ShowExclaveCores(infile)
+				fwcmd.ShowExclaveCores(data)
 				return nil
 			}
 			log.Info("Extracting Exclave Bundle")
-			out, err := fwcmd.ExtractExclaveCores(infile, output)
+			out, err := fwcmd.ExtractExclaveCores(data, output)
 			if err != nil {
 				return fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 			}

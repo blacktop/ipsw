@@ -29,7 +29,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
@@ -239,26 +238,21 @@ func SPTM(c *Config) ([]string, error) {
 		}
 
 		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
-		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
 		if err := os.MkdirAll(folder, 0o750); err != nil {
 			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
 		}
+		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
 
-		if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
-			dat, err = lzfse.NewDecoder(im4p.Data).DecodeBuffer()
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompress '%s': %v", f, err)
-			}
-			if err = os.WriteFile(fname, dat, 0o666); err != nil {
-				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
-			}
-			outfiles = append(outfiles, fname)
-		} else {
-			if err = os.WriteFile(fname, im4p.Data, 0o666); err != nil {
-				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
-			}
-			outfiles = append(outfiles, fname)
+		data, err := im4p.GetData()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
+
+		if err = os.WriteFile(fname, data, 0o644); err != nil {
+			return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
+		}
+
+		outfiles = append(outfiles, fname)
 	}
 
 	return outfiles, nil
@@ -267,6 +261,7 @@ func SPTM(c *Config) ([]string, error) {
 func Exclave(c *Config) ([]string, error) {
 	var tmpOut []string
 	var outfiles []string
+	var excs [][]byte
 
 	origOutput := c.Output
 
@@ -294,45 +289,23 @@ func Exclave(c *Config) ([]string, error) {
 		if strings.Contains(f, ".restore.") {
 			continue // TODO: skip restore bundles for now
 		}
-		dat, err := os.ReadFile(f)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
-		}
-
-		im4p, err := img4.ParsePayload(dat)
+		im4p, err := img4.OpenPayload(f)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
-
-		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
-		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
-		if err := os.MkdirAll(folder, 0o750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
+		exc, err := im4p.GetData()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
-
-		if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
-			dat, err = lzfse.NewDecoder(im4p.Data).DecodeBuffer()
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompress '%s': %v", f, err)
-			}
-			if err = os.WriteFile(fname, dat, 0o666); err != nil {
-				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
-			}
-			outfiles = append(outfiles, fname)
-		} else {
-			if err = os.WriteFile(fname, im4p.Data, 0o666); err != nil {
-				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
-			}
-			outfiles = append(outfiles, fname)
-		}
+		excs = append(excs, exc)
 	}
 
-	for _, exc := range outfiles {
+	for _, exc := range excs {
 		if c.Info {
 			fwcmd.ShowExclaveCores(exc)
 			continue
 		}
-		out, err := fwcmd.ExtractExclaveCores(exc, filepath.Dir(exc))
+		out, err := fwcmd.ExtractExclaveCores(exc, filepath.Clean(c.Output))
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 		}
