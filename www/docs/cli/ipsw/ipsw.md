@@ -24,6 +24,8 @@ Download and Parse IPSWs (and SO much more)
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
 * [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or MachO
+* [ipsw comp](/docs/cli/ipsw/comp)	 - Compress files using libcompression
+* [ipsw decomp](/docs/cli/ipsw/decomp)	 - Decompress files using libcompression
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
 * [ipsw disk](/docs/cli/ipsw/disk)	 - Disk commands
@@ -42,6 +44,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw mdevs](/docs/cli/ipsw/mdevs)	 - List all MobileDevices in IPSW
 * [ipsw mount](/docs/cli/ipsw/mount)	 - Mount DMG from IPSW
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
+* [ipsw pbzx](/docs/cli/ipsw/pbzx)	 - Decompess pbzx files
 * [ipsw pkg](/docs/cli/ipsw/pkg)	 - 🚧 List contents of a DMG/PKG file
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device

@@ -14,36 +14,48 @@ Download macOS installers
 ipsw download macos [flags]
 ```
 
+### Examples
+
+```bash
+# List available macOS installers
+❯ ipsw download macos --list
+
+# Download latest macOS installer
+❯ ipsw download macos --latest
+
+# Download specific macOS version
+❯ ipsw download macos --version 14.0
+
+# Download only InstallAssistant.pkg
+❯ ipsw download macos --version 14.0 --assistant
+
+```
+
 ### Options
 
 ```
   -a, --assistant         Only download the InstallAssistant.pkg
+  -b, --build string      iOS BuildID (i.e. 16F203)
+  -y, --confirm           do not prompt user for confirmation
   -h, --help              help for macos
+      --insecure          do not verify ssl certs
       --latest            Download latest macOS installer
   -l, --list              Show latest macOS installers
+      --proxy string      HTTP/HTTPS proxy
+      --restart-all       always restart resumable IPSWs
+      --resume-all        always resume resumable IPSWs
+      --skip-all          always skip resumable IPSWs
+  -v, --version string    iOS Version (i.e. 12.3.1)
   -w, --work-dir string   macOS installer creator working directory
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-      --color                    colorize output
-      --config string            config file (default is $HOME/.config/ipsw/config.yaml)
-  -y, --confirm                  do not prompt user for confirmation
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --insecure                 do not verify ssl certs
-  -m, --model string             iOS Model (i.e. D321AP)
-      --no-color                 disable colorize output
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
-      --skip-all                 always skip resumable IPSWs
-  -V, --verbose                  verbose output
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
 ```
 
 ### SEE ALSO

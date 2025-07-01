@@ -14,38 +14,44 @@ Download github.com/orgs/apple-oss-distributions tarballs
 ipsw download git [flags]
 ```
 
+### Examples
+
+```bash
+# Download latest dyld source tarballs
+❯ ipsw download git --product dyld --latest
+
+# Get all available tarballs as JSON
+❯ ipsw download git --json --output ~/sources
+
+# Download WebKit tags (not Apple OSS)
+❯ ipsw download git --webkit --json
+
+# Download specific product with API token
+❯ ipsw download git --product xnu --api YOUR_TOKEN
+
+```
+
 ### Options
 
 ```
   -a, --api string       Github API Token
   -h, --help             help for git
+      --insecure         do not verify ssl certs
       --json             Output downloadable tar.gz URLs as JSON
       --latest           Get ONLY latest tag
   -o, --output string    Folder to download files to
   -p, --product string   macOS product to download (i.e. dyld)
+      --proxy string     HTTP/HTTPS proxy
       --webkit           Get WebKit tags
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-      --color                    colorize output
-      --config string            config file (default is $HOME/.config/ipsw/config.yaml)
-  -y, --confirm                  do not prompt user for confirmation
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --insecure                 do not verify ssl certs
-  -m, --model string             iOS Model (i.e. D321AP)
-      --no-color                 disable colorize output
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
-      --skip-all                 always skip resumable IPSWs
-  -V, --verbose                  verbose output
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
+  -V, --verbose         verbose output
 ```
 
 ### SEE ALSO
