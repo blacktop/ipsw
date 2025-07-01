@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/blacktop/ipsw/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -39,7 +40,11 @@ func init() {
 var downloadWpCmd = &cobra.Command{
 	Use:   "wp",
 	Short: "Download and browse Apple wallpapers",
-	Args:  cobra.NoArgs,
+	Example: heredoc.Doc(`
+		# Browse and download Apple wallpapers interactively
+		❯ ipsw download wp
+	`),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		m, err := tui.NewWallpaperTUI(ctx)

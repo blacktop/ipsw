@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -62,9 +63,21 @@ func init() {
 
 // downloadKeysCmd represents the keys command
 var downloadKeysCmd = &cobra.Command{
-	Use:           "keys",
-	Short:         "Download FW keys from The iPhone Wiki",
-	SilenceUsage:  true,
+	Use:   "keys",
+	Short: "Download FW keys from The iPhone Wiki",
+	Example: heredoc.Doc(`
+		# Download firmware keys for specific device/version
+		❯ ipsw download keys --device iPhone14,2 --version 17.0
+
+		# Download keys for specific build
+		❯ ipsw download keys --device iPhone14,2 --build 21A329
+
+		# Save keys as JSON file
+		❯ ipsw download keys --device iPhone14,2 --build 21A329 --output ./keys
+
+		# Output keys as JSON to stdout
+		❯ ipsw download keys --device iPhone14,2 --build 21A329 --json
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

@@ -26,6 +26,7 @@ package download
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/tss"
@@ -62,9 +63,19 @@ func init() {
 
 // downloadTssCmd represents the tss command
 var downloadTssCmd = &cobra.Command{
-	Use:           "tss",
-	Aliases:       []string{"t", "tsschecker"},
-	Short:         "🚧 Download SHSH Blobs",
+	Use:     "tss",
+	Aliases: []string{"t", "tsschecker"},
+	Short:   "🚧 Download SHSH Blobs",
+	Example: heredoc.Doc(`
+		# Check if iOS version is still being signed
+		❯ ipsw download tss --device iPhone14,2 --version 17.0 --signed
+
+		# Check signing status for USB connected device
+		❯ ipsw download tss --usb --signed
+
+		# Download SHSH blobs for specific device/version (WIP)
+		❯ ipsw download tss --device iPhone14,2 --version 17.0
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

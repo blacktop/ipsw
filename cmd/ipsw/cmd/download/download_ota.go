@@ -31,6 +31,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
@@ -140,14 +141,19 @@ var downloadOtaCmd = &cobra.Command{
 	Use:     "ota [options]",
 	Aliases: []string{"o"},
 	Short:   "Download OTAs",
-	Example: `  # Download the iOS 14.8.1 OTA for the iPhone10,1
-  ❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
-    ? You are about to download 1 OTA files. Continue? Yes
-	  • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
-	  280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s
-  # Get all the latest BETA iOS OTAs URLs as JSON
-  ❯ ipsw download ota --platform ios --beta --urls --json`,
-	SilenceUsage:  true,
+	Example: heredoc.Doc(`
+		# Download the iOS 14.8.1 OTA for the iPhone10,1
+		❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
+
+		# Get all the latest BETA iOS OTAs URLs as JSON
+		❯ ipsw download ota --platform ios --beta --urls --json
+
+		# Download latest tvOS OTA and extract kernelcache
+		❯ ipsw download ota --platform tvos --latest --kernel
+
+		# Download Xcode Simulator Runtime OTAs
+		❯ ipsw download ota --platform ios --sim --build "22F77"
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

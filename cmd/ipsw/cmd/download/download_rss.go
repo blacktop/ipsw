@@ -28,6 +28,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -51,6 +52,17 @@ var downloadRssCmd = &cobra.Command{
 	Use:     "rss",
 	Aliases: []string{"r"},
 	Short:   "Read Releases - Apple Developer RSS Feed",
+	Example: heredoc.Doc(`
+		# Read latest Apple developer releases
+		❯ ipsw download rss
+
+		# Watch for new releases with notifications
+		❯ ipsw download rss --watch
+
+		# Output RSS feed as JSON
+		❯ ipsw download rss --json
+	`),
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var releases []string
 

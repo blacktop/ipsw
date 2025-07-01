@@ -28,6 +28,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
@@ -61,10 +62,19 @@ func init() {
 
 // downloadPccCmd represents the pcc command
 var downloadPccCmd = &cobra.Command{
-	Use:           "pcc",
-	Aliases:       []string{"p", "vre", "pccvre"},
-	Short:         "Download PCC VM files",
-	SilenceUsage:  false,
+	Use:     "pcc",
+	Aliases: []string{"p", "vre", "pccvre"},
+	Short:   "Download PCC VM files",
+	Example: heredoc.Doc(`
+		# Show available PCC releases info
+		❯ ipsw download pcc --info
+
+		# Download PCC VM files interactively
+		❯ ipsw download pcc
+
+		# Download to specific directory
+		❯ ipsw download pcc --output ./pcc-vms
+	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

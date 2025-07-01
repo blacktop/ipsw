@@ -30,6 +30,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -60,10 +61,22 @@ func init() {
 
 // downloadXcodeCmd represents the xcode command
 var downloadXcodeCmd = &cobra.Command{
-	Use:           "xcode",
-	Short:         "🚧 Download Xcode 🚧",
-	SilenceErrors: true,
-	Hidden:        true,
+	Use:   "xcode",
+	Short: "🚧 Download Xcode 🚧",
+	Example: heredoc.Doc(`
+		# Download latest Xcode
+		❯ ipsw download xcode --latest
+
+		# Download Xcode interactively
+		❯ ipsw download xcode
+
+		# Download simulator runtimes
+		❯ ipsw download xcode --sim
+
+		# Download specific simulator runtime
+		❯ ipsw download xcode --sim --runtime "iOS 17.0"
+	`),
+	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
