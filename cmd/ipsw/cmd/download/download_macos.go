@@ -36,19 +36,32 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(macosCmd)
-
+	// Download behavior flags
+	macosCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	macosCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	macosCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	macosCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	macosCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	macosCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	// Filter flags
+	macosCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	macosCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
 	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
 	macosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
 	macosCmd.Flags().Bool("latest", false, "Download latest macOS installer")
 	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
-	macosCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		c.Parent().HelpFunc()(c, s)
-	})
+	// Bind persistent flags
+	viper.BindPFlag("download.macos.proxy", macosCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.macos.insecure", macosCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.macos.confirm", macosCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.macos.skip-all", macosCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.macos.resume-all", macosCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.macos.restart-all", macosCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.macos.version", macosCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.macos.build", macosCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
 	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
 	viper.BindPFlag("download.macos.assistant", macosCmd.Flags().Lookup("assistant"))
@@ -70,34 +83,22 @@ var macosCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
-		cmd.Flags().Lookup("remove-commas").Hidden = true
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
+		proxy := viper.GetString("download.macos.proxy")
+		insecure := viper.GetBool("download.macos.insecure")
+		confirm := viper.GetBool("download.macos.confirm")
+		skipAll := viper.GetBool("download.macos.skip-all")
+		resumeAll := viper.GetBool("download.macos.resume-all")
+		restartAll := viper.GetBool("download.macos.restart-all")
 		// filters
-		version := viper.GetString("download.version")
-		build := viper.GetString("download.build")
+		version := viper.GetString("download.macos.version")
+		build := viper.GetString("download.macos.build")
 		// flags
 		showInstallers := viper.GetBool("download.macos.list")
 		workDir := viper.GetString("download.macos.work-dir")
 		assistantOnly := viper.GetBool("download.macos.assistant")
 		latest := viper.GetBool("download.macos.latest")
 		// remoteKernel := viper.GetString("download.macos.kernel")
-
 		// verify args
 		if len(version) > 0 && len(build) > 0 {
 			return fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
@@ -163,7 +164,7 @@ var macosCmd = &cobra.Command{
 					log.Warn("Exiting...")
 					os.Exit(0)
 				}
-				log.Fatal(err.Error())
+				return err
 			}
 			var chosenProds []download.ProductInfo
 			for choice := range choices {
@@ -186,7 +187,7 @@ var macosCmd = &cobra.Command{
 					log.Warn("Exiting...")
 					os.Exit(0)
 				}
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 

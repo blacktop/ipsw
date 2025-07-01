@@ -44,18 +44,51 @@ import (
 )
 
 func init() {
+	DownloadCmd.AddCommand(devCmd)
+	// Download behavior flags
+	devCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	devCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	devCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	devCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	devCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	devCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	// Auth flags
+	devCmd.Flags().StringP("username", "u", "", "Apple Developer Portal username")
+	devCmd.Flags().StringP("password", "p", "", "Apple Developer Portal password")
+	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
+	// Filter flags
+	devCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	devCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	devCmd.Flags().StringArrayP("watch", "w", []string{}, "Developer portal group pattern to watch (i.e. '^iOS.*beta$')")
 	devCmd.Flags().Bool("os", false, "Download '*OS' OSes/Apps")
 	devCmd.Flags().Bool("profile", false, "Download Logging Profiles")
 	devCmd.Flags().Bool("more", false, "Download 'More' OSes/Apps")
-	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
+	devCmd.Flags().Bool("kdk", false, "Download KDK")
+	devCmd.Flags().MarkHidden("kdk")
+	devCmd.MarkFlagsMutuallyExclusive("os", "profile", "more", "kdk")
+	devCmd.Flags().Int("page", 20, "Page size for file lists")
 	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
-	devCmd.Flags().Bool("kdk", false, "Download KDK")
 	devCmd.Flags().DurationP("timeout", "t", 5*time.Minute, "Timeout for watch attempts in minutes")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
-	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
+	devCmd.MarkFlagDirname("output")
+	// Bind persistent flags
+	viper.BindPFlag("download.dev.proxy", devCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.dev.insecure", devCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.dev.skip-all", devCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.dev.resume-all", devCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.dev.restart-all", devCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.dev.remove-commas", devCmd.Flags().Lookup("remove-commas"))
+	// Auth flags
+	viper.BindPFlag("download.dev.username", devCmd.Flags().Lookup("username"))
+	viper.BindPFlag("download.dev.password", devCmd.Flags().Lookup("password"))
+	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
+	// Filter flags
+	viper.BindPFlag("download.dev.version", devCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.dev.build", devCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("download.dev.os", devCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.dev.profile", devCmd.Flags().Lookup("profile"))
@@ -68,19 +101,6 @@ func init() {
 	viper.BindPFlag("download.dev.timeout", devCmd.Flags().Lookup("timeout"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
-	devCmd.Flags().MarkHidden("kdk")
-	devCmd.MarkFlagDirname("output")
-	devCmd.MarkFlagsMutuallyExclusive("os", "profile", "more", "kdk")
-	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		c.Parent().HelpFunc()(c, s)
-	})
-	DownloadCmd.AddCommand(devCmd)
 }
 
 // devCmd represents the dev command
@@ -97,24 +117,13 @@ var devCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		// confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
-		removeCommas := viper.GetBool("download.remove-commas")
+		proxy := viper.GetString("download.dev.proxy")
+		insecure := viper.GetBool("download.dev.insecure")
+		skipAll := viper.GetBool("download.dev.skip-all")
+		resumeAll := viper.GetBool("download.dev.resume-all")
+		restartAll := viper.GetBool("download.dev.restart-all")
+		removeCommas := viper.GetBool("download.dev.remove-commas")
 		// flags
 		watchList := viper.GetStringSlice("download.dev.watch")
 		pageSize := viper.GetInt("download.dev.page")
@@ -122,7 +131,7 @@ var devCmd = &cobra.Command{
 		asJSON := viper.GetBool("download.dev.json")
 		prettyJSON := viper.GetBool("download.dev.pretty")
 		output := viper.GetString("download.dev.output")
-
+		// auth
 		username := viper.GetString("download.dev.username")
 		password := viper.GetString("download.dev.password")
 
@@ -155,7 +164,7 @@ var devCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("download.dev.kdk") {
-			return app.DownloadKDK(viper.GetString("download.version"), viper.GetString("download.build"), output)
+			return app.DownloadKDK(viper.GetString("download.dev.version"), viper.GetString("download.dev.build"), output)
 		}
 
 		dlType := ""

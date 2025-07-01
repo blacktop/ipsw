@@ -39,28 +39,21 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(gitCmd)
-
+	// Download behavior flags
+	gitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	gitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	// Command-specific flags
 	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
 	gitCmd.Flags().Bool("latest", false, "Get ONLY latest tag")
 	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	gitCmd.MarkFlagDirname("output")
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	gitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
-	gitCmd.MarkFlagDirname("output")
-	gitCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
+	// Bind persistent flags
+	viper.BindPFlag("download.git.proxy", gitCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.git.insecure", gitCmd.Flags().Lookup("insecure"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
 	viper.BindPFlag("download.git.latest", gitCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
@@ -83,12 +76,9 @@ var gitCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
+		proxy := viper.GetString("download.git.proxy")
+		insecure := viper.GetBool("download.git.insecure")
 		// flags
 		downloadProduct := viper.GetString("download.git.product")
 		latest := viper.GetBool("download.git.latest")
@@ -118,11 +108,13 @@ var gitCmd = &cobra.Command{
 					return fmt.Errorf("failed to marshal JSON: %v", err)
 				}
 				if len(outputFolder) > 0 {
-					os.MkdirAll(outputFolder, 0750)
+					if err := os.MkdirAll(outputFolder, 0750); err != nil {
+						return fmt.Errorf("failed to create output folder %s: %v", outputFolder, err)
+					}
 					fpath := filepath.Join(outputFolder, "webkit_tags.json")
 					log.Infof("Creating %s", fpath)
-					if err := os.WriteFile(fpath, dat, 0660); err != nil {
-						return fmt.Errorf("failed to write file: %v", err)
+					if err := os.WriteFile(fpath, dat, 0644); err != nil {
+						return fmt.Errorf("failed to write file %s: %v", fpath, err)
 					}
 				} else {
 					fmt.Println(string(dat))
@@ -150,11 +142,13 @@ var gitCmd = &cobra.Command{
 				return fmt.Errorf("failed to marshal JSON: %v", err)
 			}
 			if len(outputFolder) > 0 {
-				os.MkdirAll(outputFolder, 0750)
+				if err := os.MkdirAll(outputFolder, 0750); err != nil {
+					return fmt.Errorf("failed to create output folder %s: %v", outputFolder, err)
+				}
 				fpath := filepath.Join(outputFolder, "tag_links.json")
 				log.Infof("Creating %s", fpath)
-				if err := os.WriteFile(fpath, dat, 0660); err != nil {
-					return fmt.Errorf("failed to write file: %v", err)
+				if err := os.WriteFile(fpath, dat, 0644); err != nil {
+					return fmt.Errorf("failed to write file %s: %v", fpath, err)
 				}
 			} else {
 				fmt.Println(string(dat))
@@ -166,7 +160,9 @@ var gitCmd = &cobra.Command{
 			for _, tag := range commits {
 				destName := getDestName(tag.TarURL, false)
 				if len(outputFolder) > 0 {
-					os.MkdirAll(outputFolder, 0750)
+					if err := os.MkdirAll(outputFolder, 0750); err != nil {
+						return fmt.Errorf("failed to create output folder %s: %v", outputFolder, err)
+					}
 				}
 				destName = filepath.Join(outputFolder, destName)
 
@@ -203,9 +199,7 @@ var gitCmd = &cobra.Command{
 						return fmt.Errorf("failed to read remote tarfile data: %v", err)
 					}
 
-					resp.Body.Close()
-
-					if err := os.WriteFile(destName, document, 0660); err != nil {
+					if err := os.WriteFile(destName, document, 0644); err != nil {
 						return fmt.Errorf("failed to write file %s: %v", destName, err)
 					}
 				} else {

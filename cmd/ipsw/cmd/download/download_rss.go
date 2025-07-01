@@ -42,20 +42,6 @@ func init() {
 
 	rssCmd.Flags().BoolP("watch", "w", false, "Watch for NEW releases")
 	rssCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	rssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
 	viper.BindPFlag("download.rss.watch", rssCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("download.rss.json", rssCmd.Flags().Lookup("json"))
 }

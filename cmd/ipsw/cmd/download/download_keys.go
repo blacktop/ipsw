@@ -36,22 +36,25 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(downloadKeysCmd)
-
+	// Download behavior flags
+	downloadKeysCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadKeysCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	// Filter flags
+	downloadKeysCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	downloadKeysCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	downloadKeysCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	// downloadKeysCmd.Flags().Bool("beta", false, "Download beta keys")
 	downloadKeysCmd.Flags().Bool("json", false, "Output as JSON")
 	downloadKeysCmd.Flags().StringP("output", "o", "", "Folder to download keys to")
 	downloadKeysCmd.MarkFlagDirname("output")
-	downloadKeysCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
+	// Bind persistent flags
+	viper.BindPFlag("download.keys.proxy", downloadKeysCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.keys.insecure", downloadKeysCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.keys.device", downloadKeysCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.keys.version", downloadKeysCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.keys.build", downloadKeysCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	// viper.BindPFlag("download.keys.beta", downloadKeysCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.keys.json", downloadKeysCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.keys.output", downloadKeysCmd.Flags().Lookup("output"))
@@ -70,23 +73,16 @@ var downloadKeysCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
+		proxy := viper.GetString("download.keys.proxy")
+		insecure := viper.GetBool("download.keys.insecure")
 		// filters
-		device := viper.GetString("download.device")
-		version := viper.GetString("download.version")
-		build := viper.GetString("download.build")
+		device := viper.GetString("download.keys.device")
+		version := viper.GetString("download.keys.version")
+		build := viper.GetString("download.keys.build")
 		// flags
 		asJSON := viper.GetBool("download.keys.json")
 		output := viper.GetString("download.keys.output")
-
 		// validate flags
 		if len(device) == 0 {
 			return fmt.Errorf("please supply a --device")

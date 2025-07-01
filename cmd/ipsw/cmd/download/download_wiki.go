@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
@@ -44,8 +45,23 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(wikiCmd)
+	// Download behavior flags
+	wikiCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	wikiCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	wikiCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	wikiCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	wikiCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	wikiCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	wikiCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	// Filter flags
+	wikiCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	wikiCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	wikiCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	wikiCmd.Flags().Bool("ipsw", false, "Download IPSWs")
 	wikiCmd.Flags().Bool("ota", false, "Download OTAs")
+
+	wikiCmd.MarkFlagsMutuallyExclusive("ipsw", "ota")
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs/OTAs")
@@ -53,14 +69,21 @@ func init() {
 	wikiCmd.Flags().String("pb", "", "OTA prerequisite build")
 	wikiCmd.Flags().Bool("json", false, "Parse URLs and store metadata in local JSON database")
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	wikiCmd.MarkFlagDirname("output")
 	wikiCmd.Flags().String("db", "wiki_db.json", "Path to local JSON database (will use CWD by default)")
 	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
-	wikiCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
-		c.Parent().HelpFunc()(c, s)
-	})
+	// Bind persistent flags
+	viper.BindPFlag("download.wiki.proxy", wikiCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.wiki.insecure", wikiCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.wiki.confirm", wikiCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.wiki.skip-all", wikiCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.wiki.resume-all", wikiCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.wiki.restart-all", wikiCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.wiki.remove-commas", wikiCmd.Flags().Lookup("remove-commas"))
+	viper.BindPFlag("download.wiki.device", wikiCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.wiki.version", wikiCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.wiki.build", wikiCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.wiki.ipsw", wikiCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("download.wiki.ota", wikiCmd.Flags().Lookup("ota"))
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
@@ -72,9 +95,6 @@ func init() {
 	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.wiki.db", wikiCmd.Flags().Lookup("db"))
 	viper.BindPFlag("download.wiki.flat", wikiCmd.Flags().Lookup("flat"))
-
-	wikiCmd.MarkFlagsMutuallyExclusive("ipsw", "ota")
-	wikiCmd.MarkFlagDirname("output")
 }
 
 // wikiCmd represents the wiki command
@@ -92,29 +112,18 @@ var wikiCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
-		removeCommas := viper.GetBool("download.remove-commas")
+		proxy := viper.GetString("download.wiki.proxy")
+		insecure := viper.GetBool("download.wiki.insecure")
+		confirm := viper.GetBool("download.wiki.confirm")
+		skipAll := viper.GetBool("download.wiki.skip-all")
+		resumeAll := viper.GetBool("download.wiki.resume-all")
+		restartAll := viper.GetBool("download.wiki.restart-all")
+		removeCommas := viper.GetBool("download.wiki.remove-commas")
 		// filters
-		device := viper.GetString("download.device")
-		version := viper.GetString("download.version")
-		build := viper.GetString("download.build")
+		device := viper.GetString("download.wiki.device")
+		version := viper.GetString("download.wiki.version")
+		build := viper.GetString("download.wiki.build")
 		// flags
 		dlIPSWs := viper.GetBool("download.wiki.ipsw")
 		dlOTAs := viper.GetBool("download.wiki.ota")
@@ -202,7 +211,6 @@ var wikiCmd = &cobra.Command{
 					if err := json.NewDecoder(f).Decode(&db); err != nil {
 						return fmt.Errorf("failed to decode JSON database: %v", err)
 					}
-					f.Close()
 				}
 				for idx, ipsw := range filteredIPSW {
 					log.Debugf("Parsing IPSW %s", ipsw.URL)
@@ -263,7 +271,10 @@ var wikiCmd = &cobra.Command{
 						prompt := &survey.Confirm{
 							Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(filteredIPSW)),
 						}
-						survey.AskOne(prompt, &cont)
+						if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							return nil
+						}
 					}
 				}
 
@@ -484,7 +495,10 @@ var wikiCmd = &cobra.Command{
 						prompt := &survey.Confirm{
 							Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(filteredOTAs)),
 						}
-						survey.AskOne(prompt, &cont)
+						if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							return nil
+						}
 					}
 				}
 
@@ -542,7 +556,9 @@ var wikiCmd = &cobra.Command{
 						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 						for _, o := range filteredOTAs {
 							folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.Version, o.VersionExtra))
-							os.MkdirAll(folder, 0750)
+							if err := os.MkdirAll(folder, 0750); err != nil {
+								return fmt.Errorf("failed to create folder %s: %v", folder, err)
+							}
 							var devices string
 							if len(o.Devices) > 0 {
 								sort.Strings(o.Devices)

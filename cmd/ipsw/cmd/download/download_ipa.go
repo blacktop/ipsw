@@ -39,38 +39,33 @@ import (
 )
 
 func init() {
-	ipaCmd.Flags().String("username", "", "Username for authentication")
-	ipaCmd.Flags().String("password", "", "Password for authentication")
+	DownloadCmd.AddCommand(ipaCmd)
+	// Download behavior flags
+	ipaCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	ipaCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	// Command-specific flags
 	ipaCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
 	ipaCmd.Flags().Bool("search", false, "Search for app to download")
 	ipaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	ipaCmd.MarkFlagDirname("output")
 	ipaCmd.Flags().StringP("store-front", "s", "US", "The country code for the App Store to download from")
+	// Auth flags
+	ipaCmd.Flags().String("username", "", "Username for authentication")
+	ipaCmd.Flags().String("password", "", "Password for authentication")
 	ipaCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
 	// ipaCmd.Flags().StringP("keybag-plist", "p", "", "Path to the keybag plist file (includes kbsync)")
-	ipaCmd.MarkFlagDirname("output")
+	// Bind persistent flags
+	viper.BindPFlag("download.ipa.proxy", ipaCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.ipa.insecure", ipaCmd.Flags().Lookup("insecure"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.ipa.sms", ipaCmd.Flags().Lookup("sms"))
-	viper.BindPFlag("download.ipa.username", ipaCmd.Flags().Lookup("username"))
-	viper.BindPFlag("download.ipa.password", ipaCmd.Flags().Lookup("password"))
 	viper.BindPFlag("download.ipa.search", ipaCmd.Flags().Lookup("search"))
 	viper.BindPFlag("download.ipa.output", ipaCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipa.store-front", ipaCmd.Flags().Lookup("store-front"))
+	viper.BindPFlag("download.ipa.username", ipaCmd.Flags().Lookup("username"))
+	viper.BindPFlag("download.ipa.password", ipaCmd.Flags().Lookup("password"))
 	viper.BindPFlag("download.ipa.vault-password", ipaCmd.Flags().Lookup("vault-password"))
 	// viper.BindPFlag("download.ipa.keybag-plist", ipaCmd.Flags().Lookup("keybag-plist"))
-	ipaCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
-	DownloadCmd.AddCommand(ipaCmd)
 }
 
 // ipaCmd represents the dev command
@@ -87,16 +82,13 @@ var ipaCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
+		proxy := viper.GetString("download.ipa.proxy")
+		insecure := viper.GetBool("download.ipa.insecure")
 		// flags
 		sms := viper.GetBool("download.ipa.sms")
 		output := viper.GetString("download.ipa.output")
-
+		// auth
 		username := viper.GetString("download.ipa.username")
 		password := viper.GetString("download.ipa.password")
 
