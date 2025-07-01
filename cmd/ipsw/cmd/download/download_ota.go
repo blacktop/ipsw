@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
@@ -228,7 +229,7 @@ var downloadOtaCmd = &cobra.Command{
 		// Query for asset sets
 		as, err := download.GetAssetSets(proxy, insecure)
 		if err != nil {
-			log.Fatal(err.Error())
+			return err
 		}
 
 		/****************
@@ -295,7 +296,7 @@ var downloadOtaCmd = &cobra.Command{
 		if len(version) > 0 {
 			ver, err = semver.NewVersion(version)
 			if err != nil {
-				log.Fatal("failed to convert version into semver object")
+				return fmt.Errorf("failed to convert version into semver object")
 			}
 		}
 
@@ -322,7 +323,7 @@ var downloadOtaCmd = &cobra.Command{
 
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get Pallas OTAs: %v", err)
 		}
 
 		if showLatestVersion {
@@ -381,7 +382,10 @@ var downloadOtaCmd = &cobra.Command{
 				prompt := &survey.Confirm{
 					Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
 				}
-				survey.AskOne(prompt, &cont)
+				if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					return nil
+				}
 			}
 		}
 
@@ -462,7 +466,9 @@ var downloadOtaCmd = &cobra.Command{
 					if getSim {
 						folder = filepath.Join(destPath, fmt.Sprintf("%s_%s_Simulator_OTAs", strings.ToUpper(platform), o.SimulatorVersion))
 					}
-					os.MkdirAll(folder, 0750)
+					if err := os.MkdirAll(folder, 0750); err != nil {
+						return fmt.Errorf("failed to create folder %s: %v", folder, err)
+					}
 					var devices string
 					if len(o.SupportedDevices) > 0 {
 						sort.Strings(o.SupportedDevices)
