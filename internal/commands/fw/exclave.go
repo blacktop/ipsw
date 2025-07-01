@@ -11,16 +11,15 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/bundle"
-	"github.com/blacktop/ipsw/pkg/img4"
 )
 
-func ShowExclaveCores(input string) {
-	bn, err := bundle.Open(input)
+// ShowExclaveCores prints information about the Exclave cores in the bundle.
+func ShowExclaveCores(data []byte) {
+	bn, err := bundle.Parse(bytes.NewReader(data))
 	if err != nil {
 		fmt.Printf("failed to open bundle: %v\n", err)
 		return
 	}
-	defer bn.Close()
 	if bn.Type != 3 {
 		fmt.Printf("bundle is not an exclave bundle\n")
 		return
@@ -28,19 +27,11 @@ func ShowExclaveCores(input string) {
 	fmt.Println(bn)
 }
 
-func ExtractExclaveCores(input, output string) ([]string, error) {
+func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 	var m *macho.File
 	var outfiles []string
 
-	im4p, err := img4.OpenPayload(input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open exclave img4 payload: %v", err)
-	}
-
-	data, err := im4p.GetData()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get data from exclave img4 payload: %v", err)
-	}
+	// os.WriteFile(filepath.Join(output, "exclave.bundle"), data, 0o644)
 
 	bn, err := bundle.Parse(bytes.NewReader(data))
 	if err != nil {
@@ -52,11 +43,7 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 		return nil, fmt.Errorf("bundle is not an exclave bundle")
 	}
 
-	f, err := os.Open(input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", input, err)
-	}
-	defer f.Close()
+	r := bytes.NewReader(data)
 
 	for idx, bf := range bn.Files {
 		fname := filepath.Join(output, bf.Type, bf.Name)
@@ -71,11 +58,11 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 		defer of.Close()
 
 		if idx == 0 { // SYSTEM/kernel
-			if _, err := f.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
+			if _, err := r.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
 				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[idx].Offset, err)
 			}
 			mHdrData := make([]byte, bn.Config.Assets[idx].Size)
-			if err := binary.Read(f, binary.LittleEndian, &mHdrData); err != nil {
+			if err := binary.Read(r, binary.LittleEndian, &mHdrData); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
 			m, err = macho.NewFile(bytes.NewReader(mHdrData), macho.FileConfig{
@@ -96,11 +83,11 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 					return nil, fmt.Errorf("failed to find TEXT segment")
 				}
 			}
-			if _, err := f.Seek(int64(text.Offset), io.SeekStart); err != nil {
+			if _, err := r.Seek(int64(text.Offset), io.SeekStart); err != nil {
 				return nil, fmt.Errorf("failed to seek to offset %d: %v", text.Offset, err)
 			}
 			tdata := make([]byte, text.Size)
-			if err := binary.Read(f, binary.LittleEndian, &tdata); err != nil {
+			if err := binary.Read(r, binary.LittleEndian, &tdata); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
 			m, err = macho.NewFile(bytes.NewReader(tdata), macho.FileConfig{
@@ -112,11 +99,11 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 		}
 		// write data to correct offsets
 		for _, sec := range bf.Sections {
-			if _, err := f.Seek(int64(sec.Offset), io.SeekStart); err != nil {
+			if _, err := r.Seek(int64(sec.Offset), io.SeekStart); err != nil {
 				return nil, fmt.Errorf("failed to seek to offset %d in file %s: %v", sec.Offset, fname, err)
 			}
 			data := make([]byte, sec.Size)
-			if err := binary.Read(f, binary.LittleEndian, &data); err != nil {
+			if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
 			if s := m.Segment("__" + sec.Name); s == nil { // lookup segment in MachO header
@@ -141,11 +128,11 @@ func ExtractExclaveCores(input, output string) ([]string, error) {
 						return nil, fmt.Errorf("failed to create file %s: %v", aname, err)
 					}
 					defer attr.Close()
-					if _, err := f.Seek(int64(asset.Offset), io.SeekStart); err != nil {
+					if _, err := r.Seek(int64(asset.Offset), io.SeekStart); err != nil {
 						return nil, fmt.Errorf("failed to seek to offset %d: %v", asset.Offset, err)
 					}
 					adata := make([]byte, asset.Size) // brkr_artifact
-					if err := binary.Read(f, binary.LittleEndian, &adata); err != nil {
+					if err := binary.Read(r, binary.LittleEndian, &adata); err != nil {
 						return nil, fmt.Errorf("failed to read data from file %s: %v", aname, err)
 					}
 					// TODO: parse 'brkr_artifact' which is a map[string]any or a plist essentially
