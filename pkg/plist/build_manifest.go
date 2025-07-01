@@ -46,7 +46,7 @@ type BuildIdentity struct {
 	BbFDRSecurityKeyHash          []byte                      `plist:"BbFDRSecurityKeyHash,omitempty" json:"bb_fdr_security_key_hash,omitempty"`
 	BbProvisioningManifestKeyHash []byte                      `plist:"BbProvisioningManifestKeyHash,omitempty" json:"bb_provisioning_manifest_key_hash,omitempty"`
 	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info"`
-	Manifest                      map[string]IdentityManifest `json:"manifest,omitempty"`
+	Manifest                      map[string]IdentityManifest `plist:"Manifest,omitempty" json:"manifest,omitempty"`
 	PearlCertificationRootPub     []byte                      `plist:"PearlCertificationRootPub,omitempty" json:"pearl_certification_root_pub,omitempty"`
 	ProductMarketingVersion       string                      `plist:"Ap,ProductMarketingVersion,omitempty" json:"product_marketing_version,omitempty"`
 	UniqueBuildID                 []byte                      `plist:"UniqueBuildID,omitempty" json:"unique_build_id,omitempty"`
@@ -114,11 +114,11 @@ func (i IdentityInfo) String() string {
 }
 
 type IdentityManifest struct {
-	Digest      []byte         `json:"digest,omitempty" mapstructure:"Digest,omitempty"`
+	Digest      []byte         `plist:"Digest,omitempty" json:"digest,omitempty" mapstructure:"Digest,omitempty"`
 	Name        string         `plist:"Name,omitempty" json:"name,omitempty" mapstructure:"Name,omitempty"`
 	BuildString string         `plist:"BuildString,omitempty" json:"build_string,omitempty" mapstructure:"BuildString,omitempty"`
 	Info        map[string]any `plist:"Info,omitempty" json:"info,omitempty" mapstructure:"Info,omitempty"`
-	Trusted     bool           `json:"trusted,omitempty" mapstructure:"Trusted,omitempty"`
+	Trusted     bool           `plist:"Trusted,omitempty" json:"trusted,omitempty" mapstructure:"Trusted,omitempty"`
 	EPRO        bool           `plist:"EPRO,omitempty" json:"epro,omitempty" mapstructure:"EPRO,omitempty"`
 	ESEC        bool           `plist:"ESEC,omitempty" json:"esec,omitempty" mapstructure:"ESEC,omitempty"`
 }
