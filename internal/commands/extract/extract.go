@@ -259,31 +259,28 @@ func SPTM(c *Config) ([]string, error) {
 }
 
 func Exclave(c *Config) ([]string, error) {
-	var tmpOut []string
-	var outfiles []string
-	var excs [][]byte
-
-	origOutput := c.Output
+	var (
+		err      error
+		tmpOut   []string
+		outfiles []string
+		excs     [][]byte
+	)
 
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_exclave")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory to store Exlave im4p: %v", err)
 	}
 	defer os.RemoveAll(tmpDIR)
-	c.Output = tmpDIR
 
 	c.Pattern = `.*exclavecore_bundle.*im4p$`
-	out, err := Search(c)
+	out, err := Search(c, tmpDIR)
 	if err != nil {
 		return nil, err
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no Exclave bundles found")
 	}
-
 	tmpOut = append(tmpOut, out...)
-
-	c.Output = origOutput
 
 	for _, f := range tmpOut {
 		if strings.Contains(f, ".restore.") {
@@ -312,10 +309,7 @@ func Exclave(c *Config) ([]string, error) {
 		outfiles = append(outfiles, out...)
 	}
 
-	if c.Info { // cleanup im4p files/folder
-		if folder, err := c.info.GetFolder(); err == nil {
-			os.RemoveAll(filepath.Join(c.Output, folder))
-		}
+	if c.Info {
 		return nil, nil
 	}
 
@@ -660,7 +654,7 @@ func FcsKeys(c *Config) ([]string, error) {
 }
 
 // Search searches for files matching a pattern in an IPSW
-func Search(c *Config) ([]string, error) {
+func Search(c *Config, tempDirectory ...string) ([]string, error) {
 	var artifacts []string
 
 	if len(c.Pattern) == 0 {
@@ -676,6 +670,14 @@ func Search(c *Config) ([]string, error) {
 			return nil, err
 		}
 		destPath := filepath.Join(filepath.Clean(c.Output), folder)
+		if c.Output == "" {
+			c.Output = folder
+		} else {
+			c.Output = filepath.Join(filepath.Clean(c.Output), folder)
+		}
+		if len(tempDirectory) > 0 {
+			destPath = tempDirectory[0]
+		}
 		zr, err := zip.OpenReader(c.IPSW)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open IPSW: %v", err)
@@ -727,6 +729,11 @@ func Search(c *Config) ([]string, error) {
 		_, zr, folder, err := getRemoteFolder(c)
 		if err != nil {
 			return nil, err
+		}
+		if c.Output == "" {
+			c.Output = folder
+		} else {
+			c.Output = filepath.Join(filepath.Clean(c.Output), folder)
 		}
 		artifacts, err = utils.SearchZip(zr.File, re, filepath.Join(filepath.Clean(c.Output), folder), c.Flatten, true)
 		if err != nil {
