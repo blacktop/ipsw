@@ -39,37 +39,37 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(ipaCmd)
+	DownloadCmd.AddCommand(downloadIpaCmd)
 	// Download behavior flags
-	ipaCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	ipaCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadIpaCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadIpaCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	// Command-specific flags
-	ipaCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
-	ipaCmd.Flags().Bool("search", false, "Search for app to download")
-	ipaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
-	ipaCmd.MarkFlagDirname("output")
-	ipaCmd.Flags().StringP("store-front", "s", "US", "The country code for the App Store to download from")
+	downloadIpaCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
+	downloadIpaCmd.Flags().Bool("search", false, "Search for app to download")
+	downloadIpaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	downloadIpaCmd.MarkFlagDirname("output")
+	downloadIpaCmd.Flags().StringP("store-front", "s", "US", "The country code for the App Store to download from")
 	// Auth flags
-	ipaCmd.Flags().String("username", "", "Username for authentication")
-	ipaCmd.Flags().String("password", "", "Password for authentication")
-	ipaCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
-	// ipaCmd.Flags().StringP("keybag-plist", "p", "", "Path to the keybag plist file (includes kbsync)")
+	downloadIpaCmd.Flags().String("username", "", "Username for authentication")
+	downloadIpaCmd.Flags().String("password", "", "Password for authentication")
+	downloadIpaCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
+	// downloadIpaCmd.Flags().StringP("keybag-plist", "p", "", "Path to the keybag plist file (includes kbsync)")
 	// Bind persistent flags
-	viper.BindPFlag("download.ipa.proxy", ipaCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.ipa.insecure", ipaCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.ipa.proxy", downloadIpaCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.ipa.insecure", downloadIpaCmd.Flags().Lookup("insecure"))
 	// Bind command-specific flags
-	viper.BindPFlag("download.ipa.sms", ipaCmd.Flags().Lookup("sms"))
-	viper.BindPFlag("download.ipa.search", ipaCmd.Flags().Lookup("search"))
-	viper.BindPFlag("download.ipa.output", ipaCmd.Flags().Lookup("output"))
-	viper.BindPFlag("download.ipa.store-front", ipaCmd.Flags().Lookup("store-front"))
-	viper.BindPFlag("download.ipa.username", ipaCmd.Flags().Lookup("username"))
-	viper.BindPFlag("download.ipa.password", ipaCmd.Flags().Lookup("password"))
-	viper.BindPFlag("download.ipa.vault-password", ipaCmd.Flags().Lookup("vault-password"))
-	// viper.BindPFlag("download.ipa.keybag-plist", ipaCmd.Flags().Lookup("keybag-plist"))
+	viper.BindPFlag("download.ipa.sms", downloadIpaCmd.Flags().Lookup("sms"))
+	viper.BindPFlag("download.ipa.search", downloadIpaCmd.Flags().Lookup("search"))
+	viper.BindPFlag("download.ipa.output", downloadIpaCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.ipa.store-front", downloadIpaCmd.Flags().Lookup("store-front"))
+	viper.BindPFlag("download.ipa.username", downloadIpaCmd.Flags().Lookup("username"))
+	viper.BindPFlag("download.ipa.password", downloadIpaCmd.Flags().Lookup("password"))
+	viper.BindPFlag("download.ipa.vault-password", downloadIpaCmd.Flags().Lookup("vault-password"))
+	// viper.BindPFlag("download.ipa.keybag-plist", downloadIpaCmd.Flags().Lookup("keybag-plist"))
 }
 
-// ipaCmd represents the dev command
-var ipaCmd = &cobra.Command{
+// downloadIpaCmd represents the dev command
+var downloadIpaCmd = &cobra.Command{
 	Use:           "ipa",
 	Aliases:       []string{"app"},
 	Short:         "Download App Packages from the iOS App Store",
@@ -136,7 +136,7 @@ var ipaCmd = &cobra.Command{
 			if err := survey.AskOne(prompt, &dfiles); err != nil {
 				if err == terminal.InterruptErr {
 					log.Warn("Exiting...")
-					os.Exit(0)
+					return nil
 				}
 				return err
 			}

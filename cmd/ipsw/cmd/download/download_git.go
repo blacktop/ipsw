@@ -38,32 +38,32 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(gitCmd)
+	DownloadCmd.AddCommand(downloadGitCmd)
 	// Download behavior flags
-	gitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	gitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadGitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadGitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	// Command-specific flags
-	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
-	gitCmd.Flags().Bool("latest", false, "Get ONLY latest tag")
-	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
-	gitCmd.MarkFlagDirname("output")
-	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
-	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
-	gitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
+	downloadGitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
+	downloadGitCmd.Flags().Bool("latest", false, "Get ONLY latest tag")
+	downloadGitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	downloadGitCmd.MarkFlagDirname("output")
+	downloadGitCmd.Flags().StringP("api", "a", "", "Github API Token")
+	downloadGitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
+	downloadGitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
 	// Bind persistent flags
-	viper.BindPFlag("download.git.proxy", gitCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.git.insecure", gitCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.git.proxy", downloadGitCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.git.insecure", downloadGitCmd.Flags().Lookup("insecure"))
 	// Bind command-specific flags
-	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
-	viper.BindPFlag("download.git.latest", gitCmd.Flags().Lookup("latest"))
-	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
-	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
-	viper.BindPFlag("download.git.json", gitCmd.Flags().Lookup("json"))
-	viper.BindPFlag("download.git.webkit", gitCmd.Flags().Lookup("webkit"))
+	viper.BindPFlag("download.git.product", downloadGitCmd.Flags().Lookup("product"))
+	viper.BindPFlag("download.git.latest", downloadGitCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.git.output", downloadGitCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.git.api", downloadGitCmd.Flags().Lookup("api"))
+	viper.BindPFlag("download.git.json", downloadGitCmd.Flags().Lookup("json"))
+	viper.BindPFlag("download.git.webkit", downloadGitCmd.Flags().Lookup("webkit"))
 }
 
-// gitCmd represents the git command
-var gitCmd = &cobra.Command{
+// downloadGitCmd represents the git command
+var downloadGitCmd = &cobra.Command{
 	Use:           "git",
 	Aliases:       []string{"g", "github"},
 	Short:         "Download github.com/orgs/apple-oss-distributions tarballs",

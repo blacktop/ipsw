@@ -23,7 +23,6 @@ package kernel
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -61,7 +60,7 @@ func selectKDKs() ([]string, error) {
 	if err := survey.AskOne(prompt, &selKDKs, survey.WithValidator(survey.MinItems(2)), survey.WithValidator(survey.MaxItems(2))); err != nil {
 		if err == terminal.InterruptErr {
 			log.Warn("Exiting...")
-			os.Exit(0)
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -93,7 +92,7 @@ func selectKDKs() ([]string, error) {
 	if err := survey.AskOne(prompt2, &kern); err != nil {
 		if err == terminal.InterruptErr {
 			log.Warn("Exiting...")
-			os.Exit(0)
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -125,7 +124,7 @@ func selectKDK() (string, error) {
 	if err := survey.AskOne(prompt, &selKDK); err != nil {
 		if err == terminal.InterruptErr {
 			log.Warn("Exiting...")
-			os.Exit(0)
+			return "", nil
 		}
 		return "", err
 	}
@@ -156,7 +155,7 @@ func selectKDK() (string, error) {
 	if err := survey.AskOne(prompt, &kern); err != nil {
 		if err == terminal.InterruptErr {
 			log.Warn("Exiting...")
-			os.Exit(0)
+			return "", nil
 		}
 		return "", err
 	}

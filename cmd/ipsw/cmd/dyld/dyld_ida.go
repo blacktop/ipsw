@@ -151,7 +151,7 @@ var idaCmd = &cobra.Command{
 					if err := survey.AskOne(prompt, &idaProPath); err != nil {
 						if err == terminal.InterruptErr {
 							log.Warn("Exiting...")
-							os.Exit(0)
+							return nil
 						}
 						return fmt.Errorf("failed to select IDA Pro version: %w", err)
 					}

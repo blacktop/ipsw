@@ -35,33 +35,33 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(tssCmd)
+	DownloadCmd.AddCommand(downloadTssCmd)
 	// Download behavior flags
-	tssCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	tssCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadTssCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadTssCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	// Filter flags
-	tssCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
-	tssCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
-	tssCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	downloadTssCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	downloadTssCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	downloadTssCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
 	// Command-specific flags
-	tssCmd.Flags().BoolP("signed", "s", false, "Check if iOS version is still being signed")
-	tssCmd.Flags().BoolP("usb", "u", false, "Download blobs for USB connected device")
-	// tssCmd.Flags().StringP("output", "o", "", "Output directory to save blobs to")
-	// tssCmd.MarkFlagDirname("output")
+	downloadTssCmd.Flags().BoolP("signed", "s", false, "Check if iOS version is still being signed")
+	downloadTssCmd.Flags().BoolP("usb", "u", false, "Download blobs for USB connected device")
+	// downloadTssCmd.Flags().StringP("output", "o", "", "Output directory to save blobs to")
+	// downloadTssCmd.MarkFlagDirname("output")
 	// Bind persistent flags
-	viper.BindPFlag("download.tss.proxy", tssCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.tss.insecure", tssCmd.Flags().Lookup("insecure"))
-	viper.BindPFlag("download.tss.device", tssCmd.Flags().Lookup("device"))
-	viper.BindPFlag("download.tss.version", tssCmd.Flags().Lookup("version"))
-	viper.BindPFlag("download.tss.build", tssCmd.Flags().Lookup("build"))
+	viper.BindPFlag("download.tss.proxy", downloadTssCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.tss.insecure", downloadTssCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.tss.device", downloadTssCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.tss.version", downloadTssCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.tss.build", downloadTssCmd.Flags().Lookup("build"))
 	// Bind command-specific flags
-	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
-	viper.BindPFlag("download.tss.usb", tssCmd.Flags().Lookup("usb"))
-	// viper.BindPFlag("download.tss.output", tssCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.tss.signed", downloadTssCmd.Flags().Lookup("signed"))
+	viper.BindPFlag("download.tss.usb", downloadTssCmd.Flags().Lookup("usb"))
+	// viper.BindPFlag("download.tss.output", downloadTssCmd.Flags().Lookup("output"))
 }
 
-// tssCmd represents the tss command
-var tssCmd = &cobra.Command{
+// downloadTssCmd represents the tss command
+var downloadTssCmd = &cobra.Command{
 	Use:           "tss",
 	Aliases:       []string{"t", "tsschecker"},
 	Short:         "🚧 Download SHSH Blobs",

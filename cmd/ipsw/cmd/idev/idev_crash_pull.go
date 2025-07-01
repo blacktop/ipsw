@@ -123,7 +123,7 @@ var iDevCrashPullCmd = &cobra.Command{
 			if err := survey.AskOne(prompt, &choices, survey.WithKeepFilter(true)); err != nil {
 				if err == terminal.InterruptErr {
 					log.Warn("Exiting...")
-					os.Exit(0)
+					return nil
 				}
 				return err
 			}
