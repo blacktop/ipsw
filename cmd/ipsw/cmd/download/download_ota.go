@@ -56,8 +56,23 @@ var otaDlCmdPlatforms = []string{
 
 func init() {
 	DownloadCmd.AddCommand(otaDLCmd)
-
-	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
+	// Download behavior flags
+	otaDLCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	otaDLCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	otaDLCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	otaDLCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	otaDLCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	otaDLCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	otaDLCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	// Filter flags
+	otaDLCmd.Flags().StringArray("white-list", []string{}, "iOS device white list")
+	otaDLCmd.Flags().StringArray("black-list", []string{}, "iOS device black list")
+	otaDLCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	otaDLCmd.Flags().StringP("model", "m", "", "iOS Model (i.e. D321AP)")
+	otaDLCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	otaDLCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// OTA-specific flags
+	otaDLCmd.Flags().String("platform", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
 	})
@@ -83,6 +98,22 @@ func init() {
 	otaDLCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
+	// Bind download behavior flags
+	viper.BindPFlag("download.ota.proxy", otaDLCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.ota.insecure", otaDLCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.ota.confirm", otaDLCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.ota.skip-all", otaDLCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.ota.resume-all", otaDLCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.ota.restart-all", otaDLCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.ota.remove-commas", otaDLCmd.Flags().Lookup("remove-commas"))
+	// Bind filter flags
+	viper.BindPFlag("download.ota.white-list", otaDLCmd.Flags().Lookup("white-list"))
+	viper.BindPFlag("download.ota.black-list", otaDLCmd.Flags().Lookup("black-list"))
+	viper.BindPFlag("download.ota.device", otaDLCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.ota.model", otaDLCmd.Flags().Lookup("model"))
+	viper.BindPFlag("download.ota.version", otaDLCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.ota.build", otaDLCmd.Flags().Lookup("build"))
+	// Bind OTA-specific flags
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ota.latest", otaDLCmd.Flags().Lookup("latest"))
@@ -127,35 +158,21 @@ var otaDLCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
-		removeCommas := viper.GetBool("download.remove-commas")
+		proxy := viper.GetString("download.ota.proxy")
+		insecure := viper.GetBool("download.ota.insecure")
+		confirm := viper.GetBool("download.ota.confirm")
+		skipAll := viper.GetBool("download.ota.skip-all")
+		resumeAll := viper.GetBool("download.ota.resume-all")
+		restartAll := viper.GetBool("download.ota.restart-all")
+		removeCommas := viper.GetBool("download.ota.remove-commas")
 		// filters
-		device := viper.GetString("download.device")
-		model := viper.GetString("download.model")
-		version := viper.GetString("download.version")
-		build := viper.GetString("download.build")
-		doDownload := viper.GetStringSlice("download.white-list")
-		doNotDownload := viper.GetStringSlice("download.black-list")
+		device := viper.GetString("download.ota.device")
+		model := viper.GetString("download.ota.model")
+		version := viper.GetString("download.ota.version")
+		build := viper.GetString("download.ota.build")
+		doDownload := viper.GetStringSlice("download.ota.white-list")
+		doNotDownload := viper.GetStringSlice("download.ota.black-list")
 		// flags
 		platform := viper.GetString("download.ota.platform")
 		getBeta := viper.GetBool("download.ota.beta")

@@ -40,28 +40,28 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(xcodeCmd)
+	// Download behavior flags
+	xcodeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	xcodeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	xcodeCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	xcodeCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	xcodeCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	// Command-specific flags
 	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")
 	xcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
 	xcodeCmd.Flags().StringP("runtime", "r", "", "Name of simulator runtime to download")
-
-	xcodeCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
+	// Bind persistent flags
+	viper.BindPFlag("download.xcode.proxy", xcodeCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.xcode.insecure", xcodeCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.xcode.skip-all", xcodeCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.xcode.resume-all", xcodeCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.xcode.restart-all", xcodeCmd.Flags().Lookup("restart-all"))
 }
 
 // xcodeCmd represents the xcode command
 var xcodeCmd = &cobra.Command{
 	Use:           "xcode",
 	Short:         "🚧 Download Xcode 🚧",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,18 +71,12 @@ var xcodeCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
+		proxy := viper.GetString("download.xcode.proxy")
+		insecure := viper.GetBool("download.xcode.insecure")
+		skipAll := viper.GetBool("download.xcode.skip-all")
+		resumeAll := viper.GetBool("download.xcode.resume-all")
+		restartAll := viper.GetBool("download.xcode.restart-all")
 		// flags
 		latest, _ := cmd.Flags().GetBool("latest")
 		dlSim, _ := cmd.Flags().GetBool("sim")

@@ -37,26 +37,26 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(pccCmd)
-
+	// Download behavior flags
+	pccCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	pccCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	pccCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	pccCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	pccCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	// Command-specific flags
 	pccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
 	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/instances/<NAME>' to create a PCC VM w/o needing to set the csrutil first
 	pccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
 	pccCmd.MarkFlagDirname("output")
+	// Bind persistent flags
+	viper.BindPFlag("download.pcc.proxy", pccCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.pcc.insecure", pccCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.pcc.skip-all", pccCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.pcc.resume-all", pccCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.pcc.restart-all", pccCmd.Flags().Lookup("restart-all"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.pcc.info", pccCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.pcc.output", pccCmd.Flags().Lookup("output"))
-
-	pccCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		c.Parent().HelpFunc()(c, s)
-	})
-
 }
 
 // pccCmd represents the pcc command
@@ -73,18 +73,12 @@ var pccCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		// skipAll := viper.GetBool("download.skip-all")
-		// resumeAll := viper.GetBool("download.resume-all")
-		// restartAll := viper.GetBool("download.restart-all")
+		proxy := viper.GetString("download.pcc.proxy")
+		insecure := viper.GetBool("download.pcc.insecure")
+		// skipAll := viper.GetBool("download.pcc.skip-all")
+		// resumeAll := viper.GetBool("download.pcc.resume-all")
+		// restartAll := viper.GetBool("download.pcc.restart-all")
 
 		releases, err := download.GetPCCReleases(proxy, insecure)
 		if err != nil {

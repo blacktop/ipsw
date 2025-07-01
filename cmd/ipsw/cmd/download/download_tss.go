@@ -36,27 +36,28 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(tssCmd)
-
+	// Download behavior flags
+	tssCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	tssCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	// Filter flags
+	tssCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	tssCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	tssCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	tssCmd.Flags().BoolP("signed", "s", false, "Check if iOS version is still being signed")
 	tssCmd.Flags().BoolP("usb", "u", false, "Download blobs for USB connected device")
-	tssCmd.Flags().StringP("output", "o", "", "Output directory to save blobs to")
+	// tssCmd.Flags().StringP("output", "o", "", "Output directory to save blobs to")
+	// tssCmd.MarkFlagDirname("output")
+	// Bind persistent flags
+	viper.BindPFlag("download.tss.proxy", tssCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.tss.insecure", tssCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.tss.device", tssCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.tss.version", tssCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.tss.build", tssCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
 	viper.BindPFlag("download.tss.usb", tssCmd.Flags().Lookup("usb"))
-	viper.BindPFlag("download.tss.output", tssCmd.Flags().Lookup("output"))
-
-	tssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		c.Parent().HelpFunc()(c, s)
-	})
-
-	tssCmd.MarkFlagDirname("output")
+	// viper.BindPFlag("download.tss.output", tssCmd.Flags().Lookup("output"))
 }
 
 // tssCmd represents the tss command
@@ -64,7 +65,6 @@ var tssCmd = &cobra.Command{
 	Use:           "tss",
 	Aliases:       []string{"t", "tsschecker"},
 	Short:         "🚧 Download SHSH Blobs",
-	SilenceUsage:  false,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -73,20 +73,15 @@ var tssCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
 		// settings
-		device := viper.GetString("download.device")
-		build := viper.GetString("download.build")
-		version := viper.GetString("download.version")
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
+		device := viper.GetString("download.tss.device")
+		build := viper.GetString("download.tss.build")
+		version := viper.GetString("download.tss.version")
+		proxy := viper.GetString("download.tss.proxy")
+		insecure := viper.GetBool("download.tss.insecure")
 		// flags
 		isSigned := viper.GetBool("download.tss.signed")
+		// output := viper.GetString("download.tss.output")
 
 		if device == "" {
 			device = "iPhone10,3"

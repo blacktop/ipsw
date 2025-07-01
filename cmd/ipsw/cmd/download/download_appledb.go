@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -47,9 +48,28 @@ var supportedFWs = []string{"ipsw", "ota", "rsr"}
 
 func init() {
 	DownloadCmd.AddCommand(downloadAppledbCmd)
-
+	// Download behavior flags
+	downloadAppledbCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	downloadAppledbCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	downloadAppledbCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	downloadAppledbCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	downloadAppledbCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadAppledbCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	downloadAppledbCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	// Filter flags
+	downloadAppledbCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	downloadAppledbCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	downloadAppledbCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// Command-specific flags
 	downloadAppledbCmd.Flags().StringArray("os", []string{}, fmt.Sprintf("Operating system to download (%s)", strings.Join(supportedOSes, ", ")))
+	downloadAppledbCmd.MarkFlagRequired("os")
+	downloadAppledbCmd.RegisterFlagCompletionFunc("os", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return supportedOSes, cobra.ShellCompDirectiveDefault
+	})
 	downloadAppledbCmd.Flags().String("type", "ipsw", fmt.Sprintf("FW type to download (%s)", strings.Join(supportedFWs, ", ")))
+	downloadAppledbCmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return supportedFWs, cobra.ShellCompDirectiveDefault
+	})
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
@@ -67,10 +87,22 @@ func init() {
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	downloadAppledbCmd.MarkFlagDirname("output")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	downloadAppledbCmd.MarkFlagsMutuallyExclusive("release", "beta", "rc")
-
+	// Bind persistent flags
+	viper.BindPFlag("download.appledb.proxy", downloadAppledbCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.appledb.insecure", downloadAppledbCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.appledb.confirm", downloadAppledbCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.appledb.skip-all", downloadAppledbCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.appledb.resume-all", downloadAppledbCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.appledb.restart-all", downloadAppledbCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.appledb.remove-commas", downloadAppledbCmd.Flags().Lookup("remove-commas"))
+	viper.BindPFlag("download.appledb.device", downloadAppledbCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.appledb.version", downloadAppledbCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.appledb.build", downloadAppledbCmd.Flags().Lookup("build"))
+	// Bind command-specific flags
 	viper.BindPFlag("download.appledb.os", downloadAppledbCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.appledb.type", downloadAppledbCmd.Flags().Lookup("type"))
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
@@ -92,21 +124,6 @@ func init() {
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.appledb.usb", downloadAppledbCmd.Flags().Lookup("usb"))
-
-	downloadAppledbCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		DownloadCmd.PersistentFlags().MarkHidden("white-list")
-		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
-		c.Parent().HelpFunc()(c, s)
-	})
-	downloadAppledbCmd.MarkFlagDirname("output")
-	downloadAppledbCmd.MarkFlagRequired("os")
-	downloadAppledbCmd.RegisterFlagCompletionFunc("os", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return supportedOSes, cobra.ShellCompDirectiveDefault
-	})
-	downloadAppledbCmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return supportedFWs, cobra.ShellCompDirectiveDefault
-	})
 }
 
 // downloadAppledbCmd represents the appledb command
@@ -129,29 +146,19 @@ var downloadAppledbCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = viper.GetBool("no-color")
-		// parent flags
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
+
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
-		removeCommas := viper.GetBool("download.remove-commas")
+		proxy := viper.GetString("download.appledb.proxy")
+		insecure := viper.GetBool("download.appledb.insecure")
+		confirm := viper.GetBool("download.appledb.confirm")
+		skipAll := viper.GetBool("download.appledb.skip-all")
+		resumeAll := viper.GetBool("download.appledb.resume-all")
+		restartAll := viper.GetBool("download.appledb.restart-all")
+		removeCommas := viper.GetBool("download.appledb.remove-commas")
 		// filters
-		device := viper.GetString("download.device")
-		version := viper.GetString("download.version")
-		build := viper.GetString("download.build")
+		device := viper.GetString("download.appledb.device")
+		version := viper.GetString("download.appledb.version")
+		build := viper.GetString("download.appledb.build")
 		// output
 		asURLs := viper.GetBool("download.appledb.urls")
 		asJSON := viper.GetBool("download.appledb.json")
@@ -191,13 +198,13 @@ var downloadAppledbCmd = &cobra.Command{
 		if (isBeta || isRC || latest) && len(build) > 0 {
 			return fmt.Errorf("cannot use --beta, --rc or --latest with --build")
 		}
-		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
+		if len(prereqBuild) > 0 && fwType != "ota" && fwType != "rsr" {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
 		}
 		if len(prereqBuild) > 0 && otaDeltas {
 			return fmt.Errorf("cannot use --prereq-build with --deltas")
 		}
-		if otaDeltas && !(fwType == "ota" || fwType == "rsr") {
+		if otaDeltas && fwType != "ota" && fwType != "rsr" {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
 		}
 		if viper.GetBool("download.appledb.show-latest") && (asURLs || asJSON || kernel || len(pattern) > 0 || fcsKeys || fcsKeysJson) {
@@ -386,7 +393,10 @@ var downloadAppledbCmd = &cobra.Command{
 				prompt := &survey.Confirm{
 					Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(results)),
 				}
-				survey.AskOne(prompt, &cont)
+				if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					return nil
+				}
 			}
 		}
 

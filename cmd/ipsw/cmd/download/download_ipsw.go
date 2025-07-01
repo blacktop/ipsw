@@ -30,12 +30,13 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -45,7 +46,22 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(ipswCmd)
-
+	// Download behavior flags
+	ipswCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	ipswCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	ipswCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
+	ipswCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
+	ipswCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	ipswCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
+	ipswCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	// Filter flags
+	ipswCmd.Flags().StringArray("white-list", []string{}, "iOS device white list")
+	ipswCmd.Flags().StringArray("black-list", []string{}, "iOS device black list")
+	ipswCmd.Flags().StringP("device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	ipswCmd.Flags().StringP("model", "m", "", "iOS Model (i.e. D321AP)")
+	ipswCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
+	ipswCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
+	// IPSW-specific flags
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	ipswCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	ipswCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
@@ -67,7 +83,22 @@ func init() {
 	ipswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.MarkFlagDirname("output")
-
+	// Bind download behavior flags
+	viper.BindPFlag("download.ipsw.proxy", ipswCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.ipsw.insecure", ipswCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.ipsw.confirm", ipswCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.ipsw.skip-all", ipswCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.ipsw.resume-all", ipswCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.ipsw.restart-all", ipswCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.ipsw.remove-commas", ipswCmd.Flags().Lookup("remove-commas"))
+	// Bind filter flags
+	viper.BindPFlag("download.ipsw.white-list", ipswCmd.Flags().Lookup("white-list"))
+	viper.BindPFlag("download.ipsw.black-list", ipswCmd.Flags().Lookup("black-list"))
+	viper.BindPFlag("download.ipsw.device", ipswCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.ipsw.model", ipswCmd.Flags().Lookup("model"))
+	viper.BindPFlag("download.ipsw.version", ipswCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.ipsw.build", ipswCmd.Flags().Lookup("build"))
+	// Bind IPSW-specific flags
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest-version", ipswCmd.Flags().Lookup("show-latest-version"))
 	viper.BindPFlag("download.ipsw.show-latest-build", ipswCmd.Flags().Lookup("show-latest-build"))
@@ -107,35 +138,20 @@ var ipswCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
-		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
-		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
-		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
-		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
-		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
-
 		// settings
-		proxy := viper.GetString("download.proxy")
-		insecure := viper.GetBool("download.insecure")
-		confirm := viper.GetBool("download.confirm")
-		skipAll := viper.GetBool("download.skip-all")
-		resumeAll := viper.GetBool("download.resume-all")
-		restartAll := viper.GetBool("download.restart-all")
-		removeCommas := viper.GetBool("download.remove-commas")
+		proxy := viper.GetString("download.ipsw.proxy")
+		insecure := viper.GetBool("download.ipsw.insecure")
+		confirm := viper.GetBool("download.ipsw.confirm")
+		skipAll := viper.GetBool("download.ipsw.skip-all")
+		resumeAll := viper.GetBool("download.ipsw.resume-all")
+		restartAll := viper.GetBool("download.ipsw.restart-all")
+		removeCommas := viper.GetBool("download.ipsw.remove-commas")
 		// filters
-		device := viper.GetString("download.device")
-		// model := viper.GetString("download.model")
-		// version := viper.GetString("download.version")
-		// build := viper.GetString("download.build")
-		doDownload := viper.GetStringSlice("download.white-list")
-		doNotDownload := viper.GetStringSlice("download.black-list")
+		device := viper.GetString("download.ipsw.device")
+		version := viper.GetString("download.ipsw.version")
+		build := viper.GetString("download.ipsw.build")
+		doDownload := viper.GetStringSlice("download.ipsw.white-list")
+		doNotDownload := viper.GetStringSlice("download.ipsw.black-list")
 		// flags
 		latest := viper.GetBool("download.ipsw.latest")
 		showLatestVersion := viper.GetBool("download.ipsw.show-latest-version")
@@ -152,8 +168,13 @@ var ipswCmd = &cobra.Command{
 		decrypt := viper.GetBool("download.ipsw.decrypt")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
-
 		// verify args
+		if len(device) == 0 && len(version) == 0 && len(build) == 0 {
+			log.Fatal("you must also supply a --device || --version || --build (or use --latest)")
+		}
+		if len(version) > 0 && len(build) > 0 {
+			log.Fatal("you cannot supply --version AND --build (they are mutually exclusive)")
+		}
 		if len(dyldArches) > 0 && !remoteDSC {
 			return errors.New("--dyld-arch can only be used with --dyld")
 		}
@@ -174,7 +195,7 @@ var ipswCmd = &cobra.Command{
 			}
 			device = dev.ProductType
 			if !latest {
-				dFlg.Build = dev.BuildVersion
+				build = dev.BuildVersion
 			}
 		}
 
@@ -306,11 +327,87 @@ var ipswCmd = &cobra.Command{
 				})
 			}
 		} else {
-			ipsws, err = filterIPSWs(cmd, macos)
-			if err != nil {
-				log.Fatal(err.Error())
+			// Filter IPSWs based on provided criteria
+			if len(version) > 0 {
+				ipsws, err = download.GetAllIPSW(version)
+				if err != nil {
+					log.Fatalf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
+				}
+			} else if len(build) > 0 {
+				version, err = download.GetVersion(build)
+				if err != nil {
+					log.Fatalf("failed to query ipsw.me api for buildID %s => version: %v", build, err)
+				}
+				ipsws, err = download.GetAllIPSW(version)
+				if err != nil {
+					log.Fatalf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
+				}
+				var buildFiltered []download.IPSW
+				for _, i := range ipsws {
+					if strings.EqualFold(build, i.BuildID) {
+						buildFiltered = append(buildFiltered, i)
+					}
+				}
+				ipsws = buildFiltered
+			} else if len(device) > 0 {
+				ipsws, err = download.GetDeviceIPSWs(device)
+				if err != nil {
+					log.Fatalf("failed to query ipsw.me api for device %s: %v", device, err)
+				}
 			}
-		}
+
+			var filteredIPSWs []download.IPSW
+			for _, i := range ipsws {
+				if len(device) > 0 {
+					if strings.EqualFold(device, i.Identifier) {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
+				} else {
+					if len(doDownload) > 0 {
+						for _, doDown := range doDownload {
+							if strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(doDown)) {
+								filteredIPSWs = append(filteredIPSWs, i)
+							}
+						}
+					} else if len(doNotDownload) > 0 {
+						for _, dontDown := range doNotDownload {
+							if !strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(dontDown)) {
+								filteredIPSWs = append(filteredIPSWs, i)
+							}
+						}
+					} else {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
+				}
+			}
+
+			if macos {
+				var furtherFilteredIPSWs []download.IPSW
+				for _, i := range filteredIPSWs {
+					if strings.Contains(i.Identifier, "Mac") {
+						furtherFilteredIPSWs = append(furtherFilteredIPSWs, i)
+					}
+				}
+				filteredIPSWs = furtherFilteredIPSWs
+			}
+
+			unique := make(map[string]bool, len(filteredIPSWs))
+			var uniqueIPSWs []download.IPSW
+			for _, i := range filteredIPSWs {
+				if len(i.URL) != 0 {
+					if !unique[i.URL] {
+						uniqueIPSWs = append(uniqueIPSWs, i)
+						unique[i.URL] = true
+					}
+				}
+			}
+
+			if len(uniqueIPSWs) == 0 {
+				log.Fatal("filter flags matched 0 IPSWs")
+			}
+
+			ipsws = uniqueIPSWs
+		} // END IPSW FILTERING
 
 		if viper.GetBool("download.ipsw.urls") {
 			for _, i := range ipsws {
@@ -331,7 +428,13 @@ var ipswCmd = &cobra.Command{
 				prompt := &survey.Confirm{
 					Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(ipsws)),
 				}
-				survey.AskOne(prompt, &cont)
+				if err := survey.AskOne(prompt, &cont); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return err
+				}
 			}
 		}
 
