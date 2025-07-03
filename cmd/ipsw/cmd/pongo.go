@@ -66,7 +66,6 @@ var pongoCmd = &cobra.Command{
 	Aliases:       []string{"p"},
 	Short:         "PongoOS Terminal",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
