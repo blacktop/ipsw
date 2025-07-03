@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/commands/mount"
@@ -106,6 +107,31 @@ var extractCmd = &cobra.Command{
 	Short:         "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
+	Example: heredoc.Doc(`
+		# Extract kernelcache from IPSW
+		$ ipsw extract --kernel iPhone15,2_16.5_20F66_Restore.ipsw
+
+		# Extract dyld_shared_cache for specific architecture
+		$ ipsw extract --dyld --dyld-arch arm64e iPhone.ipsw
+
+		# Extract all files matching a pattern (from the IPSW zip contents)
+		$ ipsw extract --pattern '.*\.ttf$' iOS.ipsw
+
+		# Extract multiple components with custom output directory
+		$ ipsw extract --kernel --sep --dyld -o /tmp/extracted iPhone.ipsw
+
+		# Extract from remote URL
+		$ ipsw extract --kernel --remote https://updates.cdn-apple.com/iPhone.ipsw
+
+		# Extract system version info as JSON
+		$ ipsw extract --sys-ver iPhone.ipsw
+
+		# Extract files from filesystem DMG matching pattern
+		$ ipsw extract --files --pattern '.*LaunchDaemons.*\.plist$' iPhone.ipsw
+
+		# Extract DriverKit dyld_shared_cache
+		$ ipsw extract --dyld --driverkit macOS.ipsw
+	`),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	},
