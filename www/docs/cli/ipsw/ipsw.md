@@ -26,6 +26,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or MachO
 * [ipsw comp](/docs/cli/ipsw/comp)	 - Compress files using libcompression
 * [ipsw decomp](/docs/cli/ipsw/decomp)	 - Decompress files using libcompression
+* [ipsw device-info](/docs/cli/ipsw/device-info)	 - Lookup device info
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
 * [ipsw disk](/docs/cli/ipsw/disk)	 - Disk commands
@@ -40,6 +41,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw img4](/docs/cli/ipsw/img4)	 - Parse and manipulate IMG4 files
 * [ipsw info](/docs/cli/ipsw/info)	 - Display IPSW/OTA Info
 * [ipsw kernel](/docs/cli/ipsw/kernel)	 - Parse kernelcache
+* [ipsw lsbom](/docs/cli/ipsw/lsbom)	 - List contents of a BOM file
 * [ipsw macho](/docs/cli/ipsw/macho)	 - Parse MachO
 * [ipsw mdevs](/docs/cli/ipsw/mdevs)	 - List all MobileDevices in IPSW
 * [ipsw mount](/docs/cli/ipsw/mount)	 - Mount DMG from IPSW

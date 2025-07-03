@@ -18,7 +18,11 @@ ipsw img3 extract [flags]
 
 ```
   -h, --help            help for extract
-  -o, --output string   Output file for decrypted data
+      --iv string       IV for decryption (hex string)
+  -k, --iv-key string   IV+Key for direct decryption (concatenated hex string)
+      --key string      Key for decryption (hex string)
+  -o, --output string   Output file for extracted data
+  -r, --raw             Extract raw data (no decryption)
 ```
 
 ### Options inherited from parent commands

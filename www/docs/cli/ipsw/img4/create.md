@@ -39,6 +39,9 @@ ipsw img4 create [flags]
 ❯ ipsw img4 create --input kernelcache.bin --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
 ❯ ipsw img4 create --input devicetree.bin --type dtre --compress lzss --im4m manifest.im4m --output devicetree.img4
 ❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4
+
+# Re-type existing IM4P file with new type
+❯ ipsw img4 create --im4p existing.im4p --type newt --im4m manifest.im4m --output retyped.img4
 ```
 
 ### Options

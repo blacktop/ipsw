@@ -1,23 +1,23 @@
 ---
-id: img3
-title: img3
+id: info
+title: info
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: img3
-description: Parse Img3
+sidebar_label: info
+description: Print img3 information
 ---
-## ipsw img3
+## ipsw img3 info
 
-Parse Img3
+Print img3 information
 
 ```
-ipsw img3 [flags]
+ipsw img3 info <IMG3> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for img3
+  -h, --help   help for info
 ```
 
 ### Options inherited from parent commands
@@ -31,7 +31,5 @@ ipsw img3 [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw img3 extract](/docs/cli/ipsw/img3/extract)	 - Extract data from img3 files
-* [ipsw img3 info](/docs/cli/ipsw/img3/info)	 - Print img3 information
+* [ipsw img3](/docs/cli/ipsw/img3)	 - Parse Img3
 
