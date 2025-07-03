@@ -59,7 +59,6 @@ var tcCmd = &cobra.Command{
 	Short:         "Dump TrustCache",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
