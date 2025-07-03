@@ -309,9 +309,29 @@ func Create(conf *CreateConfig) (*Image, error) {
 			return nil, fmt.Errorf("failed to create IM4P payload from input data: %v", err)
 		}
 	} else if len(conf.PayloadData) > 0 {
-		img.Payload, err = ParsePayload(conf.PayloadData)
+		existingPayload, err := ParsePayload(conf.PayloadData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse IM4P payload data: %v", err)
+		}
+
+		// If type override is specified, create new payload with overridden type
+		if conf.PayloadType != "" {
+			payloadData, err := existingPayload.GetData()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get data from existing payload: %v", err)
+			}
+			img.Payload, err = CreatePayload(&CreatePayloadConfig{
+				Type:        conf.PayloadType,
+				Version:     conf.PayloadVersion,
+				Data:        payloadData,
+				ExtraData:   existingPayload.GetExtraData(),
+				Compression: conf.PayloadCompression,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create IM4P payload with overridden type: %v", err)
+			}
+		} else {
+			img.Payload = existingPayload
 		}
 	}
 

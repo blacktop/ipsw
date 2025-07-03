@@ -104,7 +104,10 @@ var img4CreateCmd = &cobra.Command{
 		# Create IMG4 from raw data with common FourCC codes
 		❯ ipsw img4 create --input kernelcache.bin --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
 		❯ ipsw img4 create --input devicetree.bin --type dtre --compress lzss --im4m manifest.im4m --output devicetree.img4
-		❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4`),
+		❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4
+
+		# Re-type existing IM4P file with new type
+		❯ ipsw img4 create --im4p existing.im4p --type newt --im4m manifest.im4m --output retyped.img4`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// flags
