@@ -875,11 +875,11 @@ func VerifyManifestProperties(im4m *Manifest, bm *bm.BuildManifest, verbose, all
 	// Add more mappings from BuildManifest to IM4M properties
 	bmProps["love"] = buildIdentity.ApOSLongVersion
 	// Always parse ProductMarketingVersion as float64 for consistent comparison
-	if val, err := strconv.ParseFloat(buildIdentity.ProductMarketingVersion, 64); err == nil {
+	if val, err := strconv.ParseFloat(buildIdentity.ApProductMarketingVersion, 64); err == nil {
 		bmProps["apmv"] = val
 	} else {
 		// Fallback to string if parsing fails
-		bmProps["apmv"] = buildIdentity.ProductMarketingVersion
+		bmProps["apmv"] = buildIdentity.ApProductMarketingVersion
 	}
 	bmProps["prtp"] = buildIdentity.ApProductType
 	bmProps["sdkp"] = buildIdentity.ApSDKPlatform

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -14,7 +15,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
-	info "github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/pkg/info"
+	bm "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 )
@@ -30,8 +32,10 @@ import (
 const (
 	tssControllerActionURL = "http://gs.apple.com/TSS/controller?action=2"
 	// tssControllerActionURL = "http://gsra.apple.com/TSS/controller?action=2" TODO: maybe this is the new URL?
-	tssClientVersion = "libauthinstall-973.0.1"
+	tssClientVersion = "libauthinstall-1049.100.21"
 )
+
+var ErrNotSigned = fmt.Errorf("not signed")
 
 // Request is the request sent to the TSS server
 type Request struct {
@@ -53,9 +57,19 @@ type Request struct {
 	UniqueBuildID             []byte `plist:"UniqueBuildID,omitempty" mapstructure:"UniqueBuildID,omitempty"`
 	SepNonce                  []byte `plist:"SepNonce,omitempty" mapstructure:"SepNonce,omitempty"`
 	UIDMode                   bool   `plist:"UID_MODE" mapstructure:"UID_MODE"`
+	NeRDEpoch                 int    `plist:"NeRDEpoch,omitempty" mapstructure:"NeRDEpoch,omitempty"`
+	PermitNeRDPivot           []byte `plist:"PermitNeRDPivot,omitempty" mapstructure:"PermitNeRDPivot,omitempty"`
+	ApSikaFuse                int    `plist:"Ap,SikaFuse,omitempty" mapstructure:"Ap,SikaFuse,omitempty"`
+	// Ap,* fields from manifest
+	ApOSLongVersion           string `plist:"Ap,OSLongVersion,omitempty" mapstructure:"Ap,OSLongVersion,omitempty"`
+	ApProductMarketingVersion string `plist:"Ap,ProductMarketingVersion,omitempty" mapstructure:"Ap,ProductMarketingVersion,omitempty"`
+	ApProductType             string `plist:"Ap,ProductType,omitempty" mapstructure:"Ap,ProductType,omitempty"`
+	ApSDKPlatform             string `plist:"Ap,SDKPlatform,omitempty" mapstructure:"Ap,SDKPlatform,omitempty"`
+	ApTarget                  string `plist:"Ap,Target,omitempty" mapstructure:"Ap,Target,omitempty"`
+	ApTargetType              string `plist:"Ap,TargetType,omitempty" mapstructure:"Ap,TargetType,omitempty"`
 	// Personalize
-	LoadableTrustCache info.IdentityManifest `plist:"LoadableTrustCache,omitempty" mapstructure:"LoadableTrustCache,omitempty"`
-	PersonalizedDMG    info.IdentityManifest `plist:"PersonalizedDMG,omitempty" mapstructure:"PersonalizedDMG,omitempty"`
+	LoadableTrustCache bm.IdentityManifest `plist:"LoadableTrustCache,omitempty" mapstructure:"LoadableTrustCache,omitempty"`
+	PersonalizedDMG    bm.IdentityManifest `plist:"PersonalizedDMG,omitempty" mapstructure:"PersonalizedDMG,omitempty"`
 }
 
 // Response is the response from the TSS server
@@ -78,6 +92,17 @@ type Blob struct {
 	EUICCTicket []byte `plist:"eUICC,Ticket,omitempty"`
 }
 
+type RestoreRequestRule struct {
+	Actions struct {
+		EPRO bool `plist:"EPRO,omitempty"`
+		ESEC bool `plist:"ESEC,omitempty"`
+	} `plist:"Actions,omitempty"`
+	Conditions struct {
+		ApRawProductionMode bool `plist:"ApRawProductionMode,omitempty"`
+		ApRequiresImage4    bool `plist:"ApRequiresImage4,omitempty"`
+	} `plist:"Conditions,omitempty"`
+}
+
 func randomHex(n int) ([]byte, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
@@ -86,12 +111,69 @@ func randomHex(n int) ([]byte, error) {
 	return b, nil
 }
 
-func randomHexStr(n int) (string, error) {
-	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+func RandomECID() (uint64, error) {
+	b, err := randomHex(8)
+	if err != nil {
+		return 0, err
 	}
-	return hex.EncodeToString(bytes), nil
+	return binary.BigEndian.Uint64(b[:]), nil
+}
+
+// applyRestoreRequestRules applies restore request rules to a component
+func applyRestoreRequestRules(entry map[string]any, parameters map[string]any, rules any) {
+	rulesList, ok := rules.([]any)
+	if !ok {
+		return
+	}
+
+	for _, rule := range rulesList {
+		ruleMap, ok := rule.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Check conditions
+		conditions, hasConditions := ruleMap["Conditions"].(map[string]any)
+		conditionsFulfilled := true
+
+		if hasConditions {
+			for condKey, condValue := range conditions {
+				var paramValue any
+				switch condKey {
+				case "ApRawProductionMode", "ApCurrentProductionMode":
+					paramValue = parameters["ApProductionMode"]
+				case "ApRawSecurityMode":
+					paramValue = parameters["ApSecurityMode"]
+				case "ApRequiresImage4":
+					paramValue = true // We're always using IMG4
+				case "ApDemotionPolicyOverride":
+					paramValue = parameters["DemotionPolicy"]
+				case "ApInRomDFU":
+					paramValue = parameters["ApInRomDFU"]
+				default:
+					// Unknown condition, assume not fulfilled
+					conditionsFulfilled = false
+					break
+				}
+
+				if paramValue != condValue {
+					conditionsFulfilled = false
+					break
+				}
+			}
+		}
+
+		// Apply actions if conditions are fulfilled
+		if conditionsFulfilled {
+			if actions, hasActions := ruleMap["Actions"].(map[string]any); hasActions {
+				for actionKey, actionValue := range actions {
+					if boolValue, isBool := actionValue.(bool); isBool {
+						entry[actionKey] = boolValue
+					}
+				}
+			}
+		}
+	}
 }
 
 func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, error) {
@@ -160,7 +242,7 @@ func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, err
 		return &blob, nil
 	}
 
-	return nil, fmt.Errorf("failed to personalize TSS blob: %s", tr.Message)
+	return nil, fmt.Errorf("status: %d, message: %s: %w", tr.Status, tr.Message, ErrNotSigned)
 }
 
 // Config represents the configuration for a TSS request.
@@ -174,6 +256,9 @@ type Config struct {
 	Image4Supported bool
 	Proxy           string
 	Insecure        bool
+	Output          string
+
+	Info *info.Info // Optional, if provided will use this info instead of downloading it
 }
 
 // GetTSSResponse retrieves a TSS response for the given configuration.
@@ -194,63 +279,116 @@ func GetTSSResponse(conf *Config) ([]byte, error) {
 	}
 
 	if conf.Build == "" {
-		conf.Build, err = download.GetBuildID(conf.Version, conf.Device)
-		if err != nil {
-			return nil, err
+		conf.Build = conf.Info.Plists.BuildManifest.ProductBuildVersion
+	}
+
+	buildIdentity, err := conf.Info.Plists.GetBuildIdentity(conf.Device)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get build identity for %s: %v", conf.Device, err)
+	}
+
+	// Parse board and chip IDs
+	chipID, err := strconv.ParseUint(strings.TrimPrefix(buildIdentity.ApChipID, "0x"), 16, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse chip id: %v", err)
+	}
+	boardID, err := strconv.ParseUint(strings.TrimPrefix(buildIdentity.ApBoardID, "0x"), 16, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse board id: %v", err)
+	}
+	ecid := conf.ECID
+	if ecid == 0 {
+		return nil, fmt.Errorf("ECID must be provided to check signing status")
+	}
+
+	tssReq := make(map[string]any)
+	// Create base request
+	tssReq["@HostPlatformInfo"] = "mac"
+	tssReq["@VersionInfo"] = tssClientVersion
+	tssReq["@UUID"] = strings.ToUpper(uuid.New().String())
+	tssReq["ApECID"] = ecid
+	tssReq["UniqueBuildID"] = buildIdentity.UniqueBuildID
+	tssReq["ApChipID"] = chipID
+	tssReq["ApBoardID"] = boardID
+	tssReq["ApSecurityDomain"] = uint64(1)
+	tssReq["ApSecurityMode"] = true
+	tssReq["Ap,OSLongVersion"] = buildIdentity.ApOSLongVersion
+	tssReq["Ap,ProductMarketingVersion"] = buildIdentity.ApProductMarketingVersion
+	tssReq["Ap,ProductType"] = buildIdentity.ApProductType
+	tssReq["Ap,SDKPlatform"] = buildIdentity.ApSDKPlatform
+	tssReq["Ap,Target"] = buildIdentity.ApTarget
+	tssReq["Ap,TargetType"] = buildIdentity.ApTargetType
+	tssReq["ApNonce"] = conf.ApNonce
+	tssReq["SepNonce"] = conf.SepNonce
+	tssReq["@ApImg4Ticket"] = true
+	tssReq["ApProductionMode"] = true
+	tssReq["NeRDEpoch"] = 0
+	tssReq["PearlCertificationRootPub"] = buildIdentity.PearlCertificationRootPub
+	tssReq["PermitNeRDPivot"] = buildIdentity.PermitNeRDPivot
+	tssReq["UID_MODE"] = false
+	tssReq["Ap,SikaFuse"] = 0
+
+	// Parameters for restore request rules
+	parameters := map[string]any{
+		"ApProductionMode": true,
+		"ApSecurityMode":   true,
+		"ApRequiresImage4": true,
+	}
+
+	for k, v := range buildIdentity.Manifest {
+		m := make(map[string]any)
+
+		if _, ok := v.Info["RestoreRequestRules"]; !ok {
+			continue
 		}
+
+		m["Digest"] = v.Digest
+
+		if v.Trusted != nil {
+			m["Trusted"] = *v.Trusted
+		}
+
+		// Apply restore request rules to set EPRO/ESEC
+		if RestoreRequestRules, ok := v.Info["RestoreRequestRules"].([]any); ok {
+			applyRestoreRequestRules(m, parameters, RestoreRequestRules)
+		}
+
+		// Add special fields for specific components
+		if v.BuildString != nil {
+			m["BuildString"] = *v.BuildString
+		}
+		if v.MemoryMap != nil {
+			m["MemoryMap"] = *v.MemoryMap
+		}
+		if v.ObjectPayloadPropertyDigest != nil {
+			m["ObjectPayloadPropertyDigest"] = *v.ObjectPayloadPropertyDigest
+		}
+		if v.RawDataDigest != nil {
+			m["RawDataDigest"] = *v.RawDataDigest
+		}
+		if v.TBMDigests != nil {
+			m["TBMDigests"] = *v.TBMDigests
+		}
+
+		tssReq[k] = m
 	}
 
-	ipsw, err := download.GetIPSW(conf.Device, conf.Build)
-	zr, err := download.NewRemoteZipReader(ipsw.URL, &download.RemoteConfig{
-		Proxy:    conf.Proxy,
-		Insecure: conf.Insecure,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse remote ipsw: %v", err)
-	}
-
-	info, err := info.ParseZipFiles(zr.File)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse remote ipsw info: %v", err)
-	}
-
-	tssReq := Request{
-		UUID:                      uuid.New().String(),
-		ApImg4Ticket:              true,
-		BBTicket:                  true,
-		HostPlatformInfo:          "mac",
-		Locality:                  "en_US",
-		VersionInfo:               tssClientVersion,
-		ApBoardID:                 6,                // device.ApBoardID
-		ApChipID:                  32789,            // device.ApChipID
-		ApECID:                    6303405673529390, // device.ApECID
-		ApNonce:                   conf.ApNonce,     // device.ApNonce
-		ApProductionMode:          true,             // device.EPRO
-		ApSecurityDomain:          1,                // device.ApSecurityDomain
-		SepNonce:                  conf.SepNonce,
-		UniqueBuildID:             info.BuildManifest.BuildIdentities[1].UniqueBuildID,
-		PearlCertificationRootPub: info.BuildManifest.BuildIdentities[1].PearlCertificationRootPub,
-	}
-
-	if conf.Image4Supported {
-		tssReq.ApSecurityMode = true
-		tssReq.ApSupportsImg4 = true
-	} else {
-		tssReq.ApSupportsImg4 = false
-	}
-
-	trdata, err := plist.Marshal(tssReq, plist.XMLFormat)
+	trdata, err := plist.MarshalIndent(tssReq, plist.XMLFormat, "  ")
 	if err != nil {
 		return nil, err
 	}
-	// os.WriteFile("/tmp/tss.plist", trdata, 0644)
+
+	// log.Debug("Saving TSS request to /tmp/tss_request.plist")
+	// if err := os.WriteFile("/tmp/tss_request.plist", trdata, 0644); err != nil {
+	// 	return nil, err
+	// }
 
 	blob, err := getApImg4Ticket(bytes.NewReader(trdata), conf.Proxy, conf.Insecure)
 	if err != nil {
 		return nil, err
 	}
 
-	plistData, err := plist.Marshal(blob, plist.XMLFormat)
+	plistData, err := plist.MarshalIndent(blob, plist.XMLFormat, "  ")
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +401,7 @@ type PersonalConfig struct {
 	Proxy         string
 	Insecure      bool
 	PersonlID     map[string]any
-	BuildManifest *info.BuildManifest
+	BuildManifest *bm.BuildManifest
 }
 
 // Personalize returns a personalized TSS blob
@@ -290,7 +428,7 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 		SepNonce:         []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
 
-	var manifest map[string]info.IdentityManifest
+	var manifest map[string]bm.IdentityManifest
 	for _, bid := range conf.BuildManifest.BuildIdentities {
 		boardID, err := strconv.ParseUint(strings.TrimPrefix(bid.ApBoardID, "0x"), 16, 64)
 		if err != nil {
@@ -349,11 +487,13 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 					for k, v := range actions.(map[string]any) {
 						switch k {
 						case "EPRO":
-							tssReq.PersonalizedDMG.EPRO = v.(bool)
-							tssReq.LoadableTrustCache.EPRO = v.(bool)
+							epro := v.(bool)
+							tssReq.PersonalizedDMG.EPRO = &epro
+							tssReq.LoadableTrustCache.EPRO = &epro
 						case "ESEC":
-							tssReq.PersonalizedDMG.ESEC = v.(bool)
-							tssReq.LoadableTrustCache.ESEC = v.(bool)
+							esec := v.(bool)
+							tssReq.PersonalizedDMG.ESEC = &esec
+							tssReq.LoadableTrustCache.ESEC = &esec
 						}
 					}
 				}
@@ -368,9 +508,9 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 
 	for k, v := range conf.PersonlID {
 		if strings.HasPrefix(k, "Ap,") {
-			switch v.(type) {
+			switch v := v.(type) {
 			case float64:
-				tssMap[k] = uint64(v.(float64))
+				tssMap[k] = uint64(v)
 			default:
 				tssMap[k] = v
 			}
@@ -381,6 +521,7 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 	if err := plist.NewEncoder(buf).Encode(tssMap); err != nil {
 		return nil, err
 	}
+
 	// os.WriteFile("/tmp/tss.plist", buf.Bytes(), 0644)
 
 	blob, err := getApImg4Ticket(buf, conf.Proxy, conf.Insecure)
