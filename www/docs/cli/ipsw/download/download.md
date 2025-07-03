@@ -43,6 +43,6 @@ ipsw download [flags]
 * [ipsw download ota](/docs/cli/ipsw/download/ota)	 - Download OTAs
 * [ipsw download pcc](/docs/cli/ipsw/download/pcc)	 - Download PCC VM files
 * [ipsw download rss](/docs/cli/ipsw/download/rss)	 - Read Releases - Apple Developer RSS Feed
-* [ipsw download tss](/docs/cli/ipsw/download/tss)	 - 🚧 Download SHSH Blobs
+* [ipsw download tss](/docs/cli/ipsw/download/tss)	 - Check signing status and download SHSH blobs
 * [ipsw download wiki](/docs/cli/ipsw/download/wiki)	 - Download old(er) IPSWs from theiphonewiki.com
 
