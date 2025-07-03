@@ -39,7 +39,7 @@ func init() {
 // apsctlCmd represents the apsctl command
 var apsctlCmd = &cobra.Command{
 	Use:           "apsctl",
-	Short:         "Dump APS connections",
+	Short:         "Dump live APS connections on the system",
 	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	Hidden:        true,
