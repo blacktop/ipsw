@@ -3,6 +3,7 @@ package plist
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -33,29 +34,36 @@ func (b *BuildManifest) String() string {
 }
 
 type BuildIdentity struct {
-	ApOSLongVersion               string                      `plist:"Ap,OSLongVersion,omitempty" json:"ap_os_long_version,omitempty"`
-	ApBoardID                     string                      `plist:"ApBoardID,omitempty" json:"ap_board_id,omitempty"`
-	ApChipID                      string                      `plist:"ApChipID,omitempty" json:"ap_chip_id,omitempty"`
-	ApSecurityDomain              string                      `plist:"ApSecurityDomain,omitempty" json:"ap_security_domain,omitempty"`
-	ApProductType                 string                      `plist:"Ap,ProductType,omitempty" json:"ap_product_type,omitempty"`
-	ApSDKPlatform                 string                      `plist:"Ap,SDKPlatform,omitempty" json:"ap_sdk_platform,omitempty"`
-	ApTarget                      string                      `plist:"Ap,Target,omitempty" json:"ap_target,omitempty"`
-	ApTargetType                  string                      `plist:"Ap,TargetType,omitempty" json:"ap_target_type,omitempty"`
-	BbActivationManifestKeyHash   []byte                      `plist:"BbActivationManifestKeyHash,omitempty" json:"bb_activation_manifest_key_hash,omitempty"`
-	BbChipID                      string                      `plist:"BbChipID,omitempty" json:"bb_chip_id,omitempty"`
-	BbFDRSecurityKeyHash          []byte                      `plist:"BbFDRSecurityKeyHash,omitempty" json:"bb_fdr_security_key_hash,omitempty"`
-	BbProvisioningManifestKeyHash []byte                      `plist:"BbProvisioningManifestKeyHash,omitempty" json:"bb_provisioning_manifest_key_hash,omitempty"`
-	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info"`
-	Manifest                      map[string]IdentityManifest `plist:"Manifest,omitempty" json:"manifest,omitempty"`
-	PearlCertificationRootPub     []byte                      `plist:"PearlCertificationRootPub,omitempty" json:"pearl_certification_root_pub,omitempty"`
-	ProductMarketingVersion       string                      `plist:"Ap,ProductMarketingVersion,omitempty" json:"product_marketing_version,omitempty"`
-	UniqueBuildID                 []byte                      `plist:"UniqueBuildID,omitempty" json:"unique_build_id,omitempty"`
+	ApOSLongVersion                    string                      `plist:"Ap,OSLongVersion,omitempty" json:"ap_os_long_version,omitempty"`
+	ApBoardID                          string                      `plist:"ApBoardID,omitempty" json:"ap_board_id,omitempty"`
+	ApChipID                           string                      `plist:"ApChipID,omitempty" json:"ap_chip_id,omitempty"`
+	ApSecurityDomain                   string                      `plist:"ApSecurityDomain,omitempty" json:"ap_security_domain,omitempty"`
+	ApProductType                      string                      `plist:"Ap,ProductType,omitempty" json:"ap_product_type,omitempty"`
+	ApProductMarketingVersion          string                      `plist:"Ap,ProductMarketingVersion,omitempty" json:"product_marketing_version,omitempty"`
+	ApSDKPlatform                      string                      `plist:"Ap,SDKPlatform,omitempty" json:"ap_sdk_platform,omitempty"`
+	ApTarget                           string                      `plist:"Ap,Target,omitempty" json:"ap_target,omitempty"`
+	ApTargetType                       string                      `plist:"Ap,TargetType,omitempty" json:"ap_target_type,omitempty"`
+	BbActivationManifestKeyHash        []byte                      `plist:"BbActivationManifestKeyHash,omitempty" json:"bb_activation_manifest_key_hash,omitempty"`
+	BbChipID                           string                      `plist:"BbChipID,omitempty" json:"bb_chip_id,omitempty"`
+	BbGoldCertId                       string                      `plist:"BbGoldCertId,omitempty" json:"bb_gold_cert_id,omitempty"`
+	BbSkeyId                           []byte                      `plist:"BbSkeyId,omitempty" json:"bb_skey_id,omitempty"`
+	BbFDRSecurityKeyHash               []byte                      `plist:"BbFDRSecurityKeyHash,omitempty" json:"bb_fdr_security_key_hash,omitempty"`
+	BbProvisioningManifestKeyHash      []byte                      `plist:"BbProvisioningManifestKeyHash,omitempty" json:"bb_provisioning_manifest_key_hash,omitempty"`
+	BbCalibrationManifestKeyHash       []byte                      `plist:"BbCalibrationManifestKeyHash,omitempty" json:"bb_calibration_manifest_key_hash,omitempty"`
+	BbFactoryActivationManifestKeyHash []byte                      `plist:"BbFactoryActivationManifestKeyHash,omitempty" json:"bb_factory_activation_manifest_key_hash,omitempty"`
+	Info                               IdentityInfo                `plist:"Info,omitempty" json:"info"`
+	Manifest                           map[string]IdentityManifest `plist:"Manifest,omitempty" json:"manifest,omitempty"`
+	PearlCertificationRootPub          []byte                      `plist:"PearlCertificationRootPub,omitempty" json:"pearl_certification_root_pub,omitempty"`
+	UniqueBuildID                      []byte                      `plist:"UniqueBuildID,omitempty" json:"unique_build_id,omitempty"`
+	NeRDEpoch                          uint64                      `plist:"NeRDEpoch,omitempty" json:"nerd_epoch,omitempty"`
+	PermitNeRDPivot                    []byte                      `plist:"PermitNeRDPivot,omitempty" json:"permit_nerd_pivot,omitempty"`
+	ApSikaFuse                         uint64                      `plist:"Ap,SikaFuse,omitempty" json:"ap_sika_fuse,omitempty"`
 }
 
 func (i BuildIdentity) String() string {
 	var out string
-	if len(i.ProductMarketingVersion) > 0 {
-		out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ProductMarketingVersion)
+	if len(i.ApProductMarketingVersion) > 0 {
+		out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ApProductMarketingVersion)
 	}
 	if len(i.ApOSLongVersion) > 0 {
 		out += fmt.Sprintf("    Ap,OSLongVersion:        %s\n", i.ApOSLongVersion)
@@ -113,20 +121,42 @@ func (i IdentityInfo) String() string {
 	)
 }
 
+// "ACDB-DownloadDigest"
+// "BBCFG-DownloadDigest"
+// "Misc-HashTableBody"
+// "Misc-HashTableHeaderDefault"
+// "Misc-PartialDigest"
+// "RestoreSBL1-HashTableBody"
+// "RestoreSBL1-HashTableHeaderDefault"
+// "RestoreSBL1-PartialDigest"
+// "RestoreSBL1-Version"
+// "SBL1-HashTableBody"
+// "SBL1-HashTableHeaderDefault"
+// "SBL1-PartialDigest"
+// "SBL1-Version"
+
 type IdentityManifest struct {
-	Digest      []byte         `plist:"Digest,omitempty" json:"digest,omitempty" mapstructure:"Digest,omitempty"`
-	Name        string         `plist:"Name,omitempty" json:"name,omitempty" mapstructure:"Name,omitempty"`
-	BuildString string         `plist:"BuildString,omitempty" json:"build_string,omitempty" mapstructure:"BuildString,omitempty"`
-	Info        map[string]any `plist:"Info,omitempty" json:"info,omitempty" mapstructure:"Info,omitempty"`
-	Trusted     bool           `plist:"Trusted,omitempty" json:"trusted,omitempty" mapstructure:"Trusted,omitempty"`
-	EPRO        bool           `plist:"EPRO,omitempty" json:"epro,omitempty" mapstructure:"EPRO,omitempty"`
-	ESEC        bool           `plist:"ESEC,omitempty" json:"esec,omitempty" mapstructure:"ESEC,omitempty"`
+	Digest                       []byte         `plist:"Digest,omitempty" json:"digest,omitempty" mapstructure:"Digest,omitempty"`
+	DigestListSize               *int           `plist:"DigestListSize,omitempty" json:"digest_list_size,omitempty" mapstructure:"DigestListSize,omitempty"`
+	FabRevision                  *int           `plist:"FabRevision,omitempty" json:"fab_revision,omitempty" mapstructure:"FabRevision,omitempty"`
+	Name                         *string        `plist:"Name,omitempty" json:"name,omitempty" mapstructure:"Name,omitempty"`
+	BuildString                  *string        `plist:"BuildString,omitempty" json:"build_string,omitempty" mapstructure:"BuildString,omitempty"`
+	Info                         map[string]any `plist:"Info,omitempty" json:"info,omitempty" mapstructure:"Info,omitempty"`
+	EPRO                         *bool          `plist:"EPRO,omitempty" json:"epro,omitempty" mapstructure:"EPRO,omitempty"`
+	ESEC                         *bool          `plist:"ESEC,omitempty" json:"esec,omitempty" mapstructure:"ESEC,omitempty"`
+	Trusted                      *bool          `plist:"Trusted,omitempty" json:"trusted,omitempty" mapstructure:"Trusted,omitempty"`
+	MemoryMap                    *[]byte        `plist:"MemoryMap,omitempty" json:"memory_map,omitempty" mapstructure:"MemoryMap,omitempty"`
+	ObjectPayloadPropertyDigest  *[]byte        `plist:"ObjectPayloadPropertyDigest,omitempty" json:"object_payload_property_digest,omitempty" mapstructure:"ObjectPayloadPropertyDigest,omitempty"`
+	ProductionUpdatePayloadHash  *[]byte        `plist:"ProductionUpdatePayloadHash,omitempty" json:"production_update_payload_hash,omitempty" mapstructure:"ProductionUpdatePayloadHash,omitempty"`
+	DevelopmentUpdatePayloadHash *[]byte        `plist:"DevelopmentUpdatePayloadHash,omitempty" json:"development_update_payload_hash,omitempty" mapstructure:"DevelopmentUpdatePayloadHash,omitempty"`
+	RawDataDigest                *[]byte        `plist:"RawDataDigest,omitempty" json:"raw_data_digest,omitempty" mapstructure:"RawDataDigest,omitempty"`
+	TBMDigests                   *[]byte        `plist:"TBMDigests,omitempty" json:"tbm_digests,omitempty" mapstructure:"TBMDigests,omitempty"`
 }
 
 func (m IdentityManifest) String() string {
 	var bs string
-	if len(m.BuildString) > 0 {
-		bs = fmt.Sprintf(" (%s)", m.BuildString)
+	if m.BuildString != nil && len(*m.BuildString) > 0 {
+		bs = fmt.Sprintf(" (%s)", *m.BuildString)
 	}
 	return fmt.Sprintf("%s%s", m.Info["Path"].(string), bs)
 }
@@ -218,4 +248,13 @@ func (b *BuildManifest) GetBootLoaders() map[string][]string {
 		}
 	}
 	return bootLoaders
+}
+
+func (b *BuildManifest) GetBuildIdentity(device string) (*BuildIdentity, error) {
+	for _, bID := range b.BuildIdentities {
+		if strings.EqualFold(bID.ApProductType, device) {
+			return &bID, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find build identity for device %s", device)
 }

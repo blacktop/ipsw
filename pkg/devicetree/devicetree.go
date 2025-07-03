@@ -770,7 +770,7 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 }
 
 // ParseZipFiles parses DeviceTree in remote ipsw zip
-func ParseZipFiles(files []*zip.File) (dt map[string]*DeviceTree, err error) {
+func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree, err error) {
 
 	dt = make(map[string]*DeviceTree)
 
@@ -780,20 +780,48 @@ func ParseZipFiles(files []*zip.File) (dt map[string]*DeviceTree, err error) {
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
 			rc.Close()
-
-			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+			if len(keys) > 0 {
+				ivkey, err := hex.DecodeString(keys[0])
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode --iv-key: %v", err)
+				}
+				data, err := DecryptIm4pData(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
+				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+				}
+			} else {
+				dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
 			rc.Close()
-
-			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
+			if len(keys) > 0 {
+				ivkey, err := hex.DecodeString(keys[0])
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode --iv-key: %v", err)
+				}
+				data, err := img3.Decrypt(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+				}
+				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+				}
+			} else {
+				dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
+				}
 			}
 		}
 	}

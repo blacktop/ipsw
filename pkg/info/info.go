@@ -743,7 +743,7 @@ func Parse(ipswPath string, keys ...string) (*Info, error) {
 }
 
 // ParseZipFiles parses plist files and devicetree in a remote zip file
-func ParseZipFiles(files []*zip.File) (*Info, error) {
+func ParseZipFiles(files []*zip.File, keys ...string) (*Info, error) {
 	var err error
 
 	i := &Info{}
@@ -752,7 +752,7 @@ func ParseZipFiles(files []*zip.File) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse plists: %v", err)
 	}
-	i.DeviceTrees, err = devicetree.ParseZipFiles(files)
+	i.DeviceTrees, err = devicetree.ParseZipFiles(files, keys...)
 	if err != nil {
 		if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
 			log.Error(err.Error())
