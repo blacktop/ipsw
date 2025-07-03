@@ -30,12 +30,12 @@ import (
 )
 
 func init() {
-	Img3Cmd.AddCommand(showCmd)
+	Img3Cmd.AddCommand(img3InfoCmd)
 }
 
-// showCmd represents the show command
-var showCmd = &cobra.Command{
-	Use:          "show",
+// img3InfoCmd represents the img3 info command
+var img3InfoCmd = &cobra.Command{
+	Use:          "info <IMG3>",
 	Short:        "Print img3 information",
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
