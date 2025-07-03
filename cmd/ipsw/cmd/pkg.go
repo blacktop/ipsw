@@ -80,7 +80,6 @@ var pkgCmd = &cobra.Command{
 	Use:           "pkg PKG",
 	Short:         "🚧 List contents of a DMG/PKG file",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

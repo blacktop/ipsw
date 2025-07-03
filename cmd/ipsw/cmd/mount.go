@@ -30,6 +30,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/download"
@@ -53,6 +54,19 @@ var mountCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(2),
+	Example: heredoc.Doc(`
+		# Mount the filesystem DMG from an IPSW
+		$ ipsw mount fs iPhone15,2_16.5_20F66_Restore.ipsw
+
+		# Mount the system DMG with a specific decryption key
+		$ ipsw mount sys iPhone.ipsw --key "a1b2c3d4e5f6..."
+
+		# Mount fs DMG and lookup keys from theapplewiki.com
+		$ ipsw mount fs iPod5,1_7.1.2_11D257_Restore.ipsw --lookup
+
+		# Mount dyld shared cache (exc) DMG with AEA pem DB
+		$ ipsw mount exc iPhone.ipsw --pem-db /path/to/pem.json
+	`),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return mount.DmgTypes, cobra.ShellCompDirectiveNoFileComp
