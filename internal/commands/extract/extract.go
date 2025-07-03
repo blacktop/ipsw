@@ -290,11 +290,24 @@ func Exclave(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
-		exc, err := im4p.GetData()
+		excData, err := im4p.GetData()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
-		excs = append(excs, exc)
+		if !c.Info {
+			// save BUND file
+			baseName := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
+			excFile := filepath.Join(filepath.Clean(c.Output), baseName)
+			if err := os.MkdirAll(filepath.Dir(excFile), 0o750); err != nil {
+				return nil, fmt.Errorf("failed to create output directory '%s': %v", excFile, err)
+			}
+			if err := os.WriteFile(excFile, excData, 0o644); err != nil {
+				return nil, fmt.Errorf("failed to write '%s': %v", excFile, err)
+			}
+			outfiles = append(outfiles, excFile)
+		}
+		// append to exclave cores for kernel/app extraction
+		excs = append(excs, excData)
 	}
 
 	for _, exc := range excs {
