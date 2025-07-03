@@ -62,7 +62,6 @@ var deviceInfoCmd = &cobra.Command{
 	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
