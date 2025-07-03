@@ -602,24 +602,70 @@ This will ping the RSS feed every 5 minutes and create a desktop notification if
 
 ## **download tss**
 
-Download SHSH blobs from Apple
+Check IPSW signing status
 
-```
-❯ ipsw download tss
-```
-
-:::caution  note
-This is still a WIP _(however `signed` check does work)_
-:::
-
-Check the signing status of an **iOS** version
-
-```
-❯ ipsw download tss --signed 15.0.2
-   ⨯ 🔥 15.0.2 is NO LONGER being signed
+```bash
+❱ ipsw dl tss --version 17.5.1 --signed --device iPhone15,2
+   ⨯ 💀 No longer being signed  build=21F90 device=iPhone15,2 version=17.5.1
 ```
 
+```bash
+❱ ipsw dl tss --version 18.5 --signed --device iPhone17,1
+   • ✅ Is still being signed   build=22F76 device=iPhone17,1 version=18.5
 ```
-❯ ipsw download tss --signed 15.1
-   • ✅ 15.1 is still being signed
+
+```bash
+❱ ipsw dl tss --version 26.0 --beta --signed --device iPhone17,1
+   • ✅ Is still being signed   beta=true build=23A5260n device=iPhone17,1 version=26.0
+```
+
+Download SHSH blob
+
+```bash
+ipipsw dl tss --version 26.0 --beta --device iPhone17,1 --output SHSH.26.0.blob
+   • SHSH blob saved           output=SHSH.26.0.blob
+```
+
+Examine
+
+```bash
+❱ ipsw img4 im4m extract SHSH.26.0.blob
+   • Extracting IM4M           path=SHSH.26.0.blob.im4m size=12 kB
+```
+
+```bash
+❱ ipsw img4 im4m info SHSH.26.0.blob.im4m
+IM4M (Manifest):
+  Tag:        IM4M
+  Version:    0
+  Body Size:  9831 bytes
+  Raw Size:   12196 bytes
+  Properties: 22
+    Device Properties:
+      CHIP (ApChipID): 33088
+      BORD (ApBoardID): 12
+      ECID (ExclusiveChipID): 1234567890
+      SDOM (ApSecurityDomain): 1
+      CEPO (CertificateEpoch): 1
+    Security Properties:
+      CPRO (CertificateProductionStatus): true
+      CSEC (CertificateSecurityMode): true
+      srvn (SecurityRevisionNumber): 5eb61ffea80974636ceb9eda6b93fdf46d7e8a58
+      snon (SecurityNonce): 1deac0d8449ec99f69b5fe44104fdb2f65a8c386
+      BNCH (BootNonceHash): d0a5b110379645182bdfdedd7b168213bdc2bbf44d9ce6aa7147f0a5b069d4d5
+    Version Properties:
+      love (ApOSLongVersion): 23.1.260.5.14,0
+      prtp (ApProductType): iPhone17,1
+      sdkp (ApSDKPlatform): iphoneos
+    Other Properties:
+      apmv (ProductMarketingVersion): 26.0
+      eply: 7801018081
+      esdm: 0
+      nrde: 0
+      pcrp: 0440465e12b073bab7885be45281833fa8f676ba71482c6c482383683408a86c1de77c19274c48248bf44537f64d2efefeee0ace1ac03736f5f6bf93433c2a149329869de6237c98e29ba420573f9164bb0cb400c7f7ed5815d7eaf9788a0df012
+      pndp: 1
+      tagt (ApTarget): D93AP
+      tatp (ApTargetType): d93
+      uidm: false
+<SNIP>
 ```
