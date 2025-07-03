@@ -148,7 +148,7 @@ func (p *Postgres) GetIPSW(version, build, device string) (*model.Ipsw, error) {
 	var ipsw model.Ipsw
 	if err := p.db.Joins("JOIN ipsw_devices ON ipsw_devices.ipsw_id = ipsws.id").
 		Joins("JOIN devices ON devices.name = ipsw_devices.device_name").
-		Where("ipsws.version = ? AND ipsws.build_id = ? AND devices.name = ?", version, build, device).
+		Where("ipsws.version = ? AND ipsws.buildid = ? AND devices.name = ?", version, build, device).
 		First(&ipsw).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, model.ErrNotFound
