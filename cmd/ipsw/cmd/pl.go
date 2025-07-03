@@ -93,10 +93,11 @@ func init() {
 
 // plistCmd represents the pl command
 var plistCmd = &cobra.Command{
-	Use:     "plist <file|watch-path>",
-	Aliases: []string{"pl"},
-	Short:   "Dump plist as JSON",
-	Args:    cobra.MaximumNArgs(1),
+	Use:           "plist <file|watch-path>",
+	Aliases:       []string{"pl"},
+	Short:         "Dump plist as JSON",
+	Args:          cobra.MaximumNArgs(1),
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
