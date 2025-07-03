@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -98,6 +99,22 @@ var plistCmd = &cobra.Command{
 	Short:         "Dump plist as JSON",
 	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
+	Example: heredoc.Doc(`
+		# Convert a plist file to JSON
+		$ ipsw plist Info.plist
+
+		# Pipe JSON to jq
+		$ ipsw plist Info.plist --no-color | jq .
+
+		# Read plist from stdin
+		$ cat Info.plist | ipsw plist
+
+		# Watch a directory for plist changes
+		$ ipsw plist --watch ~/Library/Preferences
+
+		# Watch a specific directory and exclude certain files
+		$ ipsw plist --watch /System/Library/LaunchDaemons --exclude "com.apple.*.plist"
+	`),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
