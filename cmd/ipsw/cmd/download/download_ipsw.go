@@ -179,7 +179,7 @@ var downloadIpswCmd = &cobra.Command{
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
 		// verify args
-		if len(device) == 0 && len(version) == 0 && len(build) == 0 && !latest && !showLatestVersion && !showLatestBuild {
+		if len(device) == 0 && len(version) == 0 && len(build) == 0 && !latest && !showLatestVersion && !showLatestBuild && !viper.GetBool("download.ipsw.urls") {
 			return fmt.Errorf("you must also supply a --device || --version || --build (or use --latest)")
 		}
 		if len(version) > 0 && len(build) > 0 {
@@ -322,7 +322,7 @@ var downloadIpswCmd = &cobra.Command{
 			}
 
 			if len(filteredBuilds) == 0 {
-				return fmt.Errorf(fmt.Sprintf("no IPSWs match device(s) %s %s", device, strings.Join(doDownload, " ")))
+				return fmt.Errorf("no IPSWs match device(s) %s %s", device, strings.Join(doDownload, " "))
 			}
 
 			// convert from itunes to ipsw
