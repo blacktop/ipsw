@@ -179,7 +179,7 @@ var downloadIpswCmd = &cobra.Command{
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
 		// verify args
-		if len(device) == 0 && len(version) == 0 && len(build) == 0 {
+		if len(device) == 0 && len(version) == 0 && len(build) == 0 && !latest && !showLatestVersion && !showLatestBuild {
 			return fmt.Errorf("you must also supply a --device || --version || --build (or use --latest)")
 		}
 		if len(version) > 0 && len(build) > 0 {
