@@ -153,6 +153,8 @@ var dyldExtractCmd = &cobra.Command{
 			return fmt.Errorf("must specify at least one DYLIB to extract")
 		}
 
+		log.Warn("This command is currently experimental and may not work as expected. https://github.com/blacktop/ipsw/issues/467")
+
 		dscPath := filepath.Clean(args[0])
 
 		folder := filepath.Dir(dscPath) // default to folder of shared cache
