@@ -166,6 +166,12 @@ work-apfs: ## Work on go-apfs package
 	@go work init || true
 	@go work use . ../go-apfs
 
+.PHONY: work-term
+work-term: ## Work on go-termimg package
+	@echo " > Working on go-termimg package"
+	@go work init || true
+	@go work use . ../go-termimg
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
