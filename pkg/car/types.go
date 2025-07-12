@@ -3,7 +3,7 @@ package car
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
@@ -12,21 +12,53 @@ import (
 	"os"
 
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/go-termimg"
 )
 
+type CSISignature uint32
+
 const (
-	CsiFileSignature              = 0x49535443 // "CTSI"
-	CsiElementSignature           = 0x4D4C4543 // "CELM"
-	CsiBitmapChunkSignature       = 0x4B434243 // "CBCK"
-	CsiGradientSignature          = 0x44415247 // "GRAD"
-	CsiEffectDataSignature        = 0x58465443 // "CTFX"
-	CsiRawDataSignature           = 0x44574152 // "RAWD"
-	CsiExternalLinkSignature      = 0x4B4C5845 // "EXLK"
-	CsiInternalLinkSignature      = 0x4B4C4E49 // "INLK"
-	CsiTextureDataSignature       = 0x52545854 // "TXTR"
-	CsiColorSignature             = 0x524C4F43 // "COLR"
-	CsiMultisizeImageSetSignature = 0x5349534D // "MSIS"
+	CsiFileSignature              CSISignature = 0x49535443 // "CTSI"
+	CsiElementSignature           CSISignature = 0x4D4C4543 // "CELM"
+	CsiBitmapChunkSignature       CSISignature = 0x4B434243 // "CBCK"
+	CsiGradientSignature          CSISignature = 0x44415247 // "GRAD"
+	CsiEffectDataSignature        CSISignature = 0x58465443 // "CTFX"
+	CsiRawDataSignature           CSISignature = 0x44574152 // "RAWD"
+	CsiExternalLinkSignature      CSISignature = 0x4B4C5845 // "EXLK"
+	CsiInternalLinkSignature      CSISignature = 0x4B4C4E49 // "INLK"
+	CsiTextureDataSignature       CSISignature = 0x52545854 // "TXTR"
+	CsiColorSignature             CSISignature = 0x524C4F43 // "COLR"
+	CsiMultisizeImageSetSignature CSISignature = 0x5349534D // "MSIS"
 )
+
+func (s CSISignature) String() string {
+	switch s {
+	case CsiFileSignature:
+		return "FileSignature"
+	case CsiElementSignature:
+		return "ElementSignature"
+	case CsiBitmapChunkSignature:
+		return "BitmapChunkSignature"
+	case CsiGradientSignature:
+		return "GradientSignature"
+	case CsiEffectDataSignature:
+		return "EffectDataSignature"
+	case CsiRawDataSignature:
+		return "RawDataSignature"
+	case CsiExternalLinkSignature:
+		return "ExternalLinkSignature"
+	case CsiInternalLinkSignature:
+		return "InternalLinkSignature"
+	case CsiTextureDataSignature:
+		return "TextureDataSignature"
+	case CsiColorSignature:
+		return "ColorSignature"
+	case CsiMultisizeImageSetSignature:
+		return "MultisizeImageSetSignature"
+	default:
+		return fmt.Sprintf("unknown(%#x)", uint32(s))
+	}
+}
 
 type renditionFlags uint32
 
@@ -36,8 +68,8 @@ func (f renditionFlags) IsVectorBased() bool {
 func (f renditionFlags) IsOpaque() bool {
 	return types.ExtractBits(uint64(f), 1, 1) == 1
 }
-func (f renditionFlags) BitmapEncoding() csiBitmapEncoding {
-	return csiBitmapEncoding(types.ExtractBits(uint64(f), 2, 4))
+func (f renditionFlags) BitmapEncoding() compressionType {
+	return compressionType(types.ExtractBits(uint64(f), 2, 4))
 }
 func (f renditionFlags) OptOutOfThinning() bool {
 	return types.ExtractBits(uint64(f), 6, 1) == 1
@@ -127,19 +159,35 @@ type csiBitmapList struct {
 	AccumLength []uint32
 }
 
+type csiHeaderFlags uint32
+
+const (
+	CSIAssetIsFPO                         csiHeaderFlags = (1 << 0)
+	CSIAssetIsExcludedFromFilter          csiHeaderFlags = (1 << 1)
+	CSIAssetIsVectorBased                 csiHeaderFlags = (1 << 2)
+	CSIAssetIsTemplate                    csiHeaderFlags = (1 << 3)
+	CSIAssetIsTemplateAutomatic           csiHeaderFlags = (1 << 4)
+	CSIAssetOptOutOfThinning              csiHeaderFlags = (1 << 5)
+	CSIAssetIsFlippable                   csiHeaderFlags = (1 << 6)
+	CSIAssetIsTintable                    csiHeaderFlags = (1 << 7)
+	CSIAssetPreservedVectorRepresentation csiHeaderFlags = (1 << 8)
+)
+
 type csiHeader struct {
-	Signature   [4]byte // CsiFileSignature
+	Signature   CSISignature
 	Version     uint32
-	Flags       renditionFlags
+	Flags       csiHeaderFlags
 	Width       uint32
 	Height      uint32
-	PPI         uint32 // 100 to @1x, 200 to @2x, 300 to @3x (0 is native rez)
+	ScaleFactor uint32 // 100 to @1x, 200 to @2x, 300 to @3x (0 is native rez)
 	PixelFormat [4]byte
 	ColorSpace  csiColorSpace
 	Metadata    csiMetaData
 	ChainSize   uint32
 	ImageIndex  csiBitmapList
 } // immediatly followed by a chain of resources
+
+/* RESOURCE CHAIN */
 
 type csiResource struct {
 	ID     resourceID
@@ -167,7 +215,180 @@ const (
 	PhysicalSizeID             resourceID = 1015
 	RenditionPropertyID        resourceID = 1016
 	TransformationID           resourceID = 1017
+
+	// Unknown1ID resourceID = 1020
+	// Unknown2ID resourceID = 1021
 )
+
+type sliceResource struct {
+	NumSlices uint32
+	Slices    []struct {
+		X, Y, Width, Height uint32
+	}
+}
+
+func (s *sliceResource) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &s.NumSlices); err != nil {
+		return fmt.Errorf("failed to read NumSlices: %w", err)
+	}
+	s.Slices = make([]struct {
+		X, Y          uint32
+		Width, Height uint32
+	}, s.NumSlices)
+	for i := range s.Slices {
+		if err := binary.Read(r, binary.LittleEndian, &s.Slices[i]); err != nil {
+			return fmt.Errorf("failed to read Slice %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+type sampleResource struct {
+	NumSamples uint32
+	Samples    []struct {
+		A, R, G, B uint8
+	}
+}
+
+func (s *sampleResource) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &s.NumSamples); err != nil {
+		return fmt.Errorf("failed to read NumSamples: %w", err)
+	}
+	s.Samples = make([]struct {
+		A, R, G, B uint8
+	}, s.NumSamples)
+	for i := range s.Samples {
+		if err := binary.Read(r, binary.LittleEndian, &s.Samples[i]); err != nil {
+			return fmt.Errorf("failed to read Sample %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+type metricsResource struct {
+	NumMetrics uint32
+	Metrics    []struct {
+		LeftInset, TopInset, RightInset, BottomInset, Width, Height int32
+	}
+}
+
+func (m *metricsResource) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &m.NumMetrics); err != nil {
+		return fmt.Errorf("failed to read NumMetrics: %w", err)
+	}
+	m.Metrics = make([]struct {
+		LeftInset, TopInset, RightInset, BottomInset int32
+		Width, Height                                int32
+	}, m.NumMetrics)
+	for i := range m.Metrics {
+		if err := binary.Read(r, binary.LittleEndian, &m.Metrics[i]); err != nil {
+			return fmt.Errorf("failed to read Metric %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+type csiLayerReferenceFlags uint32
+
+func (f csiLayerReferenceFlags) FixedFrame() bool {
+	return (f & 1) != 0
+}
+
+type layerResource struct {
+	NumLayers uint32
+	Flags     uint32
+	Layers    []struct {
+		Flags csiLayerReferenceFlags
+		Frame struct {
+			X      int32
+			Y      int32
+			Width  uint32
+			Height uint32
+		}
+		BlendMode uint32
+		Opacity   float32
+		Length    uint32
+		Data      []byte
+	}
+}
+
+func (l *layerResource) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &l.NumLayers); err != nil {
+		return fmt.Errorf("failed to read NumLayers: %w", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &l.Flags); err != nil {
+		return fmt.Errorf("failed to read Flags: %w", err)
+	}
+	l.Layers = make([]struct {
+		Flags csiLayerReferenceFlags
+		Frame struct {
+			X, Y          int32
+			Width, Height uint32
+		}
+		BlendMode uint32
+		Opacity   float32
+		Length    uint32
+		Data      []byte
+	}, l.NumLayers)
+	for i := range l.Layers {
+		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].Flags); err != nil {
+			return fmt.Errorf("failed to read Flags for layer %d: %w", i, err)
+		}
+		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].Frame); err != nil {
+			return fmt.Errorf("failed to read Frame for layer %d: %w", i, err)
+		}
+		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].BlendMode); err != nil {
+			return fmt.Errorf("failed to read BlendMode for layer %d: %w", i, err)
+		}
+		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].Opacity); err != nil {
+			return fmt.Errorf("failed to read Opacity for layer %d: %w", i, err)
+		}
+		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].Length); err != nil {
+			return fmt.Errorf("failed to read Length for layer %d: %w", i, err)
+		}
+		l.Layers[i].Data = make([]byte, l.Layers[i].Length)
+		if _, err := r.Read(l.Layers[i].Data); err != nil {
+			return fmt.Errorf("failed to read Data for layer %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+type compositingResource struct {
+	BlendMode uint32
+	Opacity   float32
+}
+
+type metadataResourceFlags uint32
+
+const (
+	UtiType metadataResourceFlags = 1
+)
+
+type metadataResource struct {
+	Length uint32
+	Flags  metadataResourceFlags
+	Data   []byte
+}
+
+func (m *metadataResource) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &m.Length); err != nil {
+		return fmt.Errorf("failed to read Length: %w", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &m.Flags); err != nil {
+		return fmt.Errorf("failed to read Flags: %w", err)
+	}
+	m.Data = make([]byte, m.Length)
+	if _, err := r.Read(m.Data); err != nil {
+		return fmt.Errorf("failed to read Data: %w", err)
+	}
+	return nil
+}
 
 type csiColorType uint8
 
@@ -197,12 +418,87 @@ type csiColor struct {
 }
 
 func (c *csiColor) ToTerminal() (string, error) {
-	return colorInTerminal(color.RGBA{
-		R: alpha(c.Components[0]),
-		G: alpha(c.Components[1]),
-		B: alpha(c.Components[2]),
-		A: alpha(c.Components[3]),
-	})
+	var rgba color.RGBA
+
+	switch len(c.Components) {
+	case 2: // Grayscale: luminance and alpha
+		gray := alpha(c.Components[0])
+		rgba = color.RGBA{
+			R: gray,
+			G: gray,
+			B: gray,
+			A: alpha(c.Components[1]),
+		}
+	case 4: // RGBA
+		rgba = color.RGBA{
+			R: alpha(c.Components[0]),
+			G: alpha(c.Components[1]),
+			B: alpha(c.Components[2]),
+			A: alpha(c.Components[3]),
+		}
+	default:
+		return "", fmt.Errorf("unsupported color format: %d components", len(c.Components))
+	}
+
+	return colorInTerminal(rgba)
+}
+
+type CSIGradientDataFlags uint32
+
+const (
+	CSIGradientIsDithered CSIGradientDataFlags = (1 << 0)
+)
+
+type CUIPSDGradientStyle uint32
+
+const (
+	// CUIPSDGradientStyleLinear    CUIPSDGradientStyle = `Lnr `
+	// CUIPSDGradientStyleRadial    CUIPSDGradientStyle = `Rdl `
+	// CUIPSDGradientStyleSweep     CUIPSDGradientStyle = `Angl`
+	// CUIPSDGradientStyleReflected CUIPSDGradientStyle = `Rflc`
+	// CUIPSDGradientStyleDiamond   CUIPSDGradientStyle = `Dmnd`
+	CUIPSDGradientStyleInvalid CUIPSDGradientStyle = 0
+)
+
+type csigradientdata struct {
+	Signature            [4]byte // CsiGradientSignature
+	Flags                CSIGradientDataFlags
+	Length               uint32
+	Style                CUIPSDGradientStyle
+	Version              uint32
+	BlendMode            uint32
+	FillRed              float64
+	FillGreen            float64
+	FillBlue             float64
+	FillAlpha            float64
+	Angle                float64 // only valid if style is CUIPSDGradientStyleSweep
+	Smoothing            float64 // only valid if style is CUIPSDGradientStyleLinear or CUIPSDGradientStyleRadial
+	ColorStopCount       uint32
+	ColorMidpointCount   uint32
+	OpacityStopCount     uint32
+	OpacityMidpointCount uint32
+	// NodeList             []uint8
+}
+
+// TODO: this is probably wrong
+type gradientStartStops struct {
+	Start float32
+	Stop  float32
+}
+
+// TODO: this is probably wrong
+type gradientStop struct {
+	Stop       float32
+	NameLength uint32
+	Name       []byte
+}
+
+type csiNamedGradient struct {
+	Signature  [4]byte // 'GGRA'
+	ColorCount uint32
+	Type       uint64
+	StartStops []gradientStartStops
+	Stops      []gradientStop
 }
 
 type csiSystemColorName struct {
@@ -214,7 +510,7 @@ type csiSystemColorName struct {
 
 type csiMultiImgSetImageSize struct {
 	Width  uint32
-	Heigth uint32
+	Height uint32
 	Index  uint32 // only valid if version > 0
 }
 
@@ -240,12 +536,45 @@ type linkRect struct {
 }
 
 type csiInternalLinkData struct {
-	Signature     [4]byte // CsiInternalLinkSignature
-	Flags         uint32
-	Frame         linkRect
-	Layout        uint16 // 3Part, 9Part, etc
-	Length        uint32
-	ReferenceData []byte // renditionAttribute
+	Signature CSISignature // CsiInternalLinkSignature
+	Flags     uint32       // 0
+	Frame     linkRect
+	Layout    uint16 // 3Part, 9Part, etc
+	Length    uint32
+	Reference []renditionAttribute
+}
+
+func (l *csiInternalLinkData) UnmarshalBinary(r *bytes.Reader) error {
+	if err := binary.Read(r, binary.BigEndian, &l.Signature); err != nil {
+		return fmt.Errorf("failed to read Signature: %w", err)
+	}
+	if l.Signature != CsiInternalLinkSignature {
+		return fmt.Errorf("invalid signature: expected %s, got %s", CsiInternalLinkSignature, l.Signature)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &l.Flags); err != nil {
+		return fmt.Errorf("failed to read Flags: %w", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &l.Frame); err != nil {
+		return fmt.Errorf("failed to read Frame: %w", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &l.Layout); err != nil {
+		return fmt.Errorf("failed to read Layout: %w", err)
+	}
+	if err := binary.Read(r, binary.LittleEndian, &l.Length); err != nil {
+		return fmt.Errorf("failed to read Length: %w", err)
+	}
+	data := make([]byte, l.Length)
+	if _, err := r.Read(data); err != nil {
+		return fmt.Errorf("failed to read ReferenceData: %w", err)
+	}
+	l.Reference = make([]renditionAttribute, len(data)/binary.Size(renditionAttribute{}))
+	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &l.Reference); err != nil {
+		return fmt.Errorf("failed to read rendition internal link references: %v", err)
+	}
+	if r.Len() > 0 {
+		return fmt.Errorf("unexpected data remaining after reading csiInternalLinkData: %d bytes", r.Len())
+	}
+	return nil
 }
 
 type originalSize struct {
@@ -395,23 +724,25 @@ func alpha(f float64) uint8 {
 }
 
 func colorInTerminal(c color.RGBA) (string, error) {
-	var dat bytes.Buffer
-	buf := bufio.NewWriter(&dat)
-
-	width := 75
-	height := 75
+	width, height := 75, 75
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(img, img.Bounds(), &image.Uniform{c}, image.Point{}, draw.Src)
+
+	var dat bytes.Buffer
+	buf := bufio.NewWriter(&dat)
+
 	if err := png.Encode(buf, img); err != nil {
 		return "", fmt.Errorf("failed to encode color PNG file: %v", err)
 	}
 	buf.Flush()
 
-	return fmt.Sprintf("\033]1337;File=inline=1;width=%dpx;height=%dpx:%s\a\n",
-		width,
-		height,
-		base64.StdEncoding.EncodeToString(dat.Bytes())), nil
+	ti, err := termimg.From(bytes.NewReader(dat.Bytes()))
+	if err != nil {
+		return "", fmt.Errorf("failed to create terminal image: %v", err)
+	}
+
+	return ti.Render()
 }
 
 func createColorPNG(name string, c color.RGBA) error {

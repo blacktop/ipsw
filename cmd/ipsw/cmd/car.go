@@ -26,18 +26,20 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/profile"
 	"github.com/blacktop/ipsw/pkg/car"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+var profileFlags profile.ProfilingFlags
+
 func init() {
 	rootCmd.AddCommand(carCmd)
-	carCmd.Flags().BoolP("export", "x", false, "Export all renditions")
 	carCmd.Flags().StringP("output", "o", "", "Output folder to save renditions")
 	carCmd.MarkFlagDirname("output")
-	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
 	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
+	profile.AddFlags(carCmd, &profileFlags)
 }
 
 // carCmd represents the car command
@@ -45,7 +47,6 @@ var carCmd = &cobra.Command{
 	Use:           "car",
 	Short:         "Parse Asset.car files",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,38 +55,27 @@ var carCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// if err := filepath.Walk("/tmp/098-38745-038.dmg.mount", func(path string, info fs.FileInfo, err error) error {
-		// 	if err != nil {
-		// 		return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
-		// 	}
-		// 	if info.IsDir() {
-		// 		return nil
-		// 		// return filepath.SkipDir
-		// 	}
-		// 	if filepath.Ext(path) == ".car" {
-		// 		if _, err := car.Parse(path, &car.Config{Verbose: Verbose}); err != nil {
-		// 			log.Errorf("failed to parse %s: %v", path, err)
-		// 		}
-		// 	}
-		// 	return nil
-		// }); err != nil {
-		// 	return err
-		// }
-
-		if len(viper.GetString("car.output")) > 0 {
+		if viper.IsSet("car.output") {
 			if err := os.MkdirAll(viper.GetString("car.output"), 0755); err != nil {
-				return err
+				return fmt.Errorf("failed to create output directory: %v", err)
 			}
-		} else {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current working directory: %w", err)
-			}
-			viper.Set("car.output", cwd)
 		}
 
+		// Setup profiling
+		prof := profile.New(profileFlags.ToConfig())
+		if err := prof.Start(); err != nil {
+			return fmt.Errorf("failed to start profiling: %v", err)
+		}
+		defer func() {
+			if err := prof.Stop(); err != nil {
+				log.Errorf("failed to stop profiling: %v", err)
+			}
+			if profileFlags.IsEnabled() {
+				prof.PrintStats()
+			}
+		}()
+
 		asset, err := car.Parse(args[0], &car.Config{
-			Export:  viper.GetBool("car.export"),
 			Output:  viper.GetString("car.output"),
 			Verbose: Verbose,
 		})
