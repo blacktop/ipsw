@@ -13,7 +13,7 @@ func _() {
 	_ = x[Part-2]
 	_ = x[Size-3]
 	_ = x[Direction-4]
-	_ = x[placeholder-5]
+	_ = x[Placeholder-5]
 	_ = x[Value-6]
 	_ = x[ThemeAppearance-7]
 	_ = x[Dimension1-8]
@@ -21,6 +21,7 @@ func _() {
 	_ = x[State-10]
 	_ = x[Layer-11]
 	_ = x[Scale-12]
+	_ = x[Localization-13]
 	_ = x[PresentationState-14]
 	_ = x[Idiom-15]
 	_ = x[Subtype-16]
@@ -33,28 +34,19 @@ func _() {
 	_ = x[GraphicsFeatureSetClass-23]
 	_ = x[DisplayGamut-24]
 	_ = x[DeploymentTarget-25]
+	_ = x[GlyphWeight-26]
+	_ = x[GlyphSize-27]
 }
 
-const (
-	_renditionAttributeType_name_0 = "ThemeLookElementPartSizeDirectionplaceholderValueThemeAppearanceDimension1Dimension2StateLayerScale"
-	_renditionAttributeType_name_1 = "PresentationStateIdiomSubtypeIdentifierPreviousValuePreviousStateHorizontalSizeClassVerticalSizeClassMemoryLevelClassGraphicsFeatureSetClassDisplayGamutDeploymentTarget"
-)
+const _renditionAttributeType_name = "ThemeLookElementPartSizeDirectionPlaceholderValueThemeAppearanceDimension1Dimension2StateLayerScaleLocalizationPresentationStateIdiomSubtypeIdentifierPreviousValuePreviousStateHorizontalSizeClassVerticalSizeClassMemoryLevelClassGraphicsFeatureSetClassDisplayGamutDeploymentTargetGlyphWeightGlyphSize"
 
-var (
-	_renditionAttributeType_index_0 = [...]uint8{0, 9, 16, 20, 24, 33, 44, 49, 64, 74, 84, 89, 94, 99}
-	_renditionAttributeType_index_1 = [...]uint8{0, 17, 22, 29, 39, 52, 65, 84, 101, 117, 140, 152, 168}
-)
+var _renditionAttributeType_index = [...]uint16{0, 9, 16, 20, 24, 33, 44, 49, 64, 74, 84, 89, 94, 99, 111, 128, 133, 140, 150, 163, 176, 195, 212, 228, 251, 263, 279, 290, 299}
 
 func (i renditionAttributeType) String() string {
-	switch {
-	case i <= 12:
-		return _renditionAttributeType_name_0[_renditionAttributeType_index_0[i]:_renditionAttributeType_index_0[i+1]]
-	case 14 <= i && i <= 25:
-		i -= 14
-		return _renditionAttributeType_name_1[_renditionAttributeType_index_1[i]:_renditionAttributeType_index_1[i+1]]
-	default:
+	if i >= renditionAttributeType(len(_renditionAttributeType_index)-1) {
 		return "renditionAttributeType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
+	return _renditionAttributeType_name[_renditionAttributeType_index[i]:_renditionAttributeType_index[i+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -70,40 +62,55 @@ func _() {
 	_ = x[Effect-7]
 	_ = x[Animation-8]
 	_ = x[Vector-9]
+	_ = x[IconImage-12]
 	_ = x[RawData-1000]
 	_ = x[ExternalLink-1001]
-	_ = x[LayerStack-1002]
+	_ = x[ImageStack-1002]
 	_ = x[InternalLink-1003]
-	_ = x[Packed-1004]
+	_ = x[PackedImage-1004]
 	_ = x[NamedContents-1005]
 	_ = x[ThinningPlaceholder-1006]
-	_ = x[Texture-1007]
+	_ = x[TextureRendition-1007]
 	_ = x[TextureImage-1008]
 	_ = x[Color-1009]
 	_ = x[MultiSizeImageSet-1010]
-	_ = x[ModelAsset-1011]
+	_ = x[ModelIOAsset-1011]
 	_ = x[ModelMesh-1012]
 	_ = x[RecognitionGroup-1013]
 	_ = x[RecognitionObject-1014]
+	_ = x[ModelIOSubmesh-1016]
+	_ = x[VectorGlyph-1017]
+	_ = x[SolidImageStack-1018]
+	_ = x[IconImageStack-1019]
+	_ = x[IconGroup-1020]
+	_ = x[NamedGradient-1021]
 }
 
 const (
 	_renditionLayoutType_name_0 = "OnePartThreePartHorizontalThreePartVerticalNinePartTwelvePartManyPartGradientEffectAnimationVector"
-	_renditionLayoutType_name_1 = "RawDataExternalLinkLayerStackInternalLinkPackedNamedContentsThinningPlaceholderTextureTextureImageColorMultiSizeImageSetModelAssetModelMeshRecognitionGroupRecognitionObject"
+	_renditionLayoutType_name_1 = "IconImage"
+	_renditionLayoutType_name_2 = "RawDataExternalLinkImageStackInternalLinkPackedImageNamedContentsThinningPlaceholderTextureRenditionTextureImageColorMultiSizeImageSetModelIOAssetModelMeshRecognitionGroupRecognitionObject"
+	_renditionLayoutType_name_3 = "ModelIOSubmeshVectorGlyphSolidImageStackIconImageStackIconGroupNamedGradient"
 )
 
 var (
 	_renditionLayoutType_index_0 = [...]uint8{0, 7, 26, 43, 51, 61, 69, 77, 83, 92, 98}
-	_renditionLayoutType_index_1 = [...]uint8{0, 7, 19, 29, 41, 47, 60, 79, 86, 98, 103, 120, 130, 139, 155, 172}
+	_renditionLayoutType_index_2 = [...]uint8{0, 7, 19, 29, 41, 52, 65, 84, 100, 112, 117, 134, 146, 155, 171, 188}
+	_renditionLayoutType_index_3 = [...]uint8{0, 14, 25, 40, 54, 63, 76}
 )
 
 func (i renditionLayoutType) String() string {
 	switch {
 	case i <= 9:
 		return _renditionLayoutType_name_0[_renditionLayoutType_index_0[i]:_renditionLayoutType_index_0[i+1]]
+	case i == 12:
+		return _renditionLayoutType_name_1
 	case 1000 <= i && i <= 1014:
 		i -= 1000
-		return _renditionLayoutType_name_1[_renditionLayoutType_index_1[i]:_renditionLayoutType_index_1[i+1]]
+		return _renditionLayoutType_name_2[_renditionLayoutType_index_2[i]:_renditionLayoutType_index_2[i+1]]
+	case 1016 <= i && i <= 1021:
+		i -= 1016
+		return _renditionLayoutType_name_3[_renditionLayoutType_index_3[i]:_renditionLayoutType_index_3[i+1]]
 	default:
 		return "renditionLayoutType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
@@ -146,7 +153,7 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[RawBytes-0]
+	_ = x[Uncompressed-0]
 	_ = x[RLE-1]
 	_ = x[ZIP-2]
 	_ = x[LZVN-3]
@@ -156,16 +163,17 @@ func _() {
 	_ = x[ASTCImage-7]
 	_ = x[PaletteImage-8]
 	_ = x[HEVC-9]
-	_ = x[Deepmap-10]
+	_ = x[DeepmapLZFSE-10]
 	_ = x[Deepmap2-11]
+	_ = x[DXTC-12]
 }
 
-const _csiBitmapEncoding_name = "RawBytesRLEZIPLZVNLZFSEJPEGLZFSEBlurredImageASTCImagePaletteImageHEVCDeepmapDeepmap2"
+const _csiBitmapEncoding_name = "UncompressedRLEZIPLZVNLZFSEJPEGLZFSEBlurredImageASTCImagePaletteImageHEVCDeepmapLZFSEDeepmap2DXTC"
 
-var _csiBitmapEncoding_index = [...]uint8{0, 8, 11, 14, 18, 23, 32, 44, 53, 65, 69, 76, 84}
+var _csiBitmapEncoding_index = [...]uint8{0, 12, 15, 18, 22, 27, 36, 48, 57, 69, 73, 85, 93, 97}
 
-func (i csiBitmapEncoding) String() string {
-	if i >= csiBitmapEncoding(len(_csiBitmapEncoding_index)-1) {
+func (i compressionType) String() string {
+	if i >= compressionType(len(_csiBitmapEncoding_index)-1) {
 		return "csiBitmapEncoding(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _csiBitmapEncoding_name[_csiBitmapEncoding_index[i]:_csiBitmapEncoding_index[i+1]]

@@ -9,7 +9,10 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"os"
+	"path/filepath"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/comp"
 	"github.com/blacktop/lzfse-cgo"
@@ -27,21 +30,22 @@ const (
 	PixFmtRawData = "DATA" // Raw bytes
 )
 
-type csiBitmapEncoding uint32
+type compressionType uint32
 
 const (
-	RawBytes     csiBitmapEncoding = 0
-	RLE          csiBitmapEncoding = 1
-	ZIP          csiBitmapEncoding = 2
-	LZVN         csiBitmapEncoding = 3
-	LZFSE        csiBitmapEncoding = 4
-	JPEGLZFSE    csiBitmapEncoding = 5
-	BlurredImage csiBitmapEncoding = 6
-	ASTCImage    csiBitmapEncoding = 7
-	PaletteImage csiBitmapEncoding = 8
-	HEVC         csiBitmapEncoding = 9
-	Deepmap      csiBitmapEncoding = 10
-	Deepmap2     csiBitmapEncoding = 11
+	Uncompressed compressionType = 0
+	RLE          compressionType = 1
+	ZIP          compressionType = 2
+	LZVN         compressionType = 3
+	LZFSE        compressionType = 4
+	JPEGLZFSE    compressionType = 5
+	BlurredImage compressionType = 6
+	ASTCImage    compressionType = 7
+	PaletteImage compressionType = 8
+	HEVC         compressionType = 9
+	DeepmapLZFSE compressionType = 10
+	Deepmap2     compressionType = 11
+	DXTC         compressionType = 12
 )
 
 type csiBitmapFlags uint32
@@ -59,7 +63,16 @@ func (f csiBitmapFlags) String() string {
 type csiBitmap struct {
 	Signature [4]byte // 'PELM'
 	Flags     csiBitmapFlags
-	Encoding  csiBitmapEncoding
+	Encoding  compressionType
+	Length    uint32
+	// Data      []byte
+}
+
+// csiElement also known as CUIThemePixelRendition
+type csiElement struct {
+	Signature [4]byte // CsiElementSignature - 'CELM'
+	Version   uint32
+	Encoding  compressionType
 	Length    uint32
 	// Data      []byte
 }
@@ -108,28 +121,41 @@ type csiDeepmapData struct {
 
 type csiDeepmap2Data struct {
 	Version  uint32
-	Encoding csiBitmapEncoding
+	Encoding compressionType
 	Length   uint64
 }
 
-type deepmap2Type uint8
+type deepmapPixelFormat uint8
 
 const (
-	Deepmap2DecodeNone                      deepmap2Type = 1
-	Deepmap2DecodeDefaultScratchBufferSize  deepmap2Type = 2
-	Deepmap2DecodeLosslessScratchBufferSize deepmap2Type = 3
-	Deepmap2DecodePaletteScratchBufferSize  deepmap2Type = 4
+	ImageDeepmapPixelFormatG8      deepmapPixelFormat = 0x01
+	ImageDeepmapPixelFormatGA8     deepmapPixelFormat = 0x02
+	ImageDeepmapPixelFormatRGB8    deepmapPixelFormat = 0x03
+	ImageDeepmapPixelFormatRGBA8   deepmapPixelFormat = 0x04
+	ImageDeepmapPixelFormatG16F    deepmapPixelFormat = 0x11
+	ImageDeepmapPixelFormatGA16F   deepmapPixelFormat = 0x12
+	ImageDeepmapPixelFormatRGB16F  deepmapPixelFormat = 0x13
+	ImageDeepmapPixelFormatRGBA16F deepmapPixelFormat = 0x14
+)
+
+type deepmapCompressionMethod uint8
+
+const (
+	ImageDeepmapCompressionNone     deepmapCompressionMethod = 1
+	ImageDeepmapCompressionDefault  deepmapCompressionMethod = 2
+	ImageDeepmapCompressionLossless deepmapCompressionMethod = 3
+	ImageDeepmapCompressionPalette  deepmapCompressionMethod = 4
 )
 
 type deepmap2 struct {
-	Signature       [4]byte // 'dmp2'
-	BlockCount      uint8
-	Unknown         uint8
-	Thing1          uint8
-	Type            deepmap2Type
-	Width           uint16
-	Height          uint16
-	CompressedBlock uint32
+	Signature         [4]byte // 'dmp2'
+	Scale             uint8
+	BlobVersion       uint8 // 1
+	PixelFormat       deepmapPixelFormat
+	CompressionMethod deepmapCompressionMethod
+	Width             uint16
+	Height            uint16
+	CompressedBlock   uint32
 }
 
 // BGRA to RGBA
@@ -178,26 +204,44 @@ func (p *GA8) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*2
 }
 
-func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
+func decodeImage(r io.Reader, ci csiHeader, conf *Config) (image.Image, error) {
 	var out bytes.Buffer
 
-	var bm csiBitmap
-	if err := binary.Read(r, binary.LittleEndian, &bm); err != nil {
+	// f, err := os.Create(filepath.Join(conf.Output, fmt.Sprintf("%s", string(bytes.Trim(ci.Metadata.Name[:], "\x00")))))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create output file: %v", err)
+	// }
+	// defer f.Close()
+	// io.Copy(f, r)
+
+	// var elem csiElement
+	var elem csiBitmap
+	if err := binary.Read(r, binary.LittleEndian, &elem); err != nil {
 		return nil, fmt.Errorf("failed to read CSIBitmap: %s", err)
 	}
 
-	if bm.Flags.ChunksFollow() {
-		for i := uint32(0); i < bm.Length; i++ {
+	// log.WithFields(log.Fields{
+	// 	"signature": string(elem.Signature[:]),
+	// 	"flags":     elem.Flags.String(),
+	// 	"encoding":  elem.Encoding,
+	// 	"length":    elem.Length,
+	// }).Info("Reading CSIElement")
+
+	if elem.Flags.ChunksFollow() {
+		for i := uint32(0); i < elem.Length; i++ {
 			var chunk csiBitmapChunk
 			if err := binary.Read(r, binary.LittleEndian, &chunk); err != nil {
 				return nil, err
+			}
+			if chunk.Signature != [4]byte{'K', 'C', 'B', 'C'} {
+				return nil, fmt.Errorf("invalid chunk signature: %s", chunk.Signature)
 			}
 			data := make([]byte, chunk.Length)
 			if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
 				return nil, err
 			}
-			switch bm.Encoding {
-			case RawBytes:
+			switch elem.Encoding {
+			case Uncompressed:
 				out.Write(data)
 			case RLE:
 			case ZIP:
@@ -222,16 +266,16 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				}
 				out.Write(decompressed)
 			default:
-				return nil, fmt.Errorf("unknown encoding: %s", bm.Encoding)
+				return nil, fmt.Errorf("unknown encoding: %s", elem.Encoding)
 			}
 		}
 	} else {
-		data := make([]byte, bm.Length)
+		data := make([]byte, elem.Length)
 		if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
 			return nil, err
 		}
-		switch bm.Encoding {
-		case RawBytes:
+		switch elem.Encoding {
+		case Uncompressed:
 			out.Write(data)
 		case RLE:
 		case ZIP:
@@ -262,39 +306,86 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 			if err := binary.Read(dmr, binary.LittleEndian, &cdm2); err != nil {
 				return nil, err
 			}
+			log.WithFields(log.Fields{
+				"version":  cdm2.Version,
+				"encoding": cdm2.Encoding,
+				"length":   cdm2.Length,
+			}).Info("Reading Deepmap2 Data")
 			var dm2 deepmap2
 			if err := binary.Read(dmr, binary.LittleEndian, &dm2); err != nil {
 				return nil, err
 			}
-			_ = dm2
-			if cdm2.Encoding == LZFSE {
+			if dm2.Signature != [4]byte{'d', 'm', 'p', '2'} {
+				return nil, fmt.Errorf("invalid deepmap2 signature: %s", dm2.Signature)
+			}
+			log.WithFields(log.Fields{
+				"signature":          string(dm2.Signature[:]),
+				"blob_version":       dm2.BlobVersion,
+				"pixel_format":       dm2.PixelFormat,
+				"compression_method": dm2.CompressionMethod,
+				"width":              dm2.Width,
+				"height":             dm2.Height,
+				"scale":              dm2.Scale,
+				"compressed_block":   dm2.CompressedBlock,
+			}).Warn("Reading Deepmap2")
+			if dm2.BlobVersion != 1 {
+				return nil, fmt.Errorf("unsupported deepmap2 blob version: %d", dm2.BlobVersion)
+			}
+			switch cdm2.Encoding {
+			case LZFSE, ZIP:
+				if dmr.Len() < int(dm2.CompressedBlock) {
+					fname := fmt.Sprintf("%s.compressed.%s", string(bytes.Trim(ci.Metadata.Name[:], "\x00")), cdm2.Encoding)
+					fname = filepath.Join(conf.Output, fname)
+					log.Errorf("deepmap2 compressed block size %d is larger than remaining data %d, writing to %s", dm2.CompressedBlock, dmr.Len(), fname)
+					os.WriteFile(fname, data, 0644)
+					return nil, fmt.Errorf("deepmap2 compressed block size %d is larger than remaining data %d", dm2.CompressedBlock, dmr.Len())
+				}
 				chunck := make([]byte, dm2.CompressedBlock)
 				if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to read deepmap2 compressed block: %v", err)
 				}
 				decompressed, err := comp.Decompress(chunck, comp.LZFSE)
 				if err != nil {
 					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
 				}
 				out.Write(decompressed)
-				var size uint32
-				if err := binary.Read(dmr, binary.LittleEndian, &size); err != nil {
-					return nil, err
+				for dmr.Len() > 0 {
+					var size uint32
+					if err := binary.Read(dmr, binary.LittleEndian, &size); err != nil {
+						return nil, fmt.Errorf("failed to read deepmap2 block size: %v", err)
+					}
+					chunck = make([]byte, size)
+					if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
+						return nil, fmt.Errorf("failed to read deepmap2 block data: %v", err)
+					}
+					decompressed, err = comp.Decompress(chunck, comp.LZFSE)
+					if err != nil {
+						return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
+					}
+					out.Write(decompressed)
 				}
-				chunck = make([]byte, size)
-				if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
-					return nil, err
+				if dmr.Len() > 0 {
+					log.Warnf("deepmap2 reader still has %d bytes left after reading compressed block", dmr.Len())
 				}
-				decompressed, err = comp.Decompress(chunck, comp.LZFSE)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
-				}
-				out.Write(decompressed)
-			} else {
+			// case ZIP:
+			// 	chunck := make([]byte, dm2.CompressedBlock)
+			// 	if err := binary.Read(dmr, binary.LittleEndian, &chunck); err != nil {
+			// 		return nil, err
+			// 	}
+			// 	fname := fmt.Sprintf("%s.compressed.%s", string(bytes.Trim(ci.Metadata.Name[:], "\x00")), cdm2.Encoding)
+			// 	os.WriteFile(fname, chunck, 0644)
+			// 	gr, err := gzip.NewReader(bytes.NewReader(chunck))
+			// 	if err != nil {
+			// 		return nil, err
+			// 	}
+			// 	if _, err := io.Copy(&out, gr); err != nil {
+			// 		return nil, err
+			// 	}
+			default:
 				return nil, fmt.Errorf("unsupported deepmap2 encoding: %s", cdm2.Encoding)
 			}
 		default:
-			return nil, fmt.Errorf("unknown encoding: %s", bm.Encoding)
+			return nil, fmt.Errorf("unknown encoding: %s", elem.Encoding)
 		}
 	}
 
@@ -303,6 +394,11 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 	format := string(ci.PixelFormat[:])
 	switch format {
 	case PixFmtARGB:
+		// Special handling for IconImage layout which uses channel-separated ARGB format
+		if ci.Metadata.Layout == IconImage { // AppIcon renditionLayoutType
+			return decodeAppIconARGB(out.Bytes(), int(ci.Width), int(ci.Height))
+		}
+
 		var offset int
 		if v := out.Len() - int(ci.Width*ci.Height*4); v != 0 {
 			offset = v / int(ci.Height*4)
@@ -349,7 +445,43 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 			Rect:   rect,
 		}
 		return bgra, nil
+	default:
+		return nil, fmt.Errorf("unknown pixel format: %s", format)
+	}
+}
+
+// decodeAppIconARGB decodes AppIcon ARGB format where channels are separated
+// Instead of interleaved ARGBARGBARGB, the data is stored as AAARRRGGGBBB
+func decodeAppIconARGB(data []byte, width, height int) (image.Image, error) {
+	pixelCount := width * height
+	expectedSize := pixelCount * 4 // 4 bytes per pixel (ARGB)
+
+	if len(data) < expectedSize {
+		return nil, fmt.Errorf("insufficient data for AppIcon ARGB: got %d bytes, expected %d", len(data), expectedSize)
 	}
 
-	return nil, nil
+	rect := image.Rectangle{
+		Min: image.Point{0, 0},
+		Max: image.Point{X: width, Y: height},
+	}
+
+	img := image.NewRGBA(rect)
+
+	// Extract the separate channels
+	// The format is: all alpha values, then all red, then all green, then all blue
+	alphaChannel := data[0:pixelCount]
+	redChannel := data[pixelCount : pixelCount*2]
+	greenChannel := data[pixelCount*2 : pixelCount*3]
+	blueChannel := data[pixelCount*3 : pixelCount*4]
+
+	// Reconstruct interleaved RGBA pixels
+	for i := 0; i < pixelCount; i++ {
+		pixelIndex := i * 4
+		img.Pix[pixelIndex+0] = redChannel[i]   // R
+		img.Pix[pixelIndex+1] = greenChannel[i] // G
+		img.Pix[pixelIndex+2] = blueChannel[i]  // B
+		img.Pix[pixelIndex+3] = alphaChannel[i] // A
+	}
+
+	return img, nil
 }
