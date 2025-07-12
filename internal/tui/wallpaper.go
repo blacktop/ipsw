@@ -85,8 +85,8 @@ type model struct {
 	download       map[int]bool // row index -> downloaded
 	quitting       bool
 	status         string
-	previewContent string           // stores the rendered preview string
-	lastPreview    *termimg.TermImg // stores the last TermImg instance for clearing
+	previewContent string         // stores the rendered preview string
+	lastPreview    *termimg.Image // stores the last TermImg instance for clearing
 	termWidth      int
 }
 
@@ -153,7 +153,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Quit):
 			// Clear the last preview image if it exists
 			if m.lastPreview != nil {
-				if err := m.lastPreview.Clear(); err != nil {
+				if err := m.lastPreview.ClearAll(); err != nil {
 					log.Errorf("failed to clear previous terminal image: %v", err)
 				}
 				m.lastPreview = nil
@@ -172,7 +172,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Loading preview..."
 			// Clear previous preview image and string
 			if m.lastPreview != nil {
-				if err := m.lastPreview.Clear(); err != nil {
+				if err := m.lastPreview.ClearAll(); err != nil {
 					log.Errorf("failed to clear previous terminal image: %v", err)
 				}
 				m.lastPreview = nil
@@ -236,8 +236,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastPreview = nil         // Ensure no preview is stored on error
 		} else {
 			m.status = "Preview loaded"
-			// Render preview using go-termimg with NewTermImg
-			ti, err := termimg.NewTermImg(bytes.NewReader(msg.imgBytes))
+			// Render preview using go-termimg
+			ti, err := termimg.From(bytes.NewReader(msg.imgBytes))
 			if err != nil {
 				m.status = "Failed to load preview: " + err.Error()
 				m.previewContent = m.status // Show error in preview content

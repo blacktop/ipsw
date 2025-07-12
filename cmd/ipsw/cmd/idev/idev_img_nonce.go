@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-termimg"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
 	"github.com/boombuler/barcode"
@@ -170,7 +171,14 @@ var nonceCmd = &cobra.Command{
 
 			log.Warn("Displaying QR code in terminal (supported in iTerm2 and VSCode, otherwise supply --output flag)")
 			println()
-			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), dat.Len(), qrcSize, qrcSize)
+			ti, err := termimg.From(bytes.NewReader(dat.Bytes()))
+			if err != nil {
+				return err
+			}
+			if qrcSize > 0 {
+				ti.Width(qrcSize).Height(qrcSize)
+			}
+			return ti.Print()
 		}
 
 		if readable {
