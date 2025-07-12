@@ -43,10 +43,7 @@ func decompress(data []byte, algorithm Algorithm) ([]byte, error) {
 	}
 
 	// Start with a reasonable buffer size, and grow if needed
-	decmpSize := len(data) * 2
-	if decmpSize < 4096 {
-		decmpSize = 4096
-	}
+	decmpSize := max(len(data)*2, 4096)
 
 	for {
 		destBuf := make([]byte, decmpSize)
