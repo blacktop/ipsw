@@ -59,7 +59,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-mastodon v0.0.9
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/olekukonko/tablewriter v0.0.5
+	github.com/olekukonko/tablewriter v1.0.8
 	github.com/ollama/ollama v0.9.6
 	github.com/openai/openai-go v1.10.1
 	github.com/opencontainers/image-spec v1.1.1
@@ -111,7 +111,6 @@ require (
 	github.com/antchfx/htmlquery v1.3.4 // indirect
 	github.com/antchfx/xmlquery v1.4.4 // indirect
 	github.com/antchfx/xpath v1.3.4 // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
@@ -203,6 +202,8 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nlnwa/whatwg-url v0.6.2 // indirect
+	github.com/olekukonko/errors v0.0.0-20250405072817-4e6d85265da6 // indirect
+	github.com/olekukonko/ll v0.0.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pjbgf/sha1cd v0.4.0 // indirect
@@ -210,7 +211,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
-	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
