@@ -20,8 +20,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/table"
 	"github.com/dustin/go-humanize"
-	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 )
 
@@ -216,13 +216,13 @@ func (infos ProductInfos) String() string {
 			})
 		}
 	}
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Title", "Version", "Build", "Post Date"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(pdata)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render()
+	tbl := table.NewStringBuilderTableWriter(tableString)
+	tbl.SetHeader([]string{"Title", "Version", "Build", "Post Date"})
+	tbl.SetBorders(nil)
+	tbl.SetCenterSeparator("|")
+	tbl.AppendBulk(pdata)
+	tbl.SetAlignment(1)
+	tbl.Render()
 
 	return tableString.String()
 }

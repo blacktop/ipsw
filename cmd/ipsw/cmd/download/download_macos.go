@@ -23,15 +23,19 @@ package download
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/pkg/table"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 func init() {
@@ -124,7 +128,28 @@ var downloadMacosCmd = &cobra.Command{
 		}
 
 		if showInstallers {
-			fmt.Println(prods)
+			headers := []string{"Title", "Version", "Build", "Post Date"}
+			data := [][]string{}
+			for _, pinfo := range prods {
+				data = append(data, []string{
+					pinfo.Title,
+					pinfo.Version,
+					pinfo.Build,
+					pinfo.PostDate.Format("02Jan2006 15:04:05"),
+				})
+			}
+			if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) {
+				model := table.NewInteractiveTableWithTitle("🍎 macOS Installers", headers, data, false)
+				p := tea.NewProgram(model, tea.WithAltScreen())
+				if _, err := p.Run(); err != nil {
+					return fmt.Errorf("error running interactive table: %w", err)
+				}
+			} else {
+				// Fallback to static styled table for non-TTY environments
+				bubbleTable := table.NewBubbleTable(headers, false)
+				bubbleTable.SetData(data)
+				fmt.Println(bubbleTable.RenderStatic())
+			}
 			return nil
 		}
 

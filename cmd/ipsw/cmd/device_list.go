@@ -22,14 +22,17 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/blacktop/ipsw/pkg/table"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/olekukonko/tablewriter"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 func init() {
@@ -78,14 +81,21 @@ var deviceListCmd = &cobra.Command{
 			})
 		}
 
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Product", "Model", "Description", "CPU", "Arch", "MemClass"})
-		table.SetAutoWrapText(false)
-		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-		table.SetCenterSeparator("|")
-		table.AppendBulk(data)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.Render() // Send output
+		headers := []string{"Product", "Model", "Description", "CPU", "Arch", "MemClass"}
+
+		if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) {
+			// Use the fancy interactive BubbleTable
+			model := table.NewInteractiveTable(headers, data, false)
+			p := tea.NewProgram(model, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("error running interactive table: %w", err)
+			}
+		} else {
+			// Fallback to static styled table for non-TTY environments
+			bubbleTable := table.NewBubbleTable(headers, false)
+			bubbleTable.SetData(data)
+			fmt.Println(bubbleTable.RenderStatic())
+		}
 
 		return nil
 	},
