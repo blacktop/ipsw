@@ -1,3 +1,5 @@
+//go:build wallpaper
+
 package tui
 
 import (
@@ -106,7 +108,6 @@ func gradientText(s string) string {
 	return out.String()
 }
 
-
 type model struct {
 	list           list.Model
 	help           help.Model
@@ -124,7 +125,6 @@ type model struct {
 	termHeight     int
 	lastImageID    string
 	imageError     error
-	virtualMode    bool
 }
 
 func NewWallpaperTUI(ctx context.Context) (*model, error) {
@@ -138,9 +138,9 @@ func NewWallpaperTUI(ctx context.Context) (*model, error) {
 	var items []list.Item
 	for i, asset := range wp.Assets {
 		items = append(items, wallpaperItem{
-			asset: asset,
+			asset:      asset,
 			downloaded: false,
-			index: i,
+			index:      i,
 		})
 	}
 
@@ -177,45 +177,36 @@ func NewWallpaperTUI(ctx context.Context) (*model, error) {
 }
 
 func (m *model) Init() tea.Cmd {
-	return nil
+	return m.spinner.Tick
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var spinnerCmd tea.Cmd
+		m.spinner, spinnerCmd = m.spinner.Update(msg)
+		return m, spinnerCmd
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
-			// Clear images when using virtual mode
-			if m.virtualMode {
-				for _, widget := range m.widgetCache {
-					widget.Clear()
-				}
-			}
 			m.quitting = true
 			return m, tea.Quit
-		case "v":
-			// Toggle virtual mode (Kitty only)
-			if termimg.KittySupported() {
-				m.virtualMode = !m.virtualMode
-				// Clear cache to force re-render
-				for _, widget := range m.widgetCache {
-					widget.Clear()
-				}
-				m.widgetCache = make(map[string]*termimg.ImageWidget)
-				m.lastImageID = ""
-			}
 		case "enter":
 			if item, ok := m.list.SelectedItem().(wallpaperItem); ok {
 				if !m.download[item.index] {
-					m.status = "Downloading..."
+					m.loading = true
+					m.status = "Downloading " + item.asset.WallpaperName + "..."
 					return m, downloadWallpaperCmd(item.asset, item.index)
 				}
 			}
 		case "p":
 			if item, ok := m.list.SelectedItem().(wallpaperItem); ok {
-				wallpaperID := fmt.Sprintf("%s_%s", item.asset.WallpaperName, item.asset.WallpaperLogicalScreenClass)
+				// Use URL as unique identifier since wallpaper names can be similar
+				wallpaperID := item.asset.BaseURL + item.asset.RelativePath
+				log.Debugf("Preview requested for: %s (URL: %s)", item.asset.WallpaperName, wallpaperID)
+
 				// If already showing this preview, clear it
 				if m.imageWidget != nil && m.lastImageID == wallpaperID {
 					termimg.ClearAll()
@@ -225,13 +216,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					// Check cache first
 					if widget, found := m.widgetCache[wallpaperID]; found {
+						log.Debugf("Found cached widget for: %s", wallpaperID)
 						// For cached images, only clear after we're ready to show the new one
 						termimg.ClearAll()
 						m.imageWidget = widget
 						m.lastImageID = wallpaperID
 						m.loadingPreview = false
-						m.status = "Preview loaded (cached)"
+						m.status = fmt.Sprintf("Preview loaded (cached): %s", item.asset.WallpaperName)
 					} else {
+						log.Debugf("No cached widget found for: %s, loading...", wallpaperID)
 						// For non-cached images, start loading but keep current image visible
 						m.loadingPreview = true
 						m.status = "Loading preview for " + item.asset.WallpaperName + "..."
@@ -239,16 +232,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "l":
-			N := min(len(m.assets), 5)
-			cmds := make([]tea.Cmd, 0, N)
-			for i := range N {
-				if !m.download[i] {
-					cmds = append(cmds, downloadWallpaperCmd(m.assets[i], i))
-				}
-			}
-			m.status = "Downloading latest..."
-			return m, tea.Batch(cmds...)
 		default:
 			// Let the list handle all other key events (navigation, etc.)
 			m.list, cmd = m.list.Update(msg)
@@ -256,16 +239,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.termWidth = msg.Width
 		m.termHeight = msg.Height
-		// Account for title, borders, and legend
-		availableHeight := msg.Height - 6
+		// Title (3) + Spacing (1) + Status (1) + Legend (2) = 7 lines total
+		availableHeight := msg.Height - 7
 		m.viewport.Width = (msg.Width / 2) - 4
-		m.viewport.Height = availableHeight
-		
+		m.viewport.Height = availableHeight - 3 // Account for panel borders and padding
+
 		// Update list size for the left panel
 		leftPanelWidth := (msg.Width / 2) - 4
 		m.list.SetWidth(leftPanelWidth)
-		m.list.SetHeight(availableHeight - 2) // Account for borders
+		m.list.SetHeight(availableHeight - 3) // Account for panel borders and padding
 	case downloadResultMsg:
+		m.loading = false // Always clear loading state
 		if msg.err != nil {
 			m.status = "Download failed: " + msg.err.Error()
 		} else {
@@ -290,38 +274,38 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = "Preview loaded"
 			m.imageError = nil
-			
-			// Create proper wallpaper ID from asset info
-			if msg.row < len(m.assets) {
-				asset := m.assets[msg.row]
-				wallpaperID := fmt.Sprintf("%s_%s", asset.WallpaperName, asset.WallpaperLogicalScreenClass)
-				
-				var newWidget *termimg.ImageWidget
-				if widget, found := m.widgetCache[wallpaperID]; found {
-					newWidget = widget
+
+			// Create proper wallpaper ID from the actual asset that was processed
+			asset := msg.asset
+			wallpaperID := asset.BaseURL + asset.RelativePath
+
+			// Debug: log the wallpaper being processed
+			log.Debugf("Processing preview result for: %s (URL: %s)", asset.WallpaperName, wallpaperID)
+
+			var newWidget *termimg.ImageWidget
+			if widget, found := m.widgetCache[wallpaperID]; found {
+				newWidget = widget
+			} else {
+				// Create new image widget from bytes
+				img, err := termimg.From(bytes.NewReader(msg.imgBytes))
+				if err != nil {
+					m.imageError = err
+					// Don't clear current image on error - keep it visible
+					return m, cmd
 				} else {
-					// Create new image widget from bytes
-					img, err := termimg.From(bytes.NewReader(msg.imgBytes))
-					if err != nil {
-						m.imageError = err
-						// Don't clear current image on error - keep it visible
-						return m, cmd
-					} else {
-						widget := termimg.NewImageWidget(img)
-						if m.virtualMode && termimg.KittySupported() {
-							widget.SetProtocol(termimg.Kitty).SetVirtual(true)
-						}
-						newWidget = widget
-						m.widgetCache[wallpaperID] = widget
-					}
+					widget := termimg.NewImageWidget(img)
+					newWidget = widget
+					log.Debugf("Caching new widget for: %s", wallpaperID)
+					m.widgetCache[wallpaperID] = widget
 				}
-				
-				// Only clear previous image when new one is successfully created
-				if newWidget != nil {
-					termimg.ClearAll()
-					m.imageWidget = newWidget
-					m.lastImageID = wallpaperID
-				}
+			}
+
+			// Only clear previous image when new one is successfully created
+			if newWidget != nil {
+				termimg.ClearAll()
+				m.imageWidget = newWidget
+				m.lastImageID = wallpaperID
+				m.status = fmt.Sprintf("Preview loaded: %s", asset.WallpaperName)
 			}
 		}
 	}
@@ -331,14 +315,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update the image widget's size and viewport content
 	if m.imageWidget != nil {
-		m.imageWidget.SetSizeWithCorrection(m.viewport.Width, m.viewport.Height)
+		// Size the image to fit within the panel content area (accounting for borders and padding)
+		imageWidth := (m.termWidth / 2) - 6 // Panel width minus borders (2) and padding (2) on each side
+		imageHeight := m.termHeight - 11    // Total height minus title (3), spacing (1), status (1), legend (2), borders (2), and padding (2)
+		m.imageWidget.SetSizeWithCorrection(imageWidth, imageHeight)
 		// Don't set viewport content when displaying an image
 	}
-	
+
 	// Set viewport content for when there's no image to show
 	if m.imageWidget == nil {
 		if m.loadingPreview {
-			m.viewport.SetContent(infoStyle.Render("🔄 Loading preview..."))
+			loadingText := fmt.Sprintf("%s Loading preview...", m.spinner.View())
+			m.viewport.SetContent(infoStyle.Render(loadingText))
 		} else if m.imageError != nil {
 			m.viewport.SetContent(errorStyle.Render("❌ " + m.imageError.Error()))
 		} else {
@@ -361,18 +349,27 @@ func (m *model) View() string {
 
 	var b strings.Builder
 
-	// Title bar
-	title := fmt.Sprintf("Apple Wallpapers - %d available", len(m.list.Items()))
-	if m.virtualMode {
-		title += " [VIRTUAL MODE]"
-	}
-	b.WriteString(titleStyle.Width(m.termWidth).Render(title))
+	// Title bar with gradient
+	titleText := fmt.Sprintf("Apple Wallpapers - %d available", len(m.list.Items()))
+	gradientTitle := gradientText(titleText)
+	// Center the title and add padding
+	centeredTitle := lipgloss.NewStyle().
+		Width(m.termWidth).
+		Align(lipgloss.Center).
+		PaddingTop(1).
+		PaddingBottom(1).
+		Bold(true).
+		Render(gradientTitle)
+	b.WriteString(centeredTitle)
 	b.WriteString("\n")
 
 	// Calculate panel dimensions
 	leftPanelWidth := m.termWidth/2 - 2
 	rightPanelWidth := m.termWidth/2 - 2
-	panelHeight := m.termHeight - 6 // Account for title and legend
+	// Title takes 3 lines (1 padding top + 1 text + 1 padding bottom) + 1 spacing line
+	// Status bar takes 1 line (when present)
+	// Legend takes 2 lines (1 margin top + 1 text)
+	panelHeight := m.termHeight - 7
 
 	// File list panel using the list component
 	leftPanel := panelBorderStyle.
@@ -390,7 +387,7 @@ func (m *model) View() string {
 		// For non-images, errors, or loading states, use the viewport
 		rightPanelContent = m.viewport.View()
 	}
-	
+
 	rightPanel := panelBorderStyle.
 		Width(rightPanelWidth).
 		Height(panelHeight).
@@ -403,18 +400,28 @@ func (m *model) View() string {
 	// Append the image rendering commands AFTER the text UI has been built
 	b.WriteString(m.viewImage())
 
-	// Navigation legend  
+	// Status bar
+	if m.status != "" {
+		statusText := m.status
+		if m.loading || m.loadingPreview {
+			statusText = fmt.Sprintf("%s %s", m.spinner.View(), m.status)
+		}
+		statusBar := lipgloss.NewStyle().
+			Foreground(mutedColor).
+			PaddingLeft(1).
+			Render(statusText)
+		b.WriteString("\n")
+		b.WriteString(statusBar)
+	}
+
+	// Navigation legend
 	legend := []string{
 		legendKeyStyle.Render("↑/k") + " up",
 		legendKeyStyle.Render("↓/j") + " down",
 		legendKeyStyle.Render("p") + " preview",
 		legendKeyStyle.Render("enter") + " download",
-		legendKeyStyle.Render("l") + " latest",
 	}
 
-	if termimg.KittySupported() {
-		legend = append(legend, legendKeyStyle.Render("v")+" virtual")
-	}
 	legend = append(legend, legendKeyStyle.Render("q/esc")+" quit")
 
 	legendText := "Navigation: " + strings.Join(legend, " • ")
@@ -431,8 +438,8 @@ func (m *model) viewImage() string {
 	}
 
 	// Get the position of the right panel to draw the image over it
-	// Title(1) + Margin(1) + Panel Border(1) + Panel Padding(1) = 4
-	imageY := 4
+	// Title(3) + Spacing(1) + Panel Border(1) + Panel Padding(1) = 6
+	imageY := 6
 	// Left Panel Width + Spacing(1) + Panel Border(1) + Panel Padding(1) = m.termWidth/2 + 3
 	imageX := m.termWidth/2 + 3
 
@@ -502,6 +509,7 @@ func downloadWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
 
 type previewResultMsg struct {
 	row      int
+	asset    wallpaper.WallpaperAsset
 	imgBytes []byte
 	err      error
 }
@@ -514,13 +522,13 @@ func previewWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
 		// Download and extract thumbnail
 		imgBytes, err := wallpaper.ExtractThumbnailBytes(url, "", false)
 		if err != nil {
-			return previewResultMsg{row: row, err: fmt.Errorf("failed to extract thumbnail: %w", err)}
+			return previewResultMsg{row: row, asset: asset, err: fmt.Errorf("failed to extract thumbnail: %w", err)}
 		}
 
 		if len(imgBytes) == 0 {
-			return previewResultMsg{row: row, err: fmt.Errorf("thumbnail not found in wallpaper")}
+			return previewResultMsg{row: row, asset: asset, err: fmt.Errorf("thumbnail not found in wallpaper")}
 		}
 
-		return previewResultMsg{row: row, imgBytes: imgBytes, err: nil}
+		return previewResultMsg{row: row, asset: asset, imgBytes: imgBytes, err: nil}
 	}
 }
