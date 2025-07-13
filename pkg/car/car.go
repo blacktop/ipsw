@@ -15,6 +15,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/go-termimg"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
 )
@@ -483,7 +484,13 @@ func Parse(name string, conf *Config) (*Asset, error) {
 									if err := png.Encode(buf, img); err != nil {
 										return nil, err
 									}
-									utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), dat.Len(), int(cheader.Width), int(cheader.Height))
+									ti, err := termimg.From(bytes.NewReader(dat.Bytes()))
+									if err != nil {
+										return nil, fmt.Errorf("failed to create termimg from image: %v", err)
+									}
+									if err := ti.Print(); err != nil {
+										return nil, fmt.Errorf("failed to print termimg: %v", err)
+									}
 								}
 								rend.Asset = img
 							}
