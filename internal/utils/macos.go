@@ -530,11 +530,46 @@ func mountLinux(image, mountPoint string) error {
 	}
 }
 
+// findApfsFuse attempts to locate apfs-fuse binary using multiple strategies
+func findApfsFuse() (string, error) {
+	// Check environment variable override first
+	if envPath := os.Getenv("IPSW_APFS_FUSE_PATH"); envPath != "" {
+		if _, err := os.Stat(envPath); err == nil {
+			return envPath, nil
+		}
+		log.Warnf("IPSW_APFS_FUSE_PATH points to non-existent file: %s", envPath)
+	}
+
+	// Try standard PATH lookup
+	if path, err := execabs.LookPath("apfs-fuse"); err == nil {
+		return path, nil
+	}
+
+	// Check common installation locations (helpful for snap/confined environments)
+	commonPaths := []string{
+		"/usr/local/bin/apfs-fuse",
+		"/usr/bin/apfs-fuse",
+		"/opt/apfs-fuse/bin/apfs-fuse",
+		"/snap/bin/apfs-fuse",
+		"/home/linuxbrew/.linuxbrew/bin/apfs-fuse",
+	}
+
+	for _, path := range commonPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("apfs-fuse not found in PATH or common locations: " +
+		"Install apfs-fuse or set IPSW_APFS_FUSE_PATH environment variable. " +
+		"(snap users: try 'sudo snap connect ipsw:system-files' if available)")
+}
+
 // mountWithAPFSFuse mounts using apfs-fuse
 func mountWithAPFSFuse(image, mountPoint string) error {
-	apfsFusePath, err := execabs.LookPath("apfs-fuse")
+	apfsFusePath, err := findApfsFuse()
 	if err != nil {
-		return fmt.Errorf("failed to find apfs-fuse in $PATH: %v", err)
+		return fmt.Errorf("failed to find apfs-fuse: %v", err)
 	}
 	out, err := exec.Command(apfsFusePath, image, mountPoint).CombinedOutput()
 	if err != nil {
