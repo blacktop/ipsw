@@ -37,7 +37,7 @@ jobs:
     - name: Install dependencies for apfs-fuse
       run: |
         sudo apt-get update
-        sudo apt-get install -y libfuse-dev build-essential cmake git libbz2-dev
+        sudo apt-get install -y libfuse3-dev build-essential cmake git libbz2-dev
 
     - name: Build and install apfs-fuse
       run: |
