@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -37,6 +38,8 @@ import (
 
 func init() {
 	rootCmd.AddCommand(deviceListCmd)
+	deviceListCmd.Flags().BoolP("plain", "p", false, "Output as non-interactive table")
+	deviceListCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 }
 
 // deviceListCmd represents the deviceList command
@@ -47,20 +50,8 @@ var deviceListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// gen, _ := cmd.Flags().GetBool("gen")
-		// if gen {
-		// 	devices, err := xcode.ReadDeviceTraitsDB()
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// 	err = xcode.WriteToJSON(devices)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// 	return nil
-		// }
+		plain, _ := cmd.Flags().GetBool("plain")
+		asJSON, _ := cmd.Flags().GetBool("json")
 
 		devices, err := xcode.GetDevices()
 		if err != nil {
@@ -68,6 +59,15 @@ var deviceListCmd = &cobra.Command{
 		}
 
 		sort.Sort(xcode.ByProductType{Devices: devices})
+
+		if asJSON {
+			jdata, err := json.Marshal(devices)
+			if err != nil {
+				return fmt.Errorf("error marshalling devices to JSON: %w", err)
+			}
+			fmt.Println(string(jdata))
+			return nil
+		}
 
 		data := [][]string{}
 		for _, device := range devices {
@@ -83,7 +83,7 @@ var deviceListCmd = &cobra.Command{
 
 		headers := []string{"Product", "Model", "Description", "CPU", "Arch", "MemClass"}
 
-		if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) {
+		if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && !plain {
 			// Use the fancy interactive BubbleTable
 			model := table.NewInteractiveTable(headers, data, false)
 			p := tea.NewProgram(model, tea.WithAltScreen())
@@ -92,9 +92,15 @@ var deviceListCmd = &cobra.Command{
 			}
 		} else {
 			// Fallback to static styled table for non-TTY environments
-			bubbleTable := table.NewBubbleTable(headers, false)
-			bubbleTable.SetData(data)
-			fmt.Println(bubbleTable.RenderStatic())
+			tableString := &strings.Builder{}
+			tbl := table.NewStringBuilderTableWriter(tableString)
+			tbl.SetHeader(headers)
+			tbl.SetBorders(nil)
+			tbl.SetCenterSeparator("|")
+			tbl.SetAlignment(1) // Left align
+			tbl.AppendBulk(data)
+			tbl.Render()
+			fmt.Print(tableString.String())
 		}
 
 		return nil
