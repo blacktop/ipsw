@@ -242,6 +242,27 @@ Download iBridge firmwares
 	50.6 MiB / 577.2 MiB [====>-----------------------------------------------------| 7m20s ]  1.20 MiB/s
 ```
 
+## **download wp**
+
+Browse and download Apple wallpapers interactively through a terminal interface.
+
+```bash
+❯ ipsw download wp
+```
+
+This launches an interactive TUI (Terminal User Interface) that allows you to browse through Apple's collection of wallpapers with preview functionality.
+
+![Download WP Interface](/img/guides/download-wp.png)
+
+The interface displays:
+- A list of available wallpapers with resolution and size information
+- Live preview of selected wallpapers
+- Navigation controls: `↑/k` up, `↓/j` down, `p` preview, `enter` download, `q/esc` quit
+
+:::info note
+This command is currently available when you install `ipsw` via the brew tap.
+:::
+
 ## **download wiki**
 
 > This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
@@ -599,6 +620,136 @@ Watch for 🆕 Releases
 ```
 
 This will ping the RSS feed every 5 minutes and create a desktop notification if anything NEW shows up.
+
+## **download appledb**
+
+> Download IPSWs from [appledb](https://github.com/api4all/appledb)
+
+Download iOS 16.5 beta 4 kernelcache from appledb
+
+```bash
+❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
+```
+
+Download latest release iOS IPSWs for multiple devices
+
+```bash
+❯ ipsw download appledb --os iOS --latest --release
+```
+
+Get URLs only for beta macOS IPSWs as JSON
+
+```bash
+❯ ipsw download appledb --os macOS --beta --urls --json
+```
+
+:::info note
+The `--os` flag is required and supports: audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS, visionOS
+:::
+
+## **download kdk**
+
+Download Kernel Debug Kits
+
+```bash
+❯ ipsw download kdk --latest
+```
+
+Download specific KDK version
+
+```bash
+❯ ipsw download kdk --version 13.5
+```
+
+Download and automatically install KDK
+
+```bash
+❯ ipsw download kdk --latest --install
+```
+
+## **download keys**
+
+Download firmware encryption keys from The iPhone Wiki
+
+```bash
+❯ ipsw download keys --device iPhone15,2 --build 20F66
+```
+
+Download all available keys for a device
+
+```bash
+❯ ipsw download keys --device iPhone15,2
+```
+
+## **download pcc**
+
+Download Private Cloud Compute VM files
+
+```bash
+❯ ipsw download pcc
+```
+
+Get info about a PCC release
+
+```bash
+❯ ipsw download pcc --info
+   • Found 1 PCC Releases
+```
+```bash
+ ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴
+20872) b90e8f8813347a55cb9988aa264c73120099c179ce9992b9cc972836c2893c9a
+Type:   RELEASE
+Schema: V1
+Assets
+    [OS]
+        Variant: Darwin Cloud Customer Erase Install (IPSW)
+        Digest:  ceb5e5bde2427bf7a227b61ff307f79c4b9c701f46023262abd763758aea6453 (SHA256)
+        URL:     https://updates.cdn-apple.com/private-cloud-compute/ceb5e5bde2427bf7a227b61ff307f79c4b9c701f46023262abd763758aea6453
+    [PCS]
+        Variant: PrivateCloud Support
+        Digest:  2e61d8951957d10c8ce906b99d13853f9ab9828d6f8f8a4b5f160d2e1adc5ca8 (SHA256)
+        URL:     https://updates.cdn-apple.com/private-cloud-compute/2e61d8951957d10c8ce906b99d13853f9ab9828d6f8f8a4b5f160d2e1adc5ca8
+    [MODEL]
+        Variant: FM_LANGUAGE_SECURITY_RESEARCH_V1
+        Digest:  49e2c3c6216a027f7df0c703313398e75a6ddf769e695d0f6296bc2f4d0185e2 (SHA256)
+        URL:     https://updates.cdn-apple.com/private-cloud-compute/49e2c3c6216a027f7df0c703313398e75a6ddf769e695d0f6296bc2f4d0185e2
+    [HOST_TOOLS]
+        Variant: PrivateCloud Tools
+        Digest:  2813d1f93cfc196977d32718cfbc0e9727087f037d739ee683aaabab7598e316 (SHA256)
+        URL:     https://updates.cdn-apple.com/private-cloud-compute/2813d1f93cfc196977d32718cfbc0e9727087f037d739ee683aaabab7598e316
+    [DEBUG_SHELL]
+        Variant: Debug Shell for Private Cloud Security Research VM
+        Digest:  9f96a0fccb86d6fc024c1b69862c3d668dfa1e1b42e08ef49a4ac3a7e71174d3 (SHA256)
+        URL:     https://updates.cdn-apple.com/private-cloud-compute/9f96a0fccb86d6fc024c1b69862c3d668dfa1e1b42e08ef49a4ac3a7e71174d3
+Tickets
+    OS: ef571c0f38c4493008d43de4b298adcfb9db849e9d317f1bfd7c26d2dc289e70
+        [created: 2025-06-17 22:28:45]
+        [expires: 2025-07-23 09:00:16]
+    Cryptexes
+        0) ba5122b56ac7ed2873659cd5590550f18c1c7531bed7274ed748c214ac8cd9c0
+        1) d72a35e7891682dea9173aec66130212811db6d9f60cc5a690c1c648a229037f
+        2) b1a9a1a02885ca527231e0b63ed4287557a9665e1f89811a32d48c3ed367d753
+        3) efb993084b3f88666e6fab51ea5ee1ae6fe97d88cec889a278c0587944a438c4
+        4) c2e9614a3ef92bcb075e6b4139ccb725940e2c72e25fc0e34971ba7dacb1aa9b
+DarwinInit:
+{
+  "apply-timeout": "60min",
+  "config-security-policy": "customer",
+  "config-security-policy-version": 8,
+  "cryptex": [
+    {
+      "cacheable": true,
+      "url": "/",
+      "variant": "ASSET_TYPE_MODEL"
+    },
+    {
+      "cacheable": true,
+      "url": "/",
+      "variant": "ASSET_TYPE_PCS"
+    }
+  ],
+<SNIP>
+```
 
 ## **download tss**
 
