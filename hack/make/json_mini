@@ -5,7 +5,7 @@ find ./pkg ./internal/download -type f -name '*.json' | while read -r item; do
   printf "Minimizing JSON: %s\n" "$item"
   tmpfile="/tmp/$(basename -- "$item")"
   cp "$item" "$tmpfile"
-  jq -c < "$tmpfile" > "$item"
+  jq -c --sort-keys < "$tmpfile" > "$item"
   rm "$tmpfile"
   gzip -cn "$item" > "$(dirname "$item")/$(basename -- "$item" .json).gz"
 done
