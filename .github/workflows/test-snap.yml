@@ -48,14 +48,15 @@ jobs:
         
         # Create functional mock script
         cat > /tmp/mock-apfs-fuse << 'MOCKEOF'
-#!/bin/bash
-echo "Mock apfs-fuse v1.0 (for testing ipsw snap detection)"
-echo "Called with arguments: $@"
-echo "Would mount: $1 at $2"
-# Exit successfully to simulate working apfs-fuse
-exit 0
-MOCKEOF
-        
+        #!/bin/bash
+        echo "Mock apfs-fuse v1.0 (for testing ipsw snap detection)"
+        echo "Called with arguments: $@"
+        echo "Would mount: $1 at $2"
+        # Exit successfully to simulate working apfs-fuse
+        exit 0
+        MOCKEOF
+        # Make the mock script executable
+        sudo chmod +x /tmp/mock-apfs-fuse
         # Install in primary location
         sudo cp /tmp/mock-apfs-fuse /usr/local/bin/apfs-fuse
         sudo chmod +x /usr/local/bin/apfs-fuse
