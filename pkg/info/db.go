@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/apex/log"
@@ -120,67 +121,139 @@ func (ds Devices) Query(q *DeviceQuery) *Devices {
 		}
 		// Name
 		if len(q.Name) > 0 {
-			if strings.EqualFold(dev.Name, q.Name) || strings.EqualFold(dev.Description, q.Name) {
-				db[prod] = dev
-				goto next
+			// Try regex matching first
+			if re, err := regexp.Compile("(?i)" + q.Name); err == nil {
+				if re.MatchString(dev.Name) || re.MatchString(dev.Description) {
+					db[prod] = dev
+					goto next
+				}
+			} else {
+				// Fallback to exact matching if regex is invalid
+				if strings.EqualFold(dev.Name, q.Name) || strings.EqualFold(dev.Description, q.Name) {
+					db[prod] = dev
+					goto next
+				}
 			}
 		}
 		// Prod
-		if len(q.Prod) > 0 && strings.EqualFold(prod, q.Prod) {
-			db[prod] = dev
-			goto next
+		if len(q.Prod) > 0 {
+			if re, err := regexp.Compile("(?i)" + q.Prod); err == nil {
+				if re.MatchString(prod) {
+					db[prod] = dev
+					goto next
+				}
+			} else {
+				if strings.EqualFold(prod, q.Prod) {
+					db[prod] = dev
+					goto next
+				}
+			}
 		}
 		// Model
 		if len(q.Model) > 0 {
-			for m := range dev.Boards {
-				if strings.EqualFold(m, q.Model) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.Model); err == nil {
+				for m := range dev.Boards {
+					if re.MatchString(m) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for m := range dev.Boards {
+					if strings.EqualFold(m, q.Model) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
 		// Board
 		if len(q.Board) > 0 {
-			for id := range dev.Boards {
-				if strings.EqualFold(id, q.Board) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.Board); err == nil {
+				for id := range dev.Boards {
+					if re.MatchString(id) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for id := range dev.Boards {
+					if strings.EqualFold(id, q.Board) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
 		// CPU
 		if len(q.CPU) > 0 {
-			for _, b := range dev.Boards {
-				if strings.EqualFold(b.CPU, q.CPU) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.CPU); err == nil {
+				for _, b := range dev.Boards {
+					if re.MatchString(b.CPU) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for _, b := range dev.Boards {
+					if strings.EqualFold(b.CPU, q.CPU) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
 		// Platform
 		if len(q.Platform) > 0 {
-			for _, b := range dev.Boards {
-				if strings.EqualFold(b.Platform, q.Platform) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.Platform); err == nil {
+				for _, b := range dev.Boards {
+					if re.MatchString(b.Platform) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for _, b := range dev.Boards {
+					if strings.EqualFold(b.Platform, q.Platform) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
 		// CPID
 		if len(q.CPID) > 0 {
-			for _, b := range dev.Boards {
-				if strings.EqualFold(b.ChipID, q.CPID) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.CPID); err == nil {
+				for _, b := range dev.Boards {
+					if re.MatchString(b.ChipID) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for _, b := range dev.Boards {
+					if strings.EqualFold(b.ChipID, q.CPID) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
 		// BDID
 		if len(q.BDID) > 0 {
-			for _, b := range dev.Boards {
-				if strings.EqualFold(b.BoardID, q.BDID) {
-					db[prod] = dev
-					goto next
+			if re, err := regexp.Compile("(?i)" + q.BDID); err == nil {
+				for _, b := range dev.Boards {
+					if re.MatchString(b.BoardID) {
+						db[prod] = dev
+						goto next
+					}
+				}
+			} else {
+				for _, b := range dev.Boards {
+					if strings.EqualFold(b.BoardID, q.BDID) {
+						db[prod] = dev
+						goto next
+					}
 				}
 			}
 		}
