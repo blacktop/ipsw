@@ -146,7 +146,7 @@ jobs:
           
           # Update stable if needed
           if [ "${{ steps.check-builds.outputs.update_stable }}" = "true" ]; then
-            jq -c --arg fp "${{ steps.get-builds.outputs.stable_fingerprint }}" \
+            jq -c --sort-keys --arg fp "${{ steps.get-builds.outputs.stable_fingerprint }}" \
                --arg ios "${{ steps.get-builds.outputs.stable_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.stable_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.stable_visionos }}" \
@@ -161,13 +161,13 @@ jobs:
                       "updated_at": $timestamp
                     }
                   }
-                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+                } | sort_keys' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi
           
           # Update RC if needed
           if [ "${{ steps.check-builds.outputs.update_rc }}" = "true" ]; then
-            jq -c --arg fp "${{ steps.get-builds.outputs.rc_fingerprint }}" \
+            jq -c --sort-keys --arg fp "${{ steps.get-builds.outputs.rc_fingerprint }}" \
                --arg ios "${{ steps.get-builds.outputs.rc_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.rc_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.rc_visionos }}" \
@@ -182,13 +182,13 @@ jobs:
                       "updated_at": $timestamp
                     }
                   }
-                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+                } | sort_keys' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi
           
           # Update beta if needed
           if [ "${{ steps.check-builds.outputs.update_beta }}" = "true" ]; then
-            jq -c --arg fp "${{ steps.get-builds.outputs.beta_fingerprint }}" \
+            jq -c --sort-keys --arg fp "${{ steps.get-builds.outputs.beta_fingerprint }}" \
                --arg ios "${{ steps.get-builds.outputs.beta_ios }}" \
                --arg macos "${{ steps.get-builds.outputs.beta_macos }}" \
                --arg visionos "${{ steps.get-builds.outputs.beta_visionos }}" \
@@ -203,12 +203,19 @@ jobs:
                       "updated_at": $timestamp
                     }
                   }
-                }' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
+                } | sort_keys' hack/.watch_cache.tmp > hack/.watch_cache.tmp2
             mv hack/.watch_cache.tmp2 hack/.watch_cache.tmp
           fi
           
-          mv hack/.watch_cache.tmp hack/.watch_cache
+          # Final sort of the cache file for idempotency
+          jq --sort-keys . hack/.watch_cache.tmp > hack/.watch_cache
+          rm hack/.watch_cache.tmp
           
+          # Also sort the main FCS keys JSON file before commit (if it exists)
+          if [ -f pkg/aea/data/fcs-keys.json ]; then
+            jq --sort-keys . pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.json.tmp && mv pkg/aea/data/fcs-keys.json.tmp pkg/aea/data/fcs-keys.json
+          fi
+
           # Configure git
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
