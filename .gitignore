@@ -22,9 +22,9 @@ __debug_*
 
 # AI
 .claude
+CLAUDE*.md
 .gemini
-CLAUDE.md
-GEMINI.md
+GEMINI*.md
 
 # Go Work
 *.work
