@@ -41,13 +41,16 @@ jobs:
         
     - name: Build and install apfs-fuse
       run: |
-        git clone https://github.com/sgan81/apfs-fuse.git /tmp/apfs-fuse
+        git clone --recursive https://github.com/sgan81/apfs-fuse.git /tmp/apfs-fuse
         cd /tmp/apfs-fuse
+        # Initialize submodules (needed for lzfse dependency)
+        git submodule update --init --recursive
         mkdir build
         cd build
         cmake ..
         make -j$(nproc)
         sudo make install
+        sudo ldconfig  # Update library cache
         
     - name: Verify apfs-fuse installation
       run: |
@@ -72,6 +75,38 @@ jobs:
         snap run ipsw --help | head -5 || true
         echo "=== Testing PATH visibility ==="
         echo $PATH
+        echo "=== Available interfaces for ipsw snap ==="
+        snap interface | grep -E "(system-files|removable-media|home)" || echo "No relevant interfaces found"
+        
+    - name: Test alternative apfs-fuse locations for snap users
+      continue-on-error: true
+      run: |
+        echo "=== Testing various apfs-fuse installation methods for snap users ==="
+        
+        # Method 1: System-wide installation (what we just did)
+        echo "Method 1: System installation (/usr/local/bin)"
+        ls -la /usr/local/bin/apfs-fuse || echo "Not found in /usr/local/bin"
+        
+        # Method 2: Try to install in user space
+        echo "Method 2: User space installation"
+        mkdir -p $HOME/.local/bin
+        if [ -f /usr/local/bin/apfs-fuse ]; then
+          cp /usr/local/bin/apfs-fuse $HOME/.local/bin/
+          echo "Copied to $HOME/.local/bin/apfs-fuse"
+        fi
+        
+        # Method 3: Test with IPSW_APFS_FUSE_PATH from different locations
+        echo "Method 3: Testing environment variable with different paths"
+        for path in "/usr/local/bin/apfs-fuse" "$HOME/.local/bin/apfs-fuse" "/usr/bin/apfs-fuse"; do
+          if [ -f "$path" ]; then
+            echo "Found apfs-fuse at: $path"
+            export IPSW_APFS_FUSE_PATH="$path"
+            echo "Testing with IPSW_APFS_FUSE_PATH=$path"
+            # Quick test to see if our enhanced detection works
+            timeout 30s ipsw extract --dyld --remote https://updates.cdn-apple.com/2023FallFCS/fullrestores/042-41883/7AF02F3A-B388-4A39-A966-EF4C5BE76E02/iPhone15,2_17.0_21A329_Restore.ipsw --output /tmp/test-extract-method3 || echo "Test with $path failed or timed out"
+            break
+          fi
+        done
         
     - name: Document findings
       run: |
