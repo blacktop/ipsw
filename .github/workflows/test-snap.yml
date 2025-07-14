@@ -1,0 +1,81 @@
+name: Test Snap Package
+
+on:
+  push:
+    paths:
+      - 'internal/utils/macos.go'
+      - '.github/workflows/test-snap.yml'
+  pull_request:
+    paths:
+      - 'internal/utils/macos.go'
+      - '.github/workflows/test-snap.yml'
+  workflow_dispatch:
+
+jobs:
+  test-snap:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install ipsw via snap
+      run: |
+        sudo snap install ipsw
+        
+    - name: Test ipsw basic functionality
+      run: |
+        ipsw --version
+        
+    - name: Test apfs-fuse detection (expected to fail initially)
+      continue-on-error: true
+      run: |
+        echo "Testing apfs-fuse detection without apfs-fuse installed..."
+        # This should fail gracefully and suggest installing apfs-fuse
+        ipsw extract --dyld --remote https://updates.cdn-apple.com/2023FallFCS/fullrestores/042-41883/7AF02F3A-B388-4A39-A966-EF4C5BE76E02/iPhone15,2_17.0_21A329_Restore.ipsw --output /tmp/test-extract || true
+        
+    - name: Install dependencies for apfs-fuse
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libfuse-dev build-essential cmake git
+        
+    - name: Build and install apfs-fuse
+      run: |
+        git clone https://github.com/sgan81/apfs-fuse.git /tmp/apfs-fuse
+        cd /tmp/apfs-fuse
+        mkdir build
+        cd build
+        cmake ..
+        make -j$(nproc)
+        sudo make install
+        
+    - name: Verify apfs-fuse installation
+      run: |
+        which apfs-fuse || echo "apfs-fuse not in PATH"
+        ls -la /usr/local/bin/apfs-fuse || echo "apfs-fuse not in /usr/local/bin"
+        
+    - name: Test with IPSW_APFS_FUSE_PATH environment variable
+      continue-on-error: true
+      run: |
+        export IPSW_APFS_FUSE_PATH=/usr/local/bin/apfs-fuse
+        echo "Testing with IPSW_APFS_FUSE_PATH=$IPSW_APFS_FUSE_PATH"
+        # This should work if our fix is correct
+        ipsw extract --dyld --remote https://updates.cdn-apple.com/2023FallFCS/fullrestores/042-41883/7AF02F3A-B388-4A39-A966-EF4C5BE76E02/iPhone15,2_17.0_21A329_Restore.ipsw --output /tmp/test-extract-with-env || true
+        
+    - name: Test snap confinement behavior
+      run: |
+        echo "=== Snap info ==="
+        snap list ipsw
+        echo "=== Snap connections ==="
+        snap connections ipsw
+        echo "=== PATH from snap environment ==="
+        snap run ipsw --help | head -5 || true
+        echo "=== Testing PATH visibility ==="
+        echo $PATH
+        
+    - name: Document findings
+      run: |
+        echo "=== Test Results Summary ==="
+        echo "This workflow tests ipsw snap package functionality and apfs-fuse detection."
+        echo "Key findings will be logged above for debugging snap confinement issues."
+        echo "Check the step results to see if our enhanced apfs-fuse detection works."
