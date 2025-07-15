@@ -25,9 +25,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,11 +44,6 @@ var machoBblCmd = &cobra.Command{
 	Short:   "Create single universal/fat MachO out many MachOs",
 	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		if err := os.MkdirAll(filepath.Dir(viper.GetString("macho.bbl.output")), 0755); err != nil {
 			return err

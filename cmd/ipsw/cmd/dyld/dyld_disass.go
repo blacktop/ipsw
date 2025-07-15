@@ -37,7 +37,6 @@ import (
 	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -137,11 +136,6 @@ var DisassCmd = &cobra.Command{
 		var middleAddr uint64
 		var image *dyld.CacheImage
 		var images []*dyld.CacheImage
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		imageNames := viper.GetStringSlice("dyld.disass.image")

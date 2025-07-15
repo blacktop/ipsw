@@ -26,7 +26,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-apfs"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/spf13/cobra"
@@ -56,10 +55,6 @@ var apfsCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		// flags
 		// pattern := viper.GetString("disk.hfs.search")

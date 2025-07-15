@@ -32,7 +32,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -65,11 +64,6 @@ var downloadRssCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var releases []string
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		watch := viper.GetBool("download.rss.watch")

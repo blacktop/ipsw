@@ -71,11 +71,6 @@ var otaPatchRsrCmd = &cobra.Command{
 
 		patchVerbose := uint32(0)
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-			patchVerbose = 5
-		}
-
 		// flags
 		cryptex := viper.GetString("ota.patch.cryptex")
 		inFolder := viper.GetString("ota.patch.input")

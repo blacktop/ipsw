@@ -33,13 +33,11 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -62,11 +60,6 @@ var otaPayloadCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		if viper.GetBool("ota.payload.files") && viper.GetBool("ota.payload.dirs") {
 			return fmt.Errorf("cannot use both --files and --dirs flags")

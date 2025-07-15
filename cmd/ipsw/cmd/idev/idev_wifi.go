@@ -24,10 +24,8 @@ package idev
 import (
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,11 +47,6 @@ var wifiCmd = &cobra.Command{
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		udid := viper.GetString("idev.udid")
 		turnON := viper.GetBool("idev.wifi.on")

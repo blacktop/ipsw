@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/springboard"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -50,11 +49,6 @@ var idevSpringbWallpaperCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		udid := viper.GetString("idev.udid")
 		output := viper.GetString("idev.springb.wallpaper.output")

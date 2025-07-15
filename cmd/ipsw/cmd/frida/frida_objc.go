@@ -38,7 +38,6 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
@@ -77,11 +76,6 @@ var fridaObjcCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		udid := viper.GetString("frida.udid")
 		procName := viper.GetString("frida.objc.name")

@@ -28,7 +28,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -50,15 +49,8 @@ var ListDevicesCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		ipswSpec := viper.GetBool("idev.list.ipsw")
 		asJSON := viper.GetBool("idev.list.json")
-
-		color.NoColor = viper.GetBool("no-color")
 
 		conn, err := usb.NewConn()
 		if err != nil {

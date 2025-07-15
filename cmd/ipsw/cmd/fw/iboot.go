@@ -67,10 +67,6 @@ var ibootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		showVersion := viper.GetBool("fw.iboot.version")
 		showStrings := viper.GetBool("fw.iboot.strings")

@@ -36,7 +36,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -87,12 +86,6 @@ var symbolicateCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		/* flags */
 		all := viper.GetBool("symbolicate.all")
 		running := viper.GetBool("symbolicate.running")

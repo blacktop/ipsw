@@ -60,10 +60,6 @@ var excCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		showInfo := viper.GetBool("fw.exclave.info")
 		output := viper.GetString("fw.exclave.output")

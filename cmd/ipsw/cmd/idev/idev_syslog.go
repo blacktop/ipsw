@@ -99,11 +99,6 @@ var SyslogCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		udid := viper.GetString("idev.udid")
 		timeout := viper.GetDuration("idev.syslog.timeout")
 

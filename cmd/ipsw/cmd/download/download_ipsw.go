@@ -39,7 +39,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -142,11 +141,6 @@ var downloadIpswCmd = &cobra.Command{
 		var itunes *download.ITunesVersionMaster
 		var builds []download.Build
 		var filteredBuilds []download.Build
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// settings
 		proxy := viper.GetString("download.ipsw.proxy")

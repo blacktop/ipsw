@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -69,11 +68,6 @@ var WebkitCmd = &cobra.Command{
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		getRev := viper.GetBool("dyld.webkit.rev")
 		getGit := viper.GetBool("dyld.webkit.git")

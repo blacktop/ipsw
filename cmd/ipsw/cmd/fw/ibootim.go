@@ -67,10 +67,6 @@ var ibootimCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		showInfo := viper.GetBool("fw.ibootim.info")
 		flat := viper.GetBool("fw.ibootim.flat")

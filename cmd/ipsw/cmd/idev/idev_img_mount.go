@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -75,11 +74,6 @@ var idevImgMountCmd = &cobra.Command{
 	// SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		udid := viper.GetString("idev.udid")
