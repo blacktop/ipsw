@@ -39,6 +39,7 @@ func init() {
 	AmfiCmd.AddCommand(idevAmfiDevModeCmd)
 
 	idevAmfiDevModeCmd.Flags().BoolP("post", "p", false, "Enable post restart (acknowledges prompt after reboot)")
+	viper.BindPFlag("idev.amfi.dev.post", idevAmfiDevModeCmd.Flags().Lookup("post"))
 }
 
 // idevAmfiDevModeCmd represents the push command
@@ -56,8 +57,8 @@ var idevAmfiDevModeCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 		// flags
-		udid, _ := cmd.Flags().GetString("udid")
-		postRestart, _ := cmd.Flags().GetBool("post")
+		udid := viper.GetString("idev.udid")
+		postRestart := viper.GetBool("idev.amfi.dev.post")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

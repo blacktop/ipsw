@@ -40,6 +40,10 @@ func init() {
 	ObjcCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
 	ObjcCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
 	ObjcCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
+	viper.BindPFlag("dyld.objc.class", ObjcCmd.Flags().Lookup("class"))
+	viper.BindPFlag("dyld.objc.sel", ObjcCmd.Flags().Lookup("sel"))
+	viper.BindPFlag("dyld.objc.proto", ObjcCmd.Flags().Lookup("proto"))
+	viper.BindPFlag("dyld.objc.imp-cache", ObjcCmd.Flags().Lookup("imp-cache"))
 }
 
 // ObjcCmd represents the objc command
@@ -58,10 +62,10 @@ var ObjcCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		printClasses, _ := cmd.Flags().GetBool("class")
-		printSelectors, _ := cmd.Flags().GetBool("sel")
-		printProtocols, _ := cmd.Flags().GetBool("proto")
-		printImpCaches, _ := cmd.Flags().GetBool("imp-cache")
+		printClasses := viper.GetBool("dyld.objc.class")
+		printSelectors := viper.GetBool("dyld.objc.sel")
+		printProtocols := viper.GetBool("dyld.objc.proto")
+		printImpCaches := viper.GetBool("dyld.objc.imp-cache")
 
 		dscPath := filepath.Clean(args[0])
 

@@ -49,6 +49,13 @@ func init() {
 	WebkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	WebkitCmd.Flags().BoolP("diff", "d", false, "Diff two dyld_shared_cache files")
 	WebkitCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("dyld.webkit.rev", WebkitCmd.Flags().Lookup("rev"))
+	viper.BindPFlag("dyld.webkit.git", WebkitCmd.Flags().Lookup("git"))
+	viper.BindPFlag("dyld.webkit.api", WebkitCmd.Flags().Lookup("api"))
+	viper.BindPFlag("dyld.webkit.proxy", WebkitCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("dyld.webkit.insecure", WebkitCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("dyld.webkit.diff", WebkitCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("dyld.webkit.json", WebkitCmd.Flags().Lookup("json"))
 }
 
 // WebkitCmd represents the webkit command
@@ -68,13 +75,13 @@ var WebkitCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		getRev, _ := cmd.Flags().GetBool("rev")
-		getGit, _ := cmd.Flags().GetBool("git")
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		apiToken, _ := cmd.Flags().GetString("api")
-		diff, _ := cmd.Flags().GetBool("diff")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		getRev := viper.GetBool("dyld.webkit.rev")
+		getGit := viper.GetBool("dyld.webkit.git")
+		proxy := viper.GetString("dyld.webkit.proxy")
+		insecure := viper.GetBool("dyld.webkit.insecure")
+		apiToken := viper.GetString("dyld.webkit.api")
+		diff := viper.GetBool("dyld.webkit.diff")
+		asJSON := viper.GetBool("dyld.webkit.json")
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {

@@ -37,6 +37,8 @@ func init() {
 
 	idevImgUnmountCmd.Flags().StringP("image-type", "t", "", "Image type to unmount (i.e. 'Developer')")
 	idevImgUnmountCmd.Flags().StringP("mount-point", "m", "", "Path to mount point (i.e. '/Developer')")
+	viper.BindPFlag("idev.img.unmount.image-type", idevImgUnmountCmd.Flags().Lookup("image-type"))
+	viper.BindPFlag("idev.img.unmount.mount-point", idevImgUnmountCmd.Flags().Lookup("mount-point"))
 }
 
 // idevImgUnmountCmd represents the unmount command
@@ -52,9 +54,9 @@ var idevImgUnmountCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		imageType, _ := cmd.Flags().GetString("image-type")
-		mountPoint, _ := cmd.Flags().GetString("mount-point")
+		udid := viper.GetString("idev.udid")
+		imageType := viper.GetString("idev.img.unmount.image-type")
+		mountPoint := viper.GetString("idev.img.unmount.mount-point")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

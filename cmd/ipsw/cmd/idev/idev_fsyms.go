@@ -56,8 +56,8 @@ var FetchsymsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.fsyms.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

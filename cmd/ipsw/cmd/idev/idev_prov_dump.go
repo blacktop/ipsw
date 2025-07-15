@@ -38,6 +38,7 @@ func init() {
 	ProvCmd.AddCommand(provDumpCmd)
 	provDumpCmd.Flags().StringP("output", "o", "", "Folder to save profiles(s)")
 	provDumpCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.prov.dump.output", provDumpCmd.Flags().Lookup("output"))
 }
 
 // provDumpCmd represents the dump command
@@ -53,8 +54,8 @@ var provDumpCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.prov.dump.output")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

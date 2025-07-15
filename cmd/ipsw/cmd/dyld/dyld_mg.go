@@ -134,7 +134,7 @@ var dyldMgCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		length, _ := cmd.Flags().GetInt("length")
+		length := viper.GetInt("dyld.mg.length")
 
 		dscPath := filepath.Clean(args[0])
 

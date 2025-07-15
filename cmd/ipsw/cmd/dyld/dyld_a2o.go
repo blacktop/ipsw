@@ -40,6 +40,8 @@ func init() {
 	DyldCmd.AddCommand(AddrToOffsetCmd)
 	AddrToOffsetCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
 	AddrToOffsetCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	viper.BindPFlag("dyld.a2o.dec", AddrToOffsetCmd.Flags().Lookup("dec"))
+	viper.BindPFlag("dyld.a2o.hex", AddrToOffsetCmd.Flags().Lookup("hex"))
 }
 
 // AddrToOffsetCmd represents the a2o command
@@ -61,8 +63,8 @@ var AddrToOffsetCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		inDec, _ := cmd.Flags().GetBool("dec")
-		inHex, _ := cmd.Flags().GetBool("hex")
+		inDec := viper.GetBool("dyld.a2o.dec")
+		inHex := viper.GetBool("dyld.a2o.hex")
 
 		if inDec && inHex {
 			return fmt.Errorf("you can only use --dec OR --hex")

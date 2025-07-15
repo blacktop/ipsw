@@ -36,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -44,6 +45,9 @@ func init() {
 	mountCmd.Flags().StringP("key", "k", "", "DMG key")
 	mountCmd.Flags().Bool("lookup", false, "Lookup DMG keys on theapplewiki.com")
 	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	viper.BindPFlag("mount.key", mountCmd.Flags().Lookup("key"))
+	viper.BindPFlag("mount.lookup", mountCmd.Flags().Lookup("lookup"))
+	viper.BindPFlag("mount.pem-db", mountCmd.Flags().Lookup("pem-db"))
 }
 
 // mountCmd represents the mount command
@@ -80,9 +84,9 @@ var mountCmd = &cobra.Command{
 		}
 
 		// flags
-		key, _ := cmd.Flags().GetString("key")
-		lookupKeys, _ := cmd.Flags().GetBool("lookup")
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		key := viper.GetString("mount.key")
+		lookupKeys := viper.GetBool("mount.lookup")
+		pemDB := viper.GetString("mount.pem-db")
 		// validate flags
 		if len(key) > 0 && lookupKeys {
 			return fmt.Errorf("cannot use --key AND --lookup flags together")

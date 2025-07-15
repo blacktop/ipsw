@@ -38,6 +38,7 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kernelMigCmd)
 	kernelMigCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
+	viper.BindPFlag("kernel.mig.arch", kernelMigCmd.Flags().Lookup("arch"))
 }
 
 // kernelMigCmd represents the mig command
@@ -54,7 +55,7 @@ var kernelMigCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		selectedArch := viper.GetString("kernel.mig.arch")
 
 		m, err := mcmd.OpenMachO(filepath.Clean(args[0]), selectedArch)
 		if err != nil {

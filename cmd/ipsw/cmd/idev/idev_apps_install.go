@@ -53,7 +53,7 @@ var idevAppsInstallCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 		ipaPath := filepath.Clean(args[0])
 
 		if len(udid) == 0 {

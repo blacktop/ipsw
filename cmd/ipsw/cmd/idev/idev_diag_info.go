@@ -36,6 +36,7 @@ import (
 func init() {
 	DiagCmd.AddCommand(diagInfoCmd)
 	diagInfoCmd.Flags().BoolP("json", "j", false, "Display diagnostics info as JSON")
+	viper.BindPFlag("idev.diag.info.json", diagInfoCmd.Flags().Lookup("json"))
 }
 
 // diagInfoCmd represents the info command
@@ -51,8 +52,8 @@ var diagInfoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.diag.info.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

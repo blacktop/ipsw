@@ -38,6 +38,7 @@ func init() {
 	ImgCmd.AddCommand(idevImgLookupCmd)
 
 	idevImgLookupCmd.Flags().BoolP("json", "j", false, "Display images as JSON")
+	viper.BindPFlag("idev.img.lookup.json", idevImgLookupCmd.Flags().Lookup("json"))
 }
 
 // idevImgLookupCmd represents the lookup command
@@ -55,8 +56,8 @@ var idevImgLookupCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.img.lookup.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

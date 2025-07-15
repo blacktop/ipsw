@@ -53,7 +53,7 @@ var idevAfcCatCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

@@ -47,6 +47,7 @@ func init() {
 	IDevCmd.AddCommand(SyslogCmd)
 
 	SyslogCmd.Flags().Uint64P("timeout", "t", 0, "Log timeout in seconds")
+	viper.BindPFlag("idev.syslog.timeout", SyslogCmd.Flags().Lookup("timeout"))
 }
 
 var colorTime = color.New(color.Bold, color.FgHiBlue).SprintFunc()
@@ -103,8 +104,8 @@ var SyslogCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		timeout, _ := cmd.Flags().GetDuration("timeout")
+		udid := viper.GetString("idev.udid")
+		timeout := viper.GetDuration("idev.syslog.timeout")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

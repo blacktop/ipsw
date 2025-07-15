@@ -37,6 +37,7 @@ func init() {
 	ImgCmd.AddCommand(idevImgListCmd)
 
 	idevImgListCmd.Flags().BoolP("json", "j", false, "Display images as JSON")
+	viper.BindPFlag("idev.img.ls.json", idevImgListCmd.Flags().Lookup("json"))
 }
 
 // idevImgListCmd represents the ls command
@@ -52,8 +53,8 @@ var idevImgListCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.img.ls.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

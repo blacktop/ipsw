@@ -40,6 +40,7 @@ func init() {
 
 	idevSpringbIconCmd.Flags().StringP("output", "o", "", "Folder to save icon")
 	idevSpringbIconCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.springb.icon.output", idevSpringbIconCmd.Flags().Lookup("output"))
 }
 
 // idevSpringbIconCmd represents the icon command
@@ -56,8 +57,8 @@ var idevSpringbIconCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.springb.icon.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

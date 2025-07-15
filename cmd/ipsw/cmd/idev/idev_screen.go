@@ -41,6 +41,7 @@ func init() {
 
 	ScreenCmd.Flags().StringP("output", "o", "", "Folder to save screenshot(s)")
 	ScreenCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.screen.output", ScreenCmd.Flags().Lookup("output"))
 }
 
 func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
@@ -77,8 +78,8 @@ var ScreenCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.screen.output")
 
 		if len(udid) > 0 {
 			ldc, err := lockdownd.NewClient(udid)

@@ -41,6 +41,8 @@ func init() {
 
 	PsCmd.Flags().StringP("proc", "p", "", "process to get pid for")
 	PsCmd.Flags().BoolP("json", "j", false, "Display processes as JSON")
+	viper.BindPFlag("idev.ps.proc", PsCmd.Flags().Lookup("proc"))
+	viper.BindPFlag("idev.ps.json", PsCmd.Flags().Lookup("json"))
 }
 
 // PsCmd represents the ps command
@@ -56,9 +58,9 @@ var PsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		proc, _ := cmd.Flags().GetString("proc")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		proc := viper.GetString("idev.ps.proc")
+		asJSON := viper.GetBool("idev.ps.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

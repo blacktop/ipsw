@@ -40,6 +40,7 @@ func init() {
 
 	idevSpringbWallpaperCmd.Flags().StringP("output", "o", "", "Folder to save wallpaper")
 	idevSpringbWallpaperCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.springb.wallpaper.output", idevSpringbWallpaperCmd.Flags().Lookup("output"))
 }
 
 // idevSpringbWallpaperCmd represents the wallpaper command
@@ -55,8 +56,8 @@ var idevSpringbWallpaperCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.springb.wallpaper.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

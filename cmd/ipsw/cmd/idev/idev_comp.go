@@ -36,6 +36,7 @@ import (
 func init() {
 	IDevCmd.AddCommand(compCmd)
 	compCmd.Flags().BoolP("json", "j", false, "Display companions as JSON")
+	viper.BindPFlag("idev.comp.json", compCmd.Flags().Lookup("json"))
 }
 
 // compCmd represents the comp command
@@ -51,8 +52,8 @@ var compCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.comp.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

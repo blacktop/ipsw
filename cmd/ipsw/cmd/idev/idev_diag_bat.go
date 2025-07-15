@@ -36,6 +36,7 @@ import (
 func init() {
 	DiagCmd.AddCommand(diagBatCmd)
 	diagBatCmd.Flags().BoolP("json", "j", false, "Display battery snapshot as JSON")
+	viper.BindPFlag("idev.diag.bat.json", diagBatCmd.Flags().Lookup("json"))
 }
 
 // diagBatCmd represents the bat command
@@ -51,8 +52,8 @@ var diagBatCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.diag.bat.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

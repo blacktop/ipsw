@@ -37,6 +37,7 @@ func init() {
 	AfcCmd.AddCommand(idevAfcRmCmd)
 
 	idevAfcRmCmd.Flags().BoolP("recursive", "r", false, "recursive delete")
+	viper.BindPFlag("idev.afc.rm.recursive", idevAfcRmCmd.Flags().Lookup("recursive"))
 }
 
 // idevAfcRmCmd represents the rm command
@@ -53,8 +54,8 @@ var idevAfcRmCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		recursive, _ := cmd.Flags().GetBool("recursive")
+		udid := viper.GetString("idev.udid")
+		recursive := viper.GetBool("idev.afc.rm.recursive")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

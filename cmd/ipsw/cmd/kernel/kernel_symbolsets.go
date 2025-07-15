@@ -41,6 +41,7 @@ func init() {
 	KernelcacheCmd.AddCommand(symbolsetsCmd)
 	symbolsetsCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	symbolsetsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.symbolsets.arch", symbolsetsCmd.Flags().Lookup("arch"))
 }
 
 type symbolsSets struct {
@@ -76,7 +77,7 @@ var symbolsetsCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		selectedArch := viper.GetString("kernel.symbolsets.arch")
 
 		mr, err := mcmd.OpenMachO(args[0], selectedArch)
 		if err != nil {

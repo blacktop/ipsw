@@ -45,6 +45,8 @@ func init() {
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
+	viper.BindPFlag("dyld.imports.ipsw", dyldImportsCmd.Flags().Lookup("ipsw"))
+	viper.BindPFlag("dyld.imports.pem-db", dyldImportsCmd.Flags().Lookup("pem-db"))
 }
 
 // dyldImportsCmd represents the imports command
@@ -67,8 +69,8 @@ var dyldImportsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 		// flags
-		ipswPath, _ := cmd.Flags().GetString("ipsw")
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		ipswPath := viper.GetString("dyld.imports.ipsw")
+		pemDB := viper.GetString("dyld.imports.pem-db")
 		// validate args
 		if ipswPath != "" && len(args) != 1 {
 			return errors.New("you must specify a DYLIB to search for")

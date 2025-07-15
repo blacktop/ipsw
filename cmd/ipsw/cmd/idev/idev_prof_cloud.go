@@ -37,6 +37,7 @@ func init() {
 	ProfCmd.AddCommand(profCloudCmd)
 
 	profCloudCmd.Flags().BoolP("json", "j", false, "Display config as JSON")
+	viper.BindPFlag("idev.prof.cloud.json", profCloudCmd.Flags().Lookup("json"))
 }
 
 // profCloudCmd represents the cloud command
@@ -52,8 +53,8 @@ var profCloudCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.prof.cloud.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

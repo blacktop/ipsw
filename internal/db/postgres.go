@@ -68,7 +68,7 @@ func (p *Postgres) Connect() (err error) {
 		"host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
 		p.Host, p.Port, p.User, p.Database, p.Password, p.SSLMode,
 	)
-	
+
 	p.db, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
 		PreferSimpleProtocol: true, // Use simple protocol to avoid prepared statements
@@ -90,13 +90,13 @@ func (p *Postgres) Connect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to check table existence: %w", err)
 	}
-	
+
 	if ipswTableCount > 0 {
 		// Main tables already exist, skip migration
 		// This handles the case where tables were created manually via schema.sql
 		return nil
 	}
-	
+
 	// Tables don't exist, let GORM create them
 	return p.db.AutoMigrate(
 		&model.Ipsw{},

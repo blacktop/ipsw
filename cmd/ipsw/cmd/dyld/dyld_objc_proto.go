@@ -41,6 +41,7 @@ import (
 func init() {
 	ObjcCmd.AddCommand(objcProtoCmd)
 	objcProtoCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	viper.BindPFlag("dyld.objc.proto.image", objcProtoCmd.Flags().Lookup("image"))
 }
 
 // objcProtoCmd represents the proto command
@@ -60,7 +61,7 @@ var objcProtoCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		imageName, _ := cmd.Flags().GetString("image")
+		imageName := viper.GetString("dyld.objc.proto.image")
 
 		dscPath := filepath.Clean(args[0])
 

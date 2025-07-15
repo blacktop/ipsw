@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/wallpaper"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -38,6 +39,8 @@ func init() {
 	wpCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	wpCmd.Flags().StringP("output", "o", "", "Folder to extract wallpapers to")
 	wpCmd.MarkFlagDirname("output")
+	viper.BindPFlag("wp.pem-db", wpCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("wp.output", wpCmd.Flags().Lookup("output"))
 }
 
 // wpCmd represents the wp command
@@ -54,8 +57,8 @@ var wpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		// flags
-		pemDB, _ := cmd.Flags().GetString("pem-db")
-		// output, _ := cmd.Flags().GetString("output")
+		pemDB := viper.GetString("wp.pem-db")
+		// output := viper.GetString("wp.output")
 
 		ctx, err := mount.DmgInIPSW(filepath.Clean(args[0]), "fs", pemDB, nil)
 		if err != nil {

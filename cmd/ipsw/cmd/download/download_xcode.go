@@ -57,6 +57,10 @@ func init() {
 	viper.BindPFlag("download.xcode.skip-all", downloadXcodeCmd.Flags().Lookup("skip-all"))
 	viper.BindPFlag("download.xcode.resume-all", downloadXcodeCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.xcode.restart-all", downloadXcodeCmd.Flags().Lookup("restart-all"))
+	// Bind command-specific flags
+	viper.BindPFlag("download.xcode.latest", downloadXcodeCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.xcode.sim", downloadXcodeCmd.Flags().Lookup("sim"))
+	viper.BindPFlag("download.xcode.runtime", downloadXcodeCmd.Flags().Lookup("runtime"))
 }
 
 // downloadXcodeCmd represents the xcode command
@@ -91,9 +95,9 @@ var downloadXcodeCmd = &cobra.Command{
 		resumeAll := viper.GetBool("download.xcode.resume-all")
 		restartAll := viper.GetBool("download.xcode.restart-all")
 		// flags
-		latest, _ := cmd.Flags().GetBool("latest")
-		dlSim, _ := cmd.Flags().GetBool("sim")
-		runtime, _ := cmd.Flags().GetString("runtime")
+		latest := viper.GetBool("download.xcode.latest")
+		dlSim := viper.GetBool("download.xcode.sim")
+		runtime := viper.GetString("download.xcode.runtime")
 
 		if dlSim {
 			dvt, err := download.GetDVTDownloadableIndex()
