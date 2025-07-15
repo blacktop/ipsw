@@ -131,7 +131,7 @@ var machoDisassCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// flags
-		selectedArch := viper.GetString("macho.info.arch")
+		selectedArch := viper.GetString("macho.disass.arch")
 		entryStart := viper.GetBool("macho.disass.entry")
 		symbolName := viper.GetString("macho.disass.symbol")
 		startAddr := viper.GetUint64("macho.disass.vaddr")
