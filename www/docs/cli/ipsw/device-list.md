@@ -17,7 +17,9 @@ ipsw device-list [flags]
 ### Options
 
 ```
-  -h, --help   help for device-list
+  -h, --help    help for device-list
+  -j, --json    Output as JSON
+  -p, --plain   Output as non-interactive table
 ```
 
 ### Options inherited from parent commands
