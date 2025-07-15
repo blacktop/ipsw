@@ -33,6 +33,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/xcode"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -40,6 +41,8 @@ func init() {
 	rootCmd.AddCommand(deviceListCmd)
 	deviceListCmd.Flags().BoolP("plain", "p", false, "Output as non-interactive table")
 	deviceListCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("device-list.plain", deviceListCmd.Flags().Lookup("plain"))
+	viper.BindPFlag("device-list.json", deviceListCmd.Flags().Lookup("json"))
 }
 
 // deviceListCmd represents the deviceList command
@@ -50,8 +53,9 @@ var deviceListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		plain, _ := cmd.Flags().GetBool("plain")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		// flags
+		plain := viper.GetBool("device-list.plain")
+		asJSON := viper.GetBool("device-list.json")
 
 		devices, err := xcode.GetDevices()
 		if err != nil {

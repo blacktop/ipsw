@@ -44,6 +44,10 @@ func init() {
 	dyldEmuCmd.Flags().Uint64P("addr", "a", 0, "Virtual address to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldEmuCmd.Flags().StringP("state", "t", "", "Path to initial state file")
+	viper.BindPFlag("dyld.emu.sym", dyldEmuCmd.Flags().Lookup("sym"))
+	viper.BindPFlag("dyld.emu.addr", dyldEmuCmd.Flags().Lookup("addr"))
+	viper.BindPFlag("dyld.emu.count", dyldEmuCmd.Flags().Lookup("count"))
+	viper.BindPFlag("dyld.emu.state", dyldEmuCmd.Flags().Lookup("state"))
 }
 
 // dyldEmuCmd represents the dyld emu command
@@ -64,10 +68,10 @@ var dyldEmuCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 
 		// Flags
-		symbolName, _ := cmd.Flags().GetString("sym")
-		startAddr, _ := cmd.Flags().GetUint64("vaddr")
-		instructions, _ := cmd.Flags().GetUint64("count")
-		stateFile, _ := cmd.Flags().GetString("state")
+		symbolName := viper.GetString("dyld.emu.sym")
+		startAddr := viper.GetUint64("dyld.emu.addr")
+		instructions := viper.GetUint64("dyld.emu.count")
+		stateFile := viper.GetString("dyld.emu.state")
 		// Validate flags
 		if symbolName != "" && startAddr != 0 {
 			return fmt.Errorf("cannot specify both --sym and --vaddr")

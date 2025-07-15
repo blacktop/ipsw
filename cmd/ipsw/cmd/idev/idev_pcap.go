@@ -47,6 +47,8 @@ func init() {
 	PcapCmd.Flags().StringP("proc", "p", "", "process to get pcap for")
 	PcapCmd.Flags().StringP("output", "o", "", "Folder to save pcap")
 	PcapCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.pcap.proc", PcapCmd.Flags().Lookup("proc"))
+	viper.BindPFlag("idev.pcap.output", PcapCmd.Flags().Lookup("output"))
 }
 
 // PcapCmd represents the pcap command
@@ -62,9 +64,9 @@ var PcapCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		proc, _ := cmd.Flags().GetString("proc")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		proc := viper.GetString("idev.pcap.proc")
+		output := viper.GetString("idev.pcap.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

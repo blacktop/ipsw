@@ -37,6 +37,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type typeDecl struct {
@@ -54,6 +55,7 @@ func init() {
 	rootCmd.AddCommand(mdevsCmd)
 
 	mdevsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	viper.BindPFlag("mdevs.pem-db", mdevsCmd.Flags().Lookup("pem-db"))
 }
 
 // mdevsCmd represents the mdevs command
@@ -73,7 +75,7 @@ var mdevsCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		pemDB := viper.GetString("mdevs.pem-db")
 
 		ipswPath := filepath.Clean(args[0])
 

@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -43,6 +44,10 @@ func init() {
 	updateDBCmd.Flags().StringP("remote", "r", "", "Remote IPSW/OTA URL to parse")
 	updateDBCmd.Flags().StringP("path", "p", "", "Path to map")
 	updateDBCmd.Flags().StringP("db", "d", "", "Path to ipsw device DB JSON")
+	viper.BindPFlag("updatedb.urls", updateDBCmd.Flags().Lookup("urls"))
+	viper.BindPFlag("updatedb.remote", updateDBCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("updatedb.path", updateDBCmd.Flags().Lookup("path"))
+	viper.BindPFlag("updatedb.db", updateDBCmd.Flags().Lookup("db"))
 }
 
 // updateDBCmd represents the updatedb command
@@ -59,10 +64,10 @@ var updateDBCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		urlList, _ := cmd.Flags().GetString("urls")
-		remoteURL, _ := cmd.Flags().GetString("remote")
-		mapPath, _ := cmd.Flags().GetString("path")
-		dbPath, _ := cmd.Flags().GetString("db")
+		urlList := viper.GetString("updatedb.urls")
+		remoteURL := viper.GetString("updatedb.remote")
+		mapPath := viper.GetString("updatedb.path")
+		dbPath := viper.GetString("updatedb.db")
 
 		mut := "Creating"
 		if _, err := os.Stat(dbPath); err == nil {

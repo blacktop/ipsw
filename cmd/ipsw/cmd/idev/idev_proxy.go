@@ -41,6 +41,8 @@ func init() {
 
 	ProxyCmd.Flags().IntP("lport", "l", 0, "host port")
 	ProxyCmd.Flags().IntP("rport", "r", 0, "device port")
+	viper.BindPFlag("idev.proxy.lport", ProxyCmd.Flags().Lookup("lport"))
+	viper.BindPFlag("idev.proxy.rport", ProxyCmd.Flags().Lookup("rport"))
 }
 
 // ProxyCmd represents the proxy command
@@ -56,9 +58,9 @@ var ProxyCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		lport, _ := cmd.Flags().GetInt("lport")
-		rport, _ := cmd.Flags().GetInt("rport")
+		udid := viper.GetString("idev.udid")
+		lport := viper.GetInt("idev.proxy.lport")
+		rport := viper.GetInt("idev.proxy.rport")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

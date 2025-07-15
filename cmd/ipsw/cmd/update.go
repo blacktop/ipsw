@@ -37,6 +37,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -50,6 +51,12 @@ func init() {
 	updateCmd.Flags().StringP("api", "a", "", "Github API Token (incase you get rate limited)")
 
 	updateCmd.Flags().StringP("platform", "p", "", "ipsw platform binary to update")
+	viper.BindPFlag("update.proxy", updateCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("update.insecure", updateCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("update.detect", updateCmd.Flags().Lookup("detect"))
+	viper.BindPFlag("update.replace", updateCmd.Flags().Lookup("replace"))
+	viper.BindPFlag("update.api", updateCmd.Flags().Lookup("api"))
+	viper.BindPFlag("update.platform", updateCmd.Flags().Lookup("platform"))
 }
 
 // updateCmd represents the update command
@@ -73,14 +80,14 @@ var updateCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
+		proxy := viper.GetString("update.proxy")
+		insecure := viper.GetBool("update.insecure")
 		// confirm, _ := cmd.Flags().GetBool("yes")
-		replace, _ := cmd.Flags().GetBool("replace")
+		replace := viper.GetBool("update.replace")
 
-		platform, _ := cmd.Flags().GetString("platform")
-		detectPlatform, _ := cmd.Flags().GetBool("detect")
-		apiToken, _ := cmd.Flags().GetString("api")
+		platform := viper.GetString("update.platform")
+		detectPlatform := viper.GetBool("update.detect")
+		apiToken := viper.GetString("update.api")
 
 		if detectPlatform {
 			os := runtime.GOOS

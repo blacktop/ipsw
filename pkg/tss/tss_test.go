@@ -162,11 +162,11 @@ func TestApplyRestoreRequestRules(t *testing.T) {
 
 func TestGetApImg4Ticket(t *testing.T) {
 	tests := []struct {
-		name       string
-		payload    string
-		response   string
-		statusCode int
-		wantErr    bool
+		name        string
+		payload     string
+		response    string
+		statusCode  int
+		wantErr     bool
 		errContains string
 	}{
 		{
@@ -177,19 +177,19 @@ func TestGetApImg4Ticket(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:       "not signed response",
-			payload:    "<plist></plist>",
-			response:   "STATUS=94&MESSAGE=This device isn't eligible for the requested build.",
-			statusCode: 200,
-			wantErr:    true,
+			name:        "not signed response",
+			payload:     "<plist></plist>",
+			response:    "STATUS=94&MESSAGE=This device isn't eligible for the requested build.",
+			statusCode:  200,
+			wantErr:     true,
 			errContains: "not signed",
 		},
 		{
-			name:       "server error",
-			payload:    "<plist></plist>",
-			response:   "",
-			statusCode: 500,
-			wantErr:    true,
+			name:        "server error",
+			payload:     "<plist></plist>",
+			response:    "",
+			statusCode:  500,
+			wantErr:     true,
 			errContains: "failed to connect",
 		},
 	}
@@ -206,14 +206,14 @@ func TestGetApImg4Ticket(t *testing.T) {
 				w.Write([]byte(tt.response))
 			}))
 			defer server.Close()
-			
+
 			// Temporarily replace the TSS URL for testing
 			originalURL := tssControllerActionURL
-			defer func() { 
+			defer func() {
 				// This is a bit of a hack since tssControllerActionURL is a const
 				// In a real scenario, we'd make this configurable
 			}()
-			
+
 			// We can't easily test getApImg4Ticket directly due to the const URL
 			// This test mainly validates the logic structure
 			_ = originalURL
@@ -224,9 +224,9 @@ func TestGetApImg4Ticket(t *testing.T) {
 
 func TestPersonalize_InvalidInput(t *testing.T) {
 	tests := []struct {
-		name    string
-		conf    *PersonalConfig
-		wantErr bool
+		name        string
+		conf        *PersonalConfig
+		wantErr     bool
 		errContains string
 	}{
 		{
@@ -236,7 +236,7 @@ func TestPersonalize_InvalidInput(t *testing.T) {
 					"ApNonce": "invalid-hex",
 				},
 			},
-			wantErr: true,
+			wantErr:     true,
 			errContains: "failed to decode nonce",
 		},
 		{
@@ -250,7 +250,7 @@ func TestPersonalize_InvalidInput(t *testing.T) {
 				},
 				BuildManifest: nil,
 			},
-			wantErr: true,
+			wantErr:     true,
 			errContains: "nil pointer", // This will catch the panic scenario
 		},
 	}
@@ -263,7 +263,7 @@ func TestPersonalize_InvalidInput(t *testing.T) {
 					}
 				}
 			}()
-			
+
 			_, err := Personalize(tt.conf)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Personalize() error = %v, wantErr %v", err, tt.wantErr)
@@ -320,30 +320,30 @@ func TestRequest_Validation(t *testing.T) {
 
 func TestGetTSSResponse_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name    string
-		conf    *Config
-		wantErr bool
+		name        string
+		conf        *Config
+		wantErr     bool
 		errContains string
 	}{
 		{
 			name: "zero ECID",
 			conf: &Config{
-				Device:   "iPhone10,1",
-				Version:  "15.0",
-				Build:    "19A346",
-				ECID:     0,
+				Device:  "iPhone10,1",
+				Version: "15.0",
+				Build:   "19A346",
+				ECID:    0,
 			},
-			wantErr: true,
+			wantErr:     true,
 			errContains: "ECID must be provided",
 		},
 		{
 			name: "missing info",
 			conf: &Config{
-				Device:   "iPhone10,1",
-				Version:  "15.0",
-				Build:    "19A346",
-				ECID:     123456789,
-				Info:     nil,
+				Device:  "iPhone10,1",
+				Version: "15.0",
+				Build:   "19A346",
+				ECID:    123456789,
+				Info:    nil,
 			},
 			wantErr: true,
 		},
@@ -357,7 +357,7 @@ func TestGetTSSResponse_EdgeCases(t *testing.T) {
 					}
 				}
 			}()
-			
+
 			_, err := GetTSSResponse(tt.conf)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetTSSResponse() error = %v, wantErr %v", err, tt.wantErr)

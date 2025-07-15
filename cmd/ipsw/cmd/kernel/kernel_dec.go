@@ -38,6 +38,7 @@ func init() {
 	KernelcacheCmd.AddCommand(kernelDecCmd)
 	kernelDecCmd.Flags().StringP("output", "o", "", "Output file")
 	kernelDecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.dec.output", kernelDecCmd.Flags().Lookup("output"))
 }
 
 // kernelDecCmd represents the dec command
@@ -54,7 +55,7 @@ var kernelDecCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		outputDir, _ := cmd.Flags().GetString("output")
+		outputDir := viper.GetString("kernel.dec.output")
 
 		kcpath := filepath.Clean(args[0])
 

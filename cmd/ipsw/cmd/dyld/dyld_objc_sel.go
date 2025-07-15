@@ -37,6 +37,7 @@ import (
 func init() {
 	ObjcCmd.AddCommand(objcSelCmd)
 	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	viper.BindPFlag("dyld.objc.sel.image", objcSelCmd.Flags().Lookup("image"))
 }
 
 // objcSelCmd represents the sel command
@@ -56,7 +57,7 @@ var objcSelCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		imageName, _ := cmd.Flags().GetString("image")
+		imageName := viper.GetString("dyld.objc.sel.image")
 
 		dscPath := filepath.Clean(args[0])
 

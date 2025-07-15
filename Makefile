@@ -199,6 +199,14 @@ docker-test: ## Run docker test
 	@echo " > Testing Docker Image"
 	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(NEXT_VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
 
+.PHONY: fmt
+fmt: ## Format code
+	@echo " > Formatting code"
+	@gofmt -w -r 'interface{} -> any' .
+	@goimports -w .
+	@gofmt -w -s .
+	@go mod tidy
+
 clean: ## Clean up artifacts
 	@echo " > Cleaning"
 	rm *.tar || true

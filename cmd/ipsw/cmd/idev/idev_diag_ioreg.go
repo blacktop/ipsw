@@ -38,6 +38,9 @@ func init() {
 	idevDiagIOregCmd.Flags().StringP("plane", "p", "", "Current Plane")
 	idevDiagIOregCmd.Flags().StringP("name", "n", "", "Entry Name")
 	idevDiagIOregCmd.Flags().StringP("class", "c", "", "Entry Class")
+	viper.BindPFlag("idev.diag.ioreg.plane", idevDiagIOregCmd.Flags().Lookup("plane"))
+	viper.BindPFlag("idev.diag.ioreg.name", idevDiagIOregCmd.Flags().Lookup("name"))
+	viper.BindPFlag("idev.diag.ioreg.class", idevDiagIOregCmd.Flags().Lookup("class"))
 }
 
 // idevDiagIOregCmd represents the ioreg command
@@ -53,10 +56,10 @@ var idevDiagIOregCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		plane, _ := cmd.Flags().GetString("plane")
-		name, _ := cmd.Flags().GetString("name")
-		class, _ := cmd.Flags().GetString("class")
+		udid := viper.GetString("idev.udid")
+		plane := viper.GetString("idev.diag.ioreg.plane")
+		name := viper.GetString("idev.diag.ioreg.name")
+		class := viper.GetString("idev.diag.ioreg.class")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

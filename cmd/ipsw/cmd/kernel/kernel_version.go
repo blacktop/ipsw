@@ -42,6 +42,8 @@ func init() {
 	// kernelVersionCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// 	return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	// }
+	viper.BindPFlag("kernel.version.json", kernelVersionCmd.Flags().Lookup("json"))
+	viper.BindPFlag("kernel.version.arch", kernelVersionCmd.Flags().Lookup("arch"))
 }
 
 // kernelVersionCmd represents the version command
@@ -59,8 +61,8 @@ var kernelVersionCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		asJSON, _ := cmd.Flags().GetBool("json")
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		asJSON := viper.GetBool("kernel.version.json")
+		selectedArch := viper.GetString("kernel.version.arch")
 
 		machoPath := filepath.Clean(args[0])
 

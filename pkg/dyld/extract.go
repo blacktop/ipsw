@@ -202,7 +202,7 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 			return nil, fmt.Errorf("failed to create temporary directory: %v", err)
 		}
 		defer os.RemoveAll(tmpDIR)
-		
+
 		dmgs, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})

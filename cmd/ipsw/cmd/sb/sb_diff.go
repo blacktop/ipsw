@@ -51,6 +51,7 @@ func init() {
 	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
+	viper.BindPFlag("sb.diff.pem-db", sbDiffCmd.Flags().Lookup("pem-db"))
 }
 
 // sbDiffCmd represents the diff command
@@ -69,7 +70,7 @@ var sbDiffCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		pemDB := viper.GetString("sb.diff.pem-db")
 
 		var sbDBs []map[string]string
 

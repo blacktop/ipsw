@@ -37,6 +37,7 @@ func init() {
 	ProvCmd.AddCommand(provLsCmd)
 
 	provLsCmd.Flags().BoolP("json", "j", false, "Display profiles as JSON")
+	viper.BindPFlag("idev.prov.ls.json", provLsCmd.Flags().Lookup("json"))
 }
 
 // provLsCmd represents the ls command
@@ -52,8 +53,8 @@ var provLsCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.prov.ls.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

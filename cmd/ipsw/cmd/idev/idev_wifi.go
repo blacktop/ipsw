@@ -37,6 +37,8 @@ func init() {
 
 	wifiCmd.Flags().Bool("on", false, "Turn WiFi on")
 	wifiCmd.Flags().Bool("off", false, "Turn WiFi off")
+	viper.BindPFlag("idev.wifi.on", wifiCmd.Flags().Lookup("on"))
+	viper.BindPFlag("idev.wifi.off", wifiCmd.Flags().Lookup("off"))
 }
 
 // wifiCmd represents the wifi command
@@ -53,9 +55,9 @@ var wifiCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		udid, _ := cmd.Flags().GetString("udid")
-		turnON, _ := cmd.Flags().GetBool("on")
-		turnOFF, _ := cmd.Flags().GetBool("off")
+		udid := viper.GetString("idev.udid")
+		turnON := viper.GetBool("idev.wifi.on")
+		turnOFF := viper.GetBool("idev.wifi.off")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

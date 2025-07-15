@@ -30,19 +30,19 @@ import (
 
 // BenchmarkResult holds the results of a benchmark run
 type BenchmarkResult struct {
-	Name          string
-	Duration      time.Duration
-	MemAllocated  uint64
-	MemDelta      int64
-	TotalAlloc    uint64
-	GCRuns        uint32
-	Goroutines    int
-	Error         error
+	Name         string
+	Duration     time.Duration
+	MemAllocated uint64
+	MemDelta     int64
+	TotalAlloc   uint64
+	GCRuns       uint32
+	Goroutines   int
+	Error        error
 }
 
 // Benchmark represents a benchmark test
 type Benchmark struct {
-	name     string
+	name      string
 	startTime time.Time
 	startMem  runtime.MemStats
 	endMem    runtime.MemStats
@@ -66,15 +66,15 @@ func (b *Benchmark) Start() {
 func (b *Benchmark) Stop() BenchmarkResult {
 	duration := time.Since(b.startTime)
 	runtime.ReadMemStats(&b.endMem)
-	
+
 	return BenchmarkResult{
-		Name:          b.name,
-		Duration:      duration,
-		MemAllocated:  b.endMem.Alloc,
-		MemDelta:      int64(b.endMem.Alloc) - int64(b.startMem.Alloc),
-		TotalAlloc:    b.endMem.TotalAlloc - b.startMem.TotalAlloc,
-		GCRuns:        b.endMem.NumGC - b.startMem.NumGC,
-		Goroutines:    runtime.NumGoroutine(),
+		Name:         b.name,
+		Duration:     duration,
+		MemAllocated: b.endMem.Alloc,
+		MemDelta:     int64(b.endMem.Alloc) - int64(b.startMem.Alloc),
+		TotalAlloc:   b.endMem.TotalAlloc - b.startMem.TotalAlloc,
+		GCRuns:       b.endMem.NumGC - b.startMem.NumGC,
+		Goroutines:   runtime.NumGoroutine(),
 	}
 }
 
@@ -115,37 +115,37 @@ func (bs *BenchmarkSuite) PrintSummary() {
 	if len(bs.results) == 0 {
 		return
 	}
-	
+
 	fmt.Printf("\n=== Benchmark Suite Summary ===\n")
 	fmt.Printf("%-30s %-12s %-12s %-12s %-8s\n", "Name", "Duration", "Memory", "GC Runs", "Status")
 	fmt.Printf("%-30s %-12s %-12s %-12s %-8s\n", "----", "--------", "------", "-------", "------")
-	
+
 	var totalDuration time.Duration
 	var totalMem uint64
 	var totalGC uint32
-	
+
 	for _, result := range bs.results {
 		status := "OK"
 		if result.Error != nil {
 			status = "ERROR"
 		}
-		
-		fmt.Printf("%-30s %-12v %-12s %-12d %-8s\n", 
-			result.Name, 
-			result.Duration, 
+
+		fmt.Printf("%-30s %-12v %-12s %-12d %-8s\n",
+			result.Name,
+			result.Duration,
 			fmt.Sprintf("%.1fMB", float64(result.TotalAlloc)/1024/1024),
 			result.GCRuns,
 			status)
-		
+
 		totalDuration += result.Duration
 		totalMem += result.TotalAlloc
 		totalGC += result.GCRuns
 	}
-	
+
 	fmt.Printf("%-30s %-12s %-12s %-12s %-8s\n", "----", "--------", "------", "-------", "------")
-	fmt.Printf("%-30s %-12v %-12s %-12d %-8s\n", 
-		"TOTAL", 
-		totalDuration, 
+	fmt.Printf("%-30s %-12v %-12s %-12d %-8s\n",
+		"TOTAL",
+		totalDuration,
 		fmt.Sprintf("%.1fMB", float64(totalMem)/1024/1024),
 		totalGC,
 		"")
@@ -158,10 +158,10 @@ func (bs *BenchmarkSuite) SaveToFile(filename string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	fmt.Fprintf(file, "# Benchmark Results\n")
 	fmt.Fprintf(file, "Generated: %s\n\n", time.Now().Format(time.RFC3339))
-	
+
 	for _, result := range bs.results {
 		fmt.Fprintf(file, "## %s\n", result.Name)
 		fmt.Fprintf(file, "- Duration: %v\n", result.Duration)
@@ -175,7 +175,7 @@ func (bs *BenchmarkSuite) SaveToFile(filename string) error {
 		}
 		fmt.Fprintf(file, "\n")
 	}
-	
+
 	return nil
 }
 
@@ -183,11 +183,11 @@ func (bs *BenchmarkSuite) SaveToFile(filename string) error {
 func BenchmarkFunc(name string, fn func() error) BenchmarkResult {
 	b := NewBenchmark(name)
 	b.Start()
-	
+
 	err := fn()
-	
+
 	result := b.Stop()
 	result.Error = err
-	
+
 	return result
 }

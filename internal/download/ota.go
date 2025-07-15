@@ -160,7 +160,7 @@ func (a AssetAudienceIDs) GetVersions(platform string) []string {
 
 func (a AssetAudienceIDs) LatestVersion(platform string) string {
 	var versions []int
-	for version, _ := range a[platform].Versions {
+	for version := range a[platform].Versions {
 		i, err := strconv.Atoi(version)
 		if err != nil {
 			continue
@@ -383,7 +383,7 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 			} else {
 				// looup major version in DB
 				var assetAudiences []string
-				
+
 				if o.Config.Beta {
 					// For beta, only include beta audiences
 					if v, ok := assetAudienceDB[o.Config.Platform].Versions[fmt.Sprintf("%d.%d", segs[0], segs[1])]; ok {

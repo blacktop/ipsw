@@ -210,7 +210,7 @@ type CachedFWKeys map[string]CachedFWKey
 
 // FirmwareKeysCache represents the cache file structure
 type FirmwareKeysCache struct {
-	CachedAt time.Time                     `json:"cached_at"`
+	CachedAt time.Time                         `json:"cached_at"`
 	Entries  map[string]FirmwareKeysCacheEntry `json:"entries"`
 }
 
@@ -327,7 +327,6 @@ func saveCache(cache *FirmwareKeysCache) error {
 func getCacheKey(device, build string) string {
 	return fmt.Sprintf("%s_%s", device, build)
 }
-
 
 // convertWikiKeysToCache converts WikiFWKeys to CachedFWKeys
 func convertWikiKeysToCache(wikiKeys WikiFWKeys) CachedFWKeys {

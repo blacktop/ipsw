@@ -41,6 +41,9 @@ func init() {
 	syscallCmd.Flags().StringP("output", "o", "", "Output gzip file")
 	syscallCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	syscallCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.syscall.gen", syscallCmd.Flags().Lookup("gen"))
+	viper.BindPFlag("kernel.syscall.output", syscallCmd.Flags().Lookup("output"))
+	viper.BindPFlag("kernel.syscall.arch", syscallCmd.Flags().Lookup("arch"))
 }
 
 // syscallCmd represents the syscall command
@@ -58,9 +61,9 @@ var syscallCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		gen, _ := cmd.Flags().GetBool("gen")
-		output, _ := cmd.Flags().GetString("output")
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		gen := viper.GetBool("kernel.syscall.gen")
+		output := viper.GetString("kernel.syscall.output")
+		selectedArch := viper.GetString("kernel.syscall.arch")
 
 		if gen {
 			return kernelcache.ParseSyscallFiles(output)

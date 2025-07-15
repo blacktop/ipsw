@@ -114,7 +114,7 @@ func TestPayloadCreation(t *testing.T) {
 
 			// Verify keybags (may not be implemented in CreatePayload yet)
 			if len(tt.config.Keybags) > 0 {
-				t.Logf("Input keybags: %d, Output keybags: %d, Encrypted: %t", 
+				t.Logf("Input keybags: %d, Output keybags: %d, Encrypted: %t",
 					len(tt.config.Keybags), len(payload.Keybags), payload.Encrypted)
 				// Note: Keybag support may not be fully implemented in CreatePayload
 				// This is a placeholder for when keybag creation is added
@@ -202,7 +202,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 					t.Fatalf("Decompress() error = %v", err)
 				}
 				if !bytes.Equal(decompressed, tt.config.Data) {
-					t.Errorf("Decompressed data doesn't match original (got %d bytes, want %d bytes)", 
+					t.Errorf("Decompressed data doesn't match original (got %d bytes, want %d bytes)",
 						len(decompressed), len(tt.config.Data))
 				}
 
@@ -222,14 +222,14 @@ func TestPayloadRoundtrip(t *testing.T) {
 				if err != nil {
 					t.Fatalf("GetData() error for uncompressed data = %v", err)
 				}
-				
+
 				// For uncompressed data, GetData() should return the original data without extra data
 				// Extra data is handled separately
 				if !bytes.Equal(data, tt.config.Data) {
-					t.Errorf("Uncompressed data doesn't match original (got %d bytes, want %d bytes)", 
+					t.Errorf("Uncompressed data doesn't match original (got %d bytes, want %d bytes)",
 						len(data), len(tt.config.Data))
 				}
-				
+
 				// Test extra data if provided
 				if len(tt.config.ExtraData) > 0 {
 					if !parsed.HasExtraData() {
@@ -248,7 +248,7 @@ func TestPayloadRoundtrip(t *testing.T) {
 // TestPayloadWithRealData tests with real test files if available (CI-friendly)
 func TestPayloadWithRealData(t *testing.T) {
 	testDataDir := "../../test-caches/TEST/22L572__AppleTV5,3"
-	
+
 	// Check if test data exists (fail quietly for CI)
 	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
 		t.Skip("Test data not available, skipping real data test")
@@ -378,4 +378,3 @@ func generateTestData(size int) []byte {
 	}
 	return data
 }
-

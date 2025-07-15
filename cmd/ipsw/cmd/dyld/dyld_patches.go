@@ -41,6 +41,8 @@ func init() {
 	DyldCmd.AddCommand(PatchesCmd)
 	PatchesCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	PatchesCmd.Flags().StringP("sym", "s", "", "dylib image symbol to dump patches for")
+	viper.BindPFlag("dyld.patches.image", PatchesCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.patches.sym", PatchesCmd.Flags().Lookup("sym"))
 }
 
 // PatchesCmd represents the patches command
@@ -60,8 +62,8 @@ var PatchesCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		imageName, _ := cmd.Flags().GetString("image")
-		symbolName, _ := cmd.Flags().GetString("sym")
+		imageName := viper.GetString("dyld.patches.image")
+		symbolName := viper.GetString("dyld.patches.sym")
 
 		dscPath := filepath.Clean(args[0])
 
