@@ -45,7 +45,7 @@ func init() {
 var idevAmfiDevModeCmd = &cobra.Command{
 	Use:           "dev",
 	Aliases:       []string{"d", "developer", "developer-mode"},
-	Short:         "Enabled Developer Mode on device",
+	Short:         "Enable Developer Mode on device",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

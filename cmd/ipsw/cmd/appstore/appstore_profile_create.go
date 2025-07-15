@@ -73,11 +73,6 @@ var ASProfileCreateCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
-		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		bid := viper.GetString("appstore.profile.create.bundle-id")
 		certs := viper.GetStringSlice("appstore.profile.create.certs")

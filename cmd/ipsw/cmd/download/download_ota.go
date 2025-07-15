@@ -93,7 +93,7 @@ func init() {
 	})
 	downloadOtaCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	downloadOtaCmd.Flags().String("pattern", "", "Download remote files that match regex")
-	downloadOtaCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadOtaCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	downloadOtaCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	downloadOtaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadOtaCmd.MarkFlagDirname("output")

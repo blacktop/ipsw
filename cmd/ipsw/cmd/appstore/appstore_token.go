@@ -47,10 +47,7 @@ var ASTokenCmd = &cobra.Command{
 		color.NoColor = viper.GetBool("no-color")
 		// flags
 		lifetime := viper.GetDuration("appstore.token.lifetime")
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
+
 		// Validate flags
 		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
 			return fmt.Errorf("you must provide --p8, --iss and --kid")

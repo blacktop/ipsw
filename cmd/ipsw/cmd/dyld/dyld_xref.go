@@ -193,7 +193,7 @@ var XrefCmd = &cobra.Command{
 				engine := dyld.NewDyldDisass(f, &disass.Config{
 					Data:         data,
 					StartAddress: fn.StartAddr,
-					Quite:        true,
+					Quiet:        true,
 				})
 
 				if err := engine.Triage(); err != nil {

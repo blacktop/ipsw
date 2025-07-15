@@ -30,7 +30,7 @@ func (d DyldDisass) Demangle() bool {
 	return d.cfg.Demangle
 }
 func (d DyldDisass) Quite() bool {
-	return d.cfg.Quite
+	return d.cfg.Quiet
 }
 func (d DyldDisass) Color() bool {
 	return d.cfg.Color

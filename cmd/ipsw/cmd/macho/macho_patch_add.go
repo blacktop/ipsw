@@ -62,7 +62,7 @@ var supportedAddLCs = []string{
 func init() {
 	machoPatchCmd.AddCommand(machoPatchAddCmd)
 	machoPatchAddCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
-	machoPatchAddCmd.Flags().BoolP("re-sign", "s", false, "Adhoc sign file")
+	machoPatchAddCmd.Flags().BoolP("re-sign", "s", false, "Ad-hoc sign file")
 	machoPatchAddCmd.Flags().StringP("output", "o", "", "Output new file")
 	viper.BindPFlag("macho.patch.add.overwrite", machoPatchAddCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.patch.add.re-sign", machoPatchAddCmd.Flags().Lookup("re-sign"))

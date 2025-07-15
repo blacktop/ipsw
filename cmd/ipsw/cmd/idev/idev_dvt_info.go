@@ -30,7 +30,7 @@ import (
 // dvtInfoCmd represents the info command
 var dvtInfoCmd = &cobra.Command{
 	Use:   "info",
-	Short: "A brief description of your command",
+	Short: "Get DVT info",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

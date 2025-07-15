@@ -62,7 +62,7 @@ var supportedRmLCs = []string{
 func init() {
 	machoPatchCmd.AddCommand(machoPatchRmCmd)
 	machoPatchRmCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
-	machoPatchRmCmd.Flags().BoolP("re-sign", "s", false, "Adhoc sign file")
+	machoPatchRmCmd.Flags().BoolP("re-sign", "s", false, "Ad-hoc sign file")
 	machoPatchRmCmd.Flags().StringP("output", "o", "", "Output new file")
 	viper.BindPFlag("macho.patch.rm.overwrite", machoPatchRmCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.patch.rm.re-sign", machoPatchRmCmd.Flags().Lookup("re-sign"))

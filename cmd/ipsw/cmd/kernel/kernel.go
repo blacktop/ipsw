@@ -23,7 +23,6 @@ package kernel
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // KernelcacheCmd represents the kernelcache command
@@ -32,12 +31,6 @@ var KernelcacheCmd = &cobra.Command{
 	Aliases: []string{"k"},
 	Short:   "Parse kernelcache",
 	Args:    cobra.NoArgs,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
-		viper.BindPFlag("no-color", cmd.Flags().Lookup("no-color"))
-		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
-		viper.BindPFlag("diff-tool", cmd.Flags().Lookup("diff-tool"))
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

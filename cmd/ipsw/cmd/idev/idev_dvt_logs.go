@@ -30,7 +30,7 @@ import (
 // dvtLogsCmd represents the logs command
 var dvtLogsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "A brief description of your command",
+	Short: "Get DVT logs",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

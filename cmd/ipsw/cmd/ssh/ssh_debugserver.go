@@ -50,7 +50,7 @@ func init() {
 var sshDebugserverCmd = &cobra.Command{
 	Use:           "debugserver",
 	Aliases:       []string{"ds"},
-	Short:         "Prep device for remote debugging",
+	Short:         "Prepare device for remote debugging",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

@@ -245,7 +245,7 @@ var machoDisassCmd = &cobra.Command{
 							Middle:       0,
 							AsJSON:       asJSON,
 							Demangle:     demangleFlag,
-							Quite:        quiet,
+							Quiet:        quiet,
 							Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 						})
 
@@ -371,7 +371,7 @@ var machoDisassCmd = &cobra.Command{
 						Middle:       middleAddr,
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
-						Quite:        quiet,
+						Quiet:        quiet,
 						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
