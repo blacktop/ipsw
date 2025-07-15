@@ -30,7 +30,7 @@ import (
 // dvtPsCmd represents the ps command
 var dvtPsCmd = &cobra.Command{
 	Use:   "ps",
-	Short: "A brief description of your command",
+	Short: "Process list",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

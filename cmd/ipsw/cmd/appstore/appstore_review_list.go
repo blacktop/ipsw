@@ -61,11 +61,6 @@ var ASReviewListCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
-		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		id := viper.GetString("appstore.review-list.id")
 		after := viper.GetString("appstore.review-list.after")

@@ -30,7 +30,7 @@ import (
 // backupRestoreCmd represents the restore command
 var backupRestoreCmd = &cobra.Command{
 	Use:   "restore",
-	Short: "A brief description of your command",
+	Short: "Restore a backup",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

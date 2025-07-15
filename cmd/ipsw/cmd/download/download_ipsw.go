@@ -79,7 +79,7 @@ func init() {
 	downloadIpswCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	downloadIpswCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	downloadIpswCmd.Flags().Bool("decrypt", false, "Attempt to decrypt the partial files if keys are available")
-	downloadIpswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadIpswCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	downloadIpswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadIpswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	downloadIpswCmd.Flags().StringP("output", "o", "", "Folder to download files to")

@@ -30,7 +30,7 @@ import (
 // dvtLsCmd represents the ls command
 var dvtLsCmd = &cobra.Command{
 	Use:   "ls",
-	Short: "A brief description of your command",
+	Short: "List DVT services",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

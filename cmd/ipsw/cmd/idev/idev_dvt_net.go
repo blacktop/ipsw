@@ -30,7 +30,7 @@ import (
 // dvtNetCmd represents the net command
 var dvtNetCmd = &cobra.Command{
 	Use:   "net",
-	Short: "A brief description of your command",
+	Short: "Network related commands",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

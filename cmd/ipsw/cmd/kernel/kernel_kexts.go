@@ -49,7 +49,7 @@ func init() {
 var kextsCmd = &cobra.Command{
 	Use:           "kexts <kernelcache>",
 	Aliases:       []string{"k"},
-	Short:         "List kernel extentions",
+	Short:         "List kernel extensions",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

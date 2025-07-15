@@ -30,7 +30,7 @@ import (
 // backupLsCmd represents the ls command
 var backupLsCmd = &cobra.Command{
 	Use:   "ls",
-	Short: "A brief description of your command",
+	Short: "List backups",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

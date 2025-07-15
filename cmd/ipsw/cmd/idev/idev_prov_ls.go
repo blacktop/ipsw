@@ -42,7 +42,7 @@ func init() {
 // provLsCmd represents the ls command
 var provLsCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List installed provision profiles",
+	Short:         "List installed provisioning profiles",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

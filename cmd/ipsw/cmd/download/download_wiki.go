@@ -72,7 +72,7 @@ func init() {
 	downloadWikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadWikiCmd.MarkFlagDirname("output")
 	downloadWikiCmd.Flags().String("db", "wiki_db.json", "Path to local JSON database (will use CWD by default)")
-	downloadWikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadWikiCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	// Bind persistent flags
 	viper.BindPFlag("download.wiki.proxy", downloadWikiCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.wiki.insecure", downloadWikiCmd.Flags().Lookup("insecure"))

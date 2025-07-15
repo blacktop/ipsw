@@ -39,7 +39,7 @@ func init() {
 // provClearCmd represents the clear command
 var provClearCmd = &cobra.Command{
 	Use:           "clear",
-	Short:         "Remove all provision profiles",
+	Short:         "Remove all provisioning profiles",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
