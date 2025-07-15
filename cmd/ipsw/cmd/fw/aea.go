@@ -74,11 +74,6 @@ var aeaCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var pemData []byte
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
 		fcsKey := viper.GetBool("fw.aea.fcs-key")
 		adKey := viper.GetBool("fw.aea.key")

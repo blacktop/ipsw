@@ -62,11 +62,6 @@ var dyldEmuCmd = &cobra.Command{
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// Flags
 		symbolName := viper.GetString("dyld.emu.sym")
 		startAddr := viper.GetUint64("dyld.emu.addr")

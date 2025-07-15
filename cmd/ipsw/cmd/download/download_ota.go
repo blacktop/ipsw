@@ -160,11 +160,6 @@ var downloadOtaCmd = &cobra.Command{
 		var err error
 		var ver *semver.Version
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// settings
 		proxy := viper.GetString("download.ota.proxy")
 		insecure := viper.GetBool("download.ota.insecure")

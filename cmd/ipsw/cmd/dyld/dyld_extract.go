@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -131,11 +130,6 @@ var dyldExtractCmd = &cobra.Command{
 		var bar *mpb.Bar
 		var p *mpb.Progress
 		var images []*dyld.CacheImage
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		dumpALL := viper.GetBool("dyld.extract.all")

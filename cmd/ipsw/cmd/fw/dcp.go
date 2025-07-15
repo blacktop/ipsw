@@ -65,10 +65,6 @@ var dcpCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		showInfo := viper.GetBool("fw.dcp.info")
 		output := viper.GetString("fw.dcp.output")

@@ -158,11 +158,6 @@ var machoInfoCmd = &cobra.Command{
 		var err error
 		var m *macho.File
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
 		verbose := viper.GetBool("verbose")
 		color := viper.GetBool("color") && !viper.GetBool("no-color")
@@ -735,7 +730,6 @@ var machoInfoCmd = &cobra.Command{
 			}
 			if m.HasObjC() {
 				o, err := mcmd.NewObjC(m, nil, &mcmd.ObjcConfig{
-					Verbose:  viper.GetBool("verbose"),
 					Addrs:    true,
 					ObjcRefs: showObjcRefs,
 					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),

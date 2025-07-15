@@ -59,10 +59,6 @@ var img3ExtractCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		outputFile := viper.GetString("output")
 		ivKeyStr := viper.GetString("iv-key")

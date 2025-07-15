@@ -64,10 +64,6 @@ var aopCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		showInfo := viper.GetBool("fw.aop.info")
 		output := viper.GetString("fw.aop.output")
 		infile := filepath.Clean(args[0])

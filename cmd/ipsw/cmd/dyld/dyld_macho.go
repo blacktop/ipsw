@@ -36,7 +36,6 @@ import (
 	"github.com/blacktop/ipsw/internal/demangle"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -88,11 +87,6 @@ var MachoCmd = &cobra.Command{
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		verbose := viper.GetBool("verbose")

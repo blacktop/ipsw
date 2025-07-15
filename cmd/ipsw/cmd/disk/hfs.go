@@ -57,10 +57,6 @@ var diskHfsCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		pattern := viper.GetString("disk.hfs.pattern")
 		flat := viper.GetBool("disk.hfs.flat")

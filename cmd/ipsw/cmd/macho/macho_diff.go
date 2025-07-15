@@ -22,10 +22,7 @@ THE SOFTWARE.
 package macho
 
 import (
-	"github.com/apex/log"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -51,11 +48,6 @@ var machoDiffCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// FIXME: implement
 		panic("ipsw macho diff - not implemented yet")

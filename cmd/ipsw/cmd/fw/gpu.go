@@ -57,10 +57,6 @@ var gpuCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		infile := filepath.Clean(args[0])
 
 		dowork := func(ftab *ftab.Ftab, output string) error {

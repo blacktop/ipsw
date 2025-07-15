@@ -30,7 +30,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -55,11 +54,6 @@ var lipoCmd = &cobra.Command{
 
 		var err error
 		var farch macho.FatArch
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		selectedArch := viper.GetString("macho.lipo.arch")

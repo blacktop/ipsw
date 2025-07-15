@@ -63,10 +63,6 @@ var camCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		showInfo := viper.GetBool("fw.cam.info")
 		output := viper.GetString("fw.cam.output")

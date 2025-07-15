@@ -34,7 +34,6 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -98,11 +97,6 @@ var kernelIdaCmd = &cobra.Command{
 		var fileType string
 		var dbFile string
 		var env []string
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		scriptFile := viper.GetString("kernel.ida.script")

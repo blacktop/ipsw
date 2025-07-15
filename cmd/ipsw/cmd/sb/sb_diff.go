@@ -65,11 +65,6 @@ var sbDiffCmd = &cobra.Command{
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		pemDB := viper.GetString("sb.diff.pem-db")
 
 		var sbDBs []map[string]string

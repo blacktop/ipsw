@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/amfi"
 	"github.com/blacktop/ipsw/pkg/usb/heartbeat"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,10 +51,6 @@ var idevAmfiDevModeCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 		// flags
 		udid := viper.GetString("idev.udid")
 		postRestart := viper.GetBool("idev.amfi.dev.post")

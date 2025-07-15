@@ -39,7 +39,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -124,11 +123,6 @@ var machoDisassCmd = &cobra.Command{
 		var ms []*macho.File
 		var middleAddr uint64
 		var engine *disass.MachoDisass
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		selectedArch := viper.GetString("macho.disass.arch")

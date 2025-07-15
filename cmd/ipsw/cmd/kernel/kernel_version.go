@@ -26,10 +26,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -55,11 +53,6 @@ var kernelVersionCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		asJSON := viper.GetBool("kernel.version.json")
 		selectedArch := viper.GetString("kernel.version.arch")

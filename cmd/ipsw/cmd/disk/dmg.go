@@ -62,11 +62,6 @@ var dmgCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		pattern := viper.GetString("dmg.re")
 		partition := viper.GetInt("dmg.partition")

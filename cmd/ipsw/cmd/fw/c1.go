@@ -62,10 +62,6 @@ var c1Cmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		// flags
 		info := viper.GetBool("fw.c1.info")
 		output := viper.GetString("fw.c1.output")
