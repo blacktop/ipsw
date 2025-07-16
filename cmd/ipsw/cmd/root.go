@@ -123,6 +123,84 @@ func init() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 
+// expandPath expands tilde (~) and relative (./) paths
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path // return original path if we can't get home dir
+		}
+		return filepath.Join(home, path[2:])
+	}
+
+	if path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return home
+	}
+
+	if strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return path // return original if we can't resolve
+		}
+		return abs
+	}
+
+	return path
+}
+
+// expandConfigPaths expands relative and tilde paths in all config values
+func expandConfigPaths() {
+	allSettings := viper.AllSettings()
+	expandSettings(allSettings, "")
+
+	// Merge the expanded settings back into viper
+	for key, value := range allSettings {
+		viper.Set(key, value)
+	}
+}
+
+// expandSettings recursively processes all configuration values and expands relative paths
+func expandSettings(settings map[string]any, prefix string) {
+	for key, value := range settings {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		switch v := value.(type) {
+		case string:
+			if needsExpansion(v) {
+				expanded := expandPath(v)
+				if expanded != v {
+					log.Warnf("Expanded config path %s: %s → %s (use full paths to avoid warnings)", fullKey, v, expanded)
+				}
+				settings[key] = expanded
+			}
+		case map[string]any:
+			expandSettings(v, fullKey)
+		case []any:
+			for i, item := range v {
+				if str, ok := item.(string); ok && needsExpansion(str) {
+					expanded := expandPath(str)
+					if expanded != str {
+						log.Warnf("Expanded config path %s[%d]: %s → %s (use full paths to avoid warnings)", fullKey, i, str, expanded)
+					}
+					v[i] = expanded
+				}
+			}
+		}
+	}
+}
+
+// needsExpansion checks if a string looks like a relative path that should be expanded
+func needsExpansion(s string) bool {
+	return strings.HasPrefix(s, "~/") || s == "~" || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../")
+}
+
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
@@ -148,5 +226,8 @@ func initConfig() {
 		if !viper.GetBool("config-quiet") {
 			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 		}
+
+		// Expand tilde paths in the loaded configuration
+		expandConfigPaths()
 	}
 }

@@ -44,13 +44,13 @@ func init() {
 	SymAddrCmd.Flags().BoolP("binds", "b", false, "Also search LC_DYLD_INFO binds")
 	SymAddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	SymAddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
-	SymAddrCmd.Flags().String("out", "", "Path to output JSON file")
+	SymAddrCmd.Flags().StringP("output", "o", "", "Path to output JSON file")
 	// SymAddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	viper.BindPFlag("dyld.symaddr.all", SymAddrCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.symaddr.binds", SymAddrCmd.Flags().Lookup("binds"))
 	viper.BindPFlag("dyld.symaddr.image", SymAddrCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.symaddr.in", SymAddrCmd.Flags().Lookup("in"))
-	viper.BindPFlag("dyld.symaddr.out", SymAddrCmd.Flags().Lookup("out"))
+	viper.BindPFlag("dyld.symaddr.output", SymAddrCmd.Flags().Lookup("output"))
 }
 
 // SymAddrCmd represents the symaddr command
@@ -73,7 +73,7 @@ var SymAddrCmd = &cobra.Command{
 
 		imageName := viper.GetString("dyld.symaddr.image")
 		symbolFile := viper.GetString("dyld.symaddr.in")
-		jsonFile := viper.GetString("dyld.symaddr.out")
+		jsonFile := viper.GetString("dyld.symaddr.output")
 		allMatches := viper.GetBool("dyld.symaddr.all")
 		showBinds := viper.GetBool("dyld.symaddr.binds")
 
