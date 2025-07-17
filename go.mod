@@ -60,7 +60,7 @@ require (
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/ollama/ollama v0.9.6
-	github.com/openai/openai-go v1.10.1
+	github.com/openai/openai-go v1.11.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.4.0
