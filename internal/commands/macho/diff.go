@@ -25,6 +25,11 @@ type DiffConfig struct {
 	PemDB      string
 	SymMap     map[string]signature.SymbolMap
 	Verbose    bool
+	// Function matching tuning parameters
+	FuncMatchNameWeight     float64 // Weight for name matching (default 0.5)
+	FuncMatchSizeWeight     float64 // Weight for size matching (default 0.3)
+	FuncMatchPositionWeight float64 // Weight for position proximity (default 0.2)
+	FuncMatchMinConfidence  float64 // Minimum confidence to consider a match (default 0.3)
 }
 
 type MachoDiff struct {
@@ -229,142 +234,86 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 
 			/* DIFF Functions */
 			if conf.FuncStarts {
-				// Helper for printable name
-				printable := func(f types.Function, smap map[uint64]string) string {
-					sym, ok := smap[f.StartAddr]
-					if ok {
-						return sym
-					}
-					return fmt.Sprintf("sub_%x", f.StartAddr)
-				}
-
 				funcs1 := dat1.Starts
 				funcs2 := dat2.Starts
 
-				n1, n2 := len(funcs1), len(funcs2)
+				// Use the new function matcher
+				matcher := NewFunctionMatcher(dat1.SymbolMap, dat2.SymbolMap)
+
+				// Apply custom tuning if specified
+				if conf.FuncMatchNameWeight > 0 {
+					matcher.NameWeight = conf.FuncMatchNameWeight
+				}
+				if conf.FuncMatchSizeWeight > 0 {
+					matcher.SizeWeight = conf.FuncMatchSizeWeight
+				}
+				if conf.FuncMatchPositionWeight > 0 {
+					matcher.PositionWeight = conf.FuncMatchPositionWeight
+				}
+				if conf.FuncMatchMinConfidence > 0 {
+					matcher.MinConfidence = conf.FuncMatchMinConfidence
+				}
+				_, deltas := matcher.alignFunctions(funcs1, funcs2)
 
 				var b strings.Builder
-				appendLine := func(s string) {
-					if b.Len() == 0 {
-						b.WriteString("Functions:\n")
+
+				// Group deltas by type for cleaner output
+				var additions, removals, modifications []FunctionDelta
+				for _, delta := range deltas {
+					switch delta.Type {
+					case "add":
+						additions = append(additions, delta)
+					case "remove":
+						removals = append(removals, delta)
+					case "modify":
+						modifications = append(modifications, delta)
 					}
-					b.WriteString(s)
 				}
 
-				// same count
-				if n1 == n2 {
-					consecutiveMismatch := 0
-					const maxMismatch = 5
-
-					for i := range n1 {
-						f1 := funcs1[i]
-						f2 := funcs2[i]
-						f1.Name = printable(f1, dat1.SymbolMap)
-						f2.Name = printable(f2, dat2.SymbolMap)
-
-						if f1.Name != "" && f1.Name == f2.Name {
-							// same symbol – only record if size changed
-							sz1 := f1.EndAddr - f1.StartAddr
-							sz2 := f2.EndAddr - f2.StartAddr
-							if sz1 != sz2 {
-								appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
-							}
-							consecutiveMismatch = 0
-							continue
-						}
-
-						// unnamed or different names – compare size
-						sz1 := f1.EndAddr - f1.StartAddr
-						sz2 := f2.EndAddr - f2.StartAddr
-
-						if sz1 == sz2 {
-							consecutiveMismatch = 0
-							continue // treat as aligned
-						}
-
-						// size diff
-						appendLine(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
-						consecutiveMismatch++
-
-						if consecutiveMismatch >= maxMismatch {
-							// scan ahead for 3 consecutive size matches to recover
-							recovered := false
-							const seekAhead = 6
-							if i+seekAhead < n1 {
-								matches := 0
-								for k := 1; k <= seekAhead && i+k < n1; k++ {
-									if (funcs1[i+k].EndAddr - funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr - funcs2[i+k].StartAddr) {
-										matches++
-										if matches >= 3 {
-											recovered = true
-											break
-										}
-									} else {
-										matches = 0
-									}
-								}
-							}
-							if !recovered {
-								// bail out – noisy diff
-								b.Reset()
-								break
-							}
-						}
+				// Output modifications
+				if len(modifications) > 0 {
+					b.WriteString("Functions (modified):\n")
+					for _, mod := range modifications {
+						name := matcher.getSymbolName(mod.OldFunc, dat1.SymbolMap)
+						oldSize := mod.OldFunc.EndAddr - mod.OldFunc.StartAddr
+						newSize := mod.NewFunc.EndAddr - mod.NewFunc.StartAddr
+						b.WriteString(fmt.Sprintf("~ %s : %d -> %d\n", name, oldSize, newSize))
 					}
+				}
 
+				// Output additions
+				if len(additions) > 0 {
 					if b.Len() > 0 {
-						diff.Updated[currentFileKey] += b.String()
+						b.WriteString("\n")
 					}
-					goto CStringBlock
+					b.WriteString("Functions (added):\n")
+					for _, add := range additions {
+						if add.BlockSize > 0 {
+							// Contiguous block
+							b.WriteString(fmt.Sprintf("+ [%d functions added in block]\n", add.BlockSize))
+						} else {
+							// Individual addition
+							name := matcher.getSymbolName(add.Function, dat2.SymbolMap)
+							b.WriteString(fmt.Sprintf("+ %s\n", name))
+						}
+					}
 				}
 
-				// different counts – two-pointer scan with simple heuristics
-				i, j := 0, 0
-				consecutiveNoise := 0
-				const noiseLimit = 6
-
-				for i < n1 && j < n2 {
-					f1 := funcs1[i]
-					f2 := funcs2[j]
-					f1.Name = printable(f1, dat1.SymbolMap)
-					f2.Name = printable(f2, dat2.SymbolMap)
-					// strong name match
-					if f1.Name != "" && f1.Name == f2.Name {
-						sz1 := f1.EndAddr - f1.StartAddr
-						sz2 := f2.EndAddr - f2.StartAddr
-						if sz1 != sz2 {
-							appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
+				// Output removals
+				if len(removals) > 0 {
+					if b.Len() > 0 {
+						b.WriteString("\n")
+					}
+					b.WriteString("Functions (removed):\n")
+					for _, rm := range removals {
+						if rm.BlockSize > 0 {
+							// Contiguous block
+							b.WriteString(fmt.Sprintf("- [%d functions removed in block]\n", rm.BlockSize))
+						} else {
+							// Individual removal
+							name := matcher.getSymbolName(rm.Function, dat1.SymbolMap)
+							b.WriteString(fmt.Sprintf("- %s\n", name))
 						}
-						i++
-						j++
-						consecutiveNoise = 0
-						continue
-					}
-
-					// size match
-					if (f1.EndAddr - f1.StartAddr) == (f2.EndAddr - f2.StartAddr) {
-						i++
-						j++
-						consecutiveNoise = 0
-						continue
-					}
-
-					// try simple insert/delete to recoup
-					if j+1 < n2 && (f1.EndAddr-f1.StartAddr) == (funcs2[j+1].EndAddr-funcs2[j+1].StartAddr) {
-						appendLine(fmt.Sprintf("+ %s\n", f2.Name))
-						j++
-						consecutiveNoise++
-					} else if i+1 < n1 && (funcs1[i+1].EndAddr-funcs1[i+1].StartAddr) == (f2.EndAddr-f2.StartAddr) {
-						appendLine(fmt.Sprintf("- %s\n", f1.Name))
-						i++
-						consecutiveNoise++
-					} else {
-						consecutiveNoise++
-					}
-
-					if consecutiveNoise >= noiseLimit {
-						b.Reset()
-						break
 					}
 				}
 
@@ -372,8 +321,6 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 					diff.Updated[currentFileKey] += b.String()
 				}
 			}
-
-		CStringBlock:
 
 			/* DIFF CStrings */
 			if conf.CStrings {
