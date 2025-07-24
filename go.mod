@@ -16,7 +16,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/alecthomas/chroma/v2 v2.19.0
-	github.com/anthropics/anthropic-sdk-go v1.5.0
+	github.com/anthropics/anthropic-sdk-go v1.6.2
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/blacktop/arm64-cgo v1.0.58
@@ -28,7 +28,7 @@ require (
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.5
 	github.com/blacktop/ranger v1.0.3
-	github.com/boombuler/barcode v1.0.2
+	github.com/boombuler/barcode v1.1.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
@@ -48,9 +48,9 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.16.2
-	github.com/go-viper/mapstructure/v2 v2.3.0
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gocolly/colly/v2 v2.2.0
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
@@ -60,14 +60,14 @@ require (
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/ollama/ollama v0.9.6
-	github.com/openai/openai-go v1.10.1
+	github.com/openai/openai-go v1.11.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.4.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/spf13/cast v1.9.2
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.7
 	github.com/spf13/viper v1.20.1
 	github.com/strukturag/libheif-go v0.0.0-20250130134905-55b3482bea15
 	github.com/twmb/murmur3 v1.1.8
@@ -76,17 +76,17 @@ require (
 	github.com/vbauerster/mpb/v8 v8.10.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.40.0
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
+	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/net v0.42.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.34.0
 	golang.org/x/term v0.33.0
-	google.golang.org/genai v1.15.0
+	google.golang.org/genai v1.17.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
-	gorm.io/gorm v1.30.0
+	gorm.io/gorm v1.30.1
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -95,8 +95,8 @@ require (
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
 require (
-	cloud.google.com/go v0.121.3 // indirect
-	cloud.google.com/go/auth v0.16.2 // indirect
+	cloud.google.com/go v0.121.4 // indirect
+	cloud.google.com/go/auth v0.16.3 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
@@ -115,14 +115,14 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/bytedance/sonic v1.13.3 // indirect
+	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/caarlos0/go-version v0.2.1 // indirect
 	github.com/caarlos0/svu/v3 v3.2.3 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
 	github.com/charmbracelet/x/ansi v0.9.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
-	github.com/charmbracelet/x/mosaic v0.0.0-20250714123521-bc8a1995e079 // indirect
+	github.com/charmbracelet/x/mosaic v0.0.0-20250720010745-3615766e35a0 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
@@ -247,9 +247,9 @@ require (
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/grpc v1.73.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250721164621-a45f3dfb1074 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074 // indirect
+	google.golang.org/grpc v1.74.2 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	modernc.org/libc v1.66.3 // indirect
