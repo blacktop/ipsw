@@ -65,7 +65,6 @@ var kernelInfoCmd = &cobra.Command{
 	Use:           "info <kernelcache>",
 	Aliases:       []string{"i"},
 	Short:         "Explore a kernelcache file",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -47,7 +47,6 @@ func init() {
 var PsCmd = &cobra.Command{
 	Use:           "ps",
 	Short:         "Process list",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

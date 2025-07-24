@@ -39,7 +39,6 @@ var idevSpringbOrientationCmd = &cobra.Command{
 	Use:           "orient",
 	Short:         "Get screen orientation",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

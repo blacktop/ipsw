@@ -52,7 +52,6 @@ var ASCertAddCmd = &cobra.Command{
 	Use:           "add",
 	Short:         "Create a new certificate using a certificate signing request",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// flags

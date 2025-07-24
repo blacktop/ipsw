@@ -57,7 +57,6 @@ var createCmd = &cobra.Command{
 	Aliases:       []string{"c"},
 	Short:         "Create one or more new artifacts based on the arguments provided",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error

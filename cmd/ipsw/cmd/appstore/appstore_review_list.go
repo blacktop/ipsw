@@ -50,7 +50,6 @@ var ASReviewListCmd = &cobra.Command{
 	Aliases:       []string{"r"},
 	Short:         "List app store reviews",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

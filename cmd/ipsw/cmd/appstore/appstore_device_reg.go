@@ -48,7 +48,6 @@ var ASDeviceRegisterCmd = &cobra.Command{
 	Aliases:       []string{"r"},
 	Short:         "Register a new device for app development",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

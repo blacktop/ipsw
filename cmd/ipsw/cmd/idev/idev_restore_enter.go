@@ -39,7 +39,6 @@ var restoreEnterCmd = &cobra.Command{
 	Use:           "enter",
 	Short:         "Enter recovery mode",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

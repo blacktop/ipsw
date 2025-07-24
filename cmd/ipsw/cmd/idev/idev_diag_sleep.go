@@ -39,7 +39,6 @@ func init() {
 var idevDiagSleepCmd = &cobra.Command{
 	Use:           "sleep",
 	Short:         "Put device to sleep",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

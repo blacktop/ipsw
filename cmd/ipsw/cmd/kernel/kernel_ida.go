@@ -89,7 +89,6 @@ func init() {
 var kernelIdaCmd = &cobra.Command{
 	Use:           "ida <KC> [KEXT]",
 	Short:         "🚧 Analyze kernelcache in IDA Pro",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

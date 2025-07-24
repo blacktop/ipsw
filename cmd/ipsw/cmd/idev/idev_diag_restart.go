@@ -39,7 +39,6 @@ func init() {
 var idevDiagRestartCmd = &cobra.Command{
 	Use:           "restart",
 	Short:         "Restart the device",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

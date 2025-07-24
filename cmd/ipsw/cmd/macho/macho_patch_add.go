@@ -76,7 +76,6 @@ var machoPatchAddCmd = &cobra.Command{
 		# Add an LC_RPATH like install_name_tool
 		❯ ipsw macho patch add MACHO LC_RPATH @executable_path/Frameworks`),
 	Args:          cobra.MinimumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {

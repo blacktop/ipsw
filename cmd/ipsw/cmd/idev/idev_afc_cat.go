@@ -42,7 +42,6 @@ var idevAfcCatCmd = &cobra.Command{
 	Use:           "cat",
 	Short:         "cat file rooted at /var/mobile/Media",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

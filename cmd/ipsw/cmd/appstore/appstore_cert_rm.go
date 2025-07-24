@@ -45,7 +45,6 @@ var ASCertRevokeCmd = &cobra.Command{
 	Use:           "rm",
 	Short:         "Revoke a lost, stolen, compromised, or expiring signing certificate",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// flags

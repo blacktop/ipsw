@@ -59,7 +59,6 @@ var dmgCmd = &cobra.Command{
 	Use:           "dmg DMG [OUTPUT]",
 	Short:         "🚧 List/Extract DMG partiton/blocks",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		// flags

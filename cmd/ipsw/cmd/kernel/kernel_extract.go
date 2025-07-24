@@ -53,7 +53,6 @@ var kerExtractCmd = &cobra.Command{
 	Aliases:       []string{"e"},
 	Short:         "Extract KEXT(s) from kernelcache",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

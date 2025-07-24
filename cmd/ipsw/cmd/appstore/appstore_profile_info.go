@@ -43,7 +43,6 @@ var ASProfileInfoCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Dump provisioning profile information",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -43,7 +43,6 @@ func init() {
 var wifiCmd = &cobra.Command{
 	Use:           "wifi",
 	Short:         "Get/Set wifi connections state",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

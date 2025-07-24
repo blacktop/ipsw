@@ -64,7 +64,6 @@ var ibootCmd = &cobra.Command{
 	Short:         "Dump iBoot files",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		// flags

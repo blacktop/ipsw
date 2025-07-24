@@ -47,7 +47,6 @@ var ASBundleCapabilityAddCmd = &cobra.Command{
 	Use:           "add",
 	Short:         "🚧 Enable a capability for a bundle ID",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

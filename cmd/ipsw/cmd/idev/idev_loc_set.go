@@ -38,7 +38,6 @@ func init() {
 var locSetCmd = &cobra.Command{
 	Use:           "set -- <LAT> <LON>",
 	Short:         "Simulate Location",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

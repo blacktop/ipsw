@@ -76,7 +76,6 @@ var machoPatchModCmd = &cobra.Command{
 		# Modify LC_BUILD_VERSION like vtool
 		❯ ipsw macho patch mod MACHO LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1`),
 	Args:          cobra.MinimumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {

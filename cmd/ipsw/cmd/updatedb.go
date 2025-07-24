@@ -52,11 +52,10 @@ func init() {
 
 // updateDBCmd represents the updatedb command
 var updateDBCmd = &cobra.Command{
-	Use:          "updatedb",
-	Short:        "Update internal device database",
-	Args:         cobra.NoArgs,
-	SilenceUsage: true,
-	Hidden:       true,
+	Use:    "updatedb",
+	Short:  "Update internal device database",
+	Args:   cobra.NoArgs,
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		var devices info.Devices
 

@@ -35,7 +35,6 @@ var ASTokenCmd = &cobra.Command{
 	Use:           "token",
 	Short:         "Generate JWT for AppStore Connect API",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

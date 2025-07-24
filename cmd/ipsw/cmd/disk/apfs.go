@@ -51,7 +51,6 @@ var apfsCmd = &cobra.Command{
 	Use:           "apfs",
 	Short:         "🚧 List/Extract APFS files",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {

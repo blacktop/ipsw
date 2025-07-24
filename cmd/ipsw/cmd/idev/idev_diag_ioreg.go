@@ -45,7 +45,6 @@ func init() {
 var idevDiagIOregCmd = &cobra.Command{
 	Use:           "ioreg",
 	Short:         "Query IORegistry",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

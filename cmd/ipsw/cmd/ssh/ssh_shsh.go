@@ -42,7 +42,6 @@ var sshShshBlobCmd = &cobra.Command{
 	Aliases:       []string{"sh"},
 	Short:         "Get SHSH blobs from device",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

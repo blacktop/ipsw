@@ -45,7 +45,6 @@ var idevImgLookupCmd = &cobra.Command{
 	Short:         "Lookup image type",
 	ValidArgs:     []string{"Developer", "Cryptex"},
 	Args:          cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

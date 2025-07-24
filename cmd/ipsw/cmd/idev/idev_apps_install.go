@@ -42,7 +42,6 @@ var idevAppsInstallCmd = &cobra.Command{
 	Use:           "install <IPA_PATH>",
 	Short:         "Install an application",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

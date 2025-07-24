@@ -54,7 +54,6 @@ func init() {
 var PcapCmd = &cobra.Command{
 	Use:           "pcap",
 	Short:         "Dump network traffic",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

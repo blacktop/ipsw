@@ -34,7 +34,6 @@ var restoreRamdiskCmd = &cobra.Command{
 	Use:           "ramdisk",
 	Short:         "Enter ramdisk",
 	Args:          cobra.MaximumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -40,7 +40,6 @@ var ASDeviceListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List devices registered to your team",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate flags

@@ -43,7 +43,6 @@ var idevAfcRmCmd = &cobra.Command{
 	Use:           "rm",
 	Short:         "rm file rooted at /var/mobile/Media",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

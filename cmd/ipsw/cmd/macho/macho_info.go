@@ -151,7 +151,6 @@ var machoInfoCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Explore a MachO file",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

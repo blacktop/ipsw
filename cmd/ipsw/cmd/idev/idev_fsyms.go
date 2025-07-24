@@ -46,7 +46,6 @@ func init() {
 var FetchsymsCmd = &cobra.Command{
 	Use:           "fsyms",
 	Short:         "Dump device linker and dyld_shared_cache file",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

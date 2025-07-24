@@ -201,7 +201,6 @@ var dwarfCmd = &cobra.Command{
 ❯ ipsw kernel dwarf --type task --diff
 # Diff ALL structs
 ❯ ipsw kernel dwarf --diff`,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

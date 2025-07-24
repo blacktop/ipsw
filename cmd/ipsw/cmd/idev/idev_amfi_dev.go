@@ -47,7 +47,6 @@ var idevAmfiDevModeCmd = &cobra.Command{
 	Aliases:       []string{"d", "developer", "developer-mode"},
 	Short:         "Enable Developer Mode on device",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

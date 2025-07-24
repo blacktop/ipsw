@@ -70,7 +70,6 @@ var aeaCmd = &cobra.Command{
 	Short:         "Parse AEA1 DMGs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var pemData []byte
 

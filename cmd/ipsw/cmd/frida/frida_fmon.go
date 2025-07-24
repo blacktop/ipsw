@@ -44,7 +44,6 @@ var fridaFMonCmd = &cobra.Command{
 	Use:           "fmon",
 	Aliases:       []string{"fm"},
 	Short:         "File Monitor",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	Hidden:        true,

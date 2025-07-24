@@ -38,7 +38,6 @@ func init() {
 var locPlayCmd = &cobra.Command{
 	Use:           "play <GPX_FILE>",
 	Short:         "Play a .gpx file",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -42,7 +42,6 @@ func init() {
 var iDevCrashClearCmd = &cobra.Command{
 	Use:           "clear",
 	Short:         "Delete all crashlogs",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

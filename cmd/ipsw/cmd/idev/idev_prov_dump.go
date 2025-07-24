@@ -44,7 +44,6 @@ func init() {
 var provDumpCmd = &cobra.Command{
 	Use:           "dump",
 	Short:         "Dump installed provisioning profiles",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

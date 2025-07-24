@@ -67,7 +67,6 @@ var infoCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Display IPSW/OTA Info",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -63,7 +63,6 @@ var ASProfileCreateCmd = &cobra.Command{
 	Aliases:       []string{"c"},
 	Short:         "Create a new provisioning profile",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

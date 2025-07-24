@@ -73,7 +73,6 @@ var otaExtractCmd = &cobra.Command{
 	Aliases:       []string{"e"},
 	Short:         "Extract OTA payload files",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

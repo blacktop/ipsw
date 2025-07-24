@@ -34,7 +34,6 @@ var restoreTssCmd = &cobra.Command{
 	Use:           "tss",
 	Short:         "Get SHSH blobs",
 	Args:          cobra.MaximumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

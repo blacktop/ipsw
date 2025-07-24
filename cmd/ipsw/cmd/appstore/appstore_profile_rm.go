@@ -47,7 +47,6 @@ var ASProfileRemoveCmd = &cobra.Command{
 	Use:           "rm",
 	Short:         "Delete a provisioning profile that is used for app development or distribution",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var profile *appstore.Profile

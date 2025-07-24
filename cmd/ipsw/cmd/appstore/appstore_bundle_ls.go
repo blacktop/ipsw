@@ -40,7 +40,6 @@ var ASBundleListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List bundle IDs that are registered to your team",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate flags

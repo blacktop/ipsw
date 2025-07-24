@@ -45,7 +45,6 @@ var uniqCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

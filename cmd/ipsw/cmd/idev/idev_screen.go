@@ -68,7 +68,6 @@ func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
 var ScreenCmd = &cobra.Command{
 	Use:           "screen",
 	Short:         "Dump screenshot as a PNG",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

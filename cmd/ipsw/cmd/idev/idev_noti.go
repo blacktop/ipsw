@@ -47,7 +47,6 @@ func init() {
 var NotificationCmd = &cobra.Command{
 	Use:           "noti",
 	Short:         "Observe notifications",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

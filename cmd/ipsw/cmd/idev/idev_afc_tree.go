@@ -47,7 +47,6 @@ var idevAfcTreeCmd = &cobra.Command{
 	Use:           "tree",
 	Short:         "List contents of directories in a tree-like format rooted at /var/mobile/Media",
 	Args:          cobra.MaximumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

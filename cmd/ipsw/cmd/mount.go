@@ -55,7 +55,6 @@ var mountCmd = &cobra.Command{
 	Use:           "mount [fs|sys|app|exc] IPSW",
 	Aliases:       []string{"mo", "mnt"},
 	Short:         "Mount DMG from IPSW",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(2),
 	Example: heredoc.Doc(`

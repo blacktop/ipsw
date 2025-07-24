@@ -50,7 +50,6 @@ var syscallCmd = &cobra.Command{
 	Aliases:       []string{"sc"},
 	Short:         "Dump kernelcache syscalls",
 	Args:          cobra.MinimumNArgs(0),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

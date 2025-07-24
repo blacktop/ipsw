@@ -39,7 +39,6 @@ func init() {
 var profRmCmd = &cobra.Command{
 	Use:           "rm <PROF>",
 	Short:         "Remove profile by name",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

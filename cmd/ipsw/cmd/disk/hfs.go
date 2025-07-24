@@ -53,7 +53,6 @@ var diskHfsCmd = &cobra.Command{
 	Use:           "hfs",
 	Short:         "🚧 List/Extract HFS+ files",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

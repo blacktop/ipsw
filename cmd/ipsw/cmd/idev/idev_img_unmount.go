@@ -44,7 +44,6 @@ func init() {
 var idevImgUnmountCmd = &cobra.Command{
 	Use:           "unmount",
 	Short:         "Unmount an image",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -47,7 +47,6 @@ var idevSpringbIconCmd = &cobra.Command{
 	Use:           "icon",
 	Short:         "Dump application icon as PNG",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

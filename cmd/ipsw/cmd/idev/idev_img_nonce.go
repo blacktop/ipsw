@@ -70,7 +70,6 @@ func init() {
 var nonceCmd = &cobra.Command{
 	Use:           "nonce",
 	Short:         "Query Nonce",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

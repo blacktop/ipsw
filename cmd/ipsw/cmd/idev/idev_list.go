@@ -45,7 +45,6 @@ func init() {
 var ListDevicesCmd = &cobra.Command{
 	Use:           "list",
 	Short:         "Dump info about USB connected iDevices",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

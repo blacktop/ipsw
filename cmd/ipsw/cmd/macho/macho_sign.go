@@ -83,7 +83,6 @@ var machoSignCmd = &cobra.Command{
 	Example: `  # Ad-hoc codesign a MachO w/ entitlements
   ❯ ipsw macho sign --id com.apple.ls --ad-hoc --ent entitlements.plist <MACHO>`,
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

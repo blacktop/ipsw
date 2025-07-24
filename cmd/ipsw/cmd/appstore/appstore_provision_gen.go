@@ -61,8 +61,7 @@ var ASProvisionGenerateCmd = &cobra.Command{
 from App Store Connect for a given bundle ID, based on the specified type
 (development, adhoc, distribution). It then optionally installs them locally
 for Xcode code signing.`,
-	Args: cobra.MaximumNArgs(1),
-	// SilenceUsage:  true,
+	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

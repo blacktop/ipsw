@@ -114,7 +114,6 @@ var machoDisassCmd = &cobra.Command{
 	Use:           "disass <MACHO>",
 	Short:         "Disassemble ARM64 MachO at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
