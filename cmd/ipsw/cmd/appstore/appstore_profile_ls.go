@@ -40,7 +40,6 @@ var ASProfileListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List provisioning profiles and download their data",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -54,7 +54,6 @@ var ASProfileRenewCmd = &cobra.Command{
 	Aliases:       []string{"r"},
 	Short:         "Renew an expired or invalid provisioning profile",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var profile *appstore.Profile

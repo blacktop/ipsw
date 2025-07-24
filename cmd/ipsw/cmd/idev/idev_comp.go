@@ -42,7 +42,6 @@ func init() {
 var compCmd = &cobra.Command{
 	Use:           "comp",
 	Short:         "List all paired companion devices",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

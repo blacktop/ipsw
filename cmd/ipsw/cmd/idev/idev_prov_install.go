@@ -39,7 +39,6 @@ func init() {
 var provInstallCmd = &cobra.Command{
 	Use:           "install <PROV>",
 	Short:         "Install a provisioning profile (.mobileprovision file)",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

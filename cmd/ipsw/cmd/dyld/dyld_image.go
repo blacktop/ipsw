@@ -50,7 +50,6 @@ var ImageCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	Example: `  # List all the apps
   ❯ ipsw dyld image DSC
   # Dump the closure info for a in-cache dylib

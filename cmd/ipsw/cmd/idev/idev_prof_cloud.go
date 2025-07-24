@@ -42,7 +42,6 @@ func init() {
 var profCloudCmd = &cobra.Command{
 	Use:           "cloud",
 	Short:         "Get cloud configuration",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

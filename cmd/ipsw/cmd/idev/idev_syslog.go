@@ -95,7 +95,6 @@ func colorSyslog(line string) string {
 var SyslogCmd = &cobra.Command{
 	Use:           "syslog",
 	Short:         "Dump syslog lines",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

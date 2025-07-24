@@ -45,7 +45,6 @@ var carCmd = &cobra.Command{
 	Use:           "car",
 	Short:         "Parse Asset.car files",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

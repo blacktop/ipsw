@@ -38,7 +38,6 @@ func init() {
 var locClearCmd = &cobra.Command{
 	Use:           "clear",
 	Short:         "Reset simulated Location",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

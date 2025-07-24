@@ -59,7 +59,6 @@ var inspectCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Inspect and filter a kext collection's contents according to the options provided",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

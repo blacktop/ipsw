@@ -42,7 +42,6 @@ var idevAfcPushCmd = &cobra.Command{
 	Use:           "push <local file> <remote file>",
 	Short:         "Push local file rooted at /var/mobile/Media",
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

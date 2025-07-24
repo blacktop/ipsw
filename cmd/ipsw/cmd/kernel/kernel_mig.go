@@ -44,7 +44,6 @@ var kernelMigCmd = &cobra.Command{
 	Use:           "mig <kernelcache>",
 	Short:         "Dump kernelcache mig subsystem",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

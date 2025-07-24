@@ -92,7 +92,6 @@ var img4Im4mInfoCmd = &cobra.Command{
 		# Output as JSON
 		❯ ipsw img4 im4m info --json manifest.im4m`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -55,7 +55,6 @@ var otaLsCmd = &cobra.Command{
 	Aliases:       []string{"l"},
 	Short:         "List OTA files",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

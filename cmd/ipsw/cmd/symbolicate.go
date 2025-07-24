@@ -83,7 +83,6 @@ var symbolicateCmd = &cobra.Command{
 		  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
 		  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		/* flags */

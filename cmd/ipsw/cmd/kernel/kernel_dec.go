@@ -45,7 +45,6 @@ var kernelDecCmd = &cobra.Command{
 	Use:           "dec <kernelcache>",
 	Short:         "Decompress a kernelcache",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -46,7 +46,7 @@ func init() {
 var idevSpringbWallpaperCmd = &cobra.Command{
 	Use:           "wallpaper",
 	Short:         "Dump wallpaper as PNG",
-	SilenceUsage:  true,
+	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

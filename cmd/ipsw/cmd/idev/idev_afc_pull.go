@@ -42,7 +42,6 @@ var idevAfcPullCmd = &cobra.Command{
 	Use:           "pull <remote path> <local path>",
 	Short:         "Pull remote file rooted at /var/mobile/Media",
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

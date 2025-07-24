@@ -43,7 +43,6 @@ var lsbomCmd = &cobra.Command{
 	Use:           "lsbom",
 	Short:         "List contents of a BOM file",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

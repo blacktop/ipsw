@@ -73,7 +73,6 @@ var fridaObjcCmd = &cobra.Command{
 	Aliases:       []string{"o"},
 	Short:         "Trace ObjC methods",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

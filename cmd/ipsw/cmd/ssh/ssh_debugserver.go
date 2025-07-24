@@ -51,7 +51,6 @@ var sshDebugserverCmd = &cobra.Command{
 	Aliases:       []string{"ds"},
 	Short:         "Prepare device for remote debugging",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

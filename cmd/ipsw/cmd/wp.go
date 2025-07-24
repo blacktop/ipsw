@@ -48,7 +48,6 @@ var wpCmd = &cobra.Command{
 	Use:           "wp <IPSW>",
 	Short:         "🚧 Extract wallpapers from IPSW",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

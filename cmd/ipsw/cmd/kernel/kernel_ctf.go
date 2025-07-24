@@ -58,7 +58,6 @@ var ctfdumpCmd = &cobra.Command{
 	Aliases:       []string{"c", "ctf"},
 	Short:         "Dump CTF info",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -50,7 +50,6 @@ var kextsCmd = &cobra.Command{
 	Aliases:       []string{"k"},
 	Short:         "List kernel extensions",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

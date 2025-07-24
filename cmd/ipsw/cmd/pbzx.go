@@ -45,7 +45,6 @@ var pbzxCmd = &cobra.Command{
 	Use:           "pbzx",
 	Short:         "Decompress pbzx files",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

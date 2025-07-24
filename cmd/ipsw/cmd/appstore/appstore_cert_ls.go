@@ -40,7 +40,6 @@ var ASCertListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List certificates",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate flags

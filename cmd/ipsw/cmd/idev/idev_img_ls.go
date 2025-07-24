@@ -43,7 +43,6 @@ func init() {
 var idevImgListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List mounted images",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

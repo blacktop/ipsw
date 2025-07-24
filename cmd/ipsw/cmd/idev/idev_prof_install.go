@@ -40,7 +40,6 @@ var profInstallCmd = &cobra.Command{
 	Use:           "install <PROF_FILE>",
 	Aliases:       []string{"i"},
 	Short:         "Install profile",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -46,7 +46,6 @@ var machoA2sCmd = &cobra.Command{
 	Use:           "a2s",
 	Short:         "Lookup symbol at unslid address",
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -70,7 +70,6 @@ var kernelSymbolicateCmd = &cobra.Command{
 	Aliases:       []string{"sym"},
 	Short:         "Symbolicate kernelcache",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

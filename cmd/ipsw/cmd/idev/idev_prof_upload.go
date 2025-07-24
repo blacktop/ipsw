@@ -39,7 +39,6 @@ func init() {
 var profDumpCmd = &cobra.Command{
 	Use:           "upload",
 	Short:         "🚧 Store profile",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	Args:          cobra.ExactArgs(1),

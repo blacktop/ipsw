@@ -60,7 +60,6 @@ var sbDiffCmd = &cobra.Command{
 	Short:         "Diff the sandbox profiles between two macOS IPSWs",
 	Aliases:       []string{"d"},
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

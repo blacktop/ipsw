@@ -74,7 +74,6 @@ func init() {
 var idevImgSignCmd = &cobra.Command{
 	Use:           "sign",
 	Short:         "Personalize DDI",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

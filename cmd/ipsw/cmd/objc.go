@@ -41,7 +41,6 @@ var objcCmd = &cobra.Command{
 	Use:           "objc <CLASS>",
 	Short:         "Dump Objective-C info in running `ipsw` process",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	Run: func(cmd *cobra.Command, args []string) {

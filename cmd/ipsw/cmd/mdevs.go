@@ -63,7 +63,6 @@ var mdevsCmd = &cobra.Command{
 	Use:           "mdevs",
 	Aliases:       []string{"md", "mobiledevices"},
 	Short:         "List all MobileDevices in IPSW",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

@@ -42,7 +42,6 @@ var idevAppsUninstallCmd = &cobra.Command{
 	Use:           "uninstall <BUNDLE_ID>",
 	Short:         "Uninstall an application",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

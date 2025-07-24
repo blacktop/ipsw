@@ -39,7 +39,6 @@ func init() {
 var profWifiCmd = &cobra.Command{
 	Use:           "wifi [on|off]",
 	Short:         "Change Wi-Fi power state",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgs:     []string{"on", "off"},
 	Args:          cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),

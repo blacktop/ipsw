@@ -39,7 +39,6 @@ func init() {
 var idevDiagShutdownCmd = &cobra.Command{
 	Use:           "shutdown",
 	Short:         "Shutdown the device",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

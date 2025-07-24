@@ -41,7 +41,6 @@ func init() {
 var diagInfoCmd = &cobra.Command{
 	Use:           "info",
 	Short:         "Diagnostics info",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

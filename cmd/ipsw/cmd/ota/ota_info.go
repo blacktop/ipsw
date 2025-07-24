@@ -42,7 +42,6 @@ var otaInfoCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Display OTA metadata",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

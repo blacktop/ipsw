@@ -89,7 +89,6 @@ var diffCmd = &cobra.Command{
 		# Use a previously saved .idiff file
 		❯ ipsw diff --in <path/to/.idiff> --output <output/folder> --markdown`),
 	Args:          cobra.MaximumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

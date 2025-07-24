@@ -54,7 +54,6 @@ var gpuCmd = &cobra.Command{
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		infile := filepath.Clean(args[0])

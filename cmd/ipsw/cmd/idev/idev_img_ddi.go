@@ -57,9 +57,8 @@ func init() {
 
 // ddiCmd represents the ddi command
 var ddiCmd = &cobra.Command{
-	Use:   "ddi",
-	Short: "DDI commands",
-	// SilenceUsage:  true,
+	Use:           "ddi",
+	Short:         "DDI commands",
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -41,7 +41,6 @@ func init() {
 var diagBatCmd = &cobra.Command{
 	Use:           "bat",
 	Short:         "Get snapshot of battery data",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

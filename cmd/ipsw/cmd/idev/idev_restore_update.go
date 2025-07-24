@@ -34,7 +34,6 @@ var restoreUpdateCmd = &cobra.Command{
 	Use:           "update",
 	Short:         "Update device",
 	Args:          cobra.MaximumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

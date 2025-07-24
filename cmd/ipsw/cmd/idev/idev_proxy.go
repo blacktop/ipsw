@@ -48,7 +48,6 @@ func init() {
 var ProxyCmd = &cobra.Command{
 	Use:           "proxy",
 	Short:         "Create a TCP proxy (for ssh/debugging)",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

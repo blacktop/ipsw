@@ -49,7 +49,6 @@ func init() {
 var idevAppsListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List installed applications",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

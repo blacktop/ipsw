@@ -50,7 +50,6 @@ var kernelVersionCmd = &cobra.Command{
 	Aliases:       []string{"v"},
 	Short:         "Dump kernelcache version",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -47,7 +47,6 @@ var iaCmd = &cobra.Command{
 	Short:         "Parse InstallAssistant.pkg",
 	Long:          "Currently only extracts the SharedSupport.dmg from the InstallAssistant.pkg and mounts it for you to then extract the OTA.",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

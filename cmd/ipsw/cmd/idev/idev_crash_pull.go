@@ -52,7 +52,6 @@ func init() {
 var iDevCrashPullCmd = &cobra.Command{
 	Use:           "pull",
 	Short:         "Pull crashlogs",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

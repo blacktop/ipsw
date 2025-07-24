@@ -42,7 +42,6 @@ func init() {
 var idevDiagMobileGestaltCmd = &cobra.Command{
 	Use:           "mg",
 	Short:         "Query MobileGestalt",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

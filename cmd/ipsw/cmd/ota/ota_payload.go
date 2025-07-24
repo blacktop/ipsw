@@ -57,7 +57,6 @@ var otaPayloadCmd = &cobra.Command{
 	Aliases:       []string{"p"},
 	Short:         "List contents of a payloadv2 file",
 	Args:          cobra.MaximumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

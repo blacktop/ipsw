@@ -40,7 +40,6 @@ func init() {
 var iDevCrashLsCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List crashlogs",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

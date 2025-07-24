@@ -68,10 +68,9 @@ func init() {
 
 // idevImgMountCmd represents the img mount command
 var idevImgMountCmd = &cobra.Command{
-	Use:   "mount",
-	Short: "Mount an image",
-	Args:  cobra.NoArgs,
-	// SilenceUsage:  true,
+	Use:           "mount",
+	Short:         "Mount an image",
+	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

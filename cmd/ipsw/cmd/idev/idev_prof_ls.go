@@ -42,7 +42,6 @@ func init() {
 var profLsCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List installed provisioning profiles",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
