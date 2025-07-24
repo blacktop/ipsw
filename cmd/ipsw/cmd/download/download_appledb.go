@@ -355,6 +355,10 @@ var downloadAppledbCmd = &cobra.Command{
 			}
 		}
 
+		if len(results) == 0 {
+			return fmt.Errorf("no results found for query")
+		}
+
 		log.Debug("URLs to download:")
 		if asJSON {
 			jsonData, err := json.MarshalIndent(results, "", "  ")
