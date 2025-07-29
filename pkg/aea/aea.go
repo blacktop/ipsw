@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/ecdsa"
+	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
 	"encoding/base64"
@@ -67,7 +68,7 @@ func (k PrivateKey) UnmarshalBinaryPrivateKey() ([]byte, error) {
 
 type Metadata map[string][]byte
 
-func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (map[string]PrivateKey, error) {
+func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecure bool) (map[string]PrivateKey, error) {
 	out := make(map[string]PrivateKey)
 
 	if len(data) > 0 {
@@ -117,9 +118,18 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (
 		}
 	}
 
-	resp, err := http.Get(string(privKeyURL))
+	cli := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+	req, err := http.NewRequest("GET", string(privKeyURL), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request for fcs-key URL: %w", err)
+	}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to fcs-key URL: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -141,7 +151,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool) (
 	return out, nil
 }
 
-func (md Metadata) DecryptFCS(pemData []byte, pemDB string) ([]byte, error) {
+func (md Metadata) DecryptFCS(pemData []byte, pemDB string, insecure bool) ([]byte, error) {
 	ddata, ok := md["com.apple.wkms.fcs-response"]
 	if !ok {
 		return nil, fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
@@ -159,7 +169,7 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string) ([]byte, error) {
 		return nil, err
 	}
 
-	pkmap, err := md.GetPrivateKey(pemData, pemDB, false)
+	pkmap, err := md.GetPrivateKey(pemData, pemDB, false, insecure)
 	if err != nil {
 		return nil, err
 	}

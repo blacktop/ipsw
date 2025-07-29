@@ -272,9 +272,10 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
 		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:  dmgPath,
-			Output: filepath.Dir(dmgPath),
-			PemDB:  pemDbPath,
+			Input:    dmgPath,
+			Output:   filepath.Dir(dmgPath),
+			PemDB:    pemDbPath,
+			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)

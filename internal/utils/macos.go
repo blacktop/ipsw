@@ -782,9 +782,10 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
 		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:  dmgPath,
-			Output: filepath.Dir(dmgPath),
-			PemDB:  pemDB,
+			Input:    dmgPath,
+			Output:   filepath.Dir(dmgPath),
+			PemDB:    pemDB,
+			Insecure: false, // TODO: make this configurable
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
