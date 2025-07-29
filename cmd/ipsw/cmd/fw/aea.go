@@ -167,7 +167,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			wkey, err := metadata.DecryptFCS(pemData, pemDB)
+			wkey, err := metadata.DecryptFCS(pemData, pemDB, insecure)
 			if err != nil {
 				return fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 			}
