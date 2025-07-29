@@ -50,7 +50,7 @@ func init() {
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	aeaCmd.Flags().BoolP("encrypt", "e", false, "AEA encrypt file")
-	aeaCmd.Flags().BoolP("insecure", "i", false, "Allow insecure connections")
+	aeaCmd.Flags().Bool("insecure", false, "Allow insecure connections")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
