@@ -356,7 +356,8 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		if len(results) == 0 {
-			return fmt.Errorf("no results found for query")
+			log.Warn("no results found for query")
+			return nil
 		}
 
 		log.Debug("URLs to download:")

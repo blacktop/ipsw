@@ -125,9 +125,9 @@ update_fcs_keys_rc: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: FSC_FLAGS=--beta --latest ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 
-FCS_IOS_BUILD ?=
-FCS_MOS_BUILD ?=
-FCS_VOS_BUILD ?=
+FCS_IOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device iPhone14,2 --platform iOS)
+FCS_MOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device Mac14,7 --platform macOS)
+FCS_VOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device RealityDevice14,1 --platform visionOS)
 
 .PHONY: update_fcs_keys_release
 update_fcs_keys_release: ## Scrape the iPhoneWiki for AES keys
