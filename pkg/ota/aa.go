@@ -118,6 +118,7 @@ func Open(name string, symmetricKey ...string) (*AA, error) {
 			Input:     name,
 			Output:    os.TempDir(),
 			B64SymKey: key,
+			Insecure:  false, // TODO: make insecure configurable
 		})
 		if err != nil {
 			return nil, err

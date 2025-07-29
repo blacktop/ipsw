@@ -355,9 +355,10 @@ func mountDMG(ctx *Context) (err error) {
 	}
 	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
 		ctx.SystemOsDmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:  ctx.SystemOsDmgPath,
-			Output: filepath.Dir(ctx.SystemOsDmgPath),
-			PemDB:  ctx.PemDB,
+			Input:    ctx.SystemOsDmgPath,
+			Output:   filepath.Dir(ctx.SystemOsDmgPath),
+			PemDB:    ctx.PemDB,
+			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)

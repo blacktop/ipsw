@@ -50,6 +50,7 @@ func init() {
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	aeaCmd.Flags().BoolP("encrypt", "e", false, "AEA encrypt file")
+	aeaCmd.Flags().BoolP("insecure", "i", false, "Allow insecure connections")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
@@ -61,6 +62,7 @@ func init() {
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("fw.aea.encrypt", aeaCmd.Flags().Lookup("encrypt"))
+	viper.BindPFlag("fw.aea.insecure", aeaCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("fw.aea.output", aeaCmd.Flags().Lookup("output"))
 }
 
@@ -82,6 +84,7 @@ var aeaCmd = &cobra.Command{
 		pemFile := viper.GetString("fw.aea.pem")
 		pemDB := viper.GetString("fw.aea.pem-db")
 		doEncrypt := viper.GetBool("fw.aea.encrypt")
+		insecure := viper.GetBool("fw.aea.insecure")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
 		if (adKey || showID || showInfo) && output != "" {
@@ -135,7 +138,7 @@ var aeaCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
 			}
-			pkmap, err := metadata.GetPrivateKey(nil, pemDB, false)
+			pkmap, err := metadata.GetPrivateKey(nil, pemDB, false, insecure)
 			if err != nil {
 				return fmt.Errorf("failed to get private key: %v", err)
 			}
@@ -192,6 +195,7 @@ var aeaCmd = &cobra.Command{
 				PrivKeyData: pemData,
 				B64SymKey:   base64Key,
 				PemDB:       pemDB,
+				Insecure:    insecure,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA: %v", err)
