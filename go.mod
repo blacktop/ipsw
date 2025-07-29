@@ -37,7 +37,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/cloudflare/circl v1.6.1
 	github.com/disintegration/imaging v1.6.2
-	github.com/docker/docker v28.3.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0
