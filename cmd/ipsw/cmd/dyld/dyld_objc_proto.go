@@ -32,7 +32,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +40,7 @@ import (
 func init() {
 	ObjcCmd.AddCommand(objcProtoCmd)
 	objcProtoCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	viper.BindPFlag("dyld.objc.proto.image", objcProtoCmd.Flags().Lookup("image"))
 }
 
 // objcProtoCmd represents the proto command
@@ -55,12 +55,7 @@ var objcProtoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		imageName, _ := cmd.Flags().GetString("image")
+		imageName := viper.GetString("dyld.objc.proto.image")
 
 		dscPath := filepath.Clean(args[0])
 

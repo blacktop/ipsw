@@ -26,10 +26,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,6 +36,7 @@ func init() {
 	ImgCmd.AddCommand(idevImgLookupCmd)
 
 	idevImgLookupCmd.Flags().BoolP("json", "j", false, "Display images as JSON")
+	viper.BindPFlag("idev.img.lookup.json", idevImgLookupCmd.Flags().Lookup("json"))
 }
 
 // idevImgLookupCmd represents the lookup command
@@ -46,17 +45,11 @@ var idevImgLookupCmd = &cobra.Command{
 	Short:         "Lookup image type",
 	ValidArgs:     []string{"Developer", "Cryptex"},
 	Args:          cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.img.lookup.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

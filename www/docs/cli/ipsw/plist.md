@@ -14,6 +14,26 @@ Dump plist as JSON
 ipsw plist <file|watch-path> [flags]
 ```
 
+### Examples
+
+```bash
+# Convert a plist file to JSON
+$ ipsw plist Info.plist
+
+# Pipe JSON to jq
+$ ipsw plist Info.plist --no-color | jq .
+
+# Read plist from stdin
+$ cat Info.plist | ipsw plist
+
+# Watch a directory for plist changes
+$ ipsw plist --watch ~/Library/Preferences
+
+# Watch a specific directory and exclude certain files
+$ ipsw plist --watch /System/Library/LaunchDaemons --exclude "com.apple.*.plist"
+
+```
+
 ### Options
 
 ```

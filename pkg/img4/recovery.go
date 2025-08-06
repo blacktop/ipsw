@@ -201,7 +201,7 @@ func (r *RestoreInfo) MarshalJSON() ([]byte, error) {
 		"name":       "IM4R",
 		"properties": r.Properties,
 	}
-	
+
 	// Safely handle boot nonce formatting
 	if bncn, exists := r.Properties["BNCN"]; exists {
 		switch v := bncn.(type) {
@@ -217,6 +217,6 @@ func (r *RestoreInfo) MarshalJSON() ([]byte, error) {
 			data["boot_nonce"] = fmt.Sprintf("%v", v)
 		}
 	}
-	
+
 	return json.MarshalIndent(data, "", "  ")
 }

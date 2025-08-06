@@ -64,12 +64,7 @@ var ibootCmd = &cobra.Command{
 	Short:         "Dump iBoot files",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		// flags
 		showVersion := viper.GetBool("fw.iboot.version")

@@ -29,7 +29,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/appstore"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,20 +45,8 @@ var ASCertRevokeCmd = &cobra.Command{
 	Use:           "rm",
 	Short:         "Revoke a lost, stolen, compromised, or expiring signing certificate",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
-		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		id := viper.GetString("appstore.cert.rm.id")
 		// Validate flags

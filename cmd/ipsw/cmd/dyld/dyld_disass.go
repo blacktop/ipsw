@@ -37,7 +37,6 @@ import (
 	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -138,11 +137,6 @@ var DisassCmd = &cobra.Command{
 		var image *dyld.CacheImage
 		var images []*dyld.CacheImage
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
 		imageNames := viper.GetStringSlice("dyld.disass.image")
 		symbolName := viper.GetString("dyld.disass.symbol")
@@ -242,7 +236,7 @@ var DisassCmd = &cobra.Command{
 						Middle:       0,
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
-						Quite:        quiet,
+						Quiet:        quiet,
 						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
@@ -357,7 +351,7 @@ var DisassCmd = &cobra.Command{
 						Middle:       0,
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
-						Quite:        quiet,
+						Quiet:        quiet,
 						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 
@@ -503,7 +497,7 @@ var DisassCmd = &cobra.Command{
 					Middle:       middleAddr,
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
-					Quite:        quiet,
+					Quiet:        quiet,
 					Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 				})
 

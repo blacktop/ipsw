@@ -60,7 +60,6 @@ var deviceInfoCmd = &cobra.Command{
 	Aliases:       []string{"di", "dinfo", "dev-inf"},
 	Short:         "Lookup device info",
 	Args:          cobra.MaximumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

@@ -24,10 +24,8 @@ package idev
 import (
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/apps"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v8"
@@ -44,16 +42,10 @@ var idevAppsUninstallCmd = &cobra.Command{
 	Use:           "uninstall <BUNDLE_ID>",
 	Short:         "Uninstall an application",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

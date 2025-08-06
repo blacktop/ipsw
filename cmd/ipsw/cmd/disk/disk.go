@@ -23,7 +23,6 @@ package disk
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // DiskCmd represents the disk command
@@ -31,11 +30,6 @@ var DiskCmd = &cobra.Command{
 	Use:   "disk",
 	Short: "Disk commands",
 	Args:  cobra.NoArgs,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
-		viper.BindPFlag("no-color", cmd.Flags().Lookup("no-color"))
-		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

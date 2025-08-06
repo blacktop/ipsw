@@ -28,12 +28,15 @@ import (
 
 	"github.com/blacktop/ipsw/internal/apsd"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	rootCmd.AddCommand(apsctlCmd)
 	apsctlCmd.Flags().BoolP("text", "t", false, "Output as text")
 	apsctlCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("apsctl.text", apsctlCmd.Flags().Lookup("text"))
+	viper.BindPFlag("apsctl.json", apsctlCmd.Flags().Lookup("json"))
 }
 
 // apsctlCmd represents the apsctl command
@@ -44,8 +47,9 @@ var apsctlCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true,
 	Run: func(cmd *cobra.Command, args []string) {
-		asText, _ := cmd.Flags().GetBool("text")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		// flags
+		asText := viper.GetBool("apsctl.text")
+		asJSON := viper.GetBool("apsctl.json")
 
 		if asText {
 			fmt.Println(apsd.State(apsd.APSConnectionDefaultDebugStyle))

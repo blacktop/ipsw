@@ -58,7 +58,7 @@ func init() {
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.MarkFlagDirname("output")
-	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
+	extractCmd.Flags().Bool("flat", false, "Do NOT preserve directory structure when extracting")
 	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
 	extractCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

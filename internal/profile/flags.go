@@ -27,12 +27,12 @@ import (
 
 // ProfilingFlags holds profiling flag values
 type ProfilingFlags struct {
-	CPUProfile    string
-	MemProfile    string
-	GoroutineProf string
-	BlockProf     string
-	MutexProf     string
-	TraceFile     string
+	CPUProfile     string
+	MemProfile     string
+	GoroutineProf  string
+	BlockProf      string
+	MutexProf      string
+	TraceFile      string
 	MemProfileRate int
 }
 
@@ -56,12 +56,12 @@ func (f *ProfilingFlags) IsEnabled() bool {
 // ToConfig converts flags to profiling config
 func (f *ProfilingFlags) ToConfig() Config {
 	return Config{
-		CPUProfile:    f.CPUProfile,
-		MemProfile:    f.MemProfile,
-		GoroutineProf: f.GoroutineProf,
-		BlockProf:     f.BlockProf,
-		MutexProf:     f.MutexProf,
-		TraceFile:     f.TraceFile,
+		CPUProfile:     f.CPUProfile,
+		MemProfile:     f.MemProfile,
+		GoroutineProf:  f.GoroutineProf,
+		BlockProf:      f.BlockProf,
+		MutexProf:      f.MutexProf,
+		TraceFile:      f.TraceFile,
 		MemProfileRate: f.MemProfileRate,
 	}
 }

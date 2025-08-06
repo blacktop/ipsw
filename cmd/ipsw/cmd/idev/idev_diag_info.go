@@ -25,10 +25,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/diagnostics"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,23 +34,18 @@ import (
 func init() {
 	DiagCmd.AddCommand(diagInfoCmd)
 	diagInfoCmd.Flags().BoolP("json", "j", false, "Display diagnostics info as JSON")
+	viper.BindPFlag("idev.diag.info.json", diagInfoCmd.Flags().Lookup("json"))
 }
 
 // diagInfoCmd represents the info command
 var diagInfoCmd = &cobra.Command{
 	Use:           "info",
 	Short:         "Diagnostics info",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.diag.info.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

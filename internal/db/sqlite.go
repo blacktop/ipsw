@@ -50,12 +50,12 @@ func (s *Sqlite) Connect() (err error) {
 		if _, err := sqlDB.Exec("PRAGMA page_size = 1024"); err != nil {
 			return fmt.Errorf("failed to set page_size pragma: %w", err)
 		}
-		
+
 		// Use DELETE journal mode - more compatible with HTTP_RANGE than WAL
 		if _, err := sqlDB.Exec("PRAGMA journal_mode = DELETE"); err != nil {
 			return fmt.Errorf("failed to set journal_mode pragma: %w", err)
 		}
-		
+
 		// Additional optimization: synchronous=NORMAL for better performance while maintaining data integrity
 		if _, err := sqlDB.Exec("PRAGMA synchronous = NORMAL"); err != nil {
 			return fmt.Errorf("failed to set synchronous pragma: %w", err)
@@ -196,8 +196,6 @@ func (s *Sqlite) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	}
 	return syms, nil
 }
-
-
 
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.

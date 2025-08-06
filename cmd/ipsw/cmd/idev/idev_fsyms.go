@@ -31,7 +31,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/fetchsymbols"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -47,17 +46,11 @@ func init() {
 var FetchsymsCmd = &cobra.Command{
 	Use:           "fsyms",
 	Short:         "Dump device linker and dyld_shared_cache file",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.fsyms.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

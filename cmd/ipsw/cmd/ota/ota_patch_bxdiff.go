@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/bxdiff50"
 	"github.com/spf13/cobra"
@@ -52,10 +51,6 @@ var otaPatchBxdiffCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(2),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		// flags
 		single := viper.GetBool("ota.patch.bxdiff.single")

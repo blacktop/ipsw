@@ -137,16 +137,9 @@ var watchCmd = &cobra.Command{
 		# Watch a specific function in a local repo
 		❯ ipsw watch /path/to/local/REPO --func "MyFunction" --file "path/to/file.go" --timeout 5m`),
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var cache watch.WatchCache
-
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
 		funcName := viper.GetString("watch.func")
 		filePath := viper.GetString("watch.file")

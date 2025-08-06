@@ -261,7 +261,7 @@ func getMigInitFunc(m *macho.File) (*types.Function, error) {
 	engine := disass.NewMachoDisass(m, &disass.Config{
 		Data:         data,
 		StartAddress: text.Addr,
-		Quite:        true,
+		Quiet:        true,
 	})
 	if err := engine.Triage(); err != nil {
 		return nil, fmt.Errorf("first pass triage failed: %v", err)

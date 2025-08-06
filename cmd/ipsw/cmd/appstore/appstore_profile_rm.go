@@ -29,7 +29,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/appstore"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -48,21 +47,10 @@ var ASProfileRemoveCmd = &cobra.Command{
 	Use:           "rm",
 	Short:         "Delete a provisioning profile that is used for app development or distribution",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var profile *appstore.Profile
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
-		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		id := viper.GetString("appstore.profile.rm.id")
 		name := viper.GetString("appstore.profile.rm.name")

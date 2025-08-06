@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -69,17 +68,11 @@ func init() {
 
 // idevImgMountCmd represents the img mount command
 var idevImgMountCmd = &cobra.Command{
-	Use:   "mount",
-	Short: "Mount an image",
-	Args:  cobra.NoArgs,
-	// SilenceUsage:  true,
+	Use:           "mount",
+	Short:         "Mount an image",
+	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		udid := viper.GetString("idev.udid")

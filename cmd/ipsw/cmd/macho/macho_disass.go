@@ -39,7 +39,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -115,7 +114,6 @@ var machoDisassCmd = &cobra.Command{
 	Use:           "disass <MACHO>",
 	Short:         "Disassemble ARM64 MachO at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -125,13 +123,8 @@ var machoDisassCmd = &cobra.Command{
 		var middleAddr uint64
 		var engine *disass.MachoDisass
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
-		selectedArch := viper.GetString("macho.info.arch")
+		selectedArch := viper.GetString("macho.disass.arch")
 		entryStart := viper.GetBool("macho.disass.entry")
 		symbolName := viper.GetString("macho.disass.symbol")
 		startAddr := viper.GetUint64("macho.disass.vaddr")
@@ -245,7 +238,7 @@ var machoDisassCmd = &cobra.Command{
 							Middle:       0,
 							AsJSON:       asJSON,
 							Demangle:     demangleFlag,
-							Quite:        quiet,
+							Quiet:        quiet,
 							Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 						})
 
@@ -371,7 +364,7 @@ var machoDisassCmd = &cobra.Command{
 						Middle:       middleAddr,
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
-						Quite:        quiet,
+						Quiet:        quiet,
 						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
 					})
 

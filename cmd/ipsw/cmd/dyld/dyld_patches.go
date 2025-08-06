@@ -31,7 +31,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +40,8 @@ func init() {
 	DyldCmd.AddCommand(PatchesCmd)
 	PatchesCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	PatchesCmd.Flags().StringP("sym", "s", "", "dylib image symbol to dump patches for")
+	viper.BindPFlag("dyld.patches.image", PatchesCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.patches.sym", PatchesCmd.Flags().Lookup("sym"))
 }
 
 // PatchesCmd represents the patches command
@@ -55,13 +56,8 @@ var PatchesCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		imageName, _ := cmd.Flags().GetString("image")
-		symbolName, _ := cmd.Flags().GetString("sym")
+		imageName := viper.GetString("dyld.patches.image")
+		symbolName := viper.GetString("dyld.patches.sym")
 
 		dscPath := filepath.Clean(args[0])
 

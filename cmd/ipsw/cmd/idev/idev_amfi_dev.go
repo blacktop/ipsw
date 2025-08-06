@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/amfi"
 	"github.com/blacktop/ipsw/pkg/usb/heartbeat"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,25 +38,21 @@ func init() {
 	AmfiCmd.AddCommand(idevAmfiDevModeCmd)
 
 	idevAmfiDevModeCmd.Flags().BoolP("post", "p", false, "Enable post restart (acknowledges prompt after reboot)")
+	viper.BindPFlag("idev.amfi.dev.post", idevAmfiDevModeCmd.Flags().Lookup("post"))
 }
 
 // idevAmfiDevModeCmd represents the push command
 var idevAmfiDevModeCmd = &cobra.Command{
 	Use:           "dev",
 	Aliases:       []string{"d", "developer", "developer-mode"},
-	Short:         "Enabled Developer Mode on device",
+	Short:         "Enable Developer Mode on device",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 		// flags
-		udid, _ := cmd.Flags().GetString("udid")
-		postRestart, _ := cmd.Flags().GetBool("post")
+		udid := viper.GetString("idev.udid")
+		postRestart := viper.GetBool("idev.amfi.dev.post")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

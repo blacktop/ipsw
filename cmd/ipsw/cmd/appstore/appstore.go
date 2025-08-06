@@ -31,10 +31,10 @@ func init() {
 	AppstoreCmd.PersistentFlags().StringP("iss", "i", "", "Issuer ID")
 	AppstoreCmd.PersistentFlags().StringP("kid", "k", "", "Key ID")
 	AppstoreCmd.PersistentFlags().StringP("jwt", "j", "", "JWT api key")
-	viper.BindPFlag("appstore.p8", AppstoreCmd.Flags().Lookup("p8"))
-	viper.BindPFlag("appstore.iss", AppstoreCmd.Flags().Lookup("iss"))
-	viper.BindPFlag("appstore.kid", AppstoreCmd.Flags().Lookup("kid"))
-	viper.BindPFlag("appstore.jwt", AppstoreCmd.Flags().Lookup("jwt"))
+	viper.BindPFlag("appstore.p8", AppstoreCmd.PersistentFlags().Lookup("p8"))
+	viper.BindPFlag("appstore.iss", AppstoreCmd.PersistentFlags().Lookup("iss"))
+	viper.BindPFlag("appstore.kid", AppstoreCmd.PersistentFlags().Lookup("kid"))
+	viper.BindPFlag("appstore.jwt", AppstoreCmd.PersistentFlags().Lookup("jwt"))
 }
 
 // AppstoreCmd represents the appstore command
@@ -43,11 +43,6 @@ var AppstoreCmd = &cobra.Command{
 	Aliases: []string{"as"},
 	Short:   "Interact with the App Store Connect API",
 	Args:    cobra.NoArgs,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
-		viper.BindPFlag("no-color", cmd.Flags().Lookup("no-color"))
-		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

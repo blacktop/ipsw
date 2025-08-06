@@ -126,7 +126,7 @@ type Config struct {
 	Middle       uint64
 	AsJSON       bool
 	Demangle     bool
-	Quite        bool
+	Quiet        bool
 	Color        bool
 }
 type AddrDetails struct {

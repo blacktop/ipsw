@@ -26,10 +26,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,6 +40,8 @@ func init() {
 	// kernelVersionCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// 	return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	// }
+	viper.BindPFlag("kernel.version.json", kernelVersionCmd.Flags().Lookup("json"))
+	viper.BindPFlag("kernel.version.arch", kernelVersionCmd.Flags().Lookup("arch"))
 }
 
 // kernelVersionCmd represents the version command
@@ -50,17 +50,11 @@ var kernelVersionCmd = &cobra.Command{
 	Aliases:       []string{"v"},
 	Short:         "Dump kernelcache version",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		asJSON, _ := cmd.Flags().GetBool("json")
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		asJSON := viper.GetBool("kernel.version.json")
+		selectedArch := viper.GetString("kernel.version.arch")
 
 		machoPath := filepath.Clean(args[0])
 

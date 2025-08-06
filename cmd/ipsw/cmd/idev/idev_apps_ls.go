@@ -27,10 +27,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/apps"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,26 +39,24 @@ func init() {
 	idevAppsListCmd.Flags().BoolP("user", "r", false, "List user apps")
 	idevAppsListCmd.Flags().BoolP("hidden", "n", false, "List hidden apps")
 	idevAppsListCmd.Flags().BoolP("json", "j", false, "Display apps as JSON")
+	viper.BindPFlag("idev.apps.ls.system", idevAppsListCmd.Flags().Lookup("system"))
+	viper.BindPFlag("idev.apps.ls.user", idevAppsListCmd.Flags().Lookup("user"))
+	viper.BindPFlag("idev.apps.ls.hidden", idevAppsListCmd.Flags().Lookup("hidden"))
+	viper.BindPFlag("idev.apps.ls.json", idevAppsListCmd.Flags().Lookup("json"))
 }
 
 // idevAppsListCmd represents the list command
 var idevAppsListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List installed applications",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		system, _ := cmd.Flags().GetBool("system")
-		user, _ := cmd.Flags().GetBool("user")
-		hidden, _ := cmd.Flags().GetBool("hidden")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		system := viper.GetBool("idev.apps.ls.system")
+		user := viper.GetBool("idev.apps.ls.user")
+		hidden := viper.GetBool("idev.apps.ls.hidden")
+		asJSON := viper.GetBool("idev.apps.ls.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

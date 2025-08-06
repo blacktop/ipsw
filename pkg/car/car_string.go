@@ -22,6 +22,7 @@ func _() {
 	_ = x[Layer-11]
 	_ = x[Scale-12]
 	_ = x[Localization-13]
+	_ = x[Localization-13]
 	_ = x[PresentationState-14]
 	_ = x[Idiom-15]
 	_ = x[Subtype-16]
@@ -44,8 +45,10 @@ var _renditionAttributeType_index = [...]uint16{0, 9, 16, 20, 24, 33, 44, 49, 64
 
 func (i renditionAttributeType) String() string {
 	if i >= renditionAttributeType(len(_renditionAttributeType_index)-1) {
+	if i >= renditionAttributeType(len(_renditionAttributeType_index)-1) {
 		return "renditionAttributeType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
+	return _renditionAttributeType_name[_renditionAttributeType_index[i]:_renditionAttributeType_index[i+1]]
 	return _renditionAttributeType_name[_renditionAttributeType_index[i]:_renditionAttributeType_index[i+1]]
 }
 func _() {

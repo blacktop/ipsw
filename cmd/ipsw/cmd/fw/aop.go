@@ -61,12 +61,7 @@ var aopCmd = &cobra.Command{
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		showInfo := viper.GetBool("fw.aop.info")
 		output := viper.GetString("fw.aop.output")

@@ -97,7 +97,7 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 	engine := disass.NewMachoDisass(m, &disass.Config{
 		Data:         data,
 		StartAddress: text.Addr,
-		Quite:        true,
+		Quiet:        true,
 	})
 
 	log.WithField("name", name).Info("Analyzing MachO...")

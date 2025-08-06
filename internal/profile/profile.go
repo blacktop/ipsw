@@ -32,22 +32,22 @@ import (
 
 // Config represents profiling configuration
 type Config struct {
-	CPUProfile    string
-	MemProfile    string
-	GoroutineProf string
-	BlockProf     string
-	MutexProf     string
-	TraceFile     string
+	CPUProfile     string
+	MemProfile     string
+	GoroutineProf  string
+	BlockProf      string
+	MutexProf      string
+	TraceFile      string
 	MemProfileRate int
 }
 
 // Profiler manages profiling operations
 type Profiler struct {
-	config   Config
-	cpuFile  *os.File
-	traceFile *os.File
-	startTime time.Time
-	startMem  runtime.MemStats
+	config                 Config
+	cpuFile                *os.File
+	traceFile              *os.File
+	startTime              time.Time
+	startMem               runtime.MemStats
 	originalMemProfileRate int
 }
 
@@ -63,7 +63,7 @@ func New(cfg Config) *Profiler {
 func (p *Profiler) Start() error {
 	// Store original memory profile rate
 	p.originalMemProfileRate = runtime.MemProfileRate
-	
+
 	// Start CPU profiling
 	if p.config.CPUProfile != "" {
 		var err error
@@ -212,11 +212,11 @@ func (p *Profiler) Stop() error {
 func (p *Profiler) PrintStats() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	fmt.Printf("\n=== Performance Stats ===\n")
 	fmt.Printf("Execution time: %v\n", time.Since(p.startTime))
-	fmt.Printf("Memory allocated: %v MB (delta: %+v MB)\n", 
-		m.Alloc/1024/1024, 
+	fmt.Printf("Memory allocated: %v MB (delta: %+v MB)\n",
+		m.Alloc/1024/1024,
 		(m.Alloc-p.startMem.Alloc)/1024/1024)
 	fmt.Printf("Total memory allocated: %v MB\n", m.TotalAlloc/1024/1024)
 	fmt.Printf("System memory: %v MB\n", m.Sys/1024/1024)

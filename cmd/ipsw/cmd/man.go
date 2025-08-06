@@ -32,7 +32,6 @@ import (
 var manCmd = &cobra.Command{
 	Use:                   "man",
 	Short:                 "Generates ipsw's command line manpages",
-	SilenceUsage:          true,
 	DisableFlagsInUseLine: true,
 	Hidden:                true,
 	Args:                  cobra.MinimumNArgs(1),

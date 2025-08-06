@@ -29,7 +29,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,6 +37,7 @@ func init() {
 	KernelcacheCmd.AddCommand(kernelDecCmd)
 	kernelDecCmd.Flags().StringP("output", "o", "", "Output file")
 	kernelDecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.dec.output", kernelDecCmd.Flags().Lookup("output"))
 }
 
 // kernelDecCmd represents the dec command
@@ -45,16 +45,10 @@ var kernelDecCmd = &cobra.Command{
 	Use:           "dec <kernelcache>",
 	Short:         "Decompress a kernelcache",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		outputDir, _ := cmd.Flags().GetString("output")
+		outputDir := viper.GetString("kernel.dec.output")
 
 		kcpath := filepath.Clean(args[0])
 

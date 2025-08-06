@@ -22,18 +22,27 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/blacktop/ipsw/pkg/table"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/olekukonko/tablewriter"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 func init() {
 	rootCmd.AddCommand(deviceListCmd)
+	deviceListCmd.Flags().BoolP("plain", "p", false, "Output as non-interactive table")
+	deviceListCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	viper.BindPFlag("device-list.plain", deviceListCmd.Flags().Lookup("plain"))
+	viper.BindPFlag("device-list.json", deviceListCmd.Flags().Lookup("json"))
 }
 
 // deviceListCmd represents the deviceList command
@@ -44,20 +53,9 @@ var deviceListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// gen, _ := cmd.Flags().GetBool("gen")
-		// if gen {
-		// 	devices, err := xcode.ReadDeviceTraitsDB()
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// 	err = xcode.WriteToJSON(devices)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// 	return nil
-		// }
+		// flags
+		plain := viper.GetBool("device-list.plain")
+		asJSON := viper.GetBool("device-list.json")
 
 		devices, err := xcode.GetDevices()
 		if err != nil {
@@ -65,6 +63,15 @@ var deviceListCmd = &cobra.Command{
 		}
 
 		sort.Sort(xcode.ByProductType{Devices: devices})
+
+		if asJSON {
+			jdata, err := json.Marshal(devices)
+			if err != nil {
+				return fmt.Errorf("error marshalling devices to JSON: %w", err)
+			}
+			fmt.Println(string(jdata))
+			return nil
+		}
 
 		data := [][]string{}
 		for _, device := range devices {
@@ -78,14 +85,27 @@ var deviceListCmd = &cobra.Command{
 			})
 		}
 
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Product", "Model", "Description", "CPU", "Arch", "MemClass"})
-		table.SetAutoWrapText(false)
-		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-		table.SetCenterSeparator("|")
-		table.AppendBulk(data)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.Render() // Send output
+		headers := []string{"Product", "Model", "Description", "CPU", "Arch", "MemClass"}
+
+		if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && !plain {
+			// Use the fancy interactive BubbleTable
+			model := table.NewInteractiveTable(headers, data, false)
+			p := tea.NewProgram(model, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("error running interactive table: %w", err)
+			}
+		} else {
+			// Fallback to static styled table for non-TTY environments
+			tableString := &strings.Builder{}
+			tbl := table.NewStringBuilderTableWriter(tableString)
+			tbl.SetHeader(headers)
+			tbl.SetBorders(nil)
+			tbl.SetCenterSeparator("|")
+			tbl.SetAlignment(1) // Left align
+			tbl.AppendBulk(data)
+			tbl.Render()
+			fmt.Print(tableString.String())
+		}
 
 		return nil
 	},

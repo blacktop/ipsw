@@ -35,7 +35,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -62,7 +61,7 @@ var supportedAddLCs = []string{
 func init() {
 	machoPatchCmd.AddCommand(machoPatchAddCmd)
 	machoPatchAddCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
-	machoPatchAddCmd.Flags().BoolP("re-sign", "s", false, "Adhoc sign file")
+	machoPatchAddCmd.Flags().BoolP("re-sign", "s", false, "Ad-hoc sign file")
 	machoPatchAddCmd.Flags().StringP("output", "o", "", "Output new file")
 	viper.BindPFlag("macho.patch.add.overwrite", machoPatchAddCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.patch.add.re-sign", machoPatchAddCmd.Flags().Lookup("re-sign"))
@@ -77,7 +76,6 @@ var machoPatchAddCmd = &cobra.Command{
 		# Add an LC_RPATH like install_name_tool
 		❯ ipsw macho patch add MACHO LC_RPATH @executable_path/Frameworks`),
 	Args:          cobra.MinimumNArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
@@ -86,11 +84,6 @@ var machoPatchAddCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		overwrite := viper.GetBool("macho.patch.overwrite")

@@ -44,8 +44,13 @@ func init() {
 	SymAddrCmd.Flags().BoolP("binds", "b", false, "Also search LC_DYLD_INFO binds")
 	SymAddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	SymAddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
-	SymAddrCmd.Flags().String("out", "", "Path to output JSON file")
+	SymAddrCmd.Flags().StringP("output", "o", "", "Path to output JSON file")
 	// SymAddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
+	viper.BindPFlag("dyld.symaddr.all", SymAddrCmd.Flags().Lookup("all"))
+	viper.BindPFlag("dyld.symaddr.binds", SymAddrCmd.Flags().Lookup("binds"))
+	viper.BindPFlag("dyld.symaddr.image", SymAddrCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.symaddr.in", SymAddrCmd.Flags().Lookup("in"))
+	viper.BindPFlag("dyld.symaddr.output", SymAddrCmd.Flags().Lookup("output"))
 }
 
 // SymAddrCmd represents the symaddr command
@@ -63,18 +68,14 @@ var SymAddrCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 		useColor := viper.GetBool("color") && !viper.GetBool("no-color")
 		color.NoColor = !useColor
 
-		imageName, _ := cmd.Flags().GetString("image")
-		symbolFile, _ := cmd.Flags().GetString("in")
-		jsonFile, _ := cmd.Flags().GetString("out")
-		allMatches, _ := cmd.Flags().GetBool("all")
-		showBinds, _ := cmd.Flags().GetBool("binds")
+		imageName := viper.GetString("dyld.symaddr.image")
+		symbolFile := viper.GetString("dyld.symaddr.in")
+		jsonFile := viper.GetString("dyld.symaddr.output")
+		allMatches := viper.GetBool("dyld.symaddr.all")
+		showBinds := viper.GetBool("dyld.symaddr.binds")
 
 		dscPath := filepath.Clean(args[0])
 

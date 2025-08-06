@@ -36,7 +36,6 @@ import (
 	"github.com/blacktop/ipsw/internal/demangle"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -89,29 +88,24 @@ var MachoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
 		verbose := viper.GetBool("verbose")
-		showLoadCommands, _ := cmd.Flags().GetBool("loads")
-		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
-		showObjC, _ := cmd.Flags().GetBool("objc")
-		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
-		showSwift, _ := cmd.Flags().GetBool("swift")
-		showSwiftAll, _ := cmd.Flags().GetBool("swift-all")
-		showSymbols, _ := cmd.Flags().GetBool("symbols")
-		doDemangle, _ := cmd.Flags().GetBool("demangle")
-		showFuncStarts, _ := cmd.Flags().GetBool("starts")
-		showStrings, _ := cmd.Flags().GetBool("strings")
-		showStubs, _ := cmd.Flags().GetBool("stubs")
-		searchPattern, _ := cmd.Flags().GetString("search")
-		dumpALL, _ := cmd.Flags().GetBool("all")
-		extractDylib, _ := cmd.Flags().GetBool("extract")
-		extractPath, _ := cmd.Flags().GetString("output")
-		forceExtract, _ := cmd.Flags().GetBool("force")
+		showLoadCommands := viper.GetBool("dyld.macho.loads")
+		showLoadCommandsAsJSON := viper.GetBool("dyld.macho.json")
+		showObjC := viper.GetBool("dyld.macho.objc")
+		showObjcRefs := viper.GetBool("dyld.macho.objc-refs")
+		showSwift := viper.GetBool("dyld.macho.swift")
+		showSwiftAll := viper.GetBool("dyld.macho.swift-all")
+		showSymbols := viper.GetBool("dyld.macho.symbols")
+		doDemangle := viper.GetBool("dyld.macho.demangle")
+		showFuncStarts := viper.GetBool("dyld.macho.starts")
+		showStrings := viper.GetBool("dyld.macho.strings")
+		showStubs := viper.GetBool("dyld.macho.stubs")
+		searchPattern := viper.GetString("dyld.macho.search")
+		dumpALL := viper.GetBool("dyld.macho.all")
+		extractDylib := viper.GetBool("dyld.macho.extract")
+		extractPath := viper.GetString("dyld.macho.output")
+		forceExtract := viper.GetBool("dyld.macho.force")
 		// validate flags
 		if doDemangle && (!showSymbols && !showSwift) {
 			return fmt.Errorf("you must also supply --symbols OR --swift flag to demangle")

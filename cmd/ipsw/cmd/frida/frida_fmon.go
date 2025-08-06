@@ -31,10 +31,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -46,16 +44,10 @@ var fridaFMonCmd = &cobra.Command{
 	Use:           "fmon",
 	Aliases:       []string{"fm"},
 	Short:         "File Monitor",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// udid := viper.GetString("frida.udid")
 

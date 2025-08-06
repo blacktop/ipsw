@@ -27,10 +27,8 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,6 +39,9 @@ func init() {
 	syscallCmd.Flags().StringP("output", "o", "", "Output gzip file")
 	syscallCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	syscallCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.syscall.gen", syscallCmd.Flags().Lookup("gen"))
+	viper.BindPFlag("kernel.syscall.output", syscallCmd.Flags().Lookup("output"))
+	viper.BindPFlag("kernel.syscall.arch", syscallCmd.Flags().Lookup("arch"))
 }
 
 // syscallCmd represents the syscall command
@@ -49,18 +50,12 @@ var syscallCmd = &cobra.Command{
 	Aliases:       []string{"sc"},
 	Short:         "Dump kernelcache syscalls",
 	Args:          cobra.MinimumNArgs(0),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		gen, _ := cmd.Flags().GetBool("gen")
-		output, _ := cmd.Flags().GetString("output")
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		gen := viper.GetBool("kernel.syscall.gen")
+		output := viper.GetString("kernel.syscall.output")
+		selectedArch := viper.GetString("kernel.syscall.arch")
 
 		if gen {
 			return kernelcache.ParseSyscallFiles(output)

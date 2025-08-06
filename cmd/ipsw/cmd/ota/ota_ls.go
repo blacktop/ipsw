@@ -29,10 +29,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -57,14 +55,8 @@ var otaLsCmd = &cobra.Command{
 	Aliases:       []string{"l"},
 	Short:         "List OTA files",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		ota, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
 		if err != nil {

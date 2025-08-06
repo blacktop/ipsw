@@ -38,7 +38,6 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -89,7 +88,7 @@ func init() {
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.MarkFlagDirname("output")
-	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	downloadAppledbCmd.MarkFlagsMutuallyExclusive("release", "beta", "rc")
 	// Bind persistent flags
@@ -148,11 +147,6 @@ var downloadAppledbCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// settings
 		proxy := viper.GetString("download.appledb.proxy")
@@ -359,6 +353,11 @@ var downloadAppledbCmd = &cobra.Command{
 					return err
 				}
 			}
+		}
+
+		if len(results) == 0 {
+			log.Warn("no results found for query")
+			return nil
 		}
 
 		log.Debug("URLs to download:")

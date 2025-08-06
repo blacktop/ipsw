@@ -35,10 +35,9 @@ func init() {
 
 // img3InfoCmd represents the img3 info command
 var img3InfoCmd = &cobra.Command{
-	Use:          "info <IMG3>",
-	Short:        "Print img3 information",
-	Args:         cobra.ExactArgs(1),
-	SilenceUsage: true,
+	Use:   "info <IMG3>",
+	Short: "Print img3 information",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		data, err := os.ReadFile(args[0])
 		if err != nil {

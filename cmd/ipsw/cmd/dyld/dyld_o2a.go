@@ -30,20 +30,21 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	DyldCmd.AddCommand(OffsetToAddrCmd)
-	OffsetToAddrCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
-	OffsetToAddrCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	DyldCmd.AddCommand(machoO2aCmd)
+	machoO2aCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
+	machoO2aCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	viper.BindPFlag("macho.o2a.dec", machoO2aCmd.Flags().Lookup("dec"))
+	viper.BindPFlag("macho.o2a.hex", machoO2aCmd.Flags().Lookup("hex"))
 }
 
-// OffsetToAddrCmd represents the o2a command
-var OffsetToAddrCmd = &cobra.Command{
+// machoO2aCmd represents the o2a command
+var machoO2aCmd = &cobra.Command{
 	Use:   "o2a <DSC> <OFFSET>",
 	Short: "Convert offset to address",
 	Args:  cobra.ExactArgs(2),
@@ -56,13 +57,8 @@ var OffsetToAddrCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		inDec, _ := cmd.Flags().GetBool("dec")
-		inHex, _ := cmd.Flags().GetBool("hex")
+		inDec := viper.GetBool("dyld.o2a.dec")
+		inHex := viper.GetBool("dyld.o2a.hex")
 
 		if inDec && inHex {
 			return fmt.Errorf("you can only use --dec OR --hex")
