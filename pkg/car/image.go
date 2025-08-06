@@ -11,6 +11,7 @@ import (
 	"io"
 
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/comp"
 	"github.com/blacktop/lzfse-cgo"
 )
@@ -221,6 +222,38 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
 				}
 				out.Write(decompressed)
+			case PaletteImage:
+				// Magic byte detection for compression format
+				if len(data) >= 4 {
+					magic := data[0:4]
+					if string(magic) == "lzvn" || (len(data) >= 4 && magic[0] == 0x68 && magic[1] == 0x01 && magic[2] == 0x00 && magic[3] == 0xf0) {
+						// LZVN compressed palette image
+						dec := make([]byte, len(data)*4)
+						if n := lzfse.DecodeLZVNBuffer(data, dec); n == 0 {
+							return nil, fmt.Errorf("failed to decompress PaletteImage LZVN data")
+						} else {
+							out.Write(dec[:n])
+						}
+					} else {
+						// Raw palette image data
+						out.Write(data)
+					}
+				} else {
+					out.Write(data)
+				}
+			case Deepmap:
+				// Check if data is LZFSE compressed
+				if isLZFSE, _ := magic.IsLZFSE(data); isLZFSE {
+					// This is LZFSE compressed
+					decompressed, err := comp.Decompress(data, comp.LZFSE)
+					if err != nil {
+						return nil, fmt.Errorf("failed to decompress Deepmap LZFSE data: %v", err)
+					}
+					out.Write(decompressed)
+				} else {
+					// Raw deepmap data
+					out.Write(data)
+				}
 			default:
 				return nil, fmt.Errorf("unknown encoding: %s", bm.Encoding)
 			}
@@ -255,6 +288,38 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
 			}
 			out.Write(decompressed)
+		case PaletteImage:
+			// Magic byte detection for compression format
+			if len(data) >= 4 {
+				magic := data[0:4]
+				if string(magic) == "lzvn" || (len(data) >= 4 && magic[0] == 0x68 && magic[1] == 0x01 && magic[2] == 0x00 && magic[3] == 0xf0) {
+					// LZVN compressed palette image
+					dec := make([]byte, len(data)*4)
+					if n := lzfse.DecodeLZVNBuffer(data, dec); n == 0 {
+						return nil, fmt.Errorf("failed to decompress PaletteImage LZVN data")
+					} else {
+						out.Write(dec[:n])
+					}
+				} else {
+					// Raw palette image data
+					out.Write(data)
+				}
+			} else {
+				out.Write(data)
+			}
+		case Deepmap:
+			// Check if data is LZFSE compressed
+			if isLZFSE, _ := magic.IsLZFSE(data); isLZFSE {
+				// This is LZFSE compressed
+				decompressed, err := comp.Decompress(data, comp.LZFSE)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decompress Deepmap LZFSE data: %v", err)
+				}
+				out.Write(decompressed)
+			} else {
+				// Raw deepmap data
+				out.Write(data)
+			}
 		case Deepmap2:
 			// os.WriteFile(fmt.Sprintf("%s.compressed.%s", string(bytes.Trim(ci.Metadata.Name[:], "\x00")), bm.Encoding), data, 0644)
 			dmr := bytes.NewReader(data)
@@ -290,6 +355,30 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
 				}
 				out.Write(decompressed)
+			} else if cdm2.Encoding == ZIP {
+				// For ZIP in Deepmap2, check if it's actually LZFSE (Apple often mislabels LZFSE as ZIP)
+				remaining := make([]byte, dmr.Len())
+				if err := binary.Read(dmr, binary.LittleEndian, &remaining); err != nil {
+					return nil, fmt.Errorf("failed to read deepmap2 ZIP data: %v", err)
+				}
+				
+				if isLZFSE, _ := magic.IsLZFSE(remaining); isLZFSE {
+					// This is actually LZFSE mislabeled as ZIP
+					decompressed, err := comp.Decompress(remaining, comp.LZFSE)
+					if err != nil {
+						return nil, fmt.Errorf("failed to decompress Deepmap2 LZFSE data: %v", err)
+					}
+					out.Write(decompressed)
+				} else {
+					// Try regular gzip decompression
+					gr, err := gzip.NewReader(bytes.NewReader(remaining))
+					if err != nil {
+						return nil, fmt.Errorf("failed to create gzip reader: %v", err)
+					}
+					if _, err := io.Copy(&out, gr); err != nil {
+						return nil, fmt.Errorf("failed to decompress ZIP data: %v", err)
+					}
+				}
 			} else {
 				return nil, fmt.Errorf("unsupported deepmap2 encoding: %s", cdm2.Encoding)
 			}
