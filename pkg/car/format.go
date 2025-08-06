@@ -1,6 +1,6 @@
 package car
 
-//go:generate go tool stringer -type=renditionAttributeType,renditionLayoutType,resourceID,csiBitmapEncoding -output car_string.go
+//go:generate go tool stringer -type=renditionAttributeType,renditionLayoutType,resourceID,compressionType -output=car_string.go .
 
 import (
 	"bytes"
@@ -266,7 +266,7 @@ func (r renditionAttributeType) KeyFormatName() string {
 		return "kCRThemeSizeName"
 	case Direction:
 		return "kCRThemeDirectionName"
-	case placeholder:
+	case Placeholder:
 		return "kCRThemePlaceholderName"
 	case Value:
 		return "kCRThemeValueName"
@@ -353,7 +353,7 @@ func (a *Asset) ToJSON() ([]byte, error) {
 	// Add renditions
 	for _, rend := range a.ImageDB {
 		rendition := map[string]any{
-			"Name": rend.Name,
+			"Name": rend.RenditionName,
 			"Type": rend.Type,
 		}
 
