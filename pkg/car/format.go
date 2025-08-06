@@ -4,6 +4,7 @@ package car
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -140,4 +141,161 @@ func (a *Asset) String() string {
 		}
 	}
 	return out
+}
+
+// KeyFormatName converts renditionAttributeType to its Apple name
+func (r renditionAttributeType) KeyFormatName() string {
+	switch r {
+	case ThemeLook:
+		return "kCRThemeLookName"
+	case Element:
+		return "kCRThemeElementName"
+	case Part:
+		return "kCRThemePartName"
+	case Size:
+		return "kCRThemeSizeName"
+	case Direction:
+		return "kCRThemeDirectionName"
+	case placeholder:
+		return "kCRThemePlaceholderName"
+	case Value:
+		return "kCRThemeValueName"
+	case ThemeAppearance:
+		return "kCRThemeAppearanceName"
+	case Dimension1:
+		return "kCRThemeDimension1Name"
+	case Dimension2:
+		return "kCRThemeDimension2Name"
+	case State:
+		return "kCRThemeStateName"
+	case Layer:
+		return "kCRThemeLayerName"
+	case Scale:
+		return "kCRThemeScaleName"
+	case Localization:
+		return "kCRThemeLocalizationName"
+	case PresentationState:
+		return "kCRThemePresentationStateName"
+	case Idiom:
+		return "kCRThemeIdiomName"
+	case Subtype:
+		return "kCRThemeSubtypeName"
+	case Identifier:
+		return "kCRThemeIdentifierName"
+	case PreviousValue:
+		return "kCRThemePreviousValueName"
+	case PreviousState:
+		return "kCRThemePreviousStateName"
+	case HorizontalSizeClass:
+		return "kCRThemeHorizontalSizeClassName"
+	case VerticalSizeClass:
+		return "kCRThemeVerticalSizeClassName"
+	case MemoryLevelClass:
+		return "kCRThemeMemoryLevelClassName"
+	case GraphicsFeatureSetClass:
+		return "kCRThemeGraphicsFeatureSetClassName"
+	case DisplayGamut:
+		return "kCRThemeDisplayGamutName"
+	case DeploymentTarget:
+		return "kCRThemeDeploymentTargetName"
+	default:
+		return fmt.Sprintf("renditionAttributeType(%d)", r)
+	}
+}
+
+// ToJSON converts Asset to JSON format matching assetutil output
+func (a *Asset) ToJSON() ([]byte, error) {
+	output := []map[string]any{}
+
+	// Add header information as first element
+	header := map[string]any{
+		"CoreUIVersion":      a.Header.CoreUiVersion,
+		"StorageVersion":     a.Header.StorageVersion,
+		"Timestamp":          a.Header.StorageTimestamp,
+		"SchemaVersion":      a.Header.SchemaVersion,
+		"MainVersion":        strings.TrimSpace(string(bytes.Trim(a.Header.MainVersionString[:], "\x00"))),
+		"Authoring Tool":     strings.TrimSpace(string(bytes.Trim(a.Metadata.AuthoringTool[:], "\x00"))),
+		"ThinningParameters": string(bytes.Trim(a.Metadata.ThinningArguments[:], "\x00")),
+		"Platform":           string(bytes.Trim(a.Metadata.DeploymentPlatform[:], "\x00")),
+		"PlatformVersion":    string(bytes.Trim(a.Metadata.DeploymentPlatformVersion[:], "\x00")),
+	}
+
+	// Add key format
+	if len(a.KeyFormat) > 0 {
+		keyFormats := []string{}
+		for _, k := range a.KeyFormat {
+			keyFormats = append(keyFormats, k.KeyFormatName())
+		}
+		header["Key Format"] = keyFormats
+	}
+
+	// Add appearances
+	if len(a.AppearanceDB) > 0 {
+		appearances := map[string]int{}
+		for k, v := range a.AppearanceDB {
+			appearances[k] = int(v)
+		}
+		header["Appearances"] = appearances
+	}
+
+	output = append(output, header)
+
+	// Add renditions
+	for _, rend := range a.ImageDB {
+		rendition := map[string]any{
+			"Name": rend.Name,
+			"Type": rend.Type,
+		}
+
+		// Add attributes
+		for _, kf := range a.KeyFormat {
+			if value, ok := rend.Attributes[kf.String()]; ok {
+				switch kf {
+				case Scale:
+					rendition["Scale"] = value
+				case Idiom:
+					rendition["Idiom"] = getIdiomName(value)
+				case Subtype:
+					if value > 0 {
+						rendition["Subtype"] = value
+					}
+				case Identifier:
+					if value > 0 {
+						rendition["NameIdentifier"] = value
+					}
+				}
+			}
+		}
+
+		if rend.Size > 0 {
+			rendition["SizeOnDisk"] = rend.Size
+		}
+
+		output = append(output, rendition)
+	}
+
+	return json.MarshalIndent(output, "", "  ")
+}
+
+func getIdiomName(value uint16) string {
+	switch coreThemeIdiom(value) {
+	case Universal:
+		return "universal"
+	case Phone:
+		return "phone"
+	case Tablet:
+		return "pad"
+	case Desktop:
+		return "desktop"
+	case Tv:
+		return "tv"
+	case Car:
+		return "car"
+	case Watch:
+		return "watch"
+	case Marketing:
+		return "marketing"
+	default:
+		return fmt.Sprintf("idiom_%d", value)
+	}
 }
