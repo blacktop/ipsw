@@ -28,9 +28,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -47,14 +45,8 @@ var uniqCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		dsc, err := dyld.Open(args[0])
 		if err != nil {

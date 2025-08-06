@@ -1,6 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Layout from '@theme/Layout';
 import { EntitlementsService, EntitlementResult } from '../lib/supabase';
+
+// Type definitions
+interface FormattedValue {
+    type: 'bool' | 'number' | 'string' | 'array' | 'dict' | 'unknown';
+    value: any;
+    display: string;
+}
+
+interface ErrorWithMessage {
+    message: string;
+}
+
+function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as Record<string, unknown>).message === 'string'
+    );
+}
+
+function toErrorWithMessage(maybeError: unknown): ErrorWithMessage {
+    if (isErrorWithMessage(maybeError)) return maybeError;
+
+    try {
+        return new Error(JSON.stringify(maybeError));
+    } catch {
+        return new Error(String(maybeError));
+    }
+}
 
 export default function Entitlements() {
     const [iosVersions, setIosVersions] = useState<string[]>([]);
@@ -11,12 +41,22 @@ export default function Entitlements() {
     const [loading, setLoading] = useState<boolean>(false);
     const [dbLoading, setDbLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
-    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
     const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
     const [selectedExecutablePath, setSelectedExecutablePath] = useState<string>('');
     const [availableExecutablePaths, setAvailableExecutablePaths] = useState<string[]>([]);
     const [hasSearched, setHasSearched] = useState<boolean>(false);
-    const [accordionExpanded, setAccordionExpanded] = useState<boolean>(true);
+    const [accordionExpanded, setAccordionExpanded] = useState<boolean>(true); // Start expanded by default
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [searchUIVisible, setSearchUIVisible] = useState<boolean>(true);
+    const [hasPerformedSearch, setHasPerformedSearch] = useState<boolean>(false); // Track if user has clicked search
+
+    // Use refs for timers to prevent stale closures
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const touchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         const initSupabase = async () => {
@@ -37,9 +77,10 @@ export default function Entitlements() {
 
                 const versions = await EntitlementsService.getIosVersions();
                 setIosVersions(versions);
-            } catch (err) {
-                console.error('Failed to initialize database:', err);
-                setError(`Failed to initialize database: ${err.message}`);
+            } catch (error) {
+                const errorWithMessage = toErrorWithMessage(error);
+                console.error('Failed to initialize database:', errorWithMessage);
+                setError(`Failed to initialize database: ${errorWithMessage.message}`);
             } finally {
                 setDbLoading(false);
             }
@@ -48,14 +89,172 @@ export default function Entitlements() {
         initSupabase();
     }, []);
 
+    // Detect mobile viewport
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Mobile scroll behavior for search UI
+    useEffect(() => {
+        if (!isMobile || !hasPerformedSearch) return; // Only enable after user has searched
+
+        let lastScrollY = 0;
+        let lastScrollTime = 0;
+        let isUserScrolling = false;
+
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            const currentTime = Date.now();
+            const scrollDelta = currentScrollY - lastScrollY;
+            const timeDelta = currentTime - lastScrollTime;
+            const scrollVelocity = timeDelta > 0 ? Math.abs(scrollDelta) / timeDelta : 0;
+
+            // Clear existing timeout
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+
+            // Don't hide if we're near the top
+            if (currentScrollY < 100) {
+                setSearchUIVisible(true);
+                lastScrollY = currentScrollY;
+                lastScrollTime = currentTime;
+                return;
+            }
+
+            // Detect significant downward scroll - hide UI
+            if (scrollDelta > 8) {
+                isUserScrolling = true;
+                scrollTimeoutRef.current = setTimeout(() => {
+                    setSearchUIVisible(false);
+                    isUserScrolling = false;
+                }, 200);
+            }
+            // Detect upward scroll with velocity (quick scroll up) - show UI
+            else if (scrollDelta < -10 && scrollVelocity > 0.3) {
+                setSearchUIVisible(true);
+                isUserScrolling = false;
+            }
+            // Strong upward momentum - show UI immediately
+            else if (scrollDelta < -20) {
+                setSearchUIVisible(true);
+                isUserScrolling = false;
+            }
+
+            lastScrollY = currentScrollY;
+            lastScrollTime = currentTime;
+        };
+
+        const handleTouchStart = () => {
+            // Reset state when user starts touching
+            isUserScrolling = false;
+        };
+
+        const handleTouchEnd = () => {
+            // Clear any existing touch timeout
+            if (touchTimeoutRef.current) {
+                clearTimeout(touchTimeoutRef.current);
+            }
+            // Small delay to catch momentum scrolling
+            touchTimeoutRef.current = setTimeout(() => {
+                isUserScrolling = false;
+            }, 100);
+        };
+
+        // Use passive listeners for better performance
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('touchstart', handleTouchStart, { passive: true });
+        window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('touchstart', handleTouchStart);
+            window.removeEventListener('touchend', handleTouchEnd);
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+            if (touchTimeoutRef.current) {
+                clearTimeout(touchTimeoutRef.current);
+            }
+        };
+    }, [isMobile, hasPerformedSearch]);
+
+    // Desktop accordion collapse behavior on scroll
+    useEffect(() => {
+        if (!results.length || !hasPerformedSearch) return; // Only enable after user has searched
+
+        let lastScrollTop = 0;
+
+        const handleResultsScroll = (event: Event) => {
+            const resultsContainer = event.target as HTMLElement;
+            const currentScrollTop = resultsContainer.scrollTop;
+            const scrollDelta = currentScrollTop - lastScrollTop;
+
+            // Clear existing timeout
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+
+            // Don't collapse if we're near the top or if accordion is already collapsed
+            if (currentScrollTop < 50 || !accordionExpanded) {
+                lastScrollTop = currentScrollTop;
+                return;
+            }
+
+            // Detect downward scroll - collapse accordion after delay
+            if (scrollDelta > 20) {
+                scrollTimeoutRef.current = setTimeout(() => {
+                    setAccordionExpanded(false);
+                }, 300);
+            }
+
+            lastScrollTop = currentScrollTop;
+        };
+
+        // Find and attach listener to results container
+        const resultsContainer = document.querySelector('.results-container') as HTMLElement;
+        if (resultsContainer) {
+            resultsContainer.addEventListener('scroll', handleResultsScroll, { passive: true });
+
+            return () => {
+                resultsContainer.removeEventListener('scroll', handleResultsScroll);
+                if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
+                }
+            };
+        }
+    }, [accordionExpanded, results.length, hasPerformedSearch]);
+
     // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
-            if (searchTimeout) {
-                clearTimeout(searchTimeout);
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+            if (touchTimeoutRef.current) {
+                clearTimeout(touchTimeoutRef.current);
+            }
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+            }
+            if (collapseTimeoutRef.current) {
+                clearTimeout(collapseTimeoutRef.current);
+            }
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
             }
         };
-    }, [searchTimeout]);
+    }, []);
 
     // Debounced search function with optional path parameter
     const debouncedSearchWithPath = useCallback(async (query: string, version: string, type: 'key' | 'file', pathFilter: string = '', forceSearch = false) => {
@@ -70,6 +269,14 @@ export default function Entitlements() {
         if (isInputFocused && !forceSearch) {
             return;
         }
+
+        // Cancel any pending request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        // Create new abort controller for this request
+        abortControllerRef.current = new AbortController();
 
         try {
             setLoading(true);
@@ -95,12 +302,20 @@ export default function Entitlements() {
                 );
             }
 
+            // Check if request was aborted
+            if (abortControllerRef.current?.signal.aborted) {
+                return;
+            }
+
             setResults(searchResults);
             setHasSearched(true);
 
-            // Auto-collapse accordion after successful search with results
-            if (searchResults.length > 0 && accordionExpanded) {
-                setTimeout(() => setAccordionExpanded(false), 300);
+            // Auto-collapse accordion after successful search with results (only if user has performed a search)
+            if (searchResults.length > 0 && accordionExpanded && hasPerformedSearch) {
+                if (collapseTimeoutRef.current) {
+                    clearTimeout(collapseTimeoutRef.current);
+                }
+                collapseTimeoutRef.current = setTimeout(() => setAccordionExpanded(false), 300);
             }
 
             // Extract unique executable paths for the filter dropdown
@@ -108,16 +323,22 @@ export default function Entitlements() {
                 const uniquePaths = Array.from(new Set(searchResults.map(r => r.file_path))).sort();
                 setAvailableExecutablePaths(uniquePaths);
             }
-        } catch (err) {
-            console.error('Search failed:', err);
-            setError(`Search failed: ${err.message}`);
+        } catch (error) {
+            // Don't show error if request was aborted
+            if (abortControllerRef.current?.signal.aborted) {
+                return;
+            }
+
+            const errorWithMessage = toErrorWithMessage(error);
+            console.error('Search failed:', errorWithMessage);
+            setError(`Search failed: ${errorWithMessage.message}`);
             setResults([]);
         } finally {
-            setLoading(false);
+            if (!abortControllerRef.current?.signal.aborted) {
+                setLoading(false);
+            }
         }
-    }, [isInputFocused, selectedExecutablePath, accordionExpanded]);
-
-    // Original debouncedSearch function for backward compatibility
+    }, [isInputFocused, selectedExecutablePath, accordionExpanded, hasPerformedSearch]);    // Original debouncedSearch function for backward compatibility
     const debouncedSearch = useCallback(async (query: string, version: string, type: 'key' | 'file', forceSearch = false) => {
         return debouncedSearchWithPath(query, version, type, '', forceSearch);
     }, [debouncedSearchWithPath]);
@@ -132,17 +353,16 @@ export default function Entitlements() {
         setHasSearched(false);
 
         // Clear existing timeout
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
         }
 
         // Set new timeout for debounced search with longer delay when input is focused
-        const timeout = setTimeout(() => {
+        // Note: Don't set hasPerformedSearch here - only when user explicitly searches
+        searchTimeoutRef.current = setTimeout(() => {
             debouncedSearch(newQuery, selectedVersion, searchType, false);
         }, isInputFocused ? 1000 : 500); // 1000ms when focused, 500ms when not
-
-        setSearchTimeout(timeout);
-    }, [selectedVersion, searchType, debouncedSearch, searchTimeout, isInputFocused]);
+    }, [selectedVersion, searchType, debouncedSearch, isInputFocused]);
 
     // Handle version change
     const handleVersionChange = useCallback((newVersion: string) => {
@@ -163,14 +383,16 @@ export default function Entitlements() {
     }, [searchQuery, selectedVersion, debouncedSearch]);
 
     // Manual search trigger (for search button)
-    const handleSearch = async () => {
+    const handleSearch = useCallback(async () => {
         // Clear any pending debounced search
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
         }
+        // Mark that user has performed a search (enables auto-collapse behavior)
+        setHasPerformedSearch(true);
         // Execute search immediately (force it)
         await debouncedSearch(searchQuery, selectedVersion, searchType, true);
-    };
+    }, [searchQuery, selectedVersion, searchType, debouncedSearch]);
 
     // Handle input focus/blur events
     const handleInputFocus = useCallback(() => {
@@ -181,8 +403,12 @@ export default function Entitlements() {
         setIsInputFocused(false);
         // When input loses focus, trigger search if there's a query
         if (searchQuery.trim()) {
+            // Clear any existing blur timeout
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+            }
             // Small delay to allow for the search to happen after blur
-            setTimeout(() => {
+            blurTimeoutRef.current = setTimeout(() => {
                 debouncedSearch(searchQuery, selectedVersion, searchType, true);
             }, 100);
         }
@@ -200,9 +426,9 @@ export default function Entitlements() {
             // Pass the new path directly instead of relying on state
             debouncedSearchWithPath(searchQuery, selectedVersion, searchType, newPath, true);
         }
-    }, [searchQuery, selectedVersion, searchType]);
+    }, [searchQuery, selectedVersion, searchType, debouncedSearchWithPath]);
 
-    const formatValue = (result: any) => {
+    const formatValue = useCallback((result: EntitlementResult): FormattedValue => {
         switch (result.value_type) {
             case 'bool':
                 return {
@@ -274,7 +500,31 @@ export default function Entitlements() {
                     display: 'true'
                 };
         }
-    };
+    }, []);
+
+    // Memoized computations for performance
+    const sortedIosVersions = useMemo(() => {
+        return [...iosVersions].sort((a, b) => {
+            // Sort versions numerically (descending)
+            const aNum = parseFloat(a);
+            const bNum = parseFloat(b);
+            return bNum - aNum;
+        });
+    }, [iosVersions]);
+
+    const globalMetadata = useMemo(() => {
+        if (!hasSearched || results.length === 0) return null;
+
+        const totalResults = results.length;
+        const uniqueVersions = new Set(results.map(r => r.ios_version)).size;
+        const uniqueFiles = new Set(results.map(r => r.file_path)).size;
+
+        return {
+            totalResults,
+            uniqueVersions,
+            uniqueFiles
+        };
+    }, [results, hasSearched]);
 
     return (
         <Layout title="Entitlements">
@@ -315,14 +565,55 @@ export default function Entitlements() {
                 )}
 
                 {!dbLoading && !error && (
-                    <div className="search-wrapper">
-                        <div className="search-accordion">
-                            {/* Accordion Header */}
+                    <div className={`search-wrapper ${isMobile && !searchUIVisible ? 'search-wrapper--ui-hidden' : ''}`}>
+                        {/* Mobile Search Bar */}
+                        {isMobile && (
+                            <div className={`mobile-search-bar ${searchUIVisible ? 'mobile-search-bar--visible' : 'mobile-search-bar--hidden'}`}>
+                                <div className="mobile-search-input-group">
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => handleSearchInput(e.target.value)}
+                                        onFocus={handleInputFocus}
+                                        onBlur={handleInputBlur}
+                                        placeholder={searchType === 'key'
+                                            ? 'Search entitlement keys...'
+                                            : 'Search executable paths...'
+                                        }
+                                        className="mobile-search-input"
+                                        disabled={loading}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                handleSearch();
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => setAccordionExpanded(!accordionExpanded)}
+                                        className="mobile-filters-toggle"
+                                        type="button"
+                                        aria-label="Toggle filters"
+                                    >
+                                        ⚙️
+                                    </button>
+                                </div>
+                                {hasSearched && !accordionExpanded && (selectedVersion || selectedExecutablePath) && (
+                                    <div className="mobile-active-filters">
+                                        {selectedVersion && <span className="mobile-filter-chip">iOS {selectedVersion}</span>}
+                                        {selectedExecutablePath && <span className="mobile-filter-chip">{selectedExecutablePath.split('/').pop()}</span>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className={`search-accordion ${isMobile ? 'search-accordion--mobile' : ''} ${isMobile && !searchUIVisible ? 'search-accordion--hidden' : ''}`}>
+                            {/* Accordion Header - Hidden on mobile when we have the mobile search bar */}
                             <button
-                                className="accordion-header"
+                                className={`accordion-header ${isMobile ? 'accordion-header--mobile' : ''}`}
                                 onClick={() => setAccordionExpanded(!accordionExpanded)}
                                 type="button"
                                 aria-expanded={accordionExpanded}
+                                style={isMobile ? { display: 'none' } : {}}
                             >
                                 <div className="accordion-title">
                                     <span className="accordion-icon"></span>
@@ -341,7 +632,7 @@ export default function Entitlements() {
 
                             {/* Accordion Content */}
                             {accordionExpanded && (
-                                <div className="accordion-content">
+                                <div className={`accordion-content ${isMobile ? 'accordion-content--mobile' : ''}`}>
                                     {/* Top Row: Version Filter and Search Type */}
                                     <div className="form-row">
                                         <div className="form-group">
@@ -354,8 +645,8 @@ export default function Entitlements() {
                                                 className="form-select"
                                             >
                                                 <option value="">All versions</option>
-                                                {iosVersions.map(version => (
-                                                    <option key={version} value={version}>{version}</option>
+                                                {sortedIosVersions.map(version => (
+                                                    <option key={version} value={version}>iOS {version}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -615,7 +906,7 @@ export default function Entitlements() {
                 .entitlements-container {
                     min-height: 100vh;
                     background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 100%);
-                    padding: 2rem;
+                    padding: 2rem 1rem;
                     color: var(--ifm-color-content);
                     display: flex;
                     flex-direction: column;
@@ -624,7 +915,7 @@ export default function Entitlements() {
                 .entitlements-header {
                     text-align: center;
                     margin-bottom: 3rem;
-                    max-width: 800px;
+                    max-width: 1200px;
                     margin-left: auto;
                     margin-right: auto;
                     flex-shrink: 0;
@@ -657,7 +948,7 @@ export default function Entitlements() {
                     gap: 1rem;
                     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
                     color: var(--ifm-color-content);
-                    max-width: 1000px;
+                    max-width: 1400px;
                     margin-left: auto;
                     margin-right: auto;
                     flex-shrink: 0;
@@ -721,11 +1012,92 @@ export default function Entitlements() {
 
                 .search-wrapper {
                     width: 100%;
-                    max-width: 1000px;
+                    max-width: 1400px;
                     margin: 0 auto;
                     display: flex;
                     flex-direction: column;
                     flex: 1;
+                    min-height: 0;
+                }
+
+                /* Mobile Search Bar */
+                .mobile-search-bar {
+                    background: rgba(31, 41, 55, 0.8);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(75, 85, 99, 0.3);
+                    border-radius: 8px;
+                    padding: 0.75rem;
+                    margin-bottom: 0.75rem;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
+                }
+
+                .mobile-search-bar--visible {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+
+                .mobile-search-bar--hidden {
+                    transform: translateY(-100%);
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                .mobile-search-input-group {
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+                }
+
+                .mobile-search-input {
+                    flex: 1;
+                    padding: 0.75rem 1rem;
+                    font-size: 0.9rem;
+                    background: rgba(55, 65, 81, 0.8);
+                    border: 1px solid rgba(75, 85, 99, 0.5);
+                    border-radius: 6px;
+                    color: var(--ifm-color-content);
+                    transition: all 0.2s ease;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+                }
+
+                .mobile-search-input:focus {
+                    outline: none;
+                    border-color: #60a5fa;
+                    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1);
+                }
+
+                .mobile-filters-toggle {
+                    padding: 0.75rem;
+                    background: rgba(75, 85, 99, 0.5);
+                    border: 1px solid rgba(75, 85, 99, 0.5);
+                    border-radius: 6px;
+                    color: var(--ifm-color-content);
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    font-size: 1rem;
+                }
+
+                .mobile-filters-toggle:hover {
+                    background: rgba(75, 85, 99, 0.7);
+                }
+
+                .mobile-active-filters {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-top: 0.75rem;
+                    flex-wrap: wrap;
+                }
+
+                .mobile-filter-chip {
+                    font-size: 0.75rem;
+                    background: rgba(59, 130, 246, 0.2);
+                    color: #93c5fd;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 4px;
+                    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
                 }
 
                 .search-accordion {
@@ -739,9 +1111,23 @@ export default function Entitlements() {
                     margin-bottom: 1rem;
                 }
 
+                .search-accordion--mobile {
+                    border-radius: 8px;
+                    margin-bottom: 0.75rem;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
+                }
+
+                .search-accordion--hidden {
+                    transform: translateY(-100%);
+                    opacity: 0;
+                    pointer-events: none;
+                    margin-bottom: 0;
+                }
+
                 .accordion-header {
                     width: 100%;
-                    padding: 1.5rem 2rem;
+                    padding: 1.5rem 1.5rem;
                     background: transparent;
                     border: none;
                     cursor: pointer;
@@ -809,8 +1195,12 @@ export default function Entitlements() {
                 }
 
                 .accordion-content {
-                    padding: 0 2rem 2rem 2rem;
+                    padding: 0 1.5rem 2rem 1.5rem;
                     animation: slideDown 0.2s ease-out;
+                }
+
+                .accordion-content--mobile {
+                    padding: 0 1rem 1rem 1rem;
                 }
 
                 .form-row {
@@ -1007,7 +1397,7 @@ export default function Entitlements() {
                     }
                     
                     .results-container--expanded {
-                        max-height: calc(100vh - 220px);
+                        max-height: calc(100vh - 300px);
                     }
                 }
 
@@ -1071,15 +1461,19 @@ export default function Entitlements() {
                     flex: 1;
                     overflow-y: auto;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-                    max-height: calc(100vh - 500px);
+                    /* Use dynamic height calculation instead of fixed max-height */
+                    height: calc(100vh - 280px); /* More flexible base height */
+                    min-height: 300px;
+                    transition: height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
                 }
 
                 .results-container--expanded {
-                    max-height: calc(100vh - 350px);
+                    /* On mobile, take up most of the viewport when filters are collapsed */
+                    height: calc(100vh - 200px);
                 }
 
                 .result-item {
-                    padding: 1.5rem;
+                    padding: 1.5rem 1.25rem;
                     border-bottom: 1px solid rgba(75, 85, 99, 0.2);
                     transition: all 0.2s ease;
                 }
@@ -1304,51 +1698,222 @@ export default function Entitlements() {
                         padding: 1rem;
                     }
 
+                    .entitlements-header {
+                        margin-bottom: 1.5rem;
+                    }
+
                     .entitlements-title {
                         font-size: 2rem;
                     }
 
-                    .search-panel {
-                        padding: 1.5rem;
+                    .entitlements-subtitle {
+                        font-size: 1rem;
+                    }
+
+                    /* Hide desktop accordion header on mobile */
+                    .accordion-header--mobile {
+                        display: none !important;
+                    }
+
+                    /* Simplify accordion content on mobile */
+                    .accordion-content {
+                        padding: 1rem;
                     }
 
                     .form-row {
                         flex-direction: column;
-                        gap: 1.5rem;
+                        gap: 1rem;
                     }
 
                     .form-group {
                         min-width: auto;
+                        margin-bottom: 0.75rem;
+                    }
+
+                    .form-label {
+                        font-size: 0.85rem;
+                        margin-bottom: 0.5rem;
+                    }
+
+                    .form-select {
+                        padding: 0.5rem 0.75rem;
+                        font-size: 0.9rem;
+                        border-radius: 6px;
                     }
 
                     .search-input-group {
                         flex-direction: column;
+                        gap: 0.75rem;
+                    }
+
+                    .search-input {
+                        padding: 0.75rem 1rem;
+                        font-size: 0.9rem;
+                        border-radius: 6px;
+                    }
+
+                    .search-button {
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.9rem;
+                        min-width: 120px;
                     }
 
                     .radio-group {
-                        flex-direction: column;
+                        flex-direction: row;
                         gap: 1rem;
+                    }
+
+                    .radio-option {
+                        padding: 0.25rem;
+                    }
+
+                    .radio-label {
+                        font-size: 0.9rem;
                     }
 
                     .results-header-row {
                         flex-direction: column;
                         align-items: flex-start;
+                        margin-bottom: 0.75rem;
                     }
 
-                    .executable-filter {
-                        width: 100%;
+                    .results-header {
+                        font-size: 1rem;
                     }
 
-                    .form-select--small {
-                        max-width: 100%;
+                    .global-metadata {
+                        font-size: 0.8rem;
+                        padding: 0.5rem 0.75rem;
+                        margin-bottom: 0.75rem;
+                    }
+
+                    .results-container {
+                        border-radius: 8px;
+                        height: calc(100vh - 160px); /* Optimized for mobile viewport */
+                        min-height: 250px;
+                        /* Ensure results can scroll independently */
+                        position: relative;
+                        transition: height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                    }
+
+                    .results-container--expanded {
+                        height: calc(100vh - 140px); /* More space when filters collapsed */
+                    }
+
+                    /* When search UI is hidden, give more space to results */
+                    .search-wrapper--ui-hidden .results-container {
+                        height: calc(100vh - 80px) !important;
+                        transition: height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                    }
+
+                    .search-wrapper--ui-hidden .results-container--expanded {
+                        height: calc(100vh - 60px) !important;
                     }
 
                     .result-item {
                         padding: 1rem;
+                        border-radius: 0;
                     }
 
-                    .array-value {
+                    .result-main {
+                        font-size: 0.85rem;
+                        margin-bottom: 0.5rem;
+                    }
+
+                    .result-meta {
+                        font-size: 0.75rem;
+                        margin-bottom: 0.5rem;
+                    }
+
+                    .bool-value {
+                        font-size: 0.75rem;
+                        padding: 0.375rem 0.5rem;
+                    }
+
+                    .array-value, .dict-value, .regular-value {
+                        font-size: 0.75rem;
                         padding: 0.5rem;
+                    }
+
+                    .dict-entry {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 0.25rem;
+                    }
+
+                    .dict-key, .dict-sep, .dict-val {
+                        font-size: 0.75rem;
+                    }
+
+                    /* Reduce visual weight on mobile */
+                    .search-accordion--mobile {
+                        background: rgba(31, 41, 55, 0.6);
+                        backdrop-filter: blur(5px);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    }
+
+                    .loading-banner, .error-banner {
+                        padding: 1rem;
+                        margin-bottom: 1rem;
+                        border-radius: 8px;
+                    }
+
+                    .no-results-warning {
+                        padding: 0.75rem 1rem;
+                        margin: 1rem 0;
+                        font-size: 0.85rem;
+                    }
+                }
+
+                /* Additional mobile optimizations for smaller screens */
+                @media (max-width: 480px) {
+                    .entitlements-container {
+                        padding: 0.75rem;
+                    }
+
+                    .entitlements-header {
+                        margin-bottom: 1rem;
+                    }
+
+                    .entitlements-title {
+                        font-size: 1.5rem;
+                    }
+
+                    .mobile-search-bar {
+                        padding: 0.5rem;
+                        border-radius: 6px;
+                    }
+
+                    .mobile-search-input, .mobile-filters-toggle {
+                        padding: 0.5rem 0.75rem;
+                        font-size: 0.85rem;
+                    }
+
+                    .mobile-filter-chip {
+                        font-size: 0.7rem;
+                        padding: 0.2rem 0.4rem;
+                    }
+
+                    .results-container, .results-container--expanded {
+                        height: calc(100vh - 120px);
+                    }
+
+                    .result-item {
+                        padding: 0.75rem;
+                    }
+
+                    .result-main {
+                        font-size: 0.8rem;
+                        line-height: 1.4;
+                    }
+
+                    .result-key {
+                        word-break: break-word;
+                    }
+
+                    .result-path {
+                        word-break: break-all;
+                        font-size: 0.75rem;
                     }
                 }
 

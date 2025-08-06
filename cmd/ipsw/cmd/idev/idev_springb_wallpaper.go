@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/springboard"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,23 +39,19 @@ func init() {
 
 	idevSpringbWallpaperCmd.Flags().StringP("output", "o", "", "Folder to save wallpaper")
 	idevSpringbWallpaperCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.springb.wallpaper.output", idevSpringbWallpaperCmd.Flags().Lookup("output"))
 }
 
 // idevSpringbWallpaperCmd represents the wallpaper command
 var idevSpringbWallpaperCmd = &cobra.Command{
 	Use:           "wallpaper",
 	Short:         "Dump wallpaper as PNG",
-	SilenceUsage:  true,
+	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.springb.wallpaper.output")
 
 		var err error
 		var dev *lockdownd.DeviceValues

@@ -31,7 +31,6 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +40,7 @@ func init() {
 	KernelcacheCmd.AddCommand(symbolsetsCmd)
 	symbolsetsCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	symbolsetsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.symbolsets.arch", symbolsetsCmd.Flags().Lookup("arch"))
 }
 
 type symbolsSets struct {
@@ -67,16 +67,11 @@ var symbolsetsCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		selectedArch := viper.GetString("kernel.symbolsets.arch")
 
 		mr, err := mcmd.OpenMachO(args[0], selectedArch)
 		if err != nil {

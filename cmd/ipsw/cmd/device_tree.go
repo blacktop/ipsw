@@ -68,7 +68,6 @@ var deviceTreeCmd = &cobra.Command{
 	Aliases:       []string{"dt", "devicetree"},
 	Short:         "Parse DeviceTree",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

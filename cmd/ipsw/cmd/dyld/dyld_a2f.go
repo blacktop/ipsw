@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,13 +40,13 @@ func init() {
 	DyldCmd.AddCommand(AddrToFuncCmd)
 	AddrToFuncCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	AddrToFuncCmd.Flags().StringP("in", "i", "", "Path to file containing list of addresses to lookup")
-	AddrToFuncCmd.Flags().StringP("out", "o", "", "Path to output JSON file")
+	AddrToFuncCmd.Flags().StringP("output", "o", "", "Path to output JSON file")
 	AddrToFuncCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	AddrToFuncCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.a2f.slide", AddrToFuncCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.a2f.in", AddrToFuncCmd.Flags().Lookup("in"))
-	viper.BindPFlag("dyld.a2f.out", AddrToFuncCmd.Flags().Lookup("out"))
+	viper.BindPFlag("dyld.a2f.output", AddrToFuncCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.a2f.json", AddrToFuncCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.a2f.cache", AddrToFuncCmd.Flags().Lookup("cache"))
 }
@@ -66,14 +65,9 @@ var AddrToFuncCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		slide := viper.GetUint64("dyld.a2f.slide")
 		ptrFile := viper.GetString("dyld.a2f.in")
-		jsonFile := viper.GetString("dyld.a2f.out")
+		jsonFile := viper.GetString("dyld.a2f.output")
 		asJSON := viper.GetBool("dyld.a2f.json")
 		cacheFile := viper.GetString("dyld.a2f.cache")
 

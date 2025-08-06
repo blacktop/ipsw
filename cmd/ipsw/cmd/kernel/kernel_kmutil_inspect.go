@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -60,14 +59,8 @@ var inspectCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Inspect and filter a kext collection's contents according to the options provided",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		showKernPath := viper.GetBool("kernel.kmutil.inspect.kernel")

@@ -33,7 +33,6 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
-	"github.com/fatih/color"
 	"github.com/invopop/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -71,14 +70,8 @@ var kernelSymbolicateCmd = &cobra.Command{
 	Aliases:       []string{"sym"},
 	Short:         "Symbolicate kernelcache",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		quiet := viper.GetBool("kernel.symbolicate.quiet")
 		selectedArch := viper.GetString("kernel.symbolicate.arch")

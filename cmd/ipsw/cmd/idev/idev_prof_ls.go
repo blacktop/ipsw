@@ -25,10 +25,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mcinstall"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,23 +35,18 @@ func init() {
 	ProfCmd.AddCommand(profLsCmd)
 
 	profLsCmd.Flags().BoolP("json", "j", false, "Display profiles as JSON")
+	viper.BindPFlag("idev.prof.ls.json", profLsCmd.Flags().Lookup("json"))
 }
 
 // profLsCmd represents the ls command
 var profLsCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List installed provision profiles",
-	SilenceUsage:  true,
+	Short:         "List installed provisioning profiles",
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.prof.ls.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

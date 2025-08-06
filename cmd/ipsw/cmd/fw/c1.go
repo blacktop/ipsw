@@ -59,12 +59,7 @@ var c1Cmd = &cobra.Command{
 	Short:         "Dump C1 Baseband Firmware",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		// flags
 		info := viper.GetBool("fw.c1.info")

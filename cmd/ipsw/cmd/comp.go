@@ -52,10 +52,10 @@ func init() {
 
 // compCmd represents the comp command
 var compCmd = &cobra.Command{
-	Use:          "comp",
-	Short:        "Compress files using libcompression",
-	Args:         cobra.ExactArgs(1),
-	SilenceUsage: true,
+	Use:           "comp",
+	Short:         "Compress files using libcompression",
+	Args:          cobra.ExactArgs(1),
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

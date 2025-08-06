@@ -28,7 +28,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,7 +50,6 @@ var ImageCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	Example: `  # List all the apps
   ❯ ipsw dyld image DSC
   # Dump the closure info for a in-cache dylib
@@ -59,11 +57,6 @@ var ImageCmd = &cobra.Command{
   # Dump the closure info for an app
   ❯ ipsw dyld image DSC /usr/libexec/timed`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		dscPath := filepath.Clean(args[0])
 

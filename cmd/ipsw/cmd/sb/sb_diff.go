@@ -51,6 +51,7 @@ func init() {
 	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
+	viper.BindPFlag("sb.diff.pem-db", sbDiffCmd.Flags().Lookup("pem-db"))
 }
 
 // sbDiffCmd represents the diff command
@@ -59,17 +60,11 @@ var sbDiffCmd = &cobra.Command{
 	Short:         "Diff the sandbox profiles between two macOS IPSWs",
 	Aliases:       []string{"d"},
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		pemDB := viper.GetString("sb.diff.pem-db")
 
 		var sbDBs []map[string]string
 
@@ -119,9 +114,10 @@ var sbDiffCmd = &cobra.Command{
 
 				if filepath.Ext(dmgPath) == ".aea" {
 					dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-						Input:  dmgPath,
-						Output: filepath.Dir(dmgPath),
-						PemDB:  pemDB,
+						Input:    dmgPath,
+						Output:   filepath.Dir(dmgPath),
+						PemDB:    pemDB,
+						Insecure: false, // TODO: make insecure configurable
 					})
 					if err != nil {
 						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)

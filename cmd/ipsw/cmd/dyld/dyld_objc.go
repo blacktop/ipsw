@@ -26,9 +26,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -40,6 +38,10 @@ func init() {
 	ObjcCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
 	ObjcCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
 	ObjcCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
+	viper.BindPFlag("dyld.objc.class", ObjcCmd.Flags().Lookup("class"))
+	viper.BindPFlag("dyld.objc.sel", ObjcCmd.Flags().Lookup("sel"))
+	viper.BindPFlag("dyld.objc.proto", ObjcCmd.Flags().Lookup("proto"))
+	viper.BindPFlag("dyld.objc.imp-cache", ObjcCmd.Flags().Lookup("imp-cache"))
 }
 
 // ObjcCmd represents the objc command
@@ -53,15 +55,10 @@ var ObjcCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		printClasses, _ := cmd.Flags().GetBool("class")
-		printSelectors, _ := cmd.Flags().GetBool("sel")
-		printProtocols, _ := cmd.Flags().GetBool("proto")
-		printImpCaches, _ := cmd.Flags().GetBool("imp-cache")
+		printClasses := viper.GetBool("dyld.objc.class")
+		printSelectors := viper.GetBool("dyld.objc.sel")
+		printProtocols := viper.GetBool("dyld.objc.proto")
+		printImpCaches := viper.GetBool("dyld.objc.imp-cache")
 
 		dscPath := filepath.Clean(args[0])
 

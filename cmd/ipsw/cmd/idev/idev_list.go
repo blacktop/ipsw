@@ -28,7 +28,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,25 +37,19 @@ func init() {
 
 	ListDevicesCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
 	ListDevicesCmd.Flags().BoolP("json", "j", false, "Display devices as JSON")
+	viper.BindPFlag("idev.list.ipsw", ListDevicesCmd.Flags().Lookup("ipsw"))
+	viper.BindPFlag("idev.list.json", ListDevicesCmd.Flags().Lookup("json"))
 }
 
 // listCmd represents the list command
 var ListDevicesCmd = &cobra.Command{
 	Use:           "list",
 	Short:         "Dump info about USB connected iDevices",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
-		asJSON, _ := cmd.Flags().GetBool("json")
-
-		color.NoColor = viper.GetBool("no-color")
+		ipswSpec := viper.GetBool("idev.list.ipsw")
+		asJSON := viper.GetBool("idev.list.json")
 
 		conn, err := usb.NewConn()
 		if err != nil {

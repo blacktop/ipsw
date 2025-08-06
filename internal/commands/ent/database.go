@@ -602,12 +602,12 @@ func (ds *DatabaseService) SearchEntitlements(version, keyPattern, filePattern s
 }
 
 // GetStatistics returns database statistics using the new normalized structure
-func (ds *DatabaseService) GetStatistics() (map[string]interface{}, error) {
+func (ds *DatabaseService) GetStatistics() (map[string]any, error) {
 	if ds.gormDB == nil {
 		return nil, fmt.Errorf("statistics not supported with this database type")
 	}
 
-	stats := make(map[string]interface{})
+	stats := make(map[string]any)
 
 	var ipswCount int64
 	if err := ds.gormDB.Model(&model.Ipsw{}).Count(&ipswCount).Error; err != nil {

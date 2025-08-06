@@ -30,7 +30,7 @@ import (
 // dvtNotiCmd represents the noti command
 var dvtNotiCmd = &cobra.Command{
 	Use:   "noti",
-	Short: "A brief description of your command",
+	Short: "Notification related commands",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

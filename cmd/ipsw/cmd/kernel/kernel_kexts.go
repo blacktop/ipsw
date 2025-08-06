@@ -29,7 +29,6 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,16 +48,10 @@ func init() {
 var kextsCmd = &cobra.Command{
 	Use:           "kexts <kernelcache>",
 	Aliases:       []string{"k"},
-	Short:         "List kernel extentions",
+	Short:         "List kernel extensions",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		selectedArch := viper.GetString("kernel.kexts.arch")

@@ -29,7 +29,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/misagent"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,23 +37,18 @@ func init() {
 	ProvCmd.AddCommand(provDumpCmd)
 	provDumpCmd.Flags().StringP("output", "o", "", "Folder to save profiles(s)")
 	provDumpCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.prov.dump.output", provDumpCmd.Flags().Lookup("output"))
 }
 
 // provDumpCmd represents the dump command
 var provDumpCmd = &cobra.Command{
 	Use:           "dump",
-	Short:         "Dump installed provision profiles",
-	SilenceUsage:  true,
+	Short:         "Dump installed provisioning profiles",
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.prov.dump.output")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

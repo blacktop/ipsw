@@ -75,9 +75,10 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 	if filepath.Ext(dmgPath) == ".aea" {
 		var err error
 		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:  dmgPath,
-			Output: filepath.Dir(dmgPath),
-			PemDB:  pemDB,
+			Input:    dmgPath,
+			Output:   filepath.Dir(dmgPath),
+			PemDB:    pemDB,
+			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
@@ -197,7 +198,13 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_dyld")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temporary directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDIR)
+
+		dmgs, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
 		if err != nil {
@@ -206,7 +213,8 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		if len(dmgs) == 0 {
 			return nil, fmt.Errorf("File System %s NOT found in IPSW", dmgPath)
 		}
-		defer os.Remove(dmgs[0])
+		// Update dmgPath to point to the extracted file location
+		dmgPath = dmgs[0]
 	}
 
 	return ExtractFromDMG(i, dmgPath, destPath, pemDB, arches, driverkit, all)

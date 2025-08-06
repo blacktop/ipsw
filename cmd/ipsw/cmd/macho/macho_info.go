@@ -151,17 +151,11 @@ var machoInfoCmd = &cobra.Command{
 	Aliases:       []string{"i"},
 	Short:         "Explore a MachO file",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
 		var m *macho.File
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		verbose := viper.GetBool("verbose")
@@ -735,7 +729,6 @@ var machoInfoCmd = &cobra.Command{
 			}
 			if m.HasObjC() {
 				o, err := mcmd.NewObjC(m, nil, &mcmd.ObjcConfig{
-					Verbose:  viper.GetBool("verbose"),
 					Addrs:    true,
 					ObjcRefs: showObjcRefs,
 					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),

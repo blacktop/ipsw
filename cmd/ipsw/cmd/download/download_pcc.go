@@ -25,13 +25,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -62,12 +62,19 @@ func init() {
 
 // downloadPccCmd represents the pcc command
 var downloadPccCmd = &cobra.Command{
-	Use:     "pcc",
+	Use:     "pcc [INDEX]",
 	Aliases: []string{"p", "vre", "pccvre"},
 	Short:   "Download PCC VM files",
+	Args:    cobra.MaximumNArgs(1),
 	Example: heredoc.Doc(`
 		# Show available PCC releases info
 		❯ ipsw download pcc --info
+
+		# Show info for specific PCC release by index
+		❯ ipsw download pcc 42 --info
+
+		# Download specific PCC release by index
+		❯ ipsw download pcc 42
 
 		# Download PCC VM files interactively
 		❯ ipsw download pcc
@@ -77,11 +84,6 @@ var downloadPccCmd = &cobra.Command{
 	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// settings
 		proxy := viper.GetString("download.pcc.proxy")
@@ -98,6 +100,30 @@ var downloadPccCmd = &cobra.Command{
 
 		if len(releases) == 0 {
 			return fmt.Errorf("no PCC Releases found")
+		}
+
+		// Filter releases if user provided a specific index
+		if len(args) > 0 {
+			index, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid index: %s", args[0])
+			}
+
+			// Find release with matching index
+			foundIndex := -1
+			for i := range releases {
+				if releases[i].Index == uint64(index) {
+					foundIndex = i
+					break
+				}
+			}
+
+			if foundIndex == -1 {
+				return fmt.Errorf("no PCC release found with index %d", index)
+			}
+
+			// Replace releases list with filtered single release
+			releases = releases[foundIndex : foundIndex+1]
 		}
 
 		if viper.GetBool("download.pcc.info") {

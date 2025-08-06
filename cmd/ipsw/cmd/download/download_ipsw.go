@@ -39,7 +39,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,7 +78,7 @@ func init() {
 	downloadIpswCmd.Flags().Bool("fcs-keys", false, "Download AEA1 DMG fcs-key pem files")
 	downloadIpswCmd.Flags().Bool("fcs-keys-json", false, "Download AEA1 DMG fcs-keys as JSON")
 	downloadIpswCmd.Flags().Bool("decrypt", false, "Attempt to decrypt the partial files if keys are available")
-	downloadIpswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadIpswCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	downloadIpswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadIpswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	downloadIpswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
@@ -142,11 +141,6 @@ var downloadIpswCmd = &cobra.Command{
 		var itunes *download.ITunesVersionMaster
 		var builds []download.Build
 		var filteredBuilds []download.Build
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// settings
 		proxy := viper.GetString("download.ipsw.proxy")

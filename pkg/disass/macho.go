@@ -40,7 +40,7 @@ func (d MachoDisass) Demangle() bool {
 	return d.cfg.Demangle
 }
 func (d MachoDisass) Quite() bool {
-	return d.cfg.Quite
+	return d.cfg.Quiet
 }
 func (d MachoDisass) Color() bool {
 	return d.cfg.Color

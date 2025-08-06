@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/blacktop/go-macho/types"
-	"github.com/olekukonko/tablewriter"
+	"github.com/blacktop/ipsw/pkg/table"
 )
 
 const (
@@ -655,13 +655,13 @@ func (pl PrebuiltLoader) String(f *File) string {
 				fmt.Sprintf("%t", rg.ReadOnlyData()),
 			})
 		}
-		table := tablewriter.NewWriter(tableString)
-		table.SetHeader([]string{"File Off", "File Sz", "VM Off", "Perms", "Zero Fill", "RO Data"})
-		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-		table.SetCenterSeparator("|")
-		table.AppendBulk(rdata)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.Render()
+		tbl := table.NewStringBuilderTableWriter(tableString)
+		tbl.SetHeader([]string{"File Off", "File Sz", "VM Off", "Perms", "Zero Fill", "RO Data"})
+		tbl.SetBorders(nil)
+		tbl.SetCenterSeparator("|")
+		tbl.AppendBulk(rdata)
+		tbl.SetAlignment(1)
+		tbl.Render()
 		out += tableString.String()
 	}
 	out += "\nSections:\n"

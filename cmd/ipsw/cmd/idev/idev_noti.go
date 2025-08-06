@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/notification"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,24 +39,20 @@ func init() {
 
 	NotificationCmd.Flags().StringP("notification", "n", "", "notification to observe")
 	NotificationCmd.Flags().BoolP("all", "a", false, "observe all notifications")
+	viper.BindPFlag("idev.noti.notification", NotificationCmd.Flags().Lookup("notification"))
+	viper.BindPFlag("idev.noti.all", NotificationCmd.Flags().Lookup("all"))
 }
 
 // NotificationCmd represents the noti command
 var NotificationCmd = &cobra.Command{
 	Use:           "noti",
 	Short:         "Observe notifications",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		notificationName, _ := cmd.Flags().GetString("notification")
-		all, _ := cmd.Flags().GetBool("all")
+		udid := viper.GetString("idev.udid")
+		notificationName := viper.GetString("idev.noti.notification")
+		all := viper.GetBool("idev.noti.all")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

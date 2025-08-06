@@ -276,28 +276,28 @@ func TestPropertyTypes(t *testing.T) {
 func TestPropertyEdgeCases(t *testing.T) {
 	// Test edge cases and error conditions
 	tests := []struct {
-		name        string
+		name         string
 		propertyData []byte
-		expectError bool
-		description string
+		expectError  bool
+		description  string
 	}{
 		{
-			name: "invalid ASN.1 data",
+			name:         "invalid ASN.1 data",
 			propertyData: []byte("invalid"),
-			expectError: false, // ParsePropertyMap handles this gracefully by returning empty map
-			description: "completely invalid ASN.1 data",
+			expectError:  false, // ParsePropertyMap handles this gracefully by returning empty map
+			description:  "completely invalid ASN.1 data",
 		},
 		{
-			name: "empty data",
+			name:         "empty data",
 			propertyData: []byte{},
-			expectError: false, // Empty data should return empty properties map
-			description: "empty input data",
+			expectError:  false, // Empty data should return empty properties map
+			description:  "empty input data",
 		},
 		{
-			name: "truncated ASN.1 data",
+			name:         "truncated ASN.1 data",
 			propertyData: []byte{0x83, 0x10, 0x00}, // Private class tag with truncated data
-			expectError: false, // Should handle gracefully
-			description: "truncated ASN.1 entry",
+			expectError:  false,                    // Should handle gracefully
+			description:  "truncated ASN.1 entry",
 		},
 	}
 

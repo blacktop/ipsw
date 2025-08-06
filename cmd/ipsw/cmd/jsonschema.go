@@ -46,7 +46,6 @@ var jsonschemaCmd = &cobra.Command{
 	Aliases:       []string{"schema"},
 	Short:         "Output ipsw's JSON schema",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {

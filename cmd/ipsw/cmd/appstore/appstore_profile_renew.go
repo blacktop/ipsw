@@ -32,7 +32,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/appstore"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -53,23 +52,12 @@ func init() {
 var ASProfileRenewCmd = &cobra.Command{
 	Use:           "renew <NAME>",
 	Aliases:       []string{"r"},
-	Short:         "Renew and expired or invalide provisioning profile",
+	Short:         "Renew an expired or invalid provisioning profile",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var profile *appstore.Profile
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		// parent flags
-		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
-		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
-		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
-		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		id := viper.GetString("appstore.profile.renew.id")
 		name := viper.GetString("appstore.profile.renew.name")

@@ -56,31 +56,33 @@ func init() {
 	nonceCmd.Flags().StringP("subject", "s", "Device Nonce Info", "QR mailto subject")
 	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
 	nonceCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.img.nonce.json", nonceCmd.Flags().Lookup("json"))
+	viper.BindPFlag("idev.img.nonce.readable", nonceCmd.Flags().Lookup("readable"))
+	viper.BindPFlag("idev.img.nonce.qr-code", nonceCmd.Flags().Lookup("qr-code"))
+	viper.BindPFlag("idev.img.nonce.qr-size", nonceCmd.Flags().Lookup("qr-size"))
+	viper.BindPFlag("idev.img.nonce.url", nonceCmd.Flags().Lookup("url"))
+	viper.BindPFlag("idev.img.nonce.mail", nonceCmd.Flags().Lookup("mail"))
+	viper.BindPFlag("idev.img.nonce.subject", nonceCmd.Flags().Lookup("subject"))
+	viper.BindPFlag("idev.img.nonce.output", nonceCmd.Flags().Lookup("output"))
 }
 
 // nonceCmd represents the nonce command
 var nonceCmd = &cobra.Command{
 	Use:           "nonce",
 	Short:         "Query Nonce",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		// flags
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
-		readable, _ := cmd.Flags().GetBool("readable")
-		asQrCode, _ := cmd.Flags().GetBool("qr-code")
-		qrcSize, _ := cmd.Flags().GetInt("qr-size")
-		qrURL, _ := cmd.Flags().GetString("url")
-		email, _ := cmd.Flags().GetString("mail")
-		emailSubject, _ := cmd.Flags().GetString("subject")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.img.nonce.json")
+		readable := viper.GetBool("idev.img.nonce.readable")
+		asQrCode := viper.GetBool("idev.img.nonce.qr-code")
+		qrcSize := viper.GetInt("idev.img.nonce.qr-size")
+		qrURL := viper.GetString("idev.img.nonce.url")
+		email := viper.GetString("idev.img.nonce.mail")
+		emailSubject := viper.GetString("idev.img.nonce.subject")
+		output := viper.GetString("idev.img.nonce.output")
 		// Validate flags
 		if asQrCode && readable {
 			return fmt.Errorf("cannot specify both --qr-code and --readable")

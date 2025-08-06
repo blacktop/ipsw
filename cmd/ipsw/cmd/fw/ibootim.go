@@ -64,12 +64,7 @@ var ibootimCmd = &cobra.Command{
 	Short:         "Dump iBoot Images",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		// flags
 		showInfo := viper.GetBool("fw.ibootim.info")

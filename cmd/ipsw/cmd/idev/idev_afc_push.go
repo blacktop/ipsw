@@ -28,7 +28,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/afc"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,16 +42,10 @@ var idevAfcPushCmd = &cobra.Command{
 	Use:           "push <local file> <remote file>",
 	Short:         "Push local file rooted at /var/mobile/Media",
 	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

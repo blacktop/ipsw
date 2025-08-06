@@ -65,16 +65,10 @@ var kernelInfoCmd = &cobra.Command{
 	Use:           "info <kernelcache>",
 	Aliases:       []string{"i"},
 	Short:         "Explore a kernelcache file",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var re *regexp.Regexp
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		filter := viper.GetString("kernel.info.filter")
 		selectedArch := viper.GetString("kernel.info.arch")

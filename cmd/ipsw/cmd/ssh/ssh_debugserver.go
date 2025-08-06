@@ -32,7 +32,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ssh"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -50,16 +49,10 @@ func init() {
 var sshDebugserverCmd = &cobra.Command{
 	Use:           "debugserver",
 	Aliases:       []string{"ds"},
-	Short:         "Prep device for remote debugging",
+	Short:         "Prepare device for remote debugging",
 	Args:          cobra.NoArgs,
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// parent flags
 		viper.BindPFlag("ssh.host", cmd.Flags().Lookup("host"))

@@ -27,7 +27,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,24 +36,20 @@ func init() {
 
 	idevImgUnmountCmd.Flags().StringP("image-type", "t", "", "Image type to unmount (i.e. 'Developer')")
 	idevImgUnmountCmd.Flags().StringP("mount-point", "m", "", "Path to mount point (i.e. '/Developer')")
+	viper.BindPFlag("idev.img.unmount.image-type", idevImgUnmountCmd.Flags().Lookup("image-type"))
+	viper.BindPFlag("idev.img.unmount.mount-point", idevImgUnmountCmd.Flags().Lookup("mount-point"))
 }
 
 // idevImgUnmountCmd represents the unmount command
 var idevImgUnmountCmd = &cobra.Command{
 	Use:           "unmount",
 	Short:         "Unmount an image",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		imageType, _ := cmd.Flags().GetString("image-type")
-		mountPoint, _ := cmd.Flags().GetString("mount-point")
+		udid := viper.GetString("idev.udid")
+		imageType := viper.GetString("idev.img.unmount.image-type")
+		mountPoint := viper.GetString("idev.img.unmount.mount-point")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

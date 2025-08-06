@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/crashlog"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -44,25 +43,22 @@ func init() {
 	iDevCrashPullCmd.Flags().BoolP("rm", "r", false, "Remove crashlogs after pulling")
 	iDevCrashPullCmd.Flags().StringP("output", "o", "", "Folder to save crashlogs")
 	iDevCrashPullCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.crash.pull.all", iDevCrashPullCmd.Flags().Lookup("all"))
+	viper.BindPFlag("idev.crash.pull.rm", iDevCrashPullCmd.Flags().Lookup("rm"))
+	viper.BindPFlag("idev.crash.pull.output", iDevCrashPullCmd.Flags().Lookup("output"))
 }
 
 // iDevCrashPullCmd represents the pull command
 var iDevCrashPullCmd = &cobra.Command{
 	Use:           "pull",
 	Short:         "Pull crashlogs",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
-		allLogs, _ := cmd.Flags().GetBool("all")
-		removeLogs, _ := cmd.Flags().GetBool("rm")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.crash.pull.output")
+		allLogs := viper.GetBool("idev.crash.pull.all")
+		removeLogs := viper.GetBool("idev.crash.pull.rm")
 
 		var err error
 		var dev *lockdownd.DeviceValues

@@ -119,7 +119,6 @@ func init() {
 var docsCmd = &cobra.Command{
 	Use:                   "docs",
 	Short:                 "Generates ipsw's command line docs",
-	SilenceUsage:          true,
 	DisableFlagsInUseLine: true,
 	Hidden:                true,
 	Args:                  cobra.NoArgs,

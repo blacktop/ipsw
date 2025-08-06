@@ -11,7 +11,7 @@ description: Download PCC VM files
 Download PCC VM files
 
 ```
-ipsw download pcc [flags]
+ipsw download pcc [INDEX] [flags]
 ```
 
 ### Examples
@@ -19,6 +19,12 @@ ipsw download pcc [flags]
 ```bash
 # Show available PCC releases info
 ❯ ipsw download pcc --info
+
+# Show info for specific PCC release by index
+❯ ipsw download pcc 42 --info
+
+# Download specific PCC release by index
+❯ ipsw download pcc 42
 
 # Download PCC VM files interactively
 ❯ ipsw download pcc

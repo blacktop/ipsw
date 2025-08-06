@@ -39,6 +39,7 @@ func init() {
 	AfcCmd.AddCommand(idevAfcTreeCmd)
 
 	idevAfcTreeCmd.Flags().BoolP("flat", "f", false, "Flat output")
+	viper.BindPFlag("idev.afc.tree.flat", idevAfcTreeCmd.Flags().Lookup("flat"))
 }
 
 // idevAfcTreeCmd represents the tree command
@@ -46,17 +47,11 @@ var idevAfcTreeCmd = &cobra.Command{
 	Use:           "tree",
 	Short:         "List contents of directories in a tree-like format rooted at /var/mobile/Media",
 	Args:          cobra.MaximumNArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		flat, _ := cmd.Flags().GetBool("flat")
+		udid := viper.GetString("idev.udid")
+		flat := viper.GetBool("idev.afc.tree.flat")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

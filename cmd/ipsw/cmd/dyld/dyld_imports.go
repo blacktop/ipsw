@@ -32,7 +32,6 @@ import (
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,6 +44,8 @@ func init() {
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
+	viper.BindPFlag("dyld.imports.ipsw", dyldImportsCmd.Flags().Lookup("ipsw"))
+	viper.BindPFlag("dyld.imports.pem-db", dyldImportsCmd.Flags().Lookup("pem-db"))
 }
 
 // dyldImportsCmd represents the imports command
@@ -62,13 +63,9 @@ var dyldImportsCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 		// flags
-		ipswPath, _ := cmd.Flags().GetString("ipsw")
-		pemDB, _ := cmd.Flags().GetString("pem-db")
+		ipswPath := viper.GetString("dyld.imports.ipsw")
+		pemDB := viper.GetString("dyld.imports.pem-db")
 		// validate args
 		if ipswPath != "" && len(args) != 1 {
 			return errors.New("you must specify a DYLIB to search for")

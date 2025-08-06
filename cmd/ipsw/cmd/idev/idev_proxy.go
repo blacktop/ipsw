@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/forward"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,24 +40,20 @@ func init() {
 
 	ProxyCmd.Flags().IntP("lport", "l", 0, "host port")
 	ProxyCmd.Flags().IntP("rport", "r", 0, "device port")
+	viper.BindPFlag("idev.proxy.lport", ProxyCmd.Flags().Lookup("lport"))
+	viper.BindPFlag("idev.proxy.rport", ProxyCmd.Flags().Lookup("rport"))
 }
 
 // ProxyCmd represents the proxy command
 var ProxyCmd = &cobra.Command{
 	Use:           "proxy",
 	Short:         "Create a TCP proxy (for ssh/debugging)",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		lport, _ := cmd.Flags().GetInt("lport")
-		rport, _ := cmd.Flags().GetInt("rport")
+		udid := viper.GetString("idev.udid")
+		lport := viper.GetInt("idev.proxy.lport")
+		rport := viper.GetInt("idev.proxy.rport")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

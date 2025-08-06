@@ -26,10 +26,8 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/crashlog"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,16 +40,10 @@ func init() {
 var iDevCrashLsCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List crashlogs",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
+		udid := viper.GetString("idev.udid")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

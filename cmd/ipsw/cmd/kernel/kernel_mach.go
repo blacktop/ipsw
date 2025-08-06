@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,6 +39,7 @@ func init() {
 	KernelcacheCmd.AddCommand(kernelMachCmd)
 	kernelMachCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kernelMachCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	viper.BindPFlag("kernel.mach.arch", kernelMachCmd.Flags().Lookup("arch"))
 }
 
 // kernelMachCmd represents the mach command
@@ -48,17 +48,11 @@ var kernelMachCmd = &cobra.Command{
 	Aliases:       []string{"mt"},
 	Short:         "Dump kernelcache mach_traps",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
 		machoPath := filepath.Clean(args[0])
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		selectedArch := viper.GetString("kernel.mach.arch")
 
 		if strings.Contains(machoPath, "development") {
 			log.Warn("development kernelcache detected: 'MACH_ASSERT=1' so 'mach_trap_t' has an extra 'const char *mach_trap_name' field which will throw off the parsing of the mach_traps table")

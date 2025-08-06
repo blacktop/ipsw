@@ -31,7 +31,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/screenshot"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,6 +40,7 @@ func init() {
 
 	ScreenCmd.Flags().StringP("output", "o", "", "Folder to save screenshot(s)")
 	ScreenCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.screen.output", ScreenCmd.Flags().Lookup("output"))
 }
 
 func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
@@ -68,17 +68,11 @@ func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
 var ScreenCmd = &cobra.Command{
 	Use:           "screen",
 	Short:         "Dump screenshot as a PNG",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		output, _ := cmd.Flags().GetString("output")
+		udid := viper.GetString("idev.udid")
+		output := viper.GetString("idev.screen.output")
 
 		if len(udid) > 0 {
 			ldc, err := lockdownd.NewClient(udid)

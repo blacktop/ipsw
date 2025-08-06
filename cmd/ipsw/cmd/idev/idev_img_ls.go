@@ -28,7 +28,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,23 +36,18 @@ func init() {
 	ImgCmd.AddCommand(idevImgListCmd)
 
 	idevImgListCmd.Flags().BoolP("json", "j", false, "Display images as JSON")
+	viper.BindPFlag("idev.img.ls.json", idevImgListCmd.Flags().Lookup("json"))
 }
 
 // idevImgListCmd represents the ls command
 var idevImgListCmd = &cobra.Command{
 	Use:           "ls",
 	Short:         "List mounted images",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		udid := viper.GetString("idev.udid")
+		asJSON := viper.GetBool("idev.img.ls.json")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

@@ -125,9 +125,9 @@ update_fcs_keys_rc: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: FSC_FLAGS=--beta --latest ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 
-FCS_IOS_BUILD ?=
-FCS_MOS_BUILD ?=
-FCS_VOS_BUILD ?=
+FCS_IOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device iPhone17,1 --platform iOS)
+FCS_MOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device Mac14,7 --platform macOS)
+FCS_VOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device RealityDevice14,1 --platform visionOS)
 
 .PHONY: update_fcs_keys_release
 update_fcs_keys_release: ## Scrape the iPhoneWiki for AES keys
@@ -198,6 +198,14 @@ docker-push: docker-tag ## Push docker image to github
 docker-test: ## Run docker test
 	@echo " > Testing Docker Image"
 	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(NEXT_VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
+
+.PHONY: fmt
+fmt: ## Format code
+	@echo " > Formatting code"
+	@gofmt -w -r 'interface{} -> any' .
+	@goimports -w .
+	@gofmt -w -s .
+	@go mod tidy
 
 clean: ## Clean up artifacts
 	@echo " > Cleaning"

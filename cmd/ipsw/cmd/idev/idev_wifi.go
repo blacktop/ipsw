@@ -24,10 +24,8 @@ package idev
 import (
 	"fmt"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,25 +35,21 @@ func init() {
 
 	wifiCmd.Flags().Bool("on", false, "Turn WiFi on")
 	wifiCmd.Flags().Bool("off", false, "Turn WiFi off")
+	viper.BindPFlag("idev.wifi.on", wifiCmd.Flags().Lookup("on"))
+	viper.BindPFlag("idev.wifi.off", wifiCmd.Flags().Lookup("off"))
 }
 
 // wifiCmd represents the wifi command
 var wifiCmd = &cobra.Command{
 	Use:           "wifi",
 	Short:         "Get/Set wifi connections state",
-	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
-
-		udid, _ := cmd.Flags().GetString("udid")
-		turnON, _ := cmd.Flags().GetBool("on")
-		turnOFF, _ := cmd.Flags().GetBool("off")
+		udid := viper.GetString("idev.udid")
+		turnON := viper.GetBool("idev.wifi.on")
+		turnOFF := viper.GetBool("idev.wifi.off")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()

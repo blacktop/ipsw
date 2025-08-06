@@ -339,7 +339,29 @@ func Parse(name string, conf *Config) (*Asset, error) {
 				return nil, fmt.Errorf("failed to read CARGLOBALS data: %v", err)
 			}
 		case "KEYFORMATWORKAROUND":
-			log.Error("BOM block KEYFORMATWORKAROUND parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
+			// KEYFORMATWORKAROUND has the same structure as KEYFORMAT but without tag and version fields
+			// It starts directly with maximumRenditionKeyTokenCount followed by the tokens
+			br, err := bm.ReadBlock(v.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read block %s: %v", v.Name, err)
+			}
+
+			var maxTokenCount uint32
+			if err := binary.Read(br, binary.LittleEndian, &maxTokenCount); err != nil {
+				return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND max token count: %v", err)
+			}
+
+			// Only parse if we don't already have a key format
+			if a.KeyFormat == nil && maxTokenCount > 0 {
+				a.KeyFormat = make([]renditionAttributeType, maxTokenCount)
+				if err := binary.Read(br, binary.LittleEndian, &a.KeyFormat); err != nil {
+					return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND rendition attribute types: %v", err)
+				}
+			}
+
+			if a.conf.Verbose {
+				log.Debugf("Parsed KEYFORMATWORKAROUND: %d rendition key tokens", maxTokenCount)
+			}
 		case "EXTERNAL_KEYS":
 			log.Error("BOM block EXTERNAL_KEYS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		/*********
@@ -590,18 +612,11 @@ func Parse(name string, conf *Config) (*Asset, error) {
 										buf.Flush()
 										ti, err := termimg.From(bytes.NewReader(dat.Bytes()))
 										if err != nil {
-											return nil, err
+											return nil, fmt.Errorf("failed to create termimg from image: %v", err)
 										}
-										// ti.Protocol(termimg.Kitty)
-										// ti.Protocol(termimg.ITerm2)
-										// ti.Width(int(cheader.Width)).Height(int(cheader.Height))
-										// ti.Compression(true)
-										// if err := ti.Print(); err != nil {
-										// 	return nil, err
-										// }
-										_ = ti
-										// os.Exit(0)
-										// utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), dat.Len(), int(cheader.Width), int(cheader.Height))
+										if err := ti.Print(); err != nil {
+											return nil, fmt.Errorf("failed to print termimg: %v", err)
+										}
 									}
 									rend.Asset = img
 								}

@@ -61,10 +61,6 @@ var tcCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
 		tcs := make(map[string]*fwcmd.TrustCache)
 
 		if isZip, err := magic.IsZip(filepath.Clean(args[0])); err != nil && !viper.GetBool("fw.tc.remote") {

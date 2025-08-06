@@ -34,7 +34,6 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -111,11 +110,6 @@ var classDumpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var m *macho.File
 		var o *mcmd.ObjC
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// flag validation
 		if viper.GetBool("class-dump.headers") &&

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/pkg/table"
 	"github.com/dustin/go-humanize"
-	"github.com/olekukonko/tablewriter"
 )
 
 func (dch CacheHeader) String() string {
@@ -109,13 +109,13 @@ func (mappings cacheMappings) String() string {
 			fmt.Sprintf("%08X -> %08X", mapping.FileOffset, mapping.FileOffset+mapping.Size),
 		})
 	}
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(mdata)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render()
+	tbl := table.NewStringBuilderTableWriter(tableString)
+	tbl.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset"})
+	tbl.SetBorders(nil)
+	tbl.SetCenterSeparator("|")
+	tbl.AppendBulk(mdata)
+	tbl.SetAlignment(1) // ALIGN_LEFT
+	tbl.Render()
 
 	return tableString.String()
 }
@@ -141,13 +141,13 @@ func (mapping CacheMappingWithSlideInfo) String() string {
 		fmt.Sprintf("%d", mapping.Flags),
 	})
 
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Slide Info Offset", "Flags"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(mdata)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render()
+	tbl := table.NewStringBuilderTableWriter(tableString)
+	tbl.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Slide Info Offset", "Flags"})
+	tbl.SetBorders(nil)
+	tbl.SetCenterSeparator("|")
+	tbl.AppendBulk(mdata)
+	tbl.SetAlignment(1)
+	tbl.Render()
 
 	return tableString.String()
 }
@@ -184,13 +184,13 @@ func (mappings cacheMappingsWithSlideInfo) String(slideVersion uint32, verbose b
 			mappingFlags,
 		})
 	}
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", fmt.Sprintf("Slide Info (v%d) Offset", slideVersion), "Flags"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(mdata)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render()
+	tbl := table.NewStringBuilderTableWriter(tableString)
+	tbl.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", fmt.Sprintf("Slide Info (v%d) Offset", slideVersion), "Flags"})
+	tbl.SetBorders(nil)
+	tbl.SetCenterSeparator("|")
+	tbl.AppendBulk(mdata)
+	tbl.SetAlignment(1)
+	tbl.Render()
 
 	return tableString.String()
 }

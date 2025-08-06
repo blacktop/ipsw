@@ -35,7 +35,6 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -95,11 +94,6 @@ var swiftDumpCmd = &cobra.Command{
 
 		var m *macho.File
 		var s *mcmd.Swift
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-		color.NoColor = viper.GetBool("no-color")
 
 		// Validate Flags
 		if viper.GetBool("swift-dump.interface") &&

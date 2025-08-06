@@ -54,12 +54,7 @@ var gpuCmd = &cobra.Command{
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
 
 		infile := filepath.Clean(args[0])
 
