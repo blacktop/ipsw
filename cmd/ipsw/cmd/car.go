@@ -35,9 +35,11 @@ func init() {
 	rootCmd.AddCommand(carCmd)
 	carCmd.Flags().BoolP("export", "x", false, "Export all renditions")
 	carCmd.Flags().StringP("output", "o", "", "Output folder to save renditions")
+	carCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	carCmd.MarkFlagDirname("output")
 	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
 	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
+	viper.BindPFlag("car.json", carCmd.Flags().Lookup("json"))
 }
 
 // carCmd represents the car command
@@ -92,7 +94,15 @@ var carCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(asset)
+		if viper.GetBool("car.json") {
+			jsonOutput, err := asset.ToJSON()
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(jsonOutput))
+		} else {
+			fmt.Println(asset)
+		}
 
 		return nil
 	},

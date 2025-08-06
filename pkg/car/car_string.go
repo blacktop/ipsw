@@ -21,6 +21,7 @@ func _() {
 	_ = x[State-10]
 	_ = x[Layer-11]
 	_ = x[Scale-12]
+	_ = x[Localization-13]
 	_ = x[PresentationState-14]
 	_ = x[Idiom-15]
 	_ = x[Subtype-16]
@@ -35,26 +36,15 @@ func _() {
 	_ = x[DeploymentTarget-25]
 }
 
-const (
-	_renditionAttributeType_name_0 = "ThemeLookElementPartSizeDirectionplaceholderValueThemeAppearanceDimension1Dimension2StateLayerScale"
-	_renditionAttributeType_name_1 = "PresentationStateIdiomSubtypeIdentifierPreviousValuePreviousStateHorizontalSizeClassVerticalSizeClassMemoryLevelClassGraphicsFeatureSetClassDisplayGamutDeploymentTarget"
-)
+const _renditionAttributeType_name = "ThemeLookElementPartSizeDirectionplaceholderValueThemeAppearanceDimension1Dimension2StateLayerScaleLocalizationPresentationStateIdiomSubtypeIdentifierPreviousValuePreviousStateHorizontalSizeClassVerticalSizeClassMemoryLevelClassGraphicsFeatureSetClassDisplayGamutDeploymentTarget"
 
-var (
-	_renditionAttributeType_index_0 = [...]uint8{0, 9, 16, 20, 24, 33, 44, 49, 64, 74, 84, 89, 94, 99}
-	_renditionAttributeType_index_1 = [...]uint8{0, 17, 22, 29, 39, 52, 65, 84, 101, 117, 140, 152, 168}
-)
+var _renditionAttributeType_index = [...]uint16{0, 9, 16, 20, 24, 33, 44, 49, 64, 74, 84, 89, 94, 99, 111, 128, 133, 140, 150, 163, 176, 195, 212, 228, 251, 263, 279}
 
 func (i renditionAttributeType) String() string {
-	switch {
-	case i <= 12:
-		return _renditionAttributeType_name_0[_renditionAttributeType_index_0[i]:_renditionAttributeType_index_0[i+1]]
-	case 14 <= i && i <= 25:
-		i -= 14
-		return _renditionAttributeType_name_1[_renditionAttributeType_index_1[i]:_renditionAttributeType_index_1[i+1]]
-	default:
+	if i >= renditionAttributeType(len(_renditionAttributeType_index)-1) {
 		return "renditionAttributeType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
+	return _renditionAttributeType_name[_renditionAttributeType_index[i]:_renditionAttributeType_index[i+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.

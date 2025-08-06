@@ -95,6 +95,7 @@ const (
 	State                   renditionAttributeType = 10
 	Layer                   renditionAttributeType = 11
 	Scale                   renditionAttributeType = 12
+	Localization            renditionAttributeType = 13
 	PresentationState       renditionAttributeType = 14
 	Idiom                   renditionAttributeType = 15
 	Subtype                 renditionAttributeType = 16
@@ -262,7 +263,29 @@ func Parse(name string, conf *Config) (*Asset, error) {
 				return nil, fmt.Errorf("failed to read CARGLOBALS data: %v", err)
 			}
 		case "KEYFORMATWORKAROUND":
-			log.Error("BOM block KEYFORMATWORKAROUND parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
+			// KEYFORMATWORKAROUND has the same structure as KEYFORMAT but without tag and version fields
+			// It starts directly with maximumRenditionKeyTokenCount followed by the tokens
+			br, err := bm.ReadBlock(v.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read block %s: %v", v.Name, err)
+			}
+			
+			var maxTokenCount uint32
+			if err := binary.Read(br, binary.LittleEndian, &maxTokenCount); err != nil {
+				return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND max token count: %v", err)
+			}
+			
+			// Only parse if we don't already have a key format
+			if a.KeyFormat == nil && maxTokenCount > 0 {
+				a.KeyFormat = make([]renditionAttributeType, maxTokenCount)
+				if err := binary.Read(br, binary.LittleEndian, &a.KeyFormat); err != nil {
+					return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND rendition attribute types: %v", err)
+				}
+			}
+			
+			if a.conf.Verbose {
+				log.Debugf("Parsed KEYFORMATWORKAROUND: %d rendition key tokens", maxTokenCount)
+			}
 		case "EXTERNAL_KEYS":
 			log.Error("BOM block EXTERNAL_KEYS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		/*********
