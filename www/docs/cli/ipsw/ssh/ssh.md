@@ -38,6 +38,6 @@ ipsw ssh [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw ssh debugserver](/docs/cli/ipsw/ssh/debugserver)	 - Prep device for remote debugging
+* [ipsw ssh debugserver](/docs/cli/ipsw/ssh/debugserver)	 - Prepare device for remote debugging
 * [ipsw ssh shsh](/docs/cli/ipsw/ssh/shsh)	 - Get SHSH blobs from device
 

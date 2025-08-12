@@ -4,11 +4,11 @@ title: install
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: install
-description: Install a provision profile (.mobileprovision file)
+description: Install a provisioning profile (.mobileprovision file)
 ---
 ## ipsw idev prov install
 
-Install a provision profile (.mobileprovision file)
+Install a provisioning profile (.mobileprovision file)
 
 ```
 ipsw idev prov install <PROV> [flags]

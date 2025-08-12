@@ -55,7 +55,7 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
   -x, --exclave                 Extract Exclave Bundle
       --fcs-key                 Extract AEA1 DMG fcs-key pem files
   -f, --files                   Extract File System files
-      --flat                    Do NOT perserve directory structure when extracting
+      --flat                    Do NOT preserve directory structure when extracting
   -h, --help                    help for extract
       --iboot                   Extract iBoot
       --insecure                do not verify ssl certs

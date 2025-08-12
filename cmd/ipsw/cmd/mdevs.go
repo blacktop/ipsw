@@ -118,7 +118,7 @@ var mdevsCmd = &cobra.Command{
 		}
 		// mount filesystem DMG
 		log.Debugf("Mounting %s", dmgPath)
-		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 		if err != nil {
 			return fmt.Errorf("failed to mount DMG: %v", err)
 		}

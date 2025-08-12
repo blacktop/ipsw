@@ -4,11 +4,11 @@ title: ls
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: ls
-description: List installed provision profiles
+description: List installed provisioning profiles
 ---
 ## ipsw idev prov ls
 
-List installed provision profiles
+List installed provisioning profiles
 
 ```
 ipsw idev prov ls [flags]

@@ -43,7 +43,7 @@ ipsw download ota [options] [flags]
       --driver-kit               Extract DriverKit dyld_shared_cache(s) from remote OTA zip
       --dyld                     Extract dyld_shared_cache(s) from remote OTA zip
   -a, --dyld-arch stringArray    dyld_shared_cache architecture(s) to remote extract
-  -f, --flat                     Do NOT perserve directory structure when downloading with --pattern
+  -f, --flat                     Do NOT preserve directory structure when downloading with --pattern
   -h, --help                     help for ota
       --info                     Show all the latest OTAs available
       --insecure                 do not verify ssl certs
