@@ -15,8 +15,8 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.10.3
-	github.com/alecthomas/chroma/v2 v2.19.0
-	github.com/anthropics/anthropic-sdk-go v1.6.2
+	github.com/alecthomas/chroma/v2 v2.20.0
+	github.com/anthropics/anthropic-sdk-go v1.9.1
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/blacktop/arm64-cgo v1.0.58
@@ -50,8 +50,8 @@ require (
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gocolly/colly/v2 v2.2.0
-	github.com/golang-jwt/jwt/v5 v5.2.3
-	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
+	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.7.0
@@ -59,8 +59,8 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.9.6
-	github.com/openai/openai-go v1.11.1
+	github.com/ollama/ollama v0.11.4
+	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.4.0
@@ -75,15 +75,15 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20250410153552-f8c6db950420
 	github.com/vbauerster/mpb/v8 v8.10.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.40.0
-	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
-	golang.org/x/net v0.42.0
+	golang.org/x/crypto v0.41.0
+	golang.org/x/exp v0.0.0-20250811191247-51f88131bc50
+	golang.org/x/net v0.43.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.34.0
-	golang.org/x/term v0.33.0
-	google.golang.org/genai v1.17.0
-	google.golang.org/protobuf v1.36.6
+	golang.org/x/sys v0.35.0
+	golang.org/x/term v0.34.0
+	google.golang.org/genai v1.19.0
+	google.golang.org/protobuf v1.36.7
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.1
@@ -243,9 +243,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.19.0 // indirect
 	golang.org/x/image v0.29.0 // indirect
-	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
+	golang.org/x/mod v0.27.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/tools v0.36.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250721164621-a45f3dfb1074 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074 // indirect
