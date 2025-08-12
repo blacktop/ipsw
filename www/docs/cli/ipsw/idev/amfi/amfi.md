@@ -33,5 +33,5 @@ ipsw idev amfi [flags]
 ### SEE ALSO
 
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
-* [ipsw idev amfi dev](/docs/cli/ipsw/idev/amfi/dev)	 - Enabled Developer Mode on device
+* [ipsw idev amfi dev](/docs/cli/ipsw/idev/amfi/dev)	 - Enable Developer Mode on device
 

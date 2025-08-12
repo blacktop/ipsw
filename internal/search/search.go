@@ -54,7 +54,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		defer os.Remove(dmgPath)
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to mount DMG: %v", err)
 	}

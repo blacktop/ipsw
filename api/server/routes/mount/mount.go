@@ -50,6 +50,11 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: mount_point
+	//         in: query
+	//         description: custom mount point path
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       500: genericError
 	//       200: mountReponse
@@ -69,12 +74,18 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
+		
+		mountPointParam, _ := c.GetQuery("mount_point")
+		if mountPointParam != "" {
+			mountPointParam = filepath.Clean(mountPointParam)
+		}
+		
 		dmgType := c.Param("type")
 		if !slices.Contains([]string{"app", "sys", "fs"}, dmgType) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
 			return
 		}
-		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath, nil)
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath, nil, mountPointParam)
 		if err != nil {
 			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
 				c.AbortWithError(http.StatusNotFound, err)

@@ -4,11 +4,11 @@ title: pbzx
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: pbzx
-description: Decompess pbzx files
+description: Decompress pbzx files
 ---
 ## ipsw pbzx
 
-Decompess pbzx files
+Decompress pbzx files
 
 ```
 ipsw pbzx [flags]

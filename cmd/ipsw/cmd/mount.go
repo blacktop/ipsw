@@ -45,9 +45,11 @@ func init() {
 	mountCmd.Flags().StringP("key", "k", "", "DMG key")
 	mountCmd.Flags().Bool("lookup", false, "Lookup DMG keys on theapplewiki.com")
 	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	mountCmd.Flags().StringP("mount-point", "m", "", "Custom mount point (default: /tmp/<dmg>.mount)")
 	viper.BindPFlag("mount.key", mountCmd.Flags().Lookup("key"))
 	viper.BindPFlag("mount.lookup", mountCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("mount.pem-db", mountCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("mount.mount-point", mountCmd.Flags().Lookup("mount-point"))
 }
 
 // mountCmd represents the mount command
@@ -69,6 +71,9 @@ var mountCmd = &cobra.Command{
 
 		# Mount dyld shared cache (exc) DMG with AEA pem DB
 		$ ipsw mount exc iPhone.ipsw --pem-db /path/to/pem.json
+
+		# Mount to a custom mount point
+		$ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
 	`),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -86,6 +91,7 @@ var mountCmd = &cobra.Command{
 		key := viper.GetString("mount.key")
 		lookupKeys := viper.GetBool("mount.lookup")
 		pemDB := viper.GetString("mount.pem-db")
+		mountPoint := viper.GetString("mount.mount-point")
 		// validate flags
 		if len(key) > 0 && lookupKeys {
 			return fmt.Errorf("cannot use --key AND --lookup flags together")
@@ -129,7 +135,7 @@ var mountCmd = &cobra.Command{
 			keys = key
 		}
 
-		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB, keys)
+		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB, keys, mountPoint)
 		if err != nil {
 			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}

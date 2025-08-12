@@ -650,7 +650,7 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 				dcf.Close()
 				// mount the patched cryptex
 				utils.Indent(log.Info, 4)(fmt.Sprintf("Mounting DMG %s", dcf.Name()))
-				mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name())
+				mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name(), "")
 				if err != nil {
 					return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 				}

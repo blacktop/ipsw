@@ -4,11 +4,11 @@ title: debugserver
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: debugserver
-description: Prep device for remote debugging
+description: Prepare device for remote debugging
 ---
 ## ipsw ssh debugserver
 
-Prep device for remote debugging
+Prepare device for remote debugging
 
 ```
 ipsw ssh debugserver [flags]

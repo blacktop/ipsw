@@ -17,12 +17,12 @@ ipsw dyld symaddr <DSC> [flags]
 ### Options
 
 ```
-  -a, --all            Find all symbol matches
-  -b, --binds          Also search LC_DYLD_INFO binds
-  -h, --help           help for symaddr
-  -i, --image string   dylib image to search
-      --in string      Path to JSON file containing list of symbols to lookup
-      --out string     Path to output JSON file
+  -a, --all             Find all symbol matches
+  -b, --binds           Also search LC_DYLD_INFO binds
+  -h, --help            help for symaddr
+  -i, --image string    dylib image to search
+      --in string       Path to JSON file containing list of symbols to lookup
+  -o, --output string   Path to output JSON file
 ```
 
 ### Options inherited from parent commands

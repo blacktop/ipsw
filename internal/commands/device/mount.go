@@ -182,7 +182,7 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 	if info.ManifestPath == "" {
 		// At this point we have a DMG path that needs to be mounted to find the BuildManifest.plist
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", c.DDIDmgPath))
-		mountPoint, alreadyMounted, err := utils.MountDMG(c.DDIDmgPath)
+		mountPoint, alreadyMounted, err := utils.MountDMG(c.DDIDmgPath, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to mount %s: %w", c.DDIDmgPath, err)
 		}

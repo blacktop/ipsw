@@ -39,7 +39,7 @@ ipsw download wiki [flags]
   -y, --confirm          do not prompt user for confirmation
       --db string        Path to local JSON database (will use CWD by default) (default "wiki_db.json")
   -d, --device string    iOS Device (i.e. iPhone11,2)
-  -f, --flat             Do NOT perserve directory structure when downloading with --pattern
+  -f, --flat             Do NOT preserve directory structure when downloading with --pattern
   -h, --help             help for wiki
       --insecure         do not verify ssl certs
       --ipsw             Download IPSWs
