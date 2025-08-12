@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"io"
@@ -293,6 +294,39 @@ func Parse(name string, conf *Config) (*Asset, error) {
 	}
 
 	saved := make(map[string]int)
+	// helpers for unique naming and saving outputs
+	uniqName := func(base, ext string) string {
+		name := base
+		if _, ok := saved[name]; ok {
+			saved[name] += 1
+			name += fmt.Sprintf("_%d", saved[name])
+		} else {
+			saved[name] = 0
+		}
+		if len(ext) > 0 && !strings.HasSuffix(strings.ToLower(name), strings.ToLower(ext)) {
+			name += ext
+		}
+		return name
+	}
+	saveBytes := func(base, ext string, data []byte) error {
+		if len(a.conf.Output) == 0 {
+			return nil
+		}
+		fname := uniqName(base, ext)
+		return os.WriteFile(filepath.Join(a.conf.Output, fname), data, 0o644)
+	}
+	savePNG := func(base string, img image.Image) error {
+		if len(a.conf.Output) == 0 {
+			return nil
+		}
+		fname := uniqName(base, ".png")
+		f, err := os.Create(filepath.Join(a.conf.Output, fname))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return png.Encode(f, img)
+	}
 
 	for _, v := range bm.Vars {
 		switch v.Name {
@@ -339,28 +373,23 @@ func Parse(name string, conf *Config) (*Asset, error) {
 				return nil, fmt.Errorf("failed to read CARGLOBALS data: %v", err)
 			}
 		case "KEYFORMATWORKAROUND":
-			// KEYFORMATWORKAROUND has the same structure as KEYFORMAT but without tag and version fields
-			// It starts directly with maximumRenditionKeyTokenCount followed by the tokens
-			br, err := bm.ReadBlock(v.Name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read block %s: %v", v.Name, err)
-			}
-
-			var maxTokenCount uint32
-			if err := binary.Read(br, binary.LittleEndian, &maxTokenCount); err != nil {
-				return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND max token count: %v", err)
-			}
-
-			// Only parse if we don't already have a key format
-			if a.KeyFormat == nil && maxTokenCount > 0 {
-				a.KeyFormat = make([]renditionAttributeType, maxTokenCount)
-				if err := binary.Read(br, binary.LittleEndian, &a.KeyFormat); err != nil {
-					return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND rendition attribute types: %v", err)
-				}
-			}
-
+			// KEYFORMATWORKAROUND structure is not fully understood
+			// Skip parsing for now and log for debugging
 			if a.conf.Verbose {
-				log.Debugf("Parsed KEYFORMATWORKAROUND: %d rendition key tokens", maxTokenCount)
+				br, err := bm.ReadBlock(v.Name)
+				if err != nil {
+					log.Debugf("Failed to read KEYFORMATWORKAROUND block: %v", err)
+				} else {
+					data, err := io.ReadAll(br)
+					if err != nil {
+						log.Debugf("Failed to read KEYFORMATWORKAROUND data: %v", err)
+					} else {
+						log.Debugf("KEYFORMATWORKAROUND block found (%d bytes)", len(data))
+						if len(data) <= 256 {
+							log.Debugf("KEYFORMATWORKAROUND hex dump:\n%s", hex.Dump(data))
+						}
+					}
+				}
 			}
 		case "EXTERNAL_KEYS":
 			log.Error("BOM block EXTERNAL_KEYS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
@@ -562,14 +591,60 @@ func Parse(name string, conf *Config) (*Asset, error) {
 						switch pixelFormat {
 						case PixFmtARGB, PixFmtARGB16, PixFmtRGB555, PixFmtGray, PixFmtGray16:
 							rend.Type = fmt.Sprintf("Image (%s)", cheader.Metadata.Layout.String())
-							log.WithFields(log.Fields{
-								"rendition": rend.RenditionName,
-								"layout":    cheader.Metadata.Layout,
-							}).Info("IMAGE layout")
+							if a.conf.Verbose {
+								log.WithFields(log.Fields{
+									"rendition": rend.RenditionName,
+									"layout":    cheader.Metadata.Layout,
+								}).Debug("IMAGE layout")
+							}
 							switch cheader.Metadata.Layout {
-							// TODO: handle layout special cases
+							case PackedImage:
+								// 	// PackedImage has a special structure - the image data is embedded differently
+								// 	// For now, log that it's a packed image and skip decoding
+								// 	log.Debugf("PackedImage layout for %s - special handling needed", rend.RenditionName)
+								// 	// Store the raw data as the asset
+								// 	data, err := io.ReadAll(vr)
+								// 	if err != nil {
+								// 		return nil, fmt.Errorf("failed to read PackedImage data: %v", err)
+								// 	}
+								// 	er := bytes.NewReader(data)
+								// 	var elem csiElement
+								// 	if err := binary.Read(er, binary.LittleEndian, &elem); err != nil {
+								// 		return nil, fmt.Errorf("failed to read PackedImage element: %v", err)
+								// 	}
+								// 	if elem.Signature != [4]byte{'M', 'L', 'E', 'C'} { // 'MLEC'
+								// 		return nil, fmt.Errorf("invalid PackedImage signature: %s", elem.Signature)
+								// 	}
+								// 	edata := make([]byte, elem.Length)
+								// 	if _, err := io.ReadFull(er, edata); err != nil {
+								// 		return nil, fmt.Errorf("failed to read LZFSE PackedImage data: %v", err)
+								// 	}
+								// 	switch elem.Encoding {
+								// 	case RLE:
+								// 		rend.Asset = decodeRLE(edata)
+								// 	case LZFSE:
+								// 		decompressedData, err := comp.Decompress(edata, comp.LZFSE)
+								// 		if err != nil {
+								// 			return nil, fmt.Errorf("failed to decompress LZFSE PackedImage data: %v", err)
+								// 		}
+								// 		rend.Asset = decompressedData
+								// 	default:
+								// 		log.WithField("encoding", elem.Encoding).Warnf("Unsupported PackedImage encoding for %s", rend.RenditionName)
+								// 		rend.Asset = edata
+								// 	}
+								// TODO: handle other layout special cases
+								log.WithField("layout", cheader.Metadata.Layout).Debugf("Unsupported PackedImage layout for %s", rend.RenditionName)
+								fallthrough
 							default:
-								img, err := decodeImage(vr, *cheader, conf)
+								// Extract optional ImageRowBytes from resources for correct stride
+								var rowBytes uint32
+								for _, rsc := range rend.Resources {
+									if rsc.ID == ImageRowBytesID && len(rsc.Data) >= 4 {
+										_ = binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &rowBytes)
+										break
+									}
+								}
+								img, err := decodeImage(vr, *cheader, conf, int(rowBytes))
 								if err != nil {
 									if a.conf.Verbose {
 										log.Errorf("failed to decode image '%s': %v; data:\n%s", rend.RenditionName, err, hex.Dump(vdata))
@@ -579,27 +654,8 @@ func Parse(name string, conf *Config) (*Asset, error) {
 									// return nil, err
 								}
 								if img != nil && err == nil {
-									if len(a.conf.Output) > 0 {
-										// save image
-										name := rend.RenditionName
-										if _, ok := saved[name]; ok {
-											saved[name] += 1
-											name += fmt.Sprintf("_%d", saved[name])
-										} else {
-											saved[name] = 0
-										}
-										// FIXME: forcing image to be a PNG
-										if !strings.HasSuffix(name, ".png") {
-											name += ".png"
-										}
-										imgFile, err := os.Create(filepath.Join(a.conf.Output, name))
-										if err != nil {
-											return nil, err
-										}
-										if err := png.Encode(imgFile, img); err != nil {
-											return nil, err
-										}
-										imgFile.Close()
+									if err := savePNG(rend.RenditionName, img); err != nil {
+										return nil, err
 									}
 									if a.conf.Verbose {
 										// display image in terminal
@@ -623,64 +679,40 @@ func Parse(name string, conf *Config) (*Asset, error) {
 							}
 						case PixFmtPDF:
 							rend.Type = "PDF"
-							if len(a.conf.Output) > 0 {
-								name := rend.RenditionName
-								if _, ok := saved[name]; ok {
-									saved[name] += 1
-									name += fmt.Sprintf("_%d", saved[name])
-								} else {
-									saved[name] = 0
-								}
-								if !strings.HasSuffix(name, ".pdf") {
-									name += ".pdf"
-								}
-								f, err := os.Create(filepath.Join(a.conf.Output, name))
-								if err != nil {
-									return nil, err
-								}
-								if _, err := io.Copy(f, vr); err != nil {
+							// Read PDF data
+							pdfData, err := io.ReadAll(vr)
+							if err != nil {
+								log.Errorf("failed to read PDF data: %v", err)
+							} else {
+								// Store raw PDF data as asset
+								rend.Asset = pdfData
+								if err := saveBytes(rend.RenditionName, ".pdf", pdfData); err != nil {
 									return nil, err
 								}
 							}
 						case PixFmtJPEG:
 							rend.Type = "JPEG"
-							if len(a.conf.Output) > 0 {
-								name := rend.RenditionName
-								if _, ok := saved[name]; ok {
-									saved[name] += 1
-									name += fmt.Sprintf("_%d", saved[name])
-								} else {
-									saved[name] = 0
-								}
-								if !strings.HasSuffix(name, ".jpg") {
-									name += ".jpg"
-								}
-								f, err := os.Create(filepath.Join(a.conf.Output, name))
-								if err != nil {
-									return nil, err
-								}
-								if _, err := io.Copy(f, vr); err != nil {
+							// Read JPEG data
+							jpegData, err := io.ReadAll(vr)
+							if err != nil {
+								log.Errorf("failed to read JPEG data: %v", err)
+							} else {
+								// Store raw JPEG data as asset
+								rend.Asset = jpegData
+								if err := saveBytes(rend.RenditionName, ".jpg", jpegData); err != nil {
 									return nil, err
 								}
 							}
 						case PixFmtHEIF:
 							rend.Type = "HEIF"
-							if len(a.conf.Output) > 0 {
-								name := rend.RenditionName
-								if _, ok := saved[name]; ok {
-									saved[name] += 1
-									name += fmt.Sprintf("_%d", saved[name])
-								} else {
-									saved[name] = 0
-								}
-								if !strings.HasSuffix(name, ".heic") {
-									name += ".heic"
-								}
-								f, err := os.Create(filepath.Join(a.conf.Output, name))
-								if err != nil {
-									return nil, err
-								}
-								if _, err := io.Copy(f, vr); err != nil {
+							// Read HEIF data
+							heifData, err := io.ReadAll(vr)
+							if err != nil {
+								log.Errorf("failed to read HEIF data: %v", err)
+							} else {
+								// Store raw HEIF data as asset
+								rend.Asset = heifData
+								if err := saveBytes(rend.RenditionName, ".heic", heifData); err != nil {
 									return nil, err
 								}
 							}
@@ -983,6 +1015,41 @@ func readCSIFileHeader(r io.Reader) (*csiHeader, error) {
 		return nil, fmt.Errorf("failed to read csiHeader image index accum lengths: %v", err)
 	}
 	return &c, nil
+}
+
+// decodeRLE implements a PackBits-like RLE commonly used in CoreUI payloads.
+// Control byte N:
+//   - 0..127   : copy the next (N+1) literal bytes
+//   - 129..255 : repeat the next byte (257 - N) times
+//   - 128      : no-op
+func decodeRLE(src []byte) []byte {
+	var dst []byte
+	for i := 0; i < len(src); {
+		n := int(int8(src[i]))
+		i++
+		switch {
+		case n >= 0:
+			count := n + 1
+			if i+count > len(src) {
+				count = len(src) - i
+			}
+			dst = append(dst, src[i:i+count]...)
+			i += count
+		case n == -128:
+			// nop
+		default:
+			if i >= len(src) {
+				break
+			}
+			b := src[i]
+			i++
+			count := 1 - n
+			for j := 0; j < count; j++ {
+				dst = append(dst, b)
+			}
+		}
+	}
+	return dst
 }
 
 func readString(r io.Reader) (string, error) {

@@ -141,6 +141,9 @@ func (a *Asset) String() string {
 				for _, size := range t.ImageSizes {
 					asset += fmt.Sprintf("  - index %d: %dx%d\n", size.Index, size.Width, size.Height)
 				}
+			case []byte:
+				// Raw data (PDF, JPEG, HEIF, etc.)
+				asset += fmt.Sprintf(colorField("Data Size")+": %s (%d bytes)\n", humanize.Bytes(uint64(len(t))), len(t))
 			default:
 				log.Debugf("%s has unknown asset type: %T", ass.RenditionName, t)
 			}
