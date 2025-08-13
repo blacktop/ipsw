@@ -66,10 +66,10 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "22G6086_24G210_22O785",
+        "fingerprint": "22G6086_24G207_22O785",
         "ios_build": "22G6086",
-        "macos_build": "24G210",
-        "updated_at": "2025-08-11T19:06:38Z",
+        "macos_build": "24G207",
+        "updated_at": "2025-08-13T19:05:36Z",
         "visionos_build": "22O785"
       }
     }
