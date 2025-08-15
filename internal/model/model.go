@@ -14,12 +14,24 @@ var (
 	ErrSymExists = errors.New("symbol exists")
 )
 
+// Platform represents supported Apple platforms
+type Platform string
+
+const (
+	PlatformIOS     Platform = "iOS"
+	PlatformMacOS   Platform = "macOS"
+	PlatformWatchOS Platform = "watchOS"
+	PlatformTvOS    Platform = "tvOS"
+	PlatformVisionOS Platform = "visionOS"
+)
+
 // Ipsw is the model for an Ipsw file.
 type Ipsw struct {
 	ID         string             `gorm:"primaryKey" json:"id"`
 	Name       string             `json:"name,omitempty"`
-	Version    string             `json:"version,omitempty"`
+	Version    string             `gorm:"index:idx_platform_version,priority:2" json:"version,omitempty"`
 	BuildID    string             `gorm:"column:buildid" json:"buildid,omitempty"`
+	Platform   Platform           `gorm:"type:varchar(20);index:idx_platform_version,priority:1" json:"platform,omitempty"`
 	Devices    []*Device          `gorm:"many2many:ipsw_devices;" json:"devices,omitempty"`
 	Kernels    []*Kernelcache     `gorm:"many2many:ipsw_kernels;" json:"kernels,omitempty"`
 	DSCs       []*DyldSharedCache `gorm:"many2many:ipsw_dscs;" json:"dscs,omitempty"`
