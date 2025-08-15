@@ -63,6 +63,11 @@ func init() {
 	entCmd.Flags().Bool("stats", false, "Show database statistics")
 	entCmd.Flags().Int("limit", 100, "Limit number of results")
 
+	// Replacement flags
+	entCmd.Flags().Bool("replace", false, "Replace older builds of the same iOS version with newer builds")
+	entCmd.Flags().String("replace-strategy", "auto", "Replacement strategy: auto, prompt, force")
+	entCmd.Flags().Bool("dry-run", false, "Show what would be replaced without making changes")
+
 	// Viper bindings
 	viper.BindPFlag("ent.ipsw", entCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
@@ -80,6 +85,9 @@ func init() {
 	viper.BindPFlag("ent.file-only", entCmd.Flags().Lookup("file-only"))
 	viper.BindPFlag("ent.stats", entCmd.Flags().Lookup("stats"))
 	viper.BindPFlag("ent.limit", entCmd.Flags().Lookup("limit"))
+	viper.BindPFlag("ent.replace", entCmd.Flags().Lookup("replace"))
+	viper.BindPFlag("ent.replace-strategy", entCmd.Flags().Lookup("replace-strategy"))
+	viper.BindPFlag("ent.dry-run", entCmd.Flags().Lookup("dry-run"))
 
 }
 
@@ -113,7 +121,13 @@ var entCmd = &cobra.Command{
 		❯ ipsw ent --sqlite entitlements.db --stats
 
 		# Search PostgreSQL database (Supabase)
-		❯ ipsw ent --pg-host db.xyz.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --key sandbox`),
+		❯ ipsw ent --pg-host db.xyz.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --key sandbox
+		
+		# Replace older iOS builds with newer ones
+		❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace
+		
+		# Preview what would be replaced
+		❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace --dry-run`),
 	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -138,6 +152,9 @@ var entCmd = &cobra.Command{
 		fileOnly := viper.GetBool("ent.file-only")
 		showStats := viper.GetBool("ent.stats")
 		limit := viper.GetInt("ent.limit")
+		replace := viper.GetBool("ent.replace")
+		replaceStrategy := viper.GetString("ent.replace-strategy")
+		dryRun := viper.GetBool("ent.dry-run")
 
 		// Validate required flags
 		if sqliteDB == "" && pgHost == "" {
@@ -171,6 +188,19 @@ var entCmd = &cobra.Command{
 			return fmt.Errorf("--key, --value, --file, and --stats are mutually exclusive")
 		}
 
+		// Validate replacement flags
+		if replace && (keyPattern != "" || valuePattern != "" || filePattern != "" || showStats) {
+			return fmt.Errorf("--replace cannot be used with search operations")
+		}
+		
+		if (replaceStrategy != "auto" && replaceStrategy != "prompt" && replaceStrategy != "force") {
+			return fmt.Errorf("--replace-strategy must be one of: auto, prompt, force")
+		}
+		
+		if dryRun && !replace {
+			return fmt.Errorf("--dry-run can only be used with --replace")
+		}
+
 		// Validate PostgreSQL flags if using PostgreSQL
 		if pgHost != "" {
 			if pgUser == "" || pgDatabase == "" {
@@ -190,7 +220,13 @@ var entCmd = &cobra.Command{
 		// Handle database creation
 		if len(ipsws) > 0 || len(inputs) > 0 {
 			if pgHost != "" {
+				if replace {
+					return ent.CreatePostgreSQLDatabaseWithReplacement(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, ipsws, inputs, replaceStrategy, dryRun)
+				}
 				return ent.CreatePostgreSQLDatabase(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, ipsws, inputs)
+			}
+			if replace {
+				return ent.CreateSQLiteDatabaseWithReplacement(sqliteDB, ipsws, inputs, replaceStrategy, dryRun)
 			}
 			return ent.CreateSQLiteDatabase(sqliteDB, ipsws, inputs)
 		}

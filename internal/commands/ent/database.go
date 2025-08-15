@@ -49,11 +49,15 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 			return fmt.Errorf("failed to parse IPSW info: %v", err)
 		}
 
+		// Detect platform from IPSW
+		platform := DetectPlatformFromIPSW(ipswPath, ipswInfo)
+		
 		ipswRecord = &model.Ipsw{
-			ID:      generateIPSWID(ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
-			Name:    filepath.Base(ipswPath),
-			Version: ipswInfo.Plists.BuildManifest.ProductVersion,
-			BuildID: ipswInfo.Plists.BuildManifest.ProductBuildVersion,
+			ID:       generateIPSWIDWithPlatform(platform, ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
+			Name:     filepath.Base(ipswPath),
+			Version:  ipswInfo.Plists.BuildManifest.ProductVersion,
+			BuildID:  ipswInfo.Plists.BuildManifest.ProductBuildVersion,
+			Platform: platform,
 		}
 
 		// Add devices
@@ -94,9 +98,10 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 	} else {
 		// Create a minimal IPSW record for standalone usage
 		ipswRecord = &model.Ipsw{
-			ID:      generateIPSWID("unknown", "unknown"),
-			Version: "unknown",
-			BuildID: "unknown",
+			ID:       generateIPSWIDWithPlatform(model.PlatformIOS, "unknown", "unknown"),
+			Version:  "unknown",
+			BuildID:  "unknown",
+			Platform: model.PlatformIOS,
 		}
 	}
 
@@ -459,9 +464,14 @@ func (ds *DatabaseService) storeEntitlement(ipswRecord *model.Ipsw, filePath, en
 	return nil
 }
 
-// generateIPSWID creates a unique ID for an IPSW based on version and build
+// generateIPSWID creates a unique ID for an IPSW based on version and build (legacy)
 func generateIPSWID(version, build string) string {
 	return fmt.Sprintf("%s_%s", version, build)
+}
+
+// generateIPSWIDWithPlatform creates a unique ID for an IPSW based on platform, version and build
+func generateIPSWIDWithPlatform(platform model.Platform, version, build string) string {
+	return fmt.Sprintf("%s_%s_%s", string(platform), version, build)
 }
 
 // createValueHash creates a hash for a value to ensure uniqueness

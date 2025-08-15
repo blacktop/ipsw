@@ -9,6 +9,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/db"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 )
@@ -353,3 +354,132 @@ func contains(haystack, needle string) bool {
 	}
 	return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 }
+
+// CreateSQLiteDatabaseWithReplacement creates or updates SQLite database with replacement support
+func CreateSQLiteDatabaseWithReplacement(dbPath string, ipsws, inputs []string, replaceStrategy string, dryRun bool) error {
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return fmt.Errorf("failed to create database directory: %v", err)
+	}
+
+	// Create SQLite database connection
+	dbConn, err := db.NewSqlite(dbPath, 1000)
+	if err != nil {
+		return fmt.Errorf("failed to create SQLite database: %v", err)
+	}
+	if err := dbConn.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to SQLite database: %v", err)
+	}
+	defer dbConn.Close()
+
+	dbService := NewDatabaseService(dbConn)
+	strategy := NewSQLiteReplacementStrategy(dbService)
+
+	return processIPSWsWithReplacement(strategy, ipsws, inputs, replaceStrategy, dryRun)
+}
+
+// CreatePostgreSQLDatabaseWithReplacement creates or updates PostgreSQL database with replacement support
+func CreatePostgreSQLDatabaseWithReplacement(host, port, user, password, database, sslMode string, ipsws, inputs []string, replaceStrategy string, dryRun bool) error {
+	// Create PostgreSQL database connection
+	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, 1000)
+	if err != nil {
+		return fmt.Errorf("failed to create PostgreSQL database connection: %v", err)
+	}
+	if err := dbConn.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to PostgreSQL database: %v", err)
+	}
+	defer dbConn.Close()
+
+	dbService := NewDatabaseService(dbConn)
+	strategy := NewPostgreSQLReplacementStrategy(dbService)
+
+	return processIPSWsWithReplacement(strategy, ipsws, inputs, replaceStrategy, dryRun)
+}
+
+// processIPSWsWithReplacement processes IPSWs with replacement logic
+func processIPSWsWithReplacement(strategy ReplacementStrategy, ipsws, inputs []string, replaceStrategy string, dryRun bool) error {
+	config := &ReplacementConfig{
+		Strategy: replaceStrategy,
+		DryRun:   dryRun,
+	}
+
+	// Process IPSWs
+	for _, ipswPath := range ipsws {
+		log.WithField("ipsw", filepath.Base(ipswPath)).Info("Processing IPSW")
+
+		// Parse IPSW info for version comparison
+		ipswInfo, err := info.Parse(ipswPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse IPSW info from %s: %v", ipswPath, err)
+		}
+
+		// Detect platform for replacement logic
+		platform := DetectPlatformFromIPSW(ipswPath, ipswInfo)
+		
+		newIPSW := IPSWInfo{
+			ID:       generateIPSWIDWithPlatform(platform, ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
+			Name:     filepath.Base(ipswPath),
+			Version:  ipswInfo.Plists.BuildManifest.ProductVersion,
+			BuildID:  ipswInfo.Plists.BuildManifest.ProductBuildVersion,
+			Platform: string(platform),
+		}
+
+		// Get existing IPSWs for comparison (platform-aware)
+		existingIPSWs, err := strategy.GetExistingIPSWs(string(platform), newIPSW.Version)
+		if err != nil {
+			return fmt.Errorf("failed to get existing IPSWs: %v", err)
+		}
+
+		// Create replacement plan
+		plan, err := strategy.CreateReplacementPlan(newIPSW, existingIPSWs, config)
+		if err != nil {
+			return fmt.Errorf("failed to create replacement plan: %v", err)
+		}
+
+		// Execute replacement if needed
+		if len(plan.ToReplace) > 0 || config.DryRun {
+			if err := strategy.ExecuteReplacement(plan); err != nil {
+				return fmt.Errorf("failed to execute replacement: %v", err)
+			}
+		}
+
+		// Extract and store entitlements (only if not dry run and plan was executed)
+		if !config.DryRun {
+			// Extract entitlements from IPSW
+			entDB, err := GetDatabase(&Config{
+				IPSW:     ipswPath,
+				Database: "", // Don't create blob file
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract entitlements from %s: %v", ipswPath, err)
+			}
+
+			// Store entitlements using the strategy's database service
+			sqliteStrat, ok := strategy.(*SQLiteReplacementStrategy)
+			if ok {
+				if err := sqliteStrat.service.StoreEntitlements(ipswPath, entDB); err != nil {
+					return fmt.Errorf("failed to store entitlements: %v", err)
+				}
+			} else if pgStrat, ok := strategy.(*PostgreSQLReplacementStrategy); ok {
+				if err := pgStrat.service.StoreEntitlements(ipswPath, entDB); err != nil {
+					return fmt.Errorf("failed to store entitlements: %v", err)
+				}
+			}
+		}
+	}
+
+	// Process input folders if specified
+	for _, inputPath := range inputs {
+		log.WithField("input", inputPath).Info("Processing input folder")
+		// For inputs, we don't have version info so we use legacy replacement
+		// This would need to be implemented based on your input processing logic
+		return fmt.Errorf("input folder processing with replacement not yet implemented")
+	}
+
+	if !dryRun {
+		fmt.Printf("✓ Database creation/update completed successfully\n")
+	}
+
+	return nil
+}
+
