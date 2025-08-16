@@ -159,15 +159,7 @@ jobs:
             
             if [ -f "$ipsw_file" ]; then
               echo "Processing $platform IPSW: $ipsw_file"
-              ./ipsw ent \
-                --pg-host "$SUPABASE_HOST" \
-                --pg-port 6543 \
-                --pg-user postgres \
-                --pg-password "$SUPABASE_PASSWORD" \
-                --pg-database postgres \
-                --pg-sslmode require \
-                --ipsw "$ipsw_file" \
-                --replace
+              ./ipsw ent --ipsw "$ipsw_file" --replace
               echo "$platform database update completed successfully"
             else
               echo "Skipping $platform (no IPSW file: $ipsw_file)"
