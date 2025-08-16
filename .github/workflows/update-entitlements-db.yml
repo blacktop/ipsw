@@ -159,7 +159,7 @@ jobs:
               ./ipsw ent --ipsw "$ipsw_file" --replace \
               --pg-host "${{ secrets.SUPABASE_HOST }}" \
               --pg-port 5432 \
-              --pg-user postgres \
+              --pg-user "${{ secrets.SUPABASE_USER }}" \
               --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
               --pg-database postgres
               --pg-sslmode require
