@@ -51,6 +51,7 @@ func init() {
 	entCmd.Flags().String("pg-password", "", "PostgreSQL password")
 	entCmd.Flags().String("pg-database", "", "PostgreSQL database name")
 	entCmd.Flags().String("pg-sslmode", "require", "PostgreSQL SSL mode (disable, require, verify-ca, verify-full)")
+	entCmd.Flags().String("pg-poolmode", "", "PostgreSQL pool mode (session, transaction, statement, or empty for no pooling)")
 
 	// Search flags
 	entCmd.Flags().StringP("key", "k", "", "Search for entitlement key pattern")
@@ -78,6 +79,7 @@ func init() {
 	viper.BindPFlag("ent.pg-password", entCmd.Flags().Lookup("pg-password"))
 	viper.BindPFlag("ent.pg-database", entCmd.Flags().Lookup("pg-database"))
 	viper.BindPFlag("ent.pg-sslmode", entCmd.Flags().Lookup("pg-sslmode"))
+	viper.BindPFlag("ent.pg-poolmode", entCmd.Flags().Lookup("pg-poolmode"))
 	viper.BindPFlag("ent.key", entCmd.Flags().Lookup("key"))
 	viper.BindPFlag("ent.value", entCmd.Flags().Lookup("value"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
@@ -145,6 +147,7 @@ var entCmd = &cobra.Command{
 		pgPassword := viper.GetString("ent.pg-password")
 		pgDatabase := viper.GetString("ent.pg-database")
 		pgSSLMode := viper.GetString("ent.pg-sslmode")
+		pgPoolMode := viper.GetString("ent.pg-poolmode")
 		keyPattern := viper.GetString("ent.key")
 		valuePattern := viper.GetString("ent.value")
 		filePattern := viper.GetString("ent.file")
@@ -192,11 +195,11 @@ var entCmd = &cobra.Command{
 		if replace && (keyPattern != "" || valuePattern != "" || filePattern != "" || showStats) {
 			return fmt.Errorf("--replace cannot be used with search operations")
 		}
-		
-		if (replaceStrategy != "auto" && replaceStrategy != "prompt" && replaceStrategy != "force") {
+
+		if replaceStrategy != "auto" && replaceStrategy != "prompt" && replaceStrategy != "force" {
 			return fmt.Errorf("--replace-strategy must be one of: auto, prompt, force")
 		}
-		
+
 		if dryRun && !replace {
 			return fmt.Errorf("--dry-run can only be used with --replace")
 		}
@@ -221,9 +224,9 @@ var entCmd = &cobra.Command{
 		if len(ipsws) > 0 || len(inputs) > 0 {
 			if pgHost != "" {
 				if replace {
-					return ent.CreatePostgreSQLDatabaseWithReplacement(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, ipsws, inputs, replaceStrategy, dryRun)
+					return ent.CreatePostgreSQLDatabaseWithReplacement(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, pgPoolMode, ipsws, inputs, replaceStrategy, dryRun)
 				}
-				return ent.CreatePostgreSQLDatabase(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, ipsws, inputs)
+				return ent.CreatePostgreSQLDatabase(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, pgPoolMode, ipsws, inputs)
 			}
 			if replace {
 				return ent.CreateSQLiteDatabaseWithReplacement(sqliteDB, ipsws, inputs, replaceStrategy, dryRun)
@@ -235,14 +238,14 @@ var entCmd = &cobra.Command{
 
 		if showStats {
 			if pgHost != "" {
-				return ent.ShowPostgreSQLStatistics(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode)
+				return ent.ShowPostgreSQLStatistics(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, pgPoolMode)
 			}
 			return ent.ShowSQLiteStatistics(sqliteDB)
 		}
 
 		// Perform search
 		if pgHost != "" {
-			return ent.SearchPostgreSQLEntitlements(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, keyPattern, valuePattern, filePattern, versionFilter, fileOnly, limit)
+			return ent.SearchPostgreSQLEntitlements(pgHost, pgPort, pgUser, pgPassword, pgDatabase, pgSSLMode, pgPoolMode, keyPattern, valuePattern, filePattern, versionFilter, fileOnly, limit)
 		}
 		return ent.SearchSQLiteEntitlements(sqliteDB, keyPattern, valuePattern, filePattern, versionFilter, fileOnly, limit)
 	},

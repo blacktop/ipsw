@@ -161,8 +161,9 @@ jobs:
               --pg-port 5432 \
               --pg-user "${{ secrets.SUPABASE_USER }}" \
               --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
-              --pg-database postgres
-              --pg-sslmode require
+              --pg-database postgres \
+              --pg-sslmode require \
+              --pg-poolmode session
               echo "$platform database update completed successfully"
             else
               echo "Skipping $platform (no IPSW file: $ipsw_file)"
