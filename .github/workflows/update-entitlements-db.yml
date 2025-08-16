@@ -43,7 +43,12 @@ jobs:
             local platform_name="$2"
             
             # Try to get latest IPSW URL, handle errors gracefully
-            url=$(./ipsw dl ipsw --device "$device" --latest --urls 2>/dev/null | head -1 || echo "")
+            if [ "$platform_name" = "macOS" ]; then
+              # macOS doesn't use device IDs, just get latest macOS IPSW
+              url=$(./ipsw dl ipsw --macos --latest --urls 2>/dev/null | head -1 || echo "")
+            else
+              url=$(./ipsw dl ipsw --device "$device" --latest --urls 2>/dev/null | head -1 || echo "")
+            fi
             
             if [ -n "$url" ] && [ "$url" != "null" ]; then
               echo "$url"
@@ -62,7 +67,7 @@ jobs:
           fi
           
           if echo "$PLATFORMS" | grep -q "macos"; then
-            MACOS_URL=$(get_ipsw_url "Mac15,14" "macOS")
+            MACOS_URL=$(get_ipsw_url "" "macOS")
           fi
           
           # Export URLs to environment
