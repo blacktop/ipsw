@@ -4,6 +4,17 @@ on:
   schedule:
     - cron: '0 19 * * *'  # daily at 11:00 PST (19:00 UTC)
   workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if no new IPSWs detected'
+        required: false
+        default: false
+        type: boolean
+      platforms:
+        description: 'Platforms to check (comma-separated: ios,macos)'
+        required: false
+        default: 'ios,macos'
+        type: string
 
 jobs:
   update-entitlements-db:
@@ -19,59 +30,188 @@ jobs:
         run: |
           go build -o ipsw ./cmd/ipsw
 
-      - name: Determine latest IPSW URL
-        id: get-ipsw
+      - name: Determine latest IPSW URLs
+        id: get-ipsws
         run: |
-          # Get the latest IPSW URL
-          echo "CURRENT_IPSW_URL=$(./ipsw dl ipsw --device iPhone17,1 --latest --urls)" >> $GITHUB_ENV
+          # Determine which platforms to check
+          PLATFORMS="${{ github.event.inputs.platforms || 'ios,macos' }}"
+          echo "Checking platforms: $PLATFORMS"
+          
+          # Function to get latest IPSW URL for a platform
+          get_ipsw_url() {
+            local device="$1"
+            local platform_name="$2"
+            echo "Checking $platform_name ($device)..."
+            
+            # Try to get latest IPSW URL, handle errors gracefully
+            url=$(./ipsw dl ipsw --device "$device" --latest --urls 2>/dev/null | head -1 || echo "")
+            
+            if [ -n "$url" ] && [ "$url" != "null" ]; then
+              echo "Found $platform_name IPSW: $url"
+              echo "$url"
+            else
+              echo "No $platform_name IPSW found for device $device"
+              echo ""
+            fi
+          }
+          
+          # Initialize URLs
+          IOS_URL=""
+          MACOS_URL=""
+          
+          # Check each requested platform
+          if echo "$PLATFORMS" | grep -q "ios"; then
+            IOS_URL=$(get_ipsw_url "iPhone17,1" "iOS")
+          fi
+          
+          if echo "$PLATFORMS" | grep -q "macos"; then
+            MACOS_URL=$(get_ipsw_url "Mac15,3" "macOS")
+          fi
+          
+          # Export URLs to environment
+          echo "IOS_URL=$IOS_URL" >> $GITHUB_ENV
+          echo "MACOS_URL=$MACOS_URL" >> $GITHUB_ENV
 
-      - name: Check for new IPSW
-        id: check-ipsw
+      - name: Check for new IPSWs
+        id: check-ipsws
         run: |
-          LAST=$(jq -r '.latest_ipsw.url // ""' hack/.watch_cache)
-          echo "Last cached IPSW URL: $LAST"
-          echo "Current IPSW URL: $CURRENT_IPSW_URL"
-          if [ "$LAST" = "$CURRENT_IPSW_URL" ]; then
-            echo "No new IPSW found; skipping"
-            echo "should_update=false" >> $GITHUB_OUTPUT
+          # Get cached URLs
+          LAST_IOS=$(jq -r '.latest_ipsw.ios_url // ""' hack/.watch_cache)
+          LAST_MACOS=$(jq -r '.latest_ipsw.macos_url // ""' hack/.watch_cache)
+          
+          echo "=== Cached URLs ==="
+          echo "iOS: $LAST_IOS"
+          echo "macOS: $LAST_MACOS"
+          
+          echo "=== Current URLs ==="
+          echo "iOS: $IOS_URL"
+          echo "macOS: $MACOS_URL"
+          
+          # Check for changes
+          SHOULD_UPDATE_IOS="false"
+          SHOULD_UPDATE_MACOS="false"
+          SHOULD_UPDATE_ANY="false"
+          
+          if [ -n "$IOS_URL" ] && [ "$LAST_IOS" != "$IOS_URL" ]; then
+            echo "iOS IPSW changed: $LAST_IOS -> $IOS_URL"
+            SHOULD_UPDATE_IOS="true"
+            SHOULD_UPDATE_ANY="true"
+          fi
+          
+          if [ -n "$MACOS_URL" ] && [ "$LAST_MACOS" != "$MACOS_URL" ]; then
+            echo "macOS IPSW changed: $LAST_MACOS -> $MACOS_URL"
+            SHOULD_UPDATE_MACOS="true"
+            SHOULD_UPDATE_ANY="true"
+          fi
+          
+          # Force update if requested
+          if [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+            echo "Force update requested"
+            SHOULD_UPDATE_ANY="true"
+            if [ -n "$IOS_URL" ]; then SHOULD_UPDATE_IOS="true"; fi
+            if [ -n "$MACOS_URL" ]; then SHOULD_UPDATE_MACOS="true"; fi
+          fi
+          
+          # Export update flags
+          echo "should_update_ios=$SHOULD_UPDATE_IOS" >> $GITHUB_OUTPUT
+          echo "should_update_macos=$SHOULD_UPDATE_MACOS" >> $GITHUB_OUTPUT
+          echo "should_update_any=$SHOULD_UPDATE_ANY" >> $GITHUB_OUTPUT
+          
+          if [ "$SHOULD_UPDATE_ANY" = "true" ]; then
+            echo "Will proceed with database updates"
           else
-            echo "New IPSW found; proceeding with update"
-            echo "should_update=true" >> $GITHUB_OUTPUT
+            echo "No new IPSWs found; skipping updates"
           fi
 
-      - name: Download IPSW
-        if: steps.check-ipsw.outputs.should_update == 'true'
+      - name: Download IPSWs
+        if: steps.check-ipsws.outputs.should_update_any == 'true'
         run: |
-          echo "Downloading IPSW: $CURRENT_IPSW_URL"
-          curl -L "$CURRENT_IPSW_URL" -o latest.ipsw
-          echo "IPSW downloaded: $(ls -lh latest.ipsw)"
+          echo "Downloading new IPSWs..."
+          
+          # Download iOS IPSW
+          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ] && [ -n "$IOS_URL" ]; then
+            echo "Downloading iOS IPSW: $IOS_URL"
+            curl -L "$IOS_URL" -o ios_latest.ipsw
+            echo "iOS IPSW downloaded: $(ls -lh ios_latest.ipsw)"
+          fi
+          
+          # Download macOS IPSW
+          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ] && [ -n "$MACOS_URL" ]; then
+            echo "Downloading macOS IPSW: $MACOS_URL"
+            curl -L "$MACOS_URL" -o macos_latest.ipsw
+            echo "macOS IPSW downloaded: $(ls -lh macos_latest.ipsw)"
+          fi
 
       - name: Update entitlements database
-        if: steps.check-ipsw.outputs.should_update == 'true'
+        if: steps.check-ipsws.outputs.should_update_any == 'true'
         run: |
-          echo "Updating Supabase entitlements database..."
-          ./ipsw ent \
-            --pg-host  ${{ secrets.SUPABASE_HOST }} \
-            --pg-port 6543 \
-            --pg-user postgres \
-            --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
-            --pg-database postgres \
-            --pg-sslmode require \
-            --ipsw latest.ipsw
-          echo "Database update completed successfully"
+          echo "Updating Supabase entitlements database with replacement support..."
+          
+          # Function to update database for a platform
+          update_platform() {
+            local platform="$1"
+            local ipsw_file="$2"
+            
+            if [ -f "$ipsw_file" ]; then
+              echo "Processing $platform IPSW: $ipsw_file"
+              ./ipsw ent \
+                --pg-host  ${{ secrets.SUPABASE_HOST }} \
+                --pg-port 6543 \
+                --pg-user postgres \
+                --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
+                --pg-database postgres \
+                --pg-sslmode require \
+                --ipsw "$ipsw_file" \
+                --replace
+              echo "$platform database update completed successfully"
+            else
+              echo "Skipping $platform (no IPSW file: $ipsw_file)"
+            fi
+          }
+          
+          # Process each platform that needs updating
+          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ]; then
+            update_platform "iOS" "ios_latest.ipsw"
+          fi
+          
+          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ]; then
+            update_platform "macOS" "macos_latest.ipsw"
+          fi
+          
+          echo "All database updates completed successfully"
 
       - name: Update cache and commit
-        if: steps.check-ipsw.outputs.should_update == 'true'
+        if: steps.check-ipsws.outputs.should_update_any == 'true'
         run: |
-          # Update the cache file with the new IPSW URL
-          jq --arg url "$CURRENT_IPSW_URL" '.latest_ipsw = {"url": $url}' hack/.watch_cache > hack/.watch_cache.tmp
+          # Update the cache file with new IPSW URLs
+          echo "Updating cache with new IPSW URLs..."
+          
+          # Create temporary cache with current URLs
+          jq --arg ios_url "$IOS_URL" \
+             --arg macos_url "$MACOS_URL" \
+             '.latest_ipsw = {
+               "ios_url": (if $ios_url != "" then $ios_url else .latest_ipsw.ios_url // "" end),
+               "macos_url": (if $macos_url != "" then $macos_url else .latest_ipsw.macos_url // "" end),
+               "url": (if $ios_url != "" then $ios_url else .latest_ipsw.url // "" end)
+             }' hack/.watch_cache > hack/.watch_cache.tmp
           mv hack/.watch_cache.tmp hack/.watch_cache
           
           # Configure git
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Commit only the cache file (no more SQLite DB to commit)
+          # Create commit message with updated platforms
+          UPDATED_PLATFORMS=""
+          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ]; then
+            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}iOS "
+          fi
+          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ]; then
+            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}macOS "
+          fi
+          
+          COMMIT_MSG="chore(ents): update entitlements DB for ${UPDATED_PLATFORMS}[skip ci]"
+          
+          # Commit cache file changes
           git add hack/.watch_cache
-          git commit -m "chore(ents): update entitlements DB to $CURRENT_IPSW_URL [skip ci]" || echo "No changes to commit"
+          git commit -m "$COMMIT_MSG" || echo "No changes to commit"
           git push 
