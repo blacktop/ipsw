@@ -84,9 +84,9 @@ func CreateSQLiteDatabase(dbPath string, ipsws, inputs []string) error {
 }
 
 // CreatePostgreSQLDatabase creates or updates the PostgreSQL database
-func CreatePostgreSQLDatabase(host, port, user, password, database, sslMode string, ipsws, inputs []string) error {
+func CreatePostgreSQLDatabase(host, port, user, password, database, sslMode, poolMode string, ipsws, inputs []string) error {
 	// Create PostgreSQL database connection
-	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, 1000)
+	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, poolMode, 1000)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL database: %v", err)
 	}
@@ -158,9 +158,9 @@ func SearchSQLiteEntitlements(dbPath, keyPattern, valuePattern, filePattern, ver
 }
 
 // SearchPostgreSQLEntitlements searches the PostgreSQL database for entitlements
-func SearchPostgreSQLEntitlements(host, port, user, password, database, sslMode, keyPattern, valuePattern, filePattern, versionFilter string, fileOnly bool, limit int) error {
+func SearchPostgreSQLEntitlements(host, port, user, password, database, sslMode, poolMode, keyPattern, valuePattern, filePattern, versionFilter string, fileOnly bool, limit int) error {
 	// Create database connection
-	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, 1000)
+	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, poolMode, 1000)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL database: %v", err)
 	}
@@ -266,8 +266,8 @@ func ShowSQLiteStatistics(dbPath string) error {
 }
 
 // ShowPostgreSQLStatistics displays PostgreSQL database statistics
-func ShowPostgreSQLStatistics(host, port, user, password, database, sslMode string) error {
-	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, 1000)
+func ShowPostgreSQLStatistics(host, port, user, password, database, sslMode, poolMode string) error {
+	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, poolMode, 1000)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL database: %v", err)
 	}
@@ -379,9 +379,9 @@ func CreateSQLiteDatabaseWithReplacement(dbPath string, ipsws, inputs []string, 
 }
 
 // CreatePostgreSQLDatabaseWithReplacement creates or updates PostgreSQL database with replacement support
-func CreatePostgreSQLDatabaseWithReplacement(host, port, user, password, database, sslMode string, ipsws, inputs []string, replaceStrategy string, dryRun bool) error {
+func CreatePostgreSQLDatabaseWithReplacement(host, port, user, password, database, sslMode, poolMode string, ipsws, inputs []string, replaceStrategy string, dryRun bool) error {
 	// Create PostgreSQL database connection
-	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, 1000)
+	dbConn, err := db.NewPostgresWithSSL(host, port, user, password, database, sslMode, poolMode, 1000)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL database connection: %v", err)
 	}
@@ -415,7 +415,6 @@ func processIPSWsWithReplacement(strategy ReplacementStrategy, ipsws, inputs []s
 
 		// Detect platform for replacement logic
 		platform := DetectPlatformFromIPSW(ipswPath, ipswInfo)
-		
 		newIPSW := IPSWInfo{
 			ID:       generateIPSWIDWithPlatform(platform, ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
 			Name:     filepath.Base(ipswPath),
@@ -482,4 +481,3 @@ func processIPSWsWithReplacement(strategy ReplacementStrategy, ipsws, inputs []s
 
 	return nil
 }
-
