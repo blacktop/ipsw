@@ -146,6 +146,9 @@ jobs:
 
       - name: Update entitlements database
         if: steps.check-ipsws.outputs.should_update_any == 'true'
+        env:
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
           echo "Updating Supabase entitlements database with replacement support..."
           
@@ -157,10 +160,10 @@ jobs:
             if [ -f "$ipsw_file" ]; then
               echo "Processing $platform IPSW: $ipsw_file"
               ./ipsw ent \
-                --pg-host  ${{ secrets.SUPABASE_HOST }} \
+                --pg-host "$SUPABASE_HOST" \
                 --pg-port 6543 \
                 --pg-user postgres \
-                --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
+                --pg-password "$SUPABASE_PASSWORD" \
                 --pg-database postgres \
                 --pg-sslmode require \
                 --ipsw "$ipsw_file" \
