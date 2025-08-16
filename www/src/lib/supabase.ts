@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Platform type definition
+export type Platform = 'iOS' | 'macOS' | 'watchOS' | 'tvOS' | 'visionOS';
+
 // Define the result type for the optimized schema
 export interface EntitlementResult {
   id: number;
-  platform: string;
+  platform: Platform;
   version: string;
   build_id: string;
   device_list: string[] | string; // Array from materialized view, string for compatibility
@@ -82,7 +85,7 @@ export class EntitlementsService {
     executablePath?: string,
     limit: number = 50,
     cursor?: number,
-    platform: string = 'iOS'
+    platform: Platform = 'iOS'
   ): Promise<EntitlementResult[]> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
@@ -143,19 +146,36 @@ export class EntitlementsService {
       query = query.in('key_id', keyIds);
     }
 
-    // Filter by version if specified
-    if (version) {
+    // Filter by version and platform if specified
+    // Filter by version and platform - we'll need to get IPSW IDs first
+    if (version || platform) {
+      console.log('Filtering by:', { version, platform });
       let ipswQuery = supabase
         .from('ipsws')
-        .select('id')
-        .eq('version', version);
+        .select('id');
 
-      const { data: ipswData } = await ipswQuery;
+      if (version) {
+        ipswQuery = ipswQuery.eq('version', version);
+      }
+      if (platform) {
+        ipswQuery = ipswQuery.eq('platform', platform);
+      }
+
+      const { data: ipswData, error: ipswError } = await ipswQuery;
+      console.log('IPSW query result:', { ipswData, ipswError });
+
+      if (ipswError) {
+        throw new Error(`Failed to filter by version/platform: ${ipswError.message}`);
+      }
+
       const ipswIds = ipswData?.map(i => i.id) || [];
+      console.log('Found IPSW IDs:', ipswIds);
+
       if (ipswIds.length > 0) {
         query = query.in('ipsw_id', ipswIds);
       } else {
-        return []; // No matching version
+        console.log('No matching IPSWs found for version/platform');
+        return []; // No matching version/platform
       }
     }
 
@@ -202,7 +222,7 @@ export class EntitlementsService {
     executablePath?: string,
     limit: number = 50,
     cursor?: number,
-    platform: string = 'iOS'
+    platform: Platform = 'iOS'
   ): Promise<EntitlementResult[]> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
@@ -270,19 +290,36 @@ export class EntitlementsService {
       query = query.in('path_id', pathIds);
     }
 
-    // Filter by version if specified
-    if (version) {
+    // Filter by version and platform if specified
+    // Filter by version and platform - we'll need to get IPSW IDs first
+    if (version || platform) {
+      console.log('File search filtering by:', { version, platform });
       let ipswQuery = supabase
         .from('ipsws')
-        .select('id')
-        .eq('version', version);
+        .select('id');
 
-      const { data: ipswData } = await ipswQuery;
+      if (version) {
+        ipswQuery = ipswQuery.eq('version', version);
+      }
+      if (platform) {
+        ipswQuery = ipswQuery.eq('platform', platform);
+      }
+
+      const { data: ipswData, error: ipswError } = await ipswQuery;
+      console.log('File search IPSW query result:', { ipswData, ipswError });
+
+      if (ipswError) {
+        throw new Error(`Failed to filter by version/platform: ${ipswError.message}`);
+      }
+
       const ipswIds = ipswData?.map(i => i.id) || [];
+      console.log('File search found IPSW IDs:', ipswIds);
+
       if (ipswIds.length > 0) {
         query = query.in('ipsw_id', ipswIds);
       } else {
-        return []; // No matching version
+        console.log('File search: No matching IPSWs found for version/platform');
+        return []; // No matching version/platform
       }
     }
 
@@ -320,13 +357,16 @@ export class EntitlementsService {
       return cached.data as string[];
     }
 
-    // Simple query without platform filtering for backward compatibility
+    // Query with platform filtering since platform support is now available
+    console.log('Getting versions for platform:', platform);
     let query = supabase
       .from('ipsws')
       .select('version')
+      .eq('platform', platform)
       .order('version', { ascending: false });
 
     const { data, error } = await query;
+    console.log('Versions query result:', { data, error, platform });
 
     if (error) {
       throw new Error(`Failed to get versions: ${error.message}`);
@@ -355,7 +395,7 @@ export class EntitlementsService {
   /**
    * Get versions for any platform
    */
-  static async getVersions(platform: string): Promise<string[]> {
+  static async getVersions(platform: Platform): Promise<string[]> {
     return this.getUniqueVersions(platform);
   }
 
@@ -378,9 +418,9 @@ export class EntitlementsService {
     const keyIds = [...new Set(data.map(row => row.key_id))];
     const valueIds = [...new Set(data.map(row => row.value_id))];
 
-    // Batch fetch all related data
+    // Batch fetch all related data (including platform field)
     const [ipswData, pathData, keyData, valueData] = await Promise.all([
-      supabase.from('ipsws').select('id, version, buildid').in('id', ipswIds),
+      supabase.from('ipsws').select('id, version, buildid, platform').in('id', ipswIds),
       supabase.from('paths').select('id, path').in('id', pathIds),
       supabase.from('entitlement_keys').select('id, key').in('id', keyIds),
       supabase.from('entitlement_values').select('id, value, value_type').in('id', valueIds)
@@ -401,7 +441,7 @@ export class EntitlementsService {
 
       return {
         id: row.id as number,
-        platform: 'iOS',
+        platform: (ipsw?.platform as Platform) || 'iOS',
         version: (ipsw?.version as string) || '',
         build_id: (ipsw?.buildid as string) || '',
         device_list: '', // Would need separate device query
