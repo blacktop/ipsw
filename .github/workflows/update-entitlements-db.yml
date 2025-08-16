@@ -24,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Build ipsw CLI
         run: |
@@ -146,9 +146,6 @@ jobs:
 
       - name: Update entitlements database
         if: steps.check-ipsws.outputs.should_update_any == 'true'
-        env:
-          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
-          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
           echo "Updating Supabase entitlements database with replacement support..."
           
@@ -159,7 +156,13 @@ jobs:
             
             if [ -f "$ipsw_file" ]; then
               echo "Processing $platform IPSW: $ipsw_file"
-              ./ipsw ent --ipsw "$ipsw_file" --replace
+              ./ipsw ent --ipsw "$ipsw_file" --replace \
+              --pg-host "${{ secrets.SUPABASE_HOST }}" \
+              --pg-port 5432 \
+              --pg-user postgres \
+              --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
+              --pg-database postgres
+              --pg-sslmode require
               echo "$platform database update completed successfully"
             else
               echo "Skipping $platform (no IPSW file: $ipsw_file)"
