@@ -7,6 +7,183 @@
   min-height: 100vh;
 }
 
+/* Container constraints to prevent horizontal overflow */
+.container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure all content containers respect boundaries */
+.space-y-2, .space-y-3, .space-y-4 {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix result card containers */
+.animate-fade-in-up {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Constrain code blocks and values */
+.code-value {
+  max-width: 100%;
+  overflow-x: auto;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+/* Fix array containers */
+.array-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.array-item {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.array-item .overflow-x-auto {
+  max-width: calc(100% - 20px); /* Account for bullet space */
+}
+
+/* Fix dictionary containers */
+.dict-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.dict-entry {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.dict-entry .overflow-x-auto {
+  max-width: calc(100% - 100px); /* Account for key space */
+}
+
+/* Ensure horizontal scrollable content has proper constraints */
+.overflow-x-auto {
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+
+/* Fix whitespace handling for long content */
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+/* Ensure font-mono content doesn't break layout */
+.font-mono {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  /* Ensure proper touch targets */
+  button, [role="button"], .select-trigger {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* Better text sizing for mobile */
+  .font-mono {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Improved spacing for mobile */
+  .space-y-2 > * + * {
+    margin-top: 0.75rem !important;
+  }
+
+  /* Better button styling for mobile */
+  .select-trigger {
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+  }
+
+  /* Improved search input for mobile */
+  input[type="text"] {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    padding: 12px 16px 12px 40px !important;
+  }
+
+  /* Better scrolling on mobile */
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent horizontal scroll */
+  .break-all {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Horizontal scrolling containers */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 2px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.8);
+  }
+
+  /* Add subtle fade indicators for scrollable content */
+  .overflow-x-auto::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, var(--ifm-background-surface-color));
+    pointer-events: none;
+    opacity: 0.8;
+  }
+
+  /* Ensure scrollable containers have relative positioning */
+  .overflow-x-auto {
+    position: relative;
+  }
+}
+
 /* Fix dropdown backgrounds for readability - multiple selectors to ensure coverage */
 [data-radix-select-content],
 [data-radix-popper-content-wrapper] > div,
@@ -228,4 +405,128 @@
 
 [data-theme='dark'] .syntax-boolean {
   color: hsl(346, 87%, 63%);
+}
+
+/* Mobile-specific dark mode adjustments */
+@media (max-width: 640px) {
+  [data-theme='dark'] .font-mono {
+    color: var(--ifm-color-content) !important;
+  }
+
+  [data-theme='dark'] input[type="text"] {
+    background-color: var(--ifm-background-surface-color) !important;
+    border-color: var(--ifm-color-emphasis-300) !important;
+    color: var(--ifm-color-content) !important;
+  }
+
+  /* Dark mode scrollbar adjustments */
+  [data-theme='dark'] .overflow-x-auto {
+    scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+  }
+
+  [data-theme='dark'] .overflow-x-auto::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.5);
+  }
+
+  [data-theme='dark'] .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.8);
+  }
+
+  [data-theme='dark'] .overflow-x-auto::after {
+    background: linear-gradient(to right, transparent, var(--ifm-background-surface-color));
+  }
+
+  [data-theme='dark'] .select-trigger {
+    background-color: var(--ifm-background-surface-color) !important;
+    border-color: var(--ifm-color-emphasis-300) !important;
+    color: var(--ifm-color-content) !important;
+  }
+}
+
+/* Desktop-specific improvements */
+@media (min-width: 641px) {
+  /* Ensure proper container constraints on desktop */
+  .array-container {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .dict-container {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .code-value {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* Better scrollbar styling for desktop */
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+  }
+}
+
+/* Responsive value display improvements */
+@media (max-width: 640px) {
+  .bool-badge {
+    font-size: 10px !important;
+    padding: 4px 8px !important;
+  }
+
+  .array-container {
+    padding: 8px !important;
+    margin-top: 8px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .array-item {
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .array-bullet {
+    flex-shrink: 0 !important;
+    margin-top: 6px !important;
+  }
+
+  .dict-container {
+    padding: 8px !important;
+    margin-top: 8px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .dict-entry {
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .dict-key {
+    flex-shrink: 0 !important;
+    min-width: fit-content !important;
+  }
+
+  .code-value {
+    padding: 8px !important;
+    font-size: 11px !important;
+    margin-top: 8px !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+  }
 }
