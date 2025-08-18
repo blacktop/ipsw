@@ -224,14 +224,13 @@ export default function Entitlements() {
 
     const handleSearchInput = useCallback((value: string) => {
         setSearchQuery(value);
-        if (value.trim()) {
-            debouncedSearch(value, selectedVersion, searchType, selectedExecutablePath);
-        } else {
+        // Only clear results if search is completely empty
+        if (!value.trim()) {
             setResults([]);
             setHasSearched(false);
             setError('');
         }
-    }, [debouncedSearch, selectedVersion, searchType, selectedExecutablePath]);
+    }, []);
 
     const handleSearch = useCallback(() => {
         if (searchQuery.trim()) {
@@ -242,10 +241,8 @@ export default function Entitlements() {
     const handleVersionChange = useCallback((value: string) => {
         const newVersion = value === 'all' ? '' : value;
         setSelectedVersion(newVersion);
-        if (searchQuery.trim()) {
-            debouncedSearch(searchQuery, newVersion, searchType, selectedExecutablePath);
-        }
-    }, [debouncedSearch, searchQuery, searchType, selectedExecutablePath]);
+        // Don't auto-search on version change, let user click search button
+    }, []);
 
     const handlePlatformChange = useCallback((value: string) => {
         setSelectedPlatform(value);
@@ -262,10 +259,8 @@ export default function Entitlements() {
     const handleExecutablePathChange = useCallback((value: string) => {
         const newPath = value === 'all' ? '' : value;
         setSelectedExecutablePath(newPath);
-        if (searchQuery.trim()) {
-            debouncedSearch(searchQuery, selectedVersion, searchType, newPath);
-        }
-    }, [debouncedSearch, searchQuery, selectedVersion, searchType]);
+        // Don't auto-search on path change, let user click search button
+    }, []);
 
     const handleSearchTypeChange = useCallback((type: 'key' | 'file') => {
         setSearchType(type);
@@ -274,10 +269,8 @@ export default function Entitlements() {
         setError('');
         setSelectedExecutablePath('');
         setAvailableExecutablePaths([]);
-        if (searchQuery.trim()) {
-            debouncedSearch(searchQuery, selectedVersion, type, '');
-        }
-    }, [debouncedSearch, searchQuery, selectedVersion]);
+        // Don't auto-search on type change, let user click search button
+    }, []);
 
     const sortedVersions = useMemo(() => {
         return sortVersions(versions);
@@ -357,11 +350,13 @@ export default function Entitlements() {
             case 'array':
                 if (Array.isArray(valueData.value) && valueData.value.length > 0) {
                     return (
-                        <div className="array-container mt-3">
+                        <div className="array-container mt-3 max-w-full overflow-hidden">
                             {valueData.value.map((item, idx) => (
-                                <div key={idx} className="array-item">
+                                <div key={idx} className="array-item max-w-full overflow-hidden">
                                     <div className="array-bullet"></div>
-                                    <span className="text-sm font-mono">{String(item)}</span>
+                                    <div className="overflow-x-auto flex-1 max-w-full">
+                                        <span className="text-sm font-mono whitespace-nowrap block">{String(item)}</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -371,11 +366,13 @@ export default function Entitlements() {
             case 'dict':
                 if (typeof valueData.value === 'object' && valueData.value !== null) {
                     return (
-                        <div className="dict-container mt-3">
+                        <div className="dict-container mt-3 max-w-full overflow-hidden">
                             {Object.entries(valueData.value).map(([key, val], idx) => (
-                                <div key={idx} className="dict-entry">
+                                <div key={idx} className="dict-entry max-w-full overflow-hidden">
                                     <span className="dict-key">{key}:</span>
-                                    <span className="dict-value">{String(val)}</span>
+                                    <div className="overflow-x-auto flex-1 max-w-full">
+                                        <span className="dict-value whitespace-nowrap block">{String(val)}</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -384,8 +381,8 @@ export default function Entitlements() {
                 break;
             default:
                 return (
-                    <div className="code-value mt-3">
-                        <code>{valueData.display}</code>
+                    <div className="code-value mt-3 overflow-x-auto max-w-full">
+                        <code className="whitespace-nowrap block">{valueData.display}</code>
                     </div>
                 );
         }
@@ -394,14 +391,14 @@ export default function Entitlements() {
     return (
         <Layout title="Entitlements">
             <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--ifm-background-color)' }}>
-                <div className="container mx-auto px-4 py-8 flex-1 flex flex-col">
+                <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 flex-1 flex flex-col">
                     {/* Header */}
-                    <div className="text-center mb-8">
-                        <div className="flex items-center justify-center gap-3 mb-4">
-                            <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--ifm-background-color)' }}>
-                                <Database className="h-8 w-8" style={{ color: 'var(--ifm-color-primary)' }} />
+                    <div className="text-center mb-4 sm:mb-8">
+                        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                            <div className="p-2 sm:p-3 rounded-lg" style={{ backgroundColor: 'var(--ifm-background-color)' }}>
+                                <Database className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: 'var(--ifm-color-primary)' }} />
                             </div>
-                            <h1 className="text-4xl font-bold" style={{ color: 'var(--ifm-color-primary)' }}>
+                            <h1 className="text-2xl sm:text-4xl font-bold" style={{ color: 'var(--ifm-color-primary)' }}>
                                 Entitlements Browser
                             </h1>
                         </div>
@@ -458,7 +455,7 @@ export default function Entitlements() {
 
                     {/* Search Interface */}
                     {!dbLoading && !error && (
-                        <div className="space-y-6 flex-1 flex flex-col">
+                        <div className="space-y-4 sm:space-y-6 flex-1 flex flex-col">
                             {/* Search Filters */}
                             <div className="rounded-lg border" style={{
                                 backgroundColor: 'var(--ifm-background-surface-color)',
@@ -466,27 +463,27 @@ export default function Entitlements() {
                             }}>
                                 <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
                                     <CollapsibleTrigger asChild>
-                                        <div className="cursor-pointer p-6 transition-colors hover:bg-opacity-50" style={{
+                                        <div className="cursor-pointer p-3 sm:p-6 transition-colors hover:bg-opacity-50" style={{
                                             backgroundColor: filtersOpen ? 'transparent' : 'transparent'
                                         }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--ifm-color-emphasis-100)'}
                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--ifm-background-surface-color)' }}>
-                                                        <Filter className="h-5 w-5" style={{ color: 'var(--ifm-color-primary)' }} />
+                                                <div className="flex items-center gap-2 sm:gap-3">
+                                                    <div className="p-1.5 sm:p-2 rounded-lg" style={{ backgroundColor: 'var(--ifm-background-surface-color)' }}>
+                                                        <Filter className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: 'var(--ifm-color-primary)' }} />
                                                     </div>
                                                     <div>
-                                                        <h3 className="text-lg font-semibold" style={{ color: 'var(--ifm-color-content)' }}>Search & Filters</h3>
-                                                        <p className="text-sm" style={{ color: 'var(--ifm-color-content-secondary)' }}>
+                                                        <h3 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--ifm-color-content)' }}>Search & Filters</h3>
+                                                        <p className="text-xs sm:text-sm" style={{ color: 'var(--ifm-color-content-secondary)' }}>
                                                             {filtersOpen ? 'Configure your search parameters and filters' : 'Click to modify search and filters'}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1 sm:gap-2">
                                                     {hasSearched && !filtersOpen && (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                                                             {results.length > 0 && (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border" style={{
+                                                                <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium border" style={{
                                                                     borderColor: 'var(--ifm-color-success)',
                                                                     backgroundColor: 'var(--ifm-color-success-contrast-background)',
                                                                     color: 'var(--ifm-color-success)'
@@ -495,7 +492,7 @@ export default function Entitlements() {
                                                                 </span>
                                                             )}
                                                             {searchQuery && (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-mono border" style={{
+                                                                <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-mono border max-w-32 sm:max-w-none truncate" style={{
                                                                     borderColor: 'var(--ifm-color-emphasis-300)',
                                                                     backgroundColor: 'transparent',
                                                                     color: 'var(--ifm-color-content)'
@@ -562,14 +559,13 @@ export default function Entitlements() {
                                                 </div>
 
                                                 {/* Version Filter */}
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--ifm-color-content)' }}>
-                                                        <Smartphone className="h-4 w-4" style={{ color: 'var(--ifm-color-content-secondary)' }} />
+                                                <div className="space-y-1 sm:space-y-2">
+                                                    <label className="text-sm font-medium" style={{ color: 'var(--ifm-color-content)' }}>
                                                         Version Filter
                                                     </label>
                                                     <Select value={selectedVersion || 'all'} onValueChange={handleVersionChange}>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="All versions" />
+                                                        <SelectTrigger className="select-trigger h-10 sm:h-auto">
+                                                            <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent className="select-content">
                                                             <SelectItem value="all">All versions</SelectItem>
@@ -583,12 +579,15 @@ export default function Entitlements() {
                                                 </div>
 
                                                 {/* Search Type Selection */}
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium" style={{ color: 'var(--ifm-color-content)' }}>Search Type</label>
-                                                    <div className="flex gap-1">
+                                                {/* Search Type Toggle */}
+                                                <div className="space-y-1 sm:space-y-2">
+                                                    <label className="text-sm font-medium" style={{ color: 'var(--ifm-color-content)' }}>
+                                                        Search Type
+                                                    </label>
+                                                    <div className="flex rounded-md border" style={{ borderColor: 'var(--ifm-color-emphasis-300)' }}>
                                                         <button
                                                             onClick={() => handleSearchTypeChange('key')}
-                                                            className="flex items-center gap-1 px-3 py-2 rounded-md text-xs font-medium transition-colors"
+                                                            className="flex items-center gap-1 px-2 sm:px-3 py-2 rounded-md text-xs font-medium transition-colors flex-1"
                                                             style={{
                                                                 backgroundColor: searchType === 'key' ? 'var(--ifm-color-primary)' : 'transparent',
                                                                 color: searchType === 'key' ? 'var(--ifm-color-primary-contrast-foreground)' : 'var(--ifm-color-content)',
@@ -600,7 +599,7 @@ export default function Entitlements() {
                                                         </button>
                                                         <button
                                                             onClick={() => handleSearchTypeChange('file')}
-                                                            className="flex items-center gap-1 px-3 py-2 rounded-md text-xs font-medium transition-colors"
+                                                            className="flex items-center gap-1 px-2 sm:px-3 py-2 rounded-md text-xs font-medium transition-colors flex-1"
                                                             style={{
                                                                 backgroundColor: searchType === 'file' ? 'var(--ifm-color-primary)' : 'transparent',
                                                                 color: searchType === 'file' ? 'var(--ifm-color-primary-contrast-foreground)' : 'var(--ifm-color-content)',
@@ -653,21 +652,21 @@ export default function Entitlements() {
                                             </div>
 
                                             {/* Search Input */}
-                                            <div className="space-y-2">
+                                            <div className="space-y-2 sm:space-y-3">
                                                 <label className="text-sm font-medium" style={{ color: 'var(--ifm-color-content)' }}>
-                                                    Search {searchType === 'key' ? 'Entitlement Keys' : 'Executable Paths'}
+                                                    Search Entitlement Keys
                                                 </label>
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                                                     <div className="relative flex-1">
                                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{ color: 'var(--ifm-color-content-secondary)' }} />
                                                         <input
                                                             value={searchQuery}
                                                             onChange={(e) => handleSearchInput(e.target.value)}
                                                             placeholder={searchType === 'key'
-                                                                ? 'Enter entitlement key (e.g., com.apple.security.app-sandbox)'
-                                                                : 'Enter executable name (e.g., WebContent, Safari)'
+                                                                ? 'Enter entitlement key, then click Search'
+                                                                : 'Enter executable name, then click Search'
                                                             }
-                                                            className="w-full pl-10 pr-3 py-2 font-mono text-sm rounded-md border transition-colors"
+                                                            className="w-full pl-10 pr-3 py-2.5 sm:py-2 font-mono text-sm rounded-md border transition-colors"
                                                             style={{
                                                                 backgroundColor: 'var(--ifm-background-color)',
                                                                 borderColor: 'var(--ifm-color-emphasis-300)',
@@ -676,6 +675,7 @@ export default function Entitlements() {
                                                             disabled={loading}
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter' && !loading && searchQuery.trim()) {
+                                                                    e.preventDefault();
                                                                     handleSearch();
                                                                 }
                                                             }}
@@ -684,7 +684,7 @@ export default function Entitlements() {
                                                     <button
                                                         onClick={handleSearch}
                                                         disabled={loading || !searchQuery.trim()}
-                                                        className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-md text-sm font-medium transition-colors w-full sm:w-auto"
                                                         style={{
                                                             backgroundColor: (loading || !searchQuery.trim()) ? 'var(--ifm-color-emphasis-300)' : 'var(--ifm-color-primary)',
                                                             color: (loading || !searchQuery.trim()) ? 'var(--ifm-color-content-secondary)' : 'var(--ifm-color-primary-contrast-foreground)',
@@ -703,19 +703,19 @@ export default function Entitlements() {
 
                                             {/* No Results Warning */}
                                             {!loading && hasSearched && searchQuery.trim() && results.length === 0 && (
-                                                <div className="p-4 rounded-md border" style={{
+                                                <div className="p-3 sm:p-4 rounded-md border" style={{
                                                     backgroundColor: 'var(--ifm-color-warning-contrast-background)',
                                                     borderColor: 'var(--ifm-color-warning)'
                                                 }}>
-                                                    <div className="flex items-start gap-3">
-                                                        <AlertCircle className="flex-shrink-0 h-5 w-5 mt-0.5" style={{ color: 'var(--ifm-color-warning)' }} />
+                                                    <div className="flex items-start gap-2 sm:gap-3">
+                                                        <AlertCircle className="flex-shrink-0 h-4 w-4 sm:h-5 sm:w-5 mt-0.5" style={{ color: 'var(--ifm-color-warning)' }} />
                                                         <div>
-                                                            <p className="font-medium" style={{ color: 'var(--ifm-color-warning-dark)' }}>
+                                                            <p className="font-medium text-sm sm:text-base" style={{ color: 'var(--ifm-color-warning-dark)' }}>
                                                                 No entitlements found for "{searchQuery}"
                                                                 {selectedVersion && ` in ${selectedPlatform} ${selectedVersion}`}
                                                                 {selectedExecutablePath && ` in ${selectedExecutablePath}`}
                                                             </p>
-                                                            <p className="text-sm mt-1" style={{ color: 'var(--ifm-color-warning-dark)', opacity: 0.8 }}>
+                                                            <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--ifm-color-warning-dark)', opacity: 0.8 }}>
                                                                 Try adjusting your search terms or filters
                                                             </p>
                                                         </div>
@@ -729,16 +729,16 @@ export default function Entitlements() {
 
                             {/* Results */}
                             {results.length > 0 && (
-                                <div className="space-y-4 flex-1 min-h-0">
+                                <div className="space-y-3 sm:space-y-4 flex-1 min-h-0">
                                     {/* Results Header - Only show when filters are expanded */}
                                     {filtersOpen && (
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <h3 className="text-xl font-semibold" style={{ color: 'var(--ifm-color-success)' }}>
+                                                <h3 className="text-lg sm:text-xl font-semibold" style={{ color: 'var(--ifm-color-success)' }}>
                                                     Found {results.length} result{results.length === 1 ? '' : 's'}
                                                 </h3>
                                                 {globalMetadata && (
-                                                    <p className="text-sm" style={{ color: 'var(--ifm-color-content-secondary)' }}>
+                                                    <p className="text-xs sm:text-sm" style={{ color: 'var(--ifm-color-content-secondary)' }}>
                                                         {globalMetadata.uniqueVersions > 1 && `${globalMetadata.uniqueVersions} iOS versions • `}
                                                         {globalMetadata.uniqueFiles} unique files
                                                     </p>
@@ -749,11 +749,11 @@ export default function Entitlements() {
 
                                     {/* Global Metadata */}
                                     {(selectedVersion || (selectedExecutablePath && searchType === 'key')) && results.length > 0 && (
-                                        <div className="p-4 rounded-lg" style={{
+                                        <div className="p-3 sm:p-4 rounded-lg" style={{
                                             backgroundColor: 'var(--ifm-color-emphasis-100)',
                                             border: `1px solid var(--ifm-color-emphasis-200)`
                                         }}>
-                                            <div className="flex items-center gap-4 text-sm">
+                                            <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap">
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border" style={{
                                                     borderColor: 'var(--ifm-color-emphasis-300)',
                                                     backgroundColor: 'transparent',
@@ -782,8 +782,8 @@ export default function Entitlements() {
                                     )}
 
                                     {/* Results List */}
-                                    <ScrollArea className="flex-1 w-full">
-                                        <div className="space-y-3 pr-4">
+                                    <ScrollArea className="flex-1 w-full max-w-full overflow-hidden">
+                                        <div className="space-y-2 sm:space-y-3 pr-2 sm:pr-4 max-w-full overflow-hidden">
                                             {results.map((result, idx) => {
                                                 const valueData = formatValue(result);
                                                 const showMetadata = !selectedVersion;
@@ -791,23 +791,25 @@ export default function Entitlements() {
                                                 const showFilePath = !selectedExecutablePath && !allSamePath;
 
                                                 return (
-                                                    <div key={idx} className="animate-fade-in-up p-6 rounded-lg border" style={{
+                                                    <div key={idx} className="animate-fade-in-up p-3 sm:p-6 rounded-lg border max-w-full overflow-hidden" style={{
                                                         backgroundColor: 'var(--ifm-background-surface-color)',
                                                         borderColor: 'var(--ifm-color-emphasis-300)'
                                                     }}>
-                                                        <div className="space-y-3">
+                                                        <div className="space-y-2 sm:space-y-3 max-w-full overflow-hidden">
                                                             {/* Main Content */}
-                                                            <div className="flex items-start justify-between gap-4">
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <code
-                                                                            className="text-sm font-mono font-medium break-all"
-                                                                            style={{ color: 'var(--ifm-color-primary)' }}
-                                                                            dangerouslySetInnerHTML={{
-                                                                                __html: highlightSearchTerm(result.key, searchQuery)
-                                                                            }}
-                                                                        />
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs border" style={{
+                                                            <div className="flex flex-col gap-2 sm:gap-4 max-w-full overflow-hidden">
+                                                                <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                                                                    <div className="flex items-start sm:items-center gap-2 mb-1 flex-col sm:flex-row max-w-full overflow-hidden">
+                                                                        <div className="w-full max-w-full overflow-x-auto">
+                                                                            <code
+                                                                                className="text-xs sm:text-sm font-mono font-medium whitespace-nowrap block"
+                                                                                style={{ color: 'var(--ifm-color-primary)' }}
+                                                                                dangerouslySetInnerHTML={{
+                                                                                    __html: highlightSearchTerm(result.key, searchQuery)
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs border flex-shrink-0" style={{
                                                                             borderColor: 'var(--ifm-color-emphasis-300)',
                                                                             backgroundColor: 'transparent',
                                                                             color: 'var(--ifm-color-content-secondary)'
@@ -817,18 +819,20 @@ export default function Entitlements() {
                                                                     </div>
 
                                                                         {showFilePath && (
-                                                                            <p className="text-sm font-mono break-all" style={{ color: 'var(--ifm-color-content-secondary)' }}>
-                                                                                <span
-                                                                                    dangerouslySetInnerHTML={{
-                                                                                        __html: highlightSearchTerm(result.file_path, searchQuery)
-                                                                                    }}
-                                                                                />
-                                                                            </p>
+                                                                            <div className="w-full max-w-full overflow-x-auto">
+                                                                                <p className="text-xs sm:text-sm font-mono whitespace-nowrap" style={{ color: 'var(--ifm-color-content-secondary)' }}>
+                                                                                    <span
+                                                                                        dangerouslySetInnerHTML={{
+                                                                                            __html: highlightSearchTerm(result.file_path, searchQuery)
+                                                                                        }}
+                                                                                    />
+                                                                                </p>
+                                                                            </div>
                                                                         )}
 
                                                                         {showMetadata && (
-                                                                            <div className="flex items-center gap-2 mt-2">
-                                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{
+                                                                            <div className="flex items-center gap-1 sm:gap-2 mt-2 flex-wrap max-w-full overflow-hidden">
+                                                                                <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs" style={{
                                                                                     backgroundColor: 'var(--ifm-color-emphasis-200)',
                                                                                     color: 'var(--ifm-color-content)'
                                                                                 }}>
@@ -842,15 +846,15 @@ export default function Entitlements() {
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                </div>
 
                                                                 {/* Value Display */}
                                                                 {valueData && valueData.display && (
-                                                                    <div className="mt-3">
+                                                                    <div className="mt-2 sm:mt-3 max-w-full overflow-hidden">
                                                                         {renderValue(valueData)}
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
