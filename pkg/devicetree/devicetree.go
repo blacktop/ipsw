@@ -717,9 +717,15 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 	for _, f := range zr.File {
 		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
-			rc, _ := f.Open()
-			io.ReadFull(rc, dtData)
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("failed to open %s: %v", f.Name, err)
+			}
+			_, err = io.ReadFull(rc, dtData)
 			rc.Close()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %s: %v", f.Name, err)
+			}
 			if len(keys) > 0 {
 				ivkey, err := hex.DecodeString(keys[0])
 				if err != nil {
@@ -777,9 +783,15 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 	for _, f := range files {
 		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
-			rc, _ := f.Open()
-			io.ReadFull(rc, dtData)
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("failed to open %s: %v", f.Name, err)
+			}
+			_, err = io.ReadFull(rc, dtData)
 			rc.Close()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %s: %v", f.Name, err)
+			}
 			if len(keys) > 0 {
 				ivkey, err := hex.DecodeString(keys[0])
 				if err != nil {
