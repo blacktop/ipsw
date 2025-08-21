@@ -75,6 +75,7 @@ internal/commands/ida/dscu/data/dscu.py
 internal/download/data/proto
 venv/
 keybag.plist
+OPC/
 
 # Unicorn EMU
 unicorn2/

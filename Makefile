@@ -172,6 +172,12 @@ work-term: ## Work on go-termimg package
 	@go work init || true
 	@go work use . ../go-termimg
 
+.PHONY: work-arm64
+work-arm64: ## Work on arm64-cgo package
+	@echo " > Working on arm64-cgo package"
+	@go work init || true
+	@go work use . ../arm64-cgo
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"

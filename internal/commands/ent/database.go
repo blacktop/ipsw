@@ -51,7 +51,7 @@ func (ds *DatabaseService) StoreEntitlements(ipswPath string, entDB map[string]s
 
 		// Detect platform from IPSW
 		platform := DetectPlatformFromIPSW(ipswPath, ipswInfo)
-		
+
 		ipswRecord = &model.Ipsw{
 			ID:       generateIPSWIDWithPlatform(platform, ipswInfo.Plists.BuildManifest.ProductVersion, ipswInfo.Plists.BuildManifest.ProductBuildVersion),
 			Name:     filepath.Base(ipswPath),

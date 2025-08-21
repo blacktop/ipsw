@@ -57,7 +57,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-		
+
 		mountPointParam, _ := c.GetQuery("mount_point")
 		if mountPointParam != "" {
 			mountPointParam = filepath.Clean(mountPointParam)
