@@ -74,12 +74,12 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-		
+
 		mountPointParam, _ := c.GetQuery("mount_point")
 		if mountPointParam != "" {
 			mountPointParam = filepath.Clean(mountPointParam)
 		}
-		
+
 		dmgType := c.Param("type")
 		if !slices.Contains([]string{"app", "sys", "fs"}, dmgType) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
