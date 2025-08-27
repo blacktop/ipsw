@@ -19,7 +19,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.9.1
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
-	github.com/blacktop/arm64-cgo v1.0.58
+	github.com/blacktop/arm64-cgo v1.0.59
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.249
