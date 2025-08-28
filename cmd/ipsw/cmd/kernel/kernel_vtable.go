@@ -35,6 +35,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/kernelcache/cpp"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -96,6 +97,13 @@ var vtableCmd = &cobra.Command{
 			return fmt.Errorf("failed to open kernelcache: %v", err)
 		}
 		defer m.Close()
+
+		cls, err := cpp.GetClasses(m)
+		if err != nil {
+			return fmt.Errorf("failed to get classes from kernelcache: %v", err)
+		}
+		_ = cls
+		return nil
 
 		vs := kernelcache.NewVtableSymbolicator(m)
 
