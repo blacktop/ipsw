@@ -12,7 +12,10 @@ import (
 	"github.com/blacktop/arm64-cgo/emulate/core"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/pkg/disass"
 )
+
+const errorLogMessage = "OSMetaClass: preModLoad() wasn't called for class %s (runtime internal error)."
 
 var OSMetaClassFunc uint64 = 0 // Address of OSMetaClass::OSMetaClass function
 
@@ -37,6 +40,61 @@ type MethodInfo struct {
 	Index   int    // Position in vtable
 }
 
+func findOsMetaClassFunc(m *macho.File) (uint64, error) {
+	var osMetaClassFunc uint64
+
+	strs, err := m.GetCStrings()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get cstrings: %v", err)
+	}
+
+	var targetStrAddr uint64
+	for _, str2addr := range strs {
+		for str, addr := range str2addr {
+			if str == errorLogMessage {
+				targetStrAddr = addr
+				break
+			}
+		}
+		if targetStrAddr != 0 {
+			break
+		}
+	}
+	if targetStrAddr == 0 {
+		return 0, fmt.Errorf("failed to find target string in cstrings")
+	}
+
+	for _, fn := range m.GetFunctions() {
+		data, err := m.GetFunctionData(fn)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get function data at %#x: %v", fn.StartAddr, err)
+		}
+		engine := disass.NewMachoDisass(m, &disass.Config{
+			Data:         data,
+			StartAddress: fn.StartAddr,
+			Quiet:        true,
+		})
+
+		if err := engine.Triage(); err != nil {
+			return 0, fmt.Errorf("first pass triage failed: %v", err)
+		}
+
+		if ok, loc := engine.Contains(targetStrAddr); ok {
+			osMetaClassFunc = loc
+			fn, err := m.GetFunctionForVMAddr(loc)
+			if err != nil {
+				return 0, fmt.Errorf("failed to get function at %#x: %v", loc, err)
+			}
+			osMetaClassFunc = fn.StartAddr
+			log.Debugf("Found OSMetaClass::OSMetaClass at %#x (referenced by log message at %#x)", osMetaClassFunc, loc)
+			break
+		}
+	}
+
+	return osMetaClassFunc, nil
+}
+
+// parseClassMeta emulates the constructor function to extract class metadata
 func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, error) {
 	emu := emulate.NewEngine()
 	if err := emu.SetMemory(startAddr, data); err != nil {
@@ -62,17 +120,11 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 		ShouldHaltPreHandler: func(state core.State, info core.InstructionInfo) bool {
 			// OSMetaClass::OSMetaClass(const char *inClassName, const OSMetaClass *inSuperClass,unsigned int inClassSize)
 			if strings.EqualFold(info.Mnemonic, "bl") {
-				if state.GetX(3) > 0 { // inClassSize set
-					if OSMetaClassFunc == 0 {
-						// First time seeing the OSMetaClass function
-						OSMetaClassFunc = info.Instruction.Operands[0].Immediate
-						return true
-					} else if OSMetaClassFunc == info.Instruction.Operands[0].Immediate {
+				if state.GetX(0) > 0 && state.GetX(1) > 0 { // inClassSize set
+					if OSMetaClassFunc == info.Instruction.Operands[0].Immediate {
 						// We've hit the OSMetaClass function again, stop emulation
 						return true
 					}
-				} else {
-					return false // skip calls where inClassSize is not set
 				}
 			}
 			return false
@@ -80,7 +132,7 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 		ShouldTakeBranchHandler: func(state core.State, info core.InstructionInfo) bool {
 			if strings.EqualFold(info.Mnemonic, "bl") {
 				if OSMetaClassFunc != info.Instruction.Operands[0].Immediate {
-					return false // skip calls where inClassSize is not set
+					return false // skip branches to functions other than OSMetaClass
 				}
 			}
 			return true
@@ -105,7 +157,6 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 			Size:      uint32(emu.GetRegister(3)),
 		}, nil
 	}
-	OSMetaClassFunc = 0 // reset if we didn't find a valid class
 	return nil, fmt.Errorf("failed to parse class metadata: no valid class found")
 }
 
@@ -114,6 +165,14 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 func GetClasses(kernel *macho.File) ([]ClassMeta, error) {
 	var classes []ClassMeta
 	if kernel.FileTOC.FileHeader.Type == types.MH_FILESET {
+		k, err := kernel.GetFileSetFileByName("com.apple.kernel")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get kernel fileset entry: %v", err)
+		}
+		OSMetaClassFunc, err = findOsMetaClassFunc(k)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find OSMetaClass function: %v", err)
+		}
 		for _, fs := range kernel.FileSets() {
 			entry, err := kernel.GetFileSetFileByName(fs.EntryID)
 			if err != nil {
@@ -146,7 +205,7 @@ func GetClasses(kernel *macho.File) ([]ClassMeta, error) {
 					class, err := parseClassMeta(kernel, fn.StartAddr, funcData)
 					if err != nil {
 						// return nil, fmt.Errorf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
-						log.Errorf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
+						log.WithField("entry", fs.EntryID).Errorf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
 						continue
 					}
 					classes = append(classes, *class)
