@@ -151,6 +151,7 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 			return nil, fmt.Errorf("failed to read class name at %#x: %v", emu.GetRegister(1), err)
 		}
 		return &ClassMeta{
+			AllocFunc: startAddr,
 			Name:      name,
 			MetaPtr:   emu.GetRegister(0),
 			SuperMeta: emu.GetRegister(2),
@@ -161,7 +162,6 @@ func parseClassMeta(m *macho.File, startAddr uint64, data []byte) (*ClassMeta, e
 }
 
 // GetClasses analyzes the given Mach-O kernel file and extracts C++ class metadata
-
 func GetClasses(kernel *macho.File) ([]ClassMeta, error) {
 	var classes []ClassMeta
 	if kernel.FileTOC.FileHeader.Type == types.MH_FILESET {
@@ -205,11 +205,12 @@ func GetClasses(kernel *macho.File) ([]ClassMeta, error) {
 					class, err := parseClassMeta(kernel, fn.StartAddr, funcData)
 					if err != nil {
 						// return nil, fmt.Errorf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
-						log.WithField("entry", fs.EntryID).Errorf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
+						log.WithField("entry", fs.EntryID).Debugf("failed to parse class metadata for init func at %#x: %v", fn.StartAddr, err)
 						continue
 					}
+					class.Bundle = fs.EntryID
 					classes = append(classes, *class)
-					log.WithField("entry", fs.EntryID).Infof("Discovered class: %s (meta: %#x) in %s", class.Name, class.MetaPtr, fs.EntryID)
+					log.WithField("entry", fs.EntryID).Infof("Discovered class: %s (init: %#x) in %s", class.Name, class.AllocFunc, fs.EntryID)
 				}
 			} else {
 				log.WithField("entry", fs.EntryID).Warnf("No __mod_init_func section found")
