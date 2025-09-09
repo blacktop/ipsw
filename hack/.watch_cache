@@ -71,17 +71,11 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "22G6100_24G219_22O785",
-        "ios_build": "22G6100",
-        "macos_build": "24G219",
-        "updated_at": "2025-09-02T19:08:37Z",
+        "fingerprint": "22H6020_24G222_22O785",
+        "ios_build": "22H6020",
+        "macos_build": "24G222",
+        "updated_at": "2025-09-09T19:05:12Z",
         "visionos_build": "22O785"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
       }
     }
   },
