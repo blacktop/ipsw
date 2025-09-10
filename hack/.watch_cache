@@ -30,7 +30,11 @@
       "webkitgtk-2.49.4",
       "wpewebkit-2.49.4",
       "webkitgtk-2.48.5",
-      "wpewebkit-2.48.5"
+      "wpewebkit-2.48.5",
+      "webkitgtk-2.49.90",
+      "wpewebkit-2.49.90",
+      "webkitgtk-2.48.6",
+      "wpewebkit-2.48.6"
     ]
   },
   "apple-oss-distributions/distribution-macOS": {
@@ -47,7 +51,8 @@
     },
     "tags": [
       "macos-155",
-      "macos-154"
+      "macos-154",
+      "macos-156"
     ]
   },
   "fcs_keys": {
@@ -66,10 +71,10 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "22G6090_24G214_22O785",
-        "ios_build": "22G6090",
-        "macos_build": "24G214",
-        "updated_at": "2025-08-18T20:20:32Z",
+        "fingerprint": "22H6020_24G222_22O785",
+        "ios_build": "22H6020",
+        "macos_build": "24G222",
+        "updated_at": "2025-09-09T19:05:12Z",
         "visionos_build": "22O785"
       }
     }
@@ -77,10 +82,10 @@
   "fcs_keys_rc": {
     "fcs_keys": {
       "rc": {
-        "fingerprint": "21H221_24G84_22O785",
-        "ios_build": "21H221",
-        "macos_build": "24G84",
-        "updated_at": "2025-08-18T20:20:32Z",
+        "fingerprint": "22G100_23H730_22O785",
+        "ios_build": "22G100",
+        "macos_build": "23H730",
+        "updated_at": "2025-09-04T19:06:13Z",
         "visionos_build": "22O785"
       }
     }
@@ -88,17 +93,17 @@
   "fcs_keys_stable": {
     "fcs_keys": {
       "release": {
-        "fingerprint": "21H221_24G84_22O785",
-        "ios_build": "21H221",
-        "macos_build": "24G84",
-        "updated_at": "2025-08-18T20:20:32Z",
+        "fingerprint": "22G100_23H730_22O785",
+        "ios_build": "22G100",
+        "macos_build": "23H730",
+        "updated_at": "2025-09-04T19:06:13Z",
         "visionos_build": "22O785"
       }
     }
   },
   "latest_ipsw": {
-    "ios_url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-06826/89EB9D99-FD95-46A6-A166-A4B0B9775037/iPhone17,1_18.6.1_22G90_Restore.ipsw",
-    "macos_url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/082-08674/51294E4D-A273-44BE-A280-A69FC347FB87/UniversalMac_15.6_24G84_Restore.ipsw",
-    "url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-06826/89EB9D99-FD95-46A6-A166-A4B0B9775037/iPhone17,1_18.6.1_22G90_Restore.ipsw"
+    "ios_url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-21361/F0033AA8-4016-4030-BA3A-5C6E3E1FE7D4/iPhone17,1_18.6.2_22G100_Restore.ipsw",
+    "macos_url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-10809/CFD6DD38-DAF0-40DA-854F-31AAD1294C6F/UniversalMac_15.6.1_24G90_Restore.ipsw",
+    "url": "https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-21361/F0033AA8-4016-4030-BA3A-5C6E3E1FE7D4/iPhone17,1_18.6.2_22G100_Restore.ipsw"
   }
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	util "github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
@@ -707,13 +708,20 @@ func (y *YAA) Parse(r io.ReadSeeker) error {
 				if _, err := io.ReadFull(r, data); err != nil {
 					return fmt.Errorf("YAA.Parse: failed to read aa pbzx patch data: %w", err)
 				}
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
-					return fmt.Errorf("YAA.Parse: failed to extract aa pbzx patch data: %w", err)
-				}
-
-				if err := y.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
-					return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
+				if isPBZX, err := util.IsPBZXData(bytes.NewReader(data)); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to check if data is pbzx: %w", err)
+				} else if isPBZX {
+					var pbuf bytes.Buffer
+					if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
+						return fmt.Errorf("YAA.Parse: failed to extract aa pbzx patch data: %w", err)
+					}
+					if err := y.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
+						return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
+					}
+				} else {
+					if err := y.Parse(bytes.NewReader(data)); err != nil {
+						return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
+					}
 				}
 			default:
 				log.Warnf("YAA.Parse: unsupported YOP operation: %s (let author know)", ent.Yop)

@@ -78,7 +78,7 @@ builds:
       - arm64
     tags:
       - libusb
-      - unicorn
+      # - unicorn
       - objc
       - sandbox
       - wallpaper
