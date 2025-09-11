@@ -19,12 +19,14 @@
 debug
 __debug_*
 .env
+.gocache
 
 # AI
 .claude
 CLAUDE*.md
 .gemini
 GEMINI*.md
+AGENTS.md
 
 # Go Work
 *.work
