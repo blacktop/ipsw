@@ -144,8 +144,8 @@ github.com/blacktop/go-apfs v1.0.27 h1:+noNImiLcTaxzDMpOsEwXOxLwgnSMZdcJH+YMNHZs
 github.com/blacktop/go-apfs v1.0.27/go.mod h1:2IvPE0B/wnekB5QoNXJrDzlTrPnfCQNxTfZaKu4zbYM=
 github.com/blacktop/go-dwarf v1.0.14 h1:OjmzfSgg/qAKckn2tWFebcgKgJ7HOqCj7bS+CiE1lrY=
 github.com/blacktop/go-dwarf v1.0.14/go.mod h1:4W2FKgSFYcZLDwnR7k+apv5i3nrau4NGl9N6VQ9DSTo=
-github.com/blacktop/go-macho v1.1.249 h1:HJlYj9xsdbCHc6PYrrjLIdqhEtR3imrshzcC4p8OdSE=
-github.com/blacktop/go-macho v1.1.249/go.mod h1:qtWG1+TBJfq/8fs2Jg50v0P3LxzAZC1yLmT/rPXxuz8=
+github.com/blacktop/go-macho v1.1.250 h1:yauNqHKvxpRLR+hmkZLxWs9bF+5JNeKm/pISLouXdNo=
+github.com/blacktop/go-macho v1.1.250/go.mod h1:qtWG1+TBJfq/8fs2Jg50v0P3LxzAZC1yLmT/rPXxuz8=
 github.com/blacktop/go-plist v1.0.2 h1:DMX8uBiE308HWZkO9o37j7Z2b0neI3GSzN2caNa2zXk=
 github.com/blacktop/go-plist v1.0.2/go.mod h1:fqVhCVVXVJWsIGY9QPgdK0mDWZD82HrRMfU5PanvdTA=
 github.com/blacktop/go-termimg v0.1.20 h1:+EAUc3c9hwE/fUYaqRV1BSLvAlOuLySgLTEBzxGbYK4=
