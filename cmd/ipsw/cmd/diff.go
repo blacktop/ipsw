@@ -75,15 +75,17 @@ func init() {
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
-	Use:   "diff <IPSW> <IPSW>",
-	Short: "Diff IPSWs",
+	Use:   "diff <OLD_FW> <NEW_FW>",
+	Short: "Diff IPSWs and OTAs",
 	Example: heredoc.Doc(`
 		# Diff two IPSWs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
 		# Diff two IPSWs with KDKs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
 			--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
-			--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031`),
+			--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031
+		# Diff entitlements between an IPSW and an OTA
+		❯ ipsw diff <old.ipsw> <new.ota> --ent --markdown`),
 	Args:          cobra.ExactArgs(2),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {

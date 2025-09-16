@@ -32,9 +32,28 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"golang.org/x/exp/maps"
 )
+
+type InputKind int
+
+const (
+	InputKindIPSW InputKind = iota
+	InputKindOTA
+)
+
+func (k InputKind) String() string {
+	switch k {
+	case InputKindOTA:
+		return "ota"
+	case InputKindIPSW:
+		fallthrough
+	default:
+		return "ipsw"
+	}
+}
 
 type kernel struct {
 	Path    string
@@ -93,6 +112,7 @@ type Context struct {
 	Version         string
 	Build           string
 	Folder          string
+	Kind            InputKind
 	Mount           map[string]mount
 	SystemOsDmgPath string
 	MountPath       string
@@ -206,42 +226,111 @@ func (d *Diff) Save() error {
 	return nil
 }
 
+func (d *Diff) populateContext(ctx *Context, label string) error {
+	ctx.Kind = InputKindIPSW
+
+	meta, parseErr := info.Parse(ctx.IPSWPath)
+	if parseErr == nil && meta != nil && meta.Plists != nil && meta.Plists.Type != "OTA" {
+		ctx.Info = meta
+	} else {
+		aa, otaErr := ota.Open(ctx.IPSWPath)
+		if otaErr != nil {
+			if parseErr != nil {
+				return fmt.Errorf("failed to parse '%s' IPSW: %v; failed to open OTA: %w", strings.ToLower(label), parseErr, otaErr)
+			}
+			return fmt.Errorf("failed to open '%s' OTA: %w", strings.ToLower(label), otaErr)
+		}
+		defer aa.Close()
+
+		otaInfo, err := aa.Info()
+		if err != nil {
+			return fmt.Errorf("failed to parse '%s' OTA metadata: %w", strings.ToLower(label), err)
+		}
+		ctx.Info = otaInfo
+		ctx.Kind = InputKindOTA
+	}
+
+	if ctx.Info == nil || ctx.Info.Plists == nil {
+		return fmt.Errorf("missing metadata for %s firmware", strings.ToLower(label))
+	}
+
+	if ctx.Info.Plists.BuildManifest != nil {
+		ctx.Version = ctx.Info.Plists.BuildManifest.ProductVersion
+		ctx.Build = ctx.Info.Plists.BuildManifest.ProductBuildVersion
+	} else if ctx.Info.Plists.AssetDataInfo != nil {
+		ctx.Version = ctx.Info.Plists.AssetDataInfo.ProductVersion
+		ctx.Build = ctx.Info.Plists.AssetDataInfo.Build
+	} else if ctx.Info.Plists.SystemVersion != nil {
+		ctx.Version = ctx.Info.Plists.SystemVersion.ProductVersion
+		ctx.Build = ctx.Info.Plists.SystemVersion.ProductBuildVersion
+	}
+
+	if folder, err := ctx.Info.GetFolder(); err == nil {
+		ctx.Folder = filepath.Join(d.tmpDir, folder)
+	} else {
+		log.Errorf("failed to get folder from '%s' firmware metadata: %v", strings.ToLower(label), err)
+	}
+
+	if ctx.Info.IsMacOS() {
+		ctx.IsMacOS = true
+	}
+
+	return nil
+}
+
 func (d *Diff) getInfo() (err error) {
-	d.Old.Info, err = info.Parse(d.Old.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to parse 'Old' IPSW: %v", err)
+	if err := d.populateContext(&d.Old, "Old"); err != nil {
+		return err
 	}
-	d.New.Info, err = info.Parse(d.New.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to parse 'New' IPSW: %v", err)
+	if err := d.populateContext(&d.New, "New"); err != nil {
+		return err
 	}
-
-	d.Old.Version = d.Old.Info.Plists.BuildManifest.ProductVersion
-	d.Old.Build = d.Old.Info.Plists.BuildManifest.ProductBuildVersion
-	d.Old.Folder, err = d.Old.Info.GetFolder()
-	if err != nil {
-		log.Errorf("failed to get folder from 'Old' IPSW metadata: %v", err)
-	}
-	d.Old.Folder = filepath.Join(d.tmpDir, d.Old.Folder)
-
-	d.New.Version = d.New.Info.Plists.BuildManifest.ProductVersion
-	d.New.Build = d.New.Info.Plists.BuildManifest.ProductBuildVersion
-	d.New.Folder, err = d.New.Info.GetFolder()
-	if err != nil {
-		log.Errorf("failed to get folder from 'New' IPSW metadata: %v", err)
-	}
-	d.New.Folder = filepath.Join(d.tmpDir, d.New.Folder)
 
 	if d.Title == "" {
-		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
+		fallback := func(val, def string) string {
+			if val == "" {
+				return def
+			}
+			return val
+		}
+		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)",
+			fallback(d.Old.Version, "unknown"),
+			fallback(d.Old.Build, "unknown"),
+			fallback(d.New.Version, "unknown"),
+			fallback(d.New.Build, "unknown"),
+		)
 	}
 
-	if d.Old.Info.IsMacOS() || d.New.Info.IsMacOS() {
+	if d.Old.IsMacOS || d.New.IsMacOS {
 		d.Old.IsMacOS = true
 		d.New.IsMacOS = true
 	}
 
 	return nil
+}
+
+func (d *Diff) logIPSWOnlySectionsSkipped() {
+	skipped := []string{"kernelcache", "dyld_shared_cache", "machos"}
+	if len(d.conf.KDKs) == 2 {
+		skipped = append(skipped, "kdks")
+	}
+	if d.conf.LaunchD {
+		skipped = append(skipped, "launchd")
+	}
+	if d.conf.Firmware {
+		skipped = append(skipped, "firmware", "iboot")
+	}
+	if d.conf.Features {
+		skipped = append(skipped, "feature-flags")
+	}
+	if d.conf.Files {
+		skipped = append(skipped, "files")
+	}
+
+	log.WithFields(log.Fields{
+		"old": d.Old.Kind.String(),
+		"new": d.New.Kind.String(),
+	}).Warnf("Skipping %s diff sections; OTA support is currently limited to --ent", strings.Join(skipped, ", "))
 }
 
 // Diff diffs the diff
@@ -257,63 +346,69 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
-	log.Info("Diffing KERNELCACHES")
-	if err := d.parseKernelcache(); err != nil {
-		log.WithError(err).Error("failed to parse kernelcaches")
-	}
+	bothIPSW := d.Old.Kind == InputKindIPSW && d.New.Kind == InputKindIPSW
 
-	if d.Old.KDK != "" && d.New.KDK != "" {
-		log.Info("Diffing KDKS")
-		if err := d.parseKDKs(); err != nil {
-			log.WithError(err).Error("failed to parse KDKs")
+	if bothIPSW {
+		log.Info("Diffing KERNELCACHES")
+		if err := d.parseKernelcache(); err != nil {
+			log.WithError(err).Error("failed to parse kernelcaches")
 		}
-	}
 
-	log.Info("Diffing DYLD_SHARED_CACHES")
-	if err := d.mountSystemOsDMGs(); err != nil {
-		return fmt.Errorf("failed to mount DMGs: %v", err)
-	}
-	defer d.unmountSystemOsDMGs()
-
-	if err := d.parseDSC(); err != nil {
-		log.WithError(err).Error("failed to parse DSCs")
-	}
-
-	log.Info("Diffing MachOs")
-	if err := d.parseMachos(); err != nil {
-		log.WithError(err).Error("failed to parse MachOs")
-	}
-
-	if d.conf.LaunchD {
-		log.Info("Diffing launchd PLIST")
-		if err := d.parseLaunchdPlists(); err != nil {
-			log.WithError(err).Error("failed to parse launchd plists")
+		if d.Old.KDK != "" && d.New.KDK != "" {
+			log.Info("Diffing KDKS")
+			if err := d.parseKDKs(); err != nil {
+				log.WithError(err).Error("failed to parse KDKs")
+			}
 		}
-	}
 
-	if d.conf.Firmware {
-		log.Info("Diffing Firmware")
-		if err := d.parseFirmwares(); err != nil {
-			log.WithError(err).Error("failed to parse firmwares")
+		log.Info("Diffing DYLD_SHARED_CACHES")
+		if err := d.mountSystemOsDMGs(); err != nil {
+			return fmt.Errorf("failed to mount DMGs: %v", err)
 		}
-		log.Info("Diffing iBoot")
-		if err := d.parseIBoot(); err != nil {
-			log.WithError(err).Error("failed to parse iBoot")
-		}
-	}
+		defer d.unmountSystemOsDMGs()
 
-	if d.conf.Features {
-		log.Info("Diffing Feature Flags")
-		if err := d.parseFeatureFlags(); err != nil {
-			log.WithError(err).Error("failed to parse feature flags")
+		if err := d.parseDSC(); err != nil {
+			log.WithError(err).Error("failed to parse DSCs")
 		}
-	}
 
-	if d.conf.Files {
-		log.Info("Diffing Files")
-		if err := d.parseFiles(); err != nil {
-			log.WithError(err).Error("failed to parse files")
+		log.Info("Diffing MachOs")
+		if err := d.parseMachos(); err != nil {
+			log.WithError(err).Error("failed to parse MachOs")
 		}
+
+		if d.conf.LaunchD {
+			log.Info("Diffing launchd PLIST")
+			if err := d.parseLaunchdPlists(); err != nil {
+				log.WithError(err).Error("failed to parse launchd plists")
+			}
+		}
+
+		if d.conf.Firmware {
+			log.Info("Diffing Firmware")
+			if err := d.parseFirmwares(); err != nil {
+				log.WithError(err).Error("failed to parse firmwares")
+			}
+			log.Info("Diffing iBoot")
+			if err := d.parseIBoot(); err != nil {
+				log.WithError(err).Error("failed to parse iBoot")
+			}
+		}
+
+		if d.conf.Features {
+			log.Info("Diffing Feature Flags")
+			if err := d.parseFeatureFlags(); err != nil {
+				log.WithError(err).Error("failed to parse feature flags")
+			}
+		}
+
+		if d.conf.Files {
+			log.Info("Diffing Files")
+			if err := d.parseFiles(); err != nil {
+				log.WithError(err).Error("failed to parse files")
+			}
+		}
+	} else {
+		d.logIPSWOnlySectionsSkipped()
 	}
 
 	if d.conf.Entitlements {
@@ -640,12 +735,12 @@ func (d *Diff) parseDSC() error {
 }
 
 func (d *Diff) parseEntitlements() (string, error) {
-	oldDB, err := ent.GetDatabase(&ent.Config{IPSW: d.Old.IPSWPath})
+	oldDB, err := ent.GetDatabase(&ent.Config{IPSW: d.Old.IPSWPath, PemDB: d.conf.PemDB})
 	if err != nil {
 		return "", err
 	}
 
-	newDB, err := ent.GetDatabase(&ent.Config{IPSW: d.New.IPSWPath})
+	newDB, err := ent.GetDatabase(&ent.Config{IPSW: d.New.IPSWPath, PemDB: d.conf.PemDB})
 	if err != nil {
 		return "", err
 	}
