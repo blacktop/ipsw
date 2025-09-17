@@ -1,43 +1,36 @@
-# For most projects, this workflow file will not need changing; you simply need
-# to commit it to your repository.
-#
-# You may wish to alter this file to override the set of languages analyzed,
-# or to provide custom queries or build logic.
-#
-# ******** NOTE ********
-# We have attempted to detect the languages in your repository. Please check
-# the `language` matrix defined below to confirm you have the correct set of
-# supported CodeQL languages.
-#
-name: "CodeQL"
+name: "codeql"
 
 on:
   pull_request:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: analyze
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["go", "actions"]
     permissions:
       actions: read
       contents: read
+      pull-requests: read
       security-events: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
-          go-version: "stable"
-          check-latest: true
-          cache: true
-
-      - uses: github/codeql-action/init@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
+          persist-credentials: false
+      - uses: github/codeql-action/init@192325c86100d080feab897ff886c34abd4c83a3 # v3
         with:
-          languages: go      
-      - uses: github/codeql-action/autobuild@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
-      - uses: github/codeql-action/analyze@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@192325c86100d080feab897ff886c34abd4c83a3 # v3
+      - uses: github/codeql-action/analyze@192325c86100d080feab897ff886c34abd4c83a3 # v3
