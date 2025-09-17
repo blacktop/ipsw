@@ -1,1 +1,128 @@
-{"WebKit/WebKit":{"tags":["webkitgtk-2.48.3","wpewebkit-2.48.2","wpewebkit-2.48.3","webkitgtk-2.49.2","wpewebkit-2.49.2","webkitgtk-2.49.3","wpewebkit-2.49.3","wpewebkit-2.48.4","webkitgtk-2.48.4","webkitgtk-2.49.4","wpewebkit-2.49.4","webkitgtk-2.48.5","wpewebkit-2.48.5","webkitgtk-2.49.90","wpewebkit-2.49.90","webkitgtk-2.48.6","wpewebkit-2.48.6","webkitgtk-2.50.0"],"commits":["5477c623a01c1fa53b5441103642aa119177402d","f8332133a12b758485dd348da4c6ed991bde98f5","c78c210e4b41d758d26bb05c56f51bbbd60823ed","261b24ff1774bf055cd4378f1bd12ca926417b35"],"fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}},"apple-oss-distributions/distribution-macOS":{"tags":["macos-155","macos-154","macos-156"],"fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}},"fcs_keys":{"fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}},"fcs_keys_beta":{"fcs_keys":{"beta":{"fingerprint":"22H6020_24G222_22O785","ios_build":"22H6020","macos_build":"24G222","visionos_build":"22O785","updated_at":"2025-09-14T19:05:11Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}},"fcs_keys_rc":{"fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"fingerprint":"23A341_24G222_23M336","ios_build":"23A341","macos_build":"24G222","visionos_build":"23M336","updated_at":"2025-09-15T19:06:03Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}},"fcs_keys_stable":{"fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"fingerprint":"23A341_24G222_23M336","ios_build":"23A341","macos_build":"24G222","visionos_build":"23M336","updated_at":"2025-09-15T19:06:03Z"}}},"latest_ipsw":{"url":"https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-40536/E62697A1-4565-4068-867C-A64017377220/iPhone17,1_26.0_23A341_Restore.ipsw","fcs_keys":{"beta":{"updated_at":"0001-01-01T00:00:00Z"},"rc":{"updated_at":"0001-01-01T00:00:00Z"},"release":{"updated_at":"0001-01-01T00:00:00Z"}}}}
+{
+  "WebKit/WebKit": {
+    "tags": [
+      "webkitgtk-2.48.3",
+      "wpewebkit-2.48.2",
+      "wpewebkit-2.48.3",
+      "webkitgtk-2.49.2",
+      "wpewebkit-2.49.2",
+      "webkitgtk-2.49.3",
+      "wpewebkit-2.49.3",
+      "wpewebkit-2.48.4",
+      "webkitgtk-2.48.4",
+      "webkitgtk-2.49.4",
+      "wpewebkit-2.49.4",
+      "webkitgtk-2.48.5",
+      "wpewebkit-2.48.5",
+      "webkitgtk-2.49.90",
+      "wpewebkit-2.49.90",
+      "webkitgtk-2.48.6",
+      "wpewebkit-2.48.6",
+      "webkitgtk-2.50.0"
+    ],
+    "commits": [
+      "5477c623a01c1fa53b5441103642aa119177402d",
+      "f8332133a12b758485dd348da4c6ed991bde98f5",
+      "c78c210e4b41d758d26bb05c56f51bbbd60823ed",
+      "261b24ff1774bf055cd4378f1bd12ca926417b35"
+    ],
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  },
+  "apple-oss-distributions/distribution-macOS": {
+    "tags": [
+      "macos-155",
+      "macos-154",
+      "macos-156"
+    ],
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  },
+  "fcs_keys": {
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  },
+  "fcs_keys_beta": {
+    "fcs_keys": {
+      "beta": {
+        "fingerprint": "22H6020_24G222_22O785",
+        "ios_build": "22H6020",
+        "macos_build": "24G222",
+        "visionos_build": "22O785",
+        "updated_at": "2025-09-14T19:05:11Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  },
+  "fcs_keys_rc": {
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "fingerprint": "23A341_24G222_23M336",
+        "ios_build": "23A341",
+        "macos_build": "24G222",
+        "visionos_build": "23M336",
+        "updated_at": "2025-09-15T19:06:03Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  },
+  "fcs_keys_stable": {
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "fingerprint": "23A341_24G222_23M336",
+        "ios_build": "23A341",
+        "macos_build": "24G222",
+        "visionos_build": "23M336",
+        "updated_at": "2025-09-15T19:06:03Z"
+      }
+    }
+  },
+  "latest_ipsw": {
+    "ios_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-40536/E62697A1-4565-4068-867C-A64017377220/iPhone17,1_26.0_23A341_Restore.ipsw",
+    "macos_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-37622/CE01FAB2-7F26-48EE-AEE4-5E57A7F6D8BB/UniversalMac_26.0_25A354_Restore.ipsw",
+    "url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-40536/E62697A1-4565-4068-867C-A64017377220/iPhone17,1_26.0_23A341_Restore.ipsw"
+  }
+}
