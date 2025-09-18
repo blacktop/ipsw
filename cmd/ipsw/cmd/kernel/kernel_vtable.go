@@ -24,8 +24,17 @@ package kernel
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	stdlog "log"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
+	"runtime/trace"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
@@ -43,12 +52,30 @@ func init() {
 	vtableCmd.Flags().BoolP("methods", "m", false, "Show method details for each class")
 	vtableCmd.Flags().BoolP("inheritance", "i", false, "Show inheritance hierarchy")
 	vtableCmd.Flags().IntP("limit", "l", 0, "Limit number of classes to display (0 = all)")
+	vtableCmd.Flags().StringSliceP("entry", "e", []string{}, "Only scan specified fileset entries (e.g., com.apple.kernel); repeatable")
 
 	viper.BindPFlag("kernel.vtable.json", vtableCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.vtable.class", vtableCmd.Flags().Lookup("class"))
 	viper.BindPFlag("kernel.vtable.methods", vtableCmd.Flags().Lookup("methods"))
 	viper.BindPFlag("kernel.vtable.inheritance", vtableCmd.Flags().Lookup("inheritance"))
 	viper.BindPFlag("kernel.vtable.limit", vtableCmd.Flags().Lookup("limit"))
+	viper.BindPFlag("kernel.vtable.entry", vtableCmd.Flags().Lookup("entry"))
+
+	// Profiling flags
+	vtableCmd.Flags().String("cpuprofile", "", "Write CPU profile to file")
+	vtableCmd.Flags().String("memprofile", "", "Write heap profile to file")
+	vtableCmd.Flags().String("blockprofile", "", "Write block profile to file (enables block profiling)")
+	vtableCmd.Flags().String("mutexprofile", "", "Write mutex profile to file (enables mutex profiling)")
+	vtableCmd.Flags().String("trace", "", "Write runtime trace to file")
+	vtableCmd.Flags().String("pprof", "", "Serve net/http/pprof on address (e.g. localhost:6060)")
+	vtableCmd.Flags().Bool("timings", false, "Print timing breakdown for major phases")
+	viper.BindPFlag("kernel.vtable.cpuprofile", vtableCmd.Flags().Lookup("cpuprofile"))
+	viper.BindPFlag("kernel.vtable.memprofile", vtableCmd.Flags().Lookup("memprofile"))
+	viper.BindPFlag("kernel.vtable.blockprofile", vtableCmd.Flags().Lookup("blockprofile"))
+	viper.BindPFlag("kernel.vtable.mutexprofile", vtableCmd.Flags().Lookup("mutexprofile"))
+	viper.BindPFlag("kernel.vtable.trace", vtableCmd.Flags().Lookup("trace"))
+	viper.BindPFlag("kernel.vtable.pprof", vtableCmd.Flags().Lookup("pprof"))
+	viper.BindPFlag("kernel.vtable.timings", vtableCmd.Flags().Lookup("timings"))
 }
 
 // vtableCmd represents the vtable command
@@ -74,16 +101,84 @@ var vtableCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// Silence noisy stdlib logging from dependencies unless verbose
+		if !viper.GetBool("verbose") {
+			stdlog.SetOutput(io.Discard)
+			defer stdlog.SetOutput(os.Stderr)
+		}
+		tStart := time.Now()
+
+		// Optional net/http/pprof server
+		if addr := viper.GetString("kernel.vtable.pprof"); addr != "" {
+			go func() {
+				stdlog.Printf("pprof listening on http://%s", addr)
+				_ = http.ListenAndServe(addr, nil)
+			}()
+		}
+
+		// Profiles setup
+		if cpup := viper.GetString("kernel.vtable.cpuprofile"); cpup != "" {
+			f, err := os.Create(cpup)
+			if err != nil {
+				return fmt.Errorf("create cpuprofile: %w", err)
+			}
+			if err := pprof.StartCPUProfile(f); err != nil {
+				f.Close()
+				return fmt.Errorf("start cpu profile: %w", err)
+			}
+			defer func() {
+				pprof.StopCPUProfile()
+				f.Close()
+			}()
+		}
+		if bp := viper.GetString("kernel.vtable.blockprofile"); bp != "" {
+			runtime.SetBlockProfileRate(1)
+			defer writeProfile("block", bp)
+		}
+		if mp := viper.GetString("kernel.vtable.mutexprofile"); mp != "" {
+			runtime.SetMutexProfileFraction(1)
+			defer writeProfile("mutex", mp)
+		}
+		var traceFile *os.File
+		if tp := viper.GetString("kernel.vtable.trace"); tp != "" {
+			f, err := os.Create(tp)
+			if err != nil {
+				return fmt.Errorf("create trace: %w", err)
+			}
+			if err := trace.Start(f); err != nil {
+				f.Close()
+				return fmt.Errorf("start trace: %w", err)
+			}
+			traceFile = f
+			defer func() { trace.Stop(); traceFile.Close() }()
+		}
+
+		tOpenStart := time.Now()
 		m, err := macho.Open(filepath.Clean(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to open kernelcache: %v", err)
 		}
 		defer m.Close()
+		tOpen := time.Since(tOpenStart)
 
-		cls, err := cpp.GetClasses(m)
+		jsonOutput := viper.GetBool("kernel.vtable.json")
+		showMethods := viper.GetBool("kernel.vtable.methods")
+		showInheritance := viper.GetBool("kernel.vtable.inheritance")
+
+		cfg := &cpp.Config{
+			ResolveVtables: showMethods,
+			WithMethods:    showMethods,
+			WithOverrides:  showInheritance,
+			WithAlloc:      false,
+			Entries:        viper.GetStringSlice("kernel.vtable.entry"),
+		}
+
+		tGCStart := time.Now()
+		cls, err := cpp.GetClasses(m, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to get classes from kernelcache: %v", err)
 		}
+		tGetClasses := time.Since(tGCStart)
 
 		if len(cls) == 0 {
 			log.Warn("No classes discovered")
@@ -112,19 +207,29 @@ var vtableCmd = &cobra.Command{
 		}
 
 		// Output results
-		if viper.GetBool("kernel.vtable.json") {
+		tOutStart := time.Now()
+		if jsonOutput {
 			data, err := json.Marshal(cls)
 			if err != nil {
 				return err
 			}
 			fmt.Println(string(data))
+			tPrint := time.Since(tOutStart)
+			if viper.GetBool("kernel.vtable.timings") || viper.GetBool("verbose") {
+				log.Infof("timings: open=%s getClasses=%s output=%s total=%s", tOpen, tGetClasses, tPrint, time.Since(tStart))
+			}
+			// Heap profile at the end, if requested
+			if hp := viper.GetString("kernel.vtable.memprofile"); hp != "" {
+				if err := writeHeapProfile(hp); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 
 		// Pretty print results
 		fmt.Printf("\nDiscovered %d C++ classes:\n\n", len(cls))
-		showMethods := viper.GetBool("kernel.vtable.methods")
-		showInheritance := viper.GetBool("kernel.vtable.inheritance")
+		// already read above
 
 		for _, class := range cls {
 			fmt.Println(class.String())
@@ -137,6 +242,15 @@ var vtableCmd = &cobra.Command{
 				for _, method := range class.Methods {
 					fmt.Printf("  %s\n", method.String())
 				}
+			}
+		}
+		tPrint := time.Since(tOutStart)
+		if viper.GetBool("kernel.vtable.timings") || viper.GetBool("verbose") {
+			log.Infof("timings: open=%s getClasses=%s output=%s total=%s", tOpen, tGetClasses, tPrint, time.Since(tStart))
+		}
+		if hp := viper.GetString("kernel.vtable.memprofile"); hp != "" {
+			if err := writeHeapProfile(hp); err != nil {
+				return err
 			}
 		}
 
@@ -156,4 +270,31 @@ func printInheritanceChain(class *cpp.ClassMeta, depth int) {
 	}
 	fmt.Println()
 	printInheritanceChain(class.SuperClass, depth+1)
+}
+
+// writeHeapProfile writes a heap profile to the given filepath.
+func writeHeapProfile(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create memprofile: %w", err)
+	}
+	defer f.Close()
+	runtime.GC()
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		return fmt.Errorf("write heap profile: %w", err)
+	}
+	return nil
+}
+
+// writeProfile writes a pprof profile by name (block/mutex) to path.
+func writeProfile(name, path string) {
+	f, err := os.Create(path)
+	if err != nil {
+		stdlog.Printf("create %s profile failed: %v", name, err)
+		return
+	}
+	defer f.Close()
+	if prof := pprof.Lookup(name); prof != nil {
+		_ = prof.WriteTo(f, 0)
+	}
 }

@@ -1,8 +1,8 @@
 module github.com/blacktop/ipsw
 
-go 1.24.0
+go 1.25.0
 
-toolchain go1.24.2
+toolchain go1.25.1
 
 tool (
 	github.com/caarlos0/svu/v3
