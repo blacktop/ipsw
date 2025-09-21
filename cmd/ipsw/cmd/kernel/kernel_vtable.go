@@ -179,8 +179,6 @@ var vtableCmd = &cobra.Command{
 			return nil
 		}
 
-		log.Infof("Discovered %d C++ classes", len(cls))
-
 		// Filter by specific class if requested
 		if className != "" {
 			filtered := make([]cpp.Class, 0, 1)

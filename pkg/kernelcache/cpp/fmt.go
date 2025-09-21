@@ -42,7 +42,7 @@ func (c *Class) String() string {
 
 // String returns a formatted string representation of the MethodInfo
 func (m *Method) String() string {
-	offset := fmt.Sprintf("%#x", m.Index*8)
+	offset := fmt.Sprintf("%#x", m.Index)
 	funcAddr := colorAddr("%#x", m.Address)
 	var extra strings.Builder
 	if m.OverrideOf != 0 {
