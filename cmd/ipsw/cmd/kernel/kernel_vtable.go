@@ -100,6 +100,7 @@ var vtableCmd = &cobra.Command{
 		}
 
 		// flags
+		className := viper.GetString("kernel.vtable.class")
 		showMethods := viper.GetBool("kernel.vtable.methods")
 		showInheritance := viper.GetBool("kernel.vtable.inheritance")
 		entries := viper.GetStringSlice("kernel.vtable.entry")
@@ -163,6 +164,7 @@ var vtableCmd = &cobra.Command{
 		tGCStart := time.Now()
 
 		cls, err := cpp.Create(m, &cpp.Config{
+			ClassName:   className,
 			WithMethods: showMethods,
 			Entries:     entries,
 		}).GetClasses()
@@ -180,7 +182,7 @@ var vtableCmd = &cobra.Command{
 		log.Infof("Discovered %d C++ classes", len(cls))
 
 		// Filter by specific class if requested
-		if className := viper.GetString("kernel.vtable.class"); className != "" {
+		if className != "" {
 			filtered := make([]cpp.Class, 0, 1)
 			for _, class := range cls {
 				if strings.Contains(class.Name, className) {

@@ -20,7 +20,7 @@ func resolveMethodName(m *macho.File, mi *Method, className string) {
 			}
 		}
 	}
-	mi.Name = fmt.Sprintf("%s::fn_0x%x()", className, mi.Index*8)
+	mi.Name = fmt.Sprintf("%s::fn_%x()", className, mi.Index*8)
 }
 
 func computePAC(sym string) (uint16, bool) {
