@@ -24,8 +24,6 @@ package kernel
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	stdlog "log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -47,19 +45,19 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(vtableCmd)
 
-	vtableCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	vtableCmd.Flags().StringP("class", "c", "", "Show vtable for specific class")
 	vtableCmd.Flags().BoolP("methods", "m", false, "Show method details for each class")
 	vtableCmd.Flags().BoolP("inheritance", "i", false, "Show inheritance hierarchy")
 	vtableCmd.Flags().IntP("limit", "l", 0, "Limit number of classes to display (0 = all)")
-	vtableCmd.Flags().StringSliceP("entry", "e", []string{}, "Only scan specified fileset entries (e.g., com.apple.kernel); repeatable")
+	vtableCmd.Flags().StringSliceP("entry", "e", []string{}, "Only scan specified fileset entries (e.g., com.apple.kernel)")
+	vtableCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 
-	viper.BindPFlag("kernel.vtable.json", vtableCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.vtable.class", vtableCmd.Flags().Lookup("class"))
 	viper.BindPFlag("kernel.vtable.methods", vtableCmd.Flags().Lookup("methods"))
 	viper.BindPFlag("kernel.vtable.inheritance", vtableCmd.Flags().Lookup("inheritance"))
 	viper.BindPFlag("kernel.vtable.limit", vtableCmd.Flags().Lookup("limit"))
 	viper.BindPFlag("kernel.vtable.entry", vtableCmd.Flags().Lookup("entry"))
+	viper.BindPFlag("kernel.vtable.json", vtableCmd.Flags().Lookup("json"))
 
 	// Profiling flags
 	vtableCmd.Flags().String("cpuprofile", "", "Write CPU profile to file")
@@ -101,17 +99,18 @@ var vtableCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// Silence noisy stdlib logging from dependencies unless verbose
-		if !viper.GetBool("verbose") {
-			stdlog.SetOutput(io.Discard)
-			defer stdlog.SetOutput(os.Stderr)
-		}
+		// flags
+		showMethods := viper.GetBool("kernel.vtable.methods")
+		showInheritance := viper.GetBool("kernel.vtable.inheritance")
+		entries := viper.GetStringSlice("kernel.vtable.entry")
+		asJSON := viper.GetBool("kernel.vtable.json")
+
 		tStart := time.Now()
 
 		// Optional net/http/pprof server
 		if addr := viper.GetString("kernel.vtable.pprof"); addr != "" {
 			go func() {
-				stdlog.Printf("pprof listening on http://%s", addr)
+				log.Infof("pprof listening on http://%s", addr)
 				_ = http.ListenAndServe(addr, nil)
 			}()
 		}
@@ -161,23 +160,16 @@ var vtableCmd = &cobra.Command{
 		defer m.Close()
 		tOpen := time.Since(tOpenStart)
 
-		jsonOutput := viper.GetBool("kernel.vtable.json")
-		showMethods := viper.GetBool("kernel.vtable.methods")
-		showInheritance := viper.GetBool("kernel.vtable.inheritance")
-
-		cfg := &cpp.Config{
-			ResolveVtables: showMethods,
-			WithMethods:    showMethods,
-			WithOverrides:  showInheritance,
-			WithAlloc:      false,
-			Entries:        viper.GetStringSlice("kernel.vtable.entry"),
-		}
-
 		tGCStart := time.Now()
-		cls, err := cpp.GetClasses(m, cfg)
+
+		cls, err := cpp.Create(m, &cpp.Config{
+			WithMethods: showMethods,
+			Entries:     entries,
+		}).GetClasses()
 		if err != nil {
 			return fmt.Errorf("failed to get classes from kernelcache: %v", err)
 		}
+
 		tGetClasses := time.Since(tGCStart)
 
 		if len(cls) == 0 {
@@ -189,7 +181,7 @@ var vtableCmd = &cobra.Command{
 
 		// Filter by specific class if requested
 		if className := viper.GetString("kernel.vtable.class"); className != "" {
-			filtered := make([]cpp.ClassMeta, 0, 1)
+			filtered := make([]cpp.Class, 0, 1)
 			for _, class := range cls {
 				if strings.Contains(class.Name, className) {
 					filtered = append(filtered, class)
@@ -208,7 +200,7 @@ var vtableCmd = &cobra.Command{
 
 		// Output results
 		tOutStart := time.Now()
-		if jsonOutput {
+		if asJSON {
 			data, err := json.Marshal(cls)
 			if err != nil {
 				return err
@@ -227,10 +219,7 @@ var vtableCmd = &cobra.Command{
 			return nil
 		}
 
-		// Pretty print results
 		fmt.Printf("\nDiscovered %d C++ classes:\n\n", len(cls))
-		// already read above
-
 		for _, class := range cls {
 			fmt.Println(class.String())
 			// Show inheritance hierarchy if requested
@@ -259,7 +248,7 @@ var vtableCmd = &cobra.Command{
 }
 
 // printInheritanceChain recursively prints the inheritance hierarchy
-func printInheritanceChain(class *cpp.ClassMeta, depth int) {
+func printInheritanceChain(class *cpp.Class, depth int) {
 	if class.SuperClass == nil {
 		return
 	}
@@ -290,7 +279,7 @@ func writeHeapProfile(path string) error {
 func writeProfile(name, path string) {
 	f, err := os.Create(path)
 	if err != nil {
-		stdlog.Printf("create %s profile failed: %v", name, err)
+		log.Errorf("create %s profile failed: %v", name, err)
 		return
 	}
 	defer f.Close()

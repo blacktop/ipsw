@@ -3,7 +3,9 @@ package cpp
 import (
 	"encoding/binary"
 	"fmt"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/apex/log"
@@ -17,40 +19,22 @@ import (
 
 const errorLogMessage = "OSMetaClass: preModLoad() wasn't called for class %s (runtime internal error)."
 
-var OSMetaClassFunc uint64 = 0 // Address of OSMetaClass::OSMetaClass function
-
-// Config controls how class discovery runs.
-// Disable expensive phases to keep discovery fast on large kernels.
-type Config struct {
-	// ResolveVtables finds vtable pointers (emulation + scanning around calls).
-	ResolveVtables bool
-	// WithMethods parses each class's vtable entries into detailed methods.
-	// Implies ResolveVtables.
-	WithMethods bool
-	// WithOverrides links parents and computes method overrides.
-	WithOverrides bool
-	// WithAlloc resolves per-class alloc function from MetaClass vtable.
-	WithAlloc bool
-	// Entries restricts which fileset entries to analyze. If empty, analyze all.
-	Entries []string
+// Class represents metadata for a C++ class discovered in the kernelcache
+type Class struct {
+	Name        string   // Class name (e.g., "IOService")
+	Size        uint32   // Size of class instances in bytes
+	MetaPtr     uint64   // Address of the OSMetaClass object for this class
+	SuperMeta   uint64   // Address of superclass's meta (0 if none)
+	SuperClass  *Class   // Pointer to parent class (resolved later)
+	AllocFunc   uint64   // Address of the alloc function
+	VtableAddr  uint64   // Address of the class's vtable
+	Methods     []Method // Virtual methods in the vtable
+	DiscoveryPC uint64   // Program counter where class was discovered
+	Bundle      string   // Bundle/kext this class belongs to
 }
 
-// ClassMeta represents metadata for a C++ class discovered in the kernelcache
-type ClassMeta struct {
-	Name        string       // Class name (e.g., "IOService")
-	Size        uint32       // Size of class instances in bytes
-	MetaPtr     uint64       // Address of the OSMetaClass object for this class
-	SuperMeta   uint64       // Address of superclass's meta (0 if none)
-	SuperClass  *ClassMeta   // Pointer to parent class (resolved later)
-	AllocFunc   uint64       // Address of the alloc function
-	VtableAddr  uint64       // Address of the class's vtable
-	Methods     []MethodInfo // Virtual methods in the vtable
-	DiscoveryPC uint64       // Program counter where class was discovered
-	Bundle      string       // Bundle/kext this class belongs to
-}
-
-// MethodInfo represents a virtual method in a class vtable
-type MethodInfo struct {
+// Method represents a virtual method in a class vtable
+type Method struct {
 	Address    uint64
 	Name       string
 	Index      int
@@ -58,21 +42,11 @@ type MethodInfo struct {
 	PAC        uint16
 }
 
-// XrefInfo represents a cross-reference to OSMetaClass::OSMetaClass
-type XrefInfo struct {
-	PC        uint64 // Address of the BL instruction
-	FuncStart uint64 // Start of containing function
-	FuncEnd   uint64 // End of containing function
-}
-
-// InitFuncInfo holds information about a __mod_init_func entry
-type InitFuncInfo struct {
-	RawPtr    uint64     // Raw pointer value from __mod_init_func
-	FuncAddr  uint64     // Decoded function address
-	FuncStart uint64     // Function start address
-	FuncEnd   uint64     // Function end address
-	EntryID   string     // Fileset entry ID
-	Xrefs     []XrefInfo // OSMetaClass xrefs in this init function
+// InitFunc holds information about a __mod_init_func entry
+type InitFunc struct {
+	types.Function
+	entryID string
+	xrefs   []uint64 // OSMetaClass xrefs in this init function
 }
 
 // Cache structures for performance
@@ -118,24 +92,76 @@ func (c *funcDataCache) put(addr uint64, data []byte) {
 	c.cache[addr] = data
 }
 
-var (
-	strCache = &stringCache{}
-	fdCache  = &funcDataCache{}
-)
+// Config controls how class discovery runs.
+type Config struct {
+	// WithMethods parses each class's vtable entries into detailed methods.
+	WithMethods bool
+	// Entries restricts which fileset entries to analyze. If empty, analyze all.
+	Entries []string
+}
 
-// findOsMetaClassFunc finds the OSMetaClass::OSMetaClass function
-func findOsMetaClassFunc(m *macho.File) error {
-	if OSMetaClassFunc != 0 {
+type Cpp struct {
+	root *macho.File
+	cfg  *Config
+
+	osMetaClass uint64 // Address of OSMetaClass::OSMetaClass function
+
+	strCache *stringCache
+	fdCache  *funcDataCache
+}
+
+func Create(root *macho.File, cfg *Config) *Cpp {
+	return &Cpp{
+		root:     root,
+		cfg:      cfg,
+		strCache: &stringCache{},
+		fdCache:  &funcDataCache{},
+	}
+}
+
+func isOsMetaClassCtor(name string) bool {
+	if name == "" {
+		return false
+	}
+	trimmed := strings.TrimPrefix(name, "_")
+	if strings.Contains(trimmed, "OSMetaClass::OSMetaClass") {
+		return true
+	}
+	if strings.Contains(trimmed, "OSMetaClassC1") || strings.Contains(trimmed, "OSMetaClassC2") {
+		return true
+	}
+	return false
+}
+
+func (c *Cpp) getOsMetaClassAddr() (err error) {
+	if c.osMetaClass != 0 {
 		return nil
 	}
 
-	kernel := m
+	kernel := c.root
 	if kernel.Type == types.MH_FILESET {
-		var err error
-		// Use the main kernel file for string searching
 		kernel, err = kernel.GetFileSetFileByName("com.apple.kernel")
 		if err != nil {
 			return fmt.Errorf("failed to get main kernel fileset entry: %v", err)
+		}
+	}
+
+	// search for symbol first (KDK kernels and symbolicated kernelcaches)
+	if kernel.Symtab != nil {
+		for _, sym := range kernel.Symtab.Syms {
+			if isOsMetaClassCtor(sym.Name) {
+				c.osMetaClass = sym.Value
+				return nil
+			}
+		}
+	}
+
+	if exports, err := kernel.DyldExports(); err == nil {
+		for _, entry := range exports {
+			if isOsMetaClassCtor(entry.Name) {
+				c.osMetaClass = entry.Address
+				return nil
+			}
 		}
 	}
 
@@ -164,84 +190,175 @@ func findOsMetaClassFunc(m *macho.File) error {
 	var wg sync.WaitGroup
 	var once sync.Once
 	found := make(chan struct{})
-
 	functions := kernel.GetFunctions()
+	workChan := make(chan types.Function, len(functions))
 
-	// Process functions in parallel using WaitGroup.Go(), stop as soon as we find the target
-	for _, fn := range functions {
-		fn := fn // Capture for goroutine
+	for range runtime.NumCPU() {
 		wg.Go(func() {
-			select {
-			case <-found:
-				return // Another goroutine found it, exit early
-			default:
-			}
+			for fn := range workChan {
+				// Check if already found
+				select {
+				case <-found:
+					return // Exit worker
+				default:
+				}
 
-			data, err := kernel.GetFunctionData(fn)
-			if err != nil {
-				log.Debugf("Failed to get function data at %#x: %v", fn.StartAddr, err)
-				return // Continue with other functions
-			}
-
-			engine := disass.NewMachoDisass(kernel, &disass.Config{
-				Data:         data,
-				StartAddress: fn.StartAddr,
-				Quiet:        true,
-			})
-
-			if err := engine.Triage(); err != nil {
-				log.Debugf("First pass triage failed at %#x: %v", fn.StartAddr, err)
-				return // Continue with other functions
-			}
-
-			if ok, loc := engine.Contains(targetStrAddr); ok {
-				targetFn, err := kernel.GetFunctionForVMAddr(loc)
+				data, err := kernel.GetFunctionData(fn)
 				if err != nil {
-					log.Debugf("Failed to get function at %#x: %v", loc, err)
-					return // Continue with other functions
+					log.Debugf("Failed to get function data at %#x: %v", fn.StartAddr, err)
+					continue // Process next function
 				}
 
-				mu.Lock()
-				if OSMetaClassFunc == 0 { // Double-check in case another goroutine found it first
-					OSMetaClassFunc = targetFn.StartAddr
-					log.Debugf("Found OSMetaClass::OSMetaClass at %#x (referenced by log message at %#x)", OSMetaClassFunc, loc)
-					// Use sync.Once to ensure channel is closed only once
-					once.Do(func() { close(found) })
+				engine := disass.NewMachoDisass(kernel, &disass.Config{
+					Data:         data,
+					StartAddress: fn.StartAddr,
+					Quiet:        true,
+				})
+
+				if err := engine.Triage(); err != nil {
+					log.Debugf("First pass triage failed at %#x: %v", fn.StartAddr, err)
+					continue // Process next function
 				}
-				mu.Unlock()
+
+				if ok, loc := engine.Contains(targetStrAddr); ok {
+					targetFn, err := kernel.GetFunctionForVMAddr(loc)
+					if err != nil {
+						log.Debugf("Failed to get function at %#x: %v", loc, err)
+						continue // Process next function
+					}
+
+					mu.Lock()
+					if c.osMetaClass == 0 { // Double-check in case another goroutine found it first
+						c.osMetaClass = targetFn.StartAddr
+						log.Infof("Found OSMetaClass::OSMetaClass at %#x (referenced by log message at %#x)", c.osMetaClass, loc)
+						once.Do(func() { close(found) })
+					}
+					mu.Unlock()
+					return // Exit worker once found
+				}
 			}
 		})
 	}
 
+	go func() {
+		for _, fn := range functions {
+			select {
+			case <-found:
+				close(workChan)
+				return
+			case workChan <- fn:
+			}
+		}
+		close(workChan)
+	}()
+
 	wg.Wait()
 
-	if OSMetaClassFunc == 0 {
+	if c.osMetaClass == 0 {
 		return fmt.Errorf("failed to find OSMetaClass::OSMetaClass function")
 	}
 
 	return nil
 }
 
-// findXrefsInInitFunc scans an init function for all OSMetaClass calls (direct, indirect, veneers)
-func findXrefsInInitFunc(m *macho.File, initFunc InitFuncInfo) (xrefs []XrefInfo, err error) {
-	// Get function data from cache or read it
-	funcData, cached := fdCache.get(initFunc.FuncStart)
-	if !cached {
-		fn := types.Function{
-			StartAddr: initFunc.FuncStart,
-			EndAddr:   initFunc.FuncEnd,
+// GetClasses analyzes the given Mach-O kernel file and extracts C++ class metadata
+func (c *Cpp) GetClasses() (classes []Class, err error) {
+
+	if err := c.getOsMetaClassAddr(); err != nil {
+		return nil, fmt.Errorf("failed to find OSMetaClass function: %v", err)
+	}
+
+	if c.root.Type == types.MH_FILESET {
+		var mu sync.Mutex
+		var eg errgroup.Group
+
+		for _, fs := range c.root.FileSets() {
+			// Filter entries
+			if len(c.cfg.Entries) > 0 && !slices.Contains(c.cfg.Entries, fs.EntryID) {
+				continue
+			}
+
+			fs := fs // Capture for goroutine
+
+			eg.Go(func() error {
+				entry, err := c.root.GetFileSetFileByName(fs.EntryID)
+				if err != nil {
+					log.Debugf("Failed to get fileset entry %s: %v", fs.EntryID, err)
+					return nil // Continue with other entries
+				}
+				// Get init functions for this entry
+				initsChan, err := c.getInitFunctions(entry, fs.EntryID)
+				if err != nil {
+					log.Debugf("Failed to get init functions for %s: %v", fs.EntryID, err)
+					return nil
+				}
+
+				var entryClasses []Class
+				for initFunc := range initsChan {
+					cls, err := c.extractClassesFromInitFuncEmulated(entry, initFunc)
+					if err != nil {
+						log.Debugf("Failed to extract classes from init func %#x in %s: %v", initFunc.StartAddr, fs.EntryID, err)
+						continue
+					}
+					entryClasses = append(entryClasses, cls...)
+				}
+
+				mu.Lock()
+				classes = append(classes, entryClasses...)
+				mu.Unlock()
+
+				if len(entryClasses) > 0 {
+					log.Debugf("Found %d classes in %s", len(entryClasses), fs.EntryID)
+				}
+
+				return nil
+			})
+
+			c.fdCache = &funcDataCache{} // Reset function data cache for each entry
+			c.strCache = &stringCache{}  // Reset string cache for each entry
 		}
-		funcData, err = m.GetFunctionData(fn)
+
+		if err := eg.Wait(); err != nil {
+			return nil, err
+		}
+	} else { // NON-FILESET kernel
+		initsChan, err := c.getInitFunctions(c.root, "kernel")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get init functions: %v", err)
+		}
+		for initFunc := range initsChan {
+			cls, err := c.extractClassesFromInitFuncEmulated(c.root, initFunc)
+			if err != nil {
+				log.Debugf("Failed to extract classes from init func %#x: %v", initFunc.StartAddr, err)
+				continue
+			}
+			classes = append(classes, cls...)
+		}
+	}
+
+	classes = dedupeClasses(classes)
+	linkParentsAndComputeOverrides(classes)
+
+	log.Debugf("Discovered %d C++ classes", len(classes))
+	return classes, nil
+}
+
+// findXrefsInInitFunc scans an init function for all OSMetaClass calls (direct, indirect, veneers)
+func (c *Cpp) findXrefsInInitFunc(m *macho.File, initFunc InitFunc) (xrefs []uint64, err error) {
+	// Get function data from cache or read it
+	funcData, cached := c.fdCache.get(initFunc.StartAddr)
+	if !cached {
+		funcData, err = m.GetFunctionData(initFunc.Function)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get function data: %v", err)
 		}
-		fdCache.put(initFunc.FuncStart, funcData)
+		c.fdCache.put(initFunc.StartAddr, funcData)
 	}
 
 	// Scan for direct BL
 	for offset := 0; offset+4 <= len(funcData); offset += 4 {
 		inst := binary.LittleEndian.Uint32(funcData[offset:])
-		pc := initFunc.FuncStart + uint64(offset)
+		pc := initFunc.StartAddr + uint64(offset)
 		// Only support BL instruction (direct call)
 		if (inst & 0xFC000000) == 0x94000000 {
 			imm26 := inst & 0x03FFFFFF
@@ -254,12 +371,8 @@ func findXrefsInInitFunc(m *macho.File, initFunc InitFuncInfo) (xrefs []XrefInfo
 			// BL target = PC (current instruction) + (imm26 << 2)
 			target := uint64(int64(pc) + int64(immOffset)*4)
 			// Check if it's a direct call to OSMetaClass
-			if target == OSMetaClassFunc {
-				xrefs = append(xrefs, XrefInfo{
-					PC:        pc,
-					FuncStart: initFunc.FuncStart,
-					FuncEnd:   initFunc.FuncEnd,
-				})
+			if target == c.osMetaClass {
+				xrefs = append(xrefs, pc)
 			}
 		}
 	}
@@ -268,37 +381,33 @@ func findXrefsInInitFunc(m *macho.File, initFunc InitFuncInfo) (xrefs []XrefInfo
 }
 
 // extractClassesFromInitFuncEmulated uses emulation to extract accurate class metadata
-func extractClassesFromInitFuncEmulated(m *macho.File, initFunc InitFuncInfo, osMetaClassFunc uint64, cfg *Config) ([]ClassMeta, error) {
-	var classes []ClassMeta
+func (c *Cpp) extractClassesFromInitFuncEmulated(m *macho.File, initFunc InitFunc) ([]Class, error) {
+	var classes []Class
 
-	xrefs, err := findXrefsInInitFunc(m, initFunc)
+	xrefs, err := c.findXrefsInInitFunc(m, initFunc)
 	if err != nil {
-		log.Debugf("Failed to find xrefs in init func %#x: %v", initFunc.FuncStart, err)
+		log.Debugf("Failed to find xrefs in init func %#x: %v", initFunc.StartAddr, err)
 		return classes, nil
 	}
 	if len(xrefs) == 0 {
 		return classes, nil
 	}
 
-	log.Debugf("Found %d OSMetaClass xrefs in init function %#x", len(xrefs), initFunc.FuncStart)
+	log.Debugf("Found %d OSMetaClass xrefs in init function %#x", len(xrefs), initFunc.StartAddr)
 
-	funcData, cached := fdCache.get(initFunc.FuncStart)
+	funcData, cached := c.fdCache.get(initFunc.StartAddr)
 	if !cached {
-		fn := types.Function{
-			StartAddr: initFunc.FuncStart,
-			EndAddr:   initFunc.FuncEnd,
-		}
-		funcData, err = m.GetFunctionData(fn)
+		funcData, err = m.GetFunctionData(initFunc.Function)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get function data: %v", err)
 		}
-		fdCache.put(initFunc.FuncStart, funcData)
+		c.fdCache.put(initFunc.StartAddr, funcData)
 	}
 
 	for _, xref := range xrefs {
-		class, err := emulateClassFromXref(m, initFunc, xref, funcData, cfg)
+		class, err := c.emulateClassFromXref(m, initFunc, xref, funcData)
 		if err != nil {
-			log.Debugf("Emulation failed for xref %#x in init %#x: %v", xref.PC, initFunc.FuncStart, err)
+			log.Debugf("Emulation failed for xref %#x in init %#x: %v", xref, initFunc.StartAddr, err)
 			continue
 		}
 		classes = append(classes, *class)
@@ -307,9 +416,26 @@ func extractClassesFromInitFuncEmulated(m *macho.File, initFunc InitFuncInfo, os
 	return classes, nil
 }
 
-func emulateClassFromXref(m *macho.File, initFunc InitFuncInfo, xref XrefInfo, funcData []byte, cfg *Config) (*ClassMeta, error) {
+func (c *Cpp) emulateClassFromXref(m *macho.File, initFunc InitFunc, xref uint64, funcData []byte) (*Class, error) {
+	// Use limited emulation starting just before the BL
+	blOffset := int(xref - initFunc.StartAddr)
+	if blOffset < 0 || blOffset+4 > len(funcData) {
+		return nil, fmt.Errorf("BL offset %d out of bounds", blOffset)
+	}
+
+	// Start emulation from 64 instructions before the BL (256 bytes)
+	startOffset := max(blOffset-256, 0)
+	startPC := initFunc.StartAddr + uint64(startOffset)
+
+	// Extract the relevant portion of function data
+	endOffset := min(
+		// Include some instructions after BL for vtable
+		blOffset+64, len(funcData))
+	emuData := funcData[startOffset:endOffset]
+
 	emuCfg := emulate.DefaultEngineConfig()
-	emuCfg.InitialPC = initFunc.FuncStart
+	emuCfg.InitialPC = startPC
+	emuCfg.MaxInstructions = 512 // Limit emulation steps
 	emuCfg.MemoryHandler = func(addr uint64, size int) ([]byte, error) {
 		buf := make([]byte, size)
 		if _, err := m.ReadAtAddr(buf, addr); err != nil {
@@ -322,59 +448,52 @@ func emulateClassFromXref(m *macho.File, initFunc InitFuncInfo, xref XrefInfo, f
 	}
 
 	engine := emulate.NewEngineWithConfig(emuCfg)
-	if err := engine.SetMemory(initFunc.FuncStart, funcData); err != nil {
-		return nil, fmt.Errorf("failed to map init function: %w", err)
+	if err := engine.SetMemory(startPC, emuData); err != nil {
+		return nil, fmt.Errorf("failed to map function segment: %w", err)
 	}
 
+	// Emulate until we reach the BL
 	for steps := 0; steps < emuCfg.MaxInstructions; steps++ {
 		pc := engine.GetPC()
-		if pc == xref.PC {
-			metaPtr := engine.GetRegister(0)
+		if pc == xref {
 			namePtr := engine.GetRegister(1)
-			superPtr := engine.GetRegister(2)
-			size := uint32(engine.GetRegister(3))
-
 			className := ""
-			if cached, ok := strCache.get(namePtr); ok {
+			if cached, ok := c.strCache.get(namePtr); ok {
 				className = cached
 			} else if s, err := m.GetCString(namePtr); err == nil {
 				className = s
-				strCache.put(namePtr, s)
+				c.strCache.put(namePtr, s)
 			}
 			if className == "" {
-				className = fmt.Sprintf("class_%#x", xref.PC)
+				return nil, fmt.Errorf("failed to read class name string at %#x", namePtr)
 			}
 
-			metaPtr = m.SlidePointer(metaPtr)
-			superPtr = m.SlidePointer(superPtr)
-
-			class := &ClassMeta{
+			class := &Class{
 				Name:        className,
-				MetaPtr:     metaPtr,
-				SuperMeta:   superPtr,
-				Size:        size,
-				AllocFunc:   initFunc.FuncAddr,
-				DiscoveryPC: xref.PC,
-				Bundle:      initFunc.EntryID,
+				MetaPtr:     engine.GetRegister(0),
+				SuperMeta:   engine.GetRegister(2),
+				Size:        uint32(engine.GetRegister(3)),
+				AllocFunc:   initFunc.StartAddr,
+				DiscoveryPC: xref,
+				Bundle:      initFunc.entryID,
 			}
 
-			if cfg != nil && (cfg.ResolveVtables || cfg.WithMethods) {
-				vtable := uint64(0)
-				savedPC := engine.GetPC()
-				for i := 0; i < 16; i++ {
-					if err := engine.StepOver(); err != nil {
-						break
-					}
-					if val := engine.GetRegister(16); val != 0 {
-						vtable = m.SlidePointer(val)
-						break
-					}
-				}
-				engine.SetPC(savedPC)
-				if vtable != 0 {
-					class.VtableAddr = vtable
-					if cfg.WithMethods {
-						class.Methods = parseVtableMethods(m, class.VtableAddr, className)
+			// Step past the BL and look for vtable in X16
+			if c.cfg.WithMethods {
+				// Skip the BL instruction first
+				if err := stepOver(engine); err == nil {
+					for i := 0; i < 16; i++ {
+						if err := stepOver(engine); err != nil {
+							break
+						}
+						if val := engine.GetRegister(16); val != 0 {
+							// Don't apply slide to vtable address - it's already correct
+							class.VtableAddr = val
+							if c.cfg.WithMethods {
+								class.Methods = parseVtableMethods(m, class.VtableAddr, className)
+							}
+							break
+						}
 					}
 				}
 			}
@@ -382,77 +501,81 @@ func emulateClassFromXref(m *macho.File, initFunc InitFuncInfo, xref XrefInfo, f
 			return class, nil
 		}
 
-		if err := engine.StepOver(); err != nil {
+		// Continue emulation
+		if err := stepOver(engine); err != nil {
 			return nil, fmt.Errorf("emulation error at %#x: %w", pc, err)
 		}
 	}
 
-	return nil, fmt.Errorf("instruction budget exceeded before reaching xref %#x", xref.PC)
+	return nil, fmt.Errorf("failed to reach BL at %#x after %d steps", xref, emuCfg.MaxInstructions)
 }
 
-// getInitFunctions extracts all __mod_init_func entries with enhanced metadata
-func getInitFunctions(m *macho.File, entryID string) ([]InitFuncInfo, error) {
-	var inits []InitFuncInfo
+func stepOver(engine *emulate.Engine) error {
+	pc := engine.GetPC()
+	if err := engine.StepOver(); err != nil {
+		if shouldSkipInstruction(err) {
+			engine.SetPC(pc + 4)
+			return nil
+		}
+		return err
+	}
+	return nil
+}
 
-	// Find __mod_init_func section
+func (c *Cpp) getInitFunctions(m *macho.File, entryID string) (<-chan InitFunc, error) {
 	var modInitSec *types.Section
 	if sec := m.Section("__DATA_CONST", "__mod_init_func"); sec != nil {
 		modInitSec = sec
 	} else if sec := m.Section("__DATA", "__mod_init_func"); sec != nil {
 		modInitSec = sec
 	}
-
 	if modInitSec == nil {
 		return nil, fmt.Errorf("failed to find __mod_init_func section")
 	}
 
-	// Read all pointers from __mod_init_func
 	numPtrs := int(modInitSec.Size / 8)
+	initsChan := make(chan InitFunc, min(numPtrs, 100))
 
 	log.Debugf("Found __mod_init_func in %s with %d entries at offset %#x", entryID, numPtrs, modInitSec.Offset)
 
-	for i := range numPtrs {
-		// Calculate the virtual address of this __mod_init_func entry
-		ptrVA := modInitSec.Addr + uint64(i*8)
+	go func() {
+		defer close(initsChan)
 
-		// Use GetSlidPointerAtAddress for fast decoding
-		decodedPtr, err := m.GetSlidPointerAtAddress(ptrVA)
-		if err != nil {
-			raw, err2 := m.GetPointerAtAddress(ptrVA)
-			if err2 != nil {
-				log.Debugf("Failed to decode pointer at VA %#x: %v", ptrVA, err)
+		for i := range numPtrs {
+			ptrVA := modInitSec.Addr + uint64(i*8)
+
+			var ptr uint64
+			var err error
+			if c.root.Type == types.MH_FILESET {
+				// For MH_FILESET, we need to use the main kernel to read the pointer
+				// since the address might be outside the entry's segments
+				ptr, err = c.root.GetPointerAtAddress(ptrVA)
+			} else {
+				ptr, err = m.GetPointerAtAddress(ptrVA)
+			}
+			if err != nil {
+				log.Debugf("Failed to read pointer at VA %#x: %v", ptrVA, err)
 				continue
 			}
-			decodedPtr = m.SlidePointer(raw)
-		}
+			if ptr == 0 {
+				log.Debugf("Skipping null init func pointer at VA %#x", ptrVA)
+				continue
+			}
 
-		if decodedPtr == 0 {
-			continue
-		}
+			fn, err := m.GetFunctionForVMAddr(ptr)
+			if err != nil {
+				log.Debugf("No function found for init func pointer %#x at VA %#x: %v", ptr, ptrVA, err)
+				continue
+			}
 
-		// Try to find function bounds
-		fn, err := m.GetFunctionForVMAddr(decodedPtr)
-		if err != nil {
-			// Fallback: assume function is ~1KB
-			inits = append(inits, InitFuncInfo{
-				RawPtr:    ptrVA,
-				FuncAddr:  decodedPtr,
-				FuncStart: decodedPtr,
-				FuncEnd:   decodedPtr + 0x400,
-				EntryID:   entryID,
-			})
-		} else {
-			inits = append(inits, InitFuncInfo{
-				RawPtr:    ptrVA,
-				FuncAddr:  fn.StartAddr,
-				FuncStart: fn.StartAddr,
-				FuncEnd:   fn.EndAddr,
-				EntryID:   entryID,
-			})
+			initsChan <- InitFunc{
+				Function: fn,
+				entryID:  entryID,
+			}
 		}
-	}
+	}()
 
-	return inits, nil
+	return initsChan, nil
 }
 
 func isValidFuncAddr(m *macho.File, addr uint64) bool {
@@ -489,8 +612,8 @@ func findVtableStart(m *macho.File, vptr uint64) uint64 {
 }
 
 // parseVtableMethods parses vtable entries efficiently
-func parseVtableMethods(m *macho.File, vptr uint64, className string) []MethodInfo {
-	methods := make([]MethodInfo, 0, 64)
+func parseVtableMethods(m *macho.File, vptr uint64, className string) []Method {
+	methods := make([]Method, 0, 64)
 	ptr := findVtableStart(m, vptr)
 	if ptr == 0 {
 		return methods
@@ -508,7 +631,7 @@ func parseVtableMethods(m *macho.File, vptr uint64, className string) []MethodIn
 		addr := m.SlidePointer(val)
 		pac := extractPACFromPointer(m, ptr)
 
-		mi := MethodInfo{
+		mi := Method{
 			Address: addr,
 			Index:   i,
 			PAC:     pac,
@@ -532,6 +655,7 @@ func extractPACFromPointer(m *macho.File, ptrAddr uint64) uint16 {
 		return 0
 	}
 	offset, err := m.GetOffset(ptrAddr)
+	err = nil
 	if err != nil {
 		return 0
 	}
@@ -543,107 +667,10 @@ func extractPACFromPointer(m *macho.File, ptrAddr uint64) uint16 {
 	return 0
 }
 
-// GetClasses analyzes the given Mach-O kernel file and extracts C++ class metadata
-func GetClasses(kernel *macho.File, cfg *Config) (classes []ClassMeta, err error) {
-	// reset caches per run
-	strCache = &stringCache{}
-	fdCache = &funcDataCache{}
-
-	if err = findOsMetaClassFunc(kernel); err != nil {
-		return nil, fmt.Errorf("failed to find OSMetaClass function: %v", err)
-	}
-
-	if kernel.Type == types.MH_FILESET {
-		var mu sync.Mutex
-		var eg errgroup.Group
-
-		// Process each fileset entry in parallel
-		for _, fs := range kernel.FileSets() {
-			// Skip if specific entries are requested and this isn't one
-			if len(cfg.Entries) > 0 && !slices.Contains(cfg.Entries, fs.EntryID) {
-				continue
-			}
-
-			fs := fs // Capture for goroutine
-			eg.Go(func() error {
-				entry, err := kernel.GetFileSetFileByName(fs.EntryID)
-				if err != nil {
-					log.Debugf("Failed to get fileset entry %s: %v", fs.EntryID, err)
-					return nil // Continue with other entries
-				}
-
-				// Get init functions for this entry
-				initFuncs, err := getInitFunctions(entry, fs.EntryID)
-				if err != nil {
-					log.Debugf("Failed to get init functions for %s: %v", fs.EntryID, err)
-					return nil
-				}
-
-				if len(initFuncs) == 0 {
-					log.Debugf("No init functions found in %s", fs.EntryID)
-					return nil
-				}
-
-				var entryClasses []ClassMeta
-
-				// Process each init function with emulation
-				for _, initFunc := range initFuncs {
-					cls, err := extractClassesFromInitFuncEmulated(entry, initFunc, OSMetaClassFunc, cfg)
-					if err != nil {
-						log.Debugf("Failed to extract classes from init func %#x in %s: %v",
-							initFunc.FuncAddr, fs.EntryID, err)
-						continue
-					}
-					entryClasses = append(entryClasses, cls...)
-				}
-
-				// Add to global list
-				mu.Lock()
-				classes = append(classes, entryClasses...)
-				mu.Unlock()
-
-				if len(entryClasses) > 0 {
-					log.Debugf("Found %d classes in %s", len(entryClasses), fs.EntryID)
-				}
-
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
-			return nil, err
-		}
-	} else {
-		// NON-FILESET kernel
-		initFuncs, err := getInitFunctions(kernel, "kernel")
-		if err != nil {
-			log.Debugf("Failed to get init functions: %v", err)
-		}
-
-		// Process each init function with emulation
-		for _, initFunc := range initFuncs {
-			cls, err := extractClassesFromInitFuncEmulated(kernel, initFunc, OSMetaClassFunc, cfg)
-			if err != nil {
-				log.Debugf("Failed to extract classes from init func %#x: %v", initFunc.FuncAddr, err)
-				continue
-			}
-			classes = append(classes, cls...)
-		}
-	}
-
-	// classes = dedupeClasses(classes)
-	if cfg.WithOverrides {
-		linkParentsAndComputeOverrides(classes)
-	}
-
-	log.Infof("Discovered %d C++ classes", len(classes))
-	return classes, nil
-}
-
 // linkParentsAndComputeOverrides links parent classes and computes method overrides
-func linkParentsAndComputeOverrides(classes []ClassMeta) {
+func linkParentsAndComputeOverrides(classes []Class) {
 	// Build map of meta pointer to class
-	metaMap := make(map[uint64]*ClassMeta)
+	metaMap := make(map[uint64]*Class)
 	for i := range classes {
 		if classes[i].MetaPtr != 0 {
 			metaMap[classes[i].MetaPtr] = &classes[i]
@@ -670,101 +697,47 @@ func linkParentsAndComputeOverrides(classes []ClassMeta) {
 	}
 }
 
-func resolveMethodName(m *macho.File, mi *MethodInfo, className string) {
-	if m.Symtab != nil {
-		for _, s := range m.Symtab.Syms {
-			if s.Value == mi.Address {
-				mi.Name = s.Name
-				if mi.PAC == 0 {
-					if pac, ok := computePAC(mi.Name); ok {
-						mi.PAC = pac
-					}
-				}
-				return
+func dedupeClasses(classes []Class) []Class {
+
+	type key struct {
+		meta   uint64
+		name   string
+		bundle string
+	}
+	result := make([]Class, 0, len(classes))
+	indexByKey := make(map[key]int)
+
+	for _, class := range classes {
+		k := key{meta: class.MetaPtr, name: class.Name, bundle: class.Bundle}
+		if idx, ok := indexByKey[k]; ok {
+			existing := &result[idx]
+			if existing.VtableAddr == 0 && class.VtableAddr != 0 {
+				existing.VtableAddr = class.VtableAddr
 			}
+			if existing.SuperMeta == 0 && class.SuperMeta != 0 {
+				existing.SuperMeta = class.SuperMeta
+			}
+			if existing.Size == 0 && class.Size != 0 {
+				existing.Size = class.Size
+			}
+			if len(class.Methods) > len(existing.Methods) {
+				existing.Methods = class.Methods
+			}
+			if class.SuperClass != nil && existing.SuperClass == nil {
+				existing.SuperClass = class.SuperClass
+			}
+			if existing.AllocFunc == 0 && class.AllocFunc != 0 {
+				existing.AllocFunc = class.AllocFunc
+			}
+			if existing.DiscoveryPC == 0 && class.DiscoveryPC != 0 {
+				existing.DiscoveryPC = class.DiscoveryPC
+			}
+			continue
 		}
-	}
-	mi.Name = fmt.Sprintf("%s::fn_0x%x()", className, mi.Index*8)
-}
 
-func computePAC(sym string) (uint16, bool) {
-	if len(sym) == 0 || sym[0] != '_' { // expect underscore
-		return 0, false
+		indexByKey[k] = len(result)
+		result = append(result, class)
 	}
-	s := sym[1:]
-	n := len(s)
-	for i := 0; i < len(s); i++ {
-		if s[i] == '.' {
-			n = i
-			break
-		}
-	}
-	if n == 0 {
-		return 0, false
-	}
-	h := siphash([]byte(s[:n]))
-	return uint16(h%0xffff) + 1, true
-}
 
-func siphash(in []byte) uint64 {
-	v0 := uint64(0x0a257d1c9bbab1c0)
-	v1 := uint64(0xb0eef52375ef8302)
-	v2 := uint64(0x1533771c85aca6d4)
-	v3 := uint64(0xa0e4e32062ff891c)
-	for i := 0; i+8 <= len(in); i += 8 {
-		m := uint64(in[i+7])<<56 | uint64(in[i+6])<<48 | uint64(in[i+5])<<40 |
-			uint64(in[i+4])<<32 | uint64(in[i+3])<<24 | uint64(in[i+2])<<16 |
-			uint64(in[i+1])<<8 | uint64(in[i+0])
-		v3 ^= m
-		v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-		v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-		v0 ^= m
-	}
-	b := uint64(len(in)) << 56
-	switch len(in) & 7 {
-	case 7:
-		b |= uint64(in[len(in)-7]) << 48
-		fallthrough
-	case 6:
-		b |= uint64(in[len(in)-6]) << 40
-		fallthrough
-	case 5:
-		b |= uint64(in[len(in)-5]) << 32
-		fallthrough
-	case 4:
-		b |= uint64(in[len(in)-4]) << 24
-		fallthrough
-	case 3:
-		b |= uint64(in[len(in)-3]) << 16
-		fallthrough
-	case 2:
-		b |= uint64(in[len(in)-2]) << 8
-		fallthrough
-	case 1:
-		b |= uint64(in[len(in)-1])
-	}
-	v3 ^= b
-	v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-	v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-	v0 ^= b
-	v2 ^= 0xff
-	for i := 0; i < 4; i++ {
-		v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-	}
-	return v0 ^ v1 ^ v2 ^ v3
-}
-
-func rotl(x uint64, b uint) uint64 { return (x << b) | (x >> (64 - b)) }
-func sipround(v0, v1, v2, v3 uint64) (uint64, uint64, uint64, uint64) {
-	v0 += v1
-	v1 = rotl(v1, 13) ^ v0
-	v0 = rotl(v0, 32)
-	v2 += v3
-	v3 = rotl(v3, 16) ^ v2
-	v0 += v3
-	v3 = rotl(v3, 21) ^ v0
-	v2 += v1
-	v1 = rotl(v1, 17) ^ v2
-	v2 = rotl(v2, 32)
-	return v0, v1, v2, v3
+	return result
 }
