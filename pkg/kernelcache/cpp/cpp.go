@@ -2,6 +2,7 @@ package cpp
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
@@ -274,9 +276,14 @@ func (c *Cpp) GetClasses() (classes []Class, err error) {
 		return nil, fmt.Errorf("failed to find OSMetaClass function: %v", err)
 	}
 
+	// If we're looking for a specific class, set up early bailout
+	var found atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	if c.root.Type == types.MH_FILESET {
 		var mu sync.Mutex
-		var eg errgroup.Group
+		eg, ctx := errgroup.WithContext(ctx)
 
 		for _, fs := range c.root.FileSets() {
 			// Filter entries
@@ -287,28 +294,52 @@ func (c *Cpp) GetClasses() (classes []Class, err error) {
 			fs := fs // Capture for goroutine
 
 			eg.Go(func() error {
+				// Check if target already found
+				if c.cfg.ClassName != "" && found.Load() {
+					return nil
+				}
+
 				entry, err := c.root.GetFileSetFileByName(fs.EntryID)
 				if err != nil {
 					log.Debugf("Failed to get fileset entry %s: %v", fs.EntryID, err)
 					return nil // Continue with other entries
 				}
 				// Get init functions for this entry
-				initsChan, err := c.getInitFunctions(entry, fs.EntryID)
+				initsChan, err := c.getInitFunctions(ctx, entry, fs.EntryID)
 				if err != nil {
 					log.Debugf("Failed to get init functions for %s: %v", fs.EntryID, err)
 					return nil
 				}
 
 				var entryClasses []Class
-				for initFunc := range initsChan {
-					cls, err := c.extractClassesFromInitFunc(entry, initFunc)
-					if err != nil {
-						log.Debugf("Failed to extract classes from init func %#x in %s: %v", initFunc.StartAddr, fs.EntryID, err)
-						continue
-					}
-					entryClasses = append(entryClasses, cls...)
-				}
+				for {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case initFunc, ok := <-initsChan:
+						if !ok {
+							// Channel closed, done processing
+							goto done
+						}
+						cls, targetFound, err := c.extractClassesFromInitFunc(ctx, entry, initFunc)
+						if err != nil {
+							log.Debugf("Failed to extract classes from init func %#x in %s: %v", initFunc.StartAddr, fs.EntryID, err)
+							continue
+						}
+						entryClasses = append(entryClasses, cls...)
 
+						// Check if we found the target class
+						if targetFound {
+							found.Store(true)
+							cancel() // Signal all goroutines to stop
+							mu.Lock()
+							classes = append(classes, entryClasses...)
+							mu.Unlock()
+							return nil
+						}
+					}
+				}
+			done:
 				mu.Lock()
 				classes = append(classes, entryClasses...)
 				mu.Unlock()
@@ -325,38 +356,67 @@ func (c *Cpp) GetClasses() (classes []Class, err error) {
 		}
 
 		if err := eg.Wait(); err != nil {
-			return nil, err
+			if err == context.Canceled {
+				// Expected when target found
+				log.Debugf("Search cancelled after finding target class")
+			} else {
+				return nil, err
+			}
 		}
 	} else { // NON-FILESET kernel
-		initsChan, err := c.getInitFunctions(c.root, "kernel")
+		initsChan, err := c.getInitFunctions(ctx, c.root, "kernel")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get init functions: %v", err)
 		}
-		for initFunc := range initsChan {
-			cls, err := c.extractClassesFromInitFunc(c.root, initFunc)
-			if err != nil {
-				log.Debugf("Failed to extract classes from init func %#x: %v", initFunc.StartAddr, err)
-				continue
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			case initFunc, ok := <-initsChan:
+				if !ok {
+					// Channel closed, done processing
+					break
+				}
+				cls, targetFound, err := c.extractClassesFromInitFunc(ctx, c.root, initFunc)
+				if err != nil {
+					log.Debugf("Failed to extract classes from init func %#x: %v", initFunc.StartAddr, err)
+					continue
+				}
+				classes = append(classes, cls...)
+
+				// Check if we found the target class
+				if targetFound {
+					cancel()
+					break
+				}
 			}
-			classes = append(classes, cls...)
+			if ctx.Err() != nil {
+				break
+			}
 		}
 	}
 
 	classes = dedupeClasses(classes)
 	linkParentsAndComputeOverrides(classes)
 
-	log.Debugf("Discovered %d C++ classes", len(classes))
 	return classes, nil
 }
 
 // extractClassesFromInitFunc uses full emulation to extract class metadata
-func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Class, error) {
+// Returns (classes, targetFound, error) where targetFound indicates if cfg.ClassName was found
+func (c *Cpp) extractClassesFromInitFunc(ctx context.Context, m *macho.File, initFunc InitFunc) ([]Class, bool, error) {
 	var classes []Class
 	var currentClass *Class
 	var osMetaClassCallPC uint64
 	var stubDepth int // Track how deep we are in stub calls (0 = original function, 1 = first stub)
+	var targetFound bool
 
 	log.WithField("init", fmt.Sprintf("%#x", initFunc.StartAddr)).Debugf("Emulating init function in %s", initFunc.entryID)
+
+	// Check if context is already cancelled
+	if ctx.Err() != nil {
+		return nil, false, ctx.Err()
+	}
 
 	// Get function data
 	funcData, cached := c.fdCache.get(initFunc.StartAddr)
@@ -364,7 +424,7 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 		var err error
 		funcData, err = m.GetFunctionData(initFunc.Function)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get function data: %v", err)
+			return nil, false, fmt.Errorf("failed to get function data: %v", err)
 		}
 		c.fdCache.put(initFunc.StartAddr, funcData)
 	}
@@ -435,6 +495,17 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 							"addr":  fmt.Sprintf("%#x", info.Address),
 							"init":  fmt.Sprintf("%#x", initFunc.StartAddr),
 						}).Debug, 2)("Found Class")
+
+						// Check if this is our target class
+						if c.cfg.ClassName != "" && strings.EqualFold(className, c.cfg.ClassName) {
+							targetFound = true
+							// If we don't need methods, we can bail out now
+							if !c.cfg.WithMethods {
+								return core.HookResult{Halt: true}
+							}
+							// Otherwise continue to collect vtable info
+						}
+
 						// Skip executing the BL instruction since we've already extracted the class info
 						return core.HookResult{SkipInstruction: true}
 					} else {
@@ -506,7 +577,7 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 								currentClass.VtableAddr = val + 16
 								if c.cfg.WithMethods {
 									var err error
-									// Pass original val for proper header checking
+									// Pass the vtable address WITH header for method parsing
 									currentClass.Methods, err = c.parseVtableMethods(m, val, currentClass.Name)
 									if err != nil {
 										log.Warnf("Failed to parse vtable methods for class %s at %#x in %s: %v", currentClass.Name, val, initFunc.entryID, err)
@@ -515,9 +586,13 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 							} else {
 								log.Warnf("Skipping vtable for class %s at %#x in %s - not in __const section (found in %s)", currentClass.Name, val, initFunc.entryID, sec.Name)
 							}
-							if strings.EqualFold(currentClass.Name, c.cfg.ClassName) {
+
+							// Check if this is our target class (with vtable info)
+							if c.cfg.ClassName != "" && strings.EqualFold(currentClass.Name, c.cfg.ClassName) {
+								targetFound = true
 								return core.HookResult{Halt: true}
 							}
+
 							// Add the class and reset for next one
 							classes = append(classes, *currentClass)
 							currentClass = nil
@@ -540,7 +615,7 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 
 	// Load the function code
 	if err := engine.SetMemory(initFunc.StartAddr, funcData); err != nil {
-		return nil, fmt.Errorf("failed to load function: %w", err)
+		return nil, false, fmt.Errorf("failed to load function: %w", err)
 	}
 
 	// Run the emulation
@@ -549,22 +624,22 @@ func (c *Cpp) extractClassesFromInitFunc(m *macho.File, initFunc InitFunc) ([]Cl
 		if engine.GetPC() >= initFunc.EndAddr {
 			// This is expected - we reached the end
 		} else {
-			return nil, fmt.Errorf("emulation failed at %#x: %w (unsupported instructions should be added to emulator)", engine.GetPC(), err)
+			return nil, false, fmt.Errorf("emulation failed at %#x: %w (unsupported instructions should be added to emulator)", engine.GetPC(), err)
 		}
 	}
 
 	// Add any pending class without vtable
 	if currentClass != nil {
-		if strings.EqualFold(currentClass.Name, c.cfg.ClassName) {
-			return []Class{*currentClass}, nil
+		if c.cfg.ClassName != "" && strings.EqualFold(currentClass.Name, c.cfg.ClassName) {
+			targetFound = true
 		}
 		classes = append(classes, *currentClass)
 	}
 
-	return classes, nil
+	return classes, targetFound, nil
 }
 
-func (c *Cpp) getInitFunctions(m *macho.File, entryID string) (<-chan InitFunc, error) {
+func (c *Cpp) getInitFunctions(ctx context.Context, m *macho.File, entryID string) (<-chan InitFunc, error) {
 	var modInitSec *types.Section
 	if sec := m.Section("__DATA_CONST", "__mod_init_func"); sec != nil {
 		modInitSec = sec
@@ -584,6 +659,13 @@ func (c *Cpp) getInitFunctions(m *macho.File, entryID string) (<-chan InitFunc, 
 		defer close(initsChan)
 
 		for i := range numPtrs {
+			// Check for cancellation
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			ptrVA := modInitSec.Addr + uint64(i*8)
 
 			var ptr uint64
@@ -610,9 +692,13 @@ func (c *Cpp) getInitFunctions(m *macho.File, entryID string) (<-chan InitFunc, 
 				continue
 			}
 
-			initsChan <- InitFunc{
+			select {
+			case <-ctx.Done():
+				return
+			case initsChan <- InitFunc{
 				Function: fn,
 				entryID:  entryID,
+			}:
 			}
 		}
 	}()
@@ -621,6 +707,7 @@ func (c *Cpp) getInitFunctions(m *macho.File, entryID string) (<-chan InitFunc, 
 }
 
 func (c *Cpp) parseVtableMethods(m *macho.File, vptr uint64, className string) ([]Method, error) {
+	log.Debugf("parseVtableMethods called for class %s with vptr=%#x", className, vptr)
 	// Read vtable header
 	data := make([]byte, 16)
 	if _, err := m.ReadAtAddr(data, vptr); err != nil {
@@ -640,6 +727,9 @@ func (c *Cpp) parseVtableMethods(m *macho.File, vptr uint64, className string) (
 	}
 	vptr += 16 // Move past header
 
+	// Debug: print what we're about to read
+	log.Debugf("Starting to read methods from vtable at %#x for class %s", vptr, className)
+
 	var methods []Method
 
 	i := 0
@@ -651,19 +741,25 @@ func (c *Cpp) parseVtableMethods(m *macho.File, vptr uint64, className string) (
 			}
 			return nil, fmt.Errorf("failed to read vtable entry at %#x: %v", vptr, err)
 		}
+		// Check for 0xffffffffffffffff end marker first (sentinel value)
+		if addr == 0xffffffffffffffff {
+			break // End of vtable
+		}
 		if addr == 0 {
 			break // End of vtable
 		}
 
 		if _, err := m.GetFunctionForVMAddr(addr); err != nil {
-			return nil, fmt.Errorf("vtable entry at %#x is not valid function: %v", vptr, err)
+			log.Debugf("vtable entry at %#x (addr=%#x) is not valid function for class %s: %v", vptr, addr, className, err)
+			// For debugging, don't fail completely - just skip this entry and break
+			break
 		}
 
 		pac := extractPACFromPointer(c.root, vptr)
 
 		mi := Method{
 			Address: addr,
-			Index:   i,
+			Index:   i * 8, // Index should be byte offset, not entry count
 			PAC:     pac,
 		}
 
@@ -672,8 +768,10 @@ func (c *Cpp) parseVtableMethods(m *macho.File, vptr uint64, className string) (
 		methods = append(methods, mi)
 
 		vptr += 8
+		i++
 	}
 
+	log.Debugf("parseVtableMethods for class %s found %d methods", className, len(methods))
 	return methods, nil
 }
 
