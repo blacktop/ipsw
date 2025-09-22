@@ -24,11 +24,25 @@ func (c *Class) String() string {
 	if len(c.Methods) > 0 {
 		cMethod = fmt.Sprintf(" (%03d meths)", len(c.Methods))
 	}
-	b.WriteString(fmt.Sprintf("init=%s size=%s meta=%s vtab=%s%s",
+	var vtableInfo strings.Builder
+	if c.VtableAddr != 0 {
+		vtableInfo.WriteString(fmt.Sprintf("vtab=%s", colorAddr("%#x", c.VtableAddr)))
+	}
+	if c.MetaVtableAddr != 0 {
+		if vtableInfo.Len() > 0 {
+			vtableInfo.WriteString(" ")
+		}
+		vtableInfo.WriteString(fmt.Sprintf("metavtab=%s", colorAddr("%#x", c.MetaVtableAddr)))
+	}
+	if vtableInfo.Len() == 0 {
+		vtableInfo.WriteString("vtab=0x0000000000000000")
+	}
+
+	b.WriteString(fmt.Sprintf("init=%s size=%s meta=%s %s%s",
 		colorAddr("%#x", c.AllocFunc),
 		colorAddr("%#03x", c.Size),
 		colorAddr("%#x", c.MetaPtr),
-		colorAddr("%#x", c.VtableAddr),
+		vtableInfo.String(),
 		cMethod))
 	if c.SuperMeta != 0 {
 		b.WriteString(fmt.Sprintf(" parent=%s", colorAddr("%#x", c.SuperMeta)))

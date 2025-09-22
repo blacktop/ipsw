@@ -28,16 +28,17 @@ const errorLogMessage = "OSMetaClass: preModLoad() wasn't called for class %s (r
 
 // Class represents metadata for a C++ class discovered in the kernelcache
 type Class struct {
-	Name        string   // Class name (e.g., "IOService")
-	Size        uint32   // Size of class instances in bytes
-	MetaPtr     uint64   // Address of the OSMetaClass object for this class
-	SuperMeta   uint64   // Address of superclass's meta (0 if none)
-	SuperClass  *Class   // Pointer to parent class (resolved later)
-	AllocFunc   uint64   // Address of the alloc function
-	VtableAddr  uint64   // Address of the class's vtable
-	Methods     []Method // Virtual methods in the vtable
-	DiscoveryPC uint64   // Program counter where class was discovered
-	Bundle      string   // Bundle/kext this class belongs to
+	Name           string   // Class name (e.g., "IOService")
+	Size           uint32   // Size of class instances in bytes
+	MetaPtr        uint64   // Address of the OSMetaClass object for this class
+	SuperMeta      uint64   // Address of superclass's meta (0 if none)
+	SuperClass     *Class   // Pointer to parent class (resolved later)
+	AllocFunc      uint64   // Address of the alloc function
+	VtableAddr     uint64   // Address of the class's vtable
+	MetaVtableAddr uint64   // Address of the metaclass's vtable
+	Methods        []Method // Virtual methods in the vtable
+	DiscoveryPC    uint64   // Program counter where class was discovered
+	Bundle         string   // Bundle/kext this class belongs to
 }
 
 // Method represents a virtual method in a class vtable
@@ -53,7 +54,6 @@ type Method struct {
 type InitFunc struct {
 	types.Function
 	entryID string
-	xrefs   []uint64 // OSMetaClass xrefs in this init function
 }
 
 // Cache structures for performance
@@ -125,6 +125,43 @@ func Create(root *macho.File, cfg *Config) *Cpp {
 		strCache: &stringCache{},
 		fdCache:  &funcDataCache{},
 	}
+}
+
+// findVtableBySymbol looks up vtables using C++ name mangling
+func (c *Cpp) findVtableBySymbol(m *macho.File, className string) (vtable, metaVtable uint64) {
+	if m.Symtab == nil {
+		if exports, err := m.DyldExports(); err != nil || len(exports) == 0 {
+			return 0, 0
+		}
+	}
+
+	// Build mangled names
+	nameLen := len(className)
+	mainSymbol := fmt.Sprintf("__ZTV%d%s", nameLen, className)
+	metaSymbol := fmt.Sprintf("__ZTVN%d%s9MetaClassE", nameLen, className)
+
+	// Try FindSymbolAddress for main vtable
+	if addr, err := m.FindSymbolAddress(mainSymbol); err == nil {
+		vtable = addr + 16 // Skip 16-byte vtable header
+	}
+
+	// Try FindSymbolAddress for meta vtable
+	if addr, err := m.FindSymbolAddress(metaSymbol); err == nil {
+		metaVtable = addr + 16 // Skip 16-byte vtable header
+	}
+
+	// Also check DyldExports if Symtab didn't have it
+	if exports, err := m.DyldExports(); err == nil {
+		for _, exp := range exports {
+			if exp.Name == mainSymbol {
+				vtable = exp.Address + 16
+			} else if exp.Name == metaSymbol {
+				metaVtable = exp.Address + 16
+			}
+		}
+	}
+
+	return vtable, metaVtable
 }
 
 func isOsMetaClassCtor(name string) bool {
@@ -573,14 +610,33 @@ func (c *Cpp) extractClassesFromInitFunc(ctx context.Context, m *macho.File, ini
 				if info.Instruction.Operation != disassemble.ARM64_ADRP { // Skip ADRP since it won't have the full address yet
 					if val := state.GetX(16); val != 0 {
 						if sec := m.FindSectionForVMAddr(val); sec != nil {
-							if sec.Name == "__const" { // __DATA_CONST.__const
-								currentClass.VtableAddr = val + 16
-								if c.cfg.WithMethods {
+							if sec.Name == "__const" {
+								// This is actually the metavtable
+								currentClass.MetaVtableAddr = val + 16
+
+								// Now find the real vtable using symbols first
+								vtable, metaVtable := c.findVtableBySymbol(m, currentClass.Name)
+								if vtable != 0 {
+									currentClass.VtableAddr = vtable
+								}
+								if metaVtable == 0 && currentClass.MetaVtableAddr != 0 {
+									// We found it via emulation already
+									metaVtable = currentClass.MetaVtableAddr
+								} else if metaVtable != 0 {
+									currentClass.MetaVtableAddr = metaVtable
+								}
+
+								// Note: In many cases, especially for kernelcaches without symbols,
+								// the main vtable might not be discoverable through the MetaPtr at
+								// this point in initialization. The metavtable is what we can reliably
+								// discover through emulation (x16 register after OSMetaClass ctor).
+
+								// Parse methods from the MAIN vtable, not meta
+								if c.cfg.WithMethods && currentClass.VtableAddr != 0 {
 									var err error
-									// Pass the vtable address WITH header for method parsing
-									currentClass.Methods, err = c.parseVtableMethods(m, val, currentClass.Name)
+									currentClass.Methods, err = c.parseVtableMethods(m, currentClass.VtableAddr-16, currentClass.Name)
 									if err != nil {
-										log.Warnf("Failed to parse vtable methods for class %s at %#x in %s: %v", currentClass.Name, val, initFunc.entryID, err)
+										log.Warnf("Failed to parse vtable methods for class %s: %v", currentClass.Name, err)
 									}
 								}
 							} else {
@@ -842,6 +898,9 @@ func dedupeClasses(classes []Class) []Class {
 			existing := &result[idx]
 			if existing.VtableAddr == 0 && class.VtableAddr != 0 {
 				existing.VtableAddr = class.VtableAddr
+			}
+			if existing.MetaVtableAddr == 0 && class.MetaVtableAddr != 0 {
+				existing.MetaVtableAddr = class.MetaVtableAddr
 			}
 			if existing.SuperMeta == 0 && class.SuperMeta != 0 {
 				existing.SuperMeta = class.SuperMeta
