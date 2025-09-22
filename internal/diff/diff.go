@@ -365,7 +365,7 @@ func mountDMG(ctx *Context) (err error) {
 		}
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ctx.SystemOsDmgPath))
-	ctx.MountPath, ctx.IsMounted, err = utils.MountDMG(ctx.SystemOsDmgPath)
+	ctx.MountPath, ctx.IsMounted, err = utils.MountDMG(ctx.SystemOsDmgPath, "")
 	if err != nil {
 		if !errors.Is(err, utils.ErrMountResourceBusy) {
 			return fmt.Errorf("failed to mount DMG: %v", err)

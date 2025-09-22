@@ -35,7 +35,7 @@ ipsw idev prof [flags]
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
 * [ipsw idev prof cloud](/docs/cli/ipsw/idev/prof/cloud)	 - Get cloud configuration
 * [ipsw idev prof install](/docs/cli/ipsw/idev/prof/install)	 - Install profile
-* [ipsw idev prof ls](/docs/cli/ipsw/idev/prof/ls)	 - List installed provision profiles
+* [ipsw idev prof ls](/docs/cli/ipsw/idev/prof/ls)	 - List installed provisioning profiles
 * [ipsw idev prof rm](/docs/cli/ipsw/idev/prof/rm)	 - Remove profile by name
 * [ipsw idev prof wifi](/docs/cli/ipsw/idev/prof/wifi)	 - Change Wi-Fi power state
 

@@ -644,8 +644,13 @@ func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 	return "", false, nil
 }
 
-func MountDMG(image string) (string, bool, error) {
-	mountPoint := fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
+func MountDMG(image string, customMountPoint string) (string, bool, error) {
+	var mountPoint string
+	if customMountPoint != "" {
+		mountPoint = customMountPoint
+	} else {
+		mountPoint = fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
+	}
 
 	if runtime.GOOS == "darwin" {
 		// check if already mounted
@@ -794,7 +799,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 	}
 
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	mountPoint, alreadyMounted, err := MountDMG(dmgPath)
+	mountPoint, alreadyMounted, err := MountDMG(dmgPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}

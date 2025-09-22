@@ -9,10 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.22"
 
@@ -22,7 +22,7 @@ jobs:
           GOPROXY=${{ secrets.GOPROXY }} go mod tidy
 
       - name: Actions Status Discord
-        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
+        uses: sarisia/actions-status-discord@11a0bfe3b50977e38aa2bd4a4ebd296415e83c19 # v1.15.4
         if: always()
         with:
           webhook: ${{ secrets.GOPROXY_DISCORD_WEBHOOK }}

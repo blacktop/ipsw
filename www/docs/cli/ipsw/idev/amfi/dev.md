@@ -4,11 +4,11 @@ title: dev
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: dev
-description: Enabled Developer Mode on device
+description: Enable Developer Mode on device
 ---
 ## ipsw idev amfi dev
 
-Enabled Developer Mode on device
+Enable Developer Mode on device
 
 ```
 ipsw idev amfi dev [flags]

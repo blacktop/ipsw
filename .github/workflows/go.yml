@@ -3,17 +3,17 @@ on:
   push:
     branches:
       - master
-    paths-ignore:
-      - "*.md"
-      - "www/**"
-      - ".github/workflows/apple-meta.yml"
-      - ".github/workflows/codeql.yml"
-      - ".github/workflows/discord.yml"
-      - ".github/workflows/docs.yml"
-      - ".github/workflows/webkit-meta.yml"
-      - ".github/workflows/winget.yml"
-      - ".goreleaser.yml"
-      - "config.example.yml"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum" 
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "api/**"
+      - "Makefile"
+      - ".github/workflows/go.yml"
+      - ".github/workflows/release.yml"
   pull_request:
     branches:
       - master
@@ -49,11 +49,11 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "stable"
 

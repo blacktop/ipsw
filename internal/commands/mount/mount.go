@@ -45,7 +45,7 @@ func (c Context) Unmount() error {
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
-func DmgInIPSW(path, typ, pemDbPath string, keys any) (*Context, error) {
+func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (*Context, error) {
 	var err error
 
 	ipswPath := filepath.Clean(path)
@@ -154,7 +154,7 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any) (*Context, error) {
 		}
 	}
 
-	mp, am, err := utils.MountDMG(extractedDMG)
+	mp, am, err := utils.MountDMG(extractedDMG, customMountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}

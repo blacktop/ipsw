@@ -55,6 +55,7 @@ func init() {
 	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern control the payloadv2 file range to search")
 	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Confirm searching for pattern in payloadv2 files")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
+	otaExtractCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
 	otaExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.extract.cryptex", otaExtractCmd.Flags().Lookup("cryptex"))
@@ -64,6 +65,7 @@ func init() {
 	viper.BindPFlag("ota.extract.range", otaExtractCmd.Flags().Lookup("range"))
 	viper.BindPFlag("ota.extract.confirm", otaExtractCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("ota.extract.decomp", otaExtractCmd.Flags().Lookup("decomp"))
+	viper.BindPFlag("ota.extract.flat", otaExtractCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("ota.extract.output", otaExtractCmd.Flags().Lookup("output"))
 }
 
@@ -79,11 +81,12 @@ var otaExtractCmd = &cobra.Command{
 		// flags
 		decomp := viper.GetBool("ota.extract.decomp")
 		cryptex := viper.GetString("ota.extract.cryptex")
+		flat := viper.GetBool("ota.extract.flat")
 		// validate flags
-		if len(args) > 1 && viper.IsSet("ota.extract.pattern") {
+		if len(args) > 1 && viper.GetString("ota.extract.pattern") != "" {
 			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
 		}
-		if viper.IsSet("ota.extract.cryptex") && !slices.Contains(validCryptexes, cryptex) {
+		if viper.GetString("ota.extract.cryptex") != "" && !slices.Contains(validCryptexes, cryptex) {
 			return fmt.Errorf("invalid --cryptex: '%s' (must be one of: %s)", cryptex, strings.Join(validCryptexes, ", "))
 		}
 
@@ -101,17 +104,17 @@ var otaExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to get OTA folder: %v", err)
 		}
 
-		if viper.IsSet("ota.extract.output") {
+		if viper.GetString("ota.extract.output") != "" {
 			output = filepath.Join(viper.GetString("ota.extract.output"), output)
 			if err := os.MkdirAll(output, 0o755); err != nil {
 				return fmt.Errorf("failed to create output directory: %v", err)
 			}
 		}
 
-		if viper.IsSet("ota.extract.cryptex") || viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.IsSet("ota.extract.pattern") {
+		if viper.GetString("ota.extract.cryptex") != "" || viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.GetString("ota.extract.pattern") != "" {
 			cwd, _ := os.Getwd()
 			/* CRYPTEX */
-			if viper.IsSet("ota.extract.cryptex") {
+			if viper.GetString("ota.extract.cryptex") != "" {
 				log.Infof("Extracting %s Cryptex", cryptex)
 				out, err := o.ExtractCryptex(cryptex, output)
 				if err != nil {
@@ -147,10 +150,10 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(f.Path()) {
-						ff, err := o.Open(f.Path(), false)
+					if re.MatchString(f.Name()) {
+						ff, err := o.Open(f.Name(), false)
 						if err != nil {
-							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
 						}
 						data, err := io.ReadAll(ff)
 						if err != nil {
@@ -165,6 +168,9 @@ var otaExtractCmd = &cobra.Command{
 							return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
 						}
 						fname := filepath.Join(output, f.Name())
+						if flat {
+							fname = filepath.Join(output, filepath.Base(f.Name()))
+						}
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create output directory: %v", err)
 						}
@@ -180,7 +186,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 			}
 			/* PATTERN */
-			if viper.IsSet("ota.extract.pattern") {
+			if viper.GetString("ota.extract.pattern") != "" {
 				re, err := regexp.Compile(viper.GetString("ota.extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
@@ -190,12 +196,15 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(f.Path()) {
-						ff, err := o.Open(f.Path(), decomp)
+					if re.MatchString(f.Name()) {
+						ff, err := o.Open(f.Name(), decomp)
 						if err != nil {
-							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
 						}
-						fname := filepath.Join(output, f.Path())
+						fname := filepath.Join(output, f.Name())
+						if flat {
+							fname = filepath.Join(output, filepath.Base(f.Name()))
+						}
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create output directory: %v", err)
 						}
@@ -215,8 +224,8 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(f.Name()) {
-						utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", f.Name()))
+					if re.MatchString(filepath.Base(f.Name())) {
+						utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", filepath.Base(f.Name())))
 						bomFound = true
 					}
 				}
@@ -242,20 +251,23 @@ var otaExtractCmd = &cobra.Command{
 		}
 
 		/* ALL FILES */
-		if len(args) == 1 && !viper.IsSet("ota.extract.pattern") {
+		if len(args) == 1 && viper.GetString("ota.extract.pattern") == "" {
 			log.Info("Extracting All Files From OTA")
 			for _, f := range o.Files() {
 				if f.IsDir() {
 					continue
 				}
-				fname := filepath.Join(output, f.Path())
+				fname := filepath.Join(output, f.Name())
+				if flat {
+					fname = filepath.Join(output, filepath.Base(f.Name()))
+				}
 				if _, err := os.Stat(fname); err == nil {
 					log.Warnf("already exists: '%s' ", fname)
 					continue
 				}
-				ff, err := o.Open(f.Path(), decomp)
+				ff, err := o.Open(f.Name(), decomp)
 				if err != nil {
-					return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Path(), err)
+					return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
 				}
 				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 					return fmt.Errorf("failed to create output directory: %v", err)

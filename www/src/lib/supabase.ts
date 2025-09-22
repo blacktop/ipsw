@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Platform type definition
+export type Platform = 'iOS' | 'macOS' | 'watchOS' | 'tvOS' | 'visionOS';
+
 // Define the result type for the optimized schema
 export interface EntitlementResult {
   id: number;
-  ios_version: string;
+  platform: Platform;
+  version: string;
   build_id: string;
   device_list: string[] | string; // Array from materialized view, string for compatibility
   file_path: string;
@@ -59,20 +63,10 @@ export class EntitlementsService {
     }
 
     try {
-      // First try to connect to the materialized view
-      const { data: viewData, error: viewError } = await supabase
-        .from('entitlements_search')
-        .select('*', { count: 'exact', head: true })
-        .limit(1);
-
-      if (!viewError) {
-        return true;
-      }
-
-      // If materialized view fails, try base table
+      // Use the most lightweight query possible for connection test
       const { data, error } = await supabase
-        .from('entitlement_keys')
-        .select('*', { count: 'exact', head: true })
+        .from('ipsws')
+        .select('id', { count: 'exact', head: true })
         .limit(1);
 
       return !error;
@@ -87,22 +81,23 @@ export class EntitlementsService {
    */
   static async searchByKey(
     keyPattern: string,
-    iosVersion?: string,
+    version?: string,
     executablePath?: string,
-    limit: number = 50, // Reduced default limit for better performance
-    cursor?: number
+    limit: number = 50,
+    cursor?: number,
+    platform: Platform = 'iOS'
   ): Promise<EntitlementResult[]> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
     }
 
     // Create cache key
-    const cacheKey = `key:${keyPattern}:${iosVersion}:${executablePath}:${limit}:${cursor}`;
+    const cacheKey = `key:${keyPattern}:${version}:${executablePath}:${limit}:${cursor}:${platform}`;
     const cached = searchCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       // Type guard to ensure we return EntitlementResult[]
-      if (Array.isArray(cached.data) && cached.data.length > 0 && typeof cached.data[0] === 'object') {
+      if (Array.isArray(cached.data) && (cached.data.length === 0 || typeof cached.data[0] === 'object')) {
         return cached.data as EntitlementResult[];
       }
     }
@@ -151,18 +146,36 @@ export class EntitlementsService {
       query = query.in('key_id', keyIds);
     }
 
-    // Filter by iOS version - we'll need to get IPSW IDs first
-    if (iosVersion) {
-      const { data: ipswData } = await supabase
+    // Filter by version and platform if specified
+    // Filter by version and platform - we'll need to get IPSW IDs first
+    if (version || platform) {
+      console.log('Filtering by:', { version, platform });
+      let ipswQuery = supabase
         .from('ipsws')
-        .select('id')
-        .eq('version', iosVersion);
+        .select('id');
+
+      if (version) {
+        ipswQuery = ipswQuery.eq('version', version);
+      }
+      if (platform) {
+        ipswQuery = ipswQuery.eq('platform', platform);
+      }
+
+      const { data: ipswData, error: ipswError } = await ipswQuery;
+      console.log('IPSW query result:', { ipswData, ipswError });
+
+      if (ipswError) {
+        throw new Error(`Failed to filter by version/platform: ${ipswError.message}`);
+      }
 
       const ipswIds = ipswData?.map(i => i.id) || [];
+      console.log('Found IPSW IDs:', ipswIds);
+
       if (ipswIds.length > 0) {
         query = query.in('ipsw_id', ipswIds);
       } else {
-        return []; // No matching iOS version
+        console.log('No matching IPSWs found for version/platform');
+        return []; // No matching version/platform
       }
     }
 
@@ -205,17 +218,18 @@ export class EntitlementsService {
    */
   static async searchByFile(
     filePattern: string,
-    iosVersion?: string,
+    version?: string,
     executablePath?: string,
     limit: number = 50,
-    cursor?: number
+    cursor?: number,
+    platform: Platform = 'iOS'
   ): Promise<EntitlementResult[]> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
     }
 
     // Create cache key
-    const cacheKey = `file:${filePattern}:${iosVersion}:${executablePath}:${limit}:${cursor}`;
+    const cacheKey = `file:${filePattern}:${version}:${executablePath}:${limit}:${cursor}:${platform}`;
     const cached = searchCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -276,18 +290,36 @@ export class EntitlementsService {
       query = query.in('path_id', pathIds);
     }
 
-    // Filter by iOS version - we'll need to get IPSW IDs first
-    if (iosVersion) {
-      const { data: ipswData } = await supabase
+    // Filter by version and platform if specified
+    // Filter by version and platform - we'll need to get IPSW IDs first
+    if (version || platform) {
+      console.log('File search filtering by:', { version, platform });
+      let ipswQuery = supabase
         .from('ipsws')
-        .select('id')
-        .eq('version', iosVersion);
+        .select('id');
+
+      if (version) {
+        ipswQuery = ipswQuery.eq('version', version);
+      }
+      if (platform) {
+        ipswQuery = ipswQuery.eq('platform', platform);
+      }
+
+      const { data: ipswData, error: ipswError } = await ipswQuery;
+      console.log('File search IPSW query result:', { ipswData, ipswError });
+
+      if (ipswError) {
+        throw new Error(`Failed to filter by version/platform: ${ipswError.message}`);
+      }
 
       const ipswIds = ipswData?.map(i => i.id) || [];
+      console.log('File search found IPSW IDs:', ipswIds);
+
       if (ipswIds.length > 0) {
         query = query.in('ipsw_id', ipswIds);
       } else {
-        return []; // No matching iOS version
+        console.log('File search: No matching IPSWs found for version/platform');
+        return []; // No matching version/platform
       }
     }
 
@@ -311,24 +343,30 @@ export class EntitlementsService {
   }
 
   /**
-   * Get unique iOS versions for filter dropdown
+   * Get unique versions for filter dropdown
    */
-  static async getUniqueVersions(): Promise<string[]> {
+  static async getUniqueVersions(platform: string = 'iOS'): Promise<string[]> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured.');
     }
 
-    const cacheKey = 'versions';
+    const cacheKey = `versions:${platform}`;
     const cached = searchCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL * 6) { // Cache versions longer
       return cached.data as string[];
     }
 
-    const { data, error } = await supabase
+    // Query with platform filtering since platform support is now available
+    console.log('Getting versions for platform:', platform);
+    let query = supabase
       .from('ipsws')
       .select('version')
+      .eq('platform', platform)
       .order('version', { ascending: false });
+
+    const { data, error } = await query;
+    console.log('Versions query result:', { data, error, platform });
 
     if (error) {
       throw new Error(`Failed to get versions: ${error.message}`);
@@ -344,15 +382,29 @@ export class EntitlementsService {
    * Alias for getUniqueVersions for backward compatibility
    */
   static async getIosVersions(): Promise<string[]> {
-    return this.getUniqueVersions();
+    return this.getUniqueVersions('iOS');
+  }
+
+  /**
+   * Get unique versions for macOS
+   */
+  static async getMacOSVersions(): Promise<string[]> {
+    return this.getUniqueVersions('macOS');
+  }
+
+  /**
+   * Get versions for any platform
+   */
+  static async getVersions(platform: Platform): Promise<string[]> {
+    return this.getUniqueVersions(platform);
   }
 
   /**
    * Transform search results with separate lookups for related data
    * Includes deduplication logic to fix duplicate entries issue
-   * 
+   *
    * Note: This approach uses separate lookups instead of joins to avoid Supabase
-   * relationship schema issues. For large result sets, consider using the 
+   * relationship schema issues. For large result sets, consider using the
    * materialized view (entitlements_search) for better performance.
    */
   private static async transformSearchResultsWithLookups(data: any[]): Promise<EntitlementResult[]> {
@@ -366,9 +418,9 @@ export class EntitlementsService {
     const keyIds = [...new Set(data.map(row => row.key_id))];
     const valueIds = [...new Set(data.map(row => row.value_id))];
 
-    // Batch fetch all related data
+    // Batch fetch all related data (including platform field)
     const [ipswData, pathData, keyData, valueData] = await Promise.all([
-      supabase.from('ipsws').select('id, version, buildid').in('id', ipswIds),
+      supabase.from('ipsws').select('id, version, buildid, platform').in('id', ipswIds),
       supabase.from('paths').select('id, path').in('id', pathIds),
       supabase.from('entitlement_keys').select('id, key').in('id', keyIds),
       supabase.from('entitlement_values').select('id, value, value_type').in('id', valueIds)
@@ -389,7 +441,8 @@ export class EntitlementsService {
 
       return {
         id: row.id as number,
-        ios_version: (ipsw?.version as string) || '',
+        platform: (ipsw?.platform as Platform) || 'iOS',
+        version: (ipsw?.version as string) || '',
         build_id: (ipsw?.buildid as string) || '',
         device_list: '', // Would need separate device query
         file_path: (path?.path as string) || '',
@@ -411,7 +464,7 @@ export class EntitlementsService {
     for (const result of results) {
       // Create a unique key based on the combination of fields that define uniqueness
       const valueStr = result.string_value || result.bool_value || result.number_value || result.array_value || result.dict_value || '';
-      const uniqueKey = `${result.ios_version}|${result.file_path}|${result.key}|${result.value_type}|${valueStr}`;
+      const uniqueKey = `${result.platform}|${result.version}|${result.file_path}|${result.key}|${result.value_type}|${valueStr}`;
 
       if (!seen.has(uniqueKey)) {
         seen.add(uniqueKey);
@@ -452,19 +505,26 @@ export class EntitlementsService {
   }
 
   /**
-   * Get database statistics (optimized)
+   * Get database statistics (optimized for free tier)
    */
   static async getStats(): Promise<{
     totalEntitlements: number;
     uniqueKeys: number;
     uniquePaths: number;
-    iosVersions: number;
+    totalVersions: number;
   }> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase is not configured.');
     }
 
-    // Use more efficient count queries
+    const cacheKey = 'stats:database';
+    const cached = searchCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL * 6) { // Cache stats for 1 hour
+      return cached.data as any;
+    }
+
+    // Use more efficient count queries with minimal network overhead
     const [entitlementsCount, keysCount, pathsCount, versionsCount] = await Promise.all([
       supabase.from('entitlements').select('*', { count: 'exact', head: true }),
       supabase.from('entitlement_keys').select('*', { count: 'exact', head: true }),
@@ -472,12 +532,17 @@ export class EntitlementsService {
       supabase.from('ipsws').select('*', { count: 'exact', head: true })
     ]);
 
-    return {
+    const stats = {
       totalEntitlements: entitlementsCount.count || 0,
       uniqueKeys: keysCount.count || 0,
       uniquePaths: pathsCount.count || 0,
-      iosVersions: versionsCount.count || 0
+      totalVersions: versionsCount.count || 0
     };
+
+    // Cache the results
+    searchCache.set(cacheKey, { data: stats, timestamp: Date.now() });
+
+    return stats;
   }
 
   /**

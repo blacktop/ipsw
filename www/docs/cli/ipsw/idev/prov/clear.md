@@ -4,11 +4,11 @@ title: clear
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: clear
-description: Remove all provision profiles
+description: Remove all provisioning profiles
 ---
 ## ipsw idev prov clear
 
-Remove all provision profiles
+Remove all provisioning profiles
 
 ```
 ipsw idev prov clear [flags]

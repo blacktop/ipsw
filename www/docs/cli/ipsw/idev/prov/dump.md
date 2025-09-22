@@ -4,11 +4,11 @@ title: dump
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: dump
-description: Dump installed provision profiles
+description: Dump installed provisioning profiles
 ---
 ## ipsw idev prov dump
 
-Dump installed provision profiles
+Dump installed provisioning profiles
 
 ```
 ipsw idev prov dump [flags]

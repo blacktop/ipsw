@@ -57,6 +57,11 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
+		
+		mountPointParam, _ := c.GetQuery("mount_point")
+		if mountPointParam != "" {
+			mountPointParam = filepath.Clean(mountPointParam)
+		}
 
 		i, err := info.Parse(ipswPath)
 		if err != nil {
@@ -99,7 +104,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 
 		// mount filesystem DMG
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, mountPointParam)
 		if err != nil {
 			if !errors.Is(err, utils.ErrMountResourceBusy) {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})

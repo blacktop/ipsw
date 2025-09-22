@@ -126,7 +126,7 @@ var sbDiffCmd = &cobra.Command{
 				}
 
 				utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting FS %s", dmgPath))
-				mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+				mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 				if err != nil {
 					return fmt.Errorf("failed to mount DMG: %v", err)
 				}

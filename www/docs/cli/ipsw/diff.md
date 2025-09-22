@@ -23,8 +23,6 @@ ipsw diff <IPSW> <IPSW> [flags]
 ❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
 	--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
 	--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031
-# Use a previously saved .idiff file
-❯ ipsw diff --in <path/to/.idiff> --output <output/folder> --markdown
 ```
 
 ### Options
@@ -38,7 +36,6 @@ ipsw diff <IPSW> <IPSW> [flags]
       --fw                   Diff other firmwares
   -h, --help                 help for diff
       --html                 Save diff as HTML file
-  -i, --in string            Path to IPSW .idiff file
       --json                 Save diff as JSON file
   -k, --kdk stringArray      Path to KDKs to diff
       --launchd              Diff launchd configs

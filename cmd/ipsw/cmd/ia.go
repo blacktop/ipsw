@@ -70,7 +70,7 @@ var iaCmd = &cobra.Command{
 		dmgPath := filepath.Join(outDir, "SharedSupport.dmg")
 
 		log.Debugf("Mounting %s", dmgPath)
-		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 		if err != nil {
 			return fmt.Errorf("failed to mount DMG: %v", err)
 		}

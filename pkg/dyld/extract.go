@@ -88,7 +88,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	var alreadyMounted bool
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}

@@ -20,6 +20,7 @@ type Postgres struct {
 	Password string
 	Database string
 	SSLMode  string // SSL mode for connection (disable, require, verify-ca, verify-full)
+	PoolMode string // Connection pool mode (session, transaction)
 	// Config
 	BatchSize int
 
@@ -43,7 +44,7 @@ func NewPostgres(host, port, user, password, database string, batchSize int) (Da
 }
 
 // NewPostgresWithSSL creates a new Postgres database with SSL configuration.
-func NewPostgresWithSSL(host, port, user, password, database, sslMode string, batchSize int) (Database, error) {
+func NewPostgresWithSSL(host, port, user, password, database, sslMode, poolMode string, batchSize int) (Database, error) {
 	if host == "" || port == "" || user == "" || database == "" {
 		return nil, fmt.Errorf("'host', 'port', 'user' and 'database' are required")
 	}
@@ -57,6 +58,7 @@ func NewPostgresWithSSL(host, port, user, password, database, sslMode string, ba
 		Password:  password,
 		Database:  database,
 		SSLMode:   sslMode,
+		PoolMode:  poolMode,
 		BatchSize: batchSize,
 	}, nil
 }
@@ -68,6 +70,10 @@ func (p *Postgres) Connect() (err error) {
 		"host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
 		p.Host, p.Port, p.User, p.Database, p.Password, p.SSLMode,
 	)
+
+	if p.PoolMode != "" {
+		dsn += fmt.Sprintf(" pool_mode=%s", p.PoolMode)
+	}
 
 	p.db, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,

@@ -27,7 +27,7 @@ ipsw macho patch rm <MACHO> <LC> <LC_FIELDS...> [flags]
   -h, --help            help for rm
   -o, --output string   Output new file
   -f, --overwrite       Overwrite file
-  -s, --re-sign         Adhoc sign file
+  -s, --re-sign         Ad-hoc sign file
 ```
 
 ### Options inherited from parent commands
