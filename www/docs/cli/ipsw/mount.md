@@ -29,15 +29,19 @@ $ ipsw mount fs iPod5,1_7.1.2_11D257_Restore.ipsw --lookup
 # Mount dyld shared cache (exc) DMG with AEA pem DB
 $ ipsw mount exc iPhone.ipsw --pem-db /path/to/pem.json
 
+# Mount to a custom mount point
+$ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
+
 ```
 
 ### Options
 
 ```
-  -h, --help            help for mount
-  -k, --key string      DMG key
-      --lookup          Lookup DMG keys on theapplewiki.com
-      --pem-db string   AEA pem DB JSON file
+  -h, --help                 help for mount
+  -k, --key string           DMG key
+      --lookup               Lookup DMG keys on theapplewiki.com
+  -m, --mount-point string   Custom mount point (default: /tmp/<dmg>.mount)
+      --pem-db string        AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands

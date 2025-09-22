@@ -284,7 +284,7 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount DMG: %v", err)
 	}

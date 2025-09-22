@@ -17,12 +17,12 @@ ipsw dyld a2f <DSC> <ADDR> [flags]
 ### Options
 
 ```
-  -c, --cache string   Path to .a2s addr to sym cache file (speeds up analysis)
-  -h, --help           help for a2f
-  -i, --in string      Path to file containing list of addresses to lookup
-  -j, --json           Output as JSON
-  -o, --out string     Path to output JSON file
-  -s, --slide uint     dyld_shared_cache slide to apply
+  -c, --cache string    Path to .a2s addr to sym cache file (speeds up analysis)
+  -h, --help            help for a2f
+  -i, --in string       Path to file containing list of addresses to lookup
+  -j, --json            Output as JSON
+  -o, --output string   Path to output JSON file
+  -s, --slide uint      dyld_shared_cache slide to apply
 ```
 
 ### Options inherited from parent commands

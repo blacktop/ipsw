@@ -1,0 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for entitlements page */
+.entitlements-page {
+  min-height: 100vh;
+}
+
+/* Fix dropdown backgrounds for readability - multiple selectors to ensure coverage */
+[data-radix-select-content],
+[data-radix-popper-content-wrapper] > div,
+.select-content,
+[role="listbox"] {
+  background-color: var(--ifm-background-surface-color) !important;
+  border: 1px solid var(--ifm-color-emphasis-300) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  z-index: 50 !important;
+  padding: 4px !important;
+}
+
+/* Ensure items have proper styling */
+[data-radix-select-item] {
+  background-color: transparent !important;
+  padding: 6px 8px !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  color: var(--ifm-color-content) !important;
+}
+
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-highlighted],
+[data-radix-select-item][data-state="checked"] {
+  background-color: var(--ifm-color-emphasis-200) !important;
+  color: var(--ifm-color-content) !important;
+}
+
+/* Dark mode support using Docusaurus variables */
+[data-theme='dark'] [data-radix-select-content],
+[data-theme='dark'] [data-radix-popper-content-wrapper] > div,
+[data-theme='dark'] .select-content,
+[data-theme='dark'] [role="listbox"] {
+  background-color: var(--ifm-background-surface-color) !important;
+  border-color: var(--ifm-color-emphasis-300) !important;
+  box-shadow: 0 10px 15px -3px rgba(255, 255, 255, 0.1), 0 4px 6px -4px rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme='dark'] [data-radix-select-item] {
+  color: var(--ifm-color-content) !important;
+}
+
+[data-theme='dark'] [data-radix-select-item]:hover,
+[data-theme='dark'] [data-radix-select-item][data-highlighted],
+[data-theme='dark'] [data-radix-select-item][data-state="checked"] {
+  background-color: var(--ifm-color-emphasis-200) !important;
+  color: var(--ifm-color-content) !important;
+}
+
+/* Custom scrollbar for results */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground));
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--primary));
+}
+
+/* Animation for search results */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Syntax highlighting for code values */
+.syntax-key {
+  color: hsl(var(--primary));
+}
+
+.syntax-string {
+  color: hsl(142, 76%, 36%);
+}
+
+.syntax-number {
+  color: hsl(32, 95%, 44%);
+}
+
+.syntax-boolean {
+  color: hsl(346, 87%, 43%);
+}
+
+.syntax-null {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Value display styles */
+.bool-badge {
+  @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold font-mono uppercase tracking-wider;
+}
+
+.bool-true {
+  @apply bg-green-100 text-green-800 border border-green-200;
+}
+
+.bool-false {
+  @apply bg-red-100 text-red-800 border border-red-200;
+}
+
+.array-container {
+  @apply bg-blue-50 border border-blue-200 rounded-md p-3;
+}
+
+.array-item {
+  @apply flex items-center gap-2 mb-1 last:mb-0;
+}
+
+.array-bullet {
+  @apply w-1 h-1 bg-blue-500 rounded-full flex-shrink-0;
+}
+
+.dict-container {
+  @apply bg-card border rounded-md p-3;
+}
+
+.dict-entry {
+  @apply flex items-start gap-2 mb-1 last:mb-0 text-sm;
+}
+
+.dict-key {
+  @apply font-medium text-primary;
+}
+
+.dict-value {
+  @apply flex-1 text-green-700;
+}
+
+.code-value {
+  @apply bg-card border rounded-md p-2 font-mono text-sm break-all;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .bool-true {
+    @apply bg-green-900/20 text-green-400 border-green-800;
+  }
+
+  .bool-false {
+    @apply bg-red-900/20 text-red-400 border-red-800;
+  }
+
+  .array-container {
+    @apply bg-blue-900/20 border-blue-800;
+  }
+
+  .array-bullet {
+    @apply bg-blue-400;
+  }
+
+  .dict-value {
+    @apply text-green-400;
+  }
+
+  .syntax-string {
+    color: hsl(142, 76%, 56%);
+  }
+
+  .syntax-number {
+    color: hsl(32, 95%, 64%);
+  }
+
+  .syntax-boolean {
+    color: hsl(346, 87%, 63%);
+  }
+}
+
+/* Docusaurus dark mode support */
+[data-theme='dark'] .bool-true {
+  @apply bg-green-900/20 text-green-400 border-green-800;
+}
+
+[data-theme='dark'] .bool-false {
+  @apply bg-red-900/20 text-red-400 border-red-800;
+}
+
+[data-theme='dark'] .array-container {
+  @apply bg-blue-900/20 border-blue-800;
+}
+
+[data-theme='dark'] .array-bullet {
+  @apply bg-blue-400;
+}
+
+[data-theme='dark'] .dict-value {
+  @apply text-green-400;
+}
+
+[data-theme='dark'] .syntax-string {
+  color: hsl(142, 76%, 56%);
+}
+
+[data-theme='dark'] .syntax-number {
+  color: hsl(32, 95%, 64%);
+}
+
+[data-theme='dark'] .syntax-boolean {
+  color: hsl(346, 87%, 63%);
+}

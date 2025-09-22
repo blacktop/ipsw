@@ -59,7 +59,7 @@ var wpCmd = &cobra.Command{
 		pemDB := viper.GetString("wp.pem-db")
 		// output := viper.GetString("wp.output")
 
-		ctx, err := mount.DmgInIPSW(filepath.Clean(args[0]), "fs", pemDB, nil)
+		ctx, err := mount.DmgInIPSW(filepath.Clean(args[0]), "fs", pemDB, nil, "")
 		if err != nil {
 			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}

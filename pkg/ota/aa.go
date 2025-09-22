@@ -157,18 +157,18 @@ func (a *AA) Info() (*info.Info, error) {
 	var pfiles []fs.File
 	for _, file := range a.Files() {
 		switch {
-		case regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Path()):
+		case regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`^Info.plist$`).MatchString(file.Path()):
+		case regexp.MustCompile(`^Info.plist$`).MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`^AssetData/Info.plist$`).MatchString(file.Path()):
+		case regexp.MustCompile(`^AssetData/Info.plist$`).MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`Restore.plist$`).MatchString(file.Path()):
+		case regexp.MustCompile(`Restore.plist$`).MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`BuildManifest.plist$`).MatchString(file.Path()):
+		case regexp.MustCompile(`BuildManifest.plist$`).MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`SystemVersion.plist$`).MatchString(file.Path()):
-			f, err := a.Open(file.Path(), true)
+		case regexp.MustCompile(`SystemVersion.plist$`).MatchString(file.Name()):
+			f, err := a.Open(file.Name(), true)
 			if err != nil {
 				return nil, err
 			}
@@ -360,8 +360,8 @@ func (r *Reader) initPayloadMap() (perr error) {
 			if file.isDir {
 				continue
 			}
-			if pre.MatchString(file.Name()) {
-				f, err := r.Open(file.Path(), false)
+			if pre.MatchString(file.Base()) {
+				f, err := r.Open(file.Name(), false)
 				if err != nil {
 					perr = err
 					return
@@ -436,9 +436,9 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 		if file.isDir {
 			continue
 		}
-		if pre.MatchString(file.Name()) {
+		if pre.MatchString(file.Base()) {
 			eg.Go(func() error {
-				f, err := r.Open(file.Path(), false)
+				f, err := r.Open(file.Name(), false)
 				if err != nil {
 					return err
 				}
@@ -460,7 +460,7 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
 						}
-						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Name(), humanize.Bytes(uint64(f.Size())), fname))
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(f.Size())), fname))
 						if err := os.Rename(path, fname); err != nil {
 							return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, tmpdir), fname, err)
 						}
@@ -488,9 +488,9 @@ func (r *Reader) PayloadFiles(pattern string, json bool) error {
 		if file.isDir {
 			continue
 		}
-		if pre.MatchString(file.Name()) {
+		if pre.MatchString(file.Base()) {
 			eg.Go(func() error {
-				f, err := r.Open(file.Path(), false)
+				f, err := r.Open(file.Name(), false)
 				if err != nil {
 					return err
 				}
@@ -574,19 +574,19 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 	defer os.RemoveAll(tmpdir)
 
 	for _, file := range r.Files() {
-		if re.MatchString(file.Name()) {
-			cryptexFile, err := r.Open(file.Path(), false)
+		if re.MatchString(file.Base()) {
+			cryptexFile, err := r.Open(file.Name(), false)
 			if err != nil {
 				return "", fmt.Errorf("failed to open cryptex file: %v", err)
 			}
 			defer cryptexFile.Close()
 			// create a temp file to hold the OTA cryptex
-			cf, err := os.Create(filepath.Join(tmpdir, file.Name()))
+			cf, err := os.Create(filepath.Join(tmpdir, file.Base()))
 			if err != nil {
 				return "", fmt.Errorf("failed to create file: %v", err)
 			}
 			// create a temp file to hold the PATCHED OTA cryptex DMG
-			dcf, err := os.Create(filepath.Join(output, file.Name()+".dmg"))
+			dcf, err := os.Create(filepath.Join(output, file.Base()+".dmg"))
 			if err != nil {
 				return "", fmt.Errorf("failed to create file: %v", err)
 			}
@@ -597,7 +597,7 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 			cf.Close()
 			// patch the cryptex
 			if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
-				return "", fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Path()), err)
+				return "", fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err)
 			}
 			return dcf.Name(), nil
 		}
@@ -623,19 +623,19 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 	for _, cryptex := range []string{"cryptex-system-(arm64e?|x86_64h?)$"} {
 		re := regexp.MustCompile(cryptex)
 		for _, file := range r.Files() {
-			if re.MatchString(file.Name()) {
-				cryptexFile, err := r.Open(file.Path(), false)
+			if re.MatchString(file.Base()) {
+				cryptexFile, err := r.Open(file.Name(), false)
 				if err != nil {
 					return nil, fmt.Errorf("failed to open cryptex file: %v", err)
 				}
 				defer cryptexFile.Close()
 				// create a temp file to hold the OTA cryptex
-				cf, err := os.Create(filepath.Join(tmpdir, file.Name()))
+				cf, err := os.Create(filepath.Join(tmpdir, file.Base()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to create file: %v", err)
 				}
 				// create a temp file to hold the PATCHED OTA cryptex DMG
-				dcf, err := os.Create(filepath.Join(tmpdir, file.Name()+".dmg"))
+				dcf, err := os.Create(filepath.Join(tmpdir, file.Base()+".dmg"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to create file: %v", err)
 				}
@@ -645,12 +645,12 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 				cf.Close()
 				// patch the cryptex
 				if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
-					return nil, fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Path()), err)
+					return nil, fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err)
 				}
 				dcf.Close()
 				// mount the patched cryptex
 				utils.Indent(log.Info, 4)(fmt.Sprintf("Mounting DMG %s", dcf.Name()))
-				mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name())
+				mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name(), "")
 				if err != nil {
 					return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 				}
@@ -792,8 +792,8 @@ func (r *Reader) payloadLookuo(name string) string {
 	return ""
 }
 
-func (f *File) Name() string { _, elem, _ := split(f.name); return elem }
-func (f *File) Path() string { return f.name }
+func (f *File) Base() string { _, elem, _ := split(f.name); return elem }
+func (f *File) Name() string { return f.name }
 func (f *File) Size() int64 {
 	if f.zfile != nil {
 		return int64(f.zfile.UncompressedSize64)

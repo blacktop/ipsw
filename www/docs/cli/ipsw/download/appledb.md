@@ -44,7 +44,7 @@ ipsw download appledb [flags]
       --dyld                  Extract dyld_shared_cache(s) from remote OTA
       --fcs-keys              Download AEA1 DMG fcs-key pem files
       --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
-  -f, --flat                  Do NOT perserve directory structure when downloading with --pattern
+  -f, --flat                  Do NOT preserve directory structure when downloading with --pattern
   -h, --help                  help for appledb
       --insecure              do not verify ssl certs
   -j, --json                  Dump DB query results as JSON

@@ -22,6 +22,7 @@ ipsw fw aea [flags]
   -h, --help             help for aea
       --id               Print AEA file ID
   -i, --info             Print info
+      --insecure         Allow insecure connections
   -k, --key              Get archive decryption key
   -b, --key-val string   Base64 encoded symmetric encryption key
   -o, --output string    Folder to extract files to

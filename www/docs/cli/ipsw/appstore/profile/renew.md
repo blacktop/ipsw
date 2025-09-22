@@ -4,11 +4,11 @@ title: renew
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: renew
-description: Renew and expired or invalide provisioning profile
+description: Renew an expired or invalid provisioning profile
 ---
 ## ipsw appstore profile renew
 
-Renew and expired or invalide provisioning profile
+Renew an expired or invalid provisioning profile
 
 ```
 ipsw appstore profile renew <NAME> [flags]

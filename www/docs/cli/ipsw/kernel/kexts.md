@@ -4,11 +4,11 @@ title: kexts
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: kexts
-description: List kernel extentions
+description: List kernel extensions
 ---
 ## ipsw kernel kexts
 
-List kernel extentions
+List kernel extensions
 
 ```
 ipsw kernel kexts <kernelcache> [flags]

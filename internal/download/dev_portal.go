@@ -49,6 +49,8 @@ const (
 	developerURL        = "https://developer.apple.com"
 	downloadURLNew      = "https://download.developer.apple.com"
 	downloadURL         = "https://developer.apple.com/download/"
+	downloadOSesURL     = "https://developer.apple.com/download/os/"
+	downloadMoreURL     = "https://developer.apple.com/download/all/"
 	downloadAppsURL     = "https://developer.apple.com/download/applications/"
 	downloadProfilesURL = "https://developer.apple.com/bug-reporting/profiles-and-logs/"
 
@@ -450,12 +452,14 @@ func (dp *DevPortal) Login(username, password string) error {
 			if err != nil {
 				return fmt.Errorf("failed to marshal keychain credentials: %v", err)
 			}
-			dp.Vault.Set(keyring.Item{
+			if err := dp.Vault.Set(keyring.Item{
 				Key:         VaultName,
 				Data:        dat,
 				Label:       AppName,
 				Description: "application password",
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to save credentials to vault: %v", err)
+			}
 		} else { // credentials found in vault
 			var auth AppleAccountAuth
 			if err := json.Unmarshal(creds.Data, &auth); err != nil {
@@ -601,11 +605,13 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 
 	buf := new(bytes.Buffer)
 
-	json.NewEncoder(buf).Encode(&auth{
+	if err := json.NewEncoder(buf).Encode(&auth{
 		AccountName: username,
 		A:           base64.StdEncoding.EncodeToString(s.A.Bytes()),
 		Protocols:   []string{"s2k", "s2k_fo"},
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("failed to encode auth request: %v", err)
+	}
 
 	req, err := http.NewRequest("POST", initURL, buf)
 	if err != nil {
@@ -1121,12 +1127,14 @@ func (dp *DevPortal) storeSession() error {
 	// clear dev auth mem
 	auth = AppleAccountAuth{}
 
-	dp.Vault.Set(keyring.Item{
+	if err := dp.Vault.Set(keyring.Item{
 		Key:         VaultName,
 		Data:        data,
 		Label:       AppName,
 		Description: "application password",
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to save session to vault: %v", err)
+	}
 
 	return nil
 }
@@ -1616,7 +1624,7 @@ func (dp *DevPortal) getDownloads() (*Downloads, error) {
 func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	ipsws := make(map[string][]DevDownload)
 
-	req, err := http.NewRequest("GET", downloadURL, nil)
+	req, err := http.NewRequest("GET", downloadOSesURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -1628,7 +1636,7 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadURL, response.Status)
+		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadOSesURL, response.Status)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(response.Body)

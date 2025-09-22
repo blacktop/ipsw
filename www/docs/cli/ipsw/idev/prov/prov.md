@@ -33,9 +33,9 @@ ipsw idev prov [flags]
 ### SEE ALSO
 
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
-* [ipsw idev prov clear](/docs/cli/ipsw/idev/prov/clear)	 - Remove all provision profiles
-* [ipsw idev prov dump](/docs/cli/ipsw/idev/prov/dump)	 - Dump installed provision profiles
-* [ipsw idev prov install](/docs/cli/ipsw/idev/prov/install)	 - Install a provision profile (.mobileprovision file)
-* [ipsw idev prov ls](/docs/cli/ipsw/idev/prov/ls)	 - List installed provision profiles
-* [ipsw idev prov rm](/docs/cli/ipsw/idev/prov/rm)	 - Remove a provision profile
+* [ipsw idev prov clear](/docs/cli/ipsw/idev/prov/clear)	 - Remove all provisioning profiles
+* [ipsw idev prov dump](/docs/cli/ipsw/idev/prov/dump)	 - Dump installed provisioning profiles
+* [ipsw idev prov install](/docs/cli/ipsw/idev/prov/install)	 - Install a provisioning profile (.mobileprovision file)
+* [ipsw idev prov ls](/docs/cli/ipsw/idev/prov/ls)	 - List installed provisioning profiles
+* [ipsw idev prov rm](/docs/cli/ipsw/idev/prov/rm)	 - Remove a provisioning profile
 

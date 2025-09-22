@@ -4,11 +4,11 @@ title: rm
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: rm
-description: Remove a provision profile
+description: Remove a provisioning profile
 ---
 ## ipsw idev prov rm
 
-Remove a provision profile
+Remove a provisioning profile
 
 ```
 ipsw idev prov rm <PROV> [flags]
