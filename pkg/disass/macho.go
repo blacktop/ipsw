@@ -100,18 +100,29 @@ func (d *MachoDisass) Triage() error {
 			}
 		} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+		} else if prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP &&
+			len(prevInstr.Operands) >= 2 && len(prevInstr.Operands[0].Registers) > 0 &&
 			(instruction.Operation == disassemble.ARM64_ADD ||
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
 			adrpImm := prevInstr.Operands[1].Immediate
+			if len(instruction.Operands) < 2 {
+				prevInstr = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
+			}
+			if len(instruction.Operands[1].Registers) == 0 {
+				prevInstr = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
+			}
 			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
 			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
+			} else if instruction.Operation == disassemble.ARM64_ADD && len(instruction.Operands) > 2 && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
 			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
@@ -322,6 +333,17 @@ func (d MachoDisass) FindSymbol(addr uint64) (string, bool) {
 		return symName, true
 	}
 	return "", false
+}
+
+func (d *MachoDisass) ReferencedAddresses() map[uint64]uint64 {
+	if d.tr == nil {
+		return nil
+	}
+	result := make(map[uint64]uint64, len(d.tr.Addresses))
+	for loc, addr := range d.tr.Addresses {
+		result[loc] = addr
+	}
+	return result
 }
 
 func (d MachoDisass) FindSwiftString(addr uint64) (string, bool) {

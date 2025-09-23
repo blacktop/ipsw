@@ -4,7 +4,29 @@ import (
 	"fmt"
 
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 )
+
+// extractPACFromPointer extracts PAC diversity from a pointer
+func extractPACFromPointer(m *macho.File, ptrAddr uint64) uint16 {
+	if !m.HasFixups() {
+		return 0
+	}
+	if offset, err := m.GetOffset(ptrAddr); err != nil {
+		return 0
+	} else {
+		dcf, err := m.DyldChainedFixups()
+		if err != nil {
+			return 0
+		}
+		if fixup, err := dcf.GetFixupAtOffset(offset); err == nil && fixup != nil {
+			if auth, ok := fixup.(fixupchains.Auth); ok {
+				return uint16(auth.Diversity())
+			}
+		}
+	}
+	return 0
+}
 
 func resolveMethodName(m *macho.File, mi *Method, className string) {
 	if m.Symtab != nil {
@@ -56,28 +78,31 @@ func siphash(in []byte) uint64 {
 		v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
 		v0 ^= m
 	}
+	// Pack tail bytes in little-endian order (first tail byte → LSB)
+	// tailStart is the offset where the incomplete 8-byte block begins
+	tailStart := (len(in) / 8) * 8
 	b := uint64(len(in)) << 56
 	switch len(in) & 7 {
 	case 7:
-		b |= uint64(in[len(in)-7]) << 48
+		b |= uint64(in[tailStart+6]) << 48
 		fallthrough
 	case 6:
-		b |= uint64(in[len(in)-6]) << 40
+		b |= uint64(in[tailStart+5]) << 40
 		fallthrough
 	case 5:
-		b |= uint64(in[len(in)-5]) << 32
+		b |= uint64(in[tailStart+4]) << 32
 		fallthrough
 	case 4:
-		b |= uint64(in[len(in)-4]) << 24
+		b |= uint64(in[tailStart+3]) << 24
 		fallthrough
 	case 3:
-		b |= uint64(in[len(in)-3]) << 16
+		b |= uint64(in[tailStart+2]) << 16
 		fallthrough
 	case 2:
-		b |= uint64(in[len(in)-2]) << 8
+		b |= uint64(in[tailStart+1]) << 8
 		fallthrough
 	case 1:
-		b |= uint64(in[len(in)-1])
+		b |= uint64(in[tailStart+0])
 	}
 	v3 ^= b
 	v0, v1, v2, v3 = sipround(v0, v1, v2, v3)

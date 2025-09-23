@@ -20,36 +20,37 @@ var (
 // String returns a formatted string representation of the ClassMeta
 func (c *Class) String() string {
 	var b strings.Builder
-	var cMethod string
-	if len(c.Methods) > 0 {
-		cMethod = fmt.Sprintf(" (%03d meths)", len(c.Methods))
+	// Use DiscoveryPC (BL call site) to match iometa's behavior
+	// Note: Ctor is the function start, DiscoveryPC is where the BL to OSMetaClass occurs
+	initAddr := c.DiscoveryPC
+	if initAddr == 0 {
+		initAddr = c.Ctor // Fallback to function start if DiscoveryPC not set
 	}
-	var vtableInfo strings.Builder
-	if c.VtableAddr != 0 {
-		vtableInfo.WriteString(fmt.Sprintf("vtab=%s", colorAddr("%#x", c.VtableAddr)))
-	}
-	if c.MetaVtableAddr != 0 {
-		if vtableInfo.Len() > 0 {
-			vtableInfo.WriteString(" ")
-		}
-		vtableInfo.WriteString(fmt.Sprintf("metavtab=%s", colorAddr("%#x", c.MetaVtableAddr)))
-	}
-	if vtableInfo.Len() == 0 {
-		vtableInfo.WriteString("vtab=0x0000000000000000")
-	}
-
-	b.WriteString(fmt.Sprintf("init=%s size=%s meta=%s %s%s",
-		colorAddr("%#x", c.AllocFunc),
-		colorAddr("%#03x", c.Size),
-		colorAddr("%#x", c.MetaPtr),
-		vtableInfo.String(),
-		cMethod))
+	b.WriteString(fmt.Sprintf("init=%s size=%s",
+		colorAddr("%#x", initAddr),
+		colorAddr("%#04x", c.Size)))
 	if c.SuperMeta != 0 {
 		b.WriteString(fmt.Sprintf(" parent=%s", colorAddr("%#x", c.SuperMeta)))
 	}
+	if c.MetaPtr != 0 {
+		b.WriteString(fmt.Sprintf(" meta=%s", colorAddr("%#x", c.MetaPtr)))
+	}
+	if c.VtableAddr != 0 {
+		b.WriteString(fmt.Sprintf(" vtab=%s", colorAddr("%#x", c.VtableAddr)))
+	}
+	if len(c.Methods) > 0 {
+		b.WriteString(fmt.Sprintf(" (%03d meths)", len(c.Methods)))
+	}
 	b.WriteString(fmt.Sprintf(" %s", colorClass(c.Name)))
 	if c.Bundle != "" {
-		b.WriteString(fmt.Sprintf(" (%s)", colorBundle(c.Bundle)))
+		b.WriteString(fmt.Sprintf("\t(%s)", colorBundle(c.Bundle)))
+	}
+	if len(c.Methods) > 0 {
+		b.WriteString("\n")
+		for _, m := range c.Methods {
+			b.WriteString(m.String())
+			b.WriteString("\n")
+		}
 	}
 	return b.String()
 }
