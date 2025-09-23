@@ -55,6 +55,11 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//         description: custom mount point path
 	//         required: false
 	//         type: string
+	//       + name: ident
+	//         in: query
+	//         description: identity variant for rdisk (e.g. 'Erase', 'Update', or 'Recovery')
+	//         required: false
+	//         type: string
 	//     Responses:
 	//       500: genericError
 	//       200: mountReponse
@@ -74,18 +79,21 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-
 		mountPointParam, _ := c.GetQuery("mount_point")
 		if mountPointParam != "" {
 			mountPointParam = filepath.Clean(mountPointParam)
 		}
-
+		ident, _ := c.GetQuery("ident")
 		dmgType := c.Param("type")
-		if !slices.Contains([]string{"app", "sys", "fs"}, dmgType) {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
+		if !slices.Contains([]string{"app", "sys", "fs", "exc", "rdisk"}, dmgType) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, fs, exc, or rdisk"})
 			return
 		}
-		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, pemDbPath, nil, mountPointParam)
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, &mount.Config{
+			PemDB:      pemDbPath,
+			MountPoint: mountPointParam,
+			Ident:      ident,
+		})
 		if err != nil {
 			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
 				c.AbortWithError(http.StatusNotFound, err)
