@@ -22,7 +22,7 @@ import (
 
 const (
 	copilotChatAuthURL   = "https://api.github.com/copilot_internal/v2/token"
-	copilotEditorVersion = "vscode/1.95.3"
+	copilotEditorVersion = "vscode/1.104.1"
 	copilotUserAgent     = "curl/7.81.0" // Necessay to bypass the user-agent check
 )
 
@@ -245,7 +245,8 @@ func (c *Copilot) Models() (map[string]string, error) {
 		return nil, fmt.Errorf("failed to get models: %v", err)
 	}
 	for _, model := range modelsResponse.Data {
-		if model.ModelPickerEnabled && model.Policy.State == "enabled" {
+		// if model.ModelPickerEnabled && model.Policy.State == "enabled" {
+		if model.ModelPickerEnabled {
 			c.models[model.Name] = model.ID
 			// fmt.Println(model.Name)
 		}
@@ -263,6 +264,41 @@ func (c *Copilot) SetModel(model string) error {
 		return fmt.Errorf("model '%s' not found", model)
 	}
 	c.conf.Model = model
+	return nil
+}
+
+// Verify checks that the current model configuration is valid
+func (c *Copilot) Verify() error {
+	if c.conf.Model == "" {
+		return fmt.Errorf("no model specified")
+	}
+	if len(c.models) == 0 {
+		if err := c.GetToken(); err != nil {
+			return fmt.Errorf("failed to get token: %v", err)
+		}
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+	}
+	modelID, ok := c.models[c.conf.Model]
+	if !ok {
+		// Model not found in cache, try refreshing the models list
+		c.models = make(map[string]string) // Clear cache to force refresh
+		if err := c.GetToken(); err != nil {
+			return fmt.Errorf("failed to get token: %v", err)
+		}
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+		// Check again after refresh
+		modelID, ok = c.models[c.conf.Model]
+		if !ok {
+			return fmt.Errorf("model '%s' not found in available models (note: newly released models may take time to appear in the API even if enabled in GitHub Copilot settings)", c.conf.Model)
+		}
+	}
+	if modelID == "" {
+		return fmt.Errorf("model '%s' has empty ID", c.conf.Model)
+	}
 	return nil
 }
 
@@ -374,6 +410,11 @@ func (api *tokenResponse) getModels(ctx context.Context) (*modelsResponse, error
 func (c *Copilot) Chat() (string, error) {
 	if err := c.GetToken(); err != nil {
 		return "", fmt.Errorf("failed to get Copilot token: %v", err)
+	}
+
+	// Verify model is valid before attempting to chat
+	if err := c.Verify(); err != nil {
+		return "", fmt.Errorf("model verification failed: %v", err)
 	}
 
 	reqBody := chatRequest{

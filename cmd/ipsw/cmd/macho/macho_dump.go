@@ -91,11 +91,11 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --addr with --count")
 		} else if asBytes && count > 0 {
 			return fmt.Errorf("you can only use --bytes with --size")
-		} else if viper.IsSet("macho.dump.section") && len(args) != 1 {
+		} else if len(viper.GetString("macho.dump.section")) > 0 && len(args) != 1 {
 			return fmt.Errorf("you can only use <address> OR --section")
 		} else if len(filesetEntry) > 0 && !viper.IsSet("macho.dump.section") {
 			return fmt.Errorf("you must specify a --section when using --entry")
-		} else if viper.IsSet("macho.dump.segment") && viper.IsSet("macho.dump.section") {
+		} else if len(viper.GetString("macho.dump.segment")) > 0 && len(viper.GetString("macho.dump.section")) > 0 {
 			return fmt.Errorf("you can only use --segment OR --section")
 		}
 
@@ -115,9 +115,9 @@ var machoDumpCmd = &cobra.Command{
 		}
 
 		var addr uint64
-		if viper.IsSet("macho.dump.segment") || viper.IsSet("macho.dump.section") {
+		if len(viper.GetString("macho.dump.segment")) > 0 || len(viper.GetString("macho.dump.section")) > 0 {
 			switch {
-			case viper.IsSet("macho.dump.segment"):
+			case len(viper.GetString("macho.dump.segment")) > 0:
 				if seg := m.Segment(segment); seg != nil {
 					addr = seg.Addr
 					if size == 0 && count == 0 {
@@ -227,9 +227,9 @@ var machoDumpCmd = &cobra.Command{
 					os.WriteFile(outFile, dat, 0660)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
-					if viper.IsSet("macho.dump.segment") || viper.IsSet("macho.dump.section") {
+					if len(viper.GetString("macho.dump.segment")) > 0 || len(viper.GetString("macho.dump.section")) > 0 {
 						switch {
-						case viper.IsSet("macho.dump.segment"):
+						case len(viper.GetString("macho.dump.segment")) > 0:
 							if s := m.FindSegmentForVMAddr(addr); s != nil {
 								log.WithFields(log.Fields{"segment": s.Name, "size": len(dat)}).Info("Address location")
 							}

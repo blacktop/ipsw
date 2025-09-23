@@ -31,6 +31,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ func init() {
 	vtableCmd.Flags().BoolP("methods", "m", false, "Show method details for each class")
 	vtableCmd.Flags().BoolP("inheritance", "i", false, "Show inheritance hierarchy")
 	vtableCmd.Flags().IntP("limit", "l", 0, "Limit number of classes to display (0 = all)")
+	vtableCmd.Flags().Uint("max", 1000, "Max instructions to emulate per constructor")
 	vtableCmd.Flags().StringSliceP("entry", "e", []string{}, "Only scan specified fileset entries (e.g., com.apple.kernel)")
 	vtableCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 
@@ -56,6 +58,7 @@ func init() {
 	viper.BindPFlag("kernel.vtable.methods", vtableCmd.Flags().Lookup("methods"))
 	viper.BindPFlag("kernel.vtable.inheritance", vtableCmd.Flags().Lookup("inheritance"))
 	viper.BindPFlag("kernel.vtable.limit", vtableCmd.Flags().Lookup("limit"))
+	viper.BindPFlag("kernel.vtable.max", vtableCmd.Flags().Lookup("max"))
 	viper.BindPFlag("kernel.vtable.entry", vtableCmd.Flags().Lookup("entry"))
 	viper.BindPFlag("kernel.vtable.json", vtableCmd.Flags().Lookup("json"))
 
@@ -65,6 +68,7 @@ func init() {
 	vtableCmd.Flags().String("blockprofile", "", "Write block profile to file (enables block profiling)")
 	vtableCmd.Flags().String("mutexprofile", "", "Write mutex profile to file (enables mutex profiling)")
 	vtableCmd.Flags().String("trace", "", "Write runtime trace to file")
+	vtableCmd.Flags().String("flightrecorder", "", "Write flight recorder trace to file (Go 1.25+)")
 	vtableCmd.Flags().String("pprof", "", "Serve net/http/pprof on address (e.g. localhost:6060)")
 	vtableCmd.Flags().Bool("timings", false, "Print timing breakdown for major phases")
 	viper.BindPFlag("kernel.vtable.cpuprofile", vtableCmd.Flags().Lookup("cpuprofile"))
@@ -72,6 +76,7 @@ func init() {
 	viper.BindPFlag("kernel.vtable.blockprofile", vtableCmd.Flags().Lookup("blockprofile"))
 	viper.BindPFlag("kernel.vtable.mutexprofile", vtableCmd.Flags().Lookup("mutexprofile"))
 	viper.BindPFlag("kernel.vtable.trace", vtableCmd.Flags().Lookup("trace"))
+	viper.BindPFlag("kernel.vtable.flightrecorder", vtableCmd.Flags().Lookup("flightrecorder"))
 	viper.BindPFlag("kernel.vtable.pprof", vtableCmd.Flags().Lookup("pprof"))
 	viper.BindPFlag("kernel.vtable.timings", vtableCmd.Flags().Lookup("timings"))
 }
@@ -105,6 +110,7 @@ var vtableCmd = &cobra.Command{
 		showInheritance := viper.GetBool("kernel.vtable.inheritance")
 		entries := viper.GetStringSlice("kernel.vtable.entry")
 		asJSON := viper.GetBool("kernel.vtable.json")
+		maxInstructions := viper.GetUint("kernel.vtable.max")
 
 		tStart := time.Now()
 
@@ -153,6 +159,32 @@ var vtableCmd = &cobra.Command{
 			defer func() { trace.Stop(); traceFile.Close() }()
 		}
 
+		// Flight recorder (Go 1.25+) - continuous low-overhead profiling
+		var flightRecorder *trace.FlightRecorder
+		if frPath := viper.GetString("kernel.vtable.flightrecorder"); frPath != "" {
+			cfg := trace.FlightRecorderConfig{
+				MinAge:   15 * time.Second, // Keep last 15 seconds
+				MaxBytes: 10 << 20,         // 10MB ring buffer
+			}
+			flightRecorder = trace.NewFlightRecorder(cfg)
+			if err := flightRecorder.Start(); err != nil {
+				log.Warnf("Failed to start flight recorder: %v", err)
+			} else {
+				defer func() {
+					flightRecorder.Stop()
+					if f, err := os.Create(frPath); err == nil {
+						if _, err := flightRecorder.WriteTo(f); err != nil {
+							log.Warnf("Failed to write flight recorder trace: %v", err)
+						}
+						f.Close()
+						log.Infof("Flight recorder trace written to %s", frPath)
+					} else {
+						log.Warnf("Failed to create flight recorder file: %v", err)
+					}
+				}()
+			}
+		}
+
 		tOpenStart := time.Now()
 		m, err := macho.Open(filepath.Clean(args[0]))
 		if err != nil {
@@ -163,16 +195,29 @@ var vtableCmd = &cobra.Command{
 
 		tGCStart := time.Now()
 
-		cls, err := cpp.Create(m, &cpp.Config{
-			ClassName:   className,
-			WithMethods: showMethods,
-			Entries:     entries,
-		}).GetClasses()
+		// Create engine and run class discovery
+		cppEngine := cpp.Create(m, &cpp.Config{
+			ClassName:              className,
+			WithMethods:            showMethods,
+			Entries:                entries,
+			MaxCtorInstructions:    int(maxInstructions),
+			DisableStubResolution:  true,  // Skip unused stub resolution (saves ~29s CPU time on full scans)
+			UseXrefAnchorDiscovery: false, // Function reordering (Phase 1) is faster than xref-based (Phase 2)
+		})
+		cls, err := cppEngine.GetClasses()
 		if err != nil {
 			return fmt.Errorf("failed to get classes from kernelcache: %v", err)
 		}
 
+		// Sort classes by Ctor field
+		sort.Slice(cls, func(i, j int) bool {
+			return cls[i].Ctor < cls[j].Ctor
+		})
+
 		tGetClasses := time.Since(tGCStart)
+
+		// Get detailed phase timings
+		phaseTimings := cppEngine.GetPhaseTimings()
 
 		if len(cls) == 0 {
 			log.Warn("No classes discovered")
@@ -209,6 +254,14 @@ var vtableCmd = &cobra.Command{
 			tPrint := time.Since(tOutStart)
 			if viper.GetBool("kernel.vtable.timings") || viper.GetBool("verbose") {
 				log.Infof("timings: open=%s getClasses=%s output=%s total=%s", tOpen, tGetClasses, tPrint, time.Since(tStart))
+				log.Infof("  └─ getClasses breakdown:")
+				log.Infof("     anchor=%s fileset=%s discovery=%s dedupe=%s vtable=%s osobj=%s linking=%s",
+					phaseTimings.Anchor, phaseTimings.FilesetPrep, phaseTimings.Discovery,
+					phaseTimings.Dedupe, phaseTimings.Vtable, phaseTimings.OSObject, phaseTimings.Linking)
+				if phaseTimings.XrefScan > 0 || phaseTimings.CtorEmulation > 0 {
+					log.Infof("     └─ discovery detail: xref=%s emu=%s",
+						phaseTimings.XrefScan, phaseTimings.CtorEmulation)
+				}
 			}
 			// Heap profile at the end, if requested
 			if hp := viper.GetString("kernel.vtable.memprofile"); hp != "" {
@@ -236,6 +289,14 @@ var vtableCmd = &cobra.Command{
 		tPrint := time.Since(tOutStart)
 		if viper.GetBool("kernel.vtable.timings") || viper.GetBool("verbose") {
 			log.Infof("timings: open=%s getClasses=%s output=%s total=%s", tOpen, tGetClasses, tPrint, time.Since(tStart))
+			log.Infof("  └─ getClasses breakdown:")
+			log.Infof("     anchor=%s fileset=%s discovery=%s dedupe=%s vtable=%s osobj=%s linking=%s",
+				phaseTimings.Anchor, phaseTimings.FilesetPrep, phaseTimings.Discovery,
+				phaseTimings.Dedupe, phaseTimings.Vtable, phaseTimings.OSObject, phaseTimings.Linking)
+			if phaseTimings.XrefScan > 0 || phaseTimings.CtorEmulation > 0 {
+				log.Infof("     └─ discovery detail: xref=%s emu=%s",
+					phaseTimings.XrefScan, phaseTimings.CtorEmulation)
+			}
 		}
 		if hp := viper.GetString("kernel.vtable.memprofile"); hp != "" {
 			if err := writeHeapProfile(hp); err != nil {

@@ -94,6 +94,11 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			var files []string
 			if err := filepath.Walk(conf.Folder, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
+					// Skip paths with permission errors gracefully
+					if os.IsPermission(err) {
+						log.Debugf("skipping path due to permission denied: %s", path)
+						return nil
+					}
 					log.Errorf("failed to walk mount %s: %v", conf.Folder, err)
 					return nil
 				}
@@ -304,6 +309,11 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			// Skip paths with permission errors gracefully
+			if os.IsPermission(err) {
+				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
 			log.Errorf("failed to walk mount %s: %v", mountPoint, err)
 			return nil
 		}

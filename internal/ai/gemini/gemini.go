@@ -68,6 +68,35 @@ func (c *Gemini) SetModels(models map[string]string) (map[string]string, error) 
 	return c.models, nil
 }
 
+// Verify checks that the current model configuration is valid
+func (c *Gemini) Verify() error {
+	if c.conf.Model == "" {
+		return fmt.Errorf("no model specified")
+	}
+	if len(c.models) == 0 {
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+	}
+	modelID, ok := c.models[c.conf.Model]
+	if !ok {
+		// Model not found in cache, try refreshing the models list
+		c.models = make(map[string]string) // Clear cache to force refresh
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+		// Check again after refresh
+		modelID, ok = c.models[c.conf.Model]
+		if !ok {
+			return fmt.Errorf("model '%s' not found in available models", c.conf.Model)
+		}
+	}
+	if modelID == "" {
+		return fmt.Errorf("model '%s' has empty ID", c.conf.Model)
+	}
+	return nil
+}
+
 func (c *Gemini) getModels() error {
 	models, err := c.cli.Models.List(c.ctx, &genai.ListModelsConfig{})
 	if err != nil {
@@ -86,6 +115,11 @@ func (c *Gemini) getModels() error {
 }
 
 func (c *Gemini) Chat() (string, error) {
+	// Verify model configuration before making API call
+	if err := c.Verify(); err != nil {
+		return "", fmt.Errorf("invalid model configuration: %w", err)
+	}
+
 	chat, err := c.cli.Chats.Create(c.ctx,
 		c.models[c.conf.Model],
 		&genai.GenerateContentConfig{
