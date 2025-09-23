@@ -443,6 +443,44 @@ func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
 	return nil, fmt.Errorf("no RestoreRamDisk DMG found")
 }
 
+// GetRestoreRamDiskDmgByIdent returns the RestoreRamDisk DMG path matching a given identity hint.
+// The ident string is a substring of Info.Variant (e.g. "Customer Erase", "Customer Upgrade") [case-insensitive]
+func (i *Info) GetRestoreRamDiskDmgByIdent(ident string) (string, error) {
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
+		return "", fmt.Errorf("no BuildManifest.plist found")
+	}
+	if len(ident) == 0 {
+		return "", fmt.Errorf("ident is empty")
+	}
+	identLower := strings.ToLower(ident)
+	var matches []string
+	var variants []string
+	for _, bi := range i.Plists.BuildIdentities {
+		rrdisk, ok := bi.Manifest["RestoreRamDisk"]
+		if !ok {
+			continue
+		}
+		variants = append(variants, bi.Info.Variant)
+		path := rrdisk.Info["Path"].(string)
+		if len(path) == 0 {
+			continue
+		}
+		if len(bi.Info.Variant) > 0 && strings.Contains(strings.ToLower(bi.Info.Variant), identLower) {
+			matches = append(matches, path)
+			continue
+		}
+	}
+	matches = utils.Unique(matches)
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("no RestoreRamDisk DMG found for ident '%s': found %v", ident, strings.Join(variants, ", "))
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("multiple RestoreRamDisk DMGs matched ident '%s': %v", ident, strings.Join(variants, ", "))
+	}
+}
+
 func (i *Info) GetExclaveOSDmg() (string, error) {
 	var dmgs []string
 	if i.Plists != nil && i.Plists.BuildManifest != nil {

@@ -16,10 +16,19 @@ import (
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-var DmgTypes = []string{"fs", "sys", "app", "exc"}
+var DmgTypes = []string{"fs", "sys", "app", "exc", "rdisk"}
+
+// Config contains optional options for mounting a DMG from an IPSW
+type Config struct {
+	PemDB      string // AEA PEM DB JSON file path (for .aea decryption)
+	Keys       any    // Either string (DMG key) or download.WikiFWKeys (auto-lookup)
+	MountPoint string // Custom mount point
+	Ident      string // BuildManifest identity selector (used for rdisk)
+}
 
 // Context is the mount context
 type Context struct {
@@ -45,13 +54,13 @@ func (c Context) Unmount() error {
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
-func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (*Context, error) {
+func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 	var err error
 
 	ipswPath := filepath.Clean(path)
 
 	var i *info.Info
-	if wkeys, ok := keys.(download.WikiFWKeys); ok {
+	if wkeys, ok := cfg.Keys.(download.WikiFWKeys); ok {
 		dtkey, err := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get DeviceTree key: %v", err)
@@ -98,6 +107,29 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ExclaveOS DMG: %v", err)
 		}
+	case "rdisk":
+		if len(cfg.Ident) > 0 {
+			dmgPath, err = i.GetRestoreRamDiskDmgByIdent(cfg.Ident)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get RestoreRamDisk DMG: %v", err)
+			}
+		} else {
+			// Prefer Erase -> Update -> first
+			if p, err := i.GetRestoreRamDiskDmgByIdent("Erase"); err == nil {
+				dmgPath = p
+			} else if p, err := i.GetRestoreRamDiskDmgByIdent("Update"); err == nil {
+				dmgPath = p
+			} else {
+				if dmgs, err := i.GetRestoreRamDiskDmgs(); err == nil {
+					if len(dmgs) == 0 {
+						return nil, fmt.Errorf("no RestoreRamDisk DMG found")
+					}
+					dmgPath = dmgs[0]
+				} else {
+					return nil, fmt.Errorf("failed to get RestoreRamDisk DMGs: %v", err)
+				}
+			}
+		}
 	default:
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
 	}
@@ -117,11 +149,13 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
-		defer os.Remove(extractedDMG) // remove the encrypted AEA DMG decrypting and mounting
+		defer func() {
+			_ = os.Remove(extractedDMG) // remove the encrypted AEA DMG after decrypting and mounting
+		}()
 		extractedDMG, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:    extractedDMG,
 			Output:   filepath.Dir(extractedDMG),
-			PemDB:    pemDbPath,
+			PemDB:    cfg.PemDB,
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
@@ -132,7 +166,7 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (
 		return nil, fmt.Errorf("failed to check if DMG is encrypted: %v", err)
 	} else if isEncrypted {
 		var key string
-		switch v := keys.(type) {
+		switch v := cfg.Keys.(type) {
 		case string:
 			key = v
 		case download.WikiFWKeys:
@@ -147,14 +181,30 @@ func DmgInIPSW(path, typ, pemDbPath string, keys any, customMountPoint string) (
 		}); err != nil {
 			return nil, fmt.Errorf("failed to open DMG '%s': %v", extractedDMG, err)
 		} else {
-			defer dmg.Close()
+			defer func() { _ = dmg.Close() }()
 			if err := os.Rename(dmg.DecryptedTemp(), extractedDMG); err != nil {
 				return nil, fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %v", err)
 			}
 		}
 	}
 
-	mp, am, err := utils.MountDMG(extractedDMG, customMountPoint)
+	if typ == "rdisk" {
+		// ramdisk DMGs are actually IM4P files
+		im4p, err := img4.OpenPayload(extractedDMG)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ramdisk IM4P: %v", err)
+		}
+		data, err := im4p.GetData()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ramdisk IM4P data: %v", err)
+		}
+		// overwrite extractedDMG with the raw IM4P data
+		if err := os.WriteFile(extractedDMG, data, 0644); err != nil {
+			return nil, fmt.Errorf("failed to overwrite ramdisk DMG: %v", err)
+		}
+	}
+
+	mp, am, err := utils.MountDMG(extractedDMG, cfg.MountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}
