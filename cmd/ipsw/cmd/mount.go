@@ -46,15 +46,17 @@ func init() {
 	mountCmd.Flags().Bool("lookup", false, "Lookup DMG keys on theapplewiki.com")
 	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	mountCmd.Flags().StringP("mount-point", "m", "", "Custom mount point (default: /tmp/<dmg>.mount)")
+	mountCmd.Flags().String("ident", "", "Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')")
 	viper.BindPFlag("mount.key", mountCmd.Flags().Lookup("key"))
 	viper.BindPFlag("mount.lookup", mountCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("mount.pem-db", mountCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("mount.mount-point", mountCmd.Flags().Lookup("mount-point"))
+	viper.BindPFlag("mount.ident", mountCmd.Flags().Lookup("ident"))
 }
 
 // mountCmd represents the mount command
 var mountCmd = &cobra.Command{
-	Use:           "mount [fs|sys|app|exc] IPSW",
+	Use:           "mount [fs|sys|app|exc|rdisk] IPSW",
 	Aliases:       []string{"mo", "mnt"},
 	Short:         "Mount DMG from IPSW",
 	SilenceErrors: true,
@@ -74,6 +76,9 @@ var mountCmd = &cobra.Command{
 
 		# Mount to a custom mount point
 		$ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
+
+		# Mount a RestoreRamDisk by identity (defaults to the first if not specified)
+		$ ipsw mount rdisk iPhone.ipsw --ident Erase
 	`),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -92,6 +97,7 @@ var mountCmd = &cobra.Command{
 		lookupKeys := viper.GetBool("mount.lookup")
 		pemDB := viper.GetString("mount.pem-db")
 		mountPoint := viper.GetString("mount.mount-point")
+		ident := viper.GetString("mount.ident")
 		// validate flags
 		if len(key) > 0 && lookupKeys {
 			return fmt.Errorf("cannot use --key AND --lookup flags together")
@@ -135,7 +141,12 @@ var mountCmd = &cobra.Command{
 			keys = key
 		}
 
-		mctx, err := mount.DmgInIPSW(args[1], args[0], pemDB, keys, mountPoint)
+		mctx, err := mount.DmgInIPSW(args[1], args[0], &mount.Config{
+			PemDB:      pemDB,
+			Keys:       keys,
+			MountPoint: mountPoint,
+			Ident:      ident,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}

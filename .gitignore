@@ -13,6 +13,9 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Local cache
+.gocache
+
 # IDE
 .idea
 .vscode
