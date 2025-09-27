@@ -21,6 +21,7 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
   -c, --cryptex string   Extract cryptex as DMG (requires full OTA)
   -x, --decomp           Decompress pbzx files
   -d, --dyld             Extract dyld_shared_cache files
+  -f, --flat             Do NOT preserve directory structure when extracting
   -h, --help             help for extract
   -k, --kernel           Extract kernelcache
   -o, --output string    Output folder
