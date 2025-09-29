@@ -86,22 +86,22 @@
   "fcs_keys_rc": {
     "fcs_keys": {
       "rc": {
-        "fingerprint": "23A341_24G222_23M336",
-        "ios_build": "23A341",
-        "macos_build": "24G222",
-        "updated_at": "2025-09-28T19:05:21Z",
-        "visionos_build": "23M336"
+        "fingerprint": "23A355_24G231_23M341",
+        "ios_build": "23A355",
+        "macos_build": "24G231",
+        "updated_at": "2025-09-29T19:05:56Z",
+        "visionos_build": "23M341"
       }
     }
   },
   "fcs_keys_stable": {
     "fcs_keys": {
       "release": {
-        "fingerprint": "23A341_24G222_23M336",
-        "ios_build": "23A341",
-        "macos_build": "24G222",
-        "updated_at": "2025-09-28T19:05:21Z",
-        "visionos_build": "23M336"
+        "fingerprint": "23A355_24G231_23M341",
+        "ios_build": "23A355",
+        "macos_build": "24G231",
+        "updated_at": "2025-09-29T19:05:56Z",
+        "visionos_build": "23M341"
       }
     }
   },
