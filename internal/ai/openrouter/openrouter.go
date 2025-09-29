@@ -134,6 +134,35 @@ func (c *OpenRouter) SetModels(models map[string]string) (map[string]string, err
 	return c.models, nil
 }
 
+// Verify checks that the current model configuration is valid
+func (c *OpenRouter) Verify() error {
+	if c.conf.Model == "" {
+		return fmt.Errorf("no model specified")
+	}
+	if len(c.models) == 0 {
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+	}
+	modelID, ok := c.models[c.conf.Model]
+	if !ok {
+		// Model not found in cache, try refreshing the models list
+		c.models = make(map[string]string) // Clear cache to force refresh
+		if _, err := c.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+		// Check again after refresh
+		modelID, ok = c.models[c.conf.Model]
+		if !ok {
+			return fmt.Errorf("model '%s' not found in available models", c.conf.Model)
+		}
+	}
+	if modelID == "" {
+		return fmt.Errorf("model '%s' has empty ID", c.conf.Model)
+	}
+	return nil
+}
+
 // getModels retrieves the available models from OpenRouter API
 func (c *OpenRouter) getModels() (*modelsResponse, error) {
 	req, err := http.NewRequestWithContext(c.ctx, "GET", openrouterModelsEndpoint, nil)
@@ -164,6 +193,11 @@ func (c *OpenRouter) getModels() (*modelsResponse, error) {
 
 // Chat sends a message to the OpenRouter API and returns the response
 func (c *OpenRouter) Chat() (string, error) {
+	// Verify model configuration before making API call
+	if err := c.Verify(); err != nil {
+		return "", fmt.Errorf("invalid model configuration: %w", err)
+	}
+
 	reqBody := chatRequest{
 		Model:       c.models[c.conf.Model],
 		Messages:    []chatMessage{{Role: "user", Content: c.conf.Prompt}},
