@@ -22,7 +22,7 @@ import (
 
 const (
 	copilotChatAuthURL   = "https://api.github.com/copilot_internal/v2/token"
-	copilotEditorVersion = "vscode/1.95.3"
+	copilotEditorVersion = "vscode/1.104.1"
 	copilotUserAgent     = "curl/7.81.0" // Necessay to bypass the user-agent check
 )
 
@@ -245,7 +245,8 @@ func (c *Copilot) Models() (map[string]string, error) {
 		return nil, fmt.Errorf("failed to get models: %v", err)
 	}
 	for _, model := range modelsResponse.Data {
-		if model.ModelPickerEnabled && model.Policy.State == "enabled" {
+		// if model.ModelPickerEnabled && model.Policy.State == "enabled" {
+		if model.ModelPickerEnabled {
 			c.models[model.Name] = model.ID
 			// fmt.Println(model.Name)
 		}
