@@ -1,6 +1,6 @@
 REPO=blacktop
 NAME=ipsw
-CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
+CUR_VERSION=$(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 CUR_COMMIT=$(shell git rev-parse --short HEAD)
 LOCAL_VERSION=$(shell go tool svu --tag.pattern 'v3.1.*' current)
 NEXT_VERSION=$(shell go tool svu --tag.pattern 'v3.1.*' patch)
