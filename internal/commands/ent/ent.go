@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -121,8 +123,51 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 						continue // not a macho file (skip)
 					}
 				}
-				if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-					entDB[strings.TrimPrefix(file, conf.Folder)] = m.CodeSignature().Entitlements
+				if m.CodeSignature() != nil {
+					var output strings.Builder
+					// Add entitlements
+					if len(m.CodeSignature().Entitlements) > 0 {
+						output.WriteString(m.CodeSignature().Entitlements)
+					}
+					// Add launch constraints
+					if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+						lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+						if err == nil {
+							if output.Len() > 0 {
+								output.WriteString("\n")
+							}
+							output.WriteString("<!-- Launch Constraints (Self) -->\n")
+							lcdata, _ := json.MarshalIndent(lc, "", "  ")
+							output.WriteString(string(lcdata))
+							output.WriteString("\n")
+						}
+					}
+					if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+						lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+						if err == nil {
+							if output.Len() > 0 {
+								output.WriteString("\n")
+							}
+							output.WriteString("<!-- Launch Constraints (Parent) -->\n")
+							lcdata, _ := json.MarshalIndent(lc, "", "  ")
+							output.WriteString(string(lcdata))
+							output.WriteString("\n")
+						}
+					}
+					if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+						lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+						if err == nil {
+							if output.Len() > 0 {
+								output.WriteString("\n")
+							}
+							output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
+							lcdata, _ := json.MarshalIndent(lc, "", "  ")
+							output.WriteString(string(lcdata))
+							output.WriteString("\n")
+						}
+					}
+
+					entDB[strings.TrimPrefix(file, conf.Folder)] = output.String()
 				} else {
 					entDB[strings.TrimPrefix(file, conf.Folder)] = ""
 				}
@@ -333,8 +378,51 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 				continue // not a macho file (skip)
 			}
 		}
-		if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-			entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
+		if m.CodeSignature() != nil {
+			var output strings.Builder
+			// Add entitlements
+			if len(m.CodeSignature().Entitlements) > 0 {
+				output.WriteString(m.CodeSignature().Entitlements)
+			}
+			// Add launch constraints
+			if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+				lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+				if err == nil {
+					if output.Len() > 0 {
+						output.WriteString("\n")
+					}
+					output.WriteString("<!-- Launch Constraints (Self) -->\n")
+					lcdata, _ := json.MarshalIndent(lc, "", "  ")
+					output.WriteString(string(lcdata))
+					output.WriteString("\n")
+				}
+			}
+			if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+				lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+				if err == nil {
+					if output.Len() > 0 {
+						output.WriteString("\n")
+					}
+					output.WriteString("<!-- Launch Constraints (Parent) -->\n")
+					lcdata, _ := json.MarshalIndent(lc, "", "  ")
+					output.WriteString(string(lcdata))
+					output.WriteString("\n")
+				}
+			}
+			if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+				lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+				if err == nil {
+					if output.Len() > 0 {
+						output.WriteString("\n")
+					}
+					output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
+					lcdata, _ := json.MarshalIndent(lc, "", "  ")
+					output.WriteString(string(lcdata))
+					output.WriteString("\n")
+				}
+			}
+
+			entDB[strings.TrimPrefix(file, mountPoint)] = output.String()
 		} else {
 			entDB[strings.TrimPrefix(file, mountPoint)] = ""
 		}
