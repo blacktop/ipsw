@@ -94,6 +94,8 @@ func init() {
 	downloadOtaCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	downloadOtaCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadOtaCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
+	downloadOtaCmd.Flags().Bool("fcs-keys", false, "Get AEA decryption keys as PEM files from OTA metadata")
+	downloadOtaCmd.Flags().Bool("fcs-keys-json", false, "Get AEA decryption keys as JSON from OTA metadata")
 	downloadOtaCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	downloadOtaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadOtaCmd.MarkFlagDirname("output")
@@ -130,6 +132,8 @@ func init() {
 	viper.BindPFlag("download.ota.kernel", downloadOtaCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.ota.pattern", downloadOtaCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ota.flat", downloadOtaCmd.Flags().Lookup("flat"))
+	viper.BindPFlag("download.ota.fcs-keys", downloadOtaCmd.Flags().Lookup("fcs-keys"))
+	viper.BindPFlag("download.ota.fcs-keys-json", downloadOtaCmd.Flags().Lookup("fcs-keys-json"))
 	viper.BindPFlag("download.ota.info", downloadOtaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.ota.output", downloadOtaCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ota.show-latest-version", downloadOtaCmd.Flags().Lookup("show-latest-version"))
@@ -153,6 +157,9 @@ var downloadOtaCmd = &cobra.Command{
 
 		# Download Xcode Simulator Runtime OTAs
 		❯ ipsw download ota --platform ios --sim --build "22F77"
+
+		# Get AEA decryption keys as JSON from latest iOS OTAs
+		❯ ipsw download ota --platform ios --latest --fcs-keys-json
 	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -187,6 +194,8 @@ var downloadOtaCmd = &cobra.Command{
 		remoteKernel := viper.GetBool("download.ota.kernel")
 		remotePattern := viper.GetString("download.ota.pattern")
 		flat := viper.GetBool("download.ota.flat")
+		fcsKeys := viper.GetBool("download.ota.fcs-keys")
+		fcsKeysJson := viper.GetBool("download.ota.fcs-keys-json")
 		otaInfo := viper.GetBool("download.ota.info")
 		output := viper.GetString("download.ota.output")
 		showLatestVersion := viper.GetBool("download.ota.show-latest-version")
@@ -339,6 +348,64 @@ var downloadOtaCmd = &cobra.Command{
 				return nil
 			}
 			return fmt.Errorf("no OTA found")
+		}
+
+		if fcsKeys || fcsKeysJson {
+			type FcsKeyEntry struct {
+				OS              string   `json:"os,omitempty"`
+				Version         string   `json:"version,omitempty"`
+				Build           string   `json:"build,omitempty"`
+				Devices         []string `json:"devices,omitempty"`
+				Models          []string `json:"models,omitempty"`
+				Key             string   `json:"key,omitempty"`
+				DocumentationID string   `json:"documentation_id,omitempty"`
+				URL             string   `json:"url,omitempty"`
+				Filename        string   `json:"filename,omitempty"`
+				Size            uint64   `json:"size,omitempty"`
+			}
+			var fcsKeyEntries []FcsKeyEntry
+			for _, o := range otas {
+				if len(o.ArchiveDecryptionKey) > 0 {
+					url := o.BaseURL + o.RelativePath
+					filename := filepath.Base(o.RelativePath)
+					fcsKeyEntries = append(fcsKeyEntries, FcsKeyEntry{
+						OS:              o.ProductSystemName,
+						Version:         strings.TrimPrefix(o.OSVersion, "9.9."),
+						Build:           o.Build,
+						Devices:         o.SupportedDevices,
+						Models:          o.SupportedDeviceModels,
+						Key:             o.ArchiveDecryptionKey,
+						DocumentationID: o.DocumentationID,
+						URL:             url,
+						Filename:        filename,
+						Size:            uint64(o.UnarchivedSize),
+					})
+				}
+			}
+			if len(fcsKeyEntries) == 0 {
+				log.Warn("No AEA encrypted OTAs found with decryption keys")
+				return nil
+			}
+			if fcsKeysJson {
+				dat, err := json.MarshalIndent(fcsKeyEntries, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal FCS keys to JSON: %v", err)
+				}
+				outFile := filepath.Join(destPath, "ota_fcs_keys.json")
+				if err := os.WriteFile(outFile, dat, 0644); err != nil {
+					return fmt.Errorf("failed to write FCS keys JSON: %v", err)
+				}
+				log.Infof("Created %s", outFile)
+			} else {
+				for _, entry := range fcsKeyEntries {
+					outFile := filepath.Join(destPath, fmt.Sprintf("%s_%s_%s_fcs_key.pem", entry.OS, entry.Version, entry.Build))
+					if err := os.WriteFile(outFile, []byte(entry.Key), 0644); err != nil {
+						return fmt.Errorf("failed to write FCS key PEM: %v", err)
+					}
+					log.Infof("Created %s", outFile)
+				}
+			}
+			return nil
 		}
 
 		if viper.GetBool("download.ota.urls") || viper.GetBool("download.ota.json") {
