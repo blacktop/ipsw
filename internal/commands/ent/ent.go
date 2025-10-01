@@ -134,6 +134,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 						if entXML, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
 							output.WriteString(entXML)
 						}
+						log.Warnf("using DER entitlements for %s", file)
 					}
 					// Add launch constraints
 					if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
@@ -394,6 +395,7 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 				if entXML, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
 					output.WriteString(entXML)
 				}
+				log.Warnf("using DER entitlements for %s", file)
 			}
 			// Add launch constraints
 			if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
