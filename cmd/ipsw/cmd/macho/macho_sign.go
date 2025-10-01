@@ -60,6 +60,7 @@ func init() {
 	machoSignCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	machoSignCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
 	machoSignCmd.Flags().StringP("output", "o", "", "Output codesigned file")
+	machoSignCmd.Flags().Bool("verify", false, "Verify codesignature after signing via `codesign --verify` (darwin only)")
 	viper.BindPFlag("macho.sign.id", machoSignCmd.Flags().Lookup("id"))
 	viper.BindPFlag("macho.sign.team", machoSignCmd.Flags().Lookup("team"))
 	viper.BindPFlag("macho.sign.ad-hoc", machoSignCmd.Flags().Lookup("ad-hoc"))
@@ -73,6 +74,7 @@ func init() {
 	viper.BindPFlag("macho.sign.insecure", machoSignCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.sign.output", machoSignCmd.Flags().Lookup("output"))
+	viper.BindPFlag("macho.sign.verify", machoSignCmd.Flags().Lookup("verify"))
 }
 
 // machoSignCmd represents the macho sign command
@@ -93,6 +95,11 @@ var machoSignCmd = &cobra.Command{
 		// verify flags
 		if len(entitlementsDER) > 0 && len(entitlementsPlist) == 0 {
 			return fmt.Errorf("must specify --ent with --ent-der")
+		}
+		if !viper.GetBool("macho.sign.ad-hoc") {
+			if len(viper.GetString("macho.sign.cert")) == 0 || len(viper.GetString("macho.sign.pw")) == 0 {
+				return fmt.Errorf("must specify --cert and --pw for non-adhoc signing, or use --ad-hoc")
+			}
 		}
 
 		conf := &mcmd.SignConfig{
@@ -143,7 +150,7 @@ var machoSignCmd = &cobra.Command{
 		}
 
 		if ok, err := magic.IsMachO(conf.Input); !ok {
-			return fmt.Errorf(err.Error())
+			return fmt.Errorf("not a macho file: %w", err)
 		}
 
 		if len(entitlementsPlist) > 0 {
@@ -212,7 +219,7 @@ var machoSignCmd = &cobra.Command{
 			return fmt.Errorf("failed to sign MachO file: %v", err)
 		}
 
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == "darwin" && viper.GetBool("macho.sign.verify") {
 			out, err := utils.CodesignShow(conf.Output)
 			if err != nil {
 				return err
