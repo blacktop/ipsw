@@ -41,6 +41,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
+	"github.com/blacktop/ipsw/internal/codesign/entitlements"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
@@ -84,6 +85,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	machoInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	machoInfoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
+	machoInfoCmd.Flags().Bool("ent-der", false, "Print DER entitlements")
 	machoInfoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	machoInfoCmd.Flags().Bool("objc-refs", false, "Print ObjC references")
 	machoInfoCmd.Flags().BoolP("swift", "w", false, "Print Swift info")
@@ -125,6 +127,7 @@ func init() {
 	viper.BindPFlag("macho.info.json", machoInfoCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.info.sig", machoInfoCmd.Flags().Lookup("sig"))
 	viper.BindPFlag("macho.info.ent", machoInfoCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("macho.info.ent-der", machoInfoCmd.Flags().Lookup("ent-der"))
 	viper.BindPFlag("macho.info.objc", machoInfoCmd.Flags().Lookup("objc"))
 	viper.BindPFlag("macho.info.objc-refs", machoInfoCmd.Flags().Lookup("objc-refs"))
 	viper.BindPFlag("macho.info.swift", machoInfoCmd.Flags().Lookup("swift"))
@@ -171,6 +174,7 @@ var machoInfoCmd = &cobra.Command{
 		showSignature := viper.GetBool("macho.info.sig")
 		dumpCert := viper.GetBool("macho.info.dump-cert")
 		showEntitlements := viper.GetBool("macho.info.ent")
+		showEntitlementsDER := viper.GetBool("macho.info.ent-der")
 		showObjC := viper.GetBool("macho.info.objc")
 		showObjcRefs := viper.GetBool("macho.info.objc-refs")
 		showSwift := viper.GetBool("macho.info.swift")
@@ -196,7 +200,7 @@ var machoInfoCmd = &cobra.Command{
 
 		var options uint32
 		for i, opt := range []bool{
-			showHeader, showLoadCommands, showSignature, showEntitlements, showObjC, showSwift,
+			showHeader, showLoadCommands, showSignature, showEntitlements || showEntitlementsDER, showObjC, showSwift,
 			showSymbols, showFixups, showFuncStarts, showStrings, showSplitSeg, showBitCode,
 		} {
 			if opt {
@@ -703,21 +707,58 @@ var machoInfoCmd = &cobra.Command{
 			println()
 		}
 
-		if showEntitlements {
+		if showEntitlements || showEntitlementsDER {
 			if options != onlyEnt {
 				fmt.Println("Entitlements")
 				fmt.Println("============")
 			}
-			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-				if color {
-					if err := quick.Highlight(os.Stdout, m.CodeSignature().Entitlements, "xml", "terminal256", "nord"); err != nil {
-						return err
-					}
-				} else {
-					fmt.Println(m.CodeSignature().Entitlements)
-				}
+			if m.CodeSignature() == nil {
+				fmt.Println("  - no LC_CODE_SIGNATURE found")
 			} else {
-				fmt.Println("  - no entitlements")
+				hasXML := len(m.CodeSignature().Entitlements) > 0
+				hasDER := m.CodeSignature().EntitlementsDER != nil && len(m.CodeSignature().EntitlementsDER) > 0
+				// Display XML entitlements if present and requested
+				if hasXML && showEntitlements {
+					if hasDER && showEntitlementsDER {
+						fmt.Println("XML Entitlements:")
+					}
+					if color {
+						if err := quick.Highlight(os.Stdout, m.CodeSignature().Entitlements, "xml", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(m.CodeSignature().Entitlements)
+					}
+					if hasDER && showEntitlementsDER {
+						println()
+					}
+				}
+				// Display DER entitlements if present and requested
+				if hasDER && showEntitlementsDER {
+					if hasXML && showEntitlements {
+						fmt.Println("DER Entitlements:")
+					}
+					// Parse and display DER entitlements
+					entPlist, err := entitlements.DerDecode(m.CodeSignature().EntitlementsDER)
+					if err != nil {
+						return fmt.Errorf("failed to decode DER entitlements: %v", err)
+					}
+					if color {
+						if err := quick.Highlight(os.Stdout, entPlist, "xml", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(entPlist)
+					}
+				}
+				// Warnings for missing requested types
+				if showEntitlements && !hasXML && !hasDER {
+					fmt.Println("  - no entitlements")
+				} else if showEntitlements && !hasXML && hasDER {
+					log.Warn("No XML entitlements found; binary has DER entitlements (use --ent-der)")
+				} else if showEntitlementsDER && !hasDER && hasXML {
+					log.Warn("No DER entitlements found; binary has XML entitlements")
+				}
 			}
 			println()
 		}
