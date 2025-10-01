@@ -20,6 +20,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -125,9 +126,14 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 				}
 				if m.CodeSignature() != nil {
 					var output strings.Builder
-					// Add entitlements
+					// Add entitlements (try normal first, fallback to DER)
 					if len(m.CodeSignature().Entitlements) > 0 {
 						output.WriteString(m.CodeSignature().Entitlements)
+					} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+						// Fallback to DER entitlements if normal ones are empty
+						if entXML, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+							output.WriteString(entXML)
+						}
 					}
 					// Add launch constraints
 					if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
@@ -380,9 +386,14 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 		}
 		if m.CodeSignature() != nil {
 			var output strings.Builder
-			// Add entitlements
+			// Add entitlements (try normal first, fallback to DER)
 			if len(m.CodeSignature().Entitlements) > 0 {
 				output.WriteString(m.CodeSignature().Entitlements)
+			} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+				// Fallback to DER entitlements if normal ones are empty
+				if entXML, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+					output.WriteString(entXML)
+				}
 			}
 			// Add launch constraints
 			if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
