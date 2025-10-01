@@ -640,12 +640,20 @@ func (d *Diff) parseDSC() error {
 }
 
 func (d *Diff) parseEntitlements() (string, error) {
-	oldDB, err := ent.GetDatabase(&ent.Config{IPSW: d.Old.IPSWPath})
+	oldDB, err := ent.GetDatabase(&ent.Config{
+		IPSW:              d.Old.IPSWPath,
+		PemDB:             d.conf.PemDB,
+		LaunchConstraints: true,
+	})
 	if err != nil {
 		return "", err
 	}
 
-	newDB, err := ent.GetDatabase(&ent.Config{IPSW: d.New.IPSWPath})
+	newDB, err := ent.GetDatabase(&ent.Config{
+		IPSW:              d.New.IPSWPath,
+		PemDB:             d.conf.PemDB,
+		LaunchConstraints: true,
+	})
 	if err != nil {
 		return "", err
 	}
