@@ -97,7 +97,7 @@ var diffCmd = &cobra.Command{
 			return fmt.Errorf("you must specify two KDKs to diff; example: --kdk <KDK1> --kdk <KDK2>")
 		}
 
-		d := diff.New(&diff.Config{
+		d, err := diff.NewPipeline(&diff.Config{
 			Title:        viper.GetString("diff.title"),
 			IpswOld:      filepath.Clean(args[0]),
 			IpswNew:      filepath.Clean(args[1]),
@@ -115,7 +115,7 @@ var diffCmd = &cobra.Command{
 			Output:       viper.GetString("diff.output"),
 			Verbose:      Verbose,
 		})
-		if err := d.Diff(); err != nil {
+		if err != nil {
 			return err
 		}
 
