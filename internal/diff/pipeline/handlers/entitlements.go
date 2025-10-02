@@ -10,8 +10,8 @@ import (
 
 // EntitlementsHandler diffs entitlements databases between two IPSWs.
 //
-// Extracts entitlements from all MachO files and compares.
-// TODO: This will benefit from MachO cache when implemented.
+// Reads entitlements from the pre-populated MachO cache instead of scanning
+// files directly, eliminating redundant parsing.
 type EntitlementsHandler struct{}
 
 // Name returns the handler name for logging and results.
@@ -31,34 +31,18 @@ func (h *EntitlementsHandler) Enabled(cfg *pipeline.Config) bool {
 	return cfg.Entitlements
 }
 
-// Execute runs the entitlements diff operation.
+// Execute runs the entitlements diff operation using cached data.
 func (h *EntitlementsHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*pipeline.Result, error) {
 	result := &pipeline.Result{
 		HandlerName: h.Name(),
 		Metadata:    make(map[string]any),
 	}
 
-	// Build old entitlements database
-	oldDB, err := ent.GetDatabase(&ent.Config{
-		IPSW:              exec.OldCtx.IPSWPath,
-		PemDB:             exec.Config.PemDB,
-		LaunchConstraints: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get old entitlements database: %w", err)
-	}
+	// Extract entitlements from cache (no file scanning!)
+	oldDB := h.extractEntitlementsFromCache(exec.OldCtx.MachoCache)
+	newDB := h.extractEntitlementsFromCache(exec.NewCtx.MachoCache)
 
-	// Build new entitlements database
-	newDB, err := ent.GetDatabase(&ent.Config{
-		IPSW:              exec.NewCtx.IPSWPath,
-		PemDB:             exec.Config.PemDB,
-		LaunchConstraints: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new entitlements database: %w", err)
-	}
-
-	// Diff databases
+	// Diff databases using existing logic
 	diff, err := ent.DiffDatabases(oldDB, newDB, &ent.Config{
 		Markdown: true,
 		Color:    false,
@@ -70,4 +54,23 @@ func (h *EntitlementsHandler) Execute(ctx context.Context, exec *pipeline.Execut
 
 	result.Data = diff
 	return result, nil
+}
+
+// extractEntitlementsFromCache builds an entitlements database from cached data.
+//
+// This eliminates the need to scan MachO files again - we just read the
+// entitlements that were already extracted during cache population.
+func (h *EntitlementsHandler) extractEntitlementsFromCache(cache *pipeline.MachoCache) map[string]string {
+	entDB := make(map[string]string)
+
+	for path, metadata := range cache.All() {
+		// Skip files that failed to parse or have no entitlements
+		if metadata.ParseError != nil || metadata.Entitlements == "" {
+			continue
+		}
+
+		entDB[path] = metadata.Entitlements
+	}
+
+	return entDB
 }

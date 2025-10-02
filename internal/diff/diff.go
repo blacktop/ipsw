@@ -84,6 +84,8 @@ type Config struct {
 	Signatures   string
 	Output       string
 	Verbose      bool
+	Profile      bool
+	ProfileDir   string
 }
 
 // Context is the context for the diff
