@@ -37,6 +37,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
@@ -94,8 +95,7 @@ func init() {
 	downloadOtaCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	downloadOtaCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadOtaCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
-	downloadOtaCmd.Flags().Bool("fcs-keys", false, "Get AEA decryption keys as PEM files from OTA metadata")
-	downloadOtaCmd.Flags().Bool("fcs-keys-json", false, "Get AEA decryption keys as JSON from OTA metadata")
+	downloadOtaCmd.Flags().Bool("fcs-keys", false, "Get AEA decryption keys as JSON database from OTA metadata")
 	downloadOtaCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	downloadOtaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadOtaCmd.MarkFlagDirname("output")
@@ -133,7 +133,6 @@ func init() {
 	viper.BindPFlag("download.ota.pattern", downloadOtaCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ota.flat", downloadOtaCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ota.fcs-keys", downloadOtaCmd.Flags().Lookup("fcs-keys"))
-	viper.BindPFlag("download.ota.fcs-keys-json", downloadOtaCmd.Flags().Lookup("fcs-keys-json"))
 	viper.BindPFlag("download.ota.info", downloadOtaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.ota.output", downloadOtaCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ota.show-latest-version", downloadOtaCmd.Flags().Lookup("show-latest-version"))
@@ -159,7 +158,7 @@ var downloadOtaCmd = &cobra.Command{
 		❯ ipsw download ota --platform ios --sim --build "22F77"
 
 		# Get AEA decryption keys as JSON from latest iOS OTAs
-		❯ ipsw download ota --platform ios --latest --fcs-keys-json
+		❯ ipsw download ota --platform ios --latest --fcs-keys
 	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -195,7 +194,6 @@ var downloadOtaCmd = &cobra.Command{
 		remotePattern := viper.GetString("download.ota.pattern")
 		flat := viper.GetBool("download.ota.flat")
 		fcsKeys := viper.GetBool("download.ota.fcs-keys")
-		fcsKeysJson := viper.GetBool("download.ota.fcs-keys-json")
 		otaInfo := viper.GetBool("download.ota.info")
 		output := viper.GetString("download.ota.output")
 		showLatestVersion := viper.GetBool("download.ota.show-latest-version")
@@ -213,26 +211,26 @@ var downloadOtaCmd = &cobra.Command{
 				}
 			}
 		}
-		if len(platform) == 0 {
+		if platform == "" {
 			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos, visionos || accessory, macos, recovery")
 		} else {
 			if !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory", "visionos"}, platform) {
 				return fmt.Errorf("valid --platform flag choices are: ios, watchos, tvos, audioos, visionos || accessory, macos, recovery")
 			}
 		}
-		if (showLatestVersion || showLatestBuild) && len(device) == 0 {
+		if (showLatestVersion || showLatestBuild) && device == "" {
 			return fmt.Errorf("you must supply a --device when using --show-latest-version or --show-latest-build")
 		}
-		if len(version) == 0 {
+		if version == "" {
 			version = "0"
 		}
-		if getRSR && len(build) == 0 {
+		if getRSR && build == "" {
 			return fmt.Errorf("for now you will need to supply a --build number when using --rsr")
 		}
-		if viper.GetBool("download.ota.delta") && (len(build) == 0 || len(version) == 0) {
+		if viper.GetBool("download.ota.delta") && (build == "" || version == "") {
 			return fmt.Errorf("for now you will need to supply a --version AND --build number when using --delta")
 		}
-		if len(build) == 0 {
+		if build == "" {
 			build = "0"
 		}
 
@@ -350,25 +348,13 @@ var downloadOtaCmd = &cobra.Command{
 			return fmt.Errorf("no OTA found")
 		}
 
-		if fcsKeys || fcsKeysJson {
-			type FcsKeyEntry struct {
-				OS              string   `json:"os,omitempty"`
-				Version         string   `json:"version,omitempty"`
-				Build           string   `json:"build,omitempty"`
-				Devices         []string `json:"devices,omitempty"`
-				Models          []string `json:"models,omitempty"`
-				Key             string   `json:"key,omitempty"`
-				DocumentationID string   `json:"documentation_id,omitempty"`
-				URL             string   `json:"url,omitempty"`
-				Filename        string   `json:"filename,omitempty"`
-				Size            uint64   `json:"size,omitempty"`
-			}
-			var fcsKeyEntries []FcsKeyEntry
+		if fcsKeys {
+			var fcsKeyEntries []types.AEAKeyEntry
 			for _, o := range otas {
 				if len(o.ArchiveDecryptionKey) > 0 {
 					url := o.BaseURL + o.RelativePath
 					filename := filepath.Base(o.RelativePath)
-					fcsKeyEntries = append(fcsKeyEntries, FcsKeyEntry{
+					fcsKeyEntries = append(fcsKeyEntries, types.AEAKeyEntry{
 						OS:              o.ProductSystemName,
 						Version:         strings.TrimPrefix(o.OSVersion, "9.9."),
 						Build:           o.Build,
@@ -386,25 +372,71 @@ var downloadOtaCmd = &cobra.Command{
 				log.Warn("No AEA encrypted OTAs found with decryption keys")
 				return nil
 			}
-			if fcsKeysJson {
-				dat, err := json.MarshalIndent(fcsKeyEntries, "", "  ")
-				if err != nil {
-					return fmt.Errorf("failed to marshal FCS keys to JSON: %v", err)
-				}
-				outFile := filepath.Join(destPath, "ota_fcs_keys.json")
-				if err := os.WriteFile(outFile, dat, 0644); err != nil {
-					return fmt.Errorf("failed to write FCS keys JSON: %v", err)
-				}
-				log.Infof("Created %s", outFile)
-			} else {
-				for _, entry := range fcsKeyEntries {
-					outFile := filepath.Join(destPath, fmt.Sprintf("%s_%s_%s_fcs_key.pem", entry.OS, entry.Version, entry.Build))
-					if err := os.WriteFile(outFile, []byte(entry.Key), 0644); err != nil {
-						return fmt.Errorf("failed to write FCS key PEM: %v", err)
-					}
-					log.Infof("Created %s", outFile)
+
+			outFile := filepath.Join(destPath, "ota_fcs_keys.json")
+
+			// Read existing entries if file exists
+			var existingEntries []types.AEAKeyEntry
+			if data, err := os.ReadFile(outFile); err == nil {
+				if err := json.Unmarshal(data, &existingEntries); err != nil {
+					log.WithError(err).Warn("Failed to parse existing FCS keys JSON, will overwrite")
 				}
 			}
+
+			// Merge new entries with existing, using filename as unique key
+			entryMap := make(map[string]types.AEAKeyEntry)
+			for _, entry := range existingEntries {
+				entryMap[entry.Filename] = entry
+			}
+			// Track actually new entries
+			newCount := 0
+			updatedCount := 0
+			for _, entry := range fcsKeyEntries {
+				if _, exists := entryMap[entry.Filename]; exists {
+					updatedCount++
+				} else {
+					newCount++
+				}
+				entryMap[entry.Filename] = entry
+			}
+
+			// Extract keys and sort them for deterministic iteration
+			keys := make([]string, 0, len(entryMap))
+			for k := range entryMap {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			// Build slice in sorted key order, then sort by version/build
+			mergedEntries := make([]types.AEAKeyEntry, 0, len(entryMap))
+			for _, k := range keys {
+				mergedEntries = append(mergedEntries, entryMap[k])
+			}
+			sort.Slice(mergedEntries, func(i, j int) bool {
+				if mergedEntries[i].Version != mergedEntries[j].Version {
+					return mergedEntries[i].Version > mergedEntries[j].Version
+				}
+				return mergedEntries[i].Build > mergedEntries[j].Build
+			})
+
+			dat, err := json.MarshalIndent(mergedEntries, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal FCS keys to JSON: %v", err)
+			}
+			if err := os.WriteFile(outFile, dat, 0644); err != nil {
+				return fmt.Errorf("failed to write FCS keys JSON: %v", err)
+			}
+
+			if newCount > 0 && updatedCount > 0 {
+				log.Infof("Added %d new, updated %d existing entries in %s (total: %d)", newCount, updatedCount, outFile, len(mergedEntries))
+			} else if newCount > 0 {
+				log.Infof("Added %d new entries to %s (total: %d)", newCount, outFile, len(mergedEntries))
+			} else if updatedCount > 0 {
+				log.Infof("Updated %d existing entries in %s (total: %d)", updatedCount, outFile, len(mergedEntries))
+			} else {
+				log.Infof("No changes to %s (total: %d)", outFile, len(mergedEntries))
+			}
+
 			return nil
 		}
 

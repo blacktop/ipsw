@@ -10,6 +10,20 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
+// AEAKeyEntry represents an AEA decryption key database entry for OTAs
+type AEAKeyEntry struct {
+	OS              string   `json:"os,omitempty"`
+	Version         string   `json:"version,omitempty"`
+	Build           string   `json:"build,omitempty"`
+	Devices         []string `json:"devices,omitempty"`
+	Models          []string `json:"models,omitempty"`
+	Key             string   `json:"key,omitempty"`
+	DocumentationID string   `json:"documentation_id,omitempty"`
+	URL             string   `json:"url,omitempty"`
+	Filename        string   `json:"filename,omitempty"`
+	Size            uint64   `json:"size,omitempty"`
+}
+
 type bridgeVersionInfo struct {
 	BridgeBuildGroup          string `json:"BridgeBuildGroup,omitempty"`
 	BridgeProductBuildVersion string `json:"BridgeProductBuildVersion,omitempty"`
