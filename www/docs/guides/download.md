@@ -372,6 +372,31 @@ Just download the _kernelcache_ and _dyld_shared_cache_
 
 You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` remotely out of a OTA... ARE YOU NOT ENTERTAINED?!?!!? 😎
 
+### **download ota --fcs-keys**
+
+Build an OTA AEA decryption keys database _(for offline use)_
+
+```bash
+❯ ipsw download ota --platform ios --latest --fcs-keys
+   • Added 18 new entries to ota_fcs_keys.json (total: 18)
+```
+
+The database is **additive** so you can keep building it up
+
+```bash
+❯ ipsw download ota --platform ios --beta --fcs-keys
+   • Added 35 new entries to ota_fcs_keys.json (total: 53)
+```
+
+```bash
+❯ ipsw download ota --platform ios --version 18.0 --fcs-keys
+   • Added 12 new entries to ota_fcs_keys.json (total: 65)
+```
+
+:::info note
+Each OTA file gets its own unique AEA key _(unlike IPSWs where it's per-release)_. The JSON database includes the hash-based filename, URL, OS, version, build, devices, and the base64 key.
+:::
+
 ## **download macos**
 
 #### List macOS installers
