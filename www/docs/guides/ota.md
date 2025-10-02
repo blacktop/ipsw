@@ -21,7 +21,87 @@ To only download the OTA's `dyld_shared_cache(s)` and `kernelcache`
 If you are downloading OTAs for iOS16.x or macOS13.x or newer this will only work when ran on a **macOS Ventura** host as it calls into a private API to apply the patch.
 :::
 
-To download the latest RSR (Rapid Security Release) OTA
+#### Working with AEA Encrypted OTAs
+
+Modern OTAs are AEA encrypted _(just like IPSWs)_. The good news is `ipsw` handles this **automatically** 😎
+
+##### Fully Automatic _(requires internet)_
+
+```bash
+❯ ipsw ota info 72d75590b7c4eb278fcf0c5cf352b6407f93b58f46a724bd8bb4ce2be24239f1.aea
+```
+
+If the OTA has AEA metadata in its header, `ipsw` will automatically fetch the decryption key from Apple's servers. No flags needed.
+
+##### Build an OTA AEA Keys Database
+
+Download AEA keys as a JSON database for **offline** use
+
+```bash
+❯ ipsw download ota --platform ios --latest --fcs-keys
+   • Added 18 new entries to ota_fcs_keys.json (total: 18)
+```
+
+Now add more keys _(it appends)_
+
+```bash
+❯ ipsw download ota --platform ios --beta --fcs-keys
+   • Added 35 new entries to ota_fcs_keys.json (total: 53)
+```
+
+:::info note
+Unlike IPSW AEA keys _(which are per-release)_, OTA AEA keys are **per-file**. Each device/build combo gets its own unique key.
+:::
+
+##### Use the OTA Keys Database
+
+```bash
+❯ ipsw ota extract --key-db ota_fcs_keys.json some_ota.aea --kernel
+```
+
+The database automatically looks up the key by the OTA's hash-based filename. Works **offline** 🚀
+
+##### Manual Key
+
+You can still provide the key manually if needed
+
+```bash
+❯ ipsw ota info --key-val 9F7hR1YOTfRRi8herR0y3lTTqu+BsLZWuNeyWYIBj0M= some_ota.aea
+```
+
+:::info note
+Priority order: `--key-db` → `--key-val` → filename embedded key → automatic metadata lookup
+:::
+
+##### Troubleshooting Key Lookup
+
+If you encounter issues with AEA decryption, try these steps:
+
+**"Failed to decrypt AEA" error:**
+```bash
+# 1. Check if the OTA is in your key database
+❯ cat ota_fcs_keys.json | grep -i "filename"
+
+# 2. Try automatic key lookup (requires internet)
+❯ ipsw ota info --insecure some_ota.aea
+```
+
+**"No AEA key found in database" error:**
+- Verify the OTA filename matches an entry in `ota_fcs_keys.json`
+- Try downloading keys for that specific version: `ipsw download ota --version X.X --fcs-keys`
+- The database uses hash-based filenames (without `.aea` extension)
+
+**Offline decryption not working:**
+- Ensure you've built the key database first with `--fcs-keys`
+- Check the database file exists: `ls -lh ota_fcs_keys.json`
+- Verify database is valid JSON: `jq . ota_fcs_keys.json`
+
+**Network issues with automatic lookup:**
+- Use `--insecure` flag if behind corporate proxy
+- Or use `--key-db` / `--key-val` for offline decryption
+- Build key database ahead of time for air-gapped environments
+
+#### Download the latest RSR (Rapid Security Release) OTA
 
 ```bash
 ❯ ipsw download ota --platform ios --device iPhone15,2 --build 20C5049e --beta --rsr
