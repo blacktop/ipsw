@@ -18,7 +18,9 @@ ipsw ota [flags]
 
 ```
   -h, --help             help for ota
-      --key-val string   Base64 encoded symmetric encryption key
+      --insecure         Allow insecure connections when fetching AEA keys
+      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string   Base64 encoded AEA symmetric encryption key
 ```
 
 ### Options inherited from parent commands

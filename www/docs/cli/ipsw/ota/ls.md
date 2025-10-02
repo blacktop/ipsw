@@ -29,7 +29,9 @@ ipsw ota ls <OTA> [flags]
 ```
       --color            colorize output
       --config string    config file (default is $HOME/.config/ipsw/config.yaml)
-      --key-val string   Base64 encoded symmetric encryption key
+      --insecure         Allow insecure connections when fetching AEA keys
+      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string   Base64 encoded AEA symmetric encryption key
       --no-color         disable colorize output
   -V, --verbose          verbose output
 ```
