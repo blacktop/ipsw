@@ -31,6 +31,8 @@ func NewPipeline(conf *Config) (*Diff, error) {
 		Signatures:   conf.Signatures,
 		Output:       conf.Output,
 		Verbose:      conf.Verbose,
+		Profile:      conf.Profile,
+		ProfileDir:   conf.ProfileDir,
 	}
 
 	// Create executor
@@ -53,7 +55,7 @@ func NewPipeline(conf *Config) (*Diff, error) {
 		&handlers.FilesHandler{},
 		&handlers.EntitlementsHandler{},
 		&handlers.KDKHandler{},
-		// TODO: add MachO handler when cache is implemented
+		&handlers.MachOHandler{},
 	)
 
 	// Execute pipeline
@@ -183,7 +185,10 @@ func (d *Diff) populateFromResults(exec *pipeline.Executor) error {
 				d.New.Webkit = webkit
 			}
 
-		// TODO: handle other result types as handlers are added
+		case "MachO":
+			if machoDiff, ok := r.Data.(*mcmd.MachoDiff); ok {
+				d.Machos = machoDiff
+			}
 
 		default:
 			// Unknown handler result - log it but don't fail

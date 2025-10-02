@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -35,6 +39,7 @@ type Executor struct {
 	stats    *ExecutionStats
 	tmpDir   string
 	pemDB    string
+	profiler *Profiler
 
 	mu sync.RWMutex
 }
@@ -54,7 +59,13 @@ func NewExecutor(oldIPSW, newIPSW string, cfg *Config) *Executor {
 		},
 		Config: cfg,
 		pemDB:  cfg.PemDB,
-		stats:  &ExecutionStats{},
+		stats: &ExecutionStats{
+			HandlerTimes: make(map[string]time.Duration),
+		},
+		profiler: NewProfiler(&ProfileConfig{
+			Enabled:   cfg.Profile,
+			OutputDir: cfg.ProfileDir,
+		}),
 	}
 }
 
@@ -78,7 +89,33 @@ func (e *Executor) RegisterAll(handlers ...Handler) {
 // Individual handler errors are collected in stats but don't stop execution.
 func (e *Executor) Execute(ctx context.Context) error {
 	e.stats.StartTime = time.Now()
-	defer func() { e.stats.EndTime = time.Now() }()
+	defer func() {
+		e.stats.EndTime = time.Now()
+
+		// Capture final memory and GC stats
+		e.mu.Lock()
+		e.stats.EndMemory = e.captureMemoryStats()
+		e.stats.NumGC, e.stats.TotalGCPause = e.captureGCStats()
+		e.mu.Unlock()
+
+		// Log summary if verbose
+		if e.Config.Verbose {
+			log.Info("Execution statistics:")
+			log.Info(e.stats.Summary())
+		}
+	}()
+
+	// Capture initial memory stats
+	e.mu.Lock()
+	e.stats.StartMemory = e.captureMemoryStats()
+	e.stats.PeakMemory = e.stats.StartMemory
+	e.mu.Unlock()
+
+	// Start profiling if enabled (Go 1.25+ flight recorder)
+	if err := e.profiler.Start(ctx); err != nil {
+		log.WithError(err).Warn("Failed to start profiling")
+	}
+	defer e.profiler.StopOnPanic()
 
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "ipsw-diff")
@@ -161,6 +198,12 @@ func (e *Executor) executeGroup(ctx context.Context, group *HandlerGroup) error 
 	}
 	defer e.unmountDMGs(group.DMGTypes)
 
+	// Populate MachO caches after mounting but before handlers run
+	// This scans all MachO files once and caches the data for handlers to consume
+	if err := e.populateMachoCaches(ctx); err != nil {
+		return fmt.Errorf("failed to populate MachO caches: %w", err)
+	}
+
 	// Execute handlers concurrently within the group
 	g, gctx := errgroup.WithContext(ctx)
 	resultsChan := make(chan *Result, len(group.Handlers))
@@ -168,12 +211,26 @@ func (e *Executor) executeGroup(ctx context.Context, group *HandlerGroup) error 
 	for h := range group.Handlers {
 		handler := group.Handlers[h] // capture for goroutine
 		g.Go(func() error {
+			// Track handler execution time
+			startTime := time.Now()
+			defer func() {
+				duration := time.Since(startTime)
+				e.mu.Lock()
+				e.stats.HandlerTimes[handler.Name()] = duration
+				e.mu.Unlock()
+				log.Infof("Handler %s completed in %s", handler.Name(), duration)
+			}()
+
 			log.Infof("Running %s", handler.Name())
 			result, err := handler.Execute(gctx, e)
 			if err != nil {
 				log.WithError(err).Errorf("Handler %s failed", handler.Name())
 				return fmt.Errorf("%w: %s: %v", ErrHandlerFailed, handler.Name(), err)
 			}
+
+			// Update peak memory after handler execution
+			e.updatePeakMemory()
+
 			if result != nil {
 				resultsChan <- result
 			}
@@ -204,6 +261,13 @@ func (e *Executor) executeGroup(ctx context.Context, group *HandlerGroup) error 
 
 // mountDMGs mounts the required DMG types for both old and new contexts.
 func (e *Executor) mountDMGs(dmgTypes []DMGType) error {
+	startTime := time.Now()
+	defer func() {
+		e.mu.Lock()
+		e.stats.MountTime += time.Since(startTime)
+		e.mu.Unlock()
+	}()
+
 	for dmgType := range dmgTypes {
 		if dmgTypes[dmgType] == DMGTypeNone {
 			continue
@@ -253,6 +317,13 @@ func (e *Executor) mountDMG(ctx *Context, dmgType DMGType) error {
 		return fmt.Errorf("failed to mount: %w", err)
 	}
 
+	// Increment mount counter if we actually mounted (not already mounted)
+	if !alreadyMounted {
+		e.mu.Lock()
+		e.stats.MountCount++
+		e.mu.Unlock()
+	}
+
 	ctx.SetMount(dmgType, &Mount{
 		DMGPath:   dmgPath,
 		MountPath: mountPath,
@@ -265,6 +336,13 @@ func (e *Executor) mountDMG(ctx *Context, dmgType DMGType) error {
 
 // unmountDMGs unmounts all DMG types for both contexts.
 func (e *Executor) unmountDMGs(dmgTypes []DMGType) {
+	startTime := time.Now()
+	defer func() {
+		e.mu.Lock()
+		e.stats.UnmountTime += time.Since(startTime)
+		e.mu.Unlock()
+	}()
+
 	for dmgType := range dmgTypes {
 		if dmgTypes[dmgType] == DMGTypeNone {
 			continue
@@ -286,6 +364,11 @@ func (e *Executor) unmountDMG(ctx *Context, dmgType DMGType) {
 		return utils.Unmount(mount.MountPath, true)
 	}); err != nil {
 		log.WithError(err).Errorf("Failed to unmount %s", dmgType)
+	} else {
+		// Increment unmount counter on success
+		e.mu.Lock()
+		e.stats.UnmountCount++
+		e.mu.Unlock()
 	}
 
 	// Clean up extracted DMG
@@ -304,6 +387,15 @@ func (e *Executor) Results() []*Result {
 	return results
 }
 
+// Stats returns the execution statistics.
+func (e *Executor) Stats() *ExecutionStats {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	// Return a copy to prevent external modification
+	statsCopy := *e.stats
+	return &statsCopy
+}
+
 // GetResult returns the result from a specific handler by name.
 func (e *Executor) GetResult(handlerName string) (*Result, bool) {
 	e.mu.RLock()
@@ -316,14 +408,39 @@ func (e *Executor) GetResult(handlerName string) (*Result, bool) {
 	return nil, false
 }
 
-// Stats returns execution statistics.
-func (e *Executor) Stats() *ExecutionStats {
-	return e.stats
-}
-
 // TempDir returns the temporary directory path.
 func (e *Executor) TempDir() string {
 	return e.tmpDir
+}
+
+// captureMemoryStats captures current memory statistics.
+func (e *Executor) captureMemoryStats() uint64 {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return m.Alloc // Bytes allocated and still in use
+}
+
+// captureGCStats captures garbage collection statistics.
+func (e *Executor) captureGCStats() (numGC uint32, totalPause time.Duration) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	// Calculate total GC pause time
+	for i := range m.PauseNs {
+		totalPause += time.Duration(m.PauseNs[i])
+	}
+
+	return m.NumGC, totalPause
+}
+
+// updatePeakMemory updates the peak memory usage if current usage is higher.
+func (e *Executor) updatePeakMemory() {
+	current := e.captureMemoryStats()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if current > e.stats.PeakMemory {
+		e.stats.PeakMemory = current
+	}
 }
 
 // Helper functions
@@ -477,4 +594,202 @@ func (e *Executor) handleAEADecryption(dmgPath *string) error {
 
 	*dmgPath = decrypted
 	return nil
+}
+
+// populateMachoCaches scans all MachO files in both IPSWs and populates the caches.
+//
+// This is called ONCE after DMG mounting but BEFORE handlers run. It eliminates
+// redundant file parsing by scanning each MachO file once and storing all extracted
+// data in memory for handlers to consume.
+//
+// Expected memory usage: ~840MB for 30,000 files (~28KB per file)
+func (e *Executor) populateMachoCaches(ctx context.Context) error {
+	// Check if we need to populate caches (only for SystemOS group)
+	// Other groups don't need MachO scanning
+	_, hasOldMount := e.OldCtx.GetMount(DMGTypeSystemOS)
+	_, hasNewMount := e.NewCtx.GetMount(DMGTypeSystemOS)
+
+	if !hasOldMount && !hasNewMount {
+		// No SystemOS DMGs mounted, skip cache population
+		return nil
+	}
+
+	// Track cache population time
+	startTime := time.Now()
+	log.Info("Populating MachO caches...")
+
+	// Scan both IPSWs in parallel
+	var wg sync.WaitGroup
+	var oldErr, newErr error
+
+	if hasOldMount {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Debug("Scanning MachO files in old IPSW...")
+			oldErr = e.scanMachOs(ctx, e.OldCtx)
+		}()
+	}
+
+	if hasNewMount {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Debug("Scanning MachO files in new IPSW...")
+			newErr = e.scanMachOs(ctx, e.NewCtx)
+		}()
+	}
+
+	wg.Wait()
+
+	// Check for errors
+	if oldErr != nil {
+		return fmt.Errorf("failed to scan old IPSW: %w", oldErr)
+	}
+	if newErr != nil {
+		return fmt.Errorf("failed to scan new IPSW: %w", newErr)
+	}
+
+	// Record cache metrics
+	e.mu.Lock()
+	e.stats.CachePopulated = true
+	e.stats.CachePopulateTime = time.Since(startTime)
+	e.stats.OldCacheSize = e.OldCtx.MachoCache.Len()
+	e.stats.NewCacheSize = e.NewCtx.MachoCache.Len()
+	e.stats.OldCacheErrors = e.OldCtx.MachoCache.ErrorCount()
+	e.stats.NewCacheErrors = e.NewCtx.MachoCache.ErrorCount()
+	e.mu.Unlock()
+
+	// Log summary
+	log.Infof("MachO cache populated: %d files (old), %d files (new) in %s",
+		e.stats.OldCacheSize, e.stats.NewCacheSize, e.stats.CachePopulateTime)
+
+	if e.stats.OldCacheErrors > 0 || e.stats.NewCacheErrors > 0 {
+		log.Warnf("Cache population errors: %d (old), %d (new)",
+			e.stats.OldCacheErrors, e.stats.NewCacheErrors)
+	}
+
+	return nil
+}
+
+// scanMachOs scans all MachO files in the IPSW and populates the cache.
+func (e *Executor) scanMachOs(ctx context.Context, ipswCtx *Context) error {
+	return search.ForEachMachoInIPSW(ipswCtx.IPSWPath, e.pemDB, func(path string, m *macho.File) error {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Extract all metadata from this MachO file
+		metadata := e.extractMachoMetadata(path, m)
+
+		// Store in cache
+		ipswCtx.MachoCache.Set(path, metadata)
+
+		return nil
+	})
+}
+
+// extractMachoMetadata extracts all relevant data from a MachO file.
+//
+// This is the single point where we parse each file. All data needed by
+// any handler is extracted here to avoid redundant parsing.
+func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetadata {
+	metadata := &MachoMetadata{
+		Path:     path,
+		ParsedAt: time.Now(),
+	}
+
+	// Extract UUID
+	if m.UUID() != nil {
+		metadata.UUID = m.UUID().String()
+	}
+
+	// Extract version
+	if m.SourceVersion() != nil {
+		metadata.Version = m.SourceVersion().Version.String()
+	}
+
+	// Extract file size
+	if stat, err := os.Stat(path); err == nil {
+		metadata.Size = stat.Size()
+	}
+
+	// Extract sections (applying allow/block lists)
+	for _, s := range m.Sections {
+		sectionName := s.Seg + "." + s.Name
+
+		// Apply allow list
+		if len(e.Config.AllowList) > 0 {
+			if !slices.Contains(e.Config.AllowList, sectionName) {
+				continue
+			}
+		}
+
+		// Apply block list
+		if len(e.Config.BlockList) > 0 {
+			if slices.Contains(e.Config.BlockList, sectionName) {
+				continue
+			}
+		}
+
+		metadata.Sections = append(metadata.Sections, SectionInfo{
+			Name: sectionName,
+			Size: s.Size,
+		})
+	}
+
+	// Extract symbols
+	if m.Symtab != nil {
+		for _, sym := range m.Symtab.Syms {
+			metadata.Symbols = append(metadata.Symbols, sym.Name)
+		}
+		slices.Sort(metadata.Symbols)
+	}
+
+	// Extract functions
+	if fns := m.GetFunctions(); fns != nil {
+		metadata.Functions = len(fns)
+	}
+
+	// Extract C strings (expensive, only if enabled)
+	if e.Config.CStrings {
+		if cs, err := m.GetCStrings(); err == nil {
+			for _, val := range cs {
+				for str := range val {
+					metadata.CStrings = append(metadata.CStrings, str)
+				}
+			}
+			slices.Sort(metadata.CStrings)
+		}
+
+		if cfstrs, err := m.GetCFStrings(); err == nil {
+			for _, val := range cfstrs {
+				metadata.CStrings = append(metadata.CStrings, val.Name)
+			}
+			slices.Sort(metadata.CStrings)
+		}
+	}
+
+	// Extract load commands
+	for _, lc := range m.Loads {
+		metadata.LoadCommands = append(metadata.LoadCommands, lc.Command().String())
+	}
+
+	// Extract entitlements (if code signature exists)
+	if m.CodeSignature() != nil {
+		// Try normal entitlements first
+		if len(m.CodeSignature().Entitlements) > 0 {
+			metadata.Entitlements = m.CodeSignature().Entitlements
+		} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+			// Fallback to DER entitlements
+			if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+				metadata.Entitlements = decoded
+			}
+		}
+	}
+
+	return metadata
 }
