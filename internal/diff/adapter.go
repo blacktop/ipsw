@@ -33,6 +33,7 @@ func NewPipeline(conf *Config) (*Diff, error) {
 		Verbose:      conf.Verbose,
 		Profile:      conf.Profile,
 		ProfileDir:   conf.ProfileDir,
+		MemProfile:   conf.MemProfile,
 	}
 
 	// Create executor

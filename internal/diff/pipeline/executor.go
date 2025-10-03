@@ -63,8 +63,9 @@ func NewExecutor(oldIPSW, newIPSW string, cfg *Config) *Executor {
 			HandlerTimes: make(map[string]time.Duration),
 		},
 		profiler: NewProfiler(&ProfileConfig{
-			Enabled:   cfg.Profile,
-			OutputDir: cfg.ProfileDir,
+			Enabled:      cfg.Profile,
+			EnableMemory: cfg.MemProfile,
+			OutputDir:    cfg.ProfileDir,
 		}),
 	}
 }
