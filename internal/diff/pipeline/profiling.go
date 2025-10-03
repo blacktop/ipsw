@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"runtime/trace"
 	"time"
 
@@ -14,8 +15,9 @@ import (
 
 // ProfileConfig holds profiling configuration.
 type ProfileConfig struct {
-	Enabled   bool   // Enable profiling
-	OutputDir string // Directory for profile output (default: "./profiles")
+	Enabled      bool   // Enable execution trace profiling
+	EnableMemory bool   // Enable memory profiling
+	OutputDir    string // Directory for profile output (default: "./profiles")
 }
 
 // Profiler manages execution profiling using Go 1.25+ flight recorder.
@@ -54,35 +56,38 @@ func NewProfiler(config *ProfileConfig) *Profiler {
 // execution events with minimal overhead. The trace is written to disk when
 // Stop() is called or if the program crashes.
 func (p *Profiler) Start(ctx context.Context) error {
-	if !p.config.Enabled {
-		return nil
-	}
-
-	// Ensure output directory exists
-	if err := os.MkdirAll(p.config.OutputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create profile directory: %w", err)
-	}
-
-	// Generate trace filename with timestamp
+	// Initialize timestamp for all profiling (used by both trace and memory)
 	p.startTime = time.Now()
-	filename := fmt.Sprintf("trace-%s.out", p.startTime.Format("20060102-150405"))
-	tracePath := filepath.Join(p.config.OutputDir, filename)
 
-	// Create trace file
-	f, err := os.Create(tracePath)
-	if err != nil {
-		return fmt.Errorf("failed to create trace file: %w", err)
-	}
-	p.traceFile = f
-
-	// Start execution trace (flight recorder mode in Go 1.25+)
-	if err := trace.Start(f); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to start trace: %w", err)
+	// Ensure output directory exists if any profiling is enabled
+	if p.config.Enabled || p.config.EnableMemory {
+		if err := os.MkdirAll(p.config.OutputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create profile directory: %w", err)
+		}
 	}
 
-	log.WithField("path", tracePath).Info("Flight recorder profiling started")
-	log.Info("Trace will be written on completion for analysis")
+	// Start trace profiling if enabled
+	if p.config.Enabled {
+		// Generate trace filename with timestamp
+		filename := fmt.Sprintf("trace-%s.out", p.startTime.Format("20060102-150405"))
+		tracePath := filepath.Join(p.config.OutputDir, filename)
+
+		// Create trace file
+		f, err := os.Create(tracePath)
+		if err != nil {
+			return fmt.Errorf("failed to create trace file: %w", err)
+		}
+		p.traceFile = f
+
+		// Start execution trace (flight recorder mode in Go 1.25+)
+		if err := trace.Start(f); err != nil {
+			f.Close()
+			return fmt.Errorf("failed to start trace: %w", err)
+		}
+
+		log.WithField("path", tracePath).Info("Flight recorder profiling started")
+		log.Info("Trace will be written on completion for analysis")
+	}
 
 	return nil
 }
@@ -96,25 +101,63 @@ func (p *Profiler) Start(ctx context.Context) error {
 //
 // Or converted to CPU/memory profiles using ExtractProfiles().
 func (p *Profiler) Stop() error {
-	if !p.config.Enabled || p.traceFile == nil {
+	// Stop trace profiling if enabled
+	if p.config.Enabled && p.traceFile != nil {
+		// Stop trace and close file
+		trace.Stop()
+		if err := p.traceFile.Close(); err != nil {
+			return fmt.Errorf("failed to close trace file: %w", err)
+		}
+
+		duration := time.Since(p.startTime)
+		log.WithFields(log.Fields{
+			"path":     p.traceFile.Name(),
+			"duration": duration,
+			"size":     formatFileSize(p.traceFile.Name()),
+		}).Info("Flight recorder trace written")
+
+		// Print analysis instructions
+		log.Info("Analyze trace with: go tool trace " + p.traceFile.Name())
+	}
+
+	// Write memory profile if enabled (independent of trace profiling)
+	if p.config.EnableMemory {
+		if err := p.writeMemProfile(); err != nil {
+			log.WithError(err).Warn("Failed to write memory profile")
+		}
+	}
+
+	return nil
+}
+
+// writeMemProfile writes a heap memory profile to disk.
+func (p *Profiler) WriteMemProfile() error {
+	if !p.config.EnableMemory {
 		return nil
 	}
+	return p.writeMemProfile()
+}
 
-	// Stop trace and close file
-	trace.Stop()
-	if err := p.traceFile.Close(); err != nil {
-		return fmt.Errorf("failed to close trace file: %w", err)
+func (p *Profiler) writeMemProfile() error {
+	// Force GC to get accurate heap stats
+	runtime.GC()
+
+	memPath := filepath.Join(p.config.OutputDir, fmt.Sprintf("mem-%s.pprof", p.startTime.Format("20060102-150405")))
+	f, err := os.Create(memPath)
+	if err != nil {
+		return fmt.Errorf("failed to create memory profile: %w", err)
+	}
+	defer f.Close()
+
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		return fmt.Errorf("failed to write heap profile: %w", err)
 	}
 
-	duration := time.Since(p.startTime)
 	log.WithFields(log.Fields{
-		"path":     p.traceFile.Name(),
-		"duration": duration,
-		"size":     formatFileSize(p.traceFile.Name()),
-	}).Info("Flight recorder trace written")
-
-	// Print analysis instructions
-	log.Info("Analyze trace with: go tool trace " + p.traceFile.Name())
+		"path": memPath,
+		"size": formatFileSize(memPath),
+	}).Info("Memory profile written")
+	log.Info("Analyze with: go tool pprof " + memPath)
 
 	return nil
 }

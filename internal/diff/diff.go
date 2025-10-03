@@ -86,6 +86,7 @@ type Config struct {
 	Verbose      bool
 	Profile      bool
 	ProfileDir   string
+	MemProfile   bool
 }
 
 // Context is the context for the diff

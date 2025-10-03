@@ -35,6 +35,7 @@ type Config struct {
 	// Profiling settings
 	Profile    bool   // Enable flight recorder profiling
 	ProfileDir string // Profile output directory
+	MemProfile bool   // Enable memory profiling
 }
 
 // Context represents the state for one IPSW being diffed (either old or new).

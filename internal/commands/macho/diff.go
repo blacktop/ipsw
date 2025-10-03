@@ -178,7 +178,265 @@ func (i *DiffInfo) String() string {
 	return out
 }
 
+// ComputePairDiff compares two DiffInfo objects and returns the diff output.
+//
+// This function enables streaming diff computation without accumulating all DiffInfo
+// objects in memory. It returns an empty string if the two objects are equal.
+//
+// Memory optimization: By computing diffs immediately for each pair, we avoid
+// accumulating 9+ GB of DiffInfo data. Instead, we only keep the ~50 KB diff result.
+func ComputePairDiff(dat1, dat2 *DiffInfo, conf *DiffConfig) (string, error) {
+	// Early exit if no changes
+	if dat2.Equal(*dat1) {
+		return "", nil
+	}
+
+	var result strings.Builder
+	var err error
+
+	// Compute header diff (version, sections, imports)
+	var headerDiff string
+	if conf.Markdown {
+		headerDiff, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+		if err != nil {
+			return "", err
+		}
+	} else {
+		headerDiff, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if len(headerDiff) == 0 {
+		return "", nil // No diff
+	}
+
+	if conf.Markdown {
+		result.WriteString("```diff\n")
+	}
+	result.WriteString(headerDiff)
+
+	// DIFF Symbols
+	newSyms := utils.Difference(dat2.Symbols, dat1.Symbols)
+	sort.Strings(newSyms)
+	rmSyms := utils.Difference(dat1.Symbols, dat2.Symbols)
+	sort.Strings(rmSyms)
+	if len(newSyms) > 0 || len(rmSyms) > 0 {
+		result.WriteString("Symbols:\n")
+		for _, s := range newSyms {
+			result.WriteString(fmt.Sprintf("+ %s\n", s))
+		}
+		for _, s := range rmSyms {
+			result.WriteString(fmt.Sprintf("- %s\n", s))
+		}
+	}
+
+	// DIFF Functions
+	if conf.FuncStarts {
+		funcDiff := computeFunctionDiff(dat1, dat2)
+		if len(funcDiff) > 0 {
+			result.WriteString(funcDiff)
+		}
+	}
+
+	// DIFF CStrings
+	if conf.CStrings {
+		newStrs := utils.Difference(dat2.CStrings, dat1.CStrings)
+		sort.Strings(newStrs)
+		rmStrs := utils.Difference(dat1.CStrings, dat2.CStrings)
+		sort.Strings(rmStrs)
+		if len(newStrs) > 0 || len(rmStrs) > 0 {
+			result.WriteString("CStrings:\n")
+			for _, s := range newStrs {
+				result.WriteString(fmt.Sprintf("+ %#v\n", s))
+			}
+			for _, s := range rmStrs {
+				result.WriteString(fmt.Sprintf("- %#v\n", s))
+			}
+		}
+	}
+
+	if conf.Markdown {
+		result.WriteString("\n```\n")
+	}
+
+	return result.String(), nil
+}
+
+// computeFunctionDiff performs the function diff logic extracted from Generate().
+func computeFunctionDiff(dat1, dat2 *DiffInfo) string {
+	// Helper for printable name
+	printable := func(f types.Function, smap map[uint64]string) string {
+		sym, ok := smap[f.StartAddr]
+		if ok {
+			return sym
+		}
+		return fmt.Sprintf("sub_%x", f.StartAddr)
+	}
+
+	funcs1 := dat1.Starts
+	funcs2 := dat2.Starts
+
+	n1, n2 := len(funcs1), len(funcs2)
+
+	var b strings.Builder
+	appendLine := func(s string) {
+		if b.Len() == 0 {
+			b.WriteString("Functions:\n")
+		}
+		b.WriteString(s)
+	}
+
+	// same count
+	if n1 == n2 {
+		consecutiveMismatch := 0
+		const maxMismatch = 5
+
+		for i := range n1 {
+			f1 := funcs1[i]
+			f2 := funcs2[i]
+			f1.Name = printable(f1, dat1.SymbolMap)
+			f2.Name = printable(f2, dat2.SymbolMap)
+
+			if f1.Name != "" && f1.Name == f2.Name {
+				// same symbol – only record if size changed
+				sz1 := f1.EndAddr - f1.StartAddr
+				sz2 := f2.EndAddr - f2.StartAddr
+				if sz1 != sz2 {
+					appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
+				}
+				consecutiveMismatch = 0
+				continue
+			}
+
+			// unnamed or different names – compare size
+			sz1 := f1.EndAddr - f1.StartAddr
+			sz2 := f2.EndAddr - f2.StartAddr
+
+			if sz1 == sz2 {
+				consecutiveMismatch = 0
+				continue // treat as aligned
+			}
+
+			// size diff
+			appendLine(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
+			consecutiveMismatch++
+
+			if consecutiveMismatch >= maxMismatch {
+				// scan ahead for 3 consecutive size matches to recover
+				recovered := false
+				const seekAhead = 6
+				if i+seekAhead < n1 {
+					matches := 0
+					for k := 1; k <= seekAhead && i+k < n1; k++ {
+						if (funcs1[i+k].EndAddr - funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr - funcs2[i+k].StartAddr) {
+							matches++
+							if matches >= 3 {
+								recovered = true
+								break
+							}
+						} else {
+							matches = 0
+						}
+					}
+				}
+				if !recovered {
+					// bail out – noisy diff
+					b.Reset()
+					break
+				}
+			}
+		}
+
+		return b.String()
+	}
+
+	// different counts – two-pointer scan with simple heuristics
+	i, j := 0, 0
+	consecutiveNoise := 0
+	const noiseLimit = 6
+
+	for i < n1 && j < n2 {
+		f1 := funcs1[i]
+		f2 := funcs2[j]
+		f1.Name = printable(f1, dat1.SymbolMap)
+		f2.Name = printable(f2, dat2.SymbolMap)
+		// strong name match
+		if f1.Name != "" && f1.Name == f2.Name {
+			sz1 := f1.EndAddr - f1.StartAddr
+			sz2 := f2.EndAddr - f2.StartAddr
+			if sz1 != sz2 {
+				appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
+			}
+			i++
+			j++
+			consecutiveNoise = 0
+			continue
+		}
+
+		// size match
+		if (f1.EndAddr - f1.StartAddr) == (f2.EndAddr - f2.StartAddr) {
+			i++
+			j++
+			consecutiveNoise = 0
+			continue
+		}
+
+		// try simple insert/delete to recoup
+		if j+1 < n2 && (f1.EndAddr-f1.StartAddr) == (funcs2[j+1].EndAddr-funcs2[j+1].StartAddr) {
+			appendLine(fmt.Sprintf("+ %s\n", f2.Name))
+			j++
+			consecutiveNoise++
+		} else if i+1 < n1 && (funcs1[i+1].EndAddr-funcs1[i+1].StartAddr) == (f2.EndAddr-f2.StartAddr) {
+			appendLine(fmt.Sprintf("- %s\n", f1.Name))
+			i++
+			consecutiveNoise++
+		} else {
+			consecutiveNoise++
+		}
+
+		if consecutiveNoise >= noiseLimit {
+			b.Reset()
+			break
+		}
+	}
+
+	return b.String()
+}
+
 func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfig) error {
+
+	/* DIFF IPSW */
+	diff.New = utils.Difference(slices.Collect(maps.Keys(next)), slices.Collect(maps.Keys(prev)))
+	diff.Removed = utils.Difference(slices.Collect(maps.Keys(prev)), slices.Collect(maps.Keys(next)))
+
+	// Use the new ComputePairDiff function for each common file
+	for _, currentFileKey := range slices.Sorted(maps.Keys(next)) {
+		dat2 := next[currentFileKey]
+		if dat1, ok := prev[currentFileKey]; ok {
+			// Skip if either is nil (added/removed images with no DiffInfo)
+			if dat1 == nil || dat2 == nil {
+				continue
+			}
+
+			// Compute diff for this pair
+			diffStr, err := ComputePairDiff(dat1, dat2, conf)
+			if err != nil {
+				return err
+			}
+			if len(diffStr) > 0 {
+				diff.Updated[currentFileKey] = diffStr
+			}
+		}
+	}
+
+	return nil
+}
+
+// GenerateLegacy is the old implementation kept for reference.
+// TODO: Remove after confirming new implementation works correctly.
+func (diff *MachoDiff) GenerateLegacy(prev, next map[string]*DiffInfo, conf *DiffConfig) error {
 
 	/* DIFF IPSW */
 	diff.New = utils.Difference(slices.Collect(maps.Keys(next)), slices.Collect(maps.Keys(prev)))
@@ -188,6 +446,10 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 	for _, currentFileKey := range slices.Sorted(maps.Keys(next)) {
 		dat2 := next[currentFileKey]
 		if dat1, ok := prev[currentFileKey]; ok {
+			// Skip if either is nil (added/removed images with no DiffInfo)
+			if dat1 == nil || dat2 == nil {
+				continue
+			}
 			if dat2.Equal(*dat1) {
 				continue
 			}

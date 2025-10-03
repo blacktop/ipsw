@@ -55,6 +55,7 @@ func init() {
 	diffCmd.MarkFlagDirname("output")
 	diffCmd.Flags().Bool("profile", false, "Enable flight recorder profiling (Go 1.25+)")
 	diffCmd.Flags().String("profile-dir", "./profiles", "Directory for profile output")
+	diffCmd.Flags().Bool("memprofile", false, "Enable memory profiling")
 	diffCmd.MarkFlagDirname("profile-dir")
 	diffCmd.MarkFlagsMutuallyExclusive("markdown", "json", "html")
 	// viper.BindPFlag("diff.in", diffCmd.Flags().Lookup("in"))
@@ -76,6 +77,7 @@ func init() {
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 	viper.BindPFlag("diff.profile", diffCmd.Flags().Lookup("profile"))
 	viper.BindPFlag("diff.profile-dir", diffCmd.Flags().Lookup("profile-dir"))
+	viper.BindPFlag("diff.memprofile", diffCmd.Flags().Lookup("memprofile"))
 }
 
 // diffCmd represents the diff command
@@ -121,6 +123,7 @@ var diffCmd = &cobra.Command{
 			Verbose:      Verbose,
 			Profile:      viper.GetBool("diff.profile"),
 			ProfileDir:   viper.GetString("diff.profile-dir"),
+			MemProfile:   viper.GetBool("diff.memprofile"),
 		})
 		if err != nil {
 			return err
