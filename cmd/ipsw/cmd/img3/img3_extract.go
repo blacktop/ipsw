@@ -60,11 +60,11 @@ var img3ExtractCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
-		outputFile := viper.GetString("output")
-		ivKeyStr := viper.GetString("iv-key")
-		ivStr := viper.GetString("iv")
-		keyStr := viper.GetString("key")
-		rawExtract := viper.GetBool("raw")
+		outputFile := viper.GetString("img3.extract.output")
+		ivKeyStr := viper.GetString("img3.extract.iv-key")
+		ivStr := viper.GetString("img3.extract.iv")
+		keyStr := viper.GetString("img3.extract.key")
+		rawExtract := viper.GetBool("img3.extract.raw")
 		// validate flags
 		decrypt := ivKeyStr != "" || (ivStr != "" && keyStr != "")
 		if rawExtract && decrypt {
