@@ -17,12 +17,15 @@ ipsw img3 extract [flags]
 ### Options
 
 ```
-  -h, --help            help for extract
-      --iv string       IV for decryption (hex string)
-  -k, --iv-key string   IV+Key for direct decryption (concatenated hex string)
-      --key string      Key for decryption (hex string)
-  -o, --output string   Output file for extracted data
-  -r, --raw             Extract raw data (no decryption)
+  -h, --help                   help for extract
+      --iv string              IV for decryption (hex string)
+  -k, --iv-key string          IV+Key for direct decryption (concatenated hex string)
+      --key string             Key for decryption (hex string)
+      --lookup                 Auto-lookup IV/key on theapplewiki.com
+      --lookup-build string    Build number for key lookup (e.g., 20H71)
+      --lookup-device string   Device identifier for key lookup (e.g., iPhone14,2)
+  -o, --output string          Output file for extracted data
+  -r, --raw                    Extract raw data (no decryption)
 ```
 
 ### Options inherited from parent commands
