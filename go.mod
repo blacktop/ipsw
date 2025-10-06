@@ -26,7 +26,7 @@ require (
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.20
 	github.com/blacktop/lzfse-cgo v1.1.20
-	github.com/blacktop/lzss v0.1.5
+	github.com/blacktop/lzss v0.1.8
 	github.com/blacktop/ranger v1.0.3
 	github.com/boombuler/barcode v1.1.0
 	github.com/briandowns/spinner v1.23.2
