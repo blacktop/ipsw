@@ -152,8 +152,8 @@ github.com/blacktop/go-termimg v0.1.20 h1:+EAUc3c9hwE/fUYaqRV1BSLvAlOuLySgLTEBzx
 github.com/blacktop/go-termimg v0.1.20/go.mod h1:nwxrOjfFcBjtS358oIGBLfscSLnCpNdRlMVRxsnZwMU=
 github.com/blacktop/lzfse-cgo v1.1.20 h1:xlfMq7g1aaMCyWr8/hHqsWzvfaF8QaliU1YxDCfMx68=
 github.com/blacktop/lzfse-cgo v1.1.20/go.mod h1:VoBC8Nle73KZg/4X9NW94jkFrQkNwQ18SMMu5ev8zSA=
-github.com/blacktop/lzss v0.1.5 h1:xkmMxEdDPu4u7vjEE4N/LGJ+VfVE0QchjAOSZemNRa0=
-github.com/blacktop/lzss v0.1.5/go.mod h1:eWPx0Tq21QndictvoAb20bFvvhDDbZ3mkcZ/mDHkwBk=
+github.com/blacktop/lzss v0.1.8 h1:El89/FGEjtf8hb4NcPYTxssHzTkNQj3rZX6Gj2mlPFs=
+github.com/blacktop/lzss v0.1.8/go.mod h1:TOBycDBKPAldv/R+4FbxGTdeCjnVxT1xyx+ktfX8B74=
 github.com/blacktop/ranger v1.0.3 h1:uIWlR8chK6AtNNPZz67+cwibOe8T5XnYyQfkk04ueZA=
 github.com/blacktop/ranger v1.0.3/go.mod h1:2KXlAasHzrHMkXg1+/87hT5ISdQjxlcjbmZFZD69zas=
 github.com/boombuler/barcode v1.1.0 h1:ChaYjBR63fr4LFyGn8E8nt7dBSt3MiU3zMOZqFvVkHo=
