@@ -115,9 +115,9 @@ var idaCmd = &cobra.Command{
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
 		} else if len(args) > 2 && viper.GetBool("dyld.ida.dependancies") {
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
-		} else if viper.IsSet("dyld.ida.diaphora-db") && !viper.IsSet("dyld.ida.script") {
+		} else if viper.GetString("dyld.ida.diaphora-db") != "" && viper.GetString("dyld.ida.script") == "" {
 			return fmt.Errorf("must supply '--script /path/to/diaphora.py' with '--diaphora-db /path/to/diaphora.db'")
-		} else if (viper.IsSet("dyld.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("dyld.ida.enable-gui") {
+		} else if (viper.GetString("dyld.ida.diaphora-db") != "" || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("dyld.ida.enable-gui") {
 			return fmt.Errorf("diaphora analysis should be done headless and NOT with '--enable-gui'")
 		}
 
@@ -125,7 +125,7 @@ var idaCmd = &cobra.Command{
 			env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
 		}
 
-		if !viper.IsSet("dyld.ida.ida-path") {
+		if viper.GetString("dyld.ida.ida-path") == "" {
 			switch runtime.GOOS {
 			case "darwin":
 				matches, err := filepath.Glob(ida.DarwinPathGlob)
@@ -303,11 +303,11 @@ var idaCmd = &cobra.Command{
 			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", filepath.Base(img.Name), f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		}
 
-		if viper.IsSet("dyld.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py") {
+		if viper.GetString("dyld.ida.diaphora-db") != "" || strings.Contains(scriptFile, "diaphora.py") {
 			env = append(env, "DIAPHORA_AUTO=1")
 			env = append(env, "DIAPHORA_USE_DECOMPILER=1")
 			env = append(env, fmt.Sprintf("DIAPHORA_CPU_COUNT=%d", runtime.NumCPU()))
-			if viper.IsSet("dyld.ida.diaphora-db") {
+			if viper.GetString("dyld.ida.diaphora-db") != "" {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("dyld.ida.diaphora-db")))
 			} else {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s_diaphora.db", filepath.Base(args[1]), f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))))

@@ -129,7 +129,7 @@ var symbolicateCmd = &cobra.Command{
 			}
 
 			if len(args) < 2 && (hdr.BugType == "210" || hdr.BugType == "288") {
-				if viper.IsSet("symbolicate.server") {
+				if viper.GetString("symbolicate.server") != "" {
 					u, err := url.ParseRequestURI(viper.GetString("symbolicate.server"))
 					if err != nil {
 						return fmt.Errorf("failed to parse symbol server URL: %v", err)

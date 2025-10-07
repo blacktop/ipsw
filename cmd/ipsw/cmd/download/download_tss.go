@@ -112,7 +112,7 @@ var downloadTssCmd = &cobra.Command{
 		if device == "" {
 			return fmt.Errorf("device must be specified with --device")
 		}
-		if !viper.IsSet("download.tss.ecid") && !viper.GetBool("download.tss.usb") {
+		if viper.GetUint64("download.tss.ecid") == 0 && !viper.GetBool("download.tss.usb") {
 			ecid, err = tss.RandomECID()
 			if err != nil {
 				return fmt.Errorf("failed to generate random ECID: %v", err)
