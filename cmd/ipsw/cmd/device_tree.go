@@ -135,7 +135,7 @@ var deviceTreeCmd = &cobra.Command{
 		}
 
 		for name, dtree := range dtrees {
-			if viper.IsSet("dtree.filter") {
+			if viper.GetString("dtree.filter") != "" {
 				if !strings.Contains(strings.ToLower(name), strings.ToLower(viper.GetString("dtree.filter"))) {
 					continue
 				}
