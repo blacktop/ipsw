@@ -54,6 +54,11 @@ func NewOllama(ctx context.Context, cfg *Config) (*Ollama, error) {
 }
 
 func (o *Ollama) Chat() (string, error) {
+	// Verify model configuration before making API call
+	if err := o.Verify(); err != nil {
+		return "", fmt.Errorf("invalid model configuration: %w", err)
+	}
+
 	systemMsg := "Provide very brief, concise responses"
 
 	messages := []api.Message{
@@ -109,6 +114,30 @@ func (o *Ollama) SetModel(model string) error {
 
 func (o *Ollama) SetModels(models map[string]string) (map[string]string, error) {
 	return o.models, nil // cache is not used for local models
+}
+
+// Verify checks that the current model configuration is valid
+func (o *Ollama) Verify() error {
+	if o.cfg.Model == "" {
+		return fmt.Errorf("no model specified")
+	}
+	if len(o.models) == 0 {
+		if _, err := o.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+	}
+	if _, ok := o.models[o.cfg.Model]; !ok {
+		// Model not found in cache, try refreshing the models list
+		o.models = make(map[string]string) // Clear cache to force refresh
+		if _, err := o.Models(); err != nil {
+			return fmt.Errorf("failed to fetch models: %v", err)
+		}
+		// Check again after refresh
+		if _, ok := o.models[o.cfg.Model]; !ok {
+			return fmt.Errorf("model '%s' not found in available models", o.cfg.Model)
+		}
+	}
+	return nil
 }
 
 func (o *Ollama) getModels() error {

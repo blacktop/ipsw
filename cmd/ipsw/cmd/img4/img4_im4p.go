@@ -306,7 +306,7 @@ var img4Im4pExtractCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to marshal im4g kbag: %v", err)
 			}
-			if viper.IsSet("img4.im4p.extract.output") {
+			if viper.GetString("img4.im4p.extract.output") != "" {
 				log.WithFields(log.Fields{
 					"path": outputPath,
 				}).Info("Writing keybags JSON to file")

@@ -153,6 +153,58 @@ type IdentityManifest struct {
 	TBMDigests                   *[]byte        `plist:"TBMDigests,omitempty" json:"tbm_digests,omitempty" mapstructure:"TBMDigests,omitempty"`
 }
 
+// MarshalMap converts IdentityManifest to a map suitable for plist marshaling
+// by dereferencing all pointer values
+func (m IdentityManifest) MarshalMap() map[string]any {
+	result := make(map[string]any)
+	if len(m.Digest) > 0 {
+		result["Digest"] = m.Digest
+	}
+	if m.DigestListSize != nil {
+		result["DigestListSize"] = *m.DigestListSize
+	}
+	if m.FabRevision != nil {
+		result["FabRevision"] = *m.FabRevision
+	}
+	if m.Name != nil {
+		result["Name"] = *m.Name
+	}
+	if m.BuildString != nil {
+		result["BuildString"] = *m.BuildString
+	}
+	if m.Info != nil {
+		result["Info"] = m.Info
+	}
+	if m.EPRO != nil {
+		result["EPRO"] = *m.EPRO
+	}
+	if m.ESEC != nil {
+		result["ESEC"] = *m.ESEC
+	}
+	if m.Trusted != nil {
+		result["Trusted"] = *m.Trusted
+	}
+	if m.MemoryMap != nil {
+		result["MemoryMap"] = *m.MemoryMap
+	}
+	if m.ObjectPayloadPropertyDigest != nil {
+		result["ObjectPayloadPropertyDigest"] = *m.ObjectPayloadPropertyDigest
+	}
+	if m.ProductionUpdatePayloadHash != nil {
+		result["ProductionUpdatePayloadHash"] = *m.ProductionUpdatePayloadHash
+	}
+	if m.DevelopmentUpdatePayloadHash != nil {
+		result["DevelopmentUpdatePayloadHash"] = *m.DevelopmentUpdatePayloadHash
+	}
+	if m.RawDataDigest != nil {
+		result["RawDataDigest"] = *m.RawDataDigest
+	}
+	if m.TBMDigests != nil {
+		result["TBMDigests"] = *m.TBMDigests
+	}
+	return result
+}
+
 func (m IdentityManifest) String() string {
 	var bs string
 	if m.BuildString != nil && len(*m.BuildString) > 0 {

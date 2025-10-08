@@ -62,14 +62,14 @@ var ddiCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if !viper.IsSet("idev.img.ddi.info") &&
-			!viper.IsSet("idev.img.ddi.xcode") &&
-			!viper.IsSet("idev.img.ddi.source") &&
-			!viper.IsSet("idev.img.ddi.clean") &&
-			!viper.IsSet("idev.img.ddi.backup") {
+		if !viper.GetBool("idev.img.ddi.info") &&
+			!viper.GetBool("idev.img.ddi.xcode") &&
+			viper.GetString("idev.img.ddi.source") == "" &&
+			!viper.GetBool("idev.img.ddi.clean") &&
+			!viper.GetBool("idev.img.ddi.backup") {
 			return fmt.Errorf("no subcommand provided, must provide one of: --info, --xcode, --source, --clean, --backup")
 		}
-		if (viper.IsSet("idev.img.ddi.source") || viper.IsSet("idev.img.ddi.clean")) && viper.IsSet("idev.img.ddi.backup") {
+		if (viper.GetString("idev.img.ddi.source") != "" || viper.GetBool("idev.img.ddi.clean")) && viper.GetBool("idev.img.ddi.backup") {
 			return fmt.Errorf("cannot specify both --backup AND [--source or --clean]")
 		}
 
@@ -102,7 +102,7 @@ var ddiCmd = &cobra.Command{
 				return fmt.Errorf("failed to update DDIs from Xcode: %v", err)
 			}
 			fmt.Println(out)
-		} else if viper.IsSet("idev.img.ddi.source") {
+		} else if viper.GetString("idev.img.ddi.source") != "" {
 			if isZip, _ := magic.IsZip(viper.GetString("idev.img.ddi.source")); isZip {
 				tmpdir, err := os.MkdirTemp("", "ddi-")
 				if err != nil {

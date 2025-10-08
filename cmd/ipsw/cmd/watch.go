@@ -150,42 +150,42 @@ var watchCmd = &cobra.Command{
 		mastodon := viper.GetBool("watch.mastodon")
 		// validate flags
 		if viper.GetBool("watch.tags") {
-			if viper.IsSet("watch.branch") {
+			if cmd.Flags().Changed("branch") {
 				return fmt.Errorf("--tags watching is not supported with --branch")
 			}
-			if viper.IsSet("watch.file") {
+			if viper.GetString("watch.file") != "" {
 				return fmt.Errorf("--tags watching is not supported with --file")
 			}
-			if viper.IsSet("watch.pattern") {
+			if viper.GetString("watch.pattern") != "" {
 				return fmt.Errorf("--tags watching is not supported with --pattern")
 			}
-			if viper.IsSet("watch.days") {
+			if cmd.Flags().Changed("days") {
 				return fmt.Errorf("--tags watching is not supported with --days")
 			}
-			if viper.IsSet("watch.json") {
+			if viper.GetBool("watch.json") {
 				return fmt.Errorf("--tags watching is not supported with --json")
 			}
-			if viper.IsSet("watch.command") {
+			if viper.GetString("watch.command") != "" {
 				return fmt.Errorf("--tags watching is not supported with --command")
 			}
-			if viper.IsSet("watch.func") {
+			if viper.GetString("watch.func") != "" {
 				return fmt.Errorf("--tags watching is not supported with --func")
 			}
 		} else {
-			if viper.IsSet("watch.post") {
+			if viper.GetBool("watch.post") {
 				return fmt.Errorf("commit watching is not supported with --post")
 			}
-			if viper.IsSet("watch.func") && !viper.IsSet("watch.file") {
+			if viper.GetString("watch.func") != "" && viper.GetString("watch.file") == "" {
 				return fmt.Errorf("--func requires --file to be set")
 			}
 		}
 		if discord {
-			if !viper.IsSet("watch.discord-id") || !viper.IsSet("watch.discord-token") {
+			if viper.GetString("watch.discord-id") == "" || viper.GetString("watch.discord-token") == "" {
 				return fmt.Errorf("--discord announce requires --discord-id and --discord-token")
 			}
 		}
 		if mastodon {
-			if !viper.IsSet("watch.mastodon-client-id") || !viper.IsSet("watch.mastodon-client-secret") || !viper.IsSet("watch.mastodon-access-token") {
+			if viper.GetString("watch.mastodon-client-id") == "" || viper.GetString("watch.mastodon-client-secret") == "" || viper.GetString("watch.mastodon-access-token") == "" {
 				return fmt.Errorf("--mastodon announce requires --mastodon-client-id, --mastodon-client-secret, and --mastodon-access-token")
 			}
 		}
@@ -200,7 +200,7 @@ var watchCmd = &cobra.Command{
 			}
 		}
 
-		if viper.IsSet("watch.cache") {
+		if viper.GetString("watch.cache") != "" {
 			cache, err = watch.NewFileCache(viper.GetString("watch.cache"))
 			if err != nil {
 				return err
@@ -214,7 +214,7 @@ var watchCmd = &cobra.Command{
 
 		parts := strings.Split(args[0], "/")
 
-		if viper.IsSet("watch.func") {
+		if viper.GetString("watch.func") != "" {
 			repoPath, err := filepath.Abs(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to get absolute path for repository: %v", err)
@@ -506,7 +506,7 @@ var watchCmd = &cobra.Command{
 						}
 
 						if discord || mastodon {
-							if discord && !viper.IsSet("watch.command") {
+							if discord && viper.GetString("watch.command") == "" {
 								iconURL := viper.GetString("watch.discord-icon")
 								if iconURL == "" {
 									iconURL = "https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png"
@@ -521,7 +521,7 @@ var watchCmd = &cobra.Command{
 									return fmt.Errorf("discord announce failed: %v", err)
 								}
 							}
-							if mastodon && !viper.IsSet("watch.command") {
+							if mastodon && viper.GetString("watch.command") == "" {
 								if err := announce.Mastodon(string(commit.Message), &announce.MastodonConfig{
 									Server:       viper.GetString("watch.mastodon-server"),
 									ClientID:     viper.GetString("watch.mastodon-client-id"),

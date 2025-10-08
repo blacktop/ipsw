@@ -4,7 +4,8 @@
       "5477c623a01c1fa53b5441103642aa119177402d",
       "f8332133a12b758485dd348da4c6ed991bde98f5",
       "c78c210e4b41d758d26bb05c56f51bbbd60823ed",
-      "261b24ff1774bf055cd4378f1bd12ca926417b35"
+      "261b24ff1774bf055cd4378f1bd12ca926417b35",
+      "7395b2831bdc001a3f8604fe77e91998ee8cade0"
     ],
     "fcs_keys": {
       "beta": {
@@ -75,21 +76,21 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "23B5044l_25B5042k_23N5013j",
-        "ios_build": "23B5044l",
-        "macos_build": "25B5042k",
-        "updated_at": "2025-09-22T19:06:19Z",
-        "visionos_build": "23N5013j"
+        "fingerprint": "23B5059e_25B5057f_23N5028e",
+        "ios_build": "23B5059e",
+        "macos_build": "25B5057f",
+        "updated_at": "2025-10-06T19:06:45Z",
+        "visionos_build": "23N5028e"
       }
     }
   },
   "fcs_keys_rc": {
     "fcs_keys": {
       "rc": {
-        "fingerprint": "23A355_24G231_23M341",
-        "ios_build": "23A355",
+        "fingerprint": "22H31_24G231_23M341",
+        "ios_build": "22H31",
         "macos_build": "24G231",
-        "updated_at": "2025-10-01T19:05:46Z",
+        "updated_at": "2025-10-07T19:05:47Z",
         "visionos_build": "23M341"
       }
     }
@@ -97,17 +98,17 @@
   "fcs_keys_stable": {
     "fcs_keys": {
       "release": {
-        "fingerprint": "23A355_24G231_23M341",
-        "ios_build": "23A355",
+        "fingerprint": "22H31_24G231_23M341",
+        "ios_build": "22H31",
         "macos_build": "24G231",
-        "updated_at": "2025-10-01T19:05:46Z",
+        "updated_at": "2025-10-07T19:05:47Z",
         "visionos_build": "23M341"
       }
     }
   },
   "latest_ipsw": {
-    "ios_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-40536/E62697A1-4565-4068-867C-A64017377220/iPhone17,1_26.0_23A341_Restore.ipsw",
-    "macos_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-37622/CE01FAB2-7F26-48EE-AEE4-5E57A7F6D8BB/UniversalMac_26.0_25A354_Restore.ipsw",
-    "url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-40536/E62697A1-4565-4068-867C-A64017377220/iPhone17,1_26.0_23A341_Restore.ipsw"
+    "ios_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-43810/F2F7E980-637D-43E2-95B0-086153F454D4/iPhone17,1_26.0.1_23A355_Restore.ipsw",
+    "macos_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-50898/60AE7E97-3E60-441B-9B34-E603C694C5C1/UniversalMac_26.0.1_25A362_Restore.ipsw",
+    "url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-43810/F2F7E980-637D-43E2-95B0-086153F454D4/iPhone17,1_26.0.1_23A355_Restore.ipsw"
   }
 }

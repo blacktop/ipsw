@@ -129,7 +129,7 @@ var diffCmd = &cobra.Command{
 			return err
 		}
 
-		if viper.IsSet("diff.output") {
+		if viper.GetString("diff.output") != "" {
 			switch {
 			case viper.GetBool("diff.markdown"):
 				if err := d.Markdown(); err != nil {

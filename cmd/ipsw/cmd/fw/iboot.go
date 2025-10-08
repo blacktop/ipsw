@@ -80,7 +80,7 @@ var ibootCmd = &cobra.Command{
 		if minLen < iboot.MinStringLength {
 			return fmt.Errorf("minimum string length must be at least %d", iboot.MinStringLength)
 		}
-		if !viper.IsSet("fw.iboot.output") {
+		if viper.GetString("fw.iboot.output") == "" {
 			output = filepath.Dir(infile)
 		} else {
 			output = filepath.Clean(output)
