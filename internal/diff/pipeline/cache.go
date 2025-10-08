@@ -22,6 +22,7 @@ type MachoMetadata struct {
 	Symbols      []string      // Symbol names
 	CStrings     []string      // C strings (optional, memory-intensive)
 	Functions    int           // Function count
+	Imports      []string      // Imported library install names
 	LoadCommands []string      // Load command types
 
 	// Entitlements Data
@@ -44,7 +45,7 @@ type SectionInfo struct {
 // multiple handlers without additional file I/O.
 type MachoCache struct {
 	data map[string]*MachoMetadata // path -> metadata
-	mu   sync.RWMutex               // Thread-safe access
+	mu   sync.RWMutex              // Thread-safe access
 }
 
 // NewMachoCache creates a new empty MachO cache.

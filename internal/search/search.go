@@ -76,7 +76,8 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 	visited := make(map[string]bool)
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Errorf("failed to walk mount %s: %v", path, err)
+			// Broken symlinks are common in iOS filesystems - log at debug level
+			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
@@ -92,7 +93,8 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							log.WithError(subErr).Error("failed to walk symlinked path")
+							// Broken symlinks are common - log at debug level
+							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
 						files = append(files, subPath)
@@ -194,7 +196,8 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 	visited := make(map[string]bool)
 	if err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Errorf("failed to walk mount %s: %v", path, err)
+			// Broken symlinks are common in iOS filesystems - log at debug level
+			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
@@ -210,7 +213,8 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							log.WithError(subErr).Error("failed to walk symlinked path")
+							// Broken symlinks are common - log at debug level
+							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
 						files = append(files, subPath)
