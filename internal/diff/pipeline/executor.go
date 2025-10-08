@@ -755,6 +755,11 @@ func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetada
 		metadata.Functions = len(fns)
 	}
 
+	// Extract imported libraries
+	if imports := m.ImportedLibraries(); len(imports) > 0 {
+		metadata.Imports = append(metadata.Imports, imports...)
+	}
+
 	// Extract C strings (expensive, only if enabled)
 	if e.Config.CStrings {
 		if cs, err := m.GetCStrings(); err == nil {

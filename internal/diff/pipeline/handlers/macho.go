@@ -82,10 +82,15 @@ func (h *MachOHandler) cacheToDiffInfo(cache *pipeline.MachoCache, cfg *pipeline
 		// Create DiffInfo with available cached data
 		// Note: We can't populate the Sections field because it uses an
 		// unexported type. The diff will still work based on other fields.
+		imports := metadata.Imports
+		if len(imports) == 0 {
+			imports = metadata.LoadCommands
+		}
+
 		diffInfo := &mcmd.DiffInfo{
 			Version:   metadata.Version,
 			UUID:      metadata.UUID,
-			Imports:   metadata.LoadCommands,
+			Imports:   imports,
 			Sections:  nil, // Cannot populate due to unexported section type
 			Functions: metadata.Functions,
 			Starts:    nil, // Function start details not in cache

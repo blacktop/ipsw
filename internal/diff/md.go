@@ -522,7 +522,7 @@ func (d *Diff) Markdown() error {
 					}
 					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
 					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, d.Features.New[k])
+					fmt.Fprintf(f, "%s", d.Features.New[k])
 					f.Close()
 					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
 				}
