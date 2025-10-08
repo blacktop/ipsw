@@ -84,12 +84,12 @@ var img4ExtractCmd = &cobra.Command{
 		outputDir := viper.GetString("img4.extract.output")
 		rawExtract := viper.GetBool("img4.extract.raw")
 		// validate flags
-		if rawExtract && !viper.IsSet("img4.extract.im4p") {
+		if rawExtract && !viper.GetBool("img4.extract.im4p") {
 			return fmt.Errorf("raw extraction is only supported for IM4P payloads, please also set --im4p flag")
 		}
-		if !viper.IsSet("img4.extract.im4p") &&
-			!viper.IsSet("img4.extract.im4m") &&
-			!viper.IsSet("img4.extract.im4r") {
+		if !viper.GetBool("img4.extract.im4p") &&
+			!viper.GetBool("img4.extract.im4m") &&
+			!viper.GetBool("img4.extract.im4r") {
 			return fmt.Errorf("at least one extraction flag must be set (--im4p, --im4m, --im4r)")
 		}
 

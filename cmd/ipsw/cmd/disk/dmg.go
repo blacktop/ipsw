@@ -65,16 +65,16 @@ var dmgCmd = &cobra.Command{
 		pattern := viper.GetString("dmg.re")
 		partition := viper.GetInt("dmg.partition")
 		// validate args
-		if viper.IsSet("dmg.partition") && viper.IsSet("dmg.re") {
+		if cmd.Flags().Changed("partition") && viper.GetString("dmg.re") != "" {
 			return fmt.Errorf("cannot specify both --partition and --re")
 		}
-		if len(args) > 1 && !viper.IsSet("dmg.partition") && !viper.IsSet("dmg.re") {
+		if len(args) > 1 && !cmd.Flags().Changed("partition") && viper.GetString("dmg.re") == "" {
 			return fmt.Errorf("no partition specified. (use --partition or --re)")
 		}
-		if len(args) == 1 && (viper.IsSet("dmg.partition") || viper.IsSet("dmg.re")) {
+		if len(args) == 1 && (cmd.Flags().Changed("partition") || viper.GetString("dmg.re") != "") {
 			return fmt.Errorf("no output file specified")
 		}
-		if viper.IsSet("dmg.password") && viper.IsSet("dmg.key") {
+		if viper.GetString("dmg.password") != "" && viper.GetString("dmg.key") != "" {
 			return fmt.Errorf("cannot specify both --password and --key")
 		}
 
@@ -95,15 +95,15 @@ var dmgCmd = &cobra.Command{
 		}
 		defer d.Close()
 
-		if viper.GetBool("dmg.decrypt") || viper.IsSet("dmg.output") {
+		if viper.GetBool("dmg.decrypt") || viper.GetString("dmg.output") != "" {
 			// If only c.Decrypt is set, overwrite the input file
-			if viper.GetBool("dmg.decrypt") && !viper.IsSet("dmg.output") {
+			if viper.GetBool("dmg.decrypt") && viper.GetString("dmg.output") == "" {
 				log.Info("Decrypting DMG in-place..")
 				// Replace the original file with the decrypted content
 				if err := os.Rename(d.DecryptedTemp(), infile); err != nil {
 					return fmt.Errorf("failed to rename temporary decrypted DMG: %w", err)
 				}
-			} else if viper.IsSet("dmg.output") {
+			} else if viper.GetString("dmg.output") != "" {
 				log.Infof("Decrypting DMG to %s...", viper.GetString("dmg.output"))
 				// Create a new file with the decrypted content
 				out, err := os.Create(viper.GetString("dmg.output"))
@@ -141,12 +141,12 @@ var dmgCmd = &cobra.Command{
 			}
 			return nil
 		} else {
-			if viper.IsSet("dmg.partition") {
+			if cmd.Flags().Changed("partition") {
 				if partition > len(d.Partitions)-1 || partition < 0 {
 					return fmt.Errorf("partition number out of range (there are %d partitions)", len(d.Partitions))
 				}
 				p = &d.Partitions[partition]
-			} else if viper.IsSet("dmg.re") {
+			} else if viper.GetString("dmg.re") != "" {
 				re, err := regexp.Compile(pattern)
 				if err != nil {
 					return fmt.Errorf("failed to compile regex '%s': %w", pattern, err)

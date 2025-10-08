@@ -76,8 +76,12 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 	visited := make(map[string]bool)
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// Broken symlinks are common in iOS filesystems - log at debug level
-			log.Debugf("failed to walk mount %s: %v", path, err)
+			// Skip paths with permission errors gracefully
+			if os.IsPermission(err) {
+				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
+			log.Errorf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
@@ -196,8 +200,12 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 	visited := make(map[string]bool)
 	if err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// Broken symlinks are common in iOS filesystems - log at debug level
-			log.Debugf("failed to walk mount %s: %v", path, err)
+			// Skip paths with permission errors gracefully
+			if os.IsPermission(err) {
+				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
+			log.Errorf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks

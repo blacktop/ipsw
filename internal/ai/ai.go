@@ -37,6 +37,7 @@ type AI interface {
 	// FIXME: dump convienence method to set models from cache
 	SetModels(map[string]string) (map[string]string, error)
 	SetModel(string) error
+	Verify() error
 	Close() error
 }
 
@@ -171,6 +172,10 @@ func (c *CachingAI) SetModel(model string) error {
 
 func (c *CachingAI) SetModels(models map[string]string) (map[string]string, error) {
 	return c.ai.SetModels(models)
+}
+
+func (c *CachingAI) Verify() error {
+	return c.ai.Verify()
 }
 
 func (c *CachingAI) Close() error {
