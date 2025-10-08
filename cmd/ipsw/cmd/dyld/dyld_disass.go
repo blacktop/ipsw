@@ -155,7 +155,7 @@ var DisassCmd = &cobra.Command{
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
 		}
-		if viper.IsSet("dyld.disass.dec-llm") {
+		if viper.GetString("dyld.disass.dec-llm") != "" {
 			if !slices.Contains(ai.Providers, viper.GetString("dyld.disass.dec-llm")) {
 				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}

@@ -88,7 +88,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create jsonschema: %w", err)
 			}
-			if viper.IsSet("kernel.symbolicate.output") {
+			if viper.GetString("kernel.symbolicate.output") != "" {
 				if viper.GetString("kernel.symbolicate.output") == "-" {
 					fmt.Println(string(bts))
 					return nil
@@ -99,7 +99,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			}
 		}
 
-		if viper.IsSet("kernel.symbolicate.lookup") {
+		if viper.GetUint64("kernel.symbolicate.lookup") != 0 {
 			log.Info("Looking up symbol")
 			smap := signature.NewSymbolMap()
 			if err := smap.LoadJSON(args[0]); err != nil {
@@ -113,7 +113,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 			return fmt.Errorf("symbol not found at address %#x", addr)
 		}
 
-		if !viper.IsSet("kernel.symbolicate.signatures") {
+		if viper.GetString("kernel.symbolicate.signatures") == "" {
 			return fmt.Errorf("you must provide a path to the --signatures folder")
 		}
 

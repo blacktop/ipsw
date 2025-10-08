@@ -153,7 +153,7 @@ var machoDisassCmd = &cobra.Command{
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
 			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
-		if viper.IsSet("macho.disass.dec-llm") {
+		if viper.GetString("macho.disass.dec-llm") != "" {
 			if !slices.Contains(ai.Providers, viper.GetString("macho.disass.dec-llm")) {
 				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}

@@ -11,7 +11,7 @@ description: Mount DMG from IPSW
 Mount DMG from IPSW
 
 ```
-ipsw mount [fs|sys|app|exc] IPSW [flags]
+ipsw mount [fs|sys|app|exc|rdisk] IPSW [flags]
 ```
 
 ### Examples
@@ -32,12 +32,16 @@ $ ipsw mount exc iPhone.ipsw --pem-db /path/to/pem.json
 # Mount to a custom mount point
 $ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
 
+# Mount a RestoreRamDisk by identity (defaults to the first if not specified)
+$ ipsw mount rdisk iPhone.ipsw --ident Erase
+
 ```
 
 ### Options
 
 ```
   -h, --help                 help for mount
+      --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
   -k, --key string           DMG key
       --lookup               Lookup DMG keys on theapplewiki.com
   -m, --mount-point string   Custom mount point (default: /tmp/<dmg>.mount)

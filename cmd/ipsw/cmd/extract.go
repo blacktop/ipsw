@@ -142,7 +142,7 @@ var extractCmd = &cobra.Command{
 		}
 
 		// validate args
-		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && !viper.IsSet("extract.dmg") &&
+		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && viper.GetString("extract.dmg") == "" &&
 			!viper.GetBool("extract.dtree") && !viper.GetBool("extract.iboot") && !viper.GetBool("extract.sep") &&
 			!viper.GetBool("extract.sptm") && !viper.GetBool("extract.kbag") && !viper.GetBool("extract.sys-ver") &&
 			!viper.GetBool("extract.exclave") && len(viper.GetString("extract.pattern")) == 0 && !viper.GetBool("extract.fcs-key") {

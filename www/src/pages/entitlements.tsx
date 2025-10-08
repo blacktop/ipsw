@@ -739,7 +739,7 @@ export default function Entitlements() {
                                                 </h3>
                                                 {globalMetadata && (
                                                     <p className="text-sm" style={{ color: 'var(--ifm-color-content-secondary)' }}>
-                                                        {globalMetadata.uniqueVersions > 1 && `${globalMetadata.uniqueVersions} iOS versions • `}
+                                                        {globalMetadata.uniqueVersions > 1 && `${globalMetadata.uniqueVersions} ${selectedPlatform} versions • `}
                                                         {globalMetadata.uniqueFiles} unique files
                                                     </p>
                                                 )}

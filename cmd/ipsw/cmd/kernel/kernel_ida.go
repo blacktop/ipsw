@@ -107,9 +107,9 @@ var kernelIdaCmd = &cobra.Command{
 			return fmt.Errorf("cannot use '--temp-db' without '--enable-gui'")
 		} else if viper.GetBool("kernel.ida.temp-db") && viper.GetBool("kernel.ida.delete-db") {
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
-		} else if viper.IsSet("kernel.ida.diaphora-db") && !viper.IsSet("kernel.ida.script") {
+		} else if viper.GetString("kernel.ida.diaphora-db") != "" && viper.GetString("kernel.ida.script") == "" {
 			return fmt.Errorf("must supply '--script /path/to/diaphora.py' with '--diaphora-db /path/to/diaphora.db'")
-		} else if (viper.IsSet("kernel.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("kernel.ida.enable-gui") {
+		} else if (viper.GetString("kernel.ida.diaphora-db") != "" || strings.Contains(scriptFile, "diaphora.py")) && viper.GetBool("kernel.ida.enable-gui") {
 			return fmt.Errorf("diaphora analysis should be done headless and NOT with '--enable-gui'")
 		}
 		// if viper.GetString("kernel.ida.slide") != "" { TODO: how to set kc slide?
@@ -164,11 +164,11 @@ var kernelIdaCmd = &cobra.Command{
 			dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s_%s.i64", device, m.SubCPU.String(m.CPU), args[1]))
 		}
 
-		if viper.IsSet("kernel.ida.diaphora-db") || strings.Contains(scriptFile, "diaphora.py") {
+		if viper.GetString("kernel.ida.diaphora-db") != "" || strings.Contains(scriptFile, "diaphora.py") {
 			env = append(env, "DIAPHORA_AUTO=1")
 			env = append(env, "DIAPHORA_USE_DECOMPILER=1")
 			env = append(env, fmt.Sprintf("DIAPHORA_CPU_COUNT=%d", runtime.NumCPU()))
-			if viper.IsSet("kernel.ida.diaphora-db") {
+			if viper.GetString("kernel.ida.diaphora-db") != "" {
 				env = append(env, fmt.Sprintf("DIAPHORA_EXPORT_FILE=%s", viper.GetString("kernel.ida.diaphora-db")))
 			} else {
 				if len(args) > 1 {

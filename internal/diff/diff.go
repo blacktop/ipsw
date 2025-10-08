@@ -354,14 +354,23 @@ func mountDMG(ctx *Context) (err error) {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
 	}
 	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
+		aeaPath := ctx.SystemOsDmgPath
 		ctx.SystemOsDmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    ctx.SystemOsDmgPath,
-			Output:   filepath.Dir(ctx.SystemOsDmgPath),
+			Input:    aeaPath,
+			Output:   filepath.Dir(aeaPath),
 			PemDB:    ctx.PemDB,
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
+		// Verify the decrypted file exists before proceeding
+		if _, err := os.Stat(ctx.SystemOsDmgPath); err != nil {
+			return fmt.Errorf("decrypted DMG file not found: %v", err)
+		}
+		// Remove the original .aea file to avoid leaving it around
+		if err := os.Remove(aeaPath); err != nil {
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to remove original .aea file: %v", err))
 		}
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ctx.SystemOsDmgPath))
@@ -640,12 +649,20 @@ func (d *Diff) parseDSC() error {
 }
 
 func (d *Diff) parseEntitlements() (string, error) {
-	oldDB, err := ent.GetDatabase(&ent.Config{IPSW: d.Old.IPSWPath})
+	oldDB, err := ent.GetDatabase(&ent.Config{
+		IPSW:              d.Old.IPSWPath,
+		PemDB:             d.conf.PemDB,
+		LaunchConstraints: true,
+	})
 	if err != nil {
 		return "", err
 	}
 
-	newDB, err := ent.GetDatabase(&ent.Config{IPSW: d.New.IPSWPath})
+	newDB, err := ent.GetDatabase(&ent.Config{
+		IPSW:              d.New.IPSWPath,
+		PemDB:             d.conf.PemDB,
+		LaunchConstraints: true,
+	})
 	if err != nil {
 		return "", err
 	}

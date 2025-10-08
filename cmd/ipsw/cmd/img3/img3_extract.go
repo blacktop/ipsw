@@ -26,9 +26,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -44,11 +49,17 @@ func init() {
 	img3ExtractCmd.Flags().StringP("iv", "", "", "IV for decryption (hex string)")
 	img3ExtractCmd.Flags().StringP("key", "", "", "Key for decryption (hex string)")
 	img3ExtractCmd.Flags().BoolP("raw", "r", false, "Extract raw data (no decryption)")
+	img3ExtractCmd.Flags().Bool("lookup", false, "Auto-lookup IV/key on theapplewiki.com")
+	img3ExtractCmd.Flags().String("lookup-device", "", "Device identifier for key lookup (e.g., iPhone14,2)")
+	img3ExtractCmd.Flags().String("lookup-build", "", "Build number for key lookup (e.g., 20H71)")
 	viper.BindPFlag("img3.extract.output", img3ExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("img3.extract.iv-key", img3ExtractCmd.Flags().Lookup("iv-key"))
 	viper.BindPFlag("img3.extract.iv", img3ExtractCmd.Flags().Lookup("iv"))
 	viper.BindPFlag("img3.extract.key", img3ExtractCmd.Flags().Lookup("key"))
 	viper.BindPFlag("img3.extract.raw", img3ExtractCmd.Flags().Lookup("raw"))
+	viper.BindPFlag("img3.extract.lookup", img3ExtractCmd.Flags().Lookup("lookup"))
+	viper.BindPFlag("img3.extract.lookup-device", img3ExtractCmd.Flags().Lookup("lookup-device"))
+	viper.BindPFlag("img3.extract.lookup-build", img3ExtractCmd.Flags().Lookup("lookup-build"))
 }
 
 // img3ExtractCmd represents the extract command
@@ -60,18 +71,82 @@ var img3ExtractCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
-		outputFile := viper.GetString("output")
-		ivKeyStr := viper.GetString("iv-key")
-		ivStr := viper.GetString("iv")
-		keyStr := viper.GetString("key")
-		rawExtract := viper.GetBool("raw")
+		outputFile := viper.GetString("img3.extract.output")
+		ivKeyStr := viper.GetString("img3.extract.iv-key")
+		ivStr := viper.GetString("img3.extract.iv")
+		keyStr := viper.GetString("img3.extract.key")
+		rawExtract := viper.GetBool("img3.extract.raw")
+		lookupKeys := viper.GetBool("img3.extract.lookup")
+		lookupDevice := viper.GetString("img3.extract.lookup-device")
+		lookupBuild := viper.GetString("img3.extract.lookup-build")
+
+		infile := filepath.Clean(args[0])
+
 		// validate flags
-		decrypt := ivKeyStr != "" || (ivStr != "" && keyStr != "")
+		decrypt := len(ivKeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 || lookupKeys
+		if lookupKeys {
+			if len(ivKeyStr) != 0 || len(ivStr) != 0 || len(keyStr) != 0 {
+				return fmt.Errorf("cannot use --lookup with manual --iv-key, --iv, or --key flags")
+			}
+
+			// If device/build not provided, try to extract from folder structure
+			if lookupDevice == "" || lookupBuild == "" {
+				// Get absolute path of the file's directory
+				absPath, err := filepath.Abs(infile)
+				if err != nil {
+					return fmt.Errorf("failed to get absolute path: %v", err)
+				}
+
+				// Walk up the directory tree looking for the pattern
+				dir := filepath.Dir(absPath)
+				folderPattern := regexp.MustCompile(`^(?P<build>[A-Za-z0-9]+)__(?P<device>(AppleTV|AudioAccessory|iBridge|iP(hone|ad|od)|Mac(Book(Air|Pro)?|mini)?|RealityDevice|StudioDisplay|Watch)[0-9]+,[0-9]+)$`)
+
+				for dir != "/" && dir != "." {
+					baseName := filepath.Base(dir)
+					if matches := folderPattern.FindStringSubmatch(baseName); matches != nil {
+						detectedBuild := matches[1]
+						detectedDevice := matches[2]
+
+						log.Infof("Detected firmware folder: %s", baseName)
+						utils.Indent(log.WithFields(log.Fields{
+							"build":  detectedBuild,
+							"device": detectedDevice,
+						}).Info, 2)("Parsed firmware information")
+
+						if lookupDevice == "" && lookupBuild == "" {
+							useDetected := false
+							prompt := &survey.Confirm{
+								Message: fmt.Sprintf("Use detected build '%s' and device '%s' for key --lookup?", detectedBuild, detectedDevice),
+								Default: true,
+							}
+							if err := survey.AskOne(prompt, &useDetected); err == terminal.InterruptErr {
+								log.Warn("Exiting...")
+								return nil
+							}
+							if useDetected {
+								lookupDevice = detectedDevice
+								lookupBuild = detectedBuild
+							}
+						}
+						break
+					}
+					// Move up one directory
+					dir = filepath.Dir(dir)
+				}
+			}
+			if lookupDevice == "" || lookupBuild == "" {
+				return fmt.Errorf("--lookup requires both --lookup-device and --lookup-build")
+			}
+		} else if decrypt {
+			if len(ivKeyStr) != 0 && (len(ivStr) != 0 || len(keyStr) != 0) {
+				return fmt.Errorf("cannot specify both --iv-key AND --iv/--key")
+			} else if len(ivKeyStr) == 0 && (len(ivStr) == 0 && len(keyStr) == 0) {
+				return fmt.Errorf("must specify either --iv-key OR --iv AND --key")
+			}
+		}
 		if rawExtract && decrypt {
 			return fmt.Errorf("cannot use --raw with decryption flags")
 		}
-
-		infile := filepath.Clean(args[0])
 
 		data, err := os.ReadFile(infile)
 		if err != nil {
@@ -100,7 +175,45 @@ var img3ExtractCmd = &cobra.Command{
 		if decrypt {
 			var iv, key []byte
 
-			if ivKeyStr != "" {
+			if lookupKeys {
+				log.Info("Looking up keys on theapplewiki.com...")
+				wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+					Keys:   true,
+					Device: lookupDevice,
+					Build:  lookupBuild,
+				}, "", false)
+				if err != nil {
+					return fmt.Errorf("failed to lookup keys on theapplewiki.com: %v", err)
+				}
+
+				// Try to find the key for this specific IMG3 file
+				ivKeyStr, err = wikiKeys.GetKeyByFilename(filepath.Base(infile))
+				if err != nil {
+					return fmt.Errorf("failed to find key for %s: %v", filepath.Base(infile), err)
+				}
+
+				log.Infof("Found key for %s", filepath.Base(infile))
+
+				// Parse the concatenated IV+Key string
+				ivKeyStr = strings.ReplaceAll(ivKeyStr, " ", "")
+				ivKeyStr = strings.ReplaceAll(ivKeyStr, ":", "")
+
+				ivKeyBytes, err := hex.DecodeString(ivKeyStr)
+				if err != nil {
+					return fmt.Errorf("failed to decode IV+Key hex string: %v", err)
+				}
+
+				if len(ivKeyBytes) < 32 {
+					return fmt.Errorf("IV+Key must be at least 32 bytes (64 hex characters), got %d bytes", len(ivKeyBytes))
+				}
+
+				iv = ivKeyBytes[:16]
+				key = ivKeyBytes[16:]
+
+				if len(key) != 16 && len(key) != 24 && len(key) != 32 {
+					return fmt.Errorf("key must be 16, 24, or 32 bytes, got %d bytes", len(key))
+				}
+			} else if ivKeyStr != "" {
 				ivKeyStr = strings.ReplaceAll(ivKeyStr, " ", "")
 				ivKeyStr = strings.ReplaceAll(ivKeyStr, ":", "")
 

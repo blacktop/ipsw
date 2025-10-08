@@ -125,9 +125,9 @@ var classDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
 		}
 		doDump := false
-		if !viper.IsSet("class-dump.class") &&
-			!viper.IsSet("class-dump.proto") &&
-			!viper.IsSet("class-dump.cat") &&
+		if viper.GetString("class-dump.class") == "" &&
+			viper.GetString("class-dump.proto") == "" &&
+			viper.GetString("class-dump.cat") == "" &&
 			!viper.GetBool("class-dump.headers") &&
 			!viper.GetBool("class-dump.xcfw") &&
 			!viper.GetBool("class-dump.spm") {

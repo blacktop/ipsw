@@ -29,6 +29,9 @@ ipsw download ota [options] [flags]
 # Download Xcode Simulator Runtime OTAs
 ❯ ipsw download ota --platform ios --sim --build "22F77"
 
+# Get AEA decryption keys as JSON from latest iOS OTAs
+❯ ipsw download ota --platform ios --latest --fcs-keys
+
 ```
 
 ### Options
@@ -43,6 +46,7 @@ ipsw download ota [options] [flags]
       --driver-kit               Extract DriverKit dyld_shared_cache(s) from remote OTA zip
       --dyld                     Extract dyld_shared_cache(s) from remote OTA zip
   -a, --dyld-arch stringArray    dyld_shared_cache architecture(s) to remote extract
+      --fcs-keys                 Get AEA decryption keys as JSON database from OTA metadata
   -f, --flat                     Do NOT preserve directory structure when downloading with --pattern
   -h, --help                     help for ota
       --info                     Show all the latest OTAs available

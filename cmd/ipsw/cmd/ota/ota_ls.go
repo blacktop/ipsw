@@ -58,7 +58,7 @@ var otaLsCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		ota, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
+		ota, err := ota.Open(filepath.Clean(args[0]), ResolveAEAKeyFromFlags(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to open OTA file: %v", err)
 		}

@@ -23,6 +23,7 @@ ipsw macho info <macho> [flags]
       --demangle                Demangle symbol names
       --dump-cert               Dump the certificate
   -e, --ent                     Print entitlements
+      --ent-der                 Print DER entitlements
   -x, --extract-fileset-entry   Extract the fileset entry
   -t, --fileset-entry string    Which fileset entry to analyze
   -u, --fixups                  Print fixup chains

@@ -24,20 +24,21 @@ ipsw macho sign <MACHO> [flags]
 ### Options
 
 ```
-  -a, --ad-hoc              ad-hoc codesign
-  -c, --cert string         p12 codesign with cert
-  -e, --ent string          entitlements.plist file
-  -d, --ent-der string      entitlements asn1/der file
-  -h, --help                help for sign
-  -i, --id string           sign with identifier
-      --insecure            do not verify ssl certs
-  -o, --output string       Output codesigned file
-  -f, --overwrite           Overwrite file
-      --proxy string        HTTP/HTTPS proxy
-  -p, --pw string           p12 cert password
-  -t, --team string         sign with team id
-      --timeserver string   timeserver URL (default "http://timestamp.apple.com/ts01")
-      --ts                  timestamp signature
+  -a, --ad-hoc                     ad-hoc codesign
+  -c, --cert string                p12 codesign with cert
+  -e, --ent string                 entitlements.plist file
+  -d, --ent-der string             entitlements asn1/der file
+  -h, --help                       help for sign
+  -i, --id string                  sign with identifier
+      --insecure                   do not verify ssl certs
+  -o, --output string              Output codesigned file
+  -f, --overwrite                  Overwrite file
+      --proxy string               HTTP/HTTPS proxy
+  -p, --pw string                  p12 cert password
+  -t, --team string                sign with team id
+      --timeserver string          timeserver URL (default "http://timestamp.apple.com/ts01")
+      --ts                         timestamp signature
+      --verify codesign --verify   Verify codesignature after signing via codesign --verify (darwin only)
 ```
 
 ### Options inherited from parent commands
