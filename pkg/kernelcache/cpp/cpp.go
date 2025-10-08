@@ -137,12 +137,23 @@ type Cpp struct {
 	osMetaClassVariants []uint64 // Addresses of all OSMetaClass::OSMetaClass variants (standard + extended)
 	cxaPureVirtual      uint64   // Address of __cxa_pure_virtual function
 	allocIndex          int      // Index of alloc function in vtable
+	getMetaClassIndex   int      // Index of getMetaClass function in vtable
+	osObjectGetMetaAddr uint64   // Cached OSObject::getMetaClass address for fallback
 
 	fdCache      *funcDataCache
 	filesetCache map[string]*macho.File // Cache for parsed fileset entries
 	stubCache    *stubCache             // Cache of stub addresses to their target ctors
 	wrappers     []uint64               // Wrapper functions found in kernel (for cross-entry discovery)
 	wrapperMu    sync.RWMutex           // Protects wrappers slice
+
+	// Method parsing caches (only populated when WithMethods is true)
+	pointerIndexByFile map[*macho.File]map[uint64][]uint64 // Per-file map of pointer value → locations
+	getMetaClassCache  map[uint64]uint64                   // Map of MetaPtr → getMetaClass function address
+	canonicalToStubs   map[uint64][]uint64                 // Map of canonical body → stub addresses (for multi-key lookup)
+
+	// Binary scan results (populated once up front when WithMethods is true)
+	// Global map: metaclass address → getMetaClass function address (across all Mach-O files)
+	getMetaClassScanResults map[uint64]uint64
 
 	// Stub resolution instrumentation (thread-safe via atomic)
 	stubAttempts atomic.Uint64 // Total calls to resolveStubFunction
@@ -186,12 +197,16 @@ type Cpp struct {
 
 func Create(root *macho.File, cfg *Config) *Cpp {
 	return &Cpp{
-		root:         root,
-		cfg:          cfg,
-		fdCache:      &funcDataCache{},
-		filesetCache: make(map[string]*macho.File),
-		stubCache:    &stubCache{data: make(map[uint64]uint64)},
-		allocIndex:   -1,
+		root:                    root,
+		cfg:                     cfg,
+		fdCache:                 &funcDataCache{},
+		filesetCache:            make(map[string]*macho.File),
+		stubCache:               &stubCache{data: make(map[uint64]uint64)},
+		allocIndex:              -1,
+		getMetaClassIndex:       -1,
+		pointerIndexByFile:      make(map[*macho.File]map[uint64][]uint64),
+		getMetaClassCache:       make(map[uint64]uint64),
+		getMetaClassScanResults: make(map[uint64]uint64),
 	}
 }
 
@@ -655,7 +670,8 @@ func (c *Cpp) findAnchorFunctions() (err error) {
 
 func (c *Cpp) findAllocIndex(m *macho.File, vtable uint64) (int, error) {
 	idx := 0
-	addr := vtable
+	// Skip 16-byte metavtable header (offset-to-top + RTTI) before scanning
+	addr := vtable + 16
 	for {
 		ptr, err := m.GetPointerAtAddress(addr)
 		if err != nil {
@@ -675,6 +691,956 @@ func (c *Cpp) findAllocIndex(m *macho.File, vtable uint64) (int, error) {
 	}
 
 	return -1, fmt.Errorf("__cxa_pure_virtual not found in OSMetaClass vtable")
+}
+
+// findGetMetaClassIndex scans a vtable to find the slot containing the getMetaClass method
+func (c *Cpp) findGetMetaClassIndex(m *macho.File, vtable uint64, getMetaClassAddr uint64) (int, error) {
+	if vtable == 0 || getMetaClassAddr == 0 {
+		return -1, fmt.Errorf("invalid parameters: vtable=%#x, getMetaClass=%#x", vtable, getMetaClassAddr)
+	}
+
+	idx := 0
+	addr := vtable
+	log.Debugf("Scanning vtable at %#x for getMetaClass=%#x", vtable, getMetaClassAddr)
+
+	for idx < 100 { // Safety limit
+		ptr, err := m.GetPointerAtAddress(addr)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return -1, fmt.Errorf("failed to read vtable entry at %#x: %v", addr, err)
+		}
+		if ptr == 0 || ptr == 0xffffffffffffffff {
+			break
+		}
+
+		// Strip PAC bits and compare
+		ptrStripped := m.SlidePointer(ptr)
+		getMetaStripped := m.SlidePointer(getMetaClassAddr)
+
+		// Debug: log first 20 entries
+		if idx < 20 {
+			log.Debugf("  vtable[%d]: raw=%#x stripped=%#x (looking for %#x)", idx, ptr, ptrStripped, getMetaStripped)
+		}
+
+		if ptrStripped == getMetaStripped {
+			log.Debugf("Found getMetaClass at vtable index %d (addr=%#x, ptr=%#x)", idx, addr, ptr)
+			return idx, nil
+		}
+
+		addr += 8
+		idx++
+	}
+
+	log.Debugf("Scanned %d vtable entries without finding getMetaClass", idx)
+	return -1, fmt.Errorf("getMetaClass not found in vtable at %#x", vtable)
+}
+
+// validateGetMetaClassHeuristic validates the getMetaClass discovery and indexing logic
+// by testing with OSObject and OSOrderedSet before the full vtable population phase.
+func (c *Cpp) validateGetMetaClassHeuristic(classes []Class) {
+	log.Debug("Validating getMetaClass heuristic with OSObject...")
+
+	// Step 1: Find OSObject in classes
+	var osObject *Class
+	for i := range classes {
+		if classes[i].Name == "OSObject" {
+			osObject = &classes[i]
+			break
+		}
+	}
+	if osObject == nil {
+		log.Warn("OSObject not found - cannot validate getMetaClass heuristic")
+		return
+	}
+	if osObject.VtableAddr == 0 {
+		log.Warn("OSObject has no vtable address - cannot validate")
+		return
+	}
+
+	m := c.root
+	if m == nil {
+		log.Warn("No kernel file available for validation")
+		return
+	}
+
+	// Step 2: Resolve OSObject::getMetaClass via binary scan
+	osObjectGetMetaClass := c.findClassGetMetaClass(m, osObject)
+	if osObjectGetMetaClass == 0 {
+		log.Warn("Failed to find OSObject::getMetaClass via binary scan - cannot validate")
+		return
+	}
+
+	// Canonicalize the getMetaClass address
+	canonAddr, resolved := c.canonicalizeBranchTarget(m, osObjectGetMetaClass)
+	if resolved {
+		log.Debugf("OSObject::getMetaClass canonicalized: %#x -> %#x", osObjectGetMetaClass, canonAddr)
+		osObjectGetMetaClass = canonAddr
+	}
+
+	log.Infof("OSObject::getMetaClass resolved to %#x (canonical)", osObjectGetMetaClass)
+
+	// Step 3: Use findGetMetaClassIndex against OSObject's vtable
+	vtableWithHeader := osObject.VtableAddr - 16 // vtable stored in Class has header skipped
+	getMetaClassIndex, err := c.findGetMetaClassIndex(m, vtableWithHeader, osObjectGetMetaClass)
+	if err != nil {
+		log.Errorf("VALIDATION FAILED: findGetMetaClassIndex failed for OSObject: %v", err)
+		log.Errorf("  OSObject vtable (with header): %#x", vtableWithHeader)
+		log.Errorf("  OSObject::getMetaClass: %#x", osObjectGetMetaClass)
+		return
+	}
+
+	log.Infof("✓ OSObject::getMetaClass found at vtable index %d", getMetaClassIndex)
+
+	// Step 4: Verify by directly reading vtable[index]
+	entryAddr := vtableWithHeader + uint64((getMetaClassIndex+2)*8) // +2 to skip header (16 bytes = 2 pointers)
+	entryPtr, err := m.GetPointerAtAddress(entryAddr)
+	if err != nil {
+		log.Errorf("Failed to read vtable entry at %#x: %v", entryAddr, err)
+		return
+	}
+	entryPtrNorm := m.SlidePointer(entryPtr)
+	if entryPtrNorm == osObjectGetMetaClass {
+		log.Infof("✓ Direct memory read confirms: vtable[%d] = %#x (matches)", getMetaClassIndex, entryPtrNorm)
+	} else {
+		log.Errorf("✗ Mismatch: vtable[%d] = %#x, expected %#x", getMetaClassIndex, entryPtrNorm, osObjectGetMetaClass)
+	}
+
+	// Step 5: Test with OSOrderedSet
+	var osOrderedSet *Class
+	for i := range classes {
+		if classes[i].Name == "OSOrderedSet" {
+			osOrderedSet = &classes[i]
+			break
+		}
+	}
+	if osOrderedSet == nil {
+		log.Debug("OSOrderedSet not found - skipping secondary validation")
+		return
+	}
+	if osOrderedSet.VtableAddr == 0 {
+		log.Debug("OSOrderedSet has no vtable - skipping secondary validation")
+		return
+	}
+
+	// Resolve OSOrderedSet::getMetaClass via binary scan
+	osOrderedSetGetMeta := c.findClassGetMetaClass(m, osOrderedSet)
+	if osOrderedSetGetMeta == 0 {
+		log.Warn("Failed to find OSOrderedSet::getMetaClass via binary scan")
+		return
+	}
+
+	// Canonicalize
+	canonAddr, resolved = c.canonicalizeBranchTarget(m, osOrderedSetGetMeta)
+	if resolved {
+		log.Debugf("OSOrderedSet::getMetaClass canonicalized: %#x -> %#x", osOrderedSetGetMeta, canonAddr)
+		osOrderedSetGetMeta = canonAddr
+	}
+
+	log.Infof("OSOrderedSet::getMetaClass resolved to %#x (canonical)", osOrderedSetGetMeta)
+
+	// Verify it appears at same index in OSOrderedSet's vtable
+	osOrderedSetVtableWithHeader := osOrderedSet.VtableAddr - 16
+	osOrderedSetEntryAddr := osOrderedSetVtableWithHeader + uint64((getMetaClassIndex+2)*8)
+	osOrderedSetEntryPtr, err := m.GetPointerAtAddress(osOrderedSetEntryAddr)
+	if err != nil {
+		log.Errorf("Failed to read OSOrderedSet vtable entry at %#x: %v", osOrderedSetEntryAddr, err)
+		return
+	}
+	osOrderedSetEntryPtrNorm := m.SlidePointer(osOrderedSetEntryPtr)
+	if osOrderedSetEntryPtrNorm == osOrderedSetGetMeta {
+		log.Infof("✓ OSOrderedSet validation passed: vtable[%d] = %#x (matches getMetaClass)", getMetaClassIndex, osOrderedSetEntryPtrNorm)
+	} else {
+		log.Errorf("✗ OSOrderedSet validation failed: vtable[%d] = %#x, expected %#x", getMetaClassIndex, osOrderedSetEntryPtrNorm, osOrderedSetGetMeta)
+	}
+}
+
+// scanForGetMetaClassFunctions scans all executable text sections in a Mach-O file
+// for getMetaClass function patterns using bitmask pre-filtering for speed.
+// Returns a map of metaclass address → function address.
+//
+// Patterns detected:
+// 1. ADRP xN, ... + ADD x0, xN, ... + RET/B  (most common, B is tail call)
+// 2. ADR x0, ... + (optional NOP) + RET      (compact form)
+// 3. LDR x0, [literal] + RET                 (literal load form)
+// 4. LDR x0, [literal] + BR x16              (wrapper stub)
+func (c *Cpp) scanForGetMetaClassFunctions(m *macho.File) map[uint64]uint64 {
+	results := make(map[uint64]uint64)
+
+	// Find __TEXT_EXEC.__text section
+	sec := m.Section("__TEXT_EXEC", "__text")
+	if sec == nil {
+		return results
+	}
+
+	// Read section data
+	data, err := sec.Data()
+	if err != nil {
+		return results
+	}
+
+	// Scan with bitmask pre-filtering
+	addr := sec.Addr
+	matched := 0
+	filtered := 0
+	patternsChecked := 0
+	debugCount := 0 // Debug first 5 pattern checks
+
+	for i := 0; i+12 <= len(data); i += 4 {
+		instrAddr := addr + uint64(i)
+		raw0 := binary.LittleEndian.Uint32(data[i : i+4])
+
+		// Bitmask pre-filter: check if raw0 matches any of our patterns
+		// ADRP: bits [31,29:24] = 1_10000 → mask 0x9f000000 == 0x90000000
+		// ADR:  bits [31,29:24] = 0_10000 → mask 0x9f000000 == 0x10000000
+		// LDR literal: bits [31:30,29:24] = xx_011_000 → mask 0x3f000000 == 0x18000000 (catches both 32/64-bit)
+		isADRP := (raw0 & 0x9f000000) == 0x90000000
+		isADR := (raw0 & 0x9f000000) == 0x10000000
+		isLDR := (raw0&0x3f000000) == 0x18000000 || (raw0&0x3f000000) == 0x58000000
+
+		if !isADRP && !isADR && !isLDR {
+			filtered++
+			continue // Skip non-matching instructions
+		}
+
+		patternsChecked++
+
+		// Debug: log first 5 pattern checks
+		if debugCount < 5 && (isADRP || isADR || isLDR) {
+			log.Debugf("Pattern check %d at %#x: raw0=%#08x isADRP=%v isADR=%v isLDR=%v",
+				debugCount, instrAddr, raw0, isADRP, isADR, isLDR)
+			debugCount++
+		}
+
+		// Read next 1-3 instructions for pattern matching
+		if i+16 > len(data) {
+			break
+		}
+		raw1 := binary.LittleEndian.Uint32(data[i+4 : i+8])
+		raw2 := binary.LittleEndian.Uint32(data[i+8 : i+12])
+
+		var metaclassAddr uint64
+		funcAddr := instrAddr
+		instructionCount := 0
+
+		// Check for BTI (Branch Target Identification) preamble before the pattern
+		// BTI instructions: 0xd503201f (bti), 0xd503241f (bti j), 0xd503245f (bti c), etc.
+		// BTI mask: 0xfffff01f, base value: 0xd503201f
+		if i >= 4 {
+			rawPrev := binary.LittleEndian.Uint32(data[i-4 : i])
+			isBTI := (rawPrev & 0xfffff01f) == 0xd503201f
+			if isBTI {
+				funcAddr = instrAddr - 4
+			}
+		}
+
+		// Pattern 1: ADRP + ADD + RET/B (tail call)
+		if isADRP {
+			// Check if next is ADD immediate (catches both 32-bit 0x11 and 64-bit 0x91)
+			isADD := (raw1 & 0x1f800000) == 0x11000000 // ADD immediate (32/64-bit)
+			isRET := raw2 == 0xd65f03c0                // RET is fixed encoding
+			isB := (raw2 & 0xfc000000) == 0x14000000   // B (unconditional branch - tail call)
+
+			// Debug first few ADRP patterns
+			if debugCount <= 5 {
+				log.Debugf("  ADRP pattern: raw1=%#08x raw2=%#08x isADD=%v isRET=%v isB=%v", raw1, raw2, isADD, isRET, isB)
+			}
+
+			if isADD && (isRET || isB) {
+				// Decode ADRP: Rd is bits [4:0], check if it matches ADD Rn (bits [9:5])
+				adrpRd := raw0 & 0x1f
+				addRn := (raw1 >> 5) & 0x1f
+				addRd := raw1 & 0x1f
+
+				// Debug register values
+				if debugCount <= 5 {
+					log.Debugf("  ADRP regs: adrpRd=%d addRn=%d addRd=%d (match=%v)",
+						adrpRd, addRn, addRd, adrpRd == addRn && addRd == 0)
+				}
+
+				// Verify: ADRP writes to temp reg, ADD reads it and writes to x0
+				if adrpRd == addRn && addRd == 0 { // x0/w0 is register 0
+					// Decode ADRP immediate: immhi [23:5], immlo [30:29]
+					immhi := int64((raw0 >> 5) & 0x7FFFF)
+					immlo := int64((raw0 >> 29) & 0x3)
+					offset := (immhi << 2) | immlo
+					if offset&(1<<20) != 0 {
+						offset |= ^int64((1 << 21) - 1) // Sign extend
+					}
+					pc := instrAddr &^ 0xFFF
+					pageOffset := offset << 12
+					adrpAddr := uint64(int64(pc) + pageOffset)
+
+					// Decode ADD immediate: bits [21:10]
+					addImm := uint64((raw1 >> 10) & 0xFFF)
+
+					metaclassAddr = adrpAddr + addImm
+					instructionCount = 3
+				}
+			}
+		}
+
+		// Pattern 2: ADR + (optional NOP) + RET
+		if metaclassAddr == 0 && isADR {
+			// Check if ADR writes to x0 (bits [4:0] == 0)
+			adrRd := raw0 & 0x1f
+
+			// Debug ADR patterns
+			if debugCount <= 5 {
+				log.Debugf("  ADR pattern: adrRd=%d raw1=%#08x raw2=%#08x", adrRd, raw1, raw2)
+			}
+
+			if adrRd == 0 {
+				isRET1 := raw1 == 0xd65f03c0
+				isNOP := raw1 == 0xd503201f
+				isRET2 := raw2 == 0xd65f03c0
+
+				// Debug RET check
+				if debugCount <= 5 {
+					log.Debugf("  ADR writes to x0: isRET1=%v isNOP=%v isRET2=%v", isRET1, isNOP, isRET2)
+				}
+
+				if isRET1 || (isNOP && isRET2) {
+					// Decode ADR immediate
+					immhi := int64((raw0 >> 5) & 0x7FFFF)
+					immlo := int64((raw0 >> 29) & 0x3)
+					offset := (immhi << 2) | immlo
+					if offset&(1<<20) != 0 {
+						offset |= ^int64((1 << 21) - 1)
+					}
+
+					metaclassAddr = uint64(int64(instrAddr) + offset)
+					if isRET1 {
+						instructionCount = 2
+					} else {
+						instructionCount = 3
+					}
+				}
+			}
+		}
+
+		// Pattern 3 & 4: LDR + RET or LDR + BR
+		if metaclassAddr == 0 && isLDR {
+			// Check if LDR writes to x0 (bits [4:0] == 0)
+			ldrRd := raw0 & 0x1f
+			if ldrRd == 0 {
+				isRET := raw1 == 0xd65f03c0
+				isBR := (raw1 & 0xfffffc1f) == 0xd61f0000 // BR x16 is 0xd61f0200
+
+				if isRET || isBR {
+					// Decode LDR literal: imm19 in bits [23:5]
+					imm19 := int64((raw0 >> 5) & 0x7FFFF)
+					if imm19&(1<<18) != 0 {
+						imm19 |= ^int64((1 << 19) - 1)
+					}
+					offset := imm19 << 2
+
+					literalAddr := uint64(int64(instrAddr) + offset)
+
+					if ptr, err := m.GetPointerAtAddress(literalAddr); err == nil {
+						metaclassAddr = m.SlidePointer(ptr)
+						instructionCount = 2
+					}
+				}
+			}
+		}
+
+		// Store valid matches
+		// Store the raw metaclassAddr (VM address) in the global map, not the slid version
+		// This ensures consistent keys across all Mach-O files regardless of their slide values
+		if metaclassAddr != 0 {
+			// Kernel addresses typically start with 0xfffffe0 (not 0xfffffff)
+			if metaclassAddr >= 0xfffffe0000000000 {
+				results[metaclassAddr] = funcAddr
+				matched++
+				if debugCount <= 5 {
+					log.Debugf("  MATCH! metaclassAddr=%#x funcAddr=%#x",
+						metaclassAddr, funcAddr)
+				}
+			}
+
+			// Skip matched sequence
+			if instructionCount > 1 {
+				i += (instructionCount - 1) * 4
+			}
+		}
+	}
+
+	// Log first few metaclass addresses we found for debugging
+	var sampleAddrs []string
+	count := 0
+	for metaAddr := range results {
+		sampleAddrs = append(sampleAddrs, fmt.Sprintf("%#x", metaAddr))
+		count++
+		if count >= 3 {
+			break
+		}
+	}
+	if len(sampleAddrs) > 0 {
+		log.Debugf("Binary scan stats: scanned %d instructions, filtered %d, checked %d patterns, matched %d (sample metaclass addrs: %v)",
+			len(data)/4, filtered, patternsChecked, matched, sampleAddrs)
+	} else {
+		log.Debugf("Binary scan stats: scanned %d instructions, filtered %d, checked %d patterns, matched %d", len(data)/4, filtered, patternsChecked, matched)
+	}
+	return results
+}
+
+// canonicalizeBranchTarget resolves tail calls and auth stubs to find the real function body.
+// Returns (canonicalized address, true) if resolved, or (original, false) if not a stub.
+func (c *Cpp) canonicalizeBranchTarget(m *macho.File, addr uint64) (uint64, bool) {
+	fn, err := m.GetFunctionForVMAddr(addr)
+	if err != nil {
+		return addr, false
+	}
+
+	// Only process small functions (potential stubs)
+	funcSize := fn.EndAddr - fn.StartAddr
+	if funcSize > 16 {
+		return addr, false
+	}
+
+	funcData, cached := c.fdCache.get(fn.StartAddr)
+	if !cached {
+		data, err := m.GetFunctionData(fn)
+		if err != nil || len(data) == 0 {
+			return addr, false
+		}
+		funcData = data
+		c.fdCache.put(fn.StartAddr, funcData)
+	}
+
+	// Check last instruction for tail call
+	if len(funcData) >= 4 {
+		lastInstr := binary.LittleEndian.Uint32(funcData[len(funcData)-4:])
+
+		// Check for B (unconditional branch): bits [31,26] = 0b000101
+		if (lastInstr & 0xfc000000) == 0x14000000 {
+			// Decode imm26 (signed, PC-relative)
+			imm26 := int32(lastInstr & 0x03ffffff)
+			if imm26&(1<<25) != 0 {
+				imm26 |= ^int32((1 << 26) - 1) // Sign extend
+			}
+			targetAddr := fn.EndAddr + uint64(int64(imm26)*4)
+			return targetAddr, true
+		}
+
+		// Check for BR x16: 0xd61f0200
+		if lastInstr == 0xd61f0200 {
+			// Need to trace x16 value - for now, just mark as stub
+			return addr, false
+		}
+	}
+
+	return addr, false
+}
+
+// buildCanonicalToStubsMap scans __TEXT_EXEC for tiny stub functions (≤16 bytes)
+// that perform single-hop B/BR to a canonical body, building a reverse map.
+// Returns map of canonical body address → list of stub addresses.
+func (c *Cpp) buildCanonicalToStubsMap(m *macho.File) map[uint64][]uint64 {
+	stubMap := make(map[uint64][]uint64)
+
+	textExec := m.Section("__TEXT_EXEC", "__text")
+	if textExec == nil {
+		return stubMap
+	}
+
+	// Get all functions in __TEXT_EXEC
+	functions := m.GetFunctions()
+	if len(functions) == 0 {
+		return stubMap
+	}
+
+	stubCount := 0
+	for _, fn := range functions {
+		// Only process tiny functions (≤16 bytes)
+		funcSize := fn.EndAddr - fn.StartAddr
+		if funcSize > 16 || fn.StartAddr < textExec.Addr || fn.StartAddr >= textExec.Addr+textExec.Size {
+			continue
+		}
+
+		// Read function data
+		funcData, err := m.GetFunctionData(fn)
+		if err != nil || len(funcData) < 4 {
+			continue
+		}
+
+		// Check last instruction for unconditional branch
+		lastInstr := binary.LittleEndian.Uint32(funcData[len(funcData)-4:])
+
+		// B (unconditional branch): bits [31,26] = 0b000101
+		if (lastInstr & 0xfc000000) == 0x14000000 {
+			// Decode imm26 (signed, PC-relative)
+			imm26 := int32(lastInstr & 0x03ffffff)
+			if imm26&(1<<25) != 0 {
+				imm26 |= ^int32((1 << 26) - 1) // Sign extend
+			}
+			targetAddr := fn.EndAddr + uint64(int64(imm26)*4)
+
+			// Verify target is in __TEXT_EXEC
+			if targetAddr >= textExec.Addr && targetAddr < textExec.Addr+textExec.Size {
+				stubMap[targetAddr] = append(stubMap[targetAddr], fn.StartAddr)
+				stubCount++
+			}
+		}
+	}
+
+	log.Debugf("Built canonical→stubs map: %d canonical bodies with %d stubs", len(stubMap), stubCount)
+	return stubMap
+}
+
+// findClassGetMetaClass attempts to locate a class's getMetaClass implementation
+// by finding functions that return the class's metaclass pointer
+func (c *Cpp) findClassGetMetaClass(m *macho.File, class *Class) uint64 {
+	if class.MetaPtr == 0 {
+		return 0
+	}
+
+	// Check cache first
+	if cached, ok := c.getMetaClassCache[class.MetaPtr]; ok {
+		return cached
+	}
+
+	// Try symbol lookup first (e.g., "__ZNK{len}{name}12getMetaClassEv")
+	if len(class.Name) > 0 {
+		mangledName := fmt.Sprintf("__ZNK%d%s12getMetaClassEv", len(class.Name), class.Name)
+		if addr, err := m.FindSymbolAddress(mangledName); err == nil {
+			log.Debugf("Found %s::getMetaClass via symbol at %#x", class.Name, addr)
+			c.getMetaClassCache[class.MetaPtr] = addr
+			return addr
+		}
+	}
+
+	// Check binary scan results (O(1) lookup in global map)
+	// The scanner stores addresses that are already VM addresses (after sliding),
+	// so we use the raw class.MetaPtr directly without re-sliding with this file's handle
+	if len(c.getMetaClassScanResults) > 0 {
+		if funcAddr, found := c.getMetaClassScanResults[class.MetaPtr]; found {
+			// Canonicalize to resolve tail calls and auth stubs
+			canonAddr, resolved := c.canonicalizeBranchTarget(m, funcAddr)
+			if resolved {
+				log.Debugf("Found %s::getMetaClass via binary scan at %#x (canonical=%#x, MetaPtr=%#x)",
+					class.Name, funcAddr, canonAddr, class.MetaPtr)
+				c.getMetaClassCache[class.MetaPtr] = canonAddr
+				return canonAddr
+			}
+			log.Debugf("Found %s::getMetaClass via binary scan at %#x (MetaPtr=%#x)", class.Name, funcAddr, class.MetaPtr)
+			c.getMetaClassCache[class.MetaPtr] = funcAddr
+			return funcAddr
+		}
+		// Debug: why not found? Check for nearby addresses
+		if class.MetaPtr >= 0xfffffe0000000000 {
+			// Look for addresses within 0x1000 bytes to diagnose alignment/offset issues
+			var nearby []string
+			for scanAddr := range c.getMetaClassScanResults {
+				diff := int64(scanAddr) - int64(class.MetaPtr)
+				if diff >= -4096 && diff <= 4096 && diff != 0 {
+					nearby = append(nearby, fmt.Sprintf("%#x(off=%+d)", scanAddr, diff))
+					if len(nearby) >= 5 {
+						break
+					}
+				}
+			}
+			if len(nearby) > 0 {
+				log.Debugf("Binary scan lookup MISS for %s: MetaPtr=%#x, nearby addresses: %v",
+					class.Name, class.MetaPtr, nearby)
+			} else {
+				log.Debugf("Binary scan lookup MISS for %s: MetaPtr=%#x (no nearby addresses in %d scan results)",
+					class.Name, class.MetaPtr, len(c.getMetaClassScanResults))
+			}
+		}
+	}
+
+	// Fallback: scan for small functions that load class.MetaPtr
+	// getMetaClass is typically very short: load metaclass pointer and return
+	const maxInstr = 6
+	functions := m.GetFunctions()
+
+	for _, fn := range functions {
+		// Skip large functions
+		funcSize := fn.EndAddr - fn.StartAddr
+		if funcSize > maxInstr*4 {
+			continue
+		}
+
+		funcData, cached := c.fdCache.get(fn.StartAddr)
+		if !cached {
+			data, err := m.GetFunctionData(fn)
+			if err != nil || len(data) == 0 {
+				continue
+			}
+			funcData = data
+			c.fdCache.put(fn.StartAddr, funcData)
+		}
+
+		// Check if this function loads class.MetaPtr
+		engine := disass.NewMachoDisass(m, &disass.Config{
+			Data:         funcData,
+			StartAddress: fn.StartAddr,
+			Quiet:        true,
+		})
+		if err := engine.Triage(); err != nil {
+			continue
+		}
+
+		// Look for the metaclass pointer in the function
+		if ok, _ := engine.Contains(class.MetaPtr); ok {
+			log.Debugf("Found %s::getMetaClass candidate at %#x", class.Name, fn.StartAddr)
+			c.getMetaClassCache[class.MetaPtr] = fn.StartAddr
+			return fn.StartAddr
+		}
+	}
+
+	c.getMetaClassCache[class.MetaPtr] = 0 // Cache negative result
+	return 0
+}
+
+// findVtableViaGetMetaClass implements the iometa heuristic: search for pointers to
+// a class's getMetaClass implementation, where the pointer is preceded by vtable metadata.
+// Vtable layout: [offset-to-top (negative or 0), RTTI ptr (0 in kernel), ...function ptrs...]
+func (c *Cpp) findVtableViaGetMetaClass(m *macho.File, class *Class, getMetaClassAddr uint64) uint64 {
+	if getMetaClassAddr == 0 || c.getMetaClassIndex < 0 {
+		return 0
+	}
+
+	// Get the pointer index for this file
+	index, exists := c.pointerIndexByFile[m]
+	if !exists {
+		return 0
+	}
+
+	// Generate all key variants for getMetaClassAddr
+	// Keys: raw, fnStart, canonical, stubs
+	var keyVariants []uint64
+	keyVariants = append(keyVariants, getMetaClassAddr) // Raw address
+
+	// Determine which file owns the getMetaClass code (might be kernel, not kext)
+	owner := m
+	if m != c.root {
+		// Check if getMetaClass is kernel code
+		if textExec := c.root.Section("__TEXT_EXEC", "__text"); textExec != nil {
+			if getMetaClassAddr >= textExec.Addr && getMetaClassAddr < textExec.Addr+textExec.Size {
+				owner = c.root
+			}
+		}
+	}
+
+	// Add function start as a key
+	if fn, err := owner.GetFunctionForVMAddr(getMetaClassAddr); err == nil {
+		if fn.StartAddr != getMetaClassAddr {
+			keyVariants = append(keyVariants, fn.StartAddr)
+		}
+
+		// Add canonical body (resolve tail calls) via owner
+		canonical, resolved := c.canonicalizeBranchTarget(owner, getMetaClassAddr)
+		if resolved && canonical != getMetaClassAddr && canonical != fn.StartAddr {
+			keyVariants = append(keyVariants, canonical)
+
+			// Add stubs that point to canonical body
+			if stubs, ok := c.canonicalToStubs[canonical]; ok {
+				keyVariants = append(keyVariants, stubs...)
+			}
+		}
+	}
+
+	// Try index lookup with all key variants
+	var candidates []uint64
+	lookupMethod := "index-hit"
+	for _, key := range keyVariants {
+		if locs := index[key]; len(locs) > 0 {
+			candidates = append(candidates, locs...)
+			if len(candidates) > 0 {
+				break // Stop on first match
+			}
+		}
+	}
+
+	// If no candidates and class != "OSObject", try OSObject::getMetaClass (inheritance fallback)
+	if len(candidates) == 0 && class.Name != "OSObject" {
+		if c.osObjectGetMetaAddr != 0 {
+			log.Debugf("findVtableViaGetMetaClass for %s: no class candidates; trying OSObject addr %#x",
+				class.Name, c.osObjectGetMetaAddr)
+			lookupMethod = "OSObject-fallback"
+			// Generate key variants for OSObject::getMetaClass
+			var osObjKeys []uint64
+			osObjKeys = append(osObjKeys, c.osObjectGetMetaAddr)
+
+			// Determine which file owns OSObject::getMetaClass (should be kernel)
+			osOwner := c.root // OSObject is always in kernel
+			if fn, err := osOwner.GetFunctionForVMAddr(c.osObjectGetMetaAddr); err == nil {
+				if fn.StartAddr != c.osObjectGetMetaAddr {
+					osObjKeys = append(osObjKeys, fn.StartAddr)
+				}
+				canonical, resolved := c.canonicalizeBranchTarget(osOwner, c.osObjectGetMetaAddr)
+				if resolved && canonical != c.osObjectGetMetaAddr && canonical != fn.StartAddr {
+					osObjKeys = append(osObjKeys, canonical)
+					if stubs, ok := c.canonicalToStubs[canonical]; ok {
+						osObjKeys = append(osObjKeys, stubs...)
+					}
+				}
+			}
+
+			for _, key := range osObjKeys {
+				if locs := index[key]; len(locs) > 0 {
+					candidates = append(candidates, locs...)
+					break
+				}
+			}
+			log.Debugf("findVtableViaGetMetaClass for %s: OSObject fallback yielded %d candidates",
+				class.Name, len(candidates))
+		}
+	}
+
+	// Bounded linear scan fallback (last resort)
+	if len(candidates) == 0 {
+		lookupMethod = "bounded-scan"
+		sections := [][2]string{
+			{"__DATA_CONST", "__const"},
+			{"__AUTH_CONST", "__const"},
+			{"__DATA", "__const"},
+		}
+
+		maxHits := 4
+		for _, se := range sections {
+			sec := m.Section(se[0], se[1])
+			if sec == nil {
+				continue
+			}
+			for addr := sec.Addr; addr+8 <= sec.Addr+sec.Size && len(candidates) < maxHits; addr += 8 {
+				ptr, err := m.GetPointerAtAddress(addr)
+				if err != nil {
+					continue
+				}
+				// Check if ptr matches any key variant
+				for _, key := range keyVariants {
+					if ptr == key {
+						candidates = append(candidates, addr)
+						break
+					}
+				}
+			}
+			if len(candidates) >= maxHits {
+				break
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		return 0
+	}
+
+	// Validate candidates and find vtable start
+	for _, candidateAddr := range candidates {
+		vtableStart := candidateAddr - uint64(c.getMetaClassIndex*8)
+		vtableHeaderStart := vtableStart - 16 // offset-to-top + RTTI
+
+		_, err := m.GetPointerAtAddress(vtableHeaderStart)
+		if err != nil {
+			continue
+		}
+
+		rttiPtr, err := m.GetPointerAtAddress(vtableHeaderStart + 8)
+		if err != nil {
+			continue
+		}
+
+		if rttiPtr == 0 {
+			log.Debugf("Found vtable for %s at %#x (getMetaClass=%#x, method=%s, keys=%d)",
+				class.Name, vtableStart, getMetaClassAddr, lookupMethod, len(keyVariants))
+			return vtableStart
+		}
+	}
+
+	return 0
+}
+
+// buildPointerIndex scans const data sections and builds a normalized index
+// of pointer values to their locations for fast vtable discovery.
+// Normalizes pointers with SlidePointer to handle PAC/auth'd pointers on arm64e.
+func (c *Cpp) buildPointerIndex(m *macho.File) {
+	// Check if already built for this file
+	if _, exists := c.pointerIndexByFile[m]; exists {
+		return
+	}
+
+	tStart := time.Now()
+	index := make(map[uint64][]uint64)
+
+	// Build canonical→stubs map once from the kernel image; used for cross-image stubs
+	if c.canonicalToStubs == nil {
+		owner := m
+		if c.root != nil {
+			owner = c.root
+		}
+		c.canonicalToStubs = c.buildCanonicalToStubsMap(owner)
+	}
+
+	// Get __TEXT_EXEC ranges for current file and kernel (for cross-image code pointers)
+	textExec := m.Section("__TEXT_EXEC", "__text")
+	var textExecStart, textExecEnd uint64
+	if textExec != nil {
+		textExecStart = textExec.Addr
+		textExecEnd = textExec.Addr + textExec.Size
+	}
+	var kTextStart, kTextEnd uint64
+	if c.root != nil {
+		if ktex := c.root.Section("__TEXT_EXEC", "__text"); ktex != nil {
+			kTextStart = ktex.Addr
+			kTextEnd = ktex.Addr + ktex.Size
+		}
+	}
+
+	// Scan multiple const sections where vtable pointers may reside
+	sections := [][2]string{
+		{"__DATA_CONST", "__const"}, // Primary location for const data
+		{"__AUTH_CONST", "__const"}, // arm64e authenticated constants
+		{"__DATA", "__const"},       // Some vtables can spill here
+	}
+
+	totalScanned := 0
+	codePointers := 0
+	dataPointers := 0
+
+	for _, se := range sections {
+		sec := m.Section(se[0], se[1])
+		if sec == nil {
+			continue
+		}
+		start := sec.Addr
+		end := sec.Addr + sec.Size
+		for addr := start; addr+8 <= end; addr += 8 {
+			ptr, err := m.GetPointerAtAddress(addr)
+			if err != nil {
+				continue
+			}
+			totalScanned++
+
+			// Determine owner for code pointer key generation (current file or kernel)
+			isLocalCode := textExecStart != 0 && ptr >= textExecStart && ptr < textExecEnd
+			isKernelCode := !isLocalCode && kTextStart != 0 && ptr >= kTextStart && ptr < kTextEnd
+
+			if isLocalCode || isKernelCode {
+				// Code pointer: generate multiple keys (raw, fnStart, canonical, stubs) using the owner file
+				codePointers++
+
+				owner := m
+				if isKernelCode {
+					owner = c.root
+				}
+
+				// Key 0: raw pointer value
+				index[ptr] = append(index[ptr], addr)
+
+				// Key 1: function start address (from owner)
+				if fn, err := owner.GetFunctionForVMAddr(ptr); err == nil {
+					if fn.StartAddr != ptr {
+						index[fn.StartAddr] = append(index[fn.StartAddr], addr)
+					}
+
+					// Key 2: canonical body (resolve tail calls) via owner
+					canonical, resolved := c.canonicalizeBranchTarget(owner, ptr)
+					if resolved && canonical != ptr && canonical != fn.StartAddr {
+						index[canonical] = append(index[canonical], addr)
+					}
+				}
+			} else {
+				// Data pointer: use SlidePointer for normalization
+				dataPointers++
+				norm := m.SlidePointer(ptr)
+				if norm != 0 {
+					index[norm] = append(index[norm], addr)
+				}
+			}
+		}
+	}
+
+	log.Debugf("Built pointer index for file %p: %d unique keys from %d locations (code=%d, data=%d) in %.2fms",
+		m, len(index), totalScanned, codePointers, dataPointers, float64(time.Since(tStart).Microseconds())/1000.0)
+
+	c.pointerIndexByFile[m] = index
+}
+
+// populateVtablesViaGetMetaClass uses the iometa heuristic to discover vtables:
+// For each class, find its getMetaClass implementation, then search for pointers
+// to that function at the expected vtable offset.
+func (c *Cpp) populateVtablesViaGetMetaClass(classes []Class) []Class {
+	if c.getMetaClassIndex < 0 {
+		log.Debug("getMetaClass index not determined; skipping vtable population")
+		return classes
+	}
+
+	log.Debugf("Starting vtable population via getMetaClass heuristic (index=%d)", c.getMetaClassIndex)
+
+	vtablesFound := 0
+	vtablesSkipped := 0
+	methodsParsed := 0
+	tFindGetMeta := time.Duration(0)
+	tFindVtable := time.Duration(0)
+	tIndexBuild := time.Duration(0)
+
+	for i := range classes {
+		// Skip if vtable already populated
+		if classes[i].VtableAddr != 0 {
+			vtablesSkipped++
+			continue
+		}
+
+		m := c.fileForClass(&classes[i])
+		if m == nil {
+			log.Debugf("Skipping %s - no Mach-O file available", classes[i].Name)
+			vtablesSkipped++
+			continue
+		}
+
+		// Build pointer index for this file if not already done
+		tStart := time.Now()
+		c.buildPointerIndex(m)
+		tIndexBuild += time.Since(tStart)
+
+		// Find this class's getMetaClass implementation
+		tStart = time.Now()
+		getMetaClassAddr := c.findClassGetMetaClass(m, &classes[i])
+		tFindGetMeta += time.Since(tStart)
+		if getMetaClassAddr == 0 {
+			log.Debugf("Could not find getMetaClass for %s", classes[i].Name)
+			vtablesSkipped++
+			continue
+		}
+
+		// Use the heuristic to find the vtable
+		tStart = time.Now()
+		vtable := c.findVtableViaGetMetaClass(m, &classes[i], getMetaClassAddr)
+		tFindVtable += time.Since(tStart)
+		if vtable != 0 {
+			classes[i].VtableAddr = vtable
+			vtablesFound++
+			log.Debugf("Found vtable for %s at %#x", classes[i].Name, vtable)
+
+			// Parse methods if WithMethods is enabled
+			if c.cfg.WithMethods && len(classes[i].Methods) == 0 {
+				methods, err := c.parseVtableMethods(m, vtable-16, classes[i].Name)
+				if err != nil {
+					log.Debugf("Failed to parse methods for %s: %v", classes[i].Name, err)
+				} else {
+					classes[i].Methods = methods
+					methodsParsed++
+				}
+			}
+		} else {
+			log.Debugf("Could not find vtable for %s via getMetaClass heuristic", classes[i].Name)
+			vtablesSkipped++
+		}
+	}
+
+	log.Infof("Vtable population: %d found, %d skipped (methods parsed: %d)",
+		vtablesFound, vtablesSkipped, methodsParsed)
+	log.Debugf("Timing breakdown: indexBuild=%.2fms findGetMeta=%.2fms findVtable=%.2fms",
+		float64(tIndexBuild.Microseconds())/1000.0,
+		float64(tFindGetMeta.Microseconds())/1000.0,
+		float64(tFindVtable.Microseconds())/1000.0)
+
+	return classes
 }
 
 func (c *Cpp) findOSObjectGetMetaClass(m *macho.File, metaPtr uint64) uint64 {
@@ -875,6 +1841,48 @@ func (c *Cpp) GetClasses() (classes []Class, err error) {
 		}
 	}
 	c.timings.FilesetPrep = time.Since(tStart)
+
+	// Phase 2.5: Binary scan for getMetaClass functions (parallel, once up front when WithMethods is true)
+	if c.cfg.WithMethods {
+		log.Debug("Scanning for getMetaClass function patterns across all Mach-O files...")
+		tStart := time.Now()
+		var mu sync.Mutex
+
+		// Scan root kernel first (sequential, merge into global map)
+		rootResults := c.scanForGetMetaClassFunctions(c.root)
+		for metaclassAddr, funcAddr := range rootResults {
+			c.getMetaClassScanResults[metaclassAddr] = funcAddr
+		}
+		log.Debugf("Scanned root kernel: found %d getMetaClass candidates", len(rootResults))
+
+		// Scan all fileset entries in parallel, merging into global map
+		if c.root.Type == types.MH_FILESET {
+			eg := &errgroup.Group{}
+			eg.SetLimit(runtime.NumCPU()) // Limit concurrency to CPU count
+
+			for entryID, entry := range c.filesetCache {
+				entryID := entryID
+				entry := entry
+
+				eg.Go(func() error {
+					results := c.scanForGetMetaClassFunctions(entry)
+					mu.Lock()
+					for metaclassAddr, funcAddr := range results {
+						c.getMetaClassScanResults[metaclassAddr] = funcAddr
+					}
+					mu.Unlock()
+					log.Debugf("Scanned %s: found %d getMetaClass candidates", entryID, len(results))
+					return nil
+				})
+			}
+
+			if err := eg.Wait(); err != nil {
+				log.Warnf("Binary scan had errors: %v", err)
+			}
+		}
+
+		log.Infof("Binary scan completed in %v: found %d total getMetaClass candidates (global map)", time.Since(tStart), len(c.getMetaClassScanResults))
+	}
 
 	// Phase 3: Class discovery (xref scan + ctor emulation)
 	tStart = time.Now()
@@ -1102,15 +2110,91 @@ func (c *Cpp) GetClasses() (classes []Class, err error) {
 	classes = uniqueClasses
 	c.timings.Dedupe = time.Since(tStart)
 
-	// Phase 5: Vtable population
-	tStart = time.Now()
-	classes = c.populateVtablesPhase(classes)
-	c.timings.Vtable = time.Since(tStart)
-
-	// Phase 6: OSObject backfill
+	// Phase 5: OSObject backfill (must run before vtable population)
 	tStart = time.Now()
 	classes = c.ensureOSObjectClass(classes)
 	c.timings.OSObject = time.Since(tStart)
+
+	// Phase 5.5: Determine getMetaClass index (only when methods requested)
+	if c.cfg.WithMethods {
+		// Find OSObject to get its vtable and getMetaClass function
+		osObjectIdx := -1
+		for i, cls := range classes {
+			if cls.Name == "OSObject" && cls.VtableAddr != 0 {
+				osObjectIdx = i
+				break
+			}
+		}
+
+		if osObjectIdx >= 0 {
+			// Get the correct Mach-O file for OSObject
+			m := c.fileForClass(&classes[osObjectIdx])
+			if m == nil {
+				log.Debug("Could not get Mach-O file for OSObject")
+			} else {
+				// Find OSObject::getMetaClass function address
+				getMetaClassAddr := c.findOSObjectGetMetaClass(m, classes[osObjectIdx].MetaPtr)
+				if getMetaClassAddr != 0 {
+					// Find which vtable slot contains getMetaClass
+					if idx, err := c.findGetMetaClassIndex(m, classes[osObjectIdx].VtableAddr, getMetaClassAddr); err == nil {
+						c.getMetaClassIndex = idx
+						c.osObjectGetMetaAddr = getMetaClassAddr
+						log.Debugf("Determined getMetaClass index: %d", c.getMetaClassIndex)
+						log.Debugf("Cached OSObject::getMetaClass addr: %#x", c.osObjectGetMetaAddr)
+					} else {
+						log.Debugf("Failed to determine getMetaClass index: %v", err)
+					}
+				} else {
+					log.Debug("Could not find OSObject::getMetaClass function")
+				}
+			}
+		} else {
+			log.Debug("OSObject not found or missing vtable; cannot determine getMetaClass index")
+		}
+	}
+
+	// Phase 6: Vtable population via getMetaClass heuristic
+	tStart = time.Now()
+	if c.cfg.WithMethods && c.getMetaClassIndex >= 0 {
+		classes = c.populateVtablesViaGetMetaClass(classes)
+	}
+	c.timings.Vtable = time.Since(tStart)
+
+	// Determine alloc index after Phase 6
+	// Scan OSObject's metavtable for __cxa_pure_virtual to find the alloc index
+	if c.cfg.WithMethods && c.allocIndex < 0 {
+		// Try to find OSObject's metavtable via symbol lookup first
+		_, osObjectMetaVtab := c.findVtableBySymbol(c.root, "OSObject")
+
+		if osObjectMetaVtab != 0 {
+			// Scan OSObject's metavtable for __cxa_pure_virtual
+			// The alloc method is a class method, so it's in the metavtable
+			if idx, err := c.findAllocIndex(c.root, osObjectMetaVtab); err == nil {
+				c.allocIndex = idx
+				log.Debugf("Determined alloc index: %d (via __cxa_pure_virtual in OSObject metavtable at %#x)", c.allocIndex, osObjectMetaVtab)
+			} else {
+				// Fallback: use known offset from iometa (typically index 2)
+				c.allocIndex = 2
+				log.Debugf("Using known alloc index: %d (fallback, could not scan OSObject metavtable: %v)", c.allocIndex, err)
+			}
+		} else {
+			// Fallback: use known offset from iometa (typically index 2)
+			c.allocIndex = 2
+			log.Debugf("Using known alloc index: %d (fallback, could not find OSObject metavtable symbol)", c.allocIndex)
+		}
+	}
+
+	// Phase 6.4: Validate getMetaClass heuristic with OSObject
+	if c.cfg.WithMethods {
+		c.validateGetMetaClassHeuristic(classes)
+	}
+
+	// Phase 6.5: Vtable/method population phase (alloc emulation + method parsing)
+	tStart = time.Now()
+	if c.allocIndex >= 0 {
+		classes = c.populateVtablesPhase(classes)
+	}
+	c.timings.Vtable = time.Since(tStart)
 
 	// Phase 7: Parent linking
 	tStart = time.Now()
@@ -2018,11 +3102,15 @@ func (c *Cpp) ensureOSObjectClass(classes []Class) []Class {
 			expectedIdx = c.findVtableEntryIndex(kernel, osObject.MetaVtableAddr, getMeta)
 		}
 
-		// Option B: Skip expensive vtable scan if index lookup failed
-		if expectedIdx < 0 {
+		// Option B: Skip expensive vtable scan if index lookup failed AND methods not requested
+		needsVtable := c.cfg != nil && c.cfg.WithMethods && osObject.VtableAddr == 0
+		if expectedIdx < 0 && !needsVtable {
 			log.Debug("OSObject getMetaClass not found in metavtable; skipping expensive vtable scan")
 		} else {
-			// Only proceed with vtable scan if we have a valid index
+			// Proceed with vtable scan if we have a valid index OR methods are needed
+			if needsVtable && expectedIdx < 0 {
+				log.Debug("Methods requested but index not found; attempting broader vtable scan")
+			}
 			if osObject.MetaVtableAddr != 0 {
 				scanSection = kernel.FindSectionForVMAddr(osObject.MetaVtableAddr)
 			}

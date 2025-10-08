@@ -242,12 +242,15 @@ func (c *Cpp) populateVtablesFromAlloc(class *Class) error {
 		return fmt.Errorf("no Mach-O available for class %s", class.Name)
 	}
 
-	entryAddr := class.MetaVtableAddr + uint64(c.allocIndex*8)
+	// Skip 16-byte metavtable header (offset-to-top + RTTI) then read at allocIndex
+	entryAddr := class.MetaVtableAddr + 16 + uint64(c.allocIndex*8)
 	allocPtr, err := m.GetPointerAtAddress(entryAddr)
 	if err != nil || allocPtr == 0 {
 		return fmt.Errorf("failed to read alloc function pointer at %#x: %v", entryAddr, err)
 	}
-	allocPtr = m.SlidePointer(allocPtr)
+	// Do NOT SlidePointer on code pointers - only on data pointers
+	// allocPtr is a function pointer in __TEXT_EXEC, not a data pointer
+
 	if allocPtr == c.cxaPureVirtual {
 		return fmt.Errorf("detected pure virtual call at %#x for class %s", allocPtr, class.Name)
 	}
@@ -292,13 +295,20 @@ func (c *Cpp) populateVtablesPhase(classes []Class) []Class {
 			continue
 		}
 
+		// Debug first few iterations
+		if i < 5 {
+			log.Debugf("Processing class %d/%d: %s (VtableAddr=%#x, Methods=%d)",
+				i+1, len(classes), classes[i].Name, classes[i].VtableAddr, len(classes[i].Methods))
+		}
+
 		// Step 0: Populate missing MetaVtableAddr by reading from metaclass structure
 		// The first 8 bytes of an OSMetaClass object point to its metavtable
 		if classes[i].MetaVtableAddr == 0 && classes[i].MetaPtr != 0 {
 			if metavtabPtr, err := m.GetPointerAtAddress(classes[i].MetaPtr); err == nil {
 				// Slide the pointer if needed
 				metavtabPtr = m.SlidePointer(metavtabPtr)
-				if metavtabPtr >= 0xfffffff000000000 { // Valid kernel address
+				// Kernel addresses start with 0xfffffe0 (not 0xfffffff)
+				if metavtabPtr >= 0xfffffe0000000000 { // Valid kernel address
 					classes[i].MetaVtableAddr = metavtabPtr
 					metavtabPopulated++
 					log.Debugf("Populated MetaVtableAddr for %s at %#x (read from MetaPtr %#x)",
@@ -324,8 +334,16 @@ func (c *Cpp) populateVtablesPhase(classes []Class) []Class {
 
 		// Step 2: Parse methods if WithMethods is enabled
 		if c.cfg.WithMethods {
+			// Debug first few
+			if i < 5 {
+				log.Debugf("  WithMethods=true, checking if should parse methods for %s", classes[i].Name)
+			}
+
 			// Parse main vtable methods
 			if classes[i].VtableAddr != 0 && len(classes[i].Methods) == 0 {
+				if i < 5 {
+					log.Debugf("  Calling parseVtableMethods for %s (VtableAddr=%#x)", classes[i].Name, classes[i].VtableAddr)
+				}
 				methods, err := c.parseVtableMethods(m, classes[i].VtableAddr-16, classes[i].Name)
 				if err != nil {
 					log.Debugf("Failed to parse vtable methods for %s: %v", classes[i].Name, err)
@@ -335,6 +353,9 @@ func (c *Cpp) populateVtablesPhase(classes []Class) []Class {
 					methodsParsed++
 					log.Debugf("Parsed %d methods for %s", len(methods), classes[i].Name)
 				}
+			} else if i < 5 {
+				log.Debugf("  Skipping method parsing for %s: VtableAddr=%#x, Methods=%d",
+					classes[i].Name, classes[i].VtableAddr, len(classes[i].Methods))
 			}
 
 			// TODO: Parse metavtable methods if needed
