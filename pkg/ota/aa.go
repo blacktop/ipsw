@@ -69,6 +69,14 @@ type AA struct {
 	Reader
 }
 
+// Config holds optional configuration for opening OTA files
+type Config struct {
+	// SymmetricKey is the base64-encoded AEA symmetric encryption key
+	SymmetricKey string
+	// Insecure allows insecure connections when fetching AEA keys
+	Insecure bool
+}
+
 func getKeyFromName(name string) (string, error) {
 	_, rest, ok := strings.Cut(name, "[")
 	if !ok {
@@ -101,27 +109,39 @@ func NewOTA(r io.ReaderAt, size int64) (*AA, error) {
 	return f, nil
 }
 
-func Open(name string, symmetricKey ...string) (*AA, error) {
+// Open opens an OTA file with optional configuration
+// If conf is nil, default configuration is used (automatic key lookup)
+func Open(name string, conf *Config) (*AA, error) {
+	// Use default config if nil
+	if conf == nil {
+		conf = &Config{}
+	}
+
 	if isAEA, err := magic.IsAEA(name); err != nil {
 		return nil, err
 	} else if isAEA { // check if file is AEA encrypted
 		var key string
-		if len(symmetricKey) > 0 && symmetricKey[0] != "" {
-			key = symmetricKey[0]
+		if conf.SymmetricKey != "" {
+			key = conf.SymmetricKey
 		} else {
-			key, err = getKeyFromName(name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get key from name: %v (must supply --key-val)", err)
+			// Try to get key from filename (legacy behavior)
+			if keyFromName, err := getKeyFromName(name); err != nil {
+				// No key in filename - explicitly set empty to trigger automatic lookup
+				key = ""
+				log.Debug("No key in filename, will attempt automatic key lookup from AEA metadata")
+			} else {
+				key = keyFromName
 			}
 		}
+		// Call aea.Decrypt - if key is empty, it will attempt automatic lookup from AEA metadata
 		name, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:     name,
 			Output:    os.TempDir(),
 			B64SymKey: key,
-			Insecure:  false, // TODO: make insecure configurable
+			Insecure:  conf.Insecure,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to decrypt AEA: %v (try providing --key-val, --key-db, or ensure you're online for automatic key lookup)", err)
 		}
 		defer os.Remove(name)
 	}

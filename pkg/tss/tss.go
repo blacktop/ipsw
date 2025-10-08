@@ -506,6 +506,10 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 		return nil, err
 	}
 
+	// Convert IdentityManifest pointer values to regular values for plist marshalling
+	tssMap["PersonalizedDMG"] = tssReq.PersonalizedDMG.MarshalMap()
+	tssMap["LoadableTrustCache"] = tssReq.LoadableTrustCache.MarshalMap()
+
 	for k, v := range conf.PersonlID {
 		if strings.HasPrefix(k, "Ap,") {
 			switch v := v.(type) {

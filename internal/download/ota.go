@@ -801,15 +801,35 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 		return filteredOtas
 	}
 
-	if o.Config.Platform == "macos" {
-		if o.Config.Build != "0" && !o.Config.RSR {
-			for _, ota := range otas {
-				if strings.EqualFold(ota.Build, o.Config.Build) {
-					filteredOtas = append(filteredOtas, ota)
+	// Apply version filtering for all platforms when version is specified
+	if o.Config.Version != nil && o.Config.Version.Original() != "0" {
+		var versionFiltered []types.Asset
+		for _, ota := range otas {
+			otaVersion := strings.TrimPrefix(ota.OSVersion, "9.9.")
+			if ver, err := semver.NewVersion(otaVersion); err == nil {
+				if o.Config.Version.Equal(ver) {
+					versionFiltered = append(versionFiltered, ota)
 				}
 			}
-			return filteredOtas
 		}
+		otas = versionFiltered
+	}
+
+	// Apply build filtering for all platforms when build is specified
+	if o.Config.Build != "0" && !o.Config.RSR {
+		var buildFiltered []types.Asset
+		for _, ota := range otas {
+			if strings.EqualFold(ota.Build, o.Config.Build) {
+				buildFiltered = append(buildFiltered, ota)
+			}
+		}
+		otas = buildFiltered
+
+		// For macOS, return immediately after build filtering
+		if o.Config.Platform == "macos" {
+			return otas
+		}
+	} else if o.Config.Platform == "macos" {
 		return otas
 	}
 

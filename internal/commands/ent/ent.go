@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -18,6 +19,8 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -29,13 +32,14 @@ type Entitlements map[string]any
 
 // Config is the configuration for the entitlements command
 type Config struct {
-	IPSW     string
-	Folder   string
-	Database string
-	PemDB    string
-	Markdown bool
-	Color    bool
-	DiffTool string
+	IPSW              string
+	Folder            string
+	Database          string
+	PemDB             string
+	Markdown          bool
+	Color             bool
+	DiffTool          string
+	LaunchConstraints bool
 
 	// UI Config
 	Version string
@@ -58,7 +62,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 
 			if appOS, err := i.GetAppOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning AppOS")
-				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS", conf.PemDB); err != nil {
+				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS", conf); err != nil {
 					return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 				} else {
 					maps.Copy(entDB, ents)
@@ -66,7 +70,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning SystemOS")
-				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS", conf.PemDB); err != nil {
+				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS", conf); err != nil {
 					return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
 				} else {
 					maps.Copy(entDB, ents)
@@ -74,7 +78,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning FileSystem")
-				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem", conf.PemDB); err != nil {
+				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem", conf); err != nil {
 					return nil, fmt.Errorf("failed to scan files in FileSystem %s: %v", fsOS, err)
 				} else {
 					maps.Copy(entDB, ents)
@@ -82,7 +86,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning ExclaveOS")
-				if ents, err := scanEnts(conf.IPSW, excOS, "ExclaveOS", conf.PemDB); err != nil {
+				if ents, err := scanEnts(conf.IPSW, excOS, "ExclaveOS", conf); err != nil {
 					return nil, fmt.Errorf("failed to scan files in ExclaveOS %s: %v", excOS, err)
 				} else {
 					maps.Copy(entDB, ents)
@@ -126,8 +130,59 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 						continue // not a macho file (skip)
 					}
 				}
-				if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-					entDB[strings.TrimPrefix(file, conf.Folder)] = m.CodeSignature().Entitlements
+				if m.CodeSignature() != nil {
+					var output strings.Builder
+					// Get entitlements (try normal first, fallback to DER)
+					if len(m.CodeSignature().Entitlements) > 0 {
+						output.WriteString(m.CodeSignature().Entitlements)
+					} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+						// Fallback to DER entitlements if normal ones are empty
+						if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+							output.WriteString(decoded)
+							log.Warnf("using DER entitlements for %s", file)
+						}
+					}
+					// Add launch constraints if requested (for diff, not for database)
+					if conf.LaunchConstraints {
+						if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+							if err == nil {
+								if output.Len() > 0 {
+									output.WriteString("\n")
+								}
+								output.WriteString("<!-- Launch Constraints (Self) -->\n")
+								lcdata, _ := json.MarshalIndent(lc, "", "  ")
+								output.WriteString(string(lcdata))
+								output.WriteString("\n")
+							}
+						}
+						if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+							if err == nil {
+								if output.Len() > 0 {
+									output.WriteString("\n")
+								}
+								output.WriteString("<!-- Launch Constraints (Parent) -->\n")
+								lcdata, _ := json.MarshalIndent(lc, "", "  ")
+								output.WriteString(string(lcdata))
+								output.WriteString("\n")
+							}
+						}
+						if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+							if err == nil {
+								if output.Len() > 0 {
+									output.WriteString("\n")
+								}
+								output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
+								lcdata, _ := json.MarshalIndent(lc, "", "  ")
+								output.WriteString(string(lcdata))
+								output.WriteString("\n")
+							}
+						}
+					}
+
+					entDB[strings.TrimPrefix(file, conf.Folder)] = output.String()
 				} else {
 					entDB[strings.TrimPrefix(file, conf.Folder)] = ""
 				}
@@ -257,7 +312,7 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 	return dat.String(), nil
 }
 
-func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, error) {
+func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -279,7 +334,7 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:    dmgPath,
 			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDbPath,
+			PemDB:    conf.PemDB,
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
@@ -343,8 +398,59 @@ func scanEnts(ipswPath, dmgPath, dmgType, pemDbPath string) (map[string]string, 
 				continue // not a macho file (skip)
 			}
 		}
-		if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-			entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
+		if m.CodeSignature() != nil {
+			var output strings.Builder
+			// Get entitlements (try normal first, fallback to DER)
+			if len(m.CodeSignature().Entitlements) > 0 {
+				output.WriteString(m.CodeSignature().Entitlements)
+			} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+				// Fallback to DER entitlements if normal ones are empty
+				if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+					output.WriteString(decoded)
+					log.Warnf("using DER entitlements for %s", file)
+				}
+			}
+			// Add launch constraints if requested (for diff, not for database)
+			if conf.LaunchConstraints {
+				if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+					if err == nil {
+						if output.Len() > 0 {
+							output.WriteString("\n")
+						}
+						output.WriteString("<!-- Launch Constraints (Self) -->\n")
+						lcdata, _ := json.MarshalIndent(lc, "", "  ")
+						output.WriteString(string(lcdata))
+						output.WriteString("\n")
+					}
+				}
+				if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+					if err == nil {
+						if output.Len() > 0 {
+							output.WriteString("\n")
+						}
+						output.WriteString("<!-- Launch Constraints (Parent) -->\n")
+						lcdata, _ := json.MarshalIndent(lc, "", "  ")
+						output.WriteString(string(lcdata))
+						output.WriteString("\n")
+					}
+				}
+				if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+					if err == nil {
+						if output.Len() > 0 {
+							output.WriteString("\n")
+						}
+						output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
+						lcdata, _ := json.MarshalIndent(lc, "", "  ")
+						output.WriteString(string(lcdata))
+						output.WriteString("\n")
+					}
+				}
+			}
+
+			entDB[strings.TrimPrefix(file, mountPoint)] = output.String()
 		} else {
 			entDB[strings.TrimPrefix(file, mountPoint)] = ""
 		}

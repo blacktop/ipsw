@@ -108,9 +108,9 @@ var swiftDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot set --headers without setting --output")
 		}
 		doDump := false
-		if !viper.IsSet("swift-dump.interface") &&
-			!viper.IsSet("swift-dump.type") &&
-			!viper.IsSet("swift-dump.proto") &&
+		if viper.GetString("swift-dump.interface") == "" &&
+			viper.GetString("swift-dump.type") == "" &&
+			viper.GetString("swift-dump.proto") == "" &&
 			!viper.GetBool("swift-dump.ext") &&
 			!viper.GetBool("swift-dump.ass") {
 			doDump = true

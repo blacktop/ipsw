@@ -43,28 +43,38 @@ ipsw ent [flags]
 
 # Search PostgreSQL database (Supabase)
 ❯ ipsw ent --pg-host db.xyz.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --key sandbox
+
+# Replace older iOS builds with newer ones
+❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace
+
+# Preview what would be replaced
+❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace --dry-run
 ```
 
 ### Options
 
 ```
-  -f, --file string          Search for file path pattern
-      --file-only            Only output file paths
-  -h, --help                 help for ent
-      --input stringArray    Folders of MachOs to analyze
-      --ipsw stringArray     IPSWs to process
-  -k, --key string           Search for entitlement key pattern
-      --limit int            Limit number of results (default 100)
-      --pg-database string   PostgreSQL database name
-      --pg-host string       PostgreSQL host
-      --pg-password string   PostgreSQL password
-      --pg-port string       PostgreSQL port (default "5432")
-      --pg-sslmode string    PostgreSQL SSL mode (disable, require, verify-ca, verify-full) (default "require")
-      --pg-user string       PostgreSQL user
-      --sqlite string        Path to SQLite database
-      --stats                Show database statistics
-  -v, --value string         Search for entitlement value pattern
-      --version string       Filter by iOS version
+      --dry-run                   Show what would be replaced without making changes
+  -f, --file string               Search for file path pattern
+      --file-only                 Only output file paths
+  -h, --help                      help for ent
+      --input stringArray         Folders of MachOs to analyze
+      --ipsw stringArray          IPSWs to process
+  -k, --key string                Search for entitlement key pattern
+      --limit int                 Limit number of results (default 100)
+      --pg-database string        PostgreSQL database name
+      --pg-host string            PostgreSQL host
+      --pg-password string        PostgreSQL password
+      --pg-poolmode string        PostgreSQL pool mode (session, transaction, statement, or empty for no pooling)
+      --pg-port string            PostgreSQL port (default "5432")
+      --pg-sslmode string         PostgreSQL SSL mode (disable, require, verify-ca, verify-full) (default "require")
+      --pg-user string            PostgreSQL user
+      --replace                   Replace older builds of the same iOS version with newer builds
+      --replace-strategy string   Replacement strategy: auto, prompt, force (default "auto")
+      --sqlite string             Path to SQLite database
+      --stats                     Show database statistics
+  -v, --value string              Search for entitlement value pattern
+      --version string            Filter by iOS version
 ```
 
 ### Options inherited from parent commands

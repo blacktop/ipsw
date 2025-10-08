@@ -150,7 +150,7 @@ var tcCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.IsSet("fw.tc.output") {
+			if viper.GetString("fw.tc.output") != "" {
 				dat, err := json.Marshal(tcs)
 				if err != nil {
 					return err

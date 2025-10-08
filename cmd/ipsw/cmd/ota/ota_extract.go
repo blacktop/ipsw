@@ -90,7 +90,7 @@ var otaExtractCmd = &cobra.Command{
 			return fmt.Errorf("invalid --cryptex: '%s' (must be one of: %s)", cryptex, strings.Join(validCryptexes, ", "))
 		}
 
-		o, err := ota.Open(filepath.Clean(args[0]), viper.GetString("ota.key-val"))
+		o, err := ota.Open(filepath.Clean(args[0]), ResolveAEAKeyFromFlags(args[0]))
 		if err != nil {
 			return fmt.Errorf("failed to open OTA file: %v", err)
 		}

@@ -91,6 +91,8 @@ Download AEA PEMs as JSON form remote IPSWs *(using `ipsw`'s patent pending **pa
 
 :::info note
 It appears that these AEA PEM keys are `unique` per release for iOS and macOS. *(So only 2 🆕 keys per release; **1** `iOS` and **1** `macOS`)*
+
+**OTA AEA keys are different** - they're unique per file. See [OTA AEA Keys](ota.md#working-with-aea-encrypted-otas) for building an OTA-specific keys database.
 :::
 
 To get the `macOS` PEM JSON "Database"

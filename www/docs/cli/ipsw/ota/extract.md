@@ -21,6 +21,7 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
   -c, --cryptex string   Extract cryptex as DMG (requires full OTA)
   -x, --decomp           Decompress pbzx files
   -d, --dyld             Extract dyld_shared_cache files
+  -f, --flat             Do NOT preserve directory structure when extracting
   -h, --help             help for extract
   -k, --kernel           Extract kernelcache
   -o, --output string    Output folder
@@ -33,7 +34,9 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
 ```
       --color            colorize output
       --config string    config file (default is $HOME/.config/ipsw/config.yaml)
-      --key-val string   Base64 encoded symmetric encryption key
+      --insecure         Allow insecure connections when fetching AEA keys
+      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string   Base64 encoded AEA symmetric encryption key
       --no-color         disable colorize output
   -V, --verbose          verbose output
 ```
