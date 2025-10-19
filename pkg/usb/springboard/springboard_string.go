@@ -20,8 +20,9 @@ const _Orientation_name = "UnknownPortraitPortraitUpsideDownLandscapeLandscapeHo
 var _Orientation_index = [...]uint8{0, 7, 15, 33, 42, 61}
 
 func (i Orientation) String() string {
-	if i >= Orientation(len(_Orientation_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_Orientation_index)-1 {
 		return "Orientation(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Orientation_name[_Orientation_index[i]:_Orientation_index[i+1]]
+	return _Orientation_name[_Orientation_index[idx]:_Orientation_index[idx+1]]
 }
