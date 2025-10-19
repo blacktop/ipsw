@@ -68,9 +68,9 @@ const _floatEncoding_name = "SINGLEDOUBLECPLXDCPLXLDCPLXLDOUBLEINTRVLDINTRVLLDIN
 var _floatEncoding_index = [...]uint8{0, 6, 12, 16, 21, 27, 34, 40, 47, 55, 61, 68, 76}
 
 func (i floatEncoding) String() string {
-	i -= 1
-	if i >= floatEncoding(len(_floatEncoding_index)-1) {
-		return "floatEncoding(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_floatEncoding_index)-1 {
+		return "floatEncoding(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _floatEncoding_name[_floatEncoding_index[i]:_floatEncoding_index[i+1]]
+	return _floatEncoding_name[_floatEncoding_index[idx]:_floatEncoding_index[idx+1]]
 }
