@@ -102,8 +102,9 @@ const _linkKind_name = "regularweakupwardreExport"
 var _linkKind_index = [...]uint8{0, 7, 11, 17, 25}
 
 func (i linkKind) String() string {
-	if i >= linkKind(len(_linkKind_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_linkKind_index)-1 {
 		return "linkKind(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _linkKind_name[_linkKind_index[i]:_linkKind_index[i+1]]
+	return _linkKind_name[_linkKind_index[idx]:_linkKind_index[idx+1]]
 }
