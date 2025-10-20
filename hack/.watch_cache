@@ -77,21 +77,21 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "23B5064e_25B5062e_23N5033d",
-        "ios_build": "23B5064e",
-        "macos_build": "25B5062e",
-        "updated_at": "2025-10-14T19:05:08Z",
-        "visionos_build": "23N5033d"
+        "fingerprint": "23B5073a_25B5072a_23N5042a",
+        "ios_build": "23B5073a",
+        "macos_build": "25B5072a",
+        "updated_at": "2025-10-20T19:06:14Z",
+        "visionos_build": "23N5042a"
       }
     }
   },
   "fcs_keys_rc": {
     "fcs_keys": {
       "rc": {
-        "fingerprint": "22H31_25A362_23M8340",
-        "ios_build": "22H31",
+        "fingerprint": "23A355_25A362_23M8340",
+        "ios_build": "23A355",
         "macos_build": "25A362",
-        "updated_at": "2025-10-19T19:05:20Z",
+        "updated_at": "2025-10-20T19:06:14Z",
         "visionos_build": "23M8340"
       }
     }
@@ -99,10 +99,10 @@
   "fcs_keys_stable": {
     "fcs_keys": {
       "release": {
-        "fingerprint": "22H31_25A362_23M8340",
-        "ios_build": "22H31",
+        "fingerprint": "23A355_25A362_23M8340",
+        "ios_build": "23A355",
         "macos_build": "25A362",
-        "updated_at": "2025-10-19T19:05:20Z",
+        "updated_at": "2025-10-20T19:06:14Z",
         "visionos_build": "23M8340"
       }
     }
