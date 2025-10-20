@@ -73,6 +73,8 @@ func init() {
 	DisassCmd.Flags().Bool("force", false, "Continue to disassemble even if there are analysis errors")
 	DisassCmd.Flags().String("input", "", "Input function JSON file")
 	DisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	DisassCmd.Flags().StringSlice("match", []string{}, "Assembly instruction string(s) to search for")
+	DisassCmd.Flags().String("match-regex", "", "Regex to match assembly instructions")
 	DisassCmd.MarkFlagsMutuallyExclusive("symbol", "vaddr", "input", "image")
 	// DisassCmd.Flags().Bool("replace", false, "Replace .a2s")
 	viper.BindPFlag("dyld.disass.image", DisassCmd.Flags().Lookup("image"))
@@ -98,6 +100,8 @@ func init() {
 	viper.BindPFlag("dyld.disass.color", DisassCmd.Flags().Lookup("color"))
 	viper.BindPFlag("dyld.disass.input", DisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("dyld.disass.cache", DisassCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.disass.match", DisassCmd.Flags().Lookup("match"))
+	viper.BindPFlag("dyld.disass.match-regex", DisassCmd.Flags().Lookup("match-regex"))
 	// viper.BindPFlag("dyld.disass.replace", DisassCmd.Flags().Lookup("replace"))
 }
 
@@ -106,6 +110,23 @@ var DisassCmd = &cobra.Command{
 	Use:     "disass <DSC>",
 	Aliases: []string{"dis"},
 	Short:   "Disassemble at symbol/vaddr",
+	Long: heredoc.Doc(`
+		Disassemble dyld_shared_cache images or scan them for instruction patterns.
+
+		# Output Format
+		DSC JSON results follow:
+		  {
+		    "dylibs": [
+		      {
+		        "dylib": string,
+		        "functions": [FunctionMatch]
+		      }
+		    ],
+		    "error": string|null
+		  }
+
+		Each FunctionMatch entry matches the schema documented under 'ipsw macho disass'.
+		CLI output mirrors these fields with colored summaries grouped by dylib.`),
 	Example: heredoc.Doc(`
 		# Disassemble all images in dyld_shared_cache
 		❯ ipsw dsc disass DSC
@@ -136,6 +157,9 @@ var DisassCmd = &cobra.Command{
 		var middleAddr uint64
 		var image *dyld.CacheImage
 		var images []*dyld.CacheImage
+		var matcher *disass.InstructionMatcher
+		var compiledPatterns []disass.InstructionPattern
+		var err error
 
 		// flags
 		imageNames := viper.GetStringSlice("dyld.disass.image")
@@ -148,9 +172,46 @@ var DisassCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("dyld.disass.demangle")
 		asJSON := viper.GetBool("dyld.disass.json")
 		quiet := viper.GetBool("dyld.disass.quiet")
+		matchPatterns := viper.GetStringSlice("dyld.disass.match")
+		matchRegex := viper.GetString("dyld.disass.match-regex")
+		colorOutput := viper.GetBool("color") && !viper.GetBool("no-color")
+		searching := len(matchPatterns) > 0 || matchRegex != ""
+		useBytePatterns := len(matchPatterns) > 0 && matchRegex == ""
 
 		funcFile := viper.GetString("dyld.disass.input")
 		cacheFile := viper.GetString("dyld.disass.cache")
+
+		if searching {
+			if decompile {
+				return fmt.Errorf("instruction matching cannot be combined with --dec")
+			}
+			if len(symbolName) > 0 || startAddr > 0 || instructions > 0 || len(funcFile) > 0 {
+				return fmt.Errorf("instruction matching cannot be combined with --symbol, --vaddr, --count, or --input flags when scanning for instructions")
+			}
+			quiet = true
+			viper.Set("dyld.disass.quiet", true)
+
+			if useBytePatterns {
+				tmpPatterns, assembleErr := disass.AssembleInstructionPatterns(matchPatterns)
+				if assembleErr != nil {
+					log.WithError(assembleErr).Warn("failed to assemble instruction bytes; falling back to textual matching")
+					useBytePatterns = false
+				} else {
+					compiledPatterns = tmpPatterns
+				}
+			}
+			if !useBytePatterns {
+				matcher, err = disass.NewInstructionMatcher(matchPatterns, matchRegex)
+				if err != nil {
+					msg := err.Error()
+					if rErr := renderDyldMatchResults(nil, &msg, asJSON, colorOutput); rErr != nil {
+						return fmt.Errorf("instruction matcher error: %v (original: %w)", rErr, err)
+					}
+					return err
+				}
+			}
+		}
+
 		// validate flags
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
@@ -192,6 +253,17 @@ var DisassCmd = &cobra.Command{
 			return nil
 		}
 
+		if searching {
+			matcher, err = disass.NewInstructionMatcher(matchPatterns, matchRegex)
+			if err != nil {
+				msg := err.Error()
+				if rErr := renderDyldMatchResults(nil, &msg, asJSON, colorOutput); rErr != nil {
+					return fmt.Errorf("instruction matcher error: %v (original: %w)", rErr, err)
+				}
+				return err
+			}
+		}
+
 		if !quiet || len(symbolName) > 0 {
 			if len(cacheFile) == 0 {
 				cacheFile = dscPath + ".a2s"
@@ -199,6 +271,24 @@ var DisassCmd = &cobra.Command{
 			if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
 				return err
 			}
+		}
+
+		if searching {
+			if len(imageNames) == 0 {
+				images = f.Images
+			} else {
+				for _, name := range imageNames {
+					image, err := f.Image(name)
+					if err != nil {
+						return fmt.Errorf("failed to find image %s: %v", name, err)
+					}
+					images = append(images, image)
+				}
+			}
+			if err := executeDyldInstructionScan(images, matcher, compiledPatterns, demangleFlag, asJSON, colorOutput); err != nil {
+				return err
+			}
+			return nil
 		}
 
 		if len(symbolName) == 0 && startAddr == 0 && len(funcFile) == 0 { /* DEFAULT: disassemble image(s) */
