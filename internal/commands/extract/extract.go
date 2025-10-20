@@ -473,6 +473,35 @@ func DMG(c *Config) ([]string, error) {
 	return utils.SearchZip(zr.File, regexp.MustCompile(dmgPath), filepath.Join(filepath.Clean(c.Output), folder), c.Flatten, c.Progress)
 }
 
+func extractRemoteDMG(files []*zip.File, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
+	if dmgPath == "" {
+		return nil, nil
+	}
+
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dmg")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store %s: %v", dmgPath, err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	dmgRegex := regexp.MustCompile(fmt.Sprintf("^%s$", regexp.QuoteMeta(dmgPath)))
+	extracted, err := utils.SearchZip(files, dmgRegex, tmpDIR, false, true)
+	if err != nil {
+		return nil, err
+	}
+
+	var artifacts []string
+	for _, dmg := range extracted {
+		out, err := utils.ExtractFromDMG(dmg, dmg, destPath, pemDB, pattern)
+		if err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, out...)
+	}
+
+	return artifacts, nil
+}
+
 // Keybags extracts the keybags from an IPSW
 func Keybags(c *Config) (fname string, err error) {
 	if len(c.IPSW) == 0 && len(c.URL) == 0 {
@@ -736,21 +765,51 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
 		}
-		if c.DMGs { // SEARCH THE DMGs
-			return nil, fmt.Errorf("searching DMGs in remote IPSW is not supported")
-		}
-		_, zr, folder, err := getRemoteFolder(c)
+		i, zr, folder, err := getRemoteFolder(c)
 		if err != nil {
 			return nil, err
 		}
+		destPath := filepath.Join(filepath.Clean(c.Output), folder)
 		if c.Output == "" {
 			c.Output = folder
+			destPath = folder
 		} else {
-			c.Output = filepath.Join(filepath.Clean(c.Output), folder)
+			c.Output = destPath
 		}
-		artifacts, err = utils.SearchZip(zr.File, re, filepath.Join(filepath.Clean(c.Output), folder), c.Flatten, true)
-		if err != nil {
+		out, err := utils.SearchZip(zr.File, re, destPath, c.Flatten, true)
+		if err != nil && !c.DMGs {
 			return nil, fmt.Errorf("failed to extract files matching pattern '%s' in remote IPSW: %v", c.Pattern, err)
+		}
+		artifacts = append(artifacts, out...)
+		if c.DMGs { // SEARCH THE DMGs
+			if appOS, err := i.GetAppOsDmg(); err == nil {
+				out, err := extractRemoteDMG(zr.File, appOS, destPath, c.PemDB, re)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
+				}
+				artifacts = append(artifacts, out...)
+			}
+			if systemOS, err := i.GetSystemOsDmg(); err == nil {
+				out, err := extractRemoteDMG(zr.File, systemOS, destPath, c.PemDB, re)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
+				}
+				artifacts = append(artifacts, out...)
+			}
+			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+				out, err := extractRemoteDMG(zr.File, fsOS, destPath, c.PemDB, re)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
+				}
+				artifacts = append(artifacts, out...)
+			}
+			if excOS, err := i.GetExclaveOSDmg(); err == nil {
+				out, err := extractRemoteDMG(zr.File, excOS, destPath, c.PemDB, re)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
+				}
+				artifacts = append(artifacts, out...)
+			}
 		}
 		return artifacts, nil
 	}

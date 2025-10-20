@@ -243,24 +243,20 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetString("extract.dmg") != "" {
 			config.DMGs = true
-			if viper.GetBool("extract.remote") {
-				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
-			} else {
-				log.Info("Extracting DMG")
-				out, err := extract.DMG(config)
+			log.Info("Extracting DMG")
+			out, err := extract.DMG(config)
+			if err != nil {
+				return err
+			}
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
 				}
-				if viper.GetBool("extract.json") {
-					dat, err := json.Marshal(out)
-					if err != nil {
-						return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-					}
-					fmt.Println(string(dat))
-				} else {
-					for _, f := range out {
-						utils.Indent(log.Info, 2)("Created " + f)
-					}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
 				}
 			}
 		}
