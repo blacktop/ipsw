@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -78,6 +79,8 @@ func init() {
 	machoDisassCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	machoDisassCmd.Flags().StringSlice("match", []string{}, "Assembly instruction string(s) to search for")
+	machoDisassCmd.Flags().String("match-regex", "", "Regex to match assembly instructions")
 	machoDisassCmd.MarkFlagsMutuallyExclusive("entry", "symbol", "vaddr", "off")
 
 	viper.BindPFlag("macho.disass.arch", machoDisassCmd.Flags().Lookup("arch"))
@@ -105,14 +108,44 @@ func init() {
 	viper.BindPFlag("macho.disass.all-fileset-entries", machoDisassCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.disass.section", machoDisassCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("macho.disass.match", machoDisassCmd.Flags().Lookup("match"))
+	viper.BindPFlag("macho.disass.match-regex", machoDisassCmd.Flags().Lookup("match-regex"))
 
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // machoDisassCmd represents the dis command
 var machoDisassCmd = &cobra.Command{
-	Use:           "disass <MACHO>",
-	Short:         "Disassemble ARM64 MachO at symbol/vaddr",
+	Use:   "disass <MACHO>",
+	Short: "Disassemble ARM64 MachO at symbol/vaddr",
+	Long: heredoc.Doc(`
+		Disassemble ARM64 MachO binaries or scan them for specific instruction patterns.
+
+		# Output Format
+		MachO JSON results follow:
+		  {
+		    "matches": [
+		      {
+		        "function": string,
+		        "match_count": int,
+		        "stats": {
+		          "match_count": int,
+		          "earliest_match_offset"?: uint64,
+		          "unique_operations"?: string[]
+		        },
+		        "metadata": {
+		          "start_offset": uint64,
+		          "start_address": uint64,
+		          "other_symbols": string[],
+		          "image"?: string
+		        }
+		      }
+		    ],
+		    "error": string|null
+		  }
+
+		CLI output mirrors these fields with colored summaries when color is enabled.
+	`),
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -122,6 +155,7 @@ var machoDisassCmd = &cobra.Command{
 		var ms []*macho.File
 		var middleAddr uint64
 		var engine *disass.MachoDisass
+		var matcher *disass.InstructionMatcher
 
 		// flags
 		selectedArch := viper.GetString("macho.disass.arch")
@@ -136,12 +170,49 @@ var machoDisassCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("macho.disass.demangle")
 		asJSON := viper.GetBool("macho.disass.json")
 		quiet := viper.GetBool("macho.disass.quiet")
+		matchPatterns := viper.GetStringSlice("macho.disass.match")
+		matchRegex := viper.GetString("macho.disass.match-regex")
+		colorOutput := viper.GetBool("color") && !viper.GetBool("no-color")
+		searching := len(matchPatterns) > 0 || matchRegex != ""
+		useBytePatterns := len(matchPatterns) > 0 && matchRegex == ""
+		var compiledPatterns []disass.InstructionPattern
 
 		// funcFile := viper.GetString("macho.disass.input")
 		filesetEntry := viper.GetString("macho.disass.fileset-entry")
 		cacheFile := viper.GetString("macho.disass.cache")
 
 		allFuncs := false
+
+		if searching {
+			if decompile {
+				return fmt.Errorf("instruction matching cannot be combined with --dec")
+			}
+			if entryStart || len(symbolName) > 0 || startAddr > 0 || startOff > 0 || instructions > 0 || len(segmentSection) > 0 {
+				return fmt.Errorf("instruction matching cannot be combined with --entry, --symbol, --vaddr, --off, --count, or --section flags when scanning for instructions")
+			}
+			quiet = true
+			viper.Set("macho.disass.quiet", true)
+
+			if useBytePatterns {
+				compiled, assembleErr := disass.AssembleInstructionPatterns(matchPatterns)
+				if assembleErr != nil {
+					log.WithError(assembleErr).Warn("failed to assemble instruction bytes; falling back to textual matching")
+					useBytePatterns = false
+				} else {
+					compiledPatterns = compiled
+				}
+			}
+			if !useBytePatterns {
+				matcher, err = disass.NewInstructionMatcher(matchPatterns, matchRegex)
+				if err != nil {
+					msg := err.Error()
+					if rErr := renderMachOMatchResults(nil, &msg, asJSON, colorOutput); rErr != nil {
+						return fmt.Errorf("instruction matcher error: %v (original: %w)", rErr, err)
+					}
+					return err
+				}
+			}
+		}
 
 		// validate args
 		if len(symbolName) == 0 && startAddr == 0 && startOff == 0 && !entryStart {
@@ -171,6 +242,18 @@ var machoDisassCmd = &cobra.Command{
 		}
 		defer mr.Close()
 		m = mr.File
+		fileLabels := make(map[*macho.File]string)
+
+		if searching {
+			matcher, err = disass.NewInstructionMatcher(matchPatterns, matchRegex)
+			if err != nil {
+				msg := err.Error()
+				if rErr := renderMachOMatchResults(nil, &msg, asJSON, colorOutput); rErr != nil {
+					return fmt.Errorf("instruction matcher error: %v (original: %w)", rErr, err)
+				}
+				return err
+			}
+		}
 
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
 			return fmt.Errorf("can only disassemble arm64 binaries")
@@ -191,6 +274,7 @@ var machoDisassCmd = &cobra.Command{
 				log.Error("MachO type is not MH_FILESET (cannot use --fileset-entry)")
 			}
 			ms = append(ms, m)
+			fileLabels[m] = filesetEntry
 		} else if viper.GetBool("macho.disass.all-fileset-entries") {
 			for _, fe := range m.FileSets() {
 				mfe, err := m.GetFileSetFileByName(fe.EntryID)
@@ -198,12 +282,18 @@ var machoDisassCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
 				ms = append(ms, mfe)
+				fileLabels[mfe] = fe.EntryID
 			}
 		} else {
 			ms = append(ms, m)
+			fileLabels[m] = filepath.Base(machoPath)
 		}
 
 		if err := ctrlc.Default.Run(context.Background(), func() error {
+			if searching {
+				return executeMachOInstructionScan(ms, fileLabels, matcher, compiledPatterns, demangleFlag, asJSON, colorOutput)
+			}
+
 			for _, m := range ms {
 				if entryStart {
 					if main := m.GetLoadsByName("LC_MAIN"); len(main) == 0 {
