@@ -78,6 +78,17 @@ build-linux: ## Build ipsw (linux)
 	@echo " > Building ipswd (linux)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
 
+.PHONY: build-passkey-helper
+build-passkey-helper: ## Build macOS passkey helper for WebAuthn authentication
+	@echo " > Building passkey_helper (macOS only)"
+	@swiftc -o internal/download/webauthn/passkey_helper/passkey_helper \
+		-framework AuthenticationServices \
+		-framework Foundation \
+		-framework AppKit \
+		internal/download/webauthn/passkey_helper/main.swift
+	@chmod +x internal/download/webauthn/passkey_helper/passkey_helper
+	@echo " > ✅ Helper built at internal/download/webauthn/passkey_helper/passkey_helper"
+
 .PHONY: docs
 docs: ## Build the cli docs
 	@echo " > Updating CLI Docs"

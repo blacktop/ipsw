@@ -1,0 +1,10 @@
+# Compiled Swift helper binary
+passkey_helper/passkey_helper
+
+# macOS build artifacts
+*.dSYM
+*.swiftmodule
+*.swiftdoc
+
+# Test fixtures
+*.test
