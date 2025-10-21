@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,22 +19,26 @@ import (
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	UUID         string
-	LLM          string
-	Language     string
-	Model        string
-	Temperature  float64
-	TopP         float64
-	Stream       bool
-	DisableCache bool
-	Verbose      bool
-	Color        bool
-	Theme        string
-	MaxRetries   int
-	RetryBackoff time.Duration
+	UUID           string
+	LLM            string
+	Language       string
+	Model          string
+	Temperature    float64
+	TopP           float64
+	TemperatureSet bool
+	TopPSet        bool
+	Stream         bool
+	DisableCache   bool
+	Verbose        bool
+	Color          bool
+	Theme          string
+	MaxRetries     int
+	RetryBackoff   time.Duration
 }
 
 func Decompile(asm string, cfg *Config) (string, error) {
@@ -41,17 +47,19 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		return "", fmt.Errorf("failed to get prompt format string and syntax highlight lexer: %v", err)
 	}
 	llm, err := ai.NewAI(context.Background(), &ai.Config{
-		UUID:         cfg.UUID,
-		Provider:     cfg.LLM,
-		Prompt:       fmt.Sprintf(promptFmt, asm),
-		Model:        cfg.Model,
-		Temperature:  cfg.Temperature,
-		TopP:         cfg.TopP,
-		Stream:       cfg.Stream,
-		DisableCache: cfg.DisableCache,
-		Verbose:      cfg.Verbose,
-		MaxRetries:   cfg.MaxRetries,
-		RetryBackoff: cfg.RetryBackoff,
+		UUID:           cfg.UUID,
+		Provider:       cfg.LLM,
+		Prompt:         fmt.Sprintf(promptFmt, asm),
+		Model:          cfg.Model,
+		Temperature:    cfg.Temperature,
+		TemperatureSet: cfg.TemperatureSet,
+		TopP:           cfg.TopP,
+		TopPSet:        cfg.TopPSet,
+		Stream:         cfg.Stream,
+		DisableCache:   cfg.DisableCache,
+		Verbose:        cfg.Verbose,
+		MaxRetries:     cfg.MaxRetries,
+		RetryBackoff:   cfg.RetryBackoff,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create llm client: %v", err)
@@ -95,4 +103,26 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		return buf.String(), nil
 	}
 	return decmp, nil
+}
+
+// FlagWasProvided reports whether a CLI flag was explicitly set via the command line
+// or supplied through a config file. This allows callers to distinguish user intent
+// from default values when forwarding options to downstream systems.
+func FlagWasProvided(cmd *cobra.Command, flagName, viperKey string) bool {
+	if cmd.Flags().Changed(flagName) {
+		return true
+	}
+	if viper.InConfig(viperKey) {
+		return true
+	}
+	flag := cmd.Flags().Lookup(flagName)
+	if flag == nil {
+		return false
+	}
+	defVal, err := strconv.ParseFloat(flag.DefValue, 64)
+	if err != nil {
+		return false
+	}
+	current := viper.GetFloat64(viperKey)
+	return math.Abs(current-defVal) > 1e-9
 }

@@ -149,6 +149,9 @@ var DisassCmd = &cobra.Command{
 		asJSON := viper.GetBool("dyld.disass.json")
 		quiet := viper.GetBool("dyld.disass.quiet")
 
+		tempFlagSet := dcmd.FlagWasProvided(cmd, "dec-temp", "dyld.disass.dec-temp")
+		topPFlagSet := dcmd.FlagWasProvided(cmd, "dec-top-p", "dyld.disass.dec-top-p")
+
 		funcFile := viper.GetString("dyld.disass.input")
 		cacheFile := viper.GetString("dyld.disass.cache")
 		// validate flags
@@ -276,19 +279,21 @@ var DisassCmd = &cobra.Command{
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
 						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:         f.UUID.String(),
-							LLM:          viper.GetString("dyld.disass.dec-llm"),
-							Language:     viper.GetString("dyld.disass.dec-lang"),
-							Model:        viper.GetString("dyld.disass.dec-model"),
-							Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
-							TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
-							Stream:       false,
-							DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
-							Verbose:      viper.GetBool("verbose"),
-							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:        viper.GetString("dyld.disass.dec-theme"),
-							MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
-							RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
+							UUID:           f.UUID.String(),
+							LLM:            viper.GetString("dyld.disass.dec-llm"),
+							Language:       viper.GetString("dyld.disass.dec-lang"),
+							Model:          viper.GetString("dyld.disass.dec-model"),
+							Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
+							TemperatureSet: tempFlagSet,
+							TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
+							TopPSet:        topPFlagSet,
+							Stream:         false,
+							DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
+							Verbose:        viper.GetBool("verbose"),
+							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:          viper.GetString("dyld.disass.dec-theme"),
+							MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
+							RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
 						})
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
@@ -396,19 +401,21 @@ var DisassCmd = &cobra.Command{
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
 						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:         f.UUID.String(),
-							LLM:          viper.GetString("dyld.disass.dec-llm"),
-							Language:     viper.GetString("dyld.disass.dec-lang"),
-							Model:        viper.GetString("dyld.disass.dec-model"),
-							Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
-							TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
-							Stream:       false,
-							DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
-							Verbose:      viper.GetBool("verbose"),
-							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:        viper.GetString("dyld.disass.dec-theme"),
-							MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
-							RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
+							UUID:           f.UUID.String(),
+							LLM:            viper.GetString("dyld.disass.dec-llm"),
+							Language:       viper.GetString("dyld.disass.dec-lang"),
+							Model:          viper.GetString("dyld.disass.dec-model"),
+							Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
+							TemperatureSet: tempFlagSet,
+							TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
+							TopPSet:        topPFlagSet,
+							Stream:         false,
+							DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
+							Verbose:        viper.GetBool("verbose"),
+							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:          viper.GetString("dyld.disass.dec-theme"),
+							MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
+							RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
 						})
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
@@ -533,19 +540,21 @@ var DisassCmd = &cobra.Command{
 				asm := disass.Disassemble(engine)
 				if decompile && len(asm) > 0 {
 					decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-						UUID:         f.UUID.String(),
-						LLM:          viper.GetString("dyld.disass.dec-llm"),
-						Language:     viper.GetString("dyld.disass.dec-lang"),
-						Model:        viper.GetString("dyld.disass.dec-model"),
-						Temperature:  viper.GetFloat64("dyld.disass.dec-temp"),
-						TopP:         viper.GetFloat64("dyld.disass.dec-top-p"),
-						Stream:       false,
-						DisableCache: viper.GetBool("dyld.disass.dec-nocache"),
-						Verbose:      viper.GetBool("verbose"),
-						Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
-						Theme:        viper.GetString("dyld.disass.dec-theme"),
-						MaxRetries:   viper.GetInt("dyld.disass.dec-retries"),
-						RetryBackoff: viper.GetDuration("dyld.disass.dec-retry-backoff"),
+						UUID:           f.UUID.String(),
+						LLM:            viper.GetString("dyld.disass.dec-llm"),
+						Language:       viper.GetString("dyld.disass.dec-lang"),
+						Model:          viper.GetString("dyld.disass.dec-model"),
+						Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
+						TemperatureSet: tempFlagSet,
+						TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
+						TopPSet:        topPFlagSet,
+						Stream:         false,
+						DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
+						Verbose:        viper.GetBool("verbose"),
+						Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+						Theme:          viper.GetString("dyld.disass.dec-theme"),
+						MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
+						RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
 					})
 					if err != nil {
 						return fmt.Errorf("failed to decompile via llm: %v", err)
