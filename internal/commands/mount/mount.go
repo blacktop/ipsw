@@ -49,8 +49,19 @@ func (c Context) Unmount() error {
 	}); err != nil {
 		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
 	}
-	// TODO: check if DmgPath is safe before removing (should be in /tmp and should be src of mount)
-	return os.Remove(filepath.Clean(c.DmgPath))
+	cleanDmgPath := filepath.Clean(c.DmgPath)
+	if cleanDmgPath == "." || cleanDmgPath == "" {
+		return nil
+	}
+	return utils.Retry(3, 1*time.Second, func() error {
+		if err := os.Remove(cleanDmgPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		return nil
+	})
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
