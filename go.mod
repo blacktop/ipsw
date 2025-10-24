@@ -22,7 +22,7 @@ require (
 	github.com/blacktop/arm64-cgo v1.0.59
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.251
+	github.com/blacktop/go-macho v1.1.252
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.20
 	github.com/blacktop/lzfse-cgo v1.1.20
@@ -76,7 +76,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.10.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.43.0
-	golang.org/x/exp v0.0.0-20251017212417-90e834f514db
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 	golang.org/x/net v0.46.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/sync v0.17.0
@@ -123,7 +123,7 @@ require (
 	github.com/charmbracelet/colorprofile v0.3.2 // indirect
 	github.com/charmbracelet/x/ansi v0.10.2 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
-	github.com/charmbracelet/x/mosaic v0.0.0-20251020183722-ee4914f58d13 // indirect
+	github.com/charmbracelet/x/mosaic v0.0.0-20251023181713-f594ac034d6b // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
