@@ -37,8 +37,9 @@ const _dyld_section_location_kind_name = "text_swift5_protostext_swift5_prototex
 var _dyld_section_location_kind_index = [...]uint16{0, 18, 35, 52, 71, 91, 111, 126, 139, 152, 167, 182, 200, 215, 239, 253, 271, 290, 317, 335, 352, 364, 369}
 
 func (i dyld_section_location_kind) String() string {
-	if i >= dyld_section_location_kind(len(_dyld_section_location_kind_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_dyld_section_location_kind_index)-1 {
 		return "dyld_section_location_kind(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _dyld_section_location_kind_name[_dyld_section_location_kind_index[i]:_dyld_section_location_kind_index[i+1]]
+	return _dyld_section_location_kind_name[_dyld_section_location_kind_index[idx]:_dyld_section_location_kind_index[idx+1]]
 }
