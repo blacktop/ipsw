@@ -9,11 +9,13 @@ import (
 )
 
 type Config struct {
-	Prompt      string  `json:"prompt"`
-	Model       string  `json:"model"`
-	Temperature float64 `json:"temperature"`
-	TopP        float64 `json:"top_p"`
-	Stream      bool    `json:"stream"`
+	Prompt         string  `json:"prompt"`
+	Model          string  `json:"model"`
+	Temperature    float64 `json:"temperature"`
+	TemperatureSet bool    `json:"-"`
+	TopP           float64 `json:"top_p"`
+	TopPSet        bool    `json:"-"`
+	Stream         bool    `json:"stream"`
 }
 
 type Claude struct {
@@ -105,17 +107,26 @@ func (c *Claude) Chat() (string, error) {
 	if err := c.Verify(); err != nil {
 		return "", fmt.Errorf("invalid model configuration: %w", err)
 	}
+	if c.conf.TemperatureSet && c.conf.TopPSet {
+		return "", fmt.Errorf("claude: temperature and top_p cannot both be set for the same request")
+	}
 
-	message, err := c.cli.Messages.New(c.ctx, anthropic.MessageNewParams{
+	params := anthropic.MessageNewParams{
 		MaxTokens: 1024,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(c.conf.Prompt)),
 		},
 		Model:       anthropic.Model(c.models[c.conf.Model]),
-		Temperature: anthropic.Float(c.conf.Temperature),
-		TopP:        anthropic.Float(c.conf.TopP),
 		ServiceTier: anthropic.MessageNewParamsServiceTierAuto,
-	})
+	}
+	if c.conf.TemperatureSet {
+		params.Temperature = anthropic.Float(c.conf.Temperature)
+	}
+	if c.conf.TopPSet {
+		params.TopP = anthropic.Float(c.conf.TopP)
+	}
+
+	message, err := c.cli.Messages.New(c.ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create message: %w", err)
 	}

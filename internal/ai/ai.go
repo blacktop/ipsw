@@ -42,17 +42,19 @@ type AI interface {
 }
 
 type Config struct {
-	UUID         string
-	Provider     string
-	Prompt       string
-	Model        string
-	Temperature  float64
-	TopP         float64
-	Stream       bool
-	DisableCache bool
-	Verbose      bool
-	MaxRetries   int
-	RetryBackoff time.Duration
+	UUID           string
+	Provider       string
+	Prompt         string
+	Model          string
+	Temperature    float64
+	TopP           float64
+	TemperatureSet bool
+	TopPSet        bool
+	Stream         bool
+	DisableCache   bool
+	Verbose        bool
+	MaxRetries     int
+	RetryBackoff   time.Duration
 }
 
 type CachingAI struct {
@@ -222,11 +224,13 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	switch cfg.Provider {
 	case "claude":
 		baseAI, err = anthropic.NewClaude(ctx, &anthropic.Config{
-			Prompt:      cfg.Prompt,
-			Model:       cfg.Model,
-			Temperature: cfg.Temperature,
-			TopP:        cfg.TopP,
-			Stream:      cfg.Stream,
+			Prompt:         cfg.Prompt,
+			Model:          cfg.Model,
+			Temperature:    cfg.Temperature,
+			TemperatureSet: cfg.TemperatureSet,
+			TopP:           cfg.TopP,
+			TopPSet:        cfg.TopPSet,
+			Stream:         cfg.Stream,
 		})
 	case "copilot":
 		baseAI, err = copilot.NewCopilot(ctx, &copilot.Config{

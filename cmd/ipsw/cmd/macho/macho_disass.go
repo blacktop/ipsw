@@ -137,6 +137,9 @@ var machoDisassCmd = &cobra.Command{
 		asJSON := viper.GetBool("macho.disass.json")
 		quiet := viper.GetBool("macho.disass.quiet")
 
+		tempFlagSet := dcmd.FlagWasProvided(cmd, "dec-temp", "macho.disass.dec-temp")
+		topPFlagSet := dcmd.FlagWasProvided(cmd, "dec-top-p", "macho.disass.dec-top-p")
+
 		// funcFile := viper.GetString("macho.disass.input")
 		filesetEntry := viper.GetString("macho.disass.fileset-entry")
 		cacheFile := viper.GetString("macho.disass.cache")
@@ -269,19 +272,21 @@ var machoDisassCmd = &cobra.Command{
 						asm := disass.Disassemble(engine)
 						if decompile && len(asm) > 0 {
 							decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-								UUID:         m.UUID().String(),
-								LLM:          viper.GetString("macho.disass.dec-llm"),
-								Language:     viper.GetString("macho.disass.dec-lang"),
-								Model:        viper.GetString("macho.disass.dec-model"),
-								Temperature:  viper.GetFloat64("macho.disass.dec-temp"),
-								TopP:         viper.GetFloat64("macho.disass.dec-top-p"),
-								Stream:       false,
-								DisableCache: viper.GetBool("macho.disass.dec-nocache"),
-								Verbose:      viper.GetBool("verbose"),
-								Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
-								Theme:        viper.GetString("macho.disass.dec-theme"),
-								MaxRetries:   viper.GetInt("macho.disass.dec-retries"),
-								RetryBackoff: viper.GetDuration("macho.disass.dec-retry-backoff"),
+								UUID:           m.UUID().String(),
+								LLM:            viper.GetString("macho.disass.dec-llm"),
+								Language:       viper.GetString("macho.disass.dec-lang"),
+								Model:          viper.GetString("macho.disass.dec-model"),
+								Temperature:    viper.GetFloat64("macho.disass.dec-temp"),
+								TemperatureSet: tempFlagSet,
+								TopP:           viper.GetFloat64("macho.disass.dec-top-p"),
+								TopPSet:        topPFlagSet,
+								Stream:         false,
+								DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
+								Verbose:        viper.GetBool("verbose"),
+								Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+								Theme:          viper.GetString("macho.disass.dec-theme"),
+								MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
+								RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
 							})
 							if err != nil {
 								return fmt.Errorf("failed to decompile via llm: %v", err)
@@ -398,19 +403,21 @@ var machoDisassCmd = &cobra.Command{
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
 						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:         m.UUID().String(),
-							LLM:          viper.GetString("macho.disass.dec-llm"),
-							Language:     viper.GetString("macho.disass.dec-lang"),
-							Model:        viper.GetString("macho.disass.dec-model"),
-							Temperature:  viper.GetFloat64("macho.disass.dec-temp"),
-							TopP:         viper.GetFloat64("macho.disass.dec-top-p"),
-							Stream:       false,
-							DisableCache: viper.GetBool("macho.disass.dec-nocache"),
-							Verbose:      viper.GetBool("verbose"),
-							Color:        viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:        viper.GetString("macho.disass.dec-theme"),
-							MaxRetries:   viper.GetInt("macho.disass.dec-retries"),
-							RetryBackoff: viper.GetDuration("macho.disass.dec-retry-backoff"),
+							UUID:           m.UUID().String(),
+							LLM:            viper.GetString("macho.disass.dec-llm"),
+							Language:       viper.GetString("macho.disass.dec-lang"),
+							Model:          viper.GetString("macho.disass.dec-model"),
+							Temperature:    viper.GetFloat64("macho.disass.dec-temp"),
+							TemperatureSet: tempFlagSet,
+							TopP:           viper.GetFloat64("macho.disass.dec-top-p"),
+							TopPSet:        topPFlagSet,
+							Stream:         false,
+							DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
+							Verbose:        viper.GetBool("verbose"),
+							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+							Theme:          viper.GetString("macho.disass.dec-theme"),
+							MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
+							RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
 						})
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)

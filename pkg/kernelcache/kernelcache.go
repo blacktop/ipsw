@@ -155,14 +155,20 @@ func Decompress(kcache, outputDir string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	kcache = filepath.Join(outputDir, kcache+".decompressed")
-	os.MkdirAll(filepath.Dir(kcache), 0755)
+	outputName := filepath.Base(kcache) + ".decompressed"
+	outputPath := filepath.Join(filepath.Dir(kcache), outputName)
+	if outputDir != "" {
+		outputPath = filepath.Join(outputDir, outputName)
+	}
 
-	err = os.WriteFile(kcache, dec, 0660)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return errors.Wrap(err, "failed to create output directory")
+	}
+
+	if err := os.WriteFile(outputPath, dec, 0660); err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
-	utils.Indent(log.Info, 2)("Created " + kcache)
+	utils.Indent(log.Info, 2)("Created " + outputPath)
 	return nil
 }
 
@@ -178,16 +184,21 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 		return fmt.Errorf("failed to get kernelmanagement data: %v", err)
 	}
 
-	kcache = filepath.Join(outputDir, kcache+".decompressed")
-	if err := os.MkdirAll(filepath.Dir(kcache), 0755); err != nil {
-		return fmt.Errorf("failed to create output directory for %s: %v", kcache, err)
+	outputName := filepath.Base(kcache) + ".decompressed"
+	outputPath := filepath.Join(filepath.Dir(kcache), outputName)
+	if outputDir != "" {
+		outputPath = filepath.Join(outputDir, outputName)
 	}
 
-	if err = os.WriteFile(kcache, data, 0660); err != nil {
-		return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create output directory for %s: %v", outputPath, err)
 	}
 
-	utils.Indent(log.Info, 2)("Created " + kcache)
+	if err = os.WriteFile(outputPath, data, 0660); err != nil {
+		return fmt.Errorf("failed to write kernelcache %s: %v", outputPath, err)
+	}
+
+	utils.Indent(log.Info, 2)("Created " + outputPath)
 	return nil
 }
 
