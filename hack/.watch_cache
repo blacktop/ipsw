@@ -1,5 +1,24 @@
 {
   "WebKit/WebKit": {
+    "commits": [
+      "5477c623a01c1fa53b5441103642aa119177402d",
+      "f8332133a12b758485dd348da4c6ed991bde98f5",
+      "c78c210e4b41d758d26bb05c56f51bbbd60823ed",
+      "261b24ff1774bf055cd4378f1bd12ca926417b35",
+      "7395b2831bdc001a3f8604fe77e91998ee8cade0",
+      "6390f36dce317d5c780235d26d8f97f3826f4b48"
+    ],
+    "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    },
     "tags": [
       "webkitgtk-2.48.3",
       "wpewebkit-2.48.2",
@@ -25,15 +44,9 @@
       "webkitgtk-2.50.1",
       "webkitgtk-2.51.1",
       "wpewebkit-2.51.1"
-    ],
-    "commits": [
-      "5477c623a01c1fa53b5441103642aa119177402d",
-      "f8332133a12b758485dd348da4c6ed991bde98f5",
-      "c78c210e4b41d758d26bb05c56f51bbbd60823ed",
-      "261b24ff1774bf055cd4378f1bd12ca926417b35",
-      "7395b2831bdc001a3f8604fe77e91998ee8cade0",
-      "6390f36dce317d5c780235d26d8f97f3826f4b48"
-    ],
+    ]
+  },
+  "apple-oss-distributions/distribution-macOS": {
     "fcs_keys": {
       "beta": {
         "updated_at": "0001-01-01T00:00:00Z"
@@ -44,26 +57,13 @@
       "release": {
         "updated_at": "0001-01-01T00:00:00Z"
       }
-    }
-  },
-  "apple-oss-distributions/distribution-macOS": {
+    },
     "tags": [
       "macos-155",
       "macos-154",
       "macos-156",
       "macos-260"
-    ],
-    "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    }
+    ]
   },
   "fcs_keys": {
     "fcs_keys": {
@@ -84,8 +84,8 @@
         "fingerprint": "23B5073a_25B5072a_23N5042a",
         "ios_build": "23B5073a",
         "macos_build": "25B5072a",
-        "visionos_build": "23N5042a",
-        "updated_at": "2025-10-20T19:06:14Z"
+        "updated_at": "2025-10-20T19:06:14Z",
+        "visionos_build": "23N5042a"
       },
       "rc": {
         "updated_at": "0001-01-01T00:00:00Z"
@@ -97,35 +97,23 @@
   },
   "fcs_keys_rc": {
     "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
       "rc": {
-        "fingerprint": "23A355_22H730_23M8340",
-        "ios_build": "23A355",
+        "fingerprint": "22H31_22H730_23M8340",
+        "ios_build": "22H31",
         "macos_build": "22H730",
-        "visionos_build": "23M8340",
-        "updated_at": "2025-10-21T19:06:08Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
+        "updated_at": "2025-10-26T19:05:37Z",
+        "visionos_build": "23M8340"
       }
     }
   },
   "fcs_keys_stable": {
     "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
       "release": {
-        "fingerprint": "23A355_22H730_23M8340",
-        "ios_build": "23A355",
+        "fingerprint": "22H31_22H730_23M8340",
+        "ios_build": "22H31",
         "macos_build": "22H730",
-        "visionos_build": "23M8340",
-        "updated_at": "2025-10-21T19:06:08Z"
+        "updated_at": "2025-10-26T19:05:37Z",
+        "visionos_build": "23M8340"
       }
     }
   },
