@@ -3,8 +3,10 @@ package pipeline
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,8 +17,9 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
-	"github.com/blacktop/ipsw/internal/search"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -43,6 +46,8 @@ type Executor struct {
 
 	mu sync.RWMutex
 }
+
+var errDMGUnavailable = errors.New("dmg unavailable")
 
 // NewExecutor creates a new pipeline executor.
 func NewExecutor(oldIPSW, newIPSW string, cfg *Config) *Executor {
@@ -133,8 +138,13 @@ func (e *Executor) Execute(ctx context.Context) error {
 	}
 
 	// Group handlers by DMG requirements
-	groups := e.groupHandlers()
-	log.Infof("Grouped %d enabled handlers into %d groups", e.stats.HandlersRun+e.stats.HandlersSkipped-e.stats.HandlersSkipped, len(groups))
+	groups, enabledHandlers := e.groupHandlers()
+	log.Infof("Grouped %d enabled handlers into %d groups", len(enabledHandlers), len(groups))
+
+	// Walk IPSW zip once for all interested handlers
+	if err := e.dispatchZIPEvents(ctx, enabledHandlers); err != nil {
+		return fmt.Errorf("failed to process IPSW zip files: %w", err)
+	}
 
 	// Execute each group
 	for _, group := range groups {
@@ -155,12 +165,12 @@ func (e *Executor) Execute(ctx context.Context) error {
 //
 // Handlers with the same DMG type combination are grouped together so they
 // can share the same mount session and run concurrently.
-func (e *Executor) groupHandlers() []*HandlerGroup {
+func (e *Executor) groupHandlers() ([]*HandlerGroup, []Handler) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// Group handlers by DMG type combinations
 	groupMap := make(map[string]*HandlerGroup)
+	var enabled []Handler
 
 	for h := range e.handlers {
 		handler := e.handlers[h]
@@ -169,7 +179,8 @@ func (e *Executor) groupHandlers() []*HandlerGroup {
 			continue
 		}
 
-		// Create a key from DMG types
+		enabled = append(enabled, handler)
+
 		dmgTypes := handler.DMGTypes()
 		key := dmgTypesKey(dmgTypes)
 
@@ -182,13 +193,231 @@ func (e *Executor) groupHandlers() []*HandlerGroup {
 		groupMap[key].Handlers = append(groupMap[key].Handlers, handler)
 	}
 
-	// Convert map to slice
 	var groups []*HandlerGroup
 	for _, group := range groupMap {
 		groups = append(groups, group)
 	}
 
-	return groups
+	return groups, enabled
+}
+
+// dispatchZIPEvents processes all files inside the IPSW zip exactly once and
+// notifies interested handlers.
+func (e *Executor) dispatchZIPEvents(ctx context.Context, handlers []Handler) error {
+	subscribers := e.zipSubscribers(handlers)
+	if len(subscribers) == 0 {
+		return nil
+	}
+
+	if err := e.walkZIP(ctx, e.OldCtx, SideOld, subscribers); err != nil {
+		return fmt.Errorf("failed to process old IPSW: %w", err)
+	}
+	if err := e.walkZIP(ctx, e.NewCtx, SideNew, subscribers); err != nil {
+		return fmt.Errorf("failed to process new IPSW: %w", err)
+	}
+	return nil
+}
+
+// dispatchDMGEvents walks each mounted DMG once and notifies interested handlers.
+func (e *Executor) dispatchDMGEvents(ctx context.Context, group *HandlerGroup) error {
+	for _, dmgType := range group.DMGTypes {
+		if dmgType == DMGTypeNone {
+			continue
+		}
+
+		subscribers := e.dmgSubscribers(group.Handlers, dmgType)
+		if len(subscribers) == 0 {
+			continue
+		}
+
+		if mount, ok := e.OldCtx.GetMount(dmgType); ok && mount != nil {
+			if err := e.walkDMG(ctx, e.OldCtx, dmgType, mount, SideOld, subscribers); err != nil {
+				return err
+			}
+		}
+		if mount, ok := e.NewCtx.GetMount(dmgType); ok && mount != nil {
+			if err := e.walkDMG(ctx, e.NewCtx, dmgType, mount, SideNew, subscribers); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (e *Executor) zipSubscribers(handlers []Handler) []subscriptionEntry {
+	return e.filterSubscribers(handlers, func(sub FileSubscription) bool {
+		return sub.Source == SourceZIP
+	})
+}
+
+func (e *Executor) dmgSubscribers(handlers []Handler, dmgType DMGType) []subscriptionEntry {
+	return e.filterSubscribers(handlers, func(sub FileSubscription) bool {
+		if sub.Source != SourceDMG {
+			return false
+		}
+		if sub.DMGType == DMGTypeNone {
+			return true
+		}
+		return sub.DMGType == dmgType
+	})
+}
+
+func (e *Executor) filterSubscribers(handlers []Handler, include func(FileSubscription) bool) []subscriptionEntry {
+	var entries []subscriptionEntry
+	for _, handler := range handlers {
+		subscriber, ok := handler.(FileSubscriber)
+		if !ok {
+			continue
+		}
+		var filtered []FileSubscription
+		for idx, sub := range subscriber.FileSubscriptions() {
+			if !include(sub) {
+				continue
+			}
+			if sub.ID == "" {
+				sub.ID = fmt.Sprintf("%s#%d", handler.Name(), idx)
+			}
+			filtered = append(filtered, sub)
+		}
+		if len(filtered) == 0 {
+			continue
+		}
+		entries = append(entries, subscriptionEntry{
+			handler:    handler,
+			subscriber: subscriber,
+			subs:       filtered,
+		})
+	}
+	return entries
+}
+
+func (e *Executor) dispatchFileToSubscribers(ctx context.Context, entries []subscriptionEntry, evt *FileEvent) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	for _, entry := range entries {
+		for _, sub := range entry.subs {
+			if !sub.matches(evt) {
+				continue
+			}
+			if err := entry.subscriber.HandleFile(ctx, e, sub.ID, evt); err != nil {
+				return fmt.Errorf("handler %s subscription %s failed: %w", entry.handler.Name(), sub.ID, err)
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (e *Executor) walkZIP(ctx context.Context, ipswCtx *Context, side DiffSide, subscribers []subscriptionEntry) error {
+	if len(subscribers) == 0 {
+		return nil
+	}
+
+	zr, err := zip.OpenReader(ipswCtx.IPSWPath)
+	if err != nil {
+		return fmt.Errorf("failed to open IPSW %s: %w", ipswCtx.IPSWPath, err)
+	}
+	defer zr.Close()
+
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		evt := &FileEvent{
+			Source:  SourceZIP,
+			Side:    side,
+			Ctx:     ipswCtx,
+			RelPath: filepath.ToSlash(f.Name),
+			zipFile: f,
+		}
+		if err := e.dispatchFileToSubscribers(ctx, subscribers, evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *Executor) walkDMG(ctx context.Context, ipswCtx *Context, dmgType DMGType, mount *Mount, side DiffSide, subscribers []subscriptionEntry) error {
+	if len(subscribers) == 0 || mount == nil || mount.MountPath == "" {
+		return nil
+	}
+
+	return walkMountFiles(ctx, mount.MountPath, func(path string, info os.FileInfo) error {
+		evt := &FileEvent{
+			Source:   SourceDMG,
+			Side:     side,
+			Ctx:      ipswCtx,
+			DMGType:  dmgType,
+			MountRef: mount,
+			RelPath:  normalizeRelPath(mount.MountPath, path),
+			AbsPath:  path,
+			info:     info,
+		}
+
+		e.maybeCacheMachO(evt)
+
+		return e.dispatchFileToSubscribers(ctx, subscribers, evt)
+	})
+}
+
+func walkMountFiles(ctx context.Context, root string, visit func(string, os.FileInfo) error) error {
+	visitedDirs := make(map[string]bool)
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsPermission(err) || errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
+				targetInfo, statErr := os.Stat(linkPath)
+				if statErr != nil {
+					if os.IsPermission(statErr) || errors.Is(statErr, os.ErrNotExist) {
+						return nil
+					}
+					return statErr
+				}
+				if targetInfo.IsDir() && !visitedDirs[linkPath] {
+					visitedDirs[linkPath] = true
+					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
+						if subErr != nil {
+							if os.IsPermission(subErr) || errors.Is(subErr, os.ErrNotExist) {
+								return nil
+							}
+							return subErr
+						}
+						if subInfo.IsDir() {
+							return nil
+						}
+						return visit(subPath, subInfo)
+					})
+				}
+				if !targetInfo.IsDir() {
+					return visit(linkPath, targetInfo)
+				}
+				return nil
+			}
+			return nil
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		return visit(path, info)
+	})
 }
 
 // executeGroup runs all handlers in a group with the required DMGs mounted.
@@ -199,11 +428,15 @@ func (e *Executor) executeGroup(ctx context.Context, group *HandlerGroup) error 
 	}
 	defer e.unmountDMGs(group.DMGTypes)
 
-	// Populate MachO caches after mounting but before handlers run
-	// This scans all MachO files once and caches the data for handlers to consume
-	if err := e.populateMachoCaches(ctx); err != nil {
-		return fmt.Errorf("failed to populate MachO caches: %w", err)
+	// Dispatch file events to handlers that subscribed to this DMG set
+	// Note: maybeCacheMachO() is called during the walk, so MachO files are
+	// cached opportunistically while streaming. No separate cache scan needed.
+	if err := e.dispatchDMGEvents(ctx, group); err != nil {
+		return fmt.Errorf("failed to process DMG files: %w", err)
 	}
+
+	// Record cache stats after DMG walks complete
+	e.recordCacheStats()
 
 	// Execute handlers concurrently within the group
 	g, gctx := errgroup.WithContext(ctx)
@@ -276,15 +509,39 @@ func (e *Executor) mountDMGs(dmgTypes []DMGType) error {
 
 		// Mount for old context
 		if err := e.mountDMG(e.OldCtx, dmgTypes[dmgType]); err != nil {
-			return fmt.Errorf("failed to mount old %s: %w", dmgTypes[dmgType], err)
+			if errors.Is(err, errDMGUnavailable) {
+				log.WithError(err).Debugf("Skipping %s DMG for old IPSW: not present", dmgTypes[dmgType])
+			} else {
+				return fmt.Errorf("failed to mount old %s: %w", dmgTypes[dmgType], err)
+			}
 		}
 
 		// Mount for new context
 		if err := e.mountDMG(e.NewCtx, dmgTypes[dmgType]); err != nil {
-			return fmt.Errorf("failed to mount new %s: %w", dmgTypes[dmgType], err)
+			if errors.Is(err, errDMGUnavailable) {
+				log.WithError(err).Debugf("Skipping %s DMG for new IPSW: not present", dmgTypes[dmgType])
+			} else {
+				return fmt.Errorf("failed to mount new %s: %w", dmgTypes[dmgType], err)
+			}
 		}
 	}
 	return nil
+}
+
+// WalkDMGFiles iterates every non-directory file within the specified DMG mount
+// and invokes the provided callback with the relative and absolute paths.
+func (e *Executor) WalkDMGFiles(ctx context.Context, ipswCtx *Context, dmgType DMGType, visit func(relPath, absPath string, info os.FileInfo) error) error {
+	if visit == nil {
+		return fmt.Errorf("visit callback cannot be nil")
+	}
+	mount, ok := ipswCtx.GetMount(dmgType)
+	if !ok || mount == nil || mount.MountPath == "" {
+		return nil
+	}
+	return walkMountFiles(ctx, mount.MountPath, func(path string, info os.FileInfo) error {
+		rel := normalizeRelPath(mount.MountPath, path)
+		return visit(rel, path, info)
+	})
 }
 
 // mountDMG mounts a specific DMG type for a context.
@@ -298,17 +555,23 @@ func (e *Executor) mountDMG(ctx *Context, dmgType DMGType) error {
 	// Get DMG path based on type (relative path from IPSW metadata)
 	dmgPath, err := e.getDMGPath(ctx, dmgType)
 	if err != nil {
+		if errors.Is(err, info.ErrorCryptexNotFound) && isOptionalDMG(dmgType) {
+			return fmt.Errorf("%w: %s DMG unavailable (%v)", errDMGUnavailable, dmgType, err)
+		}
 		return fmt.Errorf("failed to get DMG path: %w", err)
 	}
 
 	// Extract DMG from IPSW if not already extracted
-	if err := e.extractDMG(ctx, &dmgPath); err != nil {
+	managed, err := e.extractDMG(ctx, &dmgPath)
+	if err != nil {
 		return fmt.Errorf("failed to extract DMG: %w", err)
 	}
 
 	// Handle AEA encryption if needed
-	if err := e.handleAEADecryption(&dmgPath); err != nil {
+	if decManaged, err := e.handleAEADecryption(&dmgPath, managed); err != nil {
 		return err
+	} else if decManaged {
+		managed = true
 	}
 
 	// Mount the DMG
@@ -330,9 +593,19 @@ func (e *Executor) mountDMG(ctx *Context, dmgType DMGType) error {
 		MountPath: mountPath,
 		IsMounted: !alreadyMounted,
 		Type:      dmgType,
+		Managed:   managed,
 	})
 
 	return nil
+}
+
+func isOptionalDMG(dmgType DMGType) bool {
+	switch dmgType {
+	case DMGTypeAppOS, DMGTypeExclave:
+		return true
+	default:
+		return false
+	}
 }
 
 // unmountDMGs unmounts all DMG types for both contexts.
@@ -372,9 +645,11 @@ func (e *Executor) unmountDMG(ctx *Context, dmgType DMGType) {
 		e.mu.Unlock()
 	}
 
-	// Clean up extracted DMG
-	if err := os.Remove(mount.DMGPath); err != nil {
-		log.WithError(err).Debugf("Failed to remove DMG %s", mount.DMGPath)
+	// Clean up extracted DMG if we created it
+	if mount.Managed {
+		if err := os.Remove(mount.DMGPath); err != nil {
+			log.WithError(err).Debugf("Failed to remove DMG %s", mount.DMGPath)
+		}
 	}
 }
 
@@ -529,9 +804,16 @@ func (e *Executor) getDMGPath(ctx *Context, dmgType DMGType) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to get FileSystem DMG: %w", err)
 		}
-	case DMGTypeAppOS, DMGTypeExclave:
-		// TODO: implement when these DMG types are needed
-		return "", fmt.Errorf("DMG type %s not yet implemented", dmgType)
+	case DMGTypeAppOS:
+		dmgPath, err = ctx.Info.GetAppOsDmg()
+		if err != nil {
+			return "", fmt.Errorf("failed to get AppOS DMG: %w", err)
+		}
+	case DMGTypeExclave:
+		dmgPath, err = ctx.Info.GetExclaveOSDmg()
+		if err != nil {
+			return "", fmt.Errorf("failed to get ExclaveOS DMG: %w", err)
+		}
 	default:
 		return "", fmt.Errorf("unsupported DMG type: %s", dmgType)
 	}
@@ -540,11 +822,11 @@ func (e *Executor) getDMGPath(ctx *Context, dmgType DMGType) (string, error) {
 }
 
 // extractDMG extracts a DMG from the IPSW zip if not already extracted.
-func (e *Executor) extractDMG(ctx *Context, dmgPath *string) error {
+func (e *Executor) extractDMG(ctx *Context, dmgPath *string) (bool, error) {
 	// Check if DMG already exists
 	if _, err := os.Stat(*dmgPath); err == nil {
 		log.Debugf("Found extracted %s", *dmgPath)
-		return nil
+		return false, nil
 	}
 
 	// Extract from IPSW
@@ -553,48 +835,81 @@ func (e *Executor) extractDMG(ctx *Context, dmgPath *string) error {
 		return strings.EqualFold(filepath.Base(f.Name), *dmgPath)
 	})
 	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %w", *dmgPath, err)
+		return false, fmt.Errorf("failed to extract %s from IPSW: %w", *dmgPath, err)
 	}
 	if len(dmgs) == 0 {
-		return fmt.Errorf("failed to find %s in IPSW", *dmgPath)
+		return false, fmt.Errorf("failed to find %s in IPSW", *dmgPath)
 	}
 
 	// Update path to extracted file (utils.Unzip returns full paths)
 	*dmgPath = dmgs[0]
-	return nil
+	return true, nil
 }
 
 // handleAEADecryption decrypts an AEA-encrypted DMG if needed.
-func (e *Executor) handleAEADecryption(dmgPath *string) error {
+func (e *Executor) handleAEADecryption(dmgPath *string, removeOriginal bool) (bool, error) {
 	if filepath.Ext(*dmgPath) != ".aea" {
-		return nil
+		return false, nil
 	}
 
 	aeaPath := *dmgPath
 	log.Infof("Decrypting AEA: %s", filepath.Base(aeaPath))
 
-	decrypted, err := aea.Decrypt(&aea.DecryptConfig{
-		Input:    aeaPath,
-		Output:   filepath.Dir(aeaPath),
-		PemDB:    e.pemDB,
-		Insecure: false,
-	})
+	var decrypted string
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		decrypted, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:    aeaPath,
+			Output:   filepath.Dir(aeaPath),
+			PemDB:    e.pemDB,
+			Insecure: false,
+		})
+		if err == nil {
+			break
+		}
+		log.WithError(err).Warnf("AEA decrypt attempt %d failed for %s", attempt, filepath.Base(aeaPath))
+		time.Sleep(time.Duration(attempt) * time.Second)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to decrypt AEA: %w", err)
+		return false, e.wrapAEAError(err, aeaPath)
 	}
 
 	// Verify decrypted file exists
 	if _, err := os.Stat(decrypted); err != nil {
-		return fmt.Errorf("decrypted DMG not found: %w", err)
+		return false, fmt.Errorf("decrypted DMG not found: %w", err)
 	}
 
-	// Remove original .aea file to save space
-	if err := os.Remove(aeaPath); err != nil {
-		log.WithError(err).Warnf("failed to remove original .aea file: %s", aeaPath)
+	// Remove original .aea file to save space if we created it
+	if removeOriginal {
+		if err := os.Remove(aeaPath); err != nil {
+			log.WithError(err).Warnf("failed to remove original .aea file: %s", aeaPath)
+		}
 	}
 
 	*dmgPath = decrypted
-	return nil
+	return true, nil
+}
+
+// wrapAEAError annotates common AEA failure cases with actionable guidance.
+func (e *Executor) wrapAEAError(err error, aeaPath string) error {
+	msg := err.Error()
+	base := filepath.Base(aeaPath)
+	switch {
+	case errors.Is(err, aea.ErrFCSKeyURLNotFound),
+		errors.Is(err, aea.ErrFCSResponseMissing),
+		errors.Is(err, aea.ErrHPKEDecrypt):
+		return fmt.Errorf(
+			"AEA decryption failed for %s because Apple has not published the FCS keys yet. Provide --pem-db (output from 'ipsw extract fcs-keys') or retry later: %w",
+			base, err,
+		)
+	case errors.Is(err, aea.ErrBadSymmetricKey):
+		return fmt.Errorf(
+			"AEA decryption failed for %s with the provided key. Verify your --pem-db contains the matching key or refresh it via 'ipsw extract fcs-keys': %w",
+			base, err,
+		)
+	default:
+		return fmt.Errorf("failed to decrypt AEA %s: %s", base, msg)
+	}
 }
 
 // populateMachoCaches scans all MachO files in both IPSWs and populates the caches.
@@ -605,13 +920,13 @@ func (e *Executor) handleAEADecryption(dmgPath *string) error {
 //
 // Expected memory usage: ~840MB for 30,000 files (~28KB per file)
 func (e *Executor) populateMachoCaches(ctx context.Context) error {
-	// Check if we need to populate caches (only for SystemOS group)
-	// Other groups don't need MachO scanning
-	_, hasOldMount := e.OldCtx.GetMount(DMGTypeSystemOS)
-	_, hasNewMount := e.NewCtx.GetMount(DMGTypeSystemOS)
+	// Determine if any DMG types that carry MachOs are mounted
+	dmgTypes := []DMGType{DMGTypeSystemOS, DMGTypeFileSystem, DMGTypeAppOS, DMGTypeExclave}
+	oldPending := e.pendingDMGs(e.OldCtx, dmgTypes)
+	newPending := e.pendingDMGs(e.NewCtx, dmgTypes)
 
-	if !hasOldMount && !hasNewMount {
-		// No SystemOS DMGs mounted, skip cache population
+	if len(oldPending) == 0 && len(newPending) == 0 {
+		e.recordCacheStats()
 		return nil
 	}
 
@@ -619,26 +934,42 @@ func (e *Executor) populateMachoCaches(ctx context.Context) error {
 	startTime := time.Now()
 	log.Info("Populating MachO caches...")
 
-	// Scan both IPSWs in parallel
 	var wg sync.WaitGroup
 	var oldErr, newErr error
+	var oldErrMu, newErrMu sync.Mutex
 
-	if hasOldMount {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			log.Debug("Scanning MachO files in old IPSW...")
-			oldErr = e.scanMachOs(ctx, e.OldCtx)
-		}()
+	if len(oldPending) > 0 {
+		for _, dmg := range oldPending {
+			dmgType := dmg
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				log.Debugf("Scanning MachO files in old IPSW (%s)...", dmgType)
+				if err := e.scanMachOs(ctx, e.OldCtx, dmgType); err != nil {
+					oldErrMu.Lock()
+					oldErr = errors.Join(oldErr, err)
+					oldErrMu.Unlock()
+					return
+				}
+			}()
+		}
 	}
 
-	if hasNewMount {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			log.Debug("Scanning MachO files in new IPSW...")
-			newErr = e.scanMachOs(ctx, e.NewCtx)
-		}()
+	if len(newPending) > 0 {
+		for _, dmg := range newPending {
+			dmgType := dmg
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				log.Debugf("Scanning MachO files in new IPSW (%s)...", dmgType)
+				if err := e.scanMachOs(ctx, e.NewCtx, dmgType); err != nil {
+					newErrMu.Lock()
+					newErr = errors.Join(newErr, err)
+					newErrMu.Unlock()
+					return
+				}
+			}()
+		}
 	}
 
 	wg.Wait()
@@ -673,33 +1004,83 @@ func (e *Executor) populateMachoCaches(ctx context.Context) error {
 	return nil
 }
 
-// scanMachOs scans all MachO files in the IPSW and populates the cache.
-func (e *Executor) scanMachOs(ctx context.Context, ipswCtx *Context) error {
-	return search.ForEachMachoInIPSW(ipswCtx.IPSWPath, e.pemDB, func(path string, m *macho.File) error {
-		// Check for context cancellation
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+func (e *Executor) pendingDMGs(ctx *Context, dmgTypes []DMGType) []DMGType {
+	var pending []DMGType
+	if ctx == nil || ctx.MachoCache == nil {
+		return pending
+	}
+	for _, dmg := range dmgTypes {
+		if dmg == DMGTypeNone {
+			continue
+		}
+		mount, ok := ctx.GetMount(dmg)
+		if !ok || mount == nil || mount.MountPath == "" {
+			continue
+		}
+		if ctx.MachoCache.DMGScanned(dmg) {
+			continue
+		}
+		pending = append(pending, dmg)
+	}
+	return pending
+}
+
+// scanMachOs scans mounted DMGs for MachO files and populates the cache.
+func (e *Executor) scanMachOs(ctx context.Context, ipswCtx *Context, dmgType DMGType) error {
+	mount, ok := ipswCtx.GetMount(dmgType)
+	if !ok || mount == nil || mount.MountPath == "" {
+		return nil
+	}
+
+	if err := walkMountFiles(ctx, mount.MountPath, func(path string, info os.FileInfo) error {
+		isMachO, err := magic.IsMachO(path)
+		if err != nil || !isMachO {
+			return nil
 		}
 
-		// Extract all metadata from this MachO file
-		metadata := e.extractMachoMetadata(path, m)
+		m, closer, err := openMachOFile(path)
+		if err != nil {
+			log.WithError(err).Debugf("failed to open MachO %s", path)
+			return nil
+		}
 
-		// Store in cache
-		ipswCtx.MachoCache.Set(path, metadata)
+		rel := normalizeRelPath(mount.MountPath, path)
+		metadata := e.extractMachoMetadata(rel, path, m)
+		ipswCtx.MachoCache.Set(rel, metadata)
+
+		if closer != nil {
+			if err := closer.Close(); err != nil {
+				log.WithError(err).Debugf("failed to close MachO %s", path)
+			}
+		}
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	ipswCtx.MachoCache.MarkDMGScanned(dmgType)
+	return nil
+}
+
+func (e *Executor) recordCacheStats() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.stats.CachePopulated = true
+	e.stats.CachePopulateTime = 0
+	e.stats.OldCacheSize = e.OldCtx.MachoCache.Len()
+	e.stats.NewCacheSize = e.NewCtx.MachoCache.Len()
+	e.stats.OldCacheErrors = e.OldCtx.MachoCache.ErrorCount()
+	e.stats.NewCacheErrors = e.NewCtx.MachoCache.ErrorCount()
 }
 
 // extractMachoMetadata extracts all relevant data from a MachO file.
 //
 // This is the single point where we parse each file. All data needed by
 // any handler is extracted here to avoid redundant parsing.
-func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetadata {
+func (e *Executor) extractMachoMetadata(relPath, absPath string, m *macho.File) *MachoMetadata {
 	metadata := &MachoMetadata{
-		Path:     path,
+		Path:     relPath,
 		ParsedAt: time.Now(),
 	}
 
@@ -713,8 +1094,8 @@ func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetada
 		metadata.Version = m.SourceVersion().Version.String()
 	}
 
-	// Extract file size
-	if stat, err := os.Stat(path); err == nil {
+	// Extract file size from mounted DMG path, keep relPath for display
+	if stat, err := os.Stat(absPath); err == nil {
 		metadata.Size = stat.Size()
 	}
 
@@ -746,6 +1127,12 @@ func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetada
 	if m.Symtab != nil {
 		for _, sym := range m.Symtab.Syms {
 			metadata.Symbols = append(metadata.Symbols, sym.Name)
+			if e.Config.FuncStarts && len(sym.Name) > 0 && sym.Name != "<redacted>" {
+				if metadata.SymbolMap == nil {
+					metadata.SymbolMap = make(map[uint64]string)
+				}
+				metadata.SymbolMap[sym.Value] = sym.Name
+			}
 		}
 		slices.Sort(metadata.Symbols)
 	}
@@ -753,6 +1140,9 @@ func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetada
 	// Extract functions
 	if fns := m.GetFunctions(); fns != nil {
 		metadata.Functions = len(fns)
+		if e.Config.FuncStarts {
+			metadata.FunctionStarts = append(metadata.FunctionStarts, fns...)
+		}
 	}
 
 	// Extract imported libraries
@@ -784,18 +1174,77 @@ func (e *Executor) extractMachoMetadata(path string, m *macho.File) *MachoMetada
 		metadata.LoadCommands = append(metadata.LoadCommands, lc.Command().String())
 	}
 
-	// Extract entitlements (if code signature exists)
-	if m.CodeSignature() != nil {
+	// Extract entitlements and launch constraints (if code signature exists)
+	if cs := m.CodeSignature(); cs != nil {
 		// Try normal entitlements first
-		if len(m.CodeSignature().Entitlements) > 0 {
-			metadata.Entitlements = m.CodeSignature().Entitlements
-		} else if len(m.CodeSignature().EntitlementsDER) > 0 {
+		if len(cs.Entitlements) > 0 {
+			metadata.Entitlements = cs.Entitlements
+		} else if len(cs.EntitlementsDER) > 0 {
 			// Fallback to DER entitlements
-			if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
+			if decoded, err := ents.DerDecode(cs.EntitlementsDER); err == nil {
 				metadata.Entitlements = decoded
 			}
 		}
+
+		// Capture launch constraints for dedicated handler
+		addConstraint := func(kind string, data []byte) {
+			if len(data) == 0 {
+				return
+			}
+			lc, err := cstypes.ParseLaunchContraints(data)
+			if err != nil {
+				return
+			}
+			serialized, err := json.MarshalIndent(lc, "", "  ")
+			if err != nil {
+				return
+			}
+			if metadata.LaunchConstraints == nil {
+				metadata.LaunchConstraints = make(map[string]string)
+			}
+			metadata.LaunchConstraints[kind] = string(serialized)
+		}
+
+		addConstraint(LaunchConstraintSelfKey, cs.LaunchConstraintsSelf)
+		addConstraint(LaunchConstraintParentKey, cs.LaunchConstraintsParent)
+		addConstraint(LaunchConstraintResponsibleKey, cs.LaunchConstraintsResponsible)
 	}
 
 	return metadata
+}
+
+func openMachOFile(path string) (*macho.File, io.Closer, error) {
+	if fat, err := macho.OpenFat(path); err == nil {
+		return fat.Arches[len(fat.Arches)-1].File, fat, nil
+	} else if !errors.Is(err, macho.ErrNotFat) {
+		return nil, nil, err
+	}
+
+	m, err := macho.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m, m, nil
+}
+
+func (e *Executor) maybeCacheMachO(evt *FileEvent) {
+	if evt.Source != SourceDMG || evt.Ctx == nil {
+		return
+	}
+	if _, exists := evt.Ctx.MachoCache.Get(evt.RelPath); exists {
+		return
+	}
+	isMachO, err := magic.IsMachO(evt.AbsPath)
+	if err != nil || !isMachO {
+		return
+	}
+	m, closer, err := openMachOFile(evt.AbsPath)
+	if err != nil {
+		log.WithError(err).Debugf("failed to open MachO %s", evt.AbsPath)
+		return
+	}
+	defer closer.Close()
+
+	metadata := e.extractMachoMetadata(evt.RelPath, evt.AbsPath, m)
+	evt.Ctx.MachoCache.Set(evt.RelPath, metadata)
 }

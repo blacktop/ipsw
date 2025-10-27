@@ -78,7 +78,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecu
 
 	privKeyURL, ok := md["com.apple.wkms.fcs-key-url"]
 	if !ok {
-		return nil, fmt.Errorf("fcs-key-url key NOT found")
+		return nil, ErrFCSKeyURLNotFound
 	}
 
 	if !skipEmbedded {
@@ -154,7 +154,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecu
 func (md Metadata) DecryptFCS(pemData []byte, pemDB string, insecure bool) ([]byte, error) {
 	ddata, ok := md["com.apple.wkms.fcs-response"]
 	if !ok {
-		return nil, fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
+		return nil, ErrFCSResponseMissing
 	}
 	var fcsResp fcsResponse
 	if err := json.Unmarshal(ddata, &fcsResp); err != nil {
@@ -202,13 +202,17 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string, insecure bool) ([]by
 	}
 	recv, err := suite.NewReceiver(privateKey, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrHPKEDecrypt, err)
 	}
 	opener, err := recv.Setup(encRequestData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrHPKEDecrypt, err)
 	}
-	return opener.Open(wrappedKeyData, nil)
+	plaintext, err := opener.Open(wrappedKeyData, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrHPKEDecrypt, err)
+	}
+	return plaintext, nil
 }
 
 func Info(in string) (Metadata, error) {

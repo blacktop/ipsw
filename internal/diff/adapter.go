@@ -55,6 +55,7 @@ func NewPipeline(conf *Config) (*Diff, error) {
 		&handlers.FeaturesHandler{},
 		&handlers.FilesHandler{},
 		&handlers.EntitlementsHandler{},
+		&handlers.LaunchConstraintsHandler{},
 		&handlers.KDKHandler{},
 		&handlers.MachOHandler{},
 	)
@@ -164,6 +165,11 @@ func (d *Diff) populateFromResults(exec *pipeline.Executor) error {
 				d.Ents = entDiff
 			}
 
+		case "Launch Constraints":
+			if lcDiff, ok := r.Data.(string); ok {
+				d.LaunchConstraints = lcDiff
+			}
+
 		case "KDK":
 			if kdkDiff, ok := r.Data.(string); ok {
 				d.KDKs = kdkDiff
@@ -176,13 +182,31 @@ func (d *Diff) populateFromResults(exec *pipeline.Executor) error {
 			}
 
 		case "DYLD Shared Cache":
-			if dylibDiff, ok := r.Data.(*mcmd.MachoDiff); ok {
+			// Handle new format: []DSCDiffResult
+			if results, ok := r.Data.([]handlers.DSCDiffResult); ok {
+				for _, result := range results {
+					switch result.Type {
+					case "system":
+						d.Dylibs = result.DylibDiff
+						if result.WebKitOld != "" {
+							d.Old.Webkit = result.WebKitOld
+						}
+						if result.WebKitNew != "" {
+							d.New.Webkit = result.WebKitNew
+						}
+					case "driverkit":
+						d.DylibsDriverKit = result.DylibDiff
+					}
+				}
+			} else if dylibDiff, ok := r.Data.(*mcmd.MachoDiff); ok {
+				// Backward compatibility: old format
 				d.Dylibs = dylibDiff
 			}
-			if webkit, ok := r.Metadata["webkit_old"].(string); ok {
+			// WebKit metadata for backward compatibility
+			if webkit, ok := r.Metadata["webkit_old"].(string); ok && d.Old.Webkit == "" {
 				d.Old.Webkit = webkit
 			}
-			if webkit, ok := r.Metadata["webkit_new"].(string); ok {
+			if webkit, ok := r.Metadata["webkit_new"].(string); ok && d.New.Webkit == "" {
 				d.New.Webkit = webkit
 			}
 

@@ -337,7 +337,7 @@ func (d *Diff) Markdown() error {
 		out.WriteString("### launchd Config\n\n<details>\n  <summary><i>View Updated</i></summary>\n\n" + d.Launchd + "\n\n</details>\n\n")
 	}
 
-	// SECTION: DSC
+	// SECTION: DSC (Main System)
 	if d.Dylibs != nil {
 		if (len(d.Old.Webkit) > 0 && len(d.New.Webkit) > 0) ||
 			(d.Dylibs.New != nil || d.Dylibs.Removed != nil || d.Dylibs.Updated != nil) {
@@ -358,7 +358,7 @@ func (d *Diff) Markdown() error {
 		)
 	}
 
-	// SUB-SECTION: Dylibs
+	// SUB-SECTION: Dylibs (Main System DSC)
 	if d.Dylibs != nil && (len(d.Dylibs.New) > 0 || len(d.Dylibs.Removed) > 0 || len(d.Dylibs.Updated) > 0) {
 		out.WriteString("### Dylibs\n\n")
 		if len(d.Dylibs.New) > 0 {
@@ -430,6 +430,82 @@ func (d *Diff) Markdown() error {
 		}
 	}
 
+	// SECTION: DSC (DriverKit)
+	if d.DylibsDriverKit != nil && (len(d.DylibsDriverKit.New) > 0 || len(d.DylibsDriverKit.Removed) > 0 || len(d.DylibsDriverKit.Updated) > 0) {
+		out.WriteString("## DSC (DriverKit)\n\n")
+		out.WriteString("### Dylibs\n\n")
+
+		if len(d.DylibsDriverKit.New) > 0 {
+			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.DylibsDriverKit.New)))
+			slices.Sort(d.DylibsDriverKit.New)
+			if len(d.DylibsDriverKit.New) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View NEW</i></summary>\n\n")
+			}
+			for _, k := range d.DylibsDriverKit.New {
+				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.DylibsDriverKit.New) > 30 {
+				out.WriteString("\n</details>\n")
+			}
+			out.WriteString("\n")
+		}
+
+		if len(d.DylibsDriverKit.Removed) > 0 {
+			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.DylibsDriverKit.Removed)))
+			slices.Sort(d.DylibsDriverKit.Removed)
+			if len(d.DylibsDriverKit.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
+			for _, k := range d.DylibsDriverKit.Removed {
+				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.DylibsDriverKit.Removed) > 30 {
+				out.WriteString("\n</details>\n")
+			}
+			out.WriteString("\n")
+		}
+
+		if len(d.DylibsDriverKit.Updated) > 0 {
+			out.WriteString(fmt.Sprintf("#### ⬆️ Updated (%d)\n\n", len(d.DylibsDriverKit.Updated)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View Updated</i></summary>\n\n")
+
+			keys := slices.Collect(maps.Keys(d.DylibsDriverKit.Updated))
+			slices.Sort(keys)
+
+			if len(d.DylibsDriverKit.Updated) < 20 {
+				for _, k := range keys {
+					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
+					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
+					out.WriteString(fmt.Sprintf("%s\n", d.DylibsDriverKit.Updated[k]))
+				}
+			} else {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "DYLIBS_DRIVERKIT"), 0o750); err != nil {
+					return err
+				}
+				for _, k := range keys {
+					fname := filepath.Join(d.conf.Output, "DYLIBS_DRIVERKIT", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+					if _, err := os.Stat(fname); os.IsExist(err) {
+						fname = filepath.Join(d.conf.Output, "DYLIBS_DRIVERKIT", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+					}
+					log.Debugf("Creating diff DriverKit dylib Markdown file: %s", fname)
+					f, err := os.Create(fname)
+					if err != nil {
+						return fmt.Errorf("failed to create diff file: %w", err)
+					}
+					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
+					fmt.Fprintf(f, "> `%s`\n\n", k)
+					fmt.Fprintf(f, "%s", d.DylibsDriverKit.Updated[k])
+					f.Close()
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("DYLIBS_DRIVERKIT", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
+				}
+			}
+			out.WriteString("\n</details>\n\n")
+		}
+	}
+
 	// SUB-SECTION: Feature Flags
 	if d.Files != nil {
 		types := []string{"IPSW", "filesystem", "SystemOS", "AppOS", "ExclaveOS"}
@@ -452,15 +528,37 @@ func (d *Diff) Markdown() error {
 				for _, t := range types {
 					if len(d.Files.New[t]) > 0 {
 						out.WriteString(fmt.Sprintf("#### %s (%d)\n\n", t, len(d.Files.New[t])))
-						if len(d.Files.New[t]) > 10 {
-							out.WriteString("<details>\n" +
-								"  <summary><i>View Files</i></summary>\n\n")
-						}
-						for _, k := range d.Files.New[t] {
-							out.WriteString(fmt.Sprintf("- `%s`\n", k))
-						}
-						if len(d.Files.New[t]) > 10 {
-							out.WriteString("\n</details>\n")
+
+						// Use threshold logic: if > 100 files, write to separate file
+						if len(d.Files.New[t]) < 100 {
+							// Embed inline for small lists
+							if len(d.Files.New[t]) > 10 {
+								out.WriteString("<details>\n" +
+									"  <summary><i>View Files</i></summary>\n\n")
+							}
+							for _, k := range d.Files.New[t] {
+								out.WriteString(fmt.Sprintf("- `%s`\n", k))
+							}
+							if len(d.Files.New[t]) > 10 {
+								out.WriteString("\n</details>\n")
+							}
+						} else {
+							// Write to separate file for large lists
+							if err := os.MkdirAll(filepath.Join(d.conf.Output, "FILES"), 0o750); err != nil {
+								return err
+							}
+							fname := filepath.Join(d.conf.Output, "FILES", fmt.Sprintf("NEW_%s.md", t))
+							log.Debugf("Creating file list: %s", fname)
+							f, err := os.Create(fname)
+							if err != nil {
+								return fmt.Errorf("failed to create file list: %w", err)
+							}
+							fmt.Fprintf(f, "## New Files: %s (%d)\n\n", t, len(d.Files.New[t]))
+							for _, k := range d.Files.New[t] {
+								fmt.Fprintf(f, "- `%s`\n", k)
+							}
+							f.Close()
+							out.WriteString(fmt.Sprintf("See [NEW_%s.md](%s)\n", t, filepath.Join("FILES", fmt.Sprintf("NEW_%s.md", t))))
 						}
 						out.WriteString("\n")
 					}
@@ -472,15 +570,37 @@ func (d *Diff) Markdown() error {
 			for _, t := range types {
 				if len(d.Files.Removed[t]) > 0 {
 					out.WriteString(fmt.Sprintf("#### %s (%d)\n\n", t, len(d.Files.Removed[t])))
-					if len(d.Files.Removed[t]) > 10 {
-						out.WriteString("<details>\n" +
-							"  <summary><i>View Files</i></summary>\n\n")
-					}
-					for _, k := range d.Files.Removed[t] {
-						out.WriteString(fmt.Sprintf("- `%s`\n", k))
-					}
-					if len(d.Files.Removed[t]) > 10 {
-						out.WriteString("\n</details>\n")
+
+					// Use threshold logic: if > 100 files, write to separate file
+					if len(d.Files.Removed[t]) < 100 {
+						// Embed inline for small lists
+						if len(d.Files.Removed[t]) > 10 {
+							out.WriteString("<details>\n" +
+								"  <summary><i>View Files</i></summary>\n\n")
+						}
+						for _, k := range d.Files.Removed[t] {
+							out.WriteString(fmt.Sprintf("- `%s`\n", k))
+						}
+						if len(d.Files.Removed[t]) > 10 {
+							out.WriteString("\n</details>\n")
+						}
+					} else {
+						// Write to separate file for large lists
+						if err := os.MkdirAll(filepath.Join(d.conf.Output, "FILES"), 0o750); err != nil {
+							return err
+						}
+						fname := filepath.Join(d.conf.Output, "FILES", fmt.Sprintf("REMOVED_%s.md", t))
+						log.Debugf("Creating file list: %s", fname)
+						f, err := os.Create(fname)
+						if err != nil {
+							return fmt.Errorf("failed to create file list: %w", err)
+						}
+						fmt.Fprintf(f, "## Removed Files: %s (%d)\n\n", t, len(d.Files.Removed[t]))
+						for _, k := range d.Files.Removed[t] {
+							fmt.Fprintf(f, "- `%s`\n", k)
+						}
+						f.Close()
+						out.WriteString(fmt.Sprintf("See [REMOVED_%s.md](%s)\n", t, filepath.Join("FILES", fmt.Sprintf("REMOVED_%s.md", t))))
 					}
 					out.WriteString("\n")
 				}

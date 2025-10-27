@@ -471,7 +471,7 @@ func Decrypt(c *DecryptConfig) (string, error) {
 	} else if c.B64SymKey == "" {
 		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Insecure)
 		if err != nil {
-			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
+			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %w", err)
 		}
 		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
 	} else {
@@ -502,7 +502,7 @@ func aea(in, out, key string) (string, error) {
 		cmd := exec.Command(aeaBinPath, "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
 		cout, err := cmd.CombinedOutput()
 		if err != nil {
-			return "", fmt.Errorf("failed to decrypt using '%s' (bad key?) %v: %s", aeaBinPath, err, cout)
+			return "", fmt.Errorf("%w: failed to decrypt using '%s': %v: %s", ErrBadSymmetricKey, aeaBinPath, err, cout)
 		}
 		return out, nil
 	}

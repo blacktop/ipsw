@@ -33,7 +33,7 @@ type MachoDiff struct {
 	Updated map[string]string `json:"updated,omitempty"`
 }
 
-type section struct {
+type Section struct {
 	Name string `json:"name,omitempty"`
 	Size uint64 `json:"size,omitempty"`
 }
@@ -42,7 +42,7 @@ type DiffInfo struct {
 	Version   string
 	UUID      string
 	Imports   []string
-	Sections  []section
+	Sections  []Section
 	Functions int
 	Starts    []types.Function
 	Symbols   []string
@@ -52,7 +52,7 @@ type DiffInfo struct {
 }
 
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.SymbolMap) *DiffInfo {
-	var secs []section
+	var secs []Section
 	for _, s := range m.Sections {
 		if len(conf.AllowList) > 0 {
 			if !slices.Contains(conf.AllowList, s.Seg+"."+s.Name) {
@@ -64,7 +64,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 				continue
 			}
 		}
-		secs = append(secs, section{
+		secs = append(secs, Section{
 			Name: s.Seg + "." + s.Name,
 			Size: s.Size,
 		})

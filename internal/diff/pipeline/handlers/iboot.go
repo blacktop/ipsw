@@ -1,17 +1,16 @@
 package handlers
 
 import (
-	"archive/zip"
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 
 	"github.com/blacktop/ipsw/internal/diff/pipeline"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/iboot"
 	"github.com/blacktop/ipsw/pkg/img4"
 )
+
+var ibootPathPattern = regexp.MustCompile(`(?i)iBoot\..*\.im4p$`)
 
 // IBootDiff represents the differences between two iBoot versions.
 type IBootDiff struct {
@@ -23,7 +22,10 @@ type IBootDiff struct {
 // IBootHandler diffs iBoot strings between two IPSWs.
 //
 // Extracts iBoot im4p files, parses strings, and compares.
-type IBootHandler struct{}
+type IBootHandler struct {
+	oldIBoot *iboot.IBoot
+	newIBoot *iboot.IBoot
+}
 
 // Name returns the handler name for logging and results.
 func (h *IBootHandler) Name() string {
@@ -42,6 +44,37 @@ func (h *IBootHandler) Enabled(cfg *pipeline.Config) bool {
 	return cfg.Firmware
 }
 
+func (h *IBootHandler) FileSubscriptions() []pipeline.FileSubscription {
+	return []pipeline.FileSubscription{
+		{
+			ID:          "iboot",
+			Source:      pipeline.SourceZIP,
+			PathPattern: ibootPathPattern,
+		},
+	}
+}
+
+func (h *IBootHandler) HandleFile(ctx context.Context, exec *pipeline.Executor, subID string, event *pipeline.FileEvent) error {
+	data, err := event.ReadAll()
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", event.RelPath, err)
+	}
+	payload, err := img4.ParsePayload(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse iBoot payload %s: %w", event.RelPath, err)
+	}
+	ib, err := iboot.Parse(payload.Data)
+	if err != nil {
+		return fmt.Errorf("failed to parse iBoot: %w", err)
+	}
+	if event.Side == pipeline.SideOld {
+		h.oldIBoot = ib
+	} else {
+		h.newIBoot = ib
+	}
+	return nil
+}
+
 // Execute runs the iBoot diff operation.
 func (h *IBootHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*pipeline.Result, error) {
 	result := &pipeline.Result{
@@ -49,34 +82,20 @@ func (h *IBootHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*p
 		Metadata:    make(map[string]any),
 	}
 
-	// Create temp directory for im4p extraction
-	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_iboot")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDIR)
-
-	// Extract iBoot from both IPSWs
-	oldIBoot, err := h.extractIBoot(exec.OldCtx.IPSWPath, tmpDIR)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract old iBoot: %w", err)
-	}
-
-	newIBoot, err := h.extractIBoot(exec.NewCtx.IPSWPath, tmpDIR)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract new iBoot: %w", err)
+	if h.oldIBoot == nil || h.newIBoot == nil {
+		return nil, fmt.Errorf("missing iBoot data (old=%t, new=%t)", h.oldIBoot != nil, h.newIBoot != nil)
 	}
 
 	// Create diff structure
 	diff := &IBootDiff{
-		Versions: []string{oldIBoot.Version, newIBoot.Version},
+		Versions: []string{h.oldIBoot.Version, h.newIBoot.Version},
 		New:      make(map[string][]string),
 		Removed:  make(map[string][]string),
 	}
 
 	// Find new strings
-	for name, strs := range newIBoot.Strings {
-		if oldStrs, ok := oldIBoot.Strings[name]; ok {
+	for name, strs := range h.newIBoot.Strings {
+		if oldStrs, ok := h.oldIBoot.Strings[name]; ok {
 			for _, str := range strs {
 				if len(str) < 10 {
 					continue
@@ -101,8 +120,8 @@ func (h *IBootHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*p
 	}
 
 	// Find removed strings
-	for name, strs := range oldIBoot.Strings {
-		if newStrs, ok := newIBoot.Strings[name]; ok {
+	for name, strs := range h.oldIBoot.Strings {
+		if newStrs, ok := h.newIBoot.Strings[name]; ok {
 			for _, str := range strs {
 				if len(str) < 10 {
 					continue
@@ -122,33 +141,7 @@ func (h *IBootHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*p
 	}
 
 	result.Data = diff
+	h.oldIBoot = nil
+	h.newIBoot = nil
 	return result, nil
-}
-
-// extractIBoot extracts and parses iBoot from an IPSW.
-func (h *IBootHandler) extractIBoot(ipswPath, tmpDIR string) (*iboot.IBoot, error) {
-	// Extract iBoot im4p file
-	iBootIm4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
-		return regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to unzip iBoot im4p: %w", err)
-	}
-	if len(iBootIm4ps) == 0 {
-		return nil, fmt.Errorf("no iBoot im4p found in IPSW")
-	}
-
-	// Open im4p payload
-	im4p, err := img4.OpenPayload(iBootIm4ps[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to open im4p: %w", err)
-	}
-
-	// Parse iBoot
-	ib, err := iboot.Parse(im4p.Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse iBoot: %w", err)
-	}
-
-	return ib, nil
 }

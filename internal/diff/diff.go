@@ -117,18 +117,20 @@ type Diff struct {
 	Old Context `json:"-"`
 	New Context `json:"-"`
 
-	Kexts     *mcmd.MachoDiff `json:"kexts,omitempty"`
-	KDKs      string          `json:"kdks,omitempty"`
-	Ents      string          `json:"ents,omitempty"`
-	Dylibs    *mcmd.MachoDiff `json:"dylibs,omitempty"`
-	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
-	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
-	IBoot     *IBootDiff      `json:"iboot,omitempty"`
-	Launchd   string          `json:"launchd,omitempty"`
-	Features  *PlistDiff      `json:"features,omitempty"`
-	Files     *FileDiff       `json:"files,omitempty"`
-	tmpDir    string          `json:"-"`
-	conf      *Config
+	Kexts             *mcmd.MachoDiff `json:"kexts,omitempty"`
+	KDKs              string          `json:"kdks,omitempty"`
+	Ents              string          `json:"ents,omitempty"`
+	Dylibs            *mcmd.MachoDiff `json:"dylibs,omitempty"`
+	DylibsDriverKit   *mcmd.MachoDiff `json:"dylibs_driverkit,omitempty"`
+	Machos            *mcmd.MachoDiff `json:"machos,omitempty"`
+	Firmwares         *mcmd.MachoDiff `json:"firmwares,omitempty"`
+	IBoot             *IBootDiff      `json:"iboot,omitempty"`
+	Launchd           string          `json:"launchd,omitempty"`
+	Features          *PlistDiff      `json:"features,omitempty"`
+	Files             *FileDiff       `json:"files,omitempty"`
+	LaunchConstraints string          `json:"launch_constraints,omitempty"`
+	tmpDir            string          `json:"-"`
+	conf              *Config
 }
 
 // New news the diff

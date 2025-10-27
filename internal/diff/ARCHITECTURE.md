@@ -1,16 +1,15 @@
 # IPSW Diff Pipeline Architecture
 
-## Implementation Status (as of 2025-10-01)
+## Implementation Status (as of 2025-10-26)
 
-**Overall Progress: 85% complete**
+- ✅ **Phase 1**: Core Infrastructure
+- ✅ **Phase 2**: Initial Handler Migration
+- ✅ **Phase 3**: MachO Cache System (legacy path)
+- ✅ **Phase 4**: Profiling & Optimization
+- 🚧 **Phase 5**: Event-Driven Streaming (ZIP/DMG walkers + handler matchers)
+- 🔁 **Phase 6**: Regression & Docs refresh (queued after streaming work)
 
-- ✅ **Phase 1**: Core Infrastructure (100% complete)
-- ✅ **Phase 2**: Handler Migration (82% complete - 9 of 11 handlers)
-- ⏳ **Phase 3**: MachO Cache System (40% complete - infrastructure done, population next)
-- 🔲 **Phase 4**: Profiling & Optimization (not started)
-- 🔲 **Phase 5**: Extended Features (not started)
-
-**Working Branch**: `feature/pipeline-refactor`
+**Working Branch**: `feat/diff_pipeline`
 
 See [TASKS.md](./TASKS.md) for detailed progress tracking.
 
@@ -18,7 +17,7 @@ See [TASKS.md](./TASKS.md) for detailed progress tracking.
 
 ## Overview
 
-This document describes the refactored pipeline-based architecture for the `ipsw diff` command, designed to optimize DMG mount/unmount operations and improve performance through intelligent handler grouping and concurrent execution.
+This document describes the refactored pipeline-based architecture for the `ipsw diff` command, designed to optimize DMG mount/unmount operations and improve performance through intelligent handler grouping, concurrent execution, and (new as of Oct 26) a streaming ZIP/DMG walker that feeds all handlers via matchers so every artifact is processed exactly once.
 
 ## Current Problems
 
@@ -56,6 +55,32 @@ type Handler interface {
 
 Handlers are self-contained diff operations that declare their dependencies and execute independently.
 
+### 1.1 File Subscriptions (NEW)
+
+As of Oct 26, handlers can also implement the optional `FileSubscriber` interface to declare matchers that should fire while the executor streams files from the IPSW zip or mounted DMGs:
+
+```go
+type FileSubscription struct {
+    ID          string
+    Source      SourceKind   // SourceZIP or SourceDMG
+    DMGType     DMGType      // Only for DMG events
+    PathPattern *regexp.Regexp
+    MatchFunc   func(*FileEvent) bool
+}
+
+type FileSubscriber interface {
+    FileSubscriptions() []FileSubscription
+    HandleFile(ctx context.Context, exec *Executor, subID string, event *FileEvent) error
+}
+```
+
+The executor now performs two passes:
+
+1. **ZIP Pass** – walks every entry in the IPSW archive once and dispatches events to ZIP subscribers (iBoot already migrated; firmware/kernelcache pending).
+2. **DMG Passes** – for each DMG type we need to mount, walk each file exactly once and dispatch events to DMG subscribers (Files, Features, Launchd, DSC migrated; MachO/Entitlements/Launch Constraints pending).
+
+This streaming layer ensures we unzip/decrypt each artifact once while all interested handlers accumulate their diff data in-place.
+
 ### 2. DMG Types
 
 ```go
@@ -85,26 +110,27 @@ The executor orchestrates handler execution:
 Handlers are grouped by DMG type combinations:
 
 ```
-Group 1: DMGTypeNone (no mounting) - ✅ COMPLETE
-  - ✅ KernelcacheHandler (extracts from IPSW zip)
-  - ✅ FirmwareHandler (extracts from IPSW zip)
-  - ✅ IBootHandler (extracts from IPSW zip)
-  - ✅ KDKHandler (works with external KDK files)
+ZIP Pass (no mounts)
+  - ⏳ KernelcacheHandler (legacy extractor, needs matcher)
+  - ⏳ FirmwareHandler (legacy extractor, needs matcher)
+  - ✅ IBootHandler (streams IM4P payloads)
+  - ✅ KDKHandler (external inputs)
 
-Group 2: DMGTypeSystemOS (mount SystemOS once) - ⏳ IN PROGRESS
-  - ✅ DSCHandler (reads dyld_shared_cache)
-  - ✅ EntitlementsHandler (currently uses old scanning, needs cache migration)
-  - ⏳ MachoHandler (blocked on cache implementation)
+Group 1: DMGTypeSystemOS
+  - ✅ DSCHandler (streams dyld_shared_cache paths)
+  - ⏳ MachOHandler (still depends on legacy cache scan)
+  - ⏳ EntitlementsHandler (cache-based)
+  - ⏳ LaunchConstraintsHandler (cache-based)
 
-Group 3: DMGTypeFileSystem (mount FileSystem once) - ✅ COMPLETE
-  - ✅ LaunchdHandler (extracts /sbin/launchd)
-  - ✅ FilesHandler (lists all files)
-  - ✅ FeaturesHandler (searches /System/Library/FeatureFlags)
+Group 2: DMGTypeFileSystem
+  - ✅ LaunchdHandler (subscribes to `/sbin/launchd`)
+  - ✅ FilesHandler (aggregates listings via matcher)
+  - ✅ FeaturesHandler (streams `/System/Library/FeatureFlags`)
 ```
 
-### 5. MachO Cache System ⏳ IN PROGRESS
+### 5. MachO Cache System (Legacy vs Streaming)
 
-**Status**: Infrastructure complete (Task 3.1-3.2 ✅), cache population next (Task 3.3 ⏳)
+**Status (Oct 26)**: The legacy cache pass still exists, but the new DMG walker now populates cache entries opportunistically while dispatching file events. MachO/Entitlements/Launch Constraints still read from the cache, so the next milestone is to remove the legacy `search.ForEachMachoInIPSW` fallback entirely.
 
 **Problem**: MachO files were being parsed 2-4 times by different handlers:
 - MachO handler: extracts symbols, sections, strings
@@ -133,6 +159,9 @@ type MachoMetadata struct {
 
     // Entitlements data
     Entitlements string
+
+    // Launch Constraints (Self/Parent/Responsible)
+    LaunchConstraints map[string]string
 
     ParseError   error
     ParsedAt     time.Time
@@ -197,6 +226,7 @@ func (h *EntitlementsHandler) Execute(ctx context.Context, exec *Executor) (*Res
 - **Memory**: ~28KB per file, ~840MB for 30,000 files (vs 60GB+ previous)
 - **Consistency**: All handlers see same parsed data
 - **Extensibility**: Add new data extraction without re-scanning
+- **Extended data**: Launch constraints (Self/Parent/Responsible) captured once and reused by the dedicated handler
 
 ## Execution Flow
 

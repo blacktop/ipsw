@@ -3,11 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/blacktop/ipsw/internal/diff/pipeline"
-	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
@@ -21,7 +21,10 @@ type PlistDiff struct {
 // FeaturesHandler diffs feature flags plists between two IPSWs.
 //
 // Searches for feature flags in /System/Library/FeatureFlags across all DMGs.
-type FeaturesHandler struct{}
+type FeaturesHandler struct {
+	oldPlists map[string]string
+	newPlists map[string]string
+}
 
 // Name returns the handler name for logging and results.
 func (h *FeaturesHandler) Name() string {
@@ -40,6 +43,39 @@ func (h *FeaturesHandler) Enabled(cfg *pipeline.Config) bool {
 	return cfg.Features
 }
 
+// FileSubscriptions registers interest in FeatureFlags plists inside FileSystem DMG.
+func (h *FeaturesHandler) FileSubscriptions() []pipeline.FileSubscription {
+	return []pipeline.FileSubscription{
+		{
+			ID:          "feature-plists",
+			Source:      pipeline.SourceDMG,
+			DMGType:     pipeline.DMGTypeFileSystem,
+			PathPattern: regexp.MustCompile(`^/System/Library/FeatureFlags/.*\.plist$`),
+		},
+	}
+}
+
+// HandleFile captures plist contents for old/new sides.
+func (h *FeaturesHandler) HandleFile(ctx context.Context, exec *pipeline.Executor, subID string, event *pipeline.FileEvent) error {
+	data, err := event.ReadAll()
+	if err != nil {
+		return fmt.Errorf("failed to read feature flag %s: %w", event.RelPath, err)
+	}
+
+	if event.Side == pipeline.SideOld {
+		if h.oldPlists == nil {
+			h.oldPlists = make(map[string]string)
+		}
+		h.oldPlists[event.RelPath] = string(data)
+	} else {
+		if h.newPlists == nil {
+			h.newPlists = make(map[string]string)
+		}
+		h.newPlists[event.RelPath] = string(data)
+	}
+	return nil
+}
+
 // Execute runs the feature flags diff operation.
 func (h *FeaturesHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*pipeline.Result, error) {
 	result := &pipeline.Result{
@@ -52,30 +88,14 @@ func (h *FeaturesHandler) Execute(ctx context.Context, exec *pipeline.Executor) 
 		Updated: make(map[string]string),
 	}
 
-	// Collect old feature flags
-	oldPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(
-		exec.OldCtx.IPSWPath,
-		"/System/Library/FeatureFlags",
-		exec.Config.PemDB,
-		func(path string, content string) error {
-			oldPlists[path] = content
-			return nil
-		}); err != nil {
-		return nil, fmt.Errorf("failed to search old feature flags: %w", err)
+	oldPlists := h.oldPlists
+	if oldPlists == nil {
+		oldPlists = make(map[string]string)
 	}
 
-	// Collect new feature flags
-	newPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(
-		exec.NewCtx.IPSWPath,
-		"/System/Library/FeatureFlags",
-		exec.Config.PemDB,
-		func(path string, content string) error {
-			newPlists[path] = content
-			return nil
-		}); err != nil {
-		return nil, fmt.Errorf("failed to search new feature flags: %w", err)
+	newPlists := h.newPlists
+	if newPlists == nil {
+		newPlists = make(map[string]string)
 	}
 
 	// Get sorted file lists
@@ -124,6 +144,9 @@ func (h *FeaturesHandler) Execute(ctx context.Context, exec *pipeline.Executor) 
 			}
 		}
 	}
+
+	h.oldPlists = nil
+	h.newPlists = nil
 
 	result.Data = diff
 	return result, nil

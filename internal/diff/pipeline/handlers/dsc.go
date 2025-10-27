@@ -4,13 +4,21 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/diff/pipeline"
 	dcmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/diff/pipeline"
 	"github.com/blacktop/ipsw/pkg/dyld"
+)
+
+var (
+	dscPathRegex     = regexp.MustCompile(fmt.Sprintf(`%s(%s)%s`, dyld.CacheUberRegex, "arm64e", `$`))
+	macArm64ePattern = regexp.MustCompile(fmt.Sprintf(`%s(%s)%s`, dyld.CacheUberRegex, "arm64e", `$`))
 )
 
 // DSCHandler diffs dyld_shared_cache between two IPSWs.
@@ -18,7 +26,23 @@ import (
 // The dyld_shared_cache contains prelinked system libraries and frameworks.
 // This handler compares the dylibs between old and new caches, extracts
 // WebKit versions, and reports changes in library exports/imports.
-type DSCHandler struct{}
+//
+// It analyzes both the main system DSC and secondary DSCs (like DriverKit).
+type DSCHandler struct {
+	oldPaths []string
+	newPaths []string
+}
+
+// DSCDiffResult holds the diff results for a specific DSC type.
+type DSCDiffResult struct {
+	Type       string // "system" or "driverkit"
+	OldPath    string
+	NewPath    string
+	WebKitOld  string
+	WebKitNew  string
+	DylibDiff  *mcmd.MachoDiff
+	ImageCount int // number of images in the cache
+}
 
 // NewDSCHandler creates a new DSC diff handler.
 func NewDSCHandler() *DSCHandler {
@@ -38,61 +62,119 @@ func (h *DSCHandler) Enabled(cfg *pipeline.Config) bool {
 	return true
 }
 
+func (h *DSCHandler) FileSubscriptions() []pipeline.FileSubscription {
+	return []pipeline.FileSubscription{
+		{
+			ID:          "dsc",
+			Source:      pipeline.SourceDMG,
+			DMGType:     pipeline.DMGTypeSystemOS,
+			PathPattern: dscPathRegex,
+		},
+	}
+}
+
+func (h *DSCHandler) HandleFile(ctx context.Context, exec *pipeline.Executor, subID string, event *pipeline.FileEvent) error {
+	if event.Side == pipeline.SideOld {
+		h.oldPaths = append(h.oldPaths, event.AbsPath)
+	} else {
+		h.newPaths = append(h.newPaths, event.AbsPath)
+	}
+	return nil
+}
+
 func (h *DSCHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*pipeline.Result, error) {
 	result := &pipeline.Result{
 		HandlerName: h.Name(),
 		Metadata:    make(map[string]any),
 	}
 
-	// Get old DSC
-	oldMount, ok := exec.OldCtx.GetMount(pipeline.DMGTypeSystemOS)
-	if !ok {
-		return nil, fmt.Errorf("SystemOS not mounted for old IPSW")
+	var err error
+	if h.oldPaths, err = h.ensureDSCPaths(exec.OldCtx, h.oldPaths); err != nil {
+		return nil, fmt.Errorf("old DSC: %w", err)
+	}
+	if h.newPaths, err = h.ensureDSCPaths(exec.NewCtx, h.newPaths); err != nil {
+		return nil, fmt.Errorf("new DSC: %w", err)
 	}
 
-	oldDSCs, err := h.findDSCs(oldMount.MountPath, exec.OldCtx)
+	// Analyze main system DSC
+	systemResult, err := h.analyzeDSC(ctx, exec, h.oldPaths, h.newPaths, "system")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find old DSCs: %w", err)
+		return nil, fmt.Errorf("main system DSC: %w", err)
 	}
 
-	dscOld, err := dyld.Open(oldDSCs[0])
+	// Analyze DriverKit DSC if available
+	driverKitResult, err := h.analyzeDSC(ctx, exec, h.oldPaths, h.newPaths, "driverkit")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open old DSC: %w", err)
+		// DriverKit is optional, just log the warning
+		log.WithError(err).Debug("DriverKit DSC not available or failed to analyze")
+	}
+
+	// Combine results
+	results := []DSCDiffResult{systemResult}
+	if driverKitResult.DylibDiff != nil {
+		results = append(results, driverKitResult)
+	}
+
+	// Set primary (system) DSC metadata for backward compatibility
+	result.Metadata["webkit_old"] = systemResult.WebKitOld
+	result.Metadata["webkit_new"] = systemResult.WebKitNew
+	result.Metadata["dsc_old"] = systemResult.OldPath
+	result.Metadata["dsc_new"] = systemResult.NewPath
+	result.Data = results
+
+	h.oldPaths = nil
+	h.newPaths = nil
+
+	return result, nil
+}
+
+// analyzeDSC analyzes a specific DSC type (system or driverkit).
+func (h *DSCHandler) analyzeDSC(ctx context.Context, exec *pipeline.Executor, oldPaths, newPaths []string, dscType string) (DSCDiffResult, error) {
+	var emptyResult DSCDiffResult
+
+	oldPath, err := h.pickDSCByType(exec.OldCtx, oldPaths, dscType)
+	if err != nil {
+		return emptyResult, fmt.Errorf("old %s DSC: %w", dscType, err)
+	}
+	newPath, err := h.pickDSCByType(exec.NewCtx, newPaths, dscType)
+	if err != nil {
+		return emptyResult, fmt.Errorf("new %s DSC: %w", dscType, err)
+	}
+
+	dscOld, err := dyld.Open(oldPath)
+	if err != nil {
+		return emptyResult, fmt.Errorf("failed to open old %s DSC: %w", dscType, err)
 	}
 	defer dscOld.Close()
 
-	// Get new DSC
-	newMount, ok := exec.NewCtx.GetMount(pipeline.DMGTypeSystemOS)
-	if !ok {
-		return nil, fmt.Errorf("SystemOS not mounted for new IPSW")
-	}
-
-	newDSCs, err := h.findDSCs(newMount.MountPath, exec.NewCtx)
+	dscNew, err := dyld.Open(newPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find new DSCs: %w", err)
-	}
-
-	dscNew, err := dyld.Open(newDSCs[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to open new DSC: %w", err)
+		return emptyResult, fmt.Errorf("failed to open new %s DSC: %w", dscType, err)
 	}
 	defer dscNew.Close()
 
-	// Get WebKit versions
-	oldWebKit, err := dcmd.GetWebkitVersion(dscOld)
-	if err != nil {
-		log.WithError(err).Warn("Failed to get old WebKit version")
-		result.Warnings = append(result.Warnings, fmt.Errorf("old webkit: %w", err))
-	} else {
-		result.Metadata["webkit_old"] = oldWebKit
+	diffResult := DSCDiffResult{
+		Type:       dscType,
+		OldPath:    oldPath,
+		NewPath:    newPath,
+		ImageCount: len(dscOld.Images),
 	}
 
-	newWebKit, err := dcmd.GetWebkitVersion(dscNew)
-	if err != nil {
-		log.WithError(err).Warn("Failed to get new WebKit version")
-		result.Warnings = append(result.Warnings, fmt.Errorf("new webkit: %w", err))
-	} else {
-		result.Metadata["webkit_new"] = newWebKit
+	// Get WebKit versions (only for main system DSC)
+	if dscType == "system" {
+		oldWebKit, err := dcmd.GetWebkitVersion(dscOld)
+		if err != nil {
+			log.WithError(err).Warnf("Failed to get old WebKit version (cache: %s)", oldPath)
+		} else {
+			diffResult.WebKitOld = oldWebKit
+		}
+
+		newWebKit, err := dcmd.GetWebkitVersion(dscNew)
+		if err != nil {
+			log.WithError(err).Warnf("Failed to get new WebKit version (cache: %s)", newPath)
+		} else {
+			diffResult.WebKitNew = newWebKit
+		}
 	}
 
 	// Diff dylibs
@@ -107,40 +189,130 @@ func (h *DSCHandler) Execute(ctx context.Context, exec *pipeline.Executor) (*pip
 		Verbose:    exec.Config.Verbose,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to diff DSCs: %w", err)
+		return emptyResult, fmt.Errorf("failed to diff %s DSCs: %w", dscType, err)
 	}
 
-	result.Data = dylibDiff
-	result.Metadata["dsc_old"] = oldDSCs[0]
-	result.Metadata["dsc_new"] = newDSCs[0]
+	diffResult.DylibDiff = dylibDiff
 
-	return result, nil
+	return diffResult, nil
 }
 
-// findDSCs locates dyld_shared_cache files in the mounted DMG.
-func (h *DSCHandler) findDSCs(mountPath string, ctx *pipeline.Context) ([]string, error) {
-	dscs, err := dyld.GetDscPathsInMount(mountPath, false, false)
+// pickDSCByType selects the appropriate DSC based on type (system or driverkit).
+func (h *DSCHandler) pickDSCByType(ctx *pipeline.Context, paths []string, dscType string) (string, error) {
+	if len(paths) == 0 {
+		return "", fmt.Errorf("no DSCs captured")
+	}
+
+	switch dscType {
+	case "system":
+		return h.pickSystemDSC(paths)
+	case "driverkit":
+		return h.pickDriverKitDSC(paths)
+	default:
+		return "", fmt.Errorf("unknown DSC type: %s", dscType)
+	}
+}
+
+// pickSystemDSC selects the main system DSC, excluding DriverKit and other specialized caches.
+func (h *DSCHandler) pickSystemDSC(paths []string) (string, error) {
+	// Exclude DriverKit and other specialized caches - we want the main system DSC
+	exclude := func(p string) bool {
+		return strings.Contains(p, "/DriverKit/") ||
+			strings.Contains(p, "/Cryptexes/")
+	}
+
+	prefer := func(p string) bool {
+		if exclude(p) {
+			return false
+		}
+		return strings.Contains(p, "/System/Library/dyld/") || strings.Contains(p, "/System/Library/Caches/com.apple.dyld/")
+	}
+
+	// prefer system/root caches first
+	for _, path := range paths {
+		if prefer(path) && macArm64ePattern.MatchString(path) {
+			return path, nil
+		}
+	}
+	for _, path := range paths {
+		if prefer(path) {
+			return path, nil
+		}
+	}
+
+	// fallback to whichever non-excluded cache we captured first
+	for _, path := range paths {
+		if !exclude(path) {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("no system DSC found")
+}
+
+// pickDriverKitDSC selects the DriverKit DSC.
+func (h *DSCHandler) pickDriverKitDSC(paths []string) (string, error) {
+	// Look for DriverKit DSC
+	for _, path := range paths {
+		if strings.Contains(path, "/DriverKit/") && macArm64ePattern.MatchString(path) {
+			return path, nil
+		}
+	}
+	for _, path := range paths {
+		if strings.Contains(path, "/DriverKit/") {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("no DriverKit DSC found")
+}
+
+// pickDSC is kept for potential backward compatibility but delegates to pickSystemDSC.
+func (h *DSCHandler) pickDSC(ctx *pipeline.Context, paths []string) (string, error) {
+	return h.pickSystemDSC(paths)
+}
+
+func (h *DSCHandler) ensureDSCPaths(ctx *pipeline.Context, existing []string) ([]string, error) {
+	if len(existing) > 0 {
+		return existing, nil
+	}
+	paths, err := h.findDSCPaths(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(dscs) == 0 {
-		return nil, fmt.Errorf("no DSCs found in %s", mountPath)
+	return paths, nil
+}
+
+func (h *DSCHandler) findDSCPaths(ctx *pipeline.Context) ([]string, error) {
+	mount, ok := ctx.GetMount(pipeline.DMGTypeSystemOS)
+	if !ok || mount == nil || mount.MountPath == "" {
+		return nil, fmt.Errorf("SystemOS mount unavailable")
 	}
 
-	// Filter for macOS arm64e
-	if ctx.Info.IsMacOS() {
-		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
-		for _, match := range dscs {
-			if r.MatchString(match) {
-				filtered = append(filtered, match)
+	searchRoots := []string{
+		filepath.Join(mount.MountPath, "System/Library/Caches/com.apple.dyld"),
+		filepath.Join(mount.MountPath, "System/Library/dyld"),
+	}
+
+	var matches []string
+	for _, root := range searchRoots {
+		glob := filepath.Join(root, "dyld_shared_cache*")
+		files, err := filepath.Glob(glob)
+		if err != nil {
+			return nil, fmt.Errorf("glob %s: %w", glob, err)
+		}
+		for _, f := range files {
+			info, err := os.Stat(f)
+			if err != nil || !info.Mode().IsRegular() {
+				continue
 			}
+			matches = append(matches, f)
 		}
-		if len(filtered) == 0 {
-			return nil, fmt.Errorf("no arm64e DSCs found")
-		}
-		return filtered, nil
 	}
 
-	return dscs, nil
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no dyld_shared_cache files found under %s", mount.MountPath)
+	}
+
+	return matches, nil
 }

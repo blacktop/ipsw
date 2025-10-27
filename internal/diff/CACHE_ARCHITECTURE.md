@@ -79,6 +79,9 @@ type MachoMetadata struct {
     // Entitlements Data
     Entitlements string           // XML from code signature
 
+    // Launch Constraints
+    LaunchConstraints map[string]string
+
     // Metadata
     ParseError   error            // If parsing failed
     ParsedAt     time.Time
@@ -316,6 +319,51 @@ func extractEntitlementsFromCache(cache *MachoCache) map[string]string {
 
     return result
 }
+
+### After: Launch Constraints Handler (Cache-based)
+
+```go
+type LaunchConstraintsHandler struct{}
+
+func (h *LaunchConstraintsHandler) Execute(ctx context.Context, exec *Executor) (*Result, error) {
+    oldLC := extractLaunchConstraintsFromCache(exec.OldCtx.MachoCache)
+    newLC := extractLaunchConstraintsFromCache(exec.NewCtx.MachoCache)
+
+    diff := diffLaunchConstraints(oldLC, newLC)
+    return &Result{HandlerName: "Launch Constraints", Data: diff}, nil
+}
+
+func extractLaunchConstraintsFromCache(cache *MachoCache) map[string]string {
+    result := make(map[string]string)
+
+    for path, metadata := range cache.data {
+        if len(metadata.LaunchConstraints) == 0 {
+            continue
+        }
+        var builder strings.Builder
+        if val := metadata.LaunchConstraints[LaunchConstraintSelfKey]; val != "" {
+            builder.WriteString("<!-- Launch Constraints (Self) -->\n")
+            builder.WriteString(val)
+            builder.WriteString("\n")
+        }
+        if val := metadata.LaunchConstraints[LaunchConstraintParentKey]; val != "" {
+            builder.WriteString("<!-- Launch Constraints (Parent) -->\n")
+            builder.WriteString(val)
+            builder.WriteString("\n")
+        }
+        if val := metadata.LaunchConstraints[LaunchConstraintResponsibleKey]; val != "" {
+            builder.WriteString("<!-- Launch Constraints (Responsible) -->\n")
+            builder.WriteString(val)
+            builder.WriteString("\n")
+        }
+        if builder.Len() > 0 {
+            result[path] = builder.String()
+        }
+    }
+
+    return result
+}
+```
 ```
 
 ## Performance Impact
