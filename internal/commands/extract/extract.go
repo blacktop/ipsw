@@ -556,10 +556,6 @@ func Keybags(c *Config) (fname string, err error) {
 		return "", fmt.Errorf("failed to marshal im4p kbags: %v", err)
 	}
 
-	if c.JSON {
-		return string(out), nil
-	}
-
 	fname = filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json")
 	if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)

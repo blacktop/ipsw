@@ -4,21 +4,31 @@
 
 Refactor the `ipsw diff` command from a monolithic sequential implementation to a modular pipeline-based architecture with intelligent DMG grouping and concurrent handler execution.
 
-**Actual Total Effort**: 3 days (Oct 1-3, 2025)
-**Risk Level**: Medium (careful migration required)
-**Target Performance Gain**: 45-50% reduction in execution time, 98% reduction in memory usage
-**Actual Performance Gain**: ✅ **60-70% execution time reduction, 99% memory reduction** (exceeded targets!)
+**Initial Effort (Phases 1-4)**: Oct 1-3, 2025  
+**Current Sprint**: Oct 24-31 (Event-driven streaming)  
+**Risk Level**: Medium (handlers changing behavior mid-flight)  
+**Target Performance Gain**: 45-50% execution reduction, 98% memory reduction  
+**Measured (Oct 3)**: ✅ 60-70% faster, 99% less memory (needs re-validation after streaming changes)
 
-## Current Progress (as of 2025-10-03)
+## Current Progress (as of 2025-10-26)
 
 ### ✅ Phase 1: Core Infrastructure - **COMPLETE**
+### ✅ Phase 2: Handler Migration (legacy ports) - **COMPLETE**
+### ✅ Phase 3: MachO Cache Implementation - **COMPLETE**
+### ✅ Phase 4: Profiling & Optimization - **COMPLETE**
+### 🚧 Phase 5: Event-Driven Streaming - **IN PROGRESS**
+### 🔁 Phase 6: Regression & Docs Refresh - **QUEUED**
+
+> The remainder of this document keeps the original phase definitions for reference. See the new **Phase 5** section near the end for the latest tasks.
+
+### Phase 1 Recap
 - Pipeline package structure created
 - Executor with DMG grouping implemented
 - Context management with thread safety
 - Execution statistics tracking
 - DMG mounting/unmounting logic
 
-### ✅ Phase 2: Handler Migration - **100% COMPLETE** (11 of 11 handlers) 🎉
+### ✅ Phase 2: Handler Migration - **100% COMPLETE** (12 of 12 handlers) 🎉
 **Completed Handlers:**
 - ✅ KernelcacheHandler (DMGTypeNone)
 - ✅ DSCHandler (DMGTypeSystemOS) - *streaming optimized* ✨
@@ -28,6 +38,7 @@ Refactor the `ipsw diff` command from a monolithic sequential implementation to 
 - ✅ FeaturesHandler (DMGTypeFileSystem)
 - ✅ FilesHandler (DMGTypeFileSystem)
 - ✅ EntitlementsHandler (DMGTypeSystemOS) - *optimized with cache* ✨
+- ✅ LaunchConstraintsHandler (DMGTypeSystemOS) - *cache-derived JSON*
 - ✅ KDKHandler (DMGTypeNone)
 - ✅ MachOHandler (DMGTypeSystemOS) - *uses cache* ✨
 
@@ -45,7 +56,33 @@ Refactor the `ipsw diff` command from a monolithic sequential implementation to 
 - ✅ Task 4.3: Performance analysis **COMPLETED** (full production test)
 - ✅ Task 4.4: Optimizations based on profiling **COMPLETED** (94% memory reduction)
 
-### 🎯 Phase 5: Extended Features - **OPTIONAL** (core functionality complete)
+### 🚧 Phase 5: Event-Driven Streaming (Week 4)
+
+**Goal**: Ensure every handler consumes streamed ZIP/DMG events so we unzip/decrypt each artifact exactly once.
+
+| Task | Owner | Status | Notes |
+|------|-------|--------|-------|
+| 5.1 Define `FileSubscription`, `FileEvent`, ZIP walker | core | ✅ | Landed Oct 26 |
+| 5.2 Add DMG walker + opportunistic MachO caching | core | ✅ | Landed Oct 26 |
+| 5.3 Convert Files handler (ZIP + DMG) | core | ✅ | Events now feed diff |
+| 5.4 Convert Features handler | core | ✅ | Reads plists directly |
+| 5.5 Convert Launchd handler | core | ✅ | No redundant `aea` work |
+| 5.6 Convert DSC handler | core | ✅ | Streams DSC paths |
+| 5.7 Convert iBoot handler | core | ✅ | Parses IM4P from ZIP events |
+| 5.8 Convert MachO handler to streaming cache | core | ⏳ | Blocks Entitlements/Constraints |
+| 5.9 Update Entitlements + Launch Constraints to streaming data | core | ⏳ | Depends on 5.8 |
+| 5.10 Add ZIP subscriptions for Firmware & Kernelcache | core | ⏳ | Replace bespoke extractors |
+| 5.11 Re-run `hack/diff-regression.sh` & refresh docs | core | ⏳ | After 5.8–5.10 |
+
+### 🔁 Phase 6: Regression & Documentation Refresh (Next)
+**Goal**: Reconfirm parity with the legacy workflow once all handlers consume streamed data.**
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 6.1 Update `hack/diff-regression.sh` instructions for matcher mode | ⏳ | Pending streaming completion |
+| 6.2 Re-run regression suite (legacy vs pipeline outputs) | ⏳ | Blocks FINAL_TEST_RESULTS |
+| 6.3 Refresh `FINAL_TEST_RESULTS.md` + `TESTING_GUIDE.md` | ⏳ | Needs new numbers |
+| 6.4 Update README / STATUS badges | ⏳ | After new results verified |
 
 ---
 
@@ -253,6 +290,17 @@ Refactor the `ipsw diff` command from a monolithic sequential implementation to 
   - [x] Path handling works
   - [ ] Integration test passes (deferred)
 
+### Task 2.12: Add Launch Constraints Handler ✅
+- **Size**: Small (3-4 hours)
+- **Dependencies**: Task 3.3 (MachO cache data available)
+- **DMG Type**: `DMGTypeSystemOS`
+- **Enabled**: `cfg.LaunchConstraints`
+- **Files**: `internal/diff/pipeline/handlers/launch_constraints.go`
+- **Acceptance**:
+  - [x] Launch constraints (Self/Parent/Responsible) captured from cache
+  - [x] Handler produces Markdown diff via `ent.DiffDatabases`
+  - [x] CLI flag `--launch-constraints` toggles handler execution
+
 **Phase 2 Checkpoint**: All handlers ported, behavior matches original
 
 ---
@@ -406,7 +454,7 @@ Refactor the `ipsw diff` command from a monolithic sequential implementation to 
 
 ---
 
-## Phase 5: Extended Features (Week 5 - Optional)
+## Phase 7: Future Enhancements (Optional)
 
 **Goal**: Add new capabilities enabled by pipeline
 **Risk**: Low (additive features)

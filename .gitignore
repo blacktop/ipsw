@@ -80,6 +80,7 @@ internal/download/data/proto
 venv/
 keybag.plist
 OPC/
+diff-run/
 
 # Unicorn EMU
 unicorn2/

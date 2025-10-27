@@ -20,15 +20,57 @@ func (h *MachOHandler) Name() string {
 }
 
 // DMGTypes returns the DMG types needed by this handler.
-// MachO files are in the SystemOS DMG.
+// MachO files are in all DMGs: SystemOS, FileSystem, AppOS, and Exclave.
 func (h *MachOHandler) DMGTypes() []pipeline.DMGType {
-	return []pipeline.DMGType{pipeline.DMGTypeSystemOS}
+	return []pipeline.DMGType{
+		pipeline.DMGTypeSystemOS,
+		pipeline.DMGTypeFileSystem,
+		pipeline.DMGTypeAppOS,
+		pipeline.DMGTypeExclave,
+	}
 }
 
 // Enabled returns whether this handler should run.
 // MachO handler always runs (no explicit flag, it's a core diff operation).
 func (h *MachOHandler) Enabled(cfg *pipeline.Config) bool {
 	return true
+}
+
+// FileSubscriptions ensures all DMG walkers run so MachO metadata
+// gets cached while the DMGs are mounted. We rely on Executor.maybeCacheMachO
+// to do the heavy lifting before these callbacks fire.
+func (h *MachOHandler) FileSubscriptions() []pipeline.FileSubscription {
+	matchFunc := func(evt *pipeline.FileEvent) bool {
+		if evt == nil || evt.Ctx == nil {
+			return false
+		}
+		_, ok := evt.Ctx.MachoCache.Get(evt.RelPath)
+		return ok
+	}
+
+	var subs []pipeline.FileSubscription
+	for _, dmgType := range []pipeline.DMGType{
+		pipeline.DMGTypeSystemOS,
+		pipeline.DMGTypeFileSystem,
+		pipeline.DMGTypeAppOS,
+		pipeline.DMGTypeExclave,
+	} {
+		dt := dmgType // capture for closure
+		subs = append(subs, pipeline.FileSubscription{
+			ID:        fmt.Sprintf("macho-cache-%d", dt),
+			Source:    pipeline.SourceDMG,
+			DMGType:   dt,
+			MatchFunc: matchFunc,
+		})
+	}
+
+	return subs
+}
+
+// HandleFile currently acts as a no-op because metadata is already inserted
+// into the cache by the executor's streaming walker.
+func (h *MachOHandler) HandleFile(ctx context.Context, exec *pipeline.Executor, subID string, event *pipeline.FileEvent) error {
+	return nil
 }
 
 // Execute runs the MachO diff operation using cached data.
@@ -79,25 +121,37 @@ func (h *MachOHandler) cacheToDiffInfo(cache *pipeline.MachoCache, cfg *pipeline
 			continue
 		}
 
-		// Create DiffInfo with available cached data
-		// Note: We can't populate the Sections field because it uses an
-		// unexported type. The diff will still work based on other fields.
 		imports := metadata.Imports
-		if len(imports) == 0 {
-			imports = metadata.LoadCommands
+
+		var sections []mcmd.Section
+		if len(metadata.Sections) > 0 {
+			sections = make([]mcmd.Section, len(metadata.Sections))
+			for i, sec := range metadata.Sections {
+				sections[i] = mcmd.Section{
+					Name: sec.Name,
+					Size: sec.Size,
+				}
+			}
 		}
 
 		diffInfo := &mcmd.DiffInfo{
 			Version:   metadata.Version,
 			UUID:      metadata.UUID,
 			Imports:   imports,
-			Sections:  nil, // Cannot populate due to unexported section type
+			Sections:  sections,
 			Functions: metadata.Functions,
-			Starts:    nil, // Function start details not in cache
 			Symbols:   metadata.Symbols,
 			CStrings:  metadata.CStrings,
 			SymbolMap: make(map[uint64]string),
 			Verbose:   cfg.Verbose,
+		}
+
+		if cfg.FuncStarts && len(metadata.FunctionStarts) > 0 {
+			diffInfo.Starts = metadata.FunctionStarts
+			diffInfo.Functions = len(metadata.FunctionStarts)
+			if len(metadata.SymbolMap) > 0 {
+				diffInfo.SymbolMap = metadata.SymbolMap
+			}
 		}
 
 		diffInfoMap[path] = diffInfo

@@ -81,6 +81,10 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
+			if errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debugf("skipping broken symlink: %s", path)
+				return nil
+			}
 			log.Errorf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
@@ -203,6 +207,10 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 			// Skip paths with permission errors gracefully
 			if os.IsPermission(err) {
 				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
+			if errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debugf("skipping broken symlink: %s", path)
 				return nil
 			}
 			log.Errorf("failed to walk mount %s: %v", path, err)

@@ -365,12 +365,8 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				fmt.Println(out)
-			} else {
-				if len(out) > 0 {
-					utils.Indent(log.Info, 2)("Created " + out)
-				}
+			if len(out) > 0 {
+				utils.Indent(log.Info, 2)("Created " + out)
 			}
 		}
 
@@ -380,12 +376,8 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				fmt.Println(out)
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 

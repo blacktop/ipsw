@@ -53,6 +53,9 @@ const diffMarkdownTemplate = `
 {{- if .Ents }}
 		- [🔑 Entitlements](#entitlements)
 {{- end }}
+{{- if .LaunchConstraints }}
+		- [🚦 Launch Constraints](#launch-constraints)
+{{- end }}
 	- [DSC](#dsc)
 		- [WebKit](#webkit)
 		- [Dylibs](#dylibs)
@@ -155,6 +158,16 @@ const diffMarkdownTemplate = `
   <summary><i>View Entitlements</i></summary>
 
   {{ .Ents | noescape }}
+
+</details>
+{{ end -}}
+
+{{ if .LaunchConstraints }}
+### 🚦 Launch Constraints
+<details>
+  <summary><i>View Launch Constraints</i></summary>
+
+  {{ .LaunchConstraints | noescape }}
 
 </details>
 {{ end -}}

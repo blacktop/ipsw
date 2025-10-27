@@ -1,10 +1,10 @@
 # IPSW Diff Pipeline Refactor
 
-**Status**: ✅ Functionally Complete - Manual Testing Only (see Known Limitations)
+**Status**: 🚧 In Progress — Event-Driven File Streaming Rollout
 **Branch**: `feat/diff_pipeline`
 **Start Date**: 2025-10-01
-**Last Updated**: 2025-10-03
-**Completion Date**: 2025-10-03
+**Last Updated**: 2025-10-26
+**Current Focus**: Converting remaining handlers to the matcher-based ZIP/DMG walker
 
 ---
 
@@ -29,12 +29,23 @@
 3. Review [ARCHITECTURE.md](./ARCHITECTURE.md) for technical design
 4. Check [TASKS.md](./TASKS.md) for what's next
 5. See [CACHE_ARCHITECTURE.md](./CACHE_ARCHITECTURE.md) for caching details
+6. Launch Constraints diffs now run automatically (look for the 🚦 section in reports).
+
+> **AEA Tip**: Use `--pem-db /path/to/aea_keys.json` (output of `ipsw extract fcs-keys`) to ensure modern AEA-encrypted DMGs decrypt even before Apple publishes new FCS keys.
 
 ---
 
 ## Overview
 
-Refactoring the `ipsw diff` command from a monolithic sequential implementation to a modular pipeline-based architecture with intelligent resource management and concurrent execution.
+Refactoring the `ipsw diff` command from a monolithic sequential implementation to a modular pipeline-based architecture with intelligent resource management and concurrent execution. The latest milestone adds a streaming ZIP/DMG walker plus handler “matchers,” allowing us to unzip/decrypt each artifact exactly once while every interested handler consumes the data it needs.
+
+### Latest Update – Oct 26, 2025
+
+- ✅ **FileSubscription API** routes every IPSW/DMG file through a single pass.
+- ✅ **Files, Features, Launchd, DSC, and iBoot** now subscribe to file events (no more redundant `aea` or unzip work).
+- 🚧 **MachO/Entitlements/Launch Constraints** still depend on the legacy cache; they are being migrated next.
+- 🚧 **Firmware/Kernelcache** still call bespoke extractors; ZIP subscriptions are queued.
+- 🔁 **Regression script** (`hack/diff-regression.sh`) needs to re-run once the remaining handlers move to the new flow.
 
 ### The Problem
 
@@ -81,20 +92,30 @@ type Handler interface {
 }
 ```
 
-### 2. DMG Grouping
+### 2. Event-Driven ZIP/DMG Streaming
 
-Mount each DMG type once, run all handlers that need it, then unmount:
+Mount each DMG (or open the IPSW zip) once, walk every file, and fire handler matchers on the fly:
 
 ```
-Group 1: DMGTypeNone (no mounting)
-  → Kernelcache, Firmware, IBoot handlers run in parallel
+Pass 1: ZIP (no mounts)
+  → Firmware/IBoot/Kernelcache/etc. consume entries via matchers
 
-Group 2: DMGTypeSystemOS (mount once)
-  → DSC, MachO, Launchd, Entitlements handlers run in parallel
-
-Group 3: DMGTypeFileSystem (mount once)
-  → Files handler runs
+Pass 2+: DMGTypeSystemOS, FileSystem, AppOS, Exclave…
+  → Handlers subscribing to those DMGs receive callbacks while the mount is live
 ```
+
+Handlers declare their interest via:
+
+```go
+func (h *FilesHandler) FileSubscriptions() []pipeline.FileSubscription {
+    return []pipeline.FileSubscription{
+        {ID: "zip", Source: pipeline.SourceZIP},
+        {ID: "filesystem", Source: pipeline.SourceDMG, DMGType: pipeline.DMGTypeFileSystem},
+    }
+}
+```
+
+The executor now streams each file through these subscriptions, so we unzip/decrypt once, parse once, and store only the diff metadata required.
 
 ### 3. Two-Phase MachO Caching
 
@@ -407,17 +428,7 @@ Since we're on a feature branch, no backward compatibility concerns:
 
 ### Feature Parity with Legacy
 
-**⚠️ Missing: LaunchConstraints in Entitlements Handler**
-
-The legacy implementation includes LaunchConstraints (Self, Parent, Responsible) in entitlements diff by default. The pipeline implementation currently only extracts basic entitlements from the MachO cache.
-
-- **Impact**: Entitlements diff output will not include LaunchConstraints data
-- **Workaround**: None currently - feature not implemented
-- **Fix**: Update cache population to extract LaunchConstraints from `m.CodeSignature()` and store in `MachoMetadata`
-- **Priority**: Low - most users diff entitlements only, not constraints
-- **Code locations**:
-  - Legacy: `internal/commands/ent/ent.go:141-166` (LaunchConstraints extraction)
-  - Pipeline: `internal/diff/pipeline/handlers/entitlements.go` (cache-based, no constraints)
+- ✅ LaunchConstraints parity restored via the dedicated `--launch-constraints` handler (Self/Parent/Responsible all diffed from the MachO cache).
 
 ### Resolved Issues
 

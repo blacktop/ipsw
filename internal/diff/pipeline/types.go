@@ -65,6 +65,7 @@ type Mount struct {
 	MountPath string  // Where the DMG is mounted
 	IsMounted bool    // Whether we mounted it (vs already mounted)
 	Type      DMGType // Type of DMG
+	Managed   bool    // Whether the pipeline created/extracted this DMG
 }
 
 // GetMount safely retrieves a mount by type.

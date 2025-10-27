@@ -3,6 +3,8 @@ package pipeline
 import (
 	"sync"
 	"time"
+
+	"github.com/blacktop/go-macho/types"
 )
 
 // MachoMetadata represents all data extracted from a single MachO file.
@@ -27,10 +29,16 @@ type MachoMetadata struct {
 
 	// Entitlements Data
 	Entitlements string // XML entitlements from code signature
+	// Launch Constraints (Self/Parent/Responsible) serialized as JSON
+	LaunchConstraints map[string]string
 
 	// Metadata
 	ParseError error     // If parsing failed, error is stored here
 	ParsedAt   time.Time // When this file was parsed
+
+	// Function metadata (optional)
+	FunctionStarts []types.Function  // Full function start metadata
+	SymbolMap      map[uint64]string // Address -> symbol name map
 }
 
 // SectionInfo represents a MachO section's basic information.
@@ -39,19 +47,27 @@ type SectionInfo struct {
 	Size uint64 // Section size in bytes
 }
 
+const (
+	LaunchConstraintSelfKey        = "self"
+	LaunchConstraintParentKey      = "parent"
+	LaunchConstraintResponsibleKey = "responsible"
+)
+
 // MachoCache is a thread-safe cache holding all parsed MachO metadata.
 //
 // Populated once during the cache scan phase, then read concurrently by
 // multiple handlers without additional file I/O.
 type MachoCache struct {
-	data map[string]*MachoMetadata // path -> metadata
-	mu   sync.RWMutex              // Thread-safe access
+	data        map[string]*MachoMetadata // path -> metadata
+	scannedDMGs map[DMGType]bool          // DMG types that have been fully scanned
+	mu          sync.RWMutex              // Thread-safe access
 }
 
 // NewMachoCache creates a new empty MachO cache.
 func NewMachoCache() *MachoCache {
 	return &MachoCache{
-		data: make(map[string]*MachoMetadata),
+		data:        make(map[string]*MachoMetadata),
+		scannedDMGs: make(map[DMGType]bool),
 	}
 }
 
@@ -129,4 +145,30 @@ func (c *MachoCache) ErrorCount() int {
 		}
 	}
 	return count
+}
+
+// MarkDMGScanned notes that the given DMG type has been fully processed.
+func (c *MachoCache) MarkDMGScanned(dmgType DMGType) {
+	if dmgType == DMGTypeNone {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.scannedDMGs == nil {
+		c.scannedDMGs = make(map[DMGType]bool)
+	}
+	c.scannedDMGs[dmgType] = true
+}
+
+// DMGScanned reports whether the cache already contains data for the DMG type.
+func (c *MachoCache) DMGScanned(dmgType DMGType) bool {
+	if dmgType == DMGTypeNone {
+		return true
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.scannedDMGs == nil {
+		return false
+	}
+	return c.scannedDMGs[dmgType]
 }
