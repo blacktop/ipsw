@@ -359,6 +359,7 @@ func mountDMG(ctx *Context) (err error) {
 			Input:    aeaPath,
 			Output:   filepath.Dir(aeaPath),
 			PemDB:    ctx.PemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
