@@ -361,7 +361,7 @@ func decodeImage(r io.Reader, ci csiHeader) (image.Image, error) {
 				if err := binary.Read(dmr, binary.LittleEndian, &remaining); err != nil {
 					return nil, fmt.Errorf("failed to read deepmap2 ZIP data: %v", err)
 				}
-				
+
 				if isLZFSE, _ := magic.IsLZFSE(remaining); isLZFSE {
 					// This is actually LZFSE mislabeled as ZIP
 					decompressed, err := comp.Decompress(remaining, comp.LZFSE)
