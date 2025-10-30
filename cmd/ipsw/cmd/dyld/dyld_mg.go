@@ -111,6 +111,7 @@ func init() {
 	DyldCmd.AddCommand(dyldMgCmd)
 
 	dyldMgCmd.Flags().IntP("length", "l", 0, "Length of MG key to brute force")
+	viper.BindPFlag("dyld.mg.length", dyldMgCmd.Flags().Lookup("length"))
 }
 
 // dyldMgCmd represents the mg command

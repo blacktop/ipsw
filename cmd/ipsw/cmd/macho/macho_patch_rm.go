@@ -86,9 +86,9 @@ var machoPatchRmCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
-		overwrite := viper.GetBool("macho.patch.overwrite")
-		reSign := viper.GetBool("macho.patch.re-sign")
-		output := viper.GetString("macho.patch.output")
+		overwrite := viper.GetBool("macho.patch.rm.overwrite")
+		reSign := viper.GetBool("macho.patch.rm.re-sign")
+		output := viper.GetString("macho.patch.rm.output")
 
 		var m *macho.File
 
