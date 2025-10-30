@@ -13,7 +13,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/internal/swift"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
@@ -91,6 +91,8 @@ func NewSwift(file *macho.File, dsc *dyld.File, conf *SwiftConfig) (*Swift, erro
 
 // DumpType returns Swift types matching a given pattern from a MachO
 func (s *Swift) DumpType(pattern string) error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
@@ -150,6 +152,8 @@ func (s *Swift) DumpType(pattern string) error {
 
 // DumpProtocol returns Swift protocols matching a given pattern from a MachO
 func (s *Swift) DumpProtocol(pattern string) error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
@@ -209,6 +213,8 @@ func (s *Swift) DumpProtocol(pattern string) error {
 
 // DumpExtension returns Swift extensions matching a given pattern from a MachO
 func (s *Swift) DumpExtension(pattern string) error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
@@ -268,6 +274,8 @@ func (s *Swift) DumpExtension(pattern string) error {
 
 // DumpAssociatedType returns Swift associated types matching a given pattern from a MachO
 func (s *Swift) DumpAssociatedType(pattern string) error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
@@ -327,6 +335,8 @@ func (s *Swift) DumpAssociatedType(pattern string) error {
 
 // Dump outputs Swift info from a MachO
 func (s *Swift) Dump() error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	ms := []*macho.File{s.file}
 	if s.conf.Deps {
 		ms = append(ms, s.deps...)
@@ -613,7 +623,12 @@ func (s *Swift) Dump() error {
 				}).Info("Swift Accessible Functions")
 				fmt.Println()
 				for _, afunc := range afuncs {
-					fmt.Println(afunc)
+					line := fmt.Sprintf("%s : %s (fn: %#x, env: %#x, flags: %#x)", afunc.Name, afunc.FunctionType, afunc.FunctionAddress, afunc.GenericEnvironment, uint32(afunc.Flags))
+					if s.conf.Color {
+						quick.Highlight(os.Stdout, line+"\n", "swift", "terminal256", s.conf.Theme)
+					} else {
+						fmt.Println(line)
+					}
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
 				log.Errorf("failed to parse swift accessible functions: %v", err)
@@ -626,6 +641,8 @@ func (s *Swift) Dump() error {
 
 // Interface outputs Swift swift-dump interface from a MachO
 func (s *Swift) Interface() error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	if s.conf.Headers {
 		return s.WriteHeaders()
 	}
@@ -635,6 +652,8 @@ func (s *Swift) Interface() error {
 }
 
 func (s *Swift) WriteHeaders() error {
+	restore := s.setAutoDemangle(s.conf.Demangle)
+	defer restore()
 	writeSwiftHeaders := func(m *macho.File) error {
 		var headers []string
 
@@ -852,6 +871,23 @@ func (s *Swift) WriteHeaders() error {
 	}
 
 	return writeSwiftHeaders(s.file)
+}
+
+func (s *Swift) setAutoDemangle(enabled bool) func() {
+	files := []*macho.File{s.file}
+	if s.conf.Deps {
+		files = append(files, s.deps...)
+	}
+	prev := make([]bool, len(files))
+	for i, f := range files {
+		prev[i] = f.SwiftAutoDemangle()
+		f.SetSwiftAutoDemangle(enabled)
+	}
+	return func() {
+		for i, f := range files {
+			f.SetSwiftAutoDemangle(prev[i])
+		}
+	}
 }
 
 /* UTILS */

@@ -16,9 +16,9 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )

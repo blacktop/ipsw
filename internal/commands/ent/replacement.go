@@ -379,7 +379,7 @@ func (s *SQLiteReplacementStrategy) GetExistingIPSWs(platform, version string) (
 	}
 
 	majorMinor := extractMajorMinorVersion(version)
-	
+
 	// Query IPSWs with same platform and major.minor version
 	var ipsws []struct {
 		ID       string
@@ -438,7 +438,7 @@ func (s *SQLiteReplacementStrategy) cleanupOrphanedReferences(tx *gorm.DB) error
 		return fmt.Errorf("failed to cleanup orphaned paths: %w", err)
 	}
 
-	// Remove keys not referenced by any entitlements  
+	// Remove keys not referenced by any entitlements
 	if err := tx.Exec(`
 		DELETE FROM entitlement_keys 
 		WHERE id NOT IN (SELECT DISTINCT key_id FROM entitlements WHERE key_id IS NOT NULL)
@@ -535,21 +535,21 @@ func (l *LegacyReplacementStrategy) GetExistingIPSWs(platform, version string) (
 // promptUserForReplacement prompts the user to confirm replacement
 func promptUserForReplacement(plan *ReplacementPlan) bool {
 	fmt.Printf("\n%s\n", plan.ReasonMsg)
-	
+
 	if len(plan.ToReplace) > 0 {
 		fmt.Printf("This will delete the following existing data:\n")
 		for _, ipsw := range plan.ToReplace {
 			fmt.Printf("  - %s (iOS %s, build %s)\n", ipsw.Name, ipsw.Version, ipsw.BuildID)
 		}
 	}
-	
+
 	fmt.Printf("\nDo you want to continue? (y/N): ")
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	if scanner.Scan() {
 		response := strings.ToLower(strings.TrimSpace(scanner.Text()))
 		return response == "y" || response == "yes"
 	}
-	
+
 	return false
 }
