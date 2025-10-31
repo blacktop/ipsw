@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -117,6 +118,89 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 		return nil, nil, "", fmt.Errorf("failed to get folder from remote zip metadata: %v", err)
 	}
 	return c.info, zr, folder, nil
+}
+
+func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+		defer os.Remove(filepath.Clean(dmgs[0]))
+	}
+
+	if filepath.Ext(dmgPath) == ".aea" {
+		var err error
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:    dmgPath,
+			Output:   filepath.Dir(dmgPath),
+			PemDB:    pemDB,
+			Proxy:    "",    // TODO: make proxy configurable
+			Insecure: false, // TODO: make insecure configurable
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
+		defer os.Remove(dmgPath)
+	}
+
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
+	}
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Retry(3, 2*time.Second, func() error {
+				return utils.Unmount(mountPoint, false)
+			}); err != nil {
+				log.Errorf("failed to unmount DMG %s at %s: %v", dmgPath, mountPoint, err)
+			}
+		}()
+	}
+
+	var artifacts []string
+	// extract files that match regex pattern
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.WithError(err).Debugf("failed to walk %s", mountPoint)
+			return nil // keep going
+		}
+		if info.IsDir() {
+			return nil // skip directories
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil // skip symlinks
+		}
+		if pattern.MatchString(strings.TrimPrefix(path, mountPoint)) {
+			fname := strings.TrimPrefix(path, mountPoint)
+			fname = filepath.Join(destPath, fname)
+			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
+			}
+			utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting to %s", fname))
+			if err := utils.Copy(path, fname); err != nil {
+				// return fmt.Errorf("failed to extract %s: %v", fname, err)
+				log.WithError(err).Errorf("failed to copy %s to %s", path, fname)
+				return nil // keep going
+			}
+			artifacts = append(artifacts, fname)
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to extract File System files from IPSW: %v", err)
+	}
+
+	return artifacts, nil
 }
 
 // FirmwareType returns the type of the firmware: IPSW or OTA
@@ -492,7 +576,7 @@ func extractRemoteDMG(files []*zip.File, dmgPath, destPath, pemDB string, patter
 
 	var artifacts []string
 	for _, dmg := range extracted {
-		out, err := utils.ExtractFromDMG(dmg, dmg, destPath, pemDB, pattern)
+		out, err := ExtractFromDMG(dmg, dmg, destPath, pemDB, pattern)
 		if err != nil {
 			return nil, err
 		}
@@ -646,7 +730,7 @@ func FcsKeys(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
 		}
-		pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true, c.Insecure)
+		pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true, c.Proxy, c.Insecure)
 		if err != nil {
 			return nil, err
 		}
@@ -732,28 +816,28 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re)
+				out, err := ExtractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re)
+				out, err := ExtractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re)
+				out, err := ExtractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
-				out, err := utils.ExtractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re)
+				out, err := ExtractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
 				}
@@ -828,7 +912,7 @@ func LaunchdConfig(path, pemDB string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get filesystem DMG path: %v", err)
 	}
-	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`.*/sbin/launchd$`))
+	extracted, err := ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`.*/sbin/launchd$`))
 	if err != nil {
 		return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
 	}
@@ -876,7 +960,7 @@ func SystemVersion(path, pemDB string) (*plist.SystemVersion, error) {
 		return nil, fmt.Errorf("failed to get filesystem DMG path: %v", err)
 	}
 
-	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
+	extracted, err := ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
 	}

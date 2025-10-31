@@ -78,6 +78,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 			Input:    dmgPath,
 			Output:   filepath.Dir(dmgPath),
 			PemDB:    pemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"archive/zip"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -10,16 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils/lsof"
-	"github.com/blacktop/ipsw/pkg/aea"
 	semver "github.com/hashicorp/go-version"
 	"golang.org/x/sys/execabs"
 )
@@ -767,88 +763,6 @@ func MountInfo() (*HdiUtilInfo, error) {
 		return &info, nil
 	}
 	return nil, fmt.Errorf("only supported on macOS")
-}
-
-func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(filepath.Clean(dmgs[0]))
-	}
-
-	if filepath.Ext(dmgPath) == ".aea" {
-		var err error
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    dmgPath,
-			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDB,
-			Insecure: false, // TODO: make this configurable
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
-		}
-		defer os.Remove(dmgPath)
-	}
-
-	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	mountPoint, alreadyMounted, err := MountDMG(dmgPath, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
-	}
-	if alreadyMounted {
-		Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
-	} else {
-		defer func() {
-			Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-			if err := Retry(3, 2*time.Second, func() error {
-				return Unmount(mountPoint, false)
-			}); err != nil {
-				log.Errorf("failed to unmount DMG %s at %s: %v", dmgPath, mountPoint, err)
-			}
-		}()
-	}
-
-	var artifacts []string
-	// extract files that match regex pattern
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.WithError(err).Debugf("failed to walk %s", mountPoint)
-			return nil // keep going
-		}
-		if info.IsDir() {
-			return nil // skip directories
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return nil // skip symlinks
-		}
-		if pattern.MatchString(strings.TrimPrefix(path, mountPoint)) {
-			fname := strings.TrimPrefix(path, mountPoint)
-			fname = filepath.Join(destPath, fname)
-			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
-				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
-			}
-			Indent(log.Debug, 3)(fmt.Sprintf("Extracting to %s", fname))
-			if err := Copy(path, fname); err != nil {
-				// return fmt.Errorf("failed to extract %s: %v", fname, err)
-				log.WithError(err).Errorf("failed to copy %s to %s", path, fname)
-				return nil // keep going
-			}
-			artifacts = append(artifacts, fname)
-		}
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("failed to extract File System files from IPSW: %v", err)
-	}
-
-	return artifacts, nil
 }
 
 func PkgUtilExpand(src, dst string) (string, error) {

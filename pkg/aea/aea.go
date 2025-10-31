@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/cloudflare/circl/hpke"
+	"github.com/blacktop/ipsw/internal/download"
 )
 
 //go:embed data/fcs-keys.gz
@@ -68,7 +69,7 @@ func (k PrivateKey) UnmarshalBinaryPrivateKey() ([]byte, error) {
 
 type Metadata map[string][]byte
 
-func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecure bool) (map[string]PrivateKey, error) {
+func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool, proxy string, insecure bool) (map[string]PrivateKey, error) {
 	out := make(map[string]PrivateKey)
 
 	if len(data) > 0 {
@@ -120,6 +121,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecu
 
 	cli := &http.Client{
 		Transport: &http.Transport{
+			Proxy:           download.GetProxy(proxy),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 	}
@@ -151,7 +153,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded, insecu
 	return out, nil
 }
 
-func (md Metadata) DecryptFCS(pemData []byte, pemDB string, insecure bool) ([]byte, error) {
+func (md Metadata) DecryptFCS(pemData []byte, pemDB string, proxy string, insecure bool) ([]byte, error) {
 	ddata, ok := md["com.apple.wkms.fcs-response"]
 	if !ok {
 		return nil, fmt.Errorf("no 'com.apple.wkms.fcs-response' found in AEA metadata")
@@ -169,7 +171,7 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string, insecure bool) ([]by
 		return nil, err
 	}
 
-	pkmap, err := md.GetPrivateKey(pemData, pemDB, false, insecure)
+	pkmap, err := md.GetPrivateKey(pemData, pemDB, false, proxy, insecure)
 	if err != nil {
 		return nil, err
 	}
