@@ -17,6 +17,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/blacktop/ipsw/pkg/tbd"
 )
 
@@ -267,6 +268,11 @@ func LookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
 	sym := &SymbolLookup{
 		Address: addr,
 	}
+	setSymbol := func(name string) (*SymbolLookup, error) {
+		sym.Symbol = name
+		sym.Demanged = symbols.DemangleSymbolName(name)
+		return sym, nil
+	}
 
 	uuid, mapping, err := f.GetMappingForVMAddress(addr)
 	if err != nil {
@@ -312,40 +318,33 @@ retry:
 			}
 			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 				if secondAttempt {
-					symName = "_ptr." + symName
+					symName = symbols.PrefixPointer + symName
 				}
-				sym.Symbol = fmt.Sprintf("%s%s", symName, delta)
-				return sym, nil
+				return setSymbol(fmt.Sprintf("%s%s", symName, delta))
 			}
 			if secondAttempt {
-				sym.Symbol = fmt.Sprintf("_ptr.func_%x%s", fn.StartAddr, delta)
-				return sym, nil
+				return setSymbol(fmt.Sprintf("%sfunc_%x%s", symbols.PrefixPointer, fn.StartAddr, delta))
 			}
-			sym.Symbol = fmt.Sprintf("func_%x%s", fn.StartAddr, delta)
-			return sym, nil
+			return setSymbol(fmt.Sprintf("func_%x%s", fn.StartAddr, delta))
 		}
 
 		if cstr, ok := m.IsCString(addr); ok {
 			if secondAttempt {
-				sym.Symbol = fmt.Sprintf("_ptr.%#v", cstr)
-				return sym, nil
+				return setSymbol(fmt.Sprintf("%s%#v", symbols.PrefixPointer, cstr))
 			}
-			sym.Symbol = fmt.Sprintf("%#v", cstr)
-			return sym, nil
+			return setSymbol(fmt.Sprintf("%#v", cstr))
 		}
 	}
 
 	if symName, ok := f.AddressToSymbol[addr]; ok {
 		if secondAttempt {
-			symName = "_ptr." + symName
+			symName = symbols.PrefixPointer + symName
 		}
-		sym.Symbol = symName
-		return sym, nil
+		return setSymbol(symName)
 	}
 
 	if secondAttempt {
-		sym.Symbol = "?"
-		return sym, nil
+		return setSymbol("?")
 	}
 
 	ptr, err := f.ReadPointerAtAddress(addr)
@@ -354,8 +353,7 @@ retry:
 	}
 
 	if f.SlideInfo.SlidePointer(ptr) == 0 {
-		sym.Symbol = "?"
-		return sym, nil
+		return setSymbol("?")
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, f.SlideInfo.SlidePointer(ptr)))

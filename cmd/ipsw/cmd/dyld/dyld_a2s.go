@@ -25,14 +25,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
-	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -145,14 +143,8 @@ var AddrToSymCmd = &cobra.Command{
 				log.WithFields(log.Fields{"dylib": sym.Image, "segment": sym.Segment}).Info("Address location")
 			}
 		}
-		if doDemangle {
-			if strings.HasPrefix(sym.Symbol, "_$s") || strings.HasPrefix(sym.Symbol, "$s") {
-				sym.Symbol, _ = swift.Demangle(sym.Symbol)
-			} else if strings.HasPrefix(sym.Symbol, "__Z") || strings.HasPrefix(sym.Symbol, "_Z") {
-				sym.Symbol = demangle.Do(sym.Symbol, false, false)
-			}
-		}
-		fmt.Printf("%#x: %s\n", unslidAddr, sym.Symbol)
+		symbol := symbols.FormatSymbol(sym.Symbol, doDemangle)
+		fmt.Printf("%#x: %s\n", unslidAddr, symbol)
 
 		return nil
 	},

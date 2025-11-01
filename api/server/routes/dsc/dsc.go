@@ -8,14 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/ipsw/api/types"
 	cmd "github.com/blacktop/ipsw/internal/commands/dsc"
-	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/gin-gonic/gin"
 )
 
@@ -86,6 +86,16 @@ func dscAddrToSym(c *gin.Context) {
 		return
 	}
 
+	doDemangle := true
+	if raw := c.Query("demangle"); raw != "" {
+		val, err := strconv.ParseBool(raw)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid demangle value %q: %v", raw, err)})
+			return
+		}
+		doDemangle = val
+	}
+
 	f, err := dyld.Open(filepath.Clean(params.Path))
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
@@ -107,8 +117,7 @@ func dscAddrToSym(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
-		sym.Demanged = demangle.Do(sym.Symbol, false, false)
-		sym.Demanged = swift.DemangleBlob(sym.Demanged)
+		sym.Symbol = symbols.FormatSymbol(sym.Symbol, doDemangle)
 		enc.Encode(sym)
 		w.(http.Flusher).Flush()
 	}

@@ -34,6 +34,13 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Produces:
 	//     - application/json
 	//
+	//     Parameters:
+	//       + name: demangle
+	//         in: query
+	//         description: toggle demangling of symbol names (defaults to true)
+	//         required: false
+	//         type: boolean
+	//
 	//     Responses:
 	//       200: dscAddrToSymResponse
 	//       500: genericError

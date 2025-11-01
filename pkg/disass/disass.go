@@ -15,6 +15,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/symbols"
 )
 
 type Disass interface {
@@ -134,6 +135,7 @@ type AddrDetails struct {
 	Segment string
 	Section string
 	Pointer uint64
+	Flags   types.SectionFlag
 }
 
 func (d AddrDetails) String() string {
@@ -148,6 +150,38 @@ type Triage struct {
 	Function  *types.Function
 	Addresses map[uint64]uint64
 	Locations map[uint64][]uint64
+}
+
+const maxCStringCommentLen = 200
+
+func cstringComment(d Disass, addr uint64) string {
+	if ok, detail := d.IsData(addr); !ok || detail == nil || !detail.Flags.IsCstringLiterals() {
+		return ""
+	}
+	cstr, err := d.GetCString(addr)
+	if err != nil || len(cstr) == 0 {
+		return ""
+	}
+	if !utils.IsPrintable(cstr) {
+		return ""
+	}
+	if len(cstr) > maxCStringCommentLen {
+		return fmt.Sprintf(" ; %#v...", cstr[:maxCStringCommentLen])
+	}
+	if len(cstr) > 1 {
+		return fmt.Sprintf(" ; %#v", cstr)
+	}
+	return ""
+}
+
+func appendComment(base, extra string) string {
+	if extra == "" {
+		return base
+	}
+	if base == "" {
+		return extra
+	}
+	return base + extra
 }
 
 func Disassemble(d Disass) string {
@@ -250,13 +284,12 @@ func Disassemble(d Disass) string {
 					} else {
 						fmt.Fprintf(&sb, "\n%s:\n", fname)
 					}
-				} else {
-					if name, ok := d.FindSymbol(uint64(instruction.Address)); ok {
-						if d.Color() {
-							sb.WriteString(colorOp("\n%s\n", name))
-						} else {
-							fmt.Fprintf(&sb, "\n%s\n", name)
-						}
+				} else if name, ok := d.FindSymbol(uint64(instruction.Address)); ok {
+					display := symbols.FormatSymbol(name, d.Demangle())
+					if d.Color() {
+						sb.WriteString(colorOp("\n%s\n", display))
+					} else {
+						fmt.Fprintf(&sb, "\n%s\n", display)
 					}
 				}
 
@@ -306,7 +339,9 @@ func Disassemble(d Disass) string {
 					for _, operand := range instruction.Operands {
 						if operand.Class == disassemble.LABEL {
 							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
-								opStr = name
+								display := symbols.FormatSymbol(name, d.Demangle())
+								opStr = display
+								comment = appendComment(comment, cstringComment(d, uint64(operand.Immediate)))
 							} else {
 								direction := ""
 								delta := int(loc) - int(instruction.Address)
@@ -324,22 +359,30 @@ func Disassemble(d Disass) string {
 					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
 				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
-						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
+						display := symbols.FormatSymbol(name, d.Demangle())
+						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, display)
+						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[0].Immediate)))
 					}
 				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
-						comment = fmt.Sprintf(" ; %s", name)
+						display := symbols.FormatSymbol(name, d.Demangle())
+						comment = fmt.Sprintf(" ; %s", display)
+						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[1].Immediate)))
 					}
 				} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
-						comment = fmt.Sprintf(" ; %s", name)
+						display := symbols.FormatSymbol(name, d.Demangle())
+						comment = fmt.Sprintf(" ; %s", display)
+						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[1].Immediate)))
 					}
 				} else if instruction.Operation == disassemble.ARM64_ADR {
 					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
 					for _, operand := range instruction.Operands {
 						if operand.Class == disassemble.LABEL {
 							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
-								opStr = strings.Replace(opStr, fmt.Sprintf("%#x", operand.Immediate), name, 1)
+								display := symbols.FormatSymbol(name, d.Demangle())
+								opStr = strings.Replace(opStr, fmt.Sprintf("%#x", operand.Immediate), display, 1)
+								comment = appendComment(comment, cstringComment(d, uint64(operand.Immediate)))
 							} else if cstr, err := d.GetCString(uint64(operand.Immediate)); err == nil {
 								if utils.IsPrintable(cstr) {
 									if len(cstr) > 200 {
@@ -372,12 +415,16 @@ func Disassemble(d Disass) string {
 						adrpImm += instruction.Operands[1].Immediate
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
-						comment = fmt.Sprintf(" ; %s", name)
+						display := symbols.FormatSymbol(name, d.Demangle())
+						comment = fmt.Sprintf(" ; %s", display)
+						comment = appendComment(comment, cstringComment(d, uint64(adrpImm)))
 					} else if ok, detail := d.IsPointer(adrpImm); ok {
 						if name, ok := d.FindSymbol(uint64(detail.Pointer)); ok {
-							comment = fmt.Sprintf(" ; _ptr.%s", name)
+							display := symbols.FormatSymbol(symbols.PrefixPointer+name, d.Demangle())
+							comment = fmt.Sprintf(" ; %s", display)
+							comment = appendComment(comment, cstringComment(d, uint64(detail.Pointer)))
 						} else {
-							comment = fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
+							comment = fmt.Sprintf(" ; %s%x (%s)", symbols.PrefixPointer, detail.Pointer, detail)
 						}
 					} else if cstr, err := d.GetCString(adrpImm); err == nil && len(cstr) > 0 {
 						if utils.IsPrintable(cstr) {
@@ -389,7 +436,9 @@ func Disassemble(d Disass) string {
 						} else { // try again with immediate as pointer
 							if ptr, err := d.ReadAddr(adrpImm); err == nil {
 								if name, ok := d.FindSymbol(ptr); ok {
-									comment = fmt.Sprintf(" ; _ptr.%s", name)
+									display := symbols.FormatSymbol(symbols.PrefixPointer+name, d.Demangle())
+									comment = fmt.Sprintf(" ; %s", display)
+									comment = appendComment(comment, cstringComment(d, ptr))
 								}
 							}
 						}
