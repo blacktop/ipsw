@@ -31,6 +31,7 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -101,7 +102,7 @@ var machoA2sCmd = &cobra.Command{
 				// check if it's a cstring
 				if cstr, ok := mfse.IsCString(addr); ok {
 					if secondAttempt {
-						fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
+						fmt.Printf("\n%#x: %s%#v\n", addr, symbols.PrefixPointer, cstr)
 					} else {
 						fmt.Printf("\n%#x: %#v\n", addr, cstr)
 					}
@@ -118,7 +119,7 @@ var machoA2sCmd = &cobra.Command{
 			// check if it's a cstring
 			if cstr, ok := m.IsCString(addr); ok {
 				if secondAttempt {
-					fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
+					fmt.Printf("\n%#x: %s%#v\n", addr, symbols.PrefixPointer, cstr)
 				} else {
 					fmt.Printf("\n%#x: %#v\n", addr, cstr)
 				}
@@ -131,7 +132,7 @@ var machoA2sCmd = &cobra.Command{
 			}
 			for _, sym := range syms {
 				if secondAttempt {
-					sym.Name = "_ptr." + sym.Name
+					sym.Name = symbols.PrefixPointer + sym.Name
 				}
 				fmt.Printf("\n%#x: %s\n", addr, sym.Name)
 			}

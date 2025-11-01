@@ -20,6 +20,7 @@ import (
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/pkg/errors"
 )
 
@@ -139,6 +140,7 @@ func (d *MachoDisass) Triage() error {
 				d.tr.Details[imm] = AddrDetails{
 					Segment: c.Seg,
 					Section: c.Name,
+					Flags:   c.Flags,
 				}
 			} else {
 				ptr, _ := d.f.GetPointerAtAddress(imm)
@@ -148,6 +150,7 @@ func (d *MachoDisass) Triage() error {
 						Segment: c.Seg,
 						Section: c.Name,
 						Pointer: ptr,
+						Flags:   c.Flags,
 					}
 				}
 			}
@@ -260,14 +263,8 @@ func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 	for _, fn := range d.f.GetFunctions() {
 		if addr == fn.StartAddr {
 			if symName, ok := d.a2s[addr]; ok {
-				if d.Demangle() {
-					if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
-						symName, _ = swift.Demangle(symName)
-						return ok, symName
-					}
-					return ok, demangle.Do(symName, false, false)
-				}
-				return ok, symName
+				display := symbols.FormatSymbol(symName, d.Demangle())
+				return ok, display
 			}
 			return true, fmt.Sprintf("sub_%x", addr)
 		}
@@ -296,7 +293,11 @@ func (d MachoDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 // IsData returns if given address is a data variable address referenced in the disassembled function
 func (d MachoDisass) IsData(addr uint64) (bool, *AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
-		if strings.Contains(strings.ToLower(detail.Segment), "data") {
+		if detail.Flags.IsCstringLiterals() {
+			return true, &detail
+		}
+		segment := strings.ToLower(detail.Segment)
+		if strings.Contains(segment, "data") {
 			return true, &detail
 		}
 	}
@@ -316,9 +317,6 @@ func (d MachoDisass) IsPointer(imm uint64) (bool, *AddrDetails) {
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
 func (d MachoDisass) FindSymbol(addr uint64) (string, bool) {
 	if symName, ok := d.a2s[addr]; ok {
-		if d.cfg.Demangle {
-			return demangle.Do(symName, false, false), true
-		}
 		return symName, true
 	}
 	return "", false
@@ -395,16 +393,7 @@ func (d MachoDisass) Analyze() error {
 func (d *MachoDisass) parseSymbols() error {
 	for _, sym := range d.f.Symtab.Syms {
 		if sym.Value > 0 && len(sym.Name) > 0 {
-			if d.cfg.Demangle {
-				if strings.HasPrefix(sym.Name, "_$s") { // TODO: better detect swift symbols
-					sym.Name, _ = swift.Demangle(sym.Name)
-					d.a2s[sym.Value] = sym.Name
-				} else {
-					d.a2s[sym.Value] = demangle.Do(sym.Name, false, false)
-				}
-			} else {
-				d.a2s[sym.Value] = sym.Name
-			}
+			d.a2s[sym.Value] = sym.Name
 		}
 	}
 	exports, err := d.f.GetExports()
@@ -415,16 +404,7 @@ func (d *MachoDisass) parseSymbols() error {
 	}
 	for _, sym := range exports {
 		if sym.Address > 0 {
-			if d.cfg.Demangle && len(sym.Name) > 0 {
-				if strings.HasPrefix(sym.Name, "_$s") { // TODO: better detect swift symbols
-					sym.Name, _ = swift.Demangle(sym.Name)
-					d.a2s[sym.Address] = sym.Name
-				} else {
-					d.a2s[sym.Address] = demangle.Do(sym.Name, false, false)
-				}
-			} else {
-				d.a2s[sym.Address] = sym.Name
-			}
+			d.a2s[sym.Address] = sym.Name
 		}
 	}
 	return nil
@@ -649,15 +629,17 @@ func (d *MachoDisass) parseGOT() error {
 			target = slide
 		}
 		if symName, ok := d.a2s[target]; ok {
-			d.a2s[entry] = fmt.Sprintf("__got.%s", symName)
-		} else if laptr, ok := gots[target]; ok {
-			if symName, ok := d.a2s[laptr]; ok {
-				d.a2s[entry] = fmt.Sprintf("__got.%s", symName)
-			}
-		} else {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x", entry, target))
-			d.a2s[entry] = fmt.Sprintf("__got_%x", target)
+			d.a2s[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+			continue
 		}
+		if laptr, ok := gots[target]; ok {
+			if symName, ok := d.a2s[laptr]; ok {
+				d.a2s[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+				continue
+			}
+		}
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x", entry, target))
+		d.a2s[entry] = fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target)
 	}
 
 	return nil
@@ -674,19 +656,19 @@ func (d *MachoDisass) parseStubs() error {
 			target = slide
 		}
 		if symName, ok := d.a2s[target]; ok {
-			if !strings.HasPrefix(symName, "j_") {
-				d.a2s[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+			if !strings.HasPrefix(symName, symbols.PrefixJump) {
+				d.a2s[stub] = symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper)
 			} else {
 				d.a2s[stub] = symName
 			}
-		} else {
-			if symName, ok := d.a2s[target]; ok {
-				d.a2s[stub] = fmt.Sprintf("j_%s", symName)
-			} else {
-				utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x", stub, target))
-				d.a2s[stub] = fmt.Sprintf("__stub_%x", target)
-			}
+			continue
 		}
+		if symName, ok := d.a2s[target]; ok {
+			d.a2s[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, symName)
+			continue
+		}
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x", stub, target))
+		d.a2s[stub] = fmt.Sprintf("%s%x", symbols.PrefixStubFallback, target)
 	}
 
 	return nil
@@ -703,9 +685,9 @@ func (d *MachoDisass) parseHelpers() error {
 			target = slide
 		}
 		if symName, ok := d.a2s[target]; ok {
-			d.a2s[start] = fmt.Sprintf("__stub_helper.%s", symName)
+			d.a2s[start] = fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName)
 		} else {
-			d.a2s[start] = fmt.Sprintf("__stub_helper.%x", target)
+			d.a2s[start] = fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target)
 		}
 	}
 
