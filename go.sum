@@ -138,8 +138,8 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/bits-and-blooms/bitset v1.20.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.24.3 h1:Bte86SlO3lwPQqww+7BE9ZuUCKIjfqnG5jtEyqA9y9Y=
 github.com/bits-and-blooms/bitset v1.24.3/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/blacktop/arm64-cgo v1.0.61 h1:j3uqImmKMfmwWUt76BtcaI/wiM6zGbXiIWQWkFAsuKo=
-github.com/blacktop/arm64-cgo v1.0.61/go.mod h1:IrNNim89QQyCwVlUbFvz27DCEmy1xVWIblYIu7KjD20=
+github.com/blacktop/arm64-cgo v1.0.67 h1:NjDw3VoIQKInD7XGoxwOHXrmAg9/8VxSttyP4yrI1io=
+github.com/blacktop/arm64-cgo v1.0.67/go.mod h1:IrNNim89QQyCwVlUbFvz27DCEmy1xVWIblYIu7KjD20=
 github.com/blacktop/go-apfs v1.0.27 h1:+noNImiLcTaxzDMpOsEwXOxLwgnSMZdcJH+YMNHZsbo=
 github.com/blacktop/go-apfs v1.0.27/go.mod h1:2IvPE0B/wnekB5QoNXJrDzlTrPnfCQNxTfZaKu4zbYM=
 github.com/blacktop/go-dwarf v1.0.14 h1:OjmzfSgg/qAKckn2tWFebcgKgJ7HOqCj7bS+CiE1lrY=
