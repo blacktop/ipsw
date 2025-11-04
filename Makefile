@@ -207,6 +207,22 @@ fmt: ## Format code
 	@gofmt -w -s .
 	@go mod tidy
 
+.PHONY: test
+test: ## Run unit tests
+	@echo " > Running unit tests"
+	@go test ./... -v
+
+.PHONY: test-integration
+test-integration: ## Run integration tests (requires IPSW test data)
+	@echo " > Running integration tests"
+	@echo "   Set IPSW_TEST_IPSW, IPSW_TEST_OTA, or IPSW_TEST_MACOS to enable tests"
+	@cd test/integration && go test -v -timeout 60m
+
+.PHONY: test-integration-quick
+test-integration-quick: ## Run quick integration tests (info and basic extract only)
+	@echo " > Running quick integration tests"
+	@cd test/integration && go test -v -timeout 30m -run "TestInfo|TestExtractKernelcache"
+
 clean: ## Clean up artifacts
 	@echo " > Cleaning"
 	rm *.tar || true

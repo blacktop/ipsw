@@ -1,0 +1,131 @@
+name: Integration Tests
+
+on:
+  # Run on manual trigger
+  workflow_dispatch:
+    inputs:
+      ipsw_url:
+        description: 'URL to iOS IPSW file for testing'
+        required: false
+        default: ''
+      run_full_suite:
+        description: 'Run full test suite (slower but comprehensive)'
+        required: false
+        default: 'false'
+  # Run on schedule (weekly)
+  schedule:
+    - cron: '0 2 * * 0'  # Every Sunday at 2 AM UTC
+
+jobs:
+  integration-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # We can add windows-latest later if needed
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Cache IPSW Test Data
+        id: cache-ipsw
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/ipsw-test-data
+          key: ipsw-test-data-v1-${{ matrix.os }}
+          restore-keys: |
+            ipsw-test-data-v1-
+
+      - name: Cache Integration Test Artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/ipsw-test-cache
+          key: ipsw-test-cache-v1-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: |
+            ipsw-test-cache-v1-${{ matrix.os }}-
+
+      - name: Download Test IPSW (if needed)
+        if: steps.cache-ipsw.outputs.cache-hit != 'true' && github.event.inputs.ipsw_url != ''
+        run: |
+          mkdir -p ~/ipsw-test-data
+          echo "Downloading test IPSW from ${{ github.event.inputs.ipsw_url }}"
+          wget -O ~/ipsw-test-data/test.ipsw "${{ github.event.inputs.ipsw_url }}"
+
+      - name: Download Small Test IPSW (default)
+        if: steps.cache-ipsw.outputs.cache-hit != 'true' && github.event.inputs.ipsw_url == ''
+        run: |
+          mkdir -p ~/ipsw-test-data
+          # Use a smaller IPSW for faster testing (iPhone 5s iOS 12.5.7 ~2.5GB)
+          echo "Downloading small test IPSW (iPhone 5s iOS 12.5.7)"
+          # Note: This is a placeholder URL - in practice, we'd use a reliable mirror
+          # or have test files stored in a separate repository
+          echo "Using ipsw tool to download a test file"
+          go run ./cmd/ipsw download ipsw --device iPhone6,1 --version 12.5.7 --output ~/ipsw-test-data || true
+
+      - name: Check Test Data Availability
+        id: check-data
+        run: |
+          if [ -f ~/ipsw-test-data/test.ipsw ] || [ -f ~/ipsw-test-data/*.ipsw ]; then
+            echo "has_ipsw=true" >> $GITHUB_OUTPUT
+            # Find the first IPSW file
+            IPSW_FILE=$(find ~/ipsw-test-data -name "*.ipsw" -type f | head -n 1)
+            echo "ipsw_path=$IPSW_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "has_ipsw=false" >> $GITHUB_OUTPUT
+            echo "No IPSW test data available"
+          fi
+
+      - name: Build ipsw
+        run: |
+          make build
+
+      - name: Run Integration Tests (without test data)
+        if: steps.check-data.outputs.has_ipsw != 'true'
+        run: |
+          echo "Running integration tests without test data (tests will be skipped)"
+          cd test/integration
+          go test -v -timeout 60m
+        continue-on-error: true
+
+      - name: Run Integration Tests (with test data)
+        if: steps.check-data.outputs.has_ipsw == 'true'
+        env:
+          IPSW_TEST_IPSW: ${{ steps.check-data.outputs.ipsw_path }}
+          IPSW_TEST_CACHE: ~/ipsw-test-cache
+        run: |
+          echo "Running integration tests with IPSW: $IPSW_TEST_IPSW"
+          cd test/integration
+          if [ "${{ github.event.inputs.run_full_suite }}" = "true" ]; then
+            go test -v -timeout 120m
+          else
+            # Run a subset of faster tests
+            go test -v -timeout 60m -run "TestInfo|TestExtractKernelcache"
+          fi
+
+      - name: Upload Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs-${{ matrix.os }}
+          path: |
+            test/integration/*.log
+          retention-days: 7
+
+      - name: Clean up large files
+        if: always()
+        run: |
+          # Clean up temporary files but keep cache
+          rm -rf /tmp/ipsw-* || true
