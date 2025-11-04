@@ -61,7 +61,7 @@ func TestMachoInfo(t *testing.T) {
 		}
 
 		if !foundAny {
-			t.Logf("Note: Expected Mach-O info. Output: %s", stdout[:Min(200, len(stdout))])
+			t.Logf("Note: Expected Mach-O info. Output: %s", stdout[:min(200, len(stdout))])
 		} else {
 			t.Logf("Successfully got Mach-O info")
 		}
