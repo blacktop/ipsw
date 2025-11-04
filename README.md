@@ -296,13 +296,31 @@ cd ipsw
 make build
 ```
 
+### Testing
+
+**Unit Tests**
+```bash
+make test
+```
+
+**Integration Tests**
+
+Integration tests verify commands work with actual IPSW files. See [test/integration/README.md](test/integration/README.md) for details.
+
+```bash
+# Set path to test IPSW
+export IPSW_TEST_IPSW="/path/to/test.ipsw"
+
+# Run integration tests
+make test-integration-quick
+```
+
 ## Known Issues
 
 - **macOS IPSW Support**: Some macOS firmware operations may have compatibility issues
-- **Testing**: Comprehensive testing is challenging due to the variety of firmware versions and device types
 - **Resource Intensive**: Some operations require significant memory and processing power
 
-> Create an [issue](https://github.com/blacktop/ipsw/issues) if you encounter problems - fixes are prioritized! A comprehensive test suite is planned for future releases.
+> Create an [issue](https://github.com/blacktop/ipsw/issues) if you encounter problems - fixes are prioritized!
 
 ## Credits
 
