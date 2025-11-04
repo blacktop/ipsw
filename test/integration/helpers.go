@@ -110,11 +110,3 @@ func GetFileSize(t *testing.T, path string) int64 {
 
 	return info.Size()
 }
-
-// Min returns the minimum of two integers
-func Min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

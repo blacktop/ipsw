@@ -46,7 +46,7 @@ func TestDyldInfo(t *testing.T) {
 		}
 
 		if !foundAny {
-			t.Logf("Note: Expected output to contain header info. Output: %s", stdout[:Min(200, len(stdout))])
+			t.Logf("Note: Expected output to contain header info. Output: %s", stdout[:min(200, len(stdout))])
 		} else {
 			t.Logf("Successfully got dyld info")
 		}

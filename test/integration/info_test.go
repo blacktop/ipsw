@@ -34,7 +34,7 @@ func TestInfoCommand(t *testing.T) {
 
 		// Check that output is valid JSON by looking for typical JSON structure
 		if !strings.HasPrefix(strings.TrimSpace(stdout), "{") {
-			t.Errorf("Expected JSON output to start with '{', but got: %s", stdout[:Min(100, len(stdout))])
+			t.Errorf("Expected JSON output to start with '{', but got: %s", stdout[:min(100, len(stdout))])
 		}
 
 		// Check for expected JSON fields

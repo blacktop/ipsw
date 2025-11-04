@@ -46,7 +46,7 @@ func TestImg4Info(t *testing.T) {
 		}
 
 		if !foundAny {
-			t.Logf("Note: Expected IMG4 info. Output: %s", stdout[:Min(200, len(stdout))])
+			t.Logf("Note: Expected IMG4 info. Output: %s", stdout[:min(200, len(stdout))])
 		} else {
 			t.Logf("Successfully got IMG4 info")
 		}
