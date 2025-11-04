@@ -2,6 +2,7 @@ package integration
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -120,7 +121,7 @@ func TestExtractRemoteFiles(t *testing.T) {
 
 		foundAny := false
 		for _, file := range expectedFiles {
-			if filepath.Base(stdout) == file || contains(stdout, file) {
+			if strings.Contains(stdout, file) {
 				foundAny = true
 				break
 			}
@@ -130,9 +131,4 @@ func TestExtractRemoteFiles(t *testing.T) {
 			t.Errorf("Expected to find some common IPSW files in listing, but found none.\nOutput: %s", stdout)
 		}
 	})
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return filepath.Base(s) == substr || len(s) > 0 && s != substr
 }

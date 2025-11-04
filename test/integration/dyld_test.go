@@ -46,7 +46,7 @@ func TestDyldInfo(t *testing.T) {
 		}
 
 		if !foundAny {
-			t.Logf("Note: Expected output to contain header info. Output: %s", stdout[:min(200, len(stdout))])
+			t.Logf("Note: Expected output to contain header info. Output: %s", stdout[:Min(200, len(stdout))])
 		} else {
 			t.Logf("Successfully got dyld info")
 		}
@@ -152,12 +152,4 @@ func TestDyldExtract(t *testing.T) {
 			t.Logf("Successfully extracted Foundation: %s", foundationFiles[0])
 		}
 	})
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
