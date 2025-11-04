@@ -34,6 +34,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/srp"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 
@@ -326,10 +327,40 @@ type dfile struct {
 
 func (d dfile) URL() string {
 	// https://download.developer.apple.com/macOS/Kernel_Debug_Kit_13.5_build_22G74/Kernel_Debug_Kit_13.5_build_22G74.dmg
+	var finalURL string
 	if u, err := url.JoinPath(downloadURLNew, d.RemotePath); err == nil {
-		return u
+		finalURL = u
+	} else {
+		finalURL = fmt.Sprintf("%s/%s", downloadURLNew, d.RemotePath)
 	}
-	return fmt.Sprintf("%s/%s", downloadURLNew, d.RemotePath)
+	return sanitizeURL(finalURL)
+}
+
+// sanitizeURL fixes common URL malformations from Apple's developer portal
+func sanitizeURL(rawURL string) string {
+	// Fix typos like "hhttp://" or "hhtps://"
+	if strings.HasPrefix(rawURL, "hhttp://") {
+		log.Warnf("Detected malformed URL (hhttp://), correcting to http://: %s", rawURL)
+		rawURL = strings.Replace(rawURL, "hhttp://", "http://", 1)
+	}
+	if strings.HasPrefix(rawURL, "hhtps://") {
+		log.Warnf("Detected malformed URL (hhtps://), correcting to https://: %s", rawURL)
+		rawURL = strings.Replace(rawURL, "hhtps://", "https://", 1)
+	}
+
+	// Check for other common repeated letter typos in the protocol
+	// Matches patterns like "hhhttp://", "hhhttps://", etc.
+	re := regexp.MustCompile(`^h+(ttps?://)`)
+	if matches := re.FindStringSubmatch(rawURL); len(matches) > 0 {
+		// Check if we have more than one 'h' at the start
+		if idx := strings.Index(rawURL, "ttp"); idx > 1 {
+			corrected := "h" + matches[1]
+			log.Warnf("Detected malformed URL with repeated 'h', correcting to %s: %s", corrected, rawURL)
+			rawURL = re.ReplaceAllString(rawURL, corrected)
+		}
+	}
+
+	return rawURL
 }
 
 type MoreDownload struct {
@@ -1310,10 +1341,45 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 		}
 
 		for _, idx := range dfiles {
-			for _, f := range dloads.Downloads[idx].Files {
-				log.Debugf("Downloading: %s", f.URL())
-				if err := dp.Download(f.URL(), folder); err != nil {
-					log.Errorf("failed to download %s: %v", f.URL(), err)
+			download := dloads.Downloads[idx]
+
+			// If there are multiple files, let user select which ones to download
+			if len(download.Files) > 1 {
+				var fileChoices []string
+				for _, f := range download.Files {
+					sizeStr := ""
+					if f.FileSize > 0 {
+						sizeStr = fmt.Sprintf(" (%s)", humanize.Bytes(uint64(f.FileSize)))
+					}
+					fileChoices = append(fileChoices, f.DisplayName+sizeStr)
+				}
+
+				selectedFiles := []int{}
+				filePrompt := &survey.MultiSelect{
+					Message:  fmt.Sprintf("Select which file(s) from '%s' to download:", download.Name),
+					Options:  fileChoices,
+					PageSize: dp.config.PageSize,
+				}
+				if err := survey.AskOne(filePrompt, &selectedFiles); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+
+				// Download only selected files
+				for _, fileIdx := range selectedFiles {
+					f := download.Files[fileIdx]
+					log.Debugf("Downloading: %s", f.URL())
+					if err := dp.Download(f.URL(), folder); err != nil {
+						log.Errorf("failed to download %s: %v", f.URL(), err)
+					}
+				}
+			} else {
+				// Single file, download directly
+				for _, f := range download.Files {
+					log.Debugf("Downloading: %s", f.URL())
+					if err := dp.Download(f.URL(), folder); err != nil {
+						log.Errorf("failed to download %s: %v", f.URL(), err)
+					}
 				}
 			}
 		}
@@ -1655,6 +1721,7 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 					if strings.HasPrefix(href, "/services-account/download") {
 						href = developerURL + href
 					}
+					href = sanitizeURL(href)
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
@@ -1674,6 +1741,7 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 					if strings.HasPrefix(href, "/services-account/download") {
 						href = developerURL + href
 					}
+					href = sanitizeURL(href)
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
