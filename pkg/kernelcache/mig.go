@@ -287,6 +287,7 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 	var prevInstr *disassemble.Instruction
 
 	startAddr := migInit.StartAddr
+	functionStart := migInit.StartAddr // Store function boundary for backward search
 
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -357,6 +358,11 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 	r.Seek(-int64(binary.Size(uint64(0))), io.SeekCurrent)
 
 	for {
+		// Check if we've reached the function start boundary
+		if startAddr < functionStart {
+			break
+		}
+
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
 		if err != nil {
 			if err == io.EOF {
@@ -366,7 +372,8 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 		}
 		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
-			startAddr += uint64(binary.Size(uint32(0)))
+			startAddr -= uint64(binary.Size(uint32(0)))
+			r.Seek(-int64(binary.Size(uint64(0))), io.SeekCurrent)
 			continue
 		}
 		if strings.Contains(instruction.Encoding.String(), "CMP") {
@@ -378,6 +385,10 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 		}
 		startAddr -= uint64(binary.Size(uint32(0)))
 		r.Seek(-int64(binary.Size(uint64(0))), io.SeekCurrent)
+	}
+
+	if sizeOfMigE == 0 {
+		return 0, 0, fmt.Errorf("failed to find CMP instruction to determine migE size (searched from %#x back to function start %#x; kernel version may have changed instruction pattern)", startAddr, functionStart)
 	}
 
 	return migE, sizeOfMigE, nil
