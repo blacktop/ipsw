@@ -19,7 +19,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.16.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
-	github.com/blacktop/arm64-cgo v1.0.61
+	github.com/blacktop/arm64-cgo v1.0.67
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.253
@@ -86,7 +86,7 @@ require (
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
-	gorm.io/gorm v1.31.0
+	gorm.io/gorm v1.31.1
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
