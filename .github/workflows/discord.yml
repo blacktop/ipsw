@@ -36,6 +36,24 @@ jobs:
           --discord-id ${{ secrets.DISCORD_ID }} \
           --discord-token ${{ secrets.DISCORD_TOKEN }} \
           --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
+      - name: Run ipsw watch WebKit/WebKit (MTE)
+        run: |
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)MTE|Memory Tagging' --days 1 \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
+      - name: Run ipsw watch WebKit/WebKit (ENHANCED SECURITY)
+        run: |
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)EnhancedSecurity|Enhanced Security' --days 1 \
+          --cache hack/.watch_cache \
+          --api ${{ secrets.GITHUB_TOKEN }} \
+          --discord \
+          --discord-id ${{ secrets.DISCORD_ID }} \
+          --discord-token ${{ secrets.DISCORD_TOKEN }} \
+          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
       - name: Run ipsw watch WebKit/WebKit tags
         if: ${{ !inputs.skip_post }}
         run: |
