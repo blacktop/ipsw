@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_post:
-        description: 'Skip posting to Social Media'
+        description: "Skip posting to Social Media"
         required: false
         type: boolean
   schedule:
@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.24"
+          go-version: "1.25"
       - name: Run ipsw watch WebKit/WebKit (LOCKDOWN MODE)
         run: |
           go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
