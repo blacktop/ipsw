@@ -27,27 +27,9 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: "1.25"
-      - name: Run ipsw watch WebKit/WebKit (LOCKDOWN MODE)
+      - name: Run ipsw watch WebKit/WebKit (Security Features)
         run: |
-          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
-          --cache hack/.watch_cache \
-          --api ${{ secrets.GITHUB_TOKEN }} \
-          --discord \
-          --discord-id ${{ secrets.DISCORD_ID }} \
-          --discord-token ${{ secrets.DISCORD_TOKEN }} \
-          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
-      - name: Run ipsw watch WebKit/WebKit (MTE)
-        run: |
-          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)MTE|Memory Tagging' --days 1 \
-          --cache hack/.watch_cache \
-          --api ${{ secrets.GITHUB_TOKEN }} \
-          --discord \
-          --discord-id ${{ secrets.DISCORD_ID }} \
-          --discord-token ${{ secrets.DISCORD_TOKEN }} \
-          --discord-icon "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png"
-      - name: Run ipsw watch WebKit/WebKit (ENHANCED SECURITY)
-        run: |
-          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)EnhancedSecurity|Enhanced Security' --days 1 \
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode|Memory Tagging|EnhancedSecurity|Enhanced Security|(?-i:MTE)' --days 1 \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
