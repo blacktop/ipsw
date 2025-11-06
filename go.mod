@@ -57,7 +57,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.12.9
+	github.com/ollama/ollama v0.12.10
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
