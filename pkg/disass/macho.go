@@ -638,6 +638,13 @@ func (d *MachoDisass) parseGOT() error {
 				continue
 			}
 		}
+		// Try to decode as a chained fixup bind pointer
+		if d.f.HasFixups() {
+			if name, err := d.f.GetBindName(target); err == nil {
+				d.a2s[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, name)
+				continue
+			}
+		}
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x", entry, target))
 		d.a2s[entry] = fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target)
 	}
@@ -655,17 +662,21 @@ func (d *MachoDisass) parseStubs() error {
 		if slide, ok := d.sinfo[stub]; ok {
 			target = slide
 		}
-		if symName, ok := d.a2s[target]; ok {
-			if !strings.HasPrefix(symName, symbols.PrefixJump) {
-				d.a2s[stub] = symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper)
+		// Check if target is in GOT - if so, use the GOT entry's symbol
+		if gotSymName, ok := d.a2s[target]; ok {
+			if !strings.HasPrefix(gotSymName, symbols.PrefixJump) {
+				d.a2s[stub] = symbols.PrefixJump + strings.TrimPrefix(strings.TrimPrefix(gotSymName, symbols.PrefixGot), symbols.PrefixStubHelper)
 			} else {
-				d.a2s[stub] = symName
+				d.a2s[stub] = gotSymName
 			}
 			continue
 		}
-		if symName, ok := d.a2s[target]; ok {
-			d.a2s[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, symName)
-			continue
+		// Try to decode as a chained fixup bind pointer
+		if d.f.HasFixups() {
+			if name, err := d.f.GetBindName(target); err == nil {
+				d.a2s[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, name)
+				continue
+			}
 		}
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x", stub, target))
 		d.a2s[stub] = fmt.Sprintf("%s%x", symbols.PrefixStubFallback, target)
