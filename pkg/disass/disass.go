@@ -357,11 +357,12 @@ func Disassemble(d Disass) string {
 						}
 					}
 					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
-				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
+				} else if instruction.Operation == disassemble.ARM64_BL || instruction.Operation == disassemble.ARM64_B {
+					target := uint64(instruction.Operands[0].Immediate)
+					if name, ok := d.FindSymbol(target); ok {
 						display := symbols.FormatSymbol(name, d.Demangle())
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, display)
-						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[0].Immediate)))
+						comment = appendComment(comment, cstringComment(d, target))
 					}
 				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
