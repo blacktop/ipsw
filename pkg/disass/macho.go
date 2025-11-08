@@ -750,7 +750,20 @@ func (d *MachoDisass) getTempCachePath(cacheFile *string) string {
 
 var ErrCorruptCache = errors.New("corrupt cache file")
 
+var (
+	cachedSymbols     map[uint64]string // In-memory cache of loaded symbols
+	cachedSymbolsFile string            // Track which file was loaded
+	cacheLoadedOnce   bool              // Track if we've printed the cache load message
+)
+
 func (d *MachoDisass) loadCache(cacheFile *string) error {
+	// If we've already loaded this exact file, copy from memory cache
+	if cachedSymbols != nil && cachedSymbolsFile == *cacheFile {
+		maps.Copy(d.a2s, cachedSymbols)
+		return nil
+	}
+
+	// Load from disk
 	f, err := os.Open(*cacheFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -765,8 +778,18 @@ func (d *MachoDisass) loadCache(cacheFile *string) error {
 		return ErrCorruptCache
 	}
 
+	// Copy to instance
 	maps.Copy(d.a2s, a2s)
-	log.Infof("Loaded %d symbols from cache file: %s", len(d.a2s), *cacheFile)
+
+	// Cache in memory for future instances
+	cachedSymbols = a2s
+	cachedSymbolsFile = *cacheFile
+
+	// Only print the load message once per program execution
+	if !cacheLoadedOnce {
+		log.Infof("Loaded %d symbols from cache file: %s", len(a2s), *cacheFile)
+		cacheLoadedOnce = true
+	}
 
 	return nil
 }
