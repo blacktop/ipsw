@@ -73,6 +73,8 @@ type AA struct {
 type Config struct {
 	// SymmetricKey is the base64-encoded AEA symmetric encryption key
 	SymmetricKey string
+	// Proxy to use when fetching AEA keys
+	Proxy string
 	// Insecure allows insecure connections when fetching AEA keys
 	Insecure bool
 }
@@ -138,6 +140,7 @@ func Open(name string, conf *Config) (*AA, error) {
 			Input:     name,
 			Output:    os.TempDir(),
 			B64SymKey: key,
+			Proxy:     conf.Proxy,
 			Insecure:  conf.Insecure,
 		})
 		if err != nil {

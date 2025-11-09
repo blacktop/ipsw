@@ -94,6 +94,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 				Input:    dmgPath,
 				Output:   filepath.Dir(dmgPath),
 				PemDB:    pemDbPath,
+				Proxy:    "",    // TODO: make proxy configurable
 				Insecure: false, // TODO: make insecure configurable
 			})
 			if err != nil {

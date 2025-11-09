@@ -46,6 +46,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 			Input:    dmgPath,
 			Output:   filepath.Dir(dmgPath),
 			PemDB:    pemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {

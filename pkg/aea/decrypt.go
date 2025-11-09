@@ -451,6 +451,7 @@ type DecryptConfig struct {
 	PrivKeyData []byte // Private key data
 	B64SymKey   string // Base64 encoded Symmetric encryption key
 	PemDB       string // Path to PEM database
+	Proxy  		string // HTTP/HTTPS proxy
 	Insecure    bool   // Allow insecure connections (skip TLS verification)
 
 	symEncKey []byte // Symmetric encryption key bytes
@@ -469,7 +470,7 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		}
 		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
 	} else if c.B64SymKey == "" {
-		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Insecure)
+		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Proxy, c.Insecure)
 		if err != nil {
 			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
 		}

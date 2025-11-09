@@ -167,6 +167,7 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 			Input:    extractedDMG,
 			Output:   filepath.Dir(extractedDMG),
 			PemDB:    cfg.PemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
