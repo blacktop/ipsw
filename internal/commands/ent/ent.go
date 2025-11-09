@@ -335,6 +335,7 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 			Input:    dmgPath,
 			Output:   filepath.Dir(dmgPath),
 			PemDB:    conf.PemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
