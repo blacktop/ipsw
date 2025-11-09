@@ -19,8 +19,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cloudflare/circl/hpke"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/cloudflare/circl/hpke"
 )
 
 //go:embed data/fcs-keys.gz
