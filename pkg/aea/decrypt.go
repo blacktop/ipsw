@@ -451,7 +451,7 @@ type DecryptConfig struct {
 	PrivKeyData []byte // Private key data
 	B64SymKey   string // Base64 encoded Symmetric encryption key
 	PemDB       string // Path to PEM database
-	Proxy  		string // HTTP/HTTPS proxy
+	Proxy       string // HTTP/HTTPS proxy
 	Insecure    bool   // Allow insecure connections (skip TLS verification)
 
 	symEncKey []byte // Symmetric encryption key bytes

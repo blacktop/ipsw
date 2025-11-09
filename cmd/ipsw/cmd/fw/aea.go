@@ -198,7 +198,7 @@ var aeaCmd = &cobra.Command{
 				PrivKeyData: pemData,
 				B64SymKey:   base64Key,
 				PemDB:       pemDB,
-				Proxy:  	 proxy,
+				Proxy:       proxy,
 				Insecure:    insecure,
 			})
 			if err != nil {
