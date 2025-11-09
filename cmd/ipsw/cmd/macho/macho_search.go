@@ -33,6 +33,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types/objc"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
@@ -40,10 +41,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 
 func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, string, int) {
 	if re.MatchString(proto.Name) {
@@ -56,6 +53,10 @@ func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, 
 	}
 	return false, "", 0
 }
+
+var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 
 func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
@@ -70,6 +71,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	machoSearchCmd.Flags().StringP("ivar", "r", "", "Search for specific ObjC instance variable regex")
+	machoSearchCmd.Flags().Bool("mte", false, "Search for binaries with MTE (Memory Tagging Extension) instructions")
 	machoSearchCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
@@ -86,6 +88,7 @@ func init() {
 	viper.BindPFlag("macho.search.category", machoSearchCmd.Flags().Lookup("category"))
 	viper.BindPFlag("macho.search.sel", machoSearchCmd.Flags().Lookup("sel"))
 	viper.BindPFlag("macho.search.ivar", machoSearchCmd.Flags().Lookup("ivar"))
+	viper.BindPFlag("macho.search.mte", machoSearchCmd.Flags().Lookup("mte"))
 	viper.BindPFlag("macho.search.pem-db", machoSearchCmd.Flags().Lookup("pem-db"))
 }
 
@@ -110,6 +113,7 @@ var machoSearchCmd = &cobra.Command{
 		categoryReStr := viper.GetString("macho.search.category")
 		selReStr := viper.GetString("macho.search.sel")
 		ivarReStr := viper.GetString("macho.search.ivar")
+		searchMTE := viper.GetBool("macho.search.mte")
 		// validate flags
 		if loadCmdReStr == "" &&
 			launchConstReStr == "" &&
@@ -121,8 +125,13 @@ var machoSearchCmd = &cobra.Command{
 			classReStr == "" &&
 			categoryReStr == "" &&
 			selReStr == "" &&
-			ivarReStr == "" {
+			ivarReStr == "" &&
+			!searchMTE {
 			return errors.New("you must specify a search criteria via one of the flags")
+		}
+
+		if searchMTE {
+			return mcmd.RunMTEScanIPSW(filepath.Clean(args[0]), viper.GetString("macho.search.pem-db"))
 		}
 
 		if err := search.ForEachMachoInIPSW(filepath.Clean(args[0]), viper.GetString("macho.search.pem-db"), func(path string, m *macho.File) error {

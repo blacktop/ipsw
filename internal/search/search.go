@@ -23,8 +23,70 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-// TODO: make this an array of handlers to perform multiple actions on each file
-func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, string) error) error {
+// DmgInfo provides a name/path pair for a DMG contained in an IPSW.
+type DmgInfo struct {
+	Name string
+	Path string
+}
+
+// ListDMGs returns known DMGs in a stable order.
+// Why: call sites often need the same enumeration.
+func ListDMGs(ipswPath string) ([]DmgInfo, error) {
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+	var dmgs []DmgInfo
+	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+		dmgs = append(dmgs, DmgInfo{"FileSystem", fsOS})
+	}
+	if systemOS, err := i.GetSystemOsDmg(); err == nil {
+		dmgs = append(dmgs, DmgInfo{"SystemOS", systemOS})
+	}
+	if appOS, err := i.GetAppOsDmg(); err == nil {
+		dmgs = append(dmgs, DmgInfo{"AppOS", appOS})
+	}
+	if excOS, err := i.GetExclaveOSDmg(); err == nil {
+		dmgs = append(dmgs, DmgInfo{"ExclaveOS", excOS})
+	}
+	return dmgs, nil
+}
+
+// ScanAllDMGs runs handlers across files in every DMG.
+// If betweenHandlers != nil, fire it after each handler (per DMG) for TUIs.
+func ScanAllDMGs(ipswPath, pemDB string, betweenHandlers func(int), handlers ...func(string, string) error) error {
+	dmgs, err := ListDMGs(ipswPath)
+	if err != nil {
+		return err
+	}
+	for _, d := range dmgs {
+		if betweenHandlers != nil {
+			if err := ScanDmgWithMultipleHandlersAndCallback(ipswPath, d.Path, d.Name, pemDB, betweenHandlers, handlers...); err != nil {
+				return fmt.Errorf("failed to scan %s: %w", d.Name, err)
+			}
+		} else {
+			if err := ScanDmgWithMultipleHandlers(ipswPath, d.Path, d.Name, pemDB, handlers...); err != nil {
+				return fmt.Errorf("failed to scan %s: %w", d.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+// ScanDmgWithMultipleHandlers mounts once and runs multiple handlers per file.
+// Why: multi-pass scans without repeated mounts.
+func ScanDmgWithMultipleHandlers(ipswPath, dmgPath, dmgType, pemDB string, handlers ...func(string, string) error) error {
+	return scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB, handlers, nil)
+}
+
+// ScanDmgWithMultipleHandlersAndCallback also runs a callback after each pass.
+// Why: TUIs can publish totals/state between passes.
+func ScanDmgWithMultipleHandlersAndCallback(ipswPath, dmgPath, dmgType, pemDB string, betweenHandlers func(int), handlers ...func(string, string) error) error {
+	return scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB, handlers, betweenHandlers)
+}
+
+// scanDmgMulti is the shared engine behind the helpers above.
+func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(string, string) error, betweenHandlers func(int)) error {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -101,7 +163,130 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 							log.WithError(subErr).Error("failed to walk symlinked path")
 							return nil
 						}
-						files = append(files, subPath)
+						// Avoid adding duplicate file paths discovered via symlinks
+						if !visited[subPath] {
+							visited[subPath] = true
+							files = append(files, subPath)
+						}
+						return nil
+					})
+				}
+			}
+		} else {
+			if !info.IsDir() {
+				if !visited[path] {
+					visited[path] = true
+					files = append(files, path)
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+	}
+
+	// Run all handlers on the same file list (single mount)
+	for i, handler := range handlers {
+		for _, file := range files {
+			if err := func() error {
+				return handler(mountPoint, file)
+			}(); err != nil {
+				return err
+			}
+		}
+		// Let caller update UI/state between passes
+		if betweenHandlers != nil {
+			betweenHandlers(i)
+		}
+	}
+
+	return nil
+}
+
+// scanDmg mounts a DMG and runs a single handler across files.
+// Why: simple case; multi-pass should use ScanDmgWithMultipleHandlers.
+func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, string) error) error {
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
+	} else {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+	}
+	if filepath.Ext(dmgPath) == ".aea" {
+		var err error
+		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+			Input:    dmgPath,
+			Output:   filepath.Dir(dmgPath),
+			PemDB:    pemDB,
+			Proxy:    "",    // TODO: make proxy configurable
+			Insecure: false, // TODO: make insecure configurable
+		})
+		if err != nil {
+			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		}
+		defer os.Remove(dmgPath)
+	}
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to mount DMG: %v", err)
+	}
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Retry(3, 2*time.Second, func() error {
+				return utils.Unmount(mountPoint, true)
+			}); err != nil {
+				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
+			}
+		}()
+	}
+
+	var files []string
+	// Track visited to avoid loops/duplicates (symlinks)
+	visited := make(map[string]bool)
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			// Ignore permission errors
+			if os.IsPermission(err) {
+				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
+			log.Errorf("failed to walk mount %s: %v", path, err)
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 { // follow symlinked dirs
+			// Resolve symlink target
+			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
+				// Stat target
+				info, err = os.Stat(linkPath)
+				if err != nil {
+					return err
+				}
+				// Recurse once per target
+				if info.IsDir() && !visited[linkPath] {
+					visited[linkPath] = true
+					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
+						if subErr != nil {
+							log.WithError(subErr).Error("failed to walk symlinked path")
+							return nil
+						}
+						// De-dupe discovered files via visited
+						if !visited[subPath] {
+							visited[subPath] = true
+							files = append(files, subPath)
+						}
 						return nil
 					})
 				}
