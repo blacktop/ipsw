@@ -20,6 +20,7 @@ ipsw dyld search <DSC> [flags]
   -h, --help                  help for search
   -i, --import string         Search for specific import regex
   -l, --load-command string   Search for specific load command regex
+      --mte                   Search for dylibs with MTE (Memory Tagging Extension) instructions
   -x, --section string        Search for specific section regex
   -u, --uuid string           Search for dylib by UUID
 ```

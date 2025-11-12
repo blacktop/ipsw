@@ -28,6 +28,7 @@ ipsw fw aea [flags]
   -o, --output string    Folder to extract files to
   -p, --pem string       AEA private_key.pem file
       --pem-db string    AEA pem DB JSON file
+      --proxy string     HTTP/HTTPS proxy
 ```
 
 ### Options inherited from parent commands
