@@ -22,7 +22,7 @@ require (
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.254
 	github.com/blacktop/go-plist v1.0.2
-	github.com/blacktop/go-termimg v0.1.20
+	github.com/blacktop/go-termimg v0.1.21
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.8
 	github.com/blacktop/ranger v1.0.3
@@ -123,11 +123,11 @@ require (
 	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3.0.20250917201909-41ff0bf215ea // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251105212737-dca72bd06dd9 // indirect
-	github.com/charmbracelet/x/ansi v0.10.3 // indirect
+	github.com/charmbracelet/x/ansi v0.11.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/exp/charmtone v0.0.0-20251105022227-dc9e59457e21 // indirect
 	github.com/charmbracelet/x/exp/color v0.0.0-20250915100343-2c2e5896ae6e // indirect
-	github.com/charmbracelet/x/mosaic v0.0.0-20251105022227-dc9e59457e21 // indirect
+	github.com/charmbracelet/x/mosaic v0.0.0-20251106172358-54469c29c2bc // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
