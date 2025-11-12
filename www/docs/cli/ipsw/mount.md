@@ -20,9 +20,6 @@ ipsw mount [fs|sys|app|exc|rdisk] IPSW [flags]
 # Mount the filesystem DMG from an IPSW
 $ ipsw mount fs iPhone15,2_16.5_20F66_Restore.ipsw
 
-# Mount the filesystem without blocking or prompting the user to unmount the DMG
-$ ipsw mount fs --detach iPhone15,2_16.5_20F66_Restore.ipsw
-
 # Mount the system DMG with a specific decryption key
 $ ipsw mount sys iPhone.ipsw --key "a1b2c3d4e5f6..."
 
@@ -38,11 +35,15 @@ $ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
 # Mount a RestoreRamDisk by identity (defaults to the first if not specified)
 $ ipsw mount rdisk iPhone.ipsw --ident Erase
 
+# Mount in background without blocking (detach mode)
+$ ipsw mount fs iPhone.ipsw --detach
+
 ```
 
 ### Options
 
 ```
+  -d, --detach               Mount without blocking (leave mounted in background)
   -h, --help                 help for mount
       --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
   -k, --key string           DMG key
