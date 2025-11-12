@@ -1009,6 +1009,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range class.InstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
@@ -1020,6 +1024,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range class.ClassMethods {
+			if method.Types == "" {
+				log.Warnf("Class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
@@ -1050,6 +1058,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.InstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1061,6 +1073,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.ClassMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1072,6 +1088,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.OptionalInstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol optional instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1083,6 +1103,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.OptionalClassMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol optional class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
