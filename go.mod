@@ -1,6 +1,6 @@
 module github.com/blacktop/ipsw
 
-go 1.25
+go 1.25.3
 
 tool (
 	github.com/caarlos0/svu/v3
@@ -20,7 +20,7 @@ require (
 	github.com/blacktop/arm64-cgo v1.0.67
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.254
+	github.com/blacktop/go-macho v1.1.257
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.20
 	github.com/blacktop/lzfse-cgo v1.1.20
