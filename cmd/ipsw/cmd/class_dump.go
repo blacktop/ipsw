@@ -253,6 +253,11 @@ var classDumpCmd = &cobra.Command{
 						}
 						continue
 					}
+					if viper.GetBool("class-dump.all") {
+						log.WithError(err).Warnf("failed to create ObjC parser for dylib '%s'", filepath.Base(img.Name))
+						continue
+					}
+					return fmt.Errorf("failed to create ObjC parser for dylib '%s': %v", filepath.Base(img.Name), err)
 				}
 
 				if viper.GetBool("class-dump.headers") {
