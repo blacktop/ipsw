@@ -1,6 +1,6 @@
 module github.com/blacktop/ipsw
 
-go 1.25.3
+go 1.25
 
 tool (
 	github.com/caarlos0/svu/v3
@@ -86,11 +86,6 @@ require (
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
-
-// replace github.com/blacktop/go-macho => ../go-macho
-// replace github.com/blacktop/go-dwarf => ../go-dwarf
-// replace github.com/blacktop/arm64-cgo => ../arm64-cgo
-// replace github.com/unicorn-engine/unicorn => ./unicorn2
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
