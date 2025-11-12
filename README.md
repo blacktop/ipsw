@@ -54,11 +54,6 @@ scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
 scoop install blacktop/ipsw
 ```
 
-#### Go Install
-```bash
-go install github.com/blacktop/ipsw/cmd/ipsw@latest
-```
-
 ### Basic Usage
 
 ```bash
