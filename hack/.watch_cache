@@ -1,31 +1,5 @@
 {
   "WebKit/WebKit": {
-    "tags": [
-      "webkitgtk-2.48.3",
-      "wpewebkit-2.48.2",
-      "wpewebkit-2.48.3",
-      "webkitgtk-2.49.2",
-      "wpewebkit-2.49.2",
-      "webkitgtk-2.49.3",
-      "wpewebkit-2.49.3",
-      "wpewebkit-2.48.4",
-      "webkitgtk-2.48.4",
-      "webkitgtk-2.49.4",
-      "wpewebkit-2.49.4",
-      "webkitgtk-2.48.5",
-      "wpewebkit-2.48.5",
-      "webkitgtk-2.49.90",
-      "wpewebkit-2.49.90",
-      "webkitgtk-2.48.6",
-      "wpewebkit-2.48.6",
-      "webkitgtk-2.50.0",
-      "wpewebkit-2.48.7",
-      "webkitgtk-2.48.7",
-      "wpewebkit-2.50.0",
-      "webkitgtk-2.50.1",
-      "webkitgtk-2.51.1",
-      "wpewebkit-2.51.1"
-    ],
     "commits": [
       "5477c623a01c1fa53b5441103642aa119177402d",
       "f8332133a12b758485dd348da4c6ed991bde98f5",
@@ -51,15 +25,35 @@
       "release": {
         "updated_at": "0001-01-01T00:00:00Z"
       }
-    }
+    },
+    "tags": [
+      "webkitgtk-2.48.3",
+      "wpewebkit-2.48.2",
+      "wpewebkit-2.48.3",
+      "webkitgtk-2.49.2",
+      "wpewebkit-2.49.2",
+      "webkitgtk-2.49.3",
+      "wpewebkit-2.49.3",
+      "wpewebkit-2.48.4",
+      "webkitgtk-2.48.4",
+      "webkitgtk-2.49.4",
+      "wpewebkit-2.49.4",
+      "webkitgtk-2.48.5",
+      "wpewebkit-2.48.5",
+      "webkitgtk-2.49.90",
+      "wpewebkit-2.49.90",
+      "webkitgtk-2.48.6",
+      "wpewebkit-2.48.6",
+      "webkitgtk-2.50.0",
+      "wpewebkit-2.48.7",
+      "webkitgtk-2.48.7",
+      "wpewebkit-2.50.0",
+      "webkitgtk-2.50.1",
+      "webkitgtk-2.51.1",
+      "wpewebkit-2.51.1"
+    ]
   },
   "apple-oss-distributions/distribution-macOS": {
-    "tags": [
-      "macos-155",
-      "macos-154",
-      "macos-156",
-      "macos-260"
-    ],
     "fcs_keys": {
       "beta": {
         "updated_at": "0001-01-01T00:00:00Z"
@@ -70,7 +64,13 @@
       "release": {
         "updated_at": "0001-01-01T00:00:00Z"
       }
-    }
+    },
+    "tags": [
+      "macos-155",
+      "macos-154",
+      "macos-156",
+      "macos-260"
+    ]
   },
   "fcs_keys": {
     "fcs_keys": {
@@ -88,17 +88,11 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "23C5027f_25C5031i_23N5279e",
-        "ios_build": "23C5027f",
-        "macos_build": "25C5031i",
-        "visionos_build": "23N5279e",
-        "updated_at": "2025-11-06T19:07:59Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
+        "fingerprint": "23C5033h_25C5037j_23N5285d",
+        "ios_build": "23C5033h",
+        "macos_build": "25C5037j",
+        "updated_at": "2025-11-13T19:06:25Z",
+        "visionos_build": "23N5285d"
       }
     }
   },
@@ -111,8 +105,8 @@
         "fingerprint": "23B85_22H730_23N49",
         "ios_build": "23B85",
         "macos_build": "22H730",
-        "visionos_build": "23N49",
-        "updated_at": "2025-11-08T19:06:13Z"
+        "updated_at": "2025-11-08T19:06:13Z",
+        "visionos_build": "23N49"
       },
       "release": {
         "updated_at": "0001-01-01T00:00:00Z"
@@ -131,8 +125,8 @@
         "fingerprint": "23B85_22H730_23N49",
         "ios_build": "23B85",
         "macos_build": "22H730",
-        "visionos_build": "23N49",
-        "updated_at": "2025-11-08T19:06:13Z"
+        "updated_at": "2025-11-08T19:06:13Z",
+        "visionos_build": "23N49"
       }
     }
   },
