@@ -65,21 +65,42 @@ func selectKDKs() ([]string, error) {
 	}
 	kdks = selKDKs
 
-	kernsGlob, err := filepath.Glob(filepath.Join(kdks[0], "System/Library/Kernels/kernel*"))
+	// Get kernel dSYMs from first KDK
+	kernsGlob1, err := filepath.Glob(filepath.Join(kdks[0], "System/Library/Kernels/kernel*.dSYM"))
 	if err != nil {
 		return nil, err
 	}
-	if len(kernsGlob) == 0 {
-		return nil, fmt.Errorf("could not find kernel in %s", kdks[0])
+	if len(kernsGlob1) == 0 {
+		return nil, fmt.Errorf("could not find kernel dSYMs in %s", kdks[0])
 	}
 
-	// filter out .dSYM
+	// Get kernel dSYMs from second KDK
+	kernsGlob2, err := filepath.Glob(filepath.Join(kdks[1], "System/Library/Kernels/kernel*.dSYM"))
+	if err != nil {
+		return nil, err
+	}
+	if len(kernsGlob2) == 0 {
+		return nil, fmt.Errorf("could not find kernel dSYMs in %s", kdks[1])
+	}
+
+	// Build set of kernel names from first KDK (strip .dSYM)
+	kerns1 := make(map[string]bool)
+	for _, k := range kernsGlob1 {
+		kernelName := strings.TrimSuffix(filepath.Base(k), ".dSYM")
+		kerns1[kernelName] = true
+	}
+
+	// Find common kernels (intersection) where dSYM exists in both
 	var kerns []string
-	for _, k := range kernsGlob {
-		if strings.HasSuffix(k, ".dSYM") {
-			continue
+	for _, k := range kernsGlob2 {
+		kernelName := strings.TrimSuffix(filepath.Base(k), ".dSYM")
+		if kerns1[kernelName] {
+			kerns = append(kerns, kernelName)
 		}
-		kerns = append(kerns, filepath.Base(k))
+	}
+
+	if len(kerns) == 0 {
+		return nil, fmt.Errorf("no common kernel dSYMs found between %s and %s", kdks[0], kdks[1])
 	}
 
 	var kern string
