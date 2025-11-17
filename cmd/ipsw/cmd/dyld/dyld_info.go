@@ -64,10 +64,10 @@ func init() {
 
 // dyldInfoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:     "info <DSC>",
+	Use:     "info <DSC> [DSC]",
 	Aliases: []string{"i"},
 	Short:   "Parse dyld_shared_cache",
-	Args:    cobra.ExactArgs(1),
+	Args:    cobra.RangeArgs(1, 2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
