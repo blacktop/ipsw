@@ -752,7 +752,7 @@ snapcrafts:
     apps:
       ipsw:
         command: ipsw
-        plugs: ["home", "network", "fuse-support"]
+        plugs: ["home", "network", "fuse-support", "removable-media"]
   - id: snaps-daemon
     ids:
       - linux_daemon_build
@@ -805,7 +805,7 @@ snapcrafts:
           sock:
             listen-stream: $SNAP_COMMON/ipsw.sock
             socket-mode: 0770
-        plugs: ["home", "network", "network-bind"]
+        plugs: ["home", "network", "network-bind", "removable-media"]
 
 scoops:
   - ids: [default_archive]
