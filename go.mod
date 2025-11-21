@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/alecthomas/chroma/v2 v2.20.0
-	github.com/anthropics/anthropic-sdk-go v1.18.0
+	github.com/anthropics/anthropic-sdk-go v1.18.1
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/blacktop/arm64-cgo v1.0.67
@@ -57,7 +57,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.12.11
+	github.com/ollama/ollama v0.13.0
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
@@ -73,7 +73,7 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20250911131444-c24c9ebe773c
 	github.com/vbauerster/mpb/v8 v8.11.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.44.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6
 	golang.org/x/net v0.47.0
 	golang.org/x/oauth2 v0.33.0
