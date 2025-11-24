@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/alecthomas/chroma/v2 v2.20.0
-	github.com/anthropics/anthropic-sdk-go v1.18.1
+	github.com/anthropics/anthropic-sdk-go v1.19.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/blacktop/arm64-cgo v1.0.67
@@ -22,7 +22,7 @@ require (
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.257
 	github.com/blacktop/go-plist v1.0.2
-	github.com/blacktop/go-termimg v0.1.20
+	github.com/blacktop/go-termimg v0.1.24
 	github.com/blacktop/lzfse-cgo v1.1.20
 	github.com/blacktop/lzss v0.1.8
 	github.com/blacktop/ranger v1.0.3
@@ -45,7 +45,7 @@ require (
 	github.com/gen2brain/beeep v0.11.1
 	github.com/gin-gonic/gin v1.11.0
 	github.com/glebarez/sqlite v1.11.0
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.4
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -118,11 +118,11 @@ require (
 	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3.0.20250917201909-41ff0bf215ea // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251105212737-dca72bd06dd9 // indirect
-	github.com/charmbracelet/x/ansi v0.10.3 // indirect
-	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
+	github.com/charmbracelet/x/ansi v0.11.0 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.14 // indirect
 	github.com/charmbracelet/x/exp/charmtone v0.0.0-20251105022227-dc9e59457e21 // indirect
 	github.com/charmbracelet/x/exp/color v0.0.0-20250915100343-2c2e5896ae6e // indirect
-	github.com/charmbracelet/x/mosaic v0.0.0-20251105022227-dc9e59457e21 // indirect
+	github.com/charmbracelet/x/mosaic v0.0.0-20251118172736-77d017256798 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
