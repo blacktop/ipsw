@@ -270,3 +270,7 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.40.0 // indirect
 )
+
+// TODO: remove this dumb fixing when charmbracelet updates their deps
+replace github.com/charmbracelet/x/ansi => github.com/charmbracelet/x/ansi v0.10.3
+replace github.com/charmbracelet/x/cellbuf => github.com/charmbracelet/x/cellbuf v0.0.13
