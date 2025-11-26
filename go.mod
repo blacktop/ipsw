@@ -74,7 +74,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.11.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.45.0
-	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6
+	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39
 	golang.org/x/net v0.47.0
 	golang.org/x/oauth2 v0.33.0
 	golang.org/x/sync v0.18.0
@@ -273,4 +273,5 @@ require (
 
 // TODO: remove this dumb fixing when charmbracelet updates their deps
 replace github.com/charmbracelet/x/ansi => github.com/charmbracelet/x/ansi v0.10.3
+
 replace github.com/charmbracelet/x/cellbuf => github.com/charmbracelet/x/cellbuf v0.0.13
