@@ -107,14 +107,11 @@ var swiftDumpCmd = &cobra.Command{
 		} else if viper.GetBool("swift-dump.headers") && len(viper.GetString("swift-dump.output")) == 0 {
 			return fmt.Errorf("cannot set --headers without setting --output")
 		}
-		doDump := false
-		if viper.GetString("swift-dump.interface") == "" &&
+		doDump := !viper.GetBool("swift-dump.interface") &&
 			viper.GetString("swift-dump.type") == "" &&
 			viper.GetString("swift-dump.proto") == "" &&
-			!viper.GetBool("swift-dump.ext") &&
-			!viper.GetBool("swift-dump.ass") {
-			doDump = true
-		}
+			viper.GetString("swift-dump.ext") == "" &&
+			viper.GetString("swift-dump.ass") == ""
 
 		if len(viper.GetString("swift-dump.output")) > 0 {
 			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {
