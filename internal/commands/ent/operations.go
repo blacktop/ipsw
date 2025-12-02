@@ -8,16 +8,16 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 )
 
-var colorBin = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorKey = color.New(color.Bold, color.FgHiGreen).SprintFunc()
-var colorValue = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorVersion = color.New(color.Bold, color.FgCyan).SprintFunc()
+var colorBin = colors.BoldHiMagenta().SprintFunc()
+var colorKey = colors.BoldHiGreen().SprintFunc()
+var colorValue = colors.BoldHiBlue().SprintFunc()
+var colorVersion = colors.BoldCyan().SprintFunc()
 
 // CreateSQLiteDatabase creates or updates the SQLite database
 func CreateSQLiteDatabase(dbPath string, ipsws, inputs []string) error {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
 const (
@@ -33,7 +33,7 @@ type Platform struct {
 	HostDDI string `json:"hostDDI"`
 }
 
-var colorField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorField = colors.BoldHiMagenta().SprintFunc()
 
 func (p *Platform) String() string {
 	var fields []string

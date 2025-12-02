@@ -34,9 +34,9 @@ import (
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types/objc"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,9 +54,9 @@ func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, 
 	return false, "", 0
 }
 
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorAddr = colors.Faint().SprintfFunc()
+var colorImage = colors.BoldHiMagenta().SprintFunc()
+var colorField = colors.BoldHiBlue().SprintFunc()
 
 func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
