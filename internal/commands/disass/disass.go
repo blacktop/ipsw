@@ -16,9 +16,9 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -87,7 +87,7 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		}
 	}
 	s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
-	s.Prefix = color.BlueString("   • Decompiling... ")
+	s.Prefix = colors.Blue().Sprint("   • Decompiling... ")
 	s.Start()
 
 	decmp, err := llm.Chat()

@@ -32,9 +32,9 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -101,8 +101,8 @@ var aeaCmd = &cobra.Command{
 			base64Key = strings.TrimPrefix(base64Key, "base64:")
 		}
 
-		var bold = color.New(color.Bold).SprintFunc()
-		var info = color.New(color.FgHiGreen).SprintFunc()
+		var bold = colors.Bold().SprintFunc()
+		var info = colors.HiGreen().SprintFunc()
 
 		if output == "" {
 			output = filepath.Dir(args[0])

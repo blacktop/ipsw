@@ -35,11 +35,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-termimg"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -185,19 +185,19 @@ var nonceCmd = &cobra.Command{
 
 		if readable {
 			if personalID != nil {
-				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApBoardID: "), personalID["BoardId"])
-				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApChipID:  "), personalID["ChipID"])
-				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApECID:    "), personalID["UniqueChipID"])
+				fmt.Printf("%s %d\n", colors.FaintHiBlue().Sprintf("ApBoardID: "), personalID["BoardId"])
+				fmt.Printf("%s %d\n", colors.FaintHiBlue().Sprintf("ApChipID:  "), personalID["ChipID"])
+				fmt.Printf("%s %d\n", colors.FaintHiBlue().Sprintf("ApECID:    "), personalID["UniqueChipID"])
 			}
-			fmt.Println(color.New(color.Faint, color.FgHiBlue).Sprintf("Nonce:"))
+			fmt.Println(colors.FaintHiBlue().Sprintf("Nonce:"))
 			var out string
 			for i, c := range nonce {
 				if i > 0 && i%4 == 0 && i%24 != 0 {
-					out += color.New(color.Faint).Sprint("-")
+					out += colors.Faint().Sprint("-")
 				} else if i > 0 && i%24 == 0 {
 					out += "\n"
 				}
-				out += color.New(color.Bold).Sprintf("%c", c)
+				out += colors.Bold().Sprintf("%c", c)
 			}
 			fmt.Println(out)
 		} else {

@@ -13,8 +13,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/disass"
-	"github.com/fatih/color"
 )
 
 const (
@@ -87,12 +87,12 @@ func (s SyscallsData) GetBsdSyscallByNumber(num int) (BsdSyscall, error) {
 	return BsdSyscall{}, fmt.Errorf("mach trap %d not found", num)
 }
 
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorBold = color.New(color.Bold).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
-var colorName = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorType = color.New(color.Bold, color.FgHiYellow).SprintFunc()
-var colorSubSystem = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorAddr = colors.Faint().SprintfFunc()
+var colorBold = colors.Bold().SprintFunc()
+var colorField = colors.BoldHiCyan().SprintFunc()
+var colorName = colors.BoldHiBlue().SprintFunc()
+var colorType = colors.BoldHiYellow().SprintFunc()
+var colorSubSystem = colors.BoldHiMagenta().SprintFunc()
 
 func (m MachTrap) String() string {
 	var funcStr string

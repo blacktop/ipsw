@@ -35,11 +35,11 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -252,9 +252,9 @@ var downloadOtaCmd = &cobra.Command{
 				for _, dl := range dvt.Downloadables {
 					fmt.Printf("%-40s %s=%s\t%s=%s\n",
 						dl.Name,
-						color.New(color.Bold, color.FgHiBlue).Sprint("build"),
+						colors.BoldHiBlue().Sprint("build"),
 						dl.SimulatorVersion.BuildUpdate,
-						color.New(color.Bold, color.FgHiBlue).Sprint("size"),
+						colors.BoldHiBlue().Sprint("size"),
 						humanize.Bytes(uint64(dl.FileSize)),
 					)
 				}

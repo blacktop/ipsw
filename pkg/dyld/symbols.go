@@ -16,8 +16,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -70,11 +70,11 @@ type Symbol struct {
 	Kind    symKind `json:"-"`
 }
 
-var symDarkAddrColor = color.New(color.Bold, color.FgBlue).SprintfFunc()
-var symAddrColor = color.New(color.Bold, color.FgMagenta).SprintfFunc()
-var symTypeColor = color.New(color.FgGreen).SprintfFunc()
-var symNameColor = color.New(color.Bold).SprintFunc()
-var symImageColor = color.New(color.Faint, color.FgHiWhite).SprintfFunc()
+var symDarkAddrColor = colors.BoldBlue().SprintfFunc()
+var symAddrColor = colors.BoldMagenta().SprintfFunc()
+var symTypeColor = colors.Green().SprintfFunc()
+var symNameColor = colors.Bold().SprintFunc()
+var symImageColor = colors.FaintHiWhite().SprintfFunc()
 
 func (s Symbol) String(color bool) string {
 	if color {
