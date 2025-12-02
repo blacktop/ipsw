@@ -29,18 +29,18 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/types"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var colorMode = color.New(color.FgHiBlue).SprintFunc()
-var colorModTime = color.New(color.Faint).SprintFunc()
-var colorSize = color.New(color.FgHiCyan).SprintFunc()
-var colorName = color.New(color.Bold).SprintFunc()
-var colorLink = color.New(color.FgHiMagenta).SprintFunc()
+var colorMode = colors.HiBlue().SprintFunc()
+var colorModTime = colors.Faint().SprintFunc()
+var colorSize = colors.HiCyan().SprintFunc()
+var colorName = colors.Bold().SprintFunc()
+var colorLink = colors.HiMagenta().SprintFunc()
 
 // GetAEAKey looks up the AEA decryption key from the JSON database based on OTA filename
 func GetAEAKey(otaPath, keyDBPath string) (string, error) {

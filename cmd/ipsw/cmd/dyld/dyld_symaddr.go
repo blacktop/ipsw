@@ -29,10 +29,10 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,10 +67,6 @@ var SymAddrCmd = &cobra.Command{
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		useColor := viper.GetBool("color") && !viper.GetBool("no-color")
-		color.NoColor = !useColor
-
 		imageName := viper.GetString("dyld.symaddr.image")
 		symbolFile := viper.GetString("dyld.symaddr.in")
 		jsonFile := viper.GetString("dyld.symaddr.output")
@@ -150,7 +146,7 @@ var SymAddrCmd = &cobra.Command{
 				}
 
 				if lsym, err := i.GetSymbol(args[1]); err == nil {
-					fmt.Println(lsym.String(useColor))
+					fmt.Println(lsym.String(colors.Active()))
 				}
 
 				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
@@ -179,7 +175,7 @@ var SymAddrCmd = &cobra.Command{
 					if !ok {
 						break
 					}
-					fmt.Println(sym.String(useColor))
+					fmt.Println(sym.String(colors.Active()))
 					if !allMatches {
 						return nil
 					}
@@ -189,7 +185,7 @@ var SymAddrCmd = &cobra.Command{
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
 					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
-						fmt.Println(sym.String(useColor))
+						fmt.Println(sym.String(colors.Active()))
 						if !allMatches {
 							return nil
 						}

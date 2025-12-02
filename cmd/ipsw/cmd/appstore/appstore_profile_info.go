@@ -28,9 +28,9 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -73,7 +73,7 @@ var ASProfileInfoCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal json: %v", err)
 		}
 
-		if viper.GetBool("color") && !viper.GetBool("no-color") {
+		if colors.Active() {
 			if err := quick.Highlight(os.Stdout, string(jsonData)+"\n", "json", "terminal256", "nord"); err != nil {
 				return fmt.Errorf("failed to highlight json: %v", err)
 			}

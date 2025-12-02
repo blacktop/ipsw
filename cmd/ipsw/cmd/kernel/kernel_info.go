@@ -34,18 +34,18 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var symAddrColor = color.New(color.Faint).SprintfFunc()
-var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
-var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
-var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
-var symNameColor = color.New(color.Bold).SprintFunc()
+var symAddrColor = colors.Faint().SprintfFunc()
+var symImageColor = colors.FaintBlue().SprintfFunc()
+var symTypeColor = colors.FaintCyan().SprintfFunc()
+var symLibColor = colors.FaintMagenta().SprintfFunc()
+var symNameColor = colors.Bold().SprintFunc()
 
 func init() {
 	KernelcacheCmd.AddCommand(kernelInfoCmd)

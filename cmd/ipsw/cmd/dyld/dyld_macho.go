@@ -33,6 +33,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/pkg/swift"
+	"github.com/blacktop/ipsw/internal/colors"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -272,7 +273,7 @@ var MachoCmd = &cobra.Command{
 							Addrs:    true,
 							ObjcRefs: showObjcRefs,
 							Demangle: doDemangle,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+							Color:    colors.Active(),
 							Theme:    "nord",
 						})
 						if err != nil {
@@ -320,7 +321,7 @@ var MachoCmd = &cobra.Command{
 							Addrs:    true,
 							All:      showSwiftAll,
 							Demangle: doDemangle,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+							Color:    colors.Active(),
 							Theme:    "nord",
 						})
 						if err != nil {

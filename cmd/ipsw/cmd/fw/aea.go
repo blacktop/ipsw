@@ -32,9 +32,9 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -101,8 +101,8 @@ var aeaCmd = &cobra.Command{
 			base64Key = strings.TrimPrefix(base64Key, "base64:")
 		}
 
-		var bold = color.New(color.Bold).SprintFunc()
-		var info = color.New(color.FgHiGreen).SprintFunc()
+		var bold = colors.Bold().SprintFunc()
+		var info = colors.HiGreen().SprintFunc()
 
 		if output == "" {
 			output = filepath.Dir(args[0])
@@ -126,7 +126,7 @@ var aeaCmd = &cobra.Command{
 				} else if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(string(v)); err == nil {
 					fmt.Printf("%s:\n%s\n", bold("["+k+"]"), utils.HexDump(b64data, 0))
 				} else {
-					if viper.GetBool("color") && !viper.GetBool("no-color") {
+					if colors.Active() {
 						fmt.Println(bold("[" + k + "]"))
 						if err := quick.Highlight(os.Stdout, string(v)+"\n\n", "json", "terminal256", "nord"); err != nil {
 							return fmt.Errorf("failed to highlight json: %v", err)
@@ -154,7 +154,7 @@ var aeaCmd = &cobra.Command{
 			if err := os.WriteFile(fname, data, 0o644); err != nil {
 				return fmt.Errorf("failed to write private key to file: %v", err)
 			}
-			if viper.GetBool("color") && !viper.GetBool("no-color") {
+			if colors.Active() {
 				if err := quick.Highlight(os.Stdout, string(data)+"\n\n", "json", "terminal256", "nord"); err != nil {
 					return fmt.Errorf("failed to highlight json: %v", err)
 				}

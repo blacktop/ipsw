@@ -33,10 +33,10 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/syslog"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -50,15 +50,15 @@ func init() {
 	viper.BindPFlag("idev.syslog.timeout", SyslogCmd.Flags().Lookup("timeout"))
 }
 
-var colorTime = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorProc = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorLib = color.New(color.Bold, color.FgHiCyan).SprintFunc()
-var colorNotice = color.New(color.Bold, color.FgHiGreen).SprintFunc()
-var colorError = color.New(color.Bold, color.FgHiRed).SprintFunc()
-var colorErrorMsg = color.New(color.Faint, color.FgHiRed).SprintFunc()
-var colorWarning = color.New(color.Bold, color.FgHiYellow).SprintFunc()
-var colorWarningMsg = color.New(color.FgYellow).SprintFunc()
-var colorDebug = color.New(color.Bold, color.FgHiWhite).SprintFunc()
+var colorTime = colors.BoldHiBlue().SprintFunc()
+var colorProc = colors.BoldHiMagenta().SprintFunc()
+var colorLib = colors.BoldHiCyan().SprintFunc()
+var colorNotice = colors.BoldHiGreen().SprintFunc()
+var colorError = colors.BoldHiRed().SprintFunc()
+var colorErrorMsg = colors.FaintHiRed().SprintFunc()
+var colorWarning = colors.BoldHiYellow().SprintFunc()
+var colorWarningMsg = colors.Yellow().SprintFunc()
+var colorDebug = colors.BoldHiWhite().SprintFunc()
 
 func colorSyslog(line string) string {
 	re := regexp.MustCompile(`(?s)(?P<date>\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2})\s(?P<device>\S+)\s(?P<proc>[a-zA-Z]+)(\((?P<lib>\S+)\))?\[(?P<pid>\S+)\]\s(?P<type>\S+)\s(?P<msg>.*)\n$`)
@@ -126,7 +126,7 @@ var SyslogCmd = &cobra.Command{
 			}
 			defer r.Close()
 
-			if viper.GetBool("color") && !viper.GetBool("no-color") {
+			if colors.Active() {
 				br := bufio.NewReader(r)
 				for {
 					line, err := br.ReadString('\x00')

@@ -16,17 +16,17 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/colors"
 	bm "github.com/blacktop/ipsw/pkg/plist"
-	"github.com/fatih/color"
 )
 
 // Color functions for verification output
 var (
-	colorSuccess  = color.New(color.FgGreen).SprintFunc()
-	colorError    = color.New(color.FgRed).SprintFunc()
-	colorWarning  = color.New(color.FgYellow).SprintFunc()
-	colorInfo     = color.New(color.FgCyan).SprintFunc()
-	colorLongName = color.New(color.FgHiYellow).SprintFunc()
+	colorSuccess  = colors.Green().SprintFunc()
+	colorError    = colors.Red().SprintFunc()
+	colorWarning  = colors.Yellow().SprintFunc()
+	colorInfo     = colors.Cyan().SprintFunc()
+	colorLongName = colors.HiYellow().SprintFunc()
 )
 
 // Core ASN.1 Private Tag Constants (stable tags that won't change)

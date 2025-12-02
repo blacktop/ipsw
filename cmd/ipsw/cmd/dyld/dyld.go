@@ -24,20 +24,20 @@ package dyld
 import (
 	"path/filepath"
 
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
-var symAddrColor = color.New(color.Faint).SprintfFunc()
-var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
-var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
-var symNameColor = color.New(color.Bold).SprintFunc()
+var symAddrColor = colors.Faint().SprintfFunc()
+var symTypeColor = colors.FaintCyan().SprintfFunc()
+var symLibColor = colors.FaintMagenta().SprintfFunc()
+var symNameColor = colors.Bold().SprintFunc()
 
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorClassField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorAddr = colors.Faint().SprintfFunc()
+var colorImage = colors.BoldHiMagenta().SprintFunc()
+var colorField = colors.BoldHiBlue().SprintFunc()
+var colorClassField = colors.BoldHiMagenta().SprintFunc()
 
 type dscFunc struct {
 	Addr  uint64 `json:"addr,omitempty"`

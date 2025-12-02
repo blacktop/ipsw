@@ -43,12 +43,12 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/colors"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -56,10 +56,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var symAddrColor = color.New(color.Faint).SprintfFunc()
-var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
-var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
-var symNameColor = color.New(color.Bold).SprintFunc()
+var symAddrColor = colors.Faint().SprintfFunc()
+var symTypeColor = colors.FaintCyan().SprintfFunc()
+var symLibColor = colors.FaintMagenta().SprintfFunc()
+var symNameColor = colors.Bold().SprintFunc()
 
 const (
 	onlyHeader       = 1 << 0
@@ -162,7 +162,7 @@ var machoInfoCmd = &cobra.Command{
 
 		// flags
 		verbose := viper.GetBool("verbose")
-		color := viper.GetBool("color") && !viper.GetBool("no-color")
+		color := colors.Active()
 
 		selectedArch := viper.GetString("macho.info.arch")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
@@ -786,7 +786,7 @@ var machoInfoCmd = &cobra.Command{
 					Addrs:    true,
 					ObjcRefs: showObjcRefs,
 					Demangle: doDemangle,
-					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+					Color:    colors.Active(),
 					Theme:    "nord",
 				})
 				if err != nil {
@@ -812,7 +812,7 @@ var machoInfoCmd = &cobra.Command{
 					Addrs:    true,
 					All:      showSwiftAll,
 					Demangle: doDemangle,
-					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+					Color:    colors.Active(),
 					Theme:    "nord",
 				})
 				if err != nil {

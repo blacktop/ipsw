@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	dcsCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -151,7 +152,10 @@ var WebkitCmd = &cobra.Command{
 			out, err := utils.GitDiff(
 				webkit1+"\n",
 				webkit2+"\n",
-				&utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+				&utils.GitDiffConfig{
+					Color: colors.Active(),
+					Tool: viper.GetString("diff-tool"),
+				})
 			if err != nil {
 				return err
 			}

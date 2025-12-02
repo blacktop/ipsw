@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
 // CREDIT: https://pkg.go.dev/encoding/hex (edited to add vaddr and color)
 
-var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorFaint = colors.FaintHiBlue().SprintFunc()
 
 func colorZeros(dump string) string {
 	if len(dump) > 0 {
@@ -90,7 +90,7 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 			h.buf[24] = ':'
 			h.buf[25] = ' '
 			h.buf[26] = ' '
-			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:25]))
+			colors.ItalicFaint().Fprint(h.w, string(h.buf[8:25]))
 			_, err = h.w.Write(h.buf[25:])
 			if err != nil {
 				return
