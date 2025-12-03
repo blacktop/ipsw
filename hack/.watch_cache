@@ -94,17 +94,11 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "23C5044b_25C5048a_23N5296b",
-        "ios_build": "23C5044b",
-        "macos_build": "25C5048a",
-        "updated_at": "2025-11-19T19:06:04Z",
-        "visionos_build": "23N5296b"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
+        "fingerprint": "23C6052_25C56_23N301",
+        "ios_build": "23C6052",
+        "macos_build": "25C56",
+        "updated_at": "2025-12-03T19:06:41Z",
+        "visionos_build": "23N301"
       }
     }
   },
