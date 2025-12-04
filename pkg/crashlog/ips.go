@@ -109,6 +109,8 @@ type Config struct {
 	PemDB         string
 	SignaturesDir string
 	ExtrasDir     string
+	IDAScript     bool   // Generate IDAPython script to mark panic frames
+	CrashlogPath  string // Path to the crashlog file (set automatically by OpenIPS)
 }
 
 type Ips struct {
@@ -743,6 +745,8 @@ func ParseHeader(in string) (hdr *IpsMetadata, err error) {
 
 func OpenIPS(in string, conf *Config) (*Ips, error) {
 	ips := Ips{Config: conf}
+	// Store the crashlog path for later use (e.g., IDA script generation)
+	conf.CrashlogPath = in
 
 	f, err := os.Open(in)
 	if err != nil {
@@ -1558,6 +1562,13 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 		}
 	}
 
+	// Generate IDA Python scripts if requested
+	if i.Config.IDAScript {
+		if err := i.generateIDAScripts(); err != nil {
+			return fmt.Errorf("failed to generate IDA scripts: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -1766,6 +1777,13 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 					}).Errorf("unexpected image")
 				}
 			}
+		}
+	}
+
+	// Generate IDA scripts if requested
+	if i.Config.IDAScript {
+		if err := i.generateIDAScripts(); err != nil {
+			return fmt.Errorf("failed to generate IDA scripts: %w", err)
 		}
 	}
 
