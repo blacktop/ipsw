@@ -491,6 +491,26 @@ brews:
     test: |
       system "#{bin}/ipswd version"
 
+homebrew_casks:
+  - repository:
+      owner: blacktop
+      name: homebrew-tap
+    ids:
+      - extras_archive
+    homepage: https://github.com/blacktop/ipsw
+    description: iOS/macOS Research Swiss Army Knife
+    license: MIT
+    conflicts:
+      - cask: ipsw-frida
+    manpages:
+      - "manpages/*"
+    completions:
+      bash: "completions/ipsw/_bash"
+      zsh: "completions/ipsw/_zsh"
+      fish: "completions/ipsw/_fish"
+    url:
+      verified: github.com/blacktop/ipsw/releases/download
+
 checksum:
   name_template: "checksums.txt"
 
