@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -46,21 +47,29 @@ func init() {
 	symbolicateCmd.Flags().BoolP("all", "a", false, "Show all threads in crashlog")
 	symbolicateCmd.Flags().BoolP("running", "r", false, "Show all running (TH_RUN) threads in crashlog")
 	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
-	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
+	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide user-space addresses for static analysis (kernel frames are always unslid)")
+	symbolicateCmd.Flags().String("kc-slide", "", "Apply custom KASLR slide to kernelcache frames for live debugging (hex, e.g. 0x14f74000)")
+	symbolicateCmd.Flags().String("dsc-slide", "", "Apply custom slide to dyld_shared_cache frames for live debugging (hex, e.g. 0x1a000000)")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.Flags().Bool("hex", false, "Display function offsets in hexadecimal")
+	symbolicateCmd.Flags().Bool("peek", false, "Show disassembly instructions around each panicked frame")
+	symbolicateCmd.Flags().Int("peek-count", 5, "Number of instructions to show with --peek (centered on frame, respects function boundaries)")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
-	symbolicateCmd.Flags().String("extra", "x", "Path to folder with extra files for symbolication")
+	symbolicateCmd.Flags().StringP("extra", "x", "", "Path to folder with extra files for symbolication")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
 	viper.BindPFlag("symbolicate.running", symbolicateCmd.Flags().Lookup("running"))
 	viper.BindPFlag("symbolicate.proc", symbolicateCmd.Flags().Lookup("proc"))
 	viper.BindPFlag("symbolicate.unslide", symbolicateCmd.Flags().Lookup("unslide"))
+	viper.BindPFlag("symbolicate.kc-slide", symbolicateCmd.Flags().Lookup("kc-slide"))
+	viper.BindPFlag("symbolicate.dsc-slide", symbolicateCmd.Flags().Lookup("dsc-slide"))
 	viper.BindPFlag("symbolicate.demangle", symbolicateCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("symbolicate.hex", symbolicateCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("symbolicate.peek", symbolicateCmd.Flags().Lookup("peek"))
+	viper.BindPFlag("symbolicate.peek-count", symbolicateCmd.Flags().Lookup("peek-count"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
@@ -77,11 +86,37 @@ var symbolicateCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 	# Symbolicate a panic crashlog (BugType=210) with an IPSW
 	❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+
+	# Show disassembly around panic frames with --peek (default 5 instructions)
+	❯ ipsw symbolicate panic.ips firmware.ipsw --peek
+
+	# Show more instructions around panic frames (10 instructions, centered on frame)
+	❯ ipsw symbolicate panic.ips firmware.ipsw --peek --peek-count 10
+	  # Note: If frame is at function start, extra instructions shift to after the frame
+
+	# Unslide user-space addresses for static analysis (kernel frames are always unslid)
+	❯ ipsw symbolicate panic.ips firmware.ipsw --unslide
+	  # Note: Kernel frame addresses are already KASLR-unslid and match static disassemblers
+	  # The --unslide flag only affects user-space frames (processes like launchd, SpringBoard, etc.)
+
+	# Apply custom KASLR slide to kernelcache frames for lldb live debugging
+	❯ ipsw symbolicate panic.ips firmware.ipsw --kc-slide 0x14f74000
+	  # Useful when reproducing a crash with a different KASLR slide
+	  # Shows runtime addresses you can use with lldb breakpoints
+
+	# Apply custom slide to dyld_shared_cache frames for lldb live debugging
+	❯ ipsw symbolicate panic.ips firmware.ipsw --dsc-slide 0x1a000000
+	  # For debugging user-space crashes where DSC was loaded at a different address
+
+	# Combine both slides for full runtime address mapping
+	❯ ipsw symbolicate panic.ips firmware.ipsw --kc-slide 0x14f74000 --dsc-slide 0x1a000000
+
 	# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
-		  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
-		  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
-		  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
-		  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
+	❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
+
+	# Symbolicate an old style crashlog (BugType=109) requiring a dyld_shared_cache
+	❯ ipsw symbolicate Delta-2024-04-20-135807.ips dyld_shared_cache
+	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -93,12 +128,39 @@ var symbolicateCmd = &cobra.Command{
 		// cacheFile, _ := cmd.Flags().GetString("cache")
 		demangleFlag := viper.GetBool("symbolicate.demangle")
 		asHex := viper.GetBool("symbolicate.hex")
+		peek := viper.GetBool("symbolicate.peek")
+		peekCount := viper.GetInt("symbolicate.peek-count")
+		if peekCount < 1 {
+			peekCount = 1
+		}
 		pemDB := viper.GetString("symbolicate.pem-db")
 		signaturesDir := viper.GetString("symbolicate.signatures")
 		extrasDir := viper.GetString("symbolicate.extra")
+		kcSlideStr := viper.GetString("symbolicate.kc-slide")
+		dscSlideStr := viper.GetString("symbolicate.dsc-slide")
+		/* parse slide values (base 0 auto-detects hex 0x, octal 0o, or decimal) */
+		var kcSlide uint64
+		if kcSlideStr != "" {
+			var err error
+			kcSlide, err = strconv.ParseUint(kcSlideStr, 0, 64)
+			if err != nil {
+				return fmt.Errorf("invalid --kc-slide value %q: must be a number (e.g., 0x14f74000 or 351748096): %v", kcSlideStr, err)
+			}
+		}
+		var dscSlide uint64
+		if dscSlideStr != "" {
+			var err error
+			dscSlide, err = strconv.ParseUint(dscSlideStr, 0, 64)
+			if err != nil {
+				return fmt.Errorf("invalid --dsc-slide value %q: must be a number (e.g., 0x1a000000 or 436207616): %v", dscSlideStr, err)
+			}
+		}
 		/* validate flags */
 		if (Verbose || all) && len(proc) > 0 {
 			return fmt.Errorf("cannot use --verbose OR --all WITH --proc")
+		}
+		if unslide && (kcSlide != 0 || dscSlide != 0) {
+			return fmt.Errorf("cannot use --unslide with --kc-slide or --dsc-slide (they are mutually exclusive)")
 		}
 
 		hdr, err := crashlog.ParseHeader(args[0])
@@ -117,8 +179,12 @@ var symbolicateCmd = &cobra.Command{
 				Running:       running,
 				Process:       proc,
 				Unslid:        unslide,
+				KernelSlide:   kcSlide,
+				DSCSlide:      dscSlide,
 				Demangle:      demangleFlag,
 				Hex:           asHex,
+				Peek:          peek,
+				PeekCount:     peekCount,
 				PemDB:         pemDB,
 				SignaturesDir: signaturesDir,
 				ExtrasDir:     extrasDir,
