@@ -58,6 +58,7 @@ func init() {
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
 	symbolicateCmd.Flags().StringP("extra", "x", "", "Path to folder with extra files for symbolication")
+	symbolicateCmd.Flags().Bool("ida", false, "Generate IDAPython script to mark panic frames in IDA Pro")
 	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 	viper.BindPFlag("symbolicate.all", symbolicateCmd.Flags().Lookup("all"))
@@ -74,6 +75,7 @@ func init() {
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbolicate.extra", symbolicateCmd.Flags().Lookup("extra"))
+	viper.BindPFlag("symbolicate.ida", symbolicateCmd.Flags().Lookup("ida"))
 }
 
 // TODO: handle all edge cases from `/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash` and handle spindumps etc
@@ -111,6 +113,11 @@ var symbolicateCmd = &cobra.Command{
 	# Combine both slides for full runtime address mapping
 	❯ ipsw symbolicate panic.ips firmware.ipsw --kc-slide 0x14f74000 --dsc-slide 0x1a000000
 
+	# Generate IDAPython script to mark panic frames in IDA Pro
+	❯ ipsw symbolicate panic.ips firmware.ipsw --ida
+	  # Outputs panic.ips.kc.ida.py for kernel frames (load in IDA with kernelcache)
+	  # Outputs panic.ips.dsc.ida.py for DSC frames if present (load in IDA with DSC image)
+
 	# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
 	❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
 
@@ -136,6 +143,7 @@ var symbolicateCmd = &cobra.Command{
 		pemDB := viper.GetString("symbolicate.pem-db")
 		signaturesDir := viper.GetString("symbolicate.signatures")
 		extrasDir := viper.GetString("symbolicate.extra")
+		idaScript := viper.GetBool("symbolicate.ida")
 		kcSlideStr := viper.GetString("symbolicate.kc-slide")
 		dscSlideStr := viper.GetString("symbolicate.dsc-slide")
 		/* parse slide values (base 0 auto-detects hex 0x, octal 0o, or decimal) */
@@ -188,6 +196,7 @@ var symbolicateCmd = &cobra.Command{
 				PemDB:         pemDB,
 				SignaturesDir: signaturesDir,
 				ExtrasDir:     extrasDir,
+				IDAScript:     idaScript,
 				Verbose:       Verbose,
 			})
 			if err != nil {
