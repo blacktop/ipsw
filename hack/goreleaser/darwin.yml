@@ -7,7 +7,7 @@ before:
     - ./hack/make/manpages
 
 builds:
-  - id: darwin_arm64
+  - id: darwin_arm64_extras
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -29,40 +29,15 @@ builds:
       - -s -w
       - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
       - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
-  - id: darwin_amd64
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CC=clang
-      - CXX=clang++
-      - CGO_CFLAGS=-arch x86_64 -I/usr/local/homebrew/include
-      - CGO_LDFLAGS=-arch x86_64 -L/usr/local/homebrew/lib
-      - PKG_CONFIG_PATH=/usr/local/homebrew/lib/pkgconfig
-    goos:
-      - darwin
-    goarch:
-      - amd64
-    tags:
-      - libusb
-      - unicorn
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
-      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
 
 archives:
-  - id: darwin_universal_archive
+  - id: darwin_arm64_extras_archive
     builds:
-      - darwin_universal
-    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_universal"
+      - darwin_arm64_extras
+    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras"
     replacements:
       darwin: macOS
       ios: iOS
-      all: universal
     format_overrides:
       - goos: windows
         format: zip
@@ -74,16 +49,7 @@ archives:
     wrap_in_directory: true
 
 checksum:
-  name_template: "checksums.darwin_universal.txt"
+  name_template: "checksums.darwin_arm64_extras.txt"
 
 sboms:
   - artifacts: archive
-
-universal_binaries:
-  - id: darwin_universal
-    name_template: "{{ .ProjectName }}"
-    replacements:
-      darwin: macOS
-    builds:
-      - darwin_arm64
-      - darwin_amd64

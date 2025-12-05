@@ -2,6 +2,3 @@ release:
   prerelease: true
   make_latest: false
   name_template: "prerelease {{ .CommitDate }} ({{ .ShortCommit }})"
-
-changelog:
-  skip: true

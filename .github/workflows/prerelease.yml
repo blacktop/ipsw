@@ -2,7 +2,7 @@ name: Pre-Release
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ env:
 
 jobs:
   goreleaser:
-    # macOS runner (Apple Silicon) builds both arches then lipo to universal
+    # macOS runner (Apple Silicon) builds arm64 extras + cross-compiles linux/windows via Zig
     runs-on: macos-latest
     if: github.ref_type == 'branch' && github.ref == 'refs/heads/master'
 
@@ -34,23 +34,22 @@ jobs:
           go-version: stable
           cache: true
 
-      - name: Install Rosetta (for x86_64 cross-build)
-        run: softwareupdate --install-rosetta --agree-to-license || true
-
+      # - name: Install Rosetta (for x86_64 cross-build)
+      #   run: softwareupdate --install-rosetta --agree-to-license || true
       - name: Install dependencies (arm64)
         run: |
-          brew install --quiet pkg-config libusb unicorn libheif
+          brew install --quiet pkg-config libusb unicorn libheif zig
         env:
           HOMEBREW_NO_AUTO_UPDATE: 1
-
-      - name: Install x86_64 Homebrew + deps
-        run: |
-          mkdir /tmp/homebrew
-          cd /tmp; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
-          sudo mv /tmp/homebrew /usr/local/homebrew
-          arch -x86_64 /usr/local/homebrew/bin/brew install --quiet unicorn libusb libheif pkg-config
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: 1
+        # x86_64 homebrew (Rosetta) bootstrap kept for later use; uncomment if/when Intel builds are needed.
+        # run: |
+        #   softwareupdate --install-rosetta --agree-to-license || true
+        #   mkdir /tmp/homebrew
+        #   cd /tmp; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
+        #   sudo mv /tmp/homebrew /usr/local/homebrew
+        #   arch -x86_64 /usr/local/homebrew/bin/brew install --quiet unicorn libusb libheif pkg-config
+        # env:
+        #   HOMEBREW_NO_AUTO_UPDATE: 1
 
       - name: Delete existing prerelease/tag
         run: gh release delete "$PRERELEASE_TAG" -y --cleanup-tag || true
@@ -62,7 +61,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --skip=announce --config hack/goreleaser/darwin.yml --config hack/goreleaser/prerelease.yml
+          args: release --clean --skip=announce --config hack/goreleaser/darwin.yml --config hack/goreleaser/cross.yml --config hack/goreleaser/prerelease.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ env.PRERELEASE_TAG }}
