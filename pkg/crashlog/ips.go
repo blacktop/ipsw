@@ -1041,6 +1041,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	{
 		// If crashlog has no device identifier, prompt user to select from available devices
 		device := i.Payload.Product
+		log.WithField("device", device).Debug("Looking for kernelcache matching crashlog device")
 		if device == "" {
 			ipswInfo, err := info.Parse(ipswPath)
 			if err != nil {
@@ -1086,6 +1087,13 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 		}
 		if len(out) == 0 {
 			return fmt.Errorf("no kernelcache found for device %s in IPSW (multi-device IPSW may not contain this device)", device)
+		}
+		// Log which kernelcache(s) were found for the device
+		for k := range out {
+			log.WithFields(log.Fields{
+				"device":      device,
+				"kernelcache": filepath.Base(k),
+			}).Debug("Found kernelcache for device")
 		}
 		defer func() {
 			for k := range out {
@@ -1137,8 +1145,14 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					expectedUUID := strings.ToUpper(strings.ReplaceAll(expectedKernelUUID, "-", ""))
 					if actualUUID != expectedUUID {
 						log.Warnf("kernelcache UUID mismatch: crashlog expects %s, IPSW contains %s", expectedKernelUUID, kcUUID.UUID.String())
+					} else {
+						log.WithFields(log.Fields{
+							"uuid": kcUUID.UUID.String(),
+						}).Debug("Kernelcache UUID matches crashlog expectation")
 					}
 				}
+			} else {
+				log.Debug("No kernelcache UUID in crashlog, skipping validation")
 			}
 
 			if kc.FileTOC.FileHeader.Type == types.MH_FILESET {

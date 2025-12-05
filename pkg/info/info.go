@@ -704,6 +704,26 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 	return utils.SortDevices(utils.Unique(devices))
 }
 
+// GetKernelCacheForDevice returns the kernelcache path(s) for a given device ProductType (e.g., "Mac16,8", "iPhone17,1")
+func (i *Info) GetKernelCacheForDevice(device string) []string {
+	// Find the BoardConfig for this device
+	var boardConfig string
+	for _, dtree := range i.DeviceTrees {
+		dt, _ := dtree.Summary()
+		if dt.ProductType == device {
+			boardConfig = strings.ToLower(dt.BoardConfig)
+			break
+		}
+	}
+	if boardConfig == "" {
+		return nil
+	}
+
+	// Get kernelcaches for this BoardConfig
+	kcs := i.Plists.BuildManifest.GetKernelCaches()
+	return kcs[boardConfig]
+}
+
 func getAbbreviatedDevList(devices []string) string {
 	var devList string
 
