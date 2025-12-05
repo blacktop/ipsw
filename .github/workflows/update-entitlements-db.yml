@@ -16,6 +16,9 @@ on:
         default: "ios,macos"
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   update-entitlements-db:
     runs-on: macos-latest
