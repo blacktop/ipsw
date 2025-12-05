@@ -65,7 +65,12 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --skip=announce --config hack/goreleaser/darwin.yml --config hack/goreleaser/cross.yml --config hack/goreleaser/prerelease.yml
+          args: >
+            release --clean --skip=announce
+            --id darwin_arm64_extras --id linux_build --id windows_build
+            --config hack/goreleaser/darwin.yml
+            --config hack/goreleaser/cross.yml
+            --config hack/goreleaser/prerelease.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ env.PRERELEASE_TAG }}
