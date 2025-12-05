@@ -1,3 +1,5 @@
+version: 2
+
 release:
   prerelease: true
   make_latest: false

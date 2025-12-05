@@ -56,6 +56,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Retag prerelease to current commit
+        run: |
+          git tag -f "$PRERELEASE_TAG" "$(git rev-parse HEAD)"
+
       - name: Run GoReleaser (prerelease)
         uses: goreleaser/goreleaser-action@v6
         with:
