@@ -144,7 +144,7 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
-			log.Errorf("failed to walk mount %s: %v", path, err)
+			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
@@ -160,7 +160,7 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							log.WithError(subErr).Error("failed to walk symlinked path")
+							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
 						// Avoid adding duplicate file paths discovered via symlinks
@@ -263,7 +263,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
-			log.Errorf("failed to walk mount %s: %v", path, err)
+			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinked dirs
@@ -279,7 +279,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							log.WithError(subErr).Error("failed to walk symlinked path")
+							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
 						// De-dupe discovered files via visited
@@ -390,7 +390,7 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
-			log.Errorf("failed to walk mount %s: %v", path, err)
+			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
 		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
@@ -406,7 +406,7 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
 						if subErr != nil {
-							log.WithError(subErr).Error("failed to walk symlinked path")
+							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
 						files = append(files, subPath)

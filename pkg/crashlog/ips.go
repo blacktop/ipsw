@@ -1101,18 +1101,37 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			}
 		}()
 
-		// Get expected kernel UUID from crashlog for validation
-		// Priority: KernelUUID (the actual kernel binary) over KernelCacheUUID (the cache container)
-		// because kc.UUID() returns the LC_UUID of the kernel macho, not the cache wrapper
-		var expectedKernelUUID string
+		// Collect all kernel-related UUIDs from crashlog for validation
+		// kc.UUID() returns the LC_UUID of the kernelcache container
+		type kernelUUIDInfo struct {
+			name string
+			uuid string
+		}
+		var crashlogKernelUUIDs []kernelUUIDInfo
 		if i.Payload.panic210 != nil {
-			switch {
-			case i.Payload.panic210.KernelUUID != nil:
-				expectedKernelUUID = i.Payload.panic210.KernelUUID.Value.(string)
-			case i.Payload.panic210.FilesetKernelCacheUUID != nil:
-				expectedKernelUUID = i.Payload.panic210.FilesetKernelCacheUUID.Value.(string)
-			case i.Payload.panic210.KernelCacheUUID != nil:
-				expectedKernelUUID = i.Payload.panic210.KernelCacheUUID.Value.(string)
+			if i.Payload.panic210.DebugHdrKernelCacheUUID != nil {
+				crashlogKernelUUIDs = append(crashlogKernelUUIDs, kernelUUIDInfo{
+					name: "Debug Header KernelCache UUID",
+					uuid: i.Payload.panic210.DebugHdrKernelCacheUUID.Value.(string),
+				})
+			}
+			if i.Payload.panic210.FilesetKernelCacheUUID != nil {
+				crashlogKernelUUIDs = append(crashlogKernelUUIDs, kernelUUIDInfo{
+					name: "Fileset KernelCache UUID",
+					uuid: i.Payload.panic210.FilesetKernelCacheUUID.Value.(string),
+				})
+			}
+			if i.Payload.panic210.KernelCacheUUID != nil {
+				crashlogKernelUUIDs = append(crashlogKernelUUIDs, kernelUUIDInfo{
+					name: "KernelCache UUID",
+					uuid: i.Payload.panic210.KernelCacheUUID.Value.(string),
+				})
+			}
+			if i.Payload.panic210.KernelUUID != nil {
+				crashlogKernelUUIDs = append(crashlogKernelUUIDs, kernelUUIDInfo{
+					name: "Kernel UUID",
+					uuid: i.Payload.panic210.KernelUUID.Value.(string),
+				})
 			}
 		}
 
@@ -1124,9 +1143,9 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				if err != nil {
 					return fmt.Errorf("failed to parse signatures: %v", err)
 				}
-				// symbolicate kernelcache
+				// symbolicate kernelcache (quiet=true suppresses per-file logs, shows progress bar)
 				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
-				if err := smap.Symbolicate(k, sigs, true); err != nil {
+				if err := smap.Symbolicate(k, sigs, !i.Config.Verbose); err != nil {
 					return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 				}
 			}
@@ -1137,18 +1156,50 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			}
 			defer kc.Close()
 
-			// Validate kernel UUID matches crashlog expectation (if available)
-			if expectedKernelUUID != "" {
+			// Validate kernelcache UUID matches any of the crashlog's kernel UUIDs
+			if len(crashlogKernelUUIDs) > 0 {
 				if kcUUID := kc.UUID(); kcUUID != nil {
-					// Normalize both UUIDs: uppercase and no dashes for comparison
-					actualUUID := strings.ToUpper(strings.ReplaceAll(kcUUID.UUID.String(), "-", ""))
-					expectedUUID := strings.ToUpper(strings.ReplaceAll(expectedKernelUUID, "-", ""))
-					if actualUUID != expectedUUID {
-						log.Warnf("kernelcache UUID mismatch: crashlog expects %s, IPSW contains %s", expectedKernelUUID, kcUUID.UUID.String())
-					} else {
+					// Log the IPSW kernelcache UUID we extracted
+					log.WithField("uuid", kcUUID.UUID.String()).Info("IPSW kernelcache UUID")
+
+					// Log all crashlog kernel UUIDs for comparison
+					for _, info := range crashlogKernelUUIDs {
 						log.WithFields(log.Fields{
-							"uuid": kcUUID.UUID.String(),
-						}).Debug("Kernelcache UUID matches crashlog expectation")
+							"field": info.name,
+							"uuid":  info.uuid,
+						}).Debug("Crashlog kernel UUID")
+					}
+
+					// Normalize IPSW UUID: uppercase and no dashes for comparison
+					actualUUID := strings.ToUpper(strings.ReplaceAll(kcUUID.UUID.String(), "-", ""))
+
+					// Check against all kernel-related UUIDs from crashlog
+					matched := false
+					var matchedField string
+					for _, info := range crashlogKernelUUIDs {
+						expectedUUID := strings.ToUpper(strings.ReplaceAll(info.uuid, "-", ""))
+						if actualUUID == expectedUUID {
+							matched = true
+							matchedField = info.name
+							break
+						}
+					}
+
+					if matched {
+						log.WithFields(log.Fields{
+							"field": matchedField,
+							"uuid":  kcUUID.UUID.String(),
+						}).Info("Kernelcache UUID validated")
+					} else {
+						// Log all the UUIDs we tried to match against
+						var uuidList []string
+						for _, info := range crashlogKernelUUIDs {
+							uuidList = append(uuidList, fmt.Sprintf("%s=%s", info.name, info.uuid))
+						}
+						log.WithFields(log.Fields{
+							"ipsw_uuid":      kcUUID.UUID.String(),
+							"crashlog_uuids": strings.Join(uuidList, ", "),
+						}).Warn("Kernelcache UUID mismatch: IPSW UUID doesn't match any crashlog kernel UUID")
 					}
 				}
 			} else {

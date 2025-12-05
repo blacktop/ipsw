@@ -204,6 +204,13 @@ var symbolicateCmd = &cobra.Command{
 			}
 
 			if len(args) < 2 && (hdr.BugType == "210" || hdr.BugType == "288") {
+				// --peek and --signatures require an IPSW
+				if peek {
+					return fmt.Errorf("--peek requires an IPSW to show disassembly instructions")
+				}
+				if signaturesDir != "" {
+					return fmt.Errorf("--signatures requires an IPSW to symbolicate")
+				}
 				if viper.GetString("symbolicate.server") != "" {
 					u, err := url.ParseRequestURI(viper.GetString("symbolicate.server"))
 					if err != nil {
