@@ -67,8 +67,6 @@ jobs:
           version: "~> v2"
           args: >
             release --clean --skip=announce
-            --config hack/goreleaser/darwin.yml
-            --config hack/goreleaser/cross.yml
             --config hack/goreleaser/prerelease.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
