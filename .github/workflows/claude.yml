@@ -9,15 +9,22 @@ on:
   pull_request_review:
     types: [submitted]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   claude-response:
     runs-on: ubuntu-latest
+    # Only run for the original repo, not forks
+    if: github.repository == 'blacktop/ipsw'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0      
-      - uses: anthropics/claude-code-action@beta
+      - uses: anthropics/claude-code-action@de8e0b9c42c6cb58e904c857f164aa072244c1ac # beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
