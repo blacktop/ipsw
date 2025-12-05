@@ -1,0 +1,88 @@
+builds:
+  - id: linux_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-linux-musl
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-linux-musl
+        {{- end }}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+  - id: windows_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-windows-gnu
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-windows-gnu
+        {{- end }}
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+archives:
+  - id: linux_archive
+    builds:
+      - linux_build
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      amd64: x86_64
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+  - id: windows_archive
+    builds:
+      - windows_build
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+checksum:
+  name_template: "checksums.cross.txt"
+
+sboms:
+  - artifacts: archive
