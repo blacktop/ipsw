@@ -1163,6 +1163,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 						machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
 						// Also map under "kernel" for Source=Kernel frames
 						machoFuncMap["kernel"] = append(machoFuncMap["kernel"], fn)
+						// Also map under "kernelcache (__TEXT_EXEC)" for Source=KernelTextExec frames
+						machoFuncMap["kernelcache (__TEXT_EXEC)"] = append(machoFuncMap["kernelcache (__TEXT_EXEC)"], fn)
 					}
 				}
 			} else { // non-fileset kernelcache
@@ -1182,6 +1184,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 					machoFuncMap["kernelcache"] = append(machoFuncMap["kernelcache"], fn)
 					// Also map under "kernel" for Source=Kernel frames
 					machoFuncMap["kernel"] = append(machoFuncMap["kernel"], fn)
+					// Also map under "kernelcache (__TEXT_EXEC)" for Source=KernelTextExec frames
+					machoFuncMap["kernelcache (__TEXT_EXEC)"] = append(machoFuncMap["kernelcache (__TEXT_EXEC)"], fn)
 				}
 			}
 		}
