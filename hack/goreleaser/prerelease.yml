@@ -80,12 +80,11 @@ builds:
 
 archives:
   - id: darwin_arm64_extras_archive
-    builds: [darwin_arm64_extras]
+    ids: [darwin_arm64_extras]
     name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras"
-    replacements: { darwin: macOS, ios: iOS }
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
       - LICENSE
@@ -94,9 +93,10 @@ archives:
     wrap_in_directory: true
 
   - id: linux_archive
-    builds: [linux_build]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    replacements: { amd64: x86_64 }
+    ids: [linux_build]
+    name_template: >-
+      {{- .ProjectName }}_{{ .Version }}_{{ .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     files:
       - README.md
       - LICENSE
@@ -105,12 +105,13 @@ archives:
     wrap_in_directory: true
 
   - id: windows_archive
-    builds: [windows_build]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    replacements: { amd64: x86_64 }
+    ids: [windows_build]
+    name_template: >-
+      {{- .ProjectName }}_{{ .Version }}_{{ .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
       - LICENSE
