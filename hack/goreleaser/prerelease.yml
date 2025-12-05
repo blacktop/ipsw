@@ -1,6 +1,125 @@
 version: 2
 
+before:
+  hooks:
+    - go mod tidy
+    - ./hack/make/completions
+    - ./hack/make/manpages
+
 release:
   prerelease: true
   make_latest: false
   name_template: "prerelease {{ .CommitDate }} ({{ .ShortCommit }})"
+
+builds:
+  - id: darwin_arm64_extras
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/opt/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include
+      - PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
+    goos: [darwin]
+    goarch: [arm64]
+    tags: [libusb, unicorn]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+  - id: linux_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-linux-musl
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-linux-musl
+        {{- end }}
+    goos: [linux]
+    goarch: [amd64, arm64]
+    goamd64: [v1]
+    goarm64: [v8.0]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+  - id: windows_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-windows-gnu
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-windows-gnu
+        {{- end }}
+    goos: [windows]
+    goarch: [amd64, arm64]
+    goamd64: [v1]
+    goarm64: [v8.0]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+archives:
+  - id: darwin_arm64_extras_archive
+    builds: [darwin_arm64_extras]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras"
+    replacements: { darwin: macOS, ios: iOS }
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+  - id: linux_archive
+    builds: [linux_build]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements: { amd64: x86_64 }
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+  - id: windows_archive
+    builds: [windows_build]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements: { amd64: x86_64 }
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+checksum:
+  name_template: "checksums.prerelease.txt"
+
+sboms:
+  - artifacts: archive
