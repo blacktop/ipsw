@@ -8,10 +8,15 @@ fi
 
 : ${FRIDA_VERSION:=""}
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+NIX_CONFIG="$REPO_ROOT/nix/ipsw/config.json"
+
 if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
     echo 'Usage: hack/make/frida-deps
 
 This script downloads and unpacks the latest frida-core-devkits for macOS.
+Also updates nix/ipsw/config.json with frida version and hashes.
 
 '
     exit
@@ -24,12 +29,20 @@ get_version() {
     echo "  [!] Updating to version: $FRIDA_VERSION"
 }
 
-change_version() {
+change_go_version() {
     echo "  [!] Updating version in cmd/ipsw/cmd/frida/frida.go"
     sed -i '' "s/const fridaVersion = \".*\"/const fridaVersion = \"$FRIDA_VERSION\"/" cmd/ipsw/cmd/frida/frida.go
 }
 
-update_frida() {
+# Compute SRI hash for a URL
+compute_sri_hash() {
+    local url="$1"
+    local hash
+    hash=$(nix-prefetch-url "$url" 2>/dev/null)
+    nix hash convert --hash-algo sha256 --to sri "$hash"
+}
+
+update_homebrew() {
     echo "  [!] Updating frida-core-devkit (ARM64)"
     gh release download $FRIDA_VERSION --pattern 'frida-core-devkit-*-macos-arm64.tar.xz' --repo frida/frida --dir /tmp --skip-existing
     gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/lib libfrida-core.a
@@ -40,11 +53,47 @@ update_frida() {
     gunzip -c /tmp/frida-core-devkit-*-macos-x86_64.tar.xz | tar -xf - -C /usr/local/homebrew/include frida-core.h
 }
 
+update_nix_frida() {
+    echo "  [!] Updating frida in nix/ipsw/config.json"
+
+    local base_url="https://github.com/frida/frida/releases/download/${FRIDA_VERSION}"
+    local arm64_url="${base_url}/frida-core-devkit-${FRIDA_VERSION}-macos-arm64.tar.xz"
+    local x86_64_url="${base_url}/frida-core-devkit-${FRIDA_VERSION}-macos-x86_64.tar.xz"
+
+    echo "  [!] Computing hash for aarch64-darwin..."
+    local arm64_hash
+    arm64_hash=$(compute_sri_hash "$arm64_url")
+
+    echo "  [!] Computing hash for x86_64-darwin..."
+    local x86_64_hash
+    x86_64_hash=$(compute_sri_hash "$x86_64_url")
+
+    local frida_json
+    frida_json=$(jq -n \
+        --arg version "$FRIDA_VERSION" \
+        --arg arm64_url "$arm64_url" \
+        --arg arm64_hash "$arm64_hash" \
+        --arg x86_64_url "$x86_64_url" \
+        --arg x86_64_hash "$x86_64_hash" \
+        '{
+            version: $version,
+            sources: {
+                "aarch64-darwin": { url: $arm64_url, hash: $arm64_hash },
+                "x86_64-darwin": { url: $x86_64_url, hash: $x86_64_hash }
+            }
+        }')
+
+    jq --argjson frida "$frida_json" '.frida = $frida' "$NIX_CONFIG" > "$NIX_CONFIG.tmp"
+    mv "$NIX_CONFIG.tmp" "$NIX_CONFIG"
+    echo "  [!] Updated $NIX_CONFIG"
+}
+
 main() {
     echo "  🚀 Starting..."
     get_version
-    change_version
-    update_frida
+    change_go_version
+    update_homebrew
+    update_nix_frida
     echo "  🎉 Done!"
 }
 
