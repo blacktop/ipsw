@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/fatih/color"
 )
 
 //go:embed data/ipsw_db.gz
@@ -44,9 +44,9 @@ type Device struct {
 
 type Devices map[string]Device
 
-var colorName = color.New(color.Bold).SprintFunc()
-var colorBoard = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorName = colors.Bold().SprintFunc()
+var colorBoard = colors.BoldHiMagenta().SprintFunc()
+var colorField = colors.BoldHiBlue().SprintFunc()
 
 func (d Device) String() string {
 	var sb strings.Builder

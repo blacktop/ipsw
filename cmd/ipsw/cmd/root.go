@@ -43,7 +43,7 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ota"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/sb"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ssh"
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -66,7 +66,7 @@ var rootCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		initColor()
 	},
 }
 
@@ -199,6 +199,21 @@ func expandSettings(settings map[string]any, prefix string) {
 // needsExpansion checks if a string looks like a relative path that should be expanded
 func needsExpansion(s string) bool {
 	return strings.HasPrefix(s, "~/") || s == "~" || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../")
+}
+
+// initColor initializes color output with TTY auto-detection.
+// --color forces colors on, --no-color forces colors off, otherwise auto-detect.
+func initColor() {
+	var forceColor *bool
+	if viper.GetBool("color") {
+		t := true
+		forceColor = &t
+	} else if viper.GetBool("no-color") {
+		f := false
+		forceColor = &f
+	}
+	// nil means auto-detect based on TTY (fatih/color's default)
+	colors.Init(forceColor)
 }
 
 // initConfig reads in config file and ENV variables if set.

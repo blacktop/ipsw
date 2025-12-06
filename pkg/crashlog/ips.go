@@ -24,6 +24,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/demangle"
@@ -32,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/signature"
-	"github.com/fatih/color"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -43,12 +43,12 @@ import (
 //go:embed data/log_type.gz
 var logTypeData []byte
 
-var colorTime = color.New(color.Bold, color.FgHiGreen).SprintFunc()
-var colorError = color.New(color.Bold, color.FgHiRed).SprintFunc()
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorBold = color.New(color.Bold).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintfFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorTime = colors.BoldHiGreen().SprintFunc()
+var colorError = colors.BoldHiRed().SprintFunc()
+var colorAddr = colors.Faint().SprintfFunc()
+var colorBold = colors.Bold().SprintfFunc()
+var colorImage = colors.BoldHiMagenta().SprintfFunc()
+var colorField = colors.BoldHiBlue().SprintFunc()
 
 var ErrDone = errors.New("done")
 

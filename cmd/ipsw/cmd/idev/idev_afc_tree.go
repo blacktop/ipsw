@@ -27,10 +27,10 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/afc"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -73,8 +73,8 @@ var idevAfcTreeCmd = &cobra.Command{
 			fpath = args[0]
 		}
 
-		var dirColor = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-		var sizeColor = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+		var dirColor = colors.BoldHiBlue().SprintFunc()
+		var sizeColor = colors.BoldHiMagenta().SprintFunc()
 
 		if flat {
 			if err := cli.Walk(fpath, func(path string, info os.FileInfo, err error) error {
