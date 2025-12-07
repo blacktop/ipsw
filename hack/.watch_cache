@@ -120,10 +120,10 @@
   "fcs_keys_rc": {
     "fcs_keys": {
       "rc": {
-        "fingerprint": "22H124_22H730_23N49",
-        "ios_build": "22H124",
+        "fingerprint": "23B85_22H730_23N49",
+        "ios_build": "23B85",
         "macos_build": "22H730",
-        "updated_at": "2025-12-06T19:05:55Z",
+        "updated_at": "2025-12-07T19:06:05Z",
         "visionos_build": "23N49"
       }
     }
@@ -131,10 +131,10 @@
   "fcs_keys_stable": {
     "fcs_keys": {
       "release": {
-        "fingerprint": "22H124_22H730_23N49",
-        "ios_build": "22H124",
+        "fingerprint": "23B85_22H730_23N49",
+        "ios_build": "23B85",
         "macos_build": "22H730",
-        "updated_at": "2025-12-06T19:05:55Z",
+        "updated_at": "2025-12-07T19:06:05Z",
         "visionos_build": "23N49"
       }
     }
