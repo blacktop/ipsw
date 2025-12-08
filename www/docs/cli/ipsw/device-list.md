@@ -10,6 +10,15 @@ description: List all iOS devices
 
 List all iOS devices
 
+### Synopsis
+
+List all iOS devices from embedded device database.
+
+NOTE: This database is sourced from Xcode's device_traits.db which includes
+simulator devices and may not accurately map to physical hardware devices.
+Some entries (e.g., iPad17,4-A, iPad17,4-B) represent simulator variants
+rather than distinct hardware models.
+
 ```
 ipsw device-list [flags]
 ```
