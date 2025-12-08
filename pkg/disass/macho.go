@@ -106,15 +106,21 @@ func (d *MachoDisass) Triage() error {
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW) {
+			// Ensure operands have registers before accessing
+			if len(prevInstr.Operands[0].Registers) == 0 {
+				prevInstr = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
+			}
 			adrpRegister := prevInstr.Operands[0].Registers[0]
 			adrpImm := prevInstr.Operands[1].Immediate
-			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
+			if instruction.Operation == disassemble.ARM64_LDR && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
+			} else if instruction.Operation == disassemble.ARM64_LDRB && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
+			} else if instruction.Operation == disassemble.ARM64_ADD && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+			} else if instruction.Operation == disassemble.ARM64_LDRSW && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
 			}
 			d.tr.Addresses[instruction.Address] = adrpImm

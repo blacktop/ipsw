@@ -114,9 +114,10 @@ type Config struct {
 }
 
 type Ips struct {
-	Header  IpsMetadata
-	Payload IPSPayload
-	Config  *Config
+	Header        IpsMetadata
+	Payload       IPSPayload
+	Config        *Config
+	KernelSymbols signature.SymbolMap // Symbols discovered via --signatures flag
 }
 
 type Platform int
@@ -540,6 +541,8 @@ type PanicFrame struct {
 	PeekAddr uint64 `json:"-"`
 	// PeekFrameIdx is the index of the frame instruction within PeekBytes (in instructions, not bytes)
 	PeekFrameIdx int `json:"-"`
+	// PeekSymbols maps addresses to symbol names for enriching branch target disassembly
+	PeekSymbols map[uint64]string `json:"-"`
 }
 
 func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
@@ -862,6 +865,57 @@ func readPeekBytes(m peekBytesReader, frameAddr uint64, count int, funcStart, fu
 	return buf, startAddr, numBefore
 }
 
+// symbolLookup is an interface for looking up symbols by address
+type symbolLookup interface {
+	FindAddressSymbols(addr uint64) ([]macho.Symbol, error)
+}
+
+// extractPeekSymbols extracts symbol names for branch targets in peek bytes.
+// peekAddr is the address to disassemble at (slid for user frames).
+// slide is subtracted from branch targets before symbol lookup (for user frames with slide).
+// The returned map uses slid addresses as keys to match formatPeekDisassembly lookups.
+func extractPeekSymbols(peekBytes []byte, peekAddr uint64, slide uint64, lookup symbolLookup) map[uint64]string {
+	if len(peekBytes) == 0 || lookup == nil {
+		return nil
+	}
+
+	instructions, err := disassemble.GetInstructions(peekAddr, peekBytes)
+	if err != nil {
+		return nil
+	}
+
+	result := make(map[uint64]string)
+	for _, block := range instructions.Blocks() {
+		for _, instr := range block {
+			// Check for branch instructions (B, BL)
+			if instr.Operation == disassemble.ARM64_BL || instr.Operation == disassemble.ARM64_B {
+				for _, operand := range instr.Operands {
+					if operand.Class == disassemble.LABEL {
+						target := uint64(operand.Immediate) // slid address
+						if _, exists := result[target]; !exists {
+							// Unslide target for symbol lookup (macho has unslid addresses)
+							lookupAddr := target
+							if slide > 0 && target >= slide {
+								lookupAddr = target - slide
+							}
+							if syms, err := lookup.FindAddressSymbols(lookupAddr); err == nil && len(syms) > 0 {
+								// Store with slid key for lookup in formatPeekDisassembly
+								result[target] = syms[0].Name
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 // formatPeekDisassembly formats the peek bytes as disassembly output.
 // peekFrameIdx is the index of the frame instruction within peekBytes (in instructions, not bytes).
 // peekAddr is the start address of peekBytes.
@@ -869,10 +923,12 @@ func readPeekBytes(m peekBytesReader, frameAddr uint64, count int, funcStart, fu
 // customSlide is added to kernel frame addresses for live debugging (--kc-slide flag).
 // dscSlide is added to DSC frame addresses for live debugging (--dsc-slide flag).
 // isDSCFrame indicates if this is a dyld_shared_cache frame (Source == "SharedCache" or "SharedCacheLibrary").
+// peekSymbols optionally maps addresses to symbol names for enriching branch targets.
+// doMangle indicates whether to demangle symbol names.
 //
 // NOTE: For kernel frames, peekAddr is already an unslid address (BinaryImage.Base + ImageOffset).
 // For user frames, peekAddr is a slid address. The unslid flag should only affect user frames.
-func formatPeekDisassembly(peekBytes []byte, peekAddr uint64, peekFrameIdx int, slide, customSlide, dscSlide uint64, isDSCFrame, unslid bool) string {
+func formatPeekDisassembly(peekBytes []byte, peekAddr uint64, peekFrameIdx int, slide, customSlide, dscSlide uint64, isDSCFrame, unslid bool, peekSymbols map[uint64]string, doMangle bool) string {
 	if len(peekBytes) == 0 {
 		return ""
 	}
@@ -911,12 +967,32 @@ func formatPeekDisassembly(peekBytes []byte, peekAddr uint64, peekFrameIdx int, 
 			}
 
 			opStr := strings.TrimSpace(strings.TrimPrefix(instr.String(), instr.Operation.String()))
-			out.WriteString(fmt.Sprintf("%s%s:  %s   %s %s\n",
+
+			// Enrich branch instructions (B/BL) with symbol names if available
+			comment := ""
+			if (instr.Operation == disassemble.ARM64_BL || instr.Operation == disassemble.ARM64_B) && len(peekSymbols) > 0 {
+				for _, operand := range instr.Operands {
+					if operand.Class == disassemble.LABEL {
+						target := uint64(operand.Immediate)
+						if symName, ok := peekSymbols[target]; ok {
+							display := symName
+							if doMangle {
+								display = demangle.Do(symName, false, false)
+							}
+							comment = fmt.Sprintf(" ; %s", display)
+						}
+						break
+					}
+				}
+			}
+
+			out.WriteString(fmt.Sprintf("%s%s:  %s   %s %s%s\n",
 				pad,
 				colorAddr("%#08x", displayAddr),
 				disassemble.GetOpCodeByteString(instr.Raw),
 				colorImage("%-7s", instr.Operation),
 				disass.ColorOperands(opStr),
+				colorField(comment),
 			))
 			instrIdx++
 		}
@@ -1148,6 +1224,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				if err := smap.Symbolicate(k, sigs, !i.Config.Verbose); err != nil {
 					return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 				}
+				// Store symbols for IDA script generation
+				i.KernelSymbols = smap
 			}
 
 			kc, err = macho.Open(k)
@@ -1326,8 +1404,13 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 									if peekBytes, startAddr, frameIdx := readPeekBytes(m, vmAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
 										frame.PeekBytes = peekBytes
 										// Store the runtime (slid) address for display
-										frame.PeekAddr = startAddr + i.Payload.BinaryImages[idx].Slide
+										slide := i.Payload.BinaryImages[idx].Slide
+										slidAddr := startAddr + slide
+										frame.PeekAddr = slidAddr
 										frame.PeekFrameIdx = frameIdx
+										// Extract symbols for branch targets in peek bytes
+										// Use slid address so keys match what formatPeekDisassembly will look up
+										frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, slide, m)
 									}
 								}
 							}
@@ -1553,6 +1636,8 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 							frame.PeekBytes = peekBytes
 							frame.PeekAddr = startAddr
 							frame.PeekFrameIdx = frameIdx
+							// Extract symbols for branch targets in peek bytes (kernel has no slide)
+							frame.PeekSymbols = extractPeekSymbols(peekBytes, startAddr, 0, kc)
 						}
 					}
 				}
@@ -1581,8 +1666,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 								}
 								if peekBytes, startAddr, peekFrameIdx := readPeekBytes(m, unslidAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
 									frame.PeekBytes = peekBytes
-									frame.PeekAddr = startAddr + frameSlide
+									slidAddr := startAddr + frameSlide
+									frame.PeekAddr = slidAddr
 									frame.PeekFrameIdx = peekFrameIdx
+									// Extract symbols for branch targets in peek bytes
+									frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, frameSlide, m)
 									continue
 								}
 							} else if m, err := macho.Open(bi.Path); err == nil {
@@ -1594,8 +1682,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 								}
 								if peekBytes, startAddr, peekFrameIdx := readPeekBytes(m, unslidAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
 									frame.PeekBytes = peekBytes
-									frame.PeekAddr = startAddr + frameSlide
+									slidAddr := startAddr + frameSlide
+									frame.PeekAddr = slidAddr
 									frame.PeekFrameIdx = peekFrameIdx
+									// Extract symbols for branch targets in peek bytes
+									frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, frameSlide, m)
 									continue
 								}
 							} else {
@@ -1618,8 +1709,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 									}
 									if peekBytes, startAddr, peekFrameIdx := readPeekBytes(m, unslidAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
 										frame.PeekBytes = peekBytes
-										frame.PeekAddr = startAddr + frameSlide
+										slidAddr := startAddr + frameSlide
+										frame.PeekAddr = slidAddr
 										frame.PeekFrameIdx = peekFrameIdx
+										// Extract symbols for branch targets in peek bytes
+										frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, frameSlide, m)
 									}
 								}
 								break
@@ -2004,7 +2098,7 @@ func (i *Ips) String() string {
 							out += buf.String()
 							buf.Reset()
 							isDSC := i.isDSCFrame(f)
-							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid)
+							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
 						}
 					}
 					w.Flush()
@@ -2040,7 +2134,7 @@ func (i *Ips) String() string {
 							out += buf.String()
 							buf.Reset()
 							// Kernel frames are never DSC frames, so pass false for isDSCFrame
-							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid)
+							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
 						}
 					}
 					w.Flush()
