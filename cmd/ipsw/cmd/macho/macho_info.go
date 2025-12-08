@@ -648,6 +648,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -663,6 +666,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -678,6 +684,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -693,6 +702,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err

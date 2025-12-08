@@ -109,7 +109,7 @@ var machoPatchAddCmd = &cobra.Command{
 		}
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return err
 		}
 
 		if len(output) == 0 { // modify in place

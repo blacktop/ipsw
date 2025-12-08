@@ -234,7 +234,7 @@ var dyldMgCmd = &cobra.Command{
 		if newMGs > 0 {
 			cont := false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to update the MG JSON with NEW obfuscated MG Keys. Continue?"),
+				Message: "You are about to update the MG JSON with NEW obfuscated MG Keys. Continue?",
 			}
 			survey.AskOne(prompt, &cont)
 
@@ -255,7 +255,7 @@ var dyldMgCmd = &cobra.Command{
 			if bruteForce(mysteries, length) {
 				cont := false
 				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to update the MG JSON with brute forced keys (you can test with 'ipsw idev diag mg --keys'). Continue?"),
+					Message: "You are about to update the MG JSON with brute forced keys (you can test with 'ipsw idev diag mg --keys'). Continue?",
 				}
 				survey.AskOne(prompt, &cont)
 
