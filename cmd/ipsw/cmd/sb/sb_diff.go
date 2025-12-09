@@ -34,10 +34,10 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -194,12 +194,12 @@ var sbDiffCmd = &cobra.Command{
 				if len(out) == 0 {
 					continue
 				}
-				fmt.Println(color.New(color.Bold).Sprintf("\n%s\n", f))
+				fmt.Println(colors.Bold().Sprintf("\n%s\n", f))
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				fmt.Println(out)
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 			} else { // NEW sandbox profile
-				fmt.Println(color.New(color.Bold).Sprintf("\n🆕 %s\n", f))
+				fmt.Println(colors.Bold().Sprintf("\n🆕 %s\n", f))
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				quick.Highlight(os.Stdout, newSbData, "scheme", "terminal256", "nord")
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
