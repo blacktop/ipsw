@@ -150,10 +150,12 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			return fmt.Errorf("failed to open %s: %v", dscExtractor.Libname, err)
 		}
 		extVer := "1040.2.2.0.0"
-		if fat.Arches[0].SourceVersion() != nil {
-			extVer = fat.Arches[0].SourceVersion().Version.String()
+		if fat != nil {
+			if fat.Arches[0].SourceVersion() != nil {
+				extVer = fat.Arches[0].SourceVersion().Version.String()
+			}
+			fat.Close()
 		}
-		fat.Close()
 		// get XCodeVersion
 		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
 		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")
