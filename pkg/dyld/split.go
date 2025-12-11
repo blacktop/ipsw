@@ -145,15 +145,35 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 
 	if xcodeCache {
 		// get ExtractorVersion
-		fat, err := macho.OpenFat(dscExtractor.Libname)
-		if err != nil && err != macho.ErrNotFat {
-			return fmt.Errorf("failed to open %s: %v", dscExtractor.Libname, err)
-		}
 		extVer := "1040.2.2.0.0"
-		if fat.Arches[0].SourceVersion() != nil {
-			extVer = fat.Arches[0].SourceVersion().Version.String()
+
+		fat, err := macho.OpenFat(dscExtractor.Libname)
+		switch err {
+		case nil:
+			// successfully opened fat mach-o
+			if len(fat.Arches) > 0 {
+				if sv := fat.Arches[0].SourceVersion(); sv != nil {
+					extVer = sv.Version.String()
+				}
+			}
+			fat.Close()
+
+		case macho.ErrNotFat:
+			// fall back on thin mach-o loading
+			m, err := macho.Open(dscExtractor.Libname)
+			if err != nil {
+				return fmt.Errorf("failed to open mach-o %s, %v", dscExtractor.Libname, err)
+			}
+			if sv := m.SourceVersion(); sv != nil {
+				extVer = sv.Version.String()
+			}
+			m.Close()
+
+		default:
+			// failed to load fat mach-o
+			return fmt.Errorf("failed to open fat mach-o %s: %v", dscExtractor.Libname, err)
 		}
-		fat.Close()
+
 		// get XCodeVersion
 		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
 		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")
