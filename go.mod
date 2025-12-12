@@ -42,7 +42,7 @@ require (
 	github.com/frida/frida-go v1.0.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.11.1
+	github.com/gen2brain/beeep v0.11.2
 	github.com/gin-gonic/gin v1.11.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.16.4
