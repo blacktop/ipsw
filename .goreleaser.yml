@@ -2,6 +2,10 @@
 # vim: set ts=2 sw=2 tw=0 fo=jcroql
 version: 2
 
+git:
+  ignore_tags:
+    - v0.0.0-prerelease
+
 before:
   hooks:
     - go mod tidy
