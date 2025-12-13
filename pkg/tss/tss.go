@@ -137,6 +137,7 @@ func applyRestoreRequestRules(entry map[string]any, parameters map[string]any, r
 		conditionsFulfilled := true
 
 		if hasConditions {
+		conditionLoop:
 			for condKey, condValue := range conditions {
 				var paramValue any
 				switch condKey {
@@ -153,7 +154,7 @@ func applyRestoreRequestRules(entry map[string]any, parameters map[string]any, r
 				default:
 					// Unknown condition, assume not fulfilled
 					conditionsFulfilled = false
-					break
+					break conditionLoop
 				}
 
 				if paramValue != condValue {

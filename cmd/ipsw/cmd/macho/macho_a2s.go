@@ -61,7 +61,7 @@ var machoA2sCmd = &cobra.Command{
 		machoPath := filepath.Clean(args[0])
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return err
 		}
 
 		// Use the helper to handle fat/universal files

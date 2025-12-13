@@ -292,7 +292,9 @@ func (c *Client) recvResponseTo(payloadBuf []byte) (*response, error) {
 	if resp.payloadSize > uint64(len(payloadBuf)) {
 		return nil, fmt.Errorf("buffer is %d, needs %d", len(payloadBuf), resp.payloadSize)
 	}
-	_, err = io.ReadFull(c.c.Conn(), payloadBuf[:resp.payloadSize])
+	if _, err = io.ReadFull(c.c.Conn(), payloadBuf[:resp.payloadSize]); err != nil {
+		return nil, err
+	}
 	return resp, nil
 }
 

@@ -109,16 +109,21 @@ func (c *Client) CopyToDevice(dst, src string, copyCbFn CopyCallbackFunc) error 
 	}
 	if srcInfo.IsDir() {
 		return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 			targetPath := pathpkg.Join(dst, path)
 			fmt.Println(targetPath, path)
 			if info.IsDir() {
 				return c.MakeDir(targetPath)
 			}
-			err = c.CopyFileToDevice(targetPath, path)
+			if err := c.CopyFileToDevice(targetPath, path); err != nil {
+				return err
+			}
 			if copyCbFn != nil {
 				copyCbFn(targetPath, src, info)
 			}
-			return err
+			return nil
 		})
 	}
 
