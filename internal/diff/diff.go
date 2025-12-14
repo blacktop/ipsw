@@ -3,7 +3,6 @@ package diff
 
 import (
 	"archive/zip"
-	"bytes"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -84,6 +83,7 @@ type Config struct {
 	Signatures   string
 	Output       string
 	Verbose      bool
+	LowMemory    bool
 }
 
 // Context is the context for the diff
@@ -193,14 +193,9 @@ func (d *Diff) Save() error {
 	gob.Register([]any{})
 	gob.Register(map[string]any{})
 
-	buff := new(bytes.Buffer)
-	if err := gob.NewEncoder(buff).Encode(&d); err != nil {
-		return fmt.Errorf("failed to encode diff: %v", err)
-	}
-
 	log.Infof("Saving pickled IPSW diff: %s", idiff.Name())
-	if _, err = buff.WriteTo(idiff); err != nil {
-		return fmt.Errorf("failed to write diff to file: %v", err)
+	if err := gob.NewEncoder(idiff).Encode(&d); err != nil {
+		return fmt.Errorf("failed to encode diff: %v", err)
 	}
 
 	return nil
@@ -685,6 +680,7 @@ func (d *Diff) parseMachos() (err error) {
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
+		LowMemory:  d.conf.LowMemory,
 	})
 	return
 }
@@ -722,6 +718,7 @@ func (d *Diff) parseFirmwares() (err error) {
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
+		LowMemory:  d.conf.LowMemory,
 	})
 	return
 }

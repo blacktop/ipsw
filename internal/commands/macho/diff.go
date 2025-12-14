@@ -1,8 +1,13 @@
 package macho
 
 import (
+	"crypto/sha256"
+	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -13,6 +18,237 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
 )
+
+type cachedDiffInfo struct {
+	Info *DiffInfo
+}
+
+func cacheFileForKey(cacheDir, key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return filepath.Join(cacheDir, hex.EncodeToString(sum[:]) + ".gob")
+}
+
+func writeCachedDiffInfo(cacheDir, key string, info *DiffInfo) error {
+	path := cacheFileForKey(cacheDir, key)
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return gob.NewEncoder(f).Encode(&cachedDiffInfo{Info: info})
+}
+
+func readCachedDiffInfo(cacheDir, key string) (*DiffInfo, error) {
+	path := cacheFileForKey(cacheDir, key)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var c cachedDiffInfo
+	if err := gob.NewDecoder(f).Decode(&c); err != nil {
+		return nil, err
+	}
+	if c.Info == nil {
+		return nil, fmt.Errorf("cached diff info missing for %s", key)
+	}
+	return c.Info, nil
+}
+
+// FormatUpdatedDiff formats a single-file diff in the same style as MachoDiff.Generate.
+// Returns an empty string if no printable diff content is produced.
+func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, error) {
+	if oldInfo == nil || newInfo == nil {
+		return "", fmt.Errorf("nil diff info")
+	}
+
+	out, err := utils.GitDiff(oldInfo.String()+"\n", newInfo.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+	if err != nil {
+		return "", err
+	}
+	if len(out) == 0 {
+		return "", nil
+	}
+
+	var b strings.Builder
+	if conf.Markdown {
+		b.WriteString("```diff\n")
+		b.WriteString(out)
+	} else {
+		b.WriteString(out)
+	}
+
+	// Symbols
+	newSyms := utils.Difference(newInfo.Symbols, oldInfo.Symbols)
+	sort.Strings(newSyms)
+	rmSyms := utils.Difference(oldInfo.Symbols, newInfo.Symbols)
+	sort.Strings(rmSyms)
+	if len(newSyms) > 0 || len(rmSyms) > 0 {
+		b.WriteString("Symbols:\n")
+		for _, s := range newSyms {
+			b.WriteString(fmt.Sprintf("+ %s\n", s))
+		}
+		for _, s := range rmSyms {
+			b.WriteString(fmt.Sprintf("- %s\n", s))
+		}
+	}
+
+	// Functions
+	if conf.FuncStarts {
+		printable := func(f types.Function, smap map[uint64]string) string {
+			sym, ok := smap[f.StartAddr]
+			if ok {
+				return sym
+			}
+			return fmt.Sprintf("sub_%x", f.StartAddr)
+		}
+
+		funcs1 := oldInfo.Starts
+		funcs2 := newInfo.Starts
+		n1, n2 := len(funcs1), len(funcs2)
+
+		var fb strings.Builder
+		appendLine := func(s string) {
+			if fb.Len() == 0 {
+				fb.WriteString("Functions:\n")
+			}
+			fb.WriteString(s)
+		}
+
+		if n1 == n2 {
+			consecutiveMismatch := 0
+			const maxMismatch = 5
+
+			for i := range n1 {
+				f1 := funcs1[i]
+				f2 := funcs2[i]
+				f1.Name = printable(f1, oldInfo.SymbolMap)
+				f2.Name = printable(f2, newInfo.SymbolMap)
+
+				if f1.Name != "" && f1.Name == f2.Name {
+					sz1 := f1.EndAddr - f1.StartAddr
+					sz2 := f2.EndAddr - f2.StartAddr
+					if sz1 != sz2 {
+						appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
+					}
+					consecutiveMismatch = 0
+					continue
+				}
+
+				sz1 := f1.EndAddr - f1.StartAddr
+				sz2 := f2.EndAddr - f2.StartAddr
+
+				if sz1 == sz2 {
+					consecutiveMismatch = 0
+					continue
+				}
+
+				appendLine(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
+				consecutiveMismatch++
+
+				if consecutiveMismatch >= maxMismatch {
+					recovered := false
+					const seekAhead = 6
+					if i+seekAhead < n1 {
+						matches := 0
+						for k := 1; k <= seekAhead && i+k < n1; k++ {
+							if (funcs1[i+k].EndAddr-funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr-funcs2[i+k].StartAddr) {
+								matches++
+								if matches >= 3 {
+									recovered = true
+									break
+								}
+							} else {
+								matches = 0
+							}
+						}
+					}
+					if !recovered {
+						fb.Reset()
+						break
+					}
+				}
+			}
+
+			if fb.Len() > 0 {
+				b.WriteString(fb.String())
+			}
+		} else {
+			i, j := 0, 0
+			consecutiveNoise := 0
+			const noiseLimit = 6
+
+			for i < n1 && j < n2 {
+				f1 := funcs1[i]
+				f2 := funcs2[j]
+				f1.Name = printable(f1, oldInfo.SymbolMap)
+				f2.Name = printable(f2, newInfo.SymbolMap)
+				if f1.Name != "" && f1.Name == f2.Name {
+					sz1 := f1.EndAddr - f1.StartAddr
+					sz2 := f2.EndAddr - f2.StartAddr
+					if sz1 != sz2 {
+						appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
+					}
+					i++
+					j++
+					consecutiveNoise = 0
+					continue
+				}
+
+				if (f1.EndAddr-f1.StartAddr) == (f2.EndAddr-f2.StartAddr) {
+					i++
+					j++
+					consecutiveNoise = 0
+					continue
+				}
+
+				if j+1 < n2 && (f1.EndAddr-f1.StartAddr) == (funcs2[j+1].EndAddr-funcs2[j+1].StartAddr) {
+					appendLine(fmt.Sprintf("+ %s\n", f2.Name))
+					j++
+					consecutiveNoise++
+				} else if i+1 < n1 && (funcs1[i+1].EndAddr-funcs1[i+1].StartAddr) == (f2.EndAddr-f2.StartAddr) {
+					appendLine(fmt.Sprintf("- %s\n", f1.Name))
+					i++
+					consecutiveNoise++
+				} else {
+					consecutiveNoise++
+				}
+
+				if consecutiveNoise >= noiseLimit {
+					fb.Reset()
+					break
+				}
+			}
+
+			if fb.Len() > 0 {
+				b.WriteString(fb.String())
+			}
+		}
+	}
+
+	// CStrings
+	if conf.CStrings {
+		newStrs := utils.Difference(newInfo.CStrings, oldInfo.CStrings)
+		sort.Strings(newStrs)
+		rmStrs := utils.Difference(oldInfo.CStrings, newInfo.CStrings)
+		sort.Strings(rmStrs)
+		if len(newStrs) > 0 || len(rmStrs) > 0 {
+			b.WriteString("CStrings:\n")
+			for _, s := range newStrs {
+				b.WriteString(fmt.Sprintf("+ %#v\n", s))
+			}
+			for _, s := range rmStrs {
+				b.WriteString(fmt.Sprintf("- %#v\n", s))
+			}
+		}
+	}
+
+	if conf.Markdown {
+		b.WriteString("\n```\n")
+	}
+
+	return b.String(), nil
+}
 
 type DiffConfig struct {
 	Markdown   bool
@@ -25,6 +261,7 @@ type DiffConfig struct {
 	PemDB      string
 	SymMap     map[string]signature.SymbolMap
 	Verbose    bool
+	LowMemory  bool // Use disk caching to reduce RAM usage
 }
 
 type MachoDiff struct {
@@ -191,210 +428,15 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 			if dat2.Equal(*dat1) {
 				continue
 			}
-			var out string
-			if conf.Markdown {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return err
-				}
-			} else {
-				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return err
-				}
+			var formatted string
+			formatted, err = FormatUpdatedDiff(dat1, dat2, conf)
+			if err != nil {
+				return err
 			}
-			if len(out) == 0 { // no diff
+			if formatted == "" {
 				continue
 			}
-			if conf.Markdown {
-				diff.Updated[currentFileKey] = "```diff\n" + out
-			} else {
-				diff.Updated[currentFileKey] = out
-			}
-
-			/* DIFF Symbols */
-			newSyms := utils.Difference(dat2.Symbols, dat1.Symbols)
-			sort.Strings(newSyms)
-			rmSyms := utils.Difference(dat1.Symbols, dat2.Symbols)
-			sort.Strings(rmSyms)
-			if len(newSyms) > 0 || len(rmSyms) > 0 {
-				diff.Updated[currentFileKey] += "Symbols:\n"
-				for _, s := range newSyms {
-					diff.Updated[currentFileKey] += fmt.Sprintf("+ %s\n", s)
-				}
-				for _, s := range rmSyms {
-					diff.Updated[currentFileKey] += fmt.Sprintf("- %s\n", s)
-				}
-			}
-
-			/* DIFF Functions */
-			if conf.FuncStarts {
-				// Helper for printable name
-				printable := func(f types.Function, smap map[uint64]string) string {
-					sym, ok := smap[f.StartAddr]
-					if ok {
-						return sym
-					}
-					return fmt.Sprintf("sub_%x", f.StartAddr)
-				}
-
-				funcs1 := dat1.Starts
-				funcs2 := dat2.Starts
-
-				n1, n2 := len(funcs1), len(funcs2)
-
-				var b strings.Builder
-				appendLine := func(s string) {
-					if b.Len() == 0 {
-						b.WriteString("Functions:\n")
-					}
-					b.WriteString(s)
-				}
-
-				// same count
-				if n1 == n2 {
-					consecutiveMismatch := 0
-					const maxMismatch = 5
-
-					for i := range n1 {
-						f1 := funcs1[i]
-						f2 := funcs2[i]
-						f1.Name = printable(f1, dat1.SymbolMap)
-						f2.Name = printable(f2, dat2.SymbolMap)
-
-						if f1.Name != "" && f1.Name == f2.Name {
-							// same symbol – only record if size changed
-							sz1 := f1.EndAddr - f1.StartAddr
-							sz2 := f2.EndAddr - f2.StartAddr
-							if sz1 != sz2 {
-								appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
-							}
-							consecutiveMismatch = 0
-							continue
-						}
-
-						// unnamed or different names – compare size
-						sz1 := f1.EndAddr - f1.StartAddr
-						sz2 := f2.EndAddr - f2.StartAddr
-
-						if sz1 == sz2 {
-							consecutiveMismatch = 0
-							continue // treat as aligned
-						}
-
-						// size diff
-						appendLine(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
-						consecutiveMismatch++
-
-						if consecutiveMismatch >= maxMismatch {
-							// scan ahead for 3 consecutive size matches to recover
-							recovered := false
-							const seekAhead = 6
-							if i+seekAhead < n1 {
-								matches := 0
-								for k := 1; k <= seekAhead && i+k < n1; k++ {
-									if (funcs1[i+k].EndAddr - funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr - funcs2[i+k].StartAddr) {
-										matches++
-										if matches >= 3 {
-											recovered = true
-											break
-										}
-									} else {
-										matches = 0
-									}
-								}
-							}
-							if !recovered {
-								// bail out – noisy diff
-								b.Reset()
-								break
-							}
-						}
-					}
-
-					if b.Len() > 0 {
-						diff.Updated[currentFileKey] += b.String()
-					}
-					goto CStringBlock
-				}
-
-				// different counts – two-pointer scan with simple heuristics
-				i, j := 0, 0
-				consecutiveNoise := 0
-				const noiseLimit = 6
-
-				for i < n1 && j < n2 {
-					f1 := funcs1[i]
-					f2 := funcs2[j]
-					f1.Name = printable(f1, dat1.SymbolMap)
-					f2.Name = printable(f2, dat2.SymbolMap)
-					// strong name match
-					if f1.Name != "" && f1.Name == f2.Name {
-						sz1 := f1.EndAddr - f1.StartAddr
-						sz2 := f2.EndAddr - f2.StartAddr
-						if sz1 != sz2 {
-							appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
-						}
-						i++
-						j++
-						consecutiveNoise = 0
-						continue
-					}
-
-					// size match
-					if (f1.EndAddr - f1.StartAddr) == (f2.EndAddr - f2.StartAddr) {
-						i++
-						j++
-						consecutiveNoise = 0
-						continue
-					}
-
-					// try simple insert/delete to recoup
-					if j+1 < n2 && (f1.EndAddr-f1.StartAddr) == (funcs2[j+1].EndAddr-funcs2[j+1].StartAddr) {
-						appendLine(fmt.Sprintf("+ %s\n", f2.Name))
-						j++
-						consecutiveNoise++
-					} else if i+1 < n1 && (funcs1[i+1].EndAddr-funcs1[i+1].StartAddr) == (f2.EndAddr-f2.StartAddr) {
-						appendLine(fmt.Sprintf("- %s\n", f1.Name))
-						i++
-						consecutiveNoise++
-					} else {
-						consecutiveNoise++
-					}
-
-					if consecutiveNoise >= noiseLimit {
-						b.Reset()
-						break
-					}
-				}
-
-				if b.Len() > 0 {
-					diff.Updated[currentFileKey] += b.String()
-				}
-			}
-
-		CStringBlock:
-
-			/* DIFF CStrings */
-			if conf.CStrings {
-				newStrs := utils.Difference(dat2.CStrings, dat1.CStrings)
-				sort.Strings(newStrs)
-				rmStrs := utils.Difference(dat1.CStrings, dat2.CStrings)
-				sort.Strings(rmStrs)
-				if len(newStrs) > 0 || len(rmStrs) > 0 {
-					diff.Updated[currentFileKey] += "CStrings:\n"
-					for _, s := range newStrs {
-						diff.Updated[currentFileKey] += fmt.Sprintf("+ %#v\n", s)
-					}
-					for _, s := range rmStrs {
-						diff.Updated[currentFileKey] += fmt.Sprintf("- %#v\n", s)
-					}
-				}
-			}
-
-			if conf.Markdown {
-				diff.Updated[currentFileKey] += "\n```\n"
-			}
+			diff.Updated[currentFileKey] = formatted
 		}
 	}
 
@@ -407,8 +449,12 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 		Updated: make(map[string]string),
 	}
 
-	/* PREVIOUS IPSW */
+	if conf.LowMemory {
+		// Low-memory mode: cache DiffInfo to disk to avoid holding all in RAM
+		return diffIPSWLowMemory(oldIPSW, newIPSW, conf, diff)
+	}
 
+	// Default: fast in-memory mode
 	prev := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(oldIPSW, conf.PemDB, func(path string, m *macho.File) error {
@@ -418,20 +464,72 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
-	/* NEXT IPSW */
-
 	next := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(newIPSW, conf.PemDB, func(path string, m *macho.File) error {
 		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse machos in 'New' IPSW: %v", err)
 	}
 
 	if err := diff.Generate(prev, next, conf); err != nil {
 		return nil, err
 	}
+
+	return diff, nil
+}
+
+// diffIPSWLowMemory uses disk caching to reduce RAM usage
+func diffIPSWLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *MachoDiff) (*MachoDiff, error) {
+	cacheDir, err := os.MkdirTemp("", "ipsw_macho_diff_cache")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(cacheDir)
+
+	prevKeys := make(map[string]struct{})
+
+	if err := search.ForEachMachoInIPSW(oldIPSW, conf.PemDB, func(path string, m *macho.File) error {
+		prevKeys[path] = struct{}{}
+		return writeCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
+	}); err != nil {
+		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+	}
+
+	if err := search.ForEachMachoInIPSW(newIPSW, conf.PemDB, func(path string, m *macho.File) error {
+		if _, ok := prevKeys[path]; !ok {
+			diff.New = append(diff.New, path)
+			return nil
+		}
+
+		oldInfo, err := readCachedDiffInfo(cacheDir, path)
+		if err != nil {
+			return err
+		}
+		newInfo := GenerateDiffInfo(m, conf)
+		if newInfo.Equal(*oldInfo) {
+			delete(prevKeys, path)
+			return nil
+		}
+		formatted, err := FormatUpdatedDiff(oldInfo, newInfo, conf)
+		if err != nil {
+			return err
+		}
+		if formatted != "" {
+			diff.Updated[path] = formatted
+		}
+		delete(prevKeys, path)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to parse machos in 'New' IPSW: %v", err)
+	}
+
+	for path := range prevKeys {
+		diff.Removed = append(diff.Removed, path)
+	}
+	sort.Strings(diff.New)
+	sort.Strings(diff.Removed)
 
 	return diff, nil
 }
@@ -442,8 +540,12 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		Updated: make(map[string]string),
 	}
 
-	/* PREVIOUS IPSW */
+	if conf.LowMemory {
+		// Low-memory mode: cache DiffInfo to disk to avoid holding all in RAM
+		return diffFirmwaresLowMemory(oldIPSW, newIPSW, conf, diff)
+	}
 
+	// Default: fast in-memory mode
 	prev := make(map[string]*DiffInfo)
 
 	if err := search.ForEachIm4pInIPSW(oldIPSW, func(path string, m *macho.File) error {
@@ -453,20 +555,70 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
-	/* NEXT IPSW */
-
 	next := make(map[string]*DiffInfo)
 
 	if err := search.ForEachIm4pInIPSW(newIPSW, func(path string, m *macho.File) error {
 		next[path] = GenerateDiffInfo(m, conf)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse firmwares in 'New' IPSW: %v", err)
 	}
 
 	if err := diff.Generate(prev, next, conf); err != nil {
 		return nil, err
 	}
+
+	return diff, nil
+}
+
+// diffFirmwaresLowMemory uses disk caching to reduce RAM usage
+func diffFirmwaresLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *MachoDiff) (*MachoDiff, error) {
+	cacheDir, err := os.MkdirTemp("", "ipsw_firmware_diff_cache")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(cacheDir)
+
+	prevKeys := make(map[string]struct{})
+	if err := search.ForEachIm4pInIPSW(oldIPSW, func(path string, m *macho.File) error {
+		prevKeys[path] = struct{}{}
+		return writeCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
+	}); err != nil {
+		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
+	}
+
+	if err := search.ForEachIm4pInIPSW(newIPSW, func(path string, m *macho.File) error {
+		if _, ok := prevKeys[path]; !ok {
+			diff.New = append(diff.New, path)
+			return nil
+		}
+		oldInfo, err := readCachedDiffInfo(cacheDir, path)
+		if err != nil {
+			return err
+		}
+		newInfo := GenerateDiffInfo(m, conf)
+		if newInfo.Equal(*oldInfo) {
+			delete(prevKeys, path)
+			return nil
+		}
+		formatted, err := FormatUpdatedDiff(oldInfo, newInfo, conf)
+		if err != nil {
+			return err
+		}
+		if formatted != "" {
+			diff.Updated[path] = formatted
+		}
+		delete(prevKeys, path)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to parse firmwares in 'New' IPSW: %v", err)
+	}
+
+	for path := range prevKeys {
+		diff.Removed = append(diff.Removed, path)
+	}
+	sort.Strings(diff.New)
+	sort.Strings(diff.Removed)
 
 	return diff, nil
 }
