@@ -154,7 +154,7 @@
   },
   "latest_ipsw": {
     "ios_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/089-91292/E0B40965-4758-4C5C-B83C-E9F75BCCE139/iPhone17,1_26.2_23C55_Restore.ipsw",
-    "macos_url": "",
+    "macos_url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/093-37399/E144C918-CF99-4BBC-B1D0-3E739B9A3F2D/UniversalMac_26.2_25C56_Restore.ipsw",
     "url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/089-91292/E0B40965-4758-4C5C-B83C-E9F75BCCE139/iPhone17,1_26.2_23C55_Restore.ipsw"
   }
 }
