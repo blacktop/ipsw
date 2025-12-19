@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -159,7 +158,7 @@ var DisassCmd = &cobra.Command{
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
 		}
 		if viper.GetString("dyld.disass.dec-llm") != "" {
-			if !slices.Contains(ai.Providers, viper.GetString("dyld.disass.dec-llm")) {
+			if !ai.IsValidProvider(viper.GetString("dyld.disass.dec-llm")) {
 				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}
 		}
