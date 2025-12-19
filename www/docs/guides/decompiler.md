@@ -11,12 +11,15 @@ The **ipsw AI decompiler** revolutionizes binary analysis by leveraging state-of
 
 ## Requirements
 
-There are currently 6 supported LLM providers
+There are currently 9 supported LLM providers
 
 - Github Copilot
 - OpenAI
-- Claude (Anthropic)
-- Gemini (Google AI)
+- Anthropic (Claude API)
+- Google (Gemini API)
+- Claude (ACP)
+- Codex (ACP)
+- Gemini (ACP)
 - Ollama (local LLMs)
 - OpenRouter (API access to multiple models)
 
@@ -72,7 +75,7 @@ export OPENAI_API_KEY="sk-your-key-here"
 ipsw macho disass binary --dec --dec-llm openai
 ```
 
-### Claude (Anthropic)
+### Anthropic (Claude API)
 
 ```bash
 # 1. Get API key from https://console.anthropic.com/
@@ -80,10 +83,10 @@ ipsw macho disass binary --dec --dec-llm openai
 export ANTHROPIC_API_KEY="sk-ant-your-key-here"
 
 # 3. Use with ipsw
-ipsw macho disass binary --dec --dec-llm claude
+ipsw macho disass binary --dec --dec-llm anthropic
 ```
 
-### Gemini (Google AI)
+### Google (Gemini API)
 
 ```bash
 # 1. Get API key from https://aistudio.google.com/apikey
@@ -91,6 +94,24 @@ ipsw macho disass binary --dec --dec-llm claude
 export GEMINI_API_KEY="your-key-here"
 
 # 3. Use with ipsw
+ipsw macho disass binary --dec --dec-llm google
+
+# Tip: omit --dec-model for interactive selection
+# (API providers do not support the "default" placeholder model)
+```
+
+### CLI Agent Providers (Claude / Codex / Gemini)
+
+For the adapters below, you need `npx` (Node.js) available.
+
+```bash
+# Claude (ACP)
+ipsw macho disass binary --dec --dec-llm claude
+
+# Codex (ACP)
+ipsw macho disass binary --dec --dec-llm codex
+
+# Gemini (ACP)
 ipsw macho disass binary --dec --dec-llm gemini
 ```
 
@@ -165,7 +186,7 @@ ipsw dsc disass dyld_shared_cache_arm64e --vaddr 0x1234567890 --dec
 ipsw dsc disass dyld_shared_cache_arm64e --symbol "_objc_msgSend" --demangle --dec
 
 # Swift function analysis
-ipsw dsc disass dyld_shared_cache --vaddr 0x... --dec --dec-lang "Swift" --dec-llm "claude"
+ipsw dsc disass dyld_shared_cache --vaddr 0x... --dec --dec-lang "Swift" --dec-llm "anthropic"
 ```
 
 ## 💡 Example Output

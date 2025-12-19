@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/utils"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/ai/acp"
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
 	"github.com/blacktop/ipsw/internal/ai/copilot"
 	"github.com/blacktop/ipsw/internal/ai/gemini"
@@ -23,12 +25,43 @@ import (
 )
 
 var Providers = []string{
+	"anthropic",
 	"claude",
 	"copilot",
+	"codex",
 	"gemini",
+	"google",
 	"ollama",
 	"openai",
 	"openrouter",
+}
+
+var ProviderAliases = map[string]string{
+	// Legacy ACP provider names
+	"claude-code-acp": "claude",
+	"codex-acp":       "codex",
+	"gemini-acp":      "gemini",
+	// Legacy API provider names
+	"claude": "claude", // canonical (ACP)
+	"gemini": "gemini", // canonical (ACP)
+	// Explicit API aliases
+	"claude-api": "anthropic",
+	"gemini-api": "google",
+}
+
+func NormalizeProvider(provider string) string {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return provider
+	}
+	if canonical, ok := ProviderAliases[provider]; ok {
+		return canonical
+	}
+	return provider
+}
+
+func IsValidProvider(provider string) bool {
+	return slices.Contains(Providers, NormalizeProvider(provider))
 }
 
 type AI interface {
@@ -203,6 +236,8 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	var err error
 	var cache db.CacheDB
 
+	cfg.Provider = NormalizeProvider(cfg.Provider)
+
 	if !cfg.DisableCache && !cfg.Stream {
 		cache, err = db.NewCacheDB(cfg.Verbose)
 		if err != nil {
@@ -223,6 +258,17 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 
 	switch cfg.Provider {
 	case "claude":
+		baseAI, err = acp.New(ctx, &acp.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+			Command:     "npx",
+			Args:        []string{"-y", "@zed-industries/claude-code-acp@latest"},
+			Verbose:     cfg.Verbose,
+		})
+	case "anthropic":
 		baseAI, err = anthropic.NewClaude(ctx, &anthropic.Config{
 			Prompt:         cfg.Prompt,
 			Model:          cfg.Model,
@@ -241,7 +287,29 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			Stream:      cfg.Stream,
 			Cache:       cache,
 		})
+	case "codex":
+		baseAI, err = acp.New(ctx, &acp.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+			Command:     "npx",
+			Args:        []string{"-y", "@zed-industries/codex-acp@latest"},
+			Verbose:     cfg.Verbose,
+		})
 	case "gemini":
+		baseAI, err = acp.New(ctx, &acp.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+			Command:     "npx",
+			Args:        []string{"-y", "@google/gemini-cli@latest", "--experimental-acp"},
+			Verbose:     cfg.Verbose,
+		})
+	case "google":
 		baseAI, err = gemini.NewGemini(ctx, &gemini.Config{
 			Prompt:      cfg.Prompt,
 			Model:       cfg.Model,

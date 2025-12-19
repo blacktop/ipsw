@@ -72,6 +72,21 @@ func Decompile(asm string, cfg *Config) (string, error) {
 		models := slices.Collect(maps.Keys(modelMap))
 		sort.Strings(models)
 
+		// If the provider only offers a single 'default' model, don't bother prompting.
+		if len(models) == 1 {
+			choice := models[0]
+			modelID := modelMap[choice]
+			if modelID == "" {
+				modelID = choice
+			}
+			if choice == "default" || modelID == "default" {
+				if err := llm.SetModel("default"); err != nil {
+					return "", fmt.Errorf("failed to set llm model: %v", err)
+				}
+				goto decompile
+			}
+		}
+
 		var choice string
 		prompt := &survey.Select{
 			Message:  "Select model to use:",
@@ -82,10 +97,16 @@ func Decompile(asm string, cfg *Config) (string, error) {
 			log.Warn("Exiting...")
 			return "", nil
 		}
-		if err := llm.SetModel(choice); err != nil {
+		modelID := modelMap[choice]
+		if modelID == "" {
+			modelID = choice
+		}
+		if err := llm.SetModel(modelID); err != nil {
 			return "", fmt.Errorf("failed to set llm model: %v", err)
 		}
 	}
+
+decompile:
 	s := spinner.New(spinner.CharSets[38], 100*time.Millisecond)
 	s.Prefix = color.BlueString("   • Decompiling... ")
 	s.Start()
