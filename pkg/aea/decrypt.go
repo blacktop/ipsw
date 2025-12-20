@@ -488,11 +488,18 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		return decrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
 	}
 	// use 'aea' binary (as is the fastest way to decrypt AEA on macOS)
-	return aea(
+	out, err := aea(
 		c.Input,
 		filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))),
 		c.B64SymKey,
 	)
+	if err != nil {
+		// fallback to pure Go implementation if system binary fails
+		// (can happen due to resource exhaustion or other transient errors)
+		log.WithError(err).Warn("System 'aea' binary failed, falling back to pure Go implementation")
+		return decrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)
+	}
+	return out, nil
 }
 
 func aea(in, out, key string) (string, error) {

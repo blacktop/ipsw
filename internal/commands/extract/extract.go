@@ -132,7 +132,8 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 		if len(dmgs) == 0 {
 			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
 		}
-		defer os.Remove(filepath.Clean(dmgs[0]))
+		dmgPath = dmgs[0] // update dmgPath to the actual extracted file path
+		defer os.Remove(filepath.Clean(dmgPath))
 	}
 
 	if filepath.Ext(dmgPath) == ".aea" {
