@@ -26,8 +26,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"syscall"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -111,36 +109,10 @@ var mountCmd = &cobra.Command{
 
 		var keys any
 		if lookupKeys {
-			var (
-				device  string
-				version string
-				build   string
-			)
-			re := regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
-			if re.MatchString(args[1]) {
-				matches := re.FindStringSubmatch(args[1])
-				if len(matches) < 4 {
-					return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
-				}
-				device = filepath.Base(matches[1])
-				version = matches[2]
-				build = matches[3]
-			} else {
-				return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
-			}
-			if device == "" || build == "" {
-				return fmt.Errorf("device or build information is missing from IPSW filename (required for key lookup)")
-			}
 			log.Info("Downloading Keys...")
-			wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
-				Keys:    true,
-				Device:  strings.Replace(device, "ip", "iP", 1),
-				Version: version,
-				Build:   strings.ToUpper(build),
-				// Beta:    viper.GetBool("download.key.beta"),
-			}, "", false)
+			wikiKeys, err := download.LookupKeysFromPath(args[1], "", false)
 			if err != nil {
-				return fmt.Errorf("failed querying theapplewiki.com: %v", err)
+				return fmt.Errorf("failed to lookup keys: %v", err)
 			}
 			keys = wikiKeys
 		} else if len(key) > 0 {
