@@ -4,6 +4,7 @@ package extract
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,8 +76,11 @@ type Config struct {
 	JSON bool `json:"json,omitempty"`
 	// show info
 	Info bool `json:"info,omitempty"`
+	// Lookup decryption keys from theapplewiki.com
+	Lookup bool `json:"lookup,omitempty"`
 
-	info *info.Info
+	info     *info.Info
+	wikiKeys download.WikiFWKeys
 }
 
 func isURL(str string) bool {
@@ -84,12 +88,81 @@ func isURL(str string) bool {
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
+// decryptExtractedIM4P decrypts an extracted IM4P file using wiki keys if available
+// Returns the new path to the decrypted file (with original extension removed)
+func decryptExtractedIM4P(extractedPath string, wikiKeys download.WikiFWKeys) (string, error) {
+	if wikiKeys == nil {
+		return extractedPath, nil
+	}
+	// Get key by filename
+	keyStr, err := wikiKeys.GetKeyByFilename(extractedPath)
+	if err != nil {
+		log.Debugf("no key found for %s: %v", filepath.Base(extractedPath), err)
+		return extractedPath, nil // Not an error, just no key available
+	}
+	// Parse IV and Key from combined hex string (IV is first 32 chars, key is rest)
+	if len(keyStr) < 64 { // 32 hex for IV + at least 32 hex for key
+		log.Warnf("key string too short for %s", filepath.Base(extractedPath))
+		return extractedPath, nil
+	}
+	ivHex := keyStr[:32]
+	keyHex := keyStr[32:]
+
+	iv, err := hex.DecodeString(ivHex)
+	if err != nil {
+		return extractedPath, fmt.Errorf("failed to decode IV: %v", err)
+	}
+	key, err := hex.DecodeString(keyHex)
+	if err != nil {
+		return extractedPath, fmt.Errorf("failed to decode key: %v", err)
+	}
+
+	// Create decrypted output file without the .im4p/.img3 extension
+	// e.g., DeviceTree.n51ap.im4p -> DeviceTree.n51ap
+	decryptedPath := strings.TrimSuffix(extractedPath, filepath.Ext(extractedPath))
+
+	log.Infof("Decrypting %s", filepath.Base(extractedPath))
+	if err := img4.DecryptPayload(extractedPath, decryptedPath, iv, key); err != nil {
+		return extractedPath, fmt.Errorf("failed to decrypt %s: %v", filepath.Base(extractedPath), err)
+	}
+
+	// Remove original encrypted file
+	if err := os.Remove(extractedPath); err != nil {
+		log.Warnf("failed to remove encrypted file: %v", err)
+	}
+
+	return decryptedPath, nil
+}
+
 func getFolder(c *Config) (*info.Info, string, error) {
 	if c.info == nil {
 		var err error
-		c.info, err = info.Parse(filepath.Clean(c.IPSW))
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+		if c.Lookup && c.wikiKeys == nil {
+			fPath := filepath.Clean(c.IPSW)
+			log.Debugf("Lookup enabled, parsing IPSW path: %s", fPath)
+			log.Info("Looking up decryption keys...")
+			wkeys, lookupErr := download.LookupKeysFromPath(fPath, "", false)
+			if lookupErr != nil {
+				log.Warnf("failed to lookup keys from theapplewiki.com: %v", lookupErr)
+			} else {
+				c.wikiKeys = wkeys // Store keys for later use in extraction
+				dtkey, keyErr := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
+				if keyErr != nil {
+					log.Warnf("failed to get DeviceTree key: %v", keyErr)
+				} else {
+					log.Debugf("Found DeviceTree key: %s", dtkey)
+					c.info, err = info.Parse(fPath, dtkey)
+					if err != nil {
+						return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+					}
+				}
+			}
+		}
+		if c.info == nil {
+			c.info, err = info.Parse(filepath.Clean(c.IPSW))
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+			}
 		}
 	}
 	folder, err := c.info.GetFolder(c.KernelDevice)
@@ -108,9 +181,29 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 		return nil, nil, "", fmt.Errorf("unable to download remote zip: %v", err)
 	}
 	if c.info == nil {
-		c.info, err = info.ParseZipFiles(zr.File)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
+		if c.Lookup {
+			log.Info("Looking up decryption keys...")
+			wkeys, lookupErr := download.LookupKeysFromPath(c.URL, c.Proxy, c.Insecure)
+			if lookupErr != nil {
+				log.Warnf("failed to lookup keys from theapplewiki.com: %v", lookupErr)
+			} else {
+				c.wikiKeys = wkeys // Store keys for later use in extraction
+				dtkey, keyErr := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
+				if keyErr != nil {
+					log.Warnf("failed to get DeviceTree key: %v", keyErr)
+				} else {
+					c.info, err = info.ParseZipFiles(zr.File, dtkey)
+					if err != nil {
+						return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
+					}
+				}
+			}
+		}
+		if c.info == nil {
+			c.info, err = info.ParseZipFiles(zr.File)
+			if err != nil {
+				return nil, nil, "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
+			}
 		}
 	}
 	folder, err := c.info.GetFolder(c.KernelDevice)
@@ -208,9 +301,10 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 func FirmwareType(c *Config) (string, error) {
 	var err error
 	if len(c.IPSW) > 0 {
-		c.info, err = info.Parse(filepath.Clean(c.IPSW))
+		// Use getFolder which handles key lookup if enabled
+		_, _, err = getFolder(c)
 		if err != nil {
-			return "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+			return "", err
 		}
 		return c.info.Plists.Type, nil
 	} else if len(c.URL) > 0 {
@@ -797,11 +891,6 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 			return nil, err
 		}
 		destPath := filepath.Join(filepath.Clean(c.Output), folder)
-		if c.Output == "" {
-			c.Output = folder
-		} else {
-			c.Output = filepath.Join(filepath.Clean(c.Output), folder)
-		}
 		if len(tempDirectory) > 0 {
 			destPath = tempDirectory[0]
 		}
@@ -845,6 +934,19 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 				artifacts = append(artifacts, out...)
 			}
 		}
+		// Decrypt extracted IM4P files if wiki keys are available
+		if c.wikiKeys != nil {
+			for i, artifact := range artifacts {
+				if strings.HasSuffix(strings.ToLower(artifact), ".im4p") || strings.HasSuffix(strings.ToLower(artifact), ".img3") {
+					newPath, err := decryptExtractedIM4P(artifact, c.wikiKeys)
+					if err != nil {
+						log.Warnf("failed to decrypt %s: %v", filepath.Base(artifact), err)
+					} else {
+						artifacts[i] = newPath
+					}
+				}
+			}
+		}
 		return artifacts, nil
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
@@ -856,10 +958,7 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		}
 		destPath := filepath.Join(filepath.Clean(c.Output), folder)
 		if c.Output == "" {
-			c.Output = folder
 			destPath = folder
-		} else {
-			c.Output = destPath
 		}
 		out, err := utils.SearchZip(zr.File, re, destPath, c.Flatten, true)
 		if err != nil && !c.DMGs {
@@ -894,6 +993,19 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
 				}
 				artifacts = append(artifacts, out...)
+			}
+		}
+		// Decrypt extracted IM4P files if wiki keys are available
+		if c.wikiKeys != nil {
+			for i, artifact := range artifacts {
+				if strings.HasSuffix(strings.ToLower(artifact), ".im4p") || strings.HasSuffix(strings.ToLower(artifact), ".img3") {
+					newPath, err := decryptExtractedIM4P(artifact, c.wikiKeys)
+					if err != nil {
+						log.Warnf("failed to decrypt %s: %v", filepath.Base(artifact), err)
+					} else {
+						artifacts[i] = newPath
+					}
+				}
 			}
 		}
 		return artifacts, nil

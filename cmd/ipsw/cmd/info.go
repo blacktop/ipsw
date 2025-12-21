@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -120,36 +119,10 @@ var infoCmd = &cobra.Command{
 			} else {
 				var err error
 				if viper.GetBool("info.lookup") {
-					var (
-						device  string
-						version string
-						build   string
-					)
-					re := regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
-					if re.MatchString(fPath) {
-						matches := re.FindStringSubmatch(fPath)
-						if len(matches) < 4 {
-							return fmt.Errorf("failed to parse IPSW filename: %s", fPath)
-						}
-						device = filepath.Base(matches[1])
-						version = matches[2]
-						build = matches[3]
-					} else {
-						return fmt.Errorf("failed to parse IPSW filename: %s", fPath)
-					}
-					if device == "" || build == "" {
-						return fmt.Errorf("device or build information is missing from IPSW filename (required for key lookup)")
-					}
 					log.Info("Downloading Keys...")
-					wkeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
-						Keys:    true,
-						Device:  strings.Replace(device, "ip", "iP", 1),
-						Version: version,
-						Build:   strings.ToUpper(build),
-						// Beta:    viper.GetBool("download.key.beta"),
-					}, "", false)
+					wkeys, err := download.LookupKeysFromPath(fPath, "", false)
 					if err != nil {
-						return fmt.Errorf("failed querying theapplewiki.com: %v", err)
+						return fmt.Errorf("failed to lookup keys: %v", err)
 					}
 					dtkey, err := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
 					if err != nil {
