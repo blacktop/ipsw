@@ -50,7 +50,13 @@ var deviceListCmd = &cobra.Command{
 	Use:     "device-list",
 	Aliases: []string{"devs"},
 	Short:   "List all iOS devices",
-	Args:    cobra.NoArgs,
+	Long: `List all iOS devices from embedded device database.
+
+NOTE: This database is sourced from Xcode's device_traits.db which includes
+simulator devices and may not accurately map to physical hardware devices.
+Some entries (e.g., iPad17,4-A, iPad17,4-B) represent simulator variants
+rather than distinct hardware models.`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags

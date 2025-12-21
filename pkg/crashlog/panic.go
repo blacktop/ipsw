@@ -453,10 +453,15 @@ func parsePanicString210(in string) (*Panic210, error) {
 	return crash, nil
 }
 
+// hasPrefixFold checks if s has the given prefix, ignoring case
+func hasPrefixFold(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+}
+
 func (p *Panic210) getBoolField(title, key string) (*Field, error) {
 	for _, line := range p.lines {
-		if strings.HasPrefix(line, key) {
-			switch strings.ToLower(strings.TrimPrefix(line, key)) {
+		if hasPrefixFold(line, key) {
+			switch strings.ToLower(line[len(key):]) {
 			case "yes", "1", "true":
 				return &Field{Title: title, Value: true}, nil
 			case "no", "0", "false":
@@ -468,18 +473,20 @@ func (p *Panic210) getBoolField(title, key string) (*Field, error) {
 	}
 	return nil, fmt.Errorf("failed to find '%s'", key)
 }
+
 func (p *Panic210) getStrField(title, key string) (*Field, error) {
 	for _, line := range p.lines {
-		if strings.HasPrefix(line, key) {
-			return &Field{Title: title, Value: strings.TrimPrefix(line, key)}, nil
+		if hasPrefixFold(line, key) {
+			// Use the actual prefix length to trim, preserving the remainder
+			return &Field{Title: title, Value: line[len(key):]}, nil
 		}
 	}
 	return nil, fmt.Errorf("failed to find '%s'", key)
 }
 func (p *Panic210) getIntField(title, key string) (*Field, error) {
 	for _, line := range p.lines {
-		if strings.HasPrefix(line, key) {
-			return &Field{Title: title, Value: cast.ToUint64(strings.TrimSpace(strings.TrimPrefix(line, key)))}, nil
+		if hasPrefixFold(line, key) {
+			return &Field{Title: title, Value: cast.ToUint64(strings.TrimSpace(line[len(key):]))}, nil
 		}
 	}
 	return nil, fmt.Errorf("failed to find '%s'", key)

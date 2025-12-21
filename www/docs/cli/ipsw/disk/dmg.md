@@ -11,7 +11,7 @@ description: 🚧 List/Extract DMG partiton/blocks
 🚧 List/Extract DMG partiton/blocks
 
 ```
-ipsw disk dmg DMG [OUTPUT] [flags]
+ipsw disk dmg <DMG> [flags]
 ```
 
 ### Options

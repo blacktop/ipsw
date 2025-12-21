@@ -9,7 +9,7 @@ import (
 
 const serviceName = "com.apple.amfi.lockdown"
 
-var ErrPasscodeSet = fmt.Errorf("Device has a passcode set")
+var ErrPasscodeSet = fmt.Errorf("device has a passcode set")
 
 type AmfiAction struct {
 	Action int `plist:"action,omitempty"`

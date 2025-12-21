@@ -30,10 +30,10 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/swift"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -99,22 +99,19 @@ var swiftDumpCmd = &cobra.Command{
 		if viper.GetBool("swift-dump.interface") &&
 			(viper.GetString("swift-dump.type") != "" ||
 				viper.GetString("swift-dump.proto") != "" ||
-				viper.GetString("swift-dump.ext") != "") ||
-			viper.GetString("swift-dump.ass") != "" {
+				viper.GetString("swift-dump.ext") != "" ||
+				viper.GetString("swift-dump.ass") != "") {
 			return fmt.Errorf("cannot dump --interface and use --type, --protocol, --ext or --ass flags")
 		} else if len(viper.GetString("swift-dump.output")) > 0 && !viper.GetBool("swift-dump.interface") && !viper.GetBool("swift-dump.headers") {
 			return fmt.Errorf("cannot set --output without setting --interface or --headers")
 		} else if viper.GetBool("swift-dump.headers") && len(viper.GetString("swift-dump.output")) == 0 {
 			return fmt.Errorf("cannot set --headers without setting --output")
 		}
-		doDump := false
-		if viper.GetString("swift-dump.interface") == "" &&
+		doDump := !viper.GetBool("swift-dump.interface") &&
 			viper.GetString("swift-dump.type") == "" &&
 			viper.GetString("swift-dump.proto") == "" &&
-			!viper.GetBool("swift-dump.ext") &&
-			!viper.GetBool("swift-dump.ass") {
-			doDump = true
-		}
+			viper.GetString("swift-dump.ext") == "" &&
+			viper.GetString("swift-dump.ass") == ""
 
 		if len(viper.GetString("swift-dump.output")) > 0 {
 			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {

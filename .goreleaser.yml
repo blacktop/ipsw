@@ -2,6 +2,10 @@
 # vim: set ts=2 sw=2 tw=0 fo=jcroql
 version: 2
 
+git:
+  ignore_tags:
+    - v0.0.0-prerelease
+
 before:
   hooks:
     - go mod tidy
@@ -491,6 +495,27 @@ brews:
     test: |
       system "#{bin}/ipswd version"
 
+homebrew_casks:
+  - repository:
+      owner: blacktop
+      name: homebrew-tap
+    ids:
+      - extras_archive
+    homepage: https://github.com/blacktop/ipsw
+    description: iOS/macOS Research Swiss Army Knife
+    license: MIT
+    conflicts:
+      - cask: ipsw-frida
+    manpages:
+      # TODO: add ALL manpages back in
+      - "manpages/ipsw.1.gz"
+    completions:
+      bash: "completions/ipsw/_bash"
+      zsh: "completions/ipsw/_zsh"
+      fish: "completions/ipsw/_fish"
+    url:
+      verified: github.com/blacktop/ipsw/releases/download
+
 checksum:
   name_template: "checksums.txt"
 
@@ -752,7 +777,7 @@ snapcrafts:
     apps:
       ipsw:
         command: ipsw
-        plugs: ["home", "network", "fuse-support"]
+        plugs: ["home", "network", "fuse-support", "removable-media"]
   - id: snaps-daemon
     ids:
       - linux_daemon_build
@@ -805,7 +830,7 @@ snapcrafts:
           sock:
             listen-stream: $SNAP_COMMON/ipsw.sock
             socket-mode: 0770
-        plugs: ["home", "network", "network-bind"]
+        plugs: ["home", "network", "network-bind", "removable-media"]
 
 scoops:
   - ids: [default_archive]
@@ -918,7 +943,7 @@ release:
     - Follow us on [Twitter](https://twitter.com/blacktop__)
     - Follow us on [Mastodon](https://mastodon.social/@blacktop)
     - Follow us on [Bluesky](https://bsky.app/profile/blacktop.bsky.social)
-    - Join our [Discord](https://discord.gg/cg9ceu35)
+    - Join our [Discord](https://discord.gg/BEamsHAWAh)
 
 announce:
   discord:

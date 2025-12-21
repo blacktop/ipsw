@@ -11,8 +11,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	iswift "github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types"
-	iswift "github.com/blacktop/ipsw/internal/swift"
 )
 
 const MAX_PRESPECIALIZED_METADATA_TABLES = 8

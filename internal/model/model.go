@@ -18,10 +18,10 @@ var (
 type Platform string
 
 const (
-	PlatformIOS     Platform = "iOS"
-	PlatformMacOS   Platform = "macOS"
-	PlatformWatchOS Platform = "watchOS"
-	PlatformTvOS    Platform = "tvOS"
+	PlatformIOS      Platform = "iOS"
+	PlatformMacOS    Platform = "macOS"
+	PlatformWatchOS  Platform = "watchOS"
+	PlatformTvOS     Platform = "tvOS"
 	PlatformVisionOS Platform = "visionOS"
 )
 

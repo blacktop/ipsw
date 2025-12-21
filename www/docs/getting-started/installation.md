@@ -109,6 +109,19 @@ The **extras** and **frida** versions of `ipsw` only support macOS for now. *(Pl
 sudo snap install ipsw
 ```
 
+:::info Accessing External USB Drives
+To access files on external USB drives (e.g., exFAT formatted drives), the snap needs the `removable-media` interface. This is automatically connected in newer versions, but if you're experiencing permission issues, you can manually connect it:
+
+```bash
+snap connect ipsw:removable-media
+```
+
+To verify the connection:
+```bash
+snap connections ipsw
+```
+:::
+
 ## Via `deb`/`rpm`/`apk` debian packages in the [releases](https://github.com/blacktop/ipsw/releases) page
 
 To install, after downloading the files, run:

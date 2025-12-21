@@ -86,9 +86,9 @@ var machoPatchModCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
-		overwrite := viper.GetBool("macho.patch.overwrite")
-		reSign := viper.GetBool("macho.patch.re-sign")
-		output := viper.GetString("macho.patch.output")
+		overwrite := viper.GetBool("macho.patch.mod.overwrite")
+		reSign := viper.GetBool("macho.patch.mod.re-sign")
+		output := viper.GetString("macho.patch.mod.output")
 
 		var m *macho.File
 
@@ -109,7 +109,7 @@ var machoPatchModCmd = &cobra.Command{
 		}
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf(err.Error())
+			return err
 		}
 
 		if len(output) == 0 { // modify in place

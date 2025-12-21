@@ -39,13 +39,13 @@ import (
 	"github.com/blacktop/go-macho"
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/codesign/entitlements"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
-	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fatih/color"
@@ -648,6 +648,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -663,6 +666,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -678,6 +684,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -693,6 +702,9 @@ var machoInfoCmd = &cobra.Command{
 						return err
 					}
 					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if err != nil {
+						return err
+					}
 					if color {
 						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
 							return err
@@ -770,8 +782,10 @@ var machoInfoCmd = &cobra.Command{
 			}
 			if m.HasObjC() {
 				o, err := mcmd.NewObjC(m, nil, &mcmd.ObjcConfig{
+					Verbose:  viper.GetBool("verbose"),
 					Addrs:    true,
 					ObjcRefs: showObjcRefs,
+					Demangle: doDemangle,
 					Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 					Theme:    "nord",
 				})

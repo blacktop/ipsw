@@ -293,30 +293,49 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 // Extract extracts and decompresses a kernelcache from ipsw
 func Extract(ipsw, destPath, device string) (map[string][]string, error) {
-	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
-	}
-	defer os.RemoveAll(tmpDIR)
-
-	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
-		return strings.Contains(f.Name, "kernelcache")
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to unzip kernelcache: %v", err)
-	}
-
+	// Parse IPSW info first to determine which kernelcache(s) to extract
 	i, err := info.Parse(ipsw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ipsw info: %v", err)
 	}
 
+	// Determine which kernelcache files to extract
+	var targetKCs []string
+	if len(device) > 0 {
+		// Only extract kernelcache(s) for the specified device
+		targetKCs = i.GetKernelCacheForDevice(device)
+		if len(targetKCs) == 0 {
+			return nil, fmt.Errorf("no kernelcache found for device %s in IPSW", device)
+		}
+	}
+
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store kernelcache: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
+		if !strings.Contains(f.Name, "kernelcache") {
+			return false
+		}
+		// If we have specific targets, only extract those
+		if len(targetKCs) > 0 {
+			for _, target := range targetKCs {
+				if strings.HasSuffix(f.Name, target) || filepath.Base(f.Name) == filepath.Base(target) {
+					return true
+				}
+			}
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to unzip kernelcache: %v", err)
+	}
+
 	artifacts := make(map[string][]string)
 	for _, kcache := range kcaches {
-		if len(device) > 0 && !slices.Contains(i.GetDevicesForKernelCache(kcache), device) {
-			os.Remove(kcache)
-			continue // skip if kernel not for given device
-		}
 		fname := i.GetKernelCacheFileName(kcache)
 		fname = filepath.Join(destPath, fname)
 		fname = filepath.Clean(fname)

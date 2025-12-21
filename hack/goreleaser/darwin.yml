@@ -1,5 +1,7 @@
 # This is an example .goreleaser.yml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -7,35 +9,37 @@ before:
     - ./hack/make/manpages
 
 builds:
-  - id: darwin_extras_build
+  - id: darwin_arm64_extras
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
       - CGO_LDFLAGS=-L/opt/homebrew/lib
       - CGO_CFLAGS=-I/opt/homebrew/include
+      - PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
     goos:
       - darwin
     goarch:
-      - amd64
+      - arm64
     tags:
       - libusb
       - unicorn
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
 
 archives:
-  - id : darwin_extras_archive
+  - id: darwin_arm64_extras_archive
     builds:
-      - darwin_extras_build
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
+      - darwin_arm64_extras
+    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras"
     replacements:
       darwin: macOS
       ios: iOS
-      amd64: x86_64
-      all: universal
     format_overrides:
       - goos: windows
         format: zip
@@ -47,7 +51,7 @@ archives:
     wrap_in_directory: true
 
 checksum:
-  name_template: "checksums.darwin_extras.txt"
+  name_template: "checksums.darwin_arm64_extras.txt"
 
 sboms:
   - artifacts: archive

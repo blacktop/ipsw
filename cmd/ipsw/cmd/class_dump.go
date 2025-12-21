@@ -147,13 +147,15 @@ var classDumpCmd = &cobra.Command{
 			}
 		}
 
+		demangleOpt := viper.GetBool("class-dump.demangle")
 		conf := mcmd.ObjcConfig{
-			Verbose:  Verbose || viper.GetBool("class-dump.demangle"),
+			Verbose:  Verbose || demangleOpt,
 			Addrs:    viper.GetBool("class-dump.re"),
 			Headers:  viper.GetBool("class-dump.headers"),
 			ObjcRefs: viper.GetBool("class-dump.refs"),
 			Deps:     viper.GetBool("class-dump.deps"),
 			// Generic:     viper.GetBool("class-dump.generic"),
+			Demangle:    demangleOpt,
 			IpswVersion: fmt.Sprintf("Version: %s, BuildCommit: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildCommit)),
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("class-dump.theme"),
@@ -251,6 +253,11 @@ var classDumpCmd = &cobra.Command{
 						}
 						continue
 					}
+					if viper.GetBool("class-dump.all") {
+						log.WithError(err).Warnf("failed to create ObjC parser for dylib '%s'", filepath.Base(img.Name))
+						continue
+					}
+					return fmt.Errorf("failed to create ObjC parser for dylib '%s': %v", filepath.Base(img.Name), err)
 				}
 
 				if viper.GetBool("class-dump.headers") {

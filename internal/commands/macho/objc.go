@@ -15,10 +15,10 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/tbd"
 )
@@ -37,6 +37,7 @@ type ObjcConfig struct {
 	ObjcRefs bool
 	Deps     bool
 	Generic  bool
+	Demangle bool
 
 	IpswVersion string
 
@@ -97,6 +98,13 @@ type headerInfo struct {
 	Name          string
 	Imports       Imports
 	Object        string
+}
+
+func (o *ObjC) maybeDemangle(text string) string {
+	if !o.conf.Demangle {
+		return text
+	}
+	return swift.DemangleBlob(text)
 }
 
 // ObjC represents a MachO ObjC parser
@@ -180,16 +188,16 @@ func (o *ObjC) DumpClass(pattern string) error {
 			if re.MatchString(class.Name) {
 				if o.conf.Color {
 					if o.conf.Addrs {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+						quick.Highlight(os.Stdout, o.maybeDemangle(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 					} else {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", o.conf.Theme)
+						quick.Highlight(os.Stdout, o.maybeDemangle(class.Verbose()), "objc", "terminal256", o.conf.Theme)
 					}
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 				} else {
 					if o.conf.Addrs {
-						fmt.Println(swift.DemangleBlob(class.WithAddrs()))
+						fmt.Println(o.maybeDemangle(class.WithAddrs()))
 					} else {
-						fmt.Println(swift.DemangleBlob(class.Verbose()))
+						fmt.Println(o.maybeDemangle(class.Verbose()))
 					}
 				}
 			}
@@ -227,16 +235,16 @@ func (o *ObjC) DumpProtocol(pattern string) error {
 				if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
 					if o.conf.Color {
 						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 						} else {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
 						}
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
 						if o.conf.Addrs {
-							fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
+							fmt.Println(o.maybeDemangle(proto.WithAddrs()))
 						} else {
-							fmt.Println(swift.DemangleBlob(proto.Verbose()))
+							fmt.Println(o.maybeDemangle(proto.Verbose()))
 						}
 					}
 					seen[proto.Ptr] = true
@@ -274,16 +282,16 @@ func (o *ObjC) DumpCategory(pattern string) error {
 			if re.MatchString(cat.Name) {
 				if o.conf.Color {
 					if o.conf.Addrs {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+						quick.Highlight(os.Stdout, o.maybeDemangle(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 					} else {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
+						quick.Highlight(os.Stdout, o.maybeDemangle(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
 					}
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 				} else {
 					if o.conf.Addrs {
-						fmt.Println(swift.DemangleBlob(cat.WithAddrs()))
+						fmt.Println(o.maybeDemangle(cat.WithAddrs()))
 					} else {
-						fmt.Println(swift.DemangleBlob(cat.Verbose()))
+						fmt.Println(o.maybeDemangle(cat.Verbose()))
 					}
 				}
 			}
@@ -318,16 +326,16 @@ func (o *ObjC) Dump() error {
 					if o.conf.Verbose {
 						if o.conf.Color {
 							if o.conf.Addrs {
-								quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+								quick.Highlight(os.Stdout, o.maybeDemangle(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 							} else {
-								quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
+								quick.Highlight(os.Stdout, o.maybeDemangle(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
 							}
 							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 						} else {
 							if o.conf.Addrs {
-								fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
+								fmt.Println(o.maybeDemangle(proto.WithAddrs()))
 							} else {
-								fmt.Println(swift.DemangleBlob(proto.Verbose()))
+								fmt.Println(o.maybeDemangle(proto.Verbose()))
 							}
 						}
 					} else {
@@ -352,16 +360,16 @@ func (o *ObjC) Dump() error {
 				if o.conf.Verbose {
 					if o.conf.Color {
 						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 						} else {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(class.Verbose()), "objc", "terminal256", o.conf.Theme)
 						}
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
 						if o.conf.Addrs {
-							fmt.Println(swift.DemangleBlob(class.WithAddrs()))
+							fmt.Println(o.maybeDemangle(class.WithAddrs()))
 						} else {
-							fmt.Println(swift.DemangleBlob(class.Verbose()))
+							fmt.Println(o.maybeDemangle(class.Verbose()))
 						}
 					}
 				} else {
@@ -384,16 +392,16 @@ func (o *ObjC) Dump() error {
 				if o.conf.Verbose {
 					if o.conf.Color {
 						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
 						} else {
-							quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
+							quick.Highlight(os.Stdout, o.maybeDemangle(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
 						}
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
 						if o.conf.Addrs {
-							fmt.Println(swift.DemangleBlob(cat.WithAddrs()))
+							fmt.Println(o.maybeDemangle(cat.WithAddrs()))
 						} else {
-							fmt.Println(swift.DemangleBlob(cat.Verbose()))
+							fmt.Println(o.maybeDemangle(cat.Verbose()))
 						}
 					}
 				} else {
@@ -533,7 +541,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion: sourceVersion,
 				Name:          class.Name,
 				Imports:       imps[class.Name],
-				Object:        swift.DemangleBlob(class.Verbose()),
+				Object:        o.maybeDemangle(class.Verbose()),
 			}); err != nil {
 				return err
 			}
@@ -581,7 +589,7 @@ func (o *ObjC) Headers() error {
 					SourceVersion: sourceVersion,
 					Name:          proto.Name + "_Protocol",
 					Imports:       imps[proto.Name+"-Protocol"],
-					Object:        swift.DemangleBlob(proto.Verbose()),
+					Object:        o.maybeDemangle(proto.Verbose()),
 				}); err != nil {
 					return err
 				}
@@ -618,7 +626,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion: sourceVersion,
 				Name:          name,
 				Imports:       imps[cat.Name],
-				Object:        swift.DemangleBlob(cat.Verbose()),
+				Object:        o.maybeDemangle(cat.Verbose()),
 			}); err != nil {
 				return err
 			}
@@ -1001,6 +1009,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range class.InstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
@@ -1012,6 +1024,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range class.ClassMethods {
+			if method.Types == "" {
+				log.Warnf("Class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
@@ -1042,6 +1058,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.InstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1053,6 +1073,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.ClassMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1064,6 +1088,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.OptionalInstanceMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol optional instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
@@ -1075,6 +1103,10 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 			}
 		}
 		for _, method := range proto.OptionalClassMethods {
+			if method.Types == "" {
+				log.Warnf("Protocol optional class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
+				continue
+			}
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
 				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {

@@ -33,19 +33,19 @@ import (
 // DetectPlatformFromIPSW detects the platform from IPSW filename and metadata
 func DetectPlatformFromIPSW(ipswPath string, ipswInfo *info.Info) model.Platform {
 	filename := strings.ToLower(filepath.Base(ipswPath))
-	
+
 	// First, try to detect from filename patterns
 	if platform := detectPlatformFromFilename(filename); platform != "" {
 		return platform
 	}
-	
+
 	// If filename detection fails, try from device types in BuildManifest
 	if ipswInfo != nil && ipswInfo.Plists.BuildManifest != nil {
 		if platform := detectPlatformFromDevices(ipswInfo.Plists.BuildManifest.SupportedProductTypes); platform != "" {
 			return platform
 		}
 	}
-	
+
 	// Default fallback to iOS
 	return model.PlatformIOS
 }
@@ -56,47 +56,47 @@ func detectPlatformFromFilename(filename string) model.Platform {
 	macOSPatterns := []string{
 		"universalmac", "macos", "mac_os", "macbook", "imac", "macmini", "macpro", "macstudio",
 	}
-	
+
 	// visionOS patterns (check before general patterns to avoid conflicts)
 	visionOSPatterns := []string{
 		"apple_vision_pro", "vision_pro", "visionos", "vision_os", "applevision", "realityos", "realitydevice",
 	}
-	
-	// watchOS patterns  
+
+	// watchOS patterns
 	watchOSPatterns := []string{
 		"watchos", "watch_os", "watch7", "watch6", "watch5", "applewatch",
 	}
-	
+
 	// tvOS patterns
 	tvOSPatterns := []string{
 		"tvos", "tv_os", "appletv", "apple_tv",
 	}
-	
+
 	// Check each platform pattern (order matters - most specific first)
 	for _, pattern := range visionOSPatterns {
 		if strings.Contains(filename, pattern) {
 			return model.PlatformVisionOS
 		}
 	}
-	
+
 	for _, pattern := range macOSPatterns {
 		if strings.Contains(filename, pattern) {
 			return model.PlatformMacOS
 		}
 	}
-	
+
 	for _, pattern := range watchOSPatterns {
 		if strings.Contains(filename, pattern) {
 			return model.PlatformWatchOS
 		}
 	}
-	
+
 	for _, pattern := range tvOSPatterns {
 		if strings.Contains(filename, pattern) {
 			return model.PlatformTvOS
 		}
 	}
-	
+
 	// If no patterns match, return empty (caller will try other methods)
 	return ""
 }
@@ -106,42 +106,42 @@ func detectPlatformFromDevices(devices []string) model.Platform {
 	if len(devices) == 0 {
 		return ""
 	}
-	
+
 	// Count device types to determine platform
 	iosCount := 0
 	macOSCount := 0
 	watchOSCount := 0
 	tvOSCount := 0
 	visionOSCount := 0
-	
+
 	for _, device := range devices {
 		deviceLower := strings.ToLower(device)
-		
+
 		// macOS device patterns
-		if strings.Contains(deviceLower, "mac") || 
-		   strings.Contains(deviceLower, "vmware") ||
-		   strings.Contains(deviceLower, "parallels") {
+		if strings.Contains(deviceLower, "mac") ||
+			strings.Contains(deviceLower, "vmware") ||
+			strings.Contains(deviceLower, "parallels") {
 			macOSCount++
 		} else if strings.Contains(deviceLower, "watch") {
 			watchOSCount++
-		} else if strings.Contains(deviceLower, "appletv") || 
-				  strings.Contains(deviceLower, "atv") {
+		} else if strings.Contains(deviceLower, "appletv") ||
+			strings.Contains(deviceLower, "atv") {
 			tvOSCount++
 		} else if strings.Contains(deviceLower, "realitydevice") ||
-				  strings.Contains(deviceLower, "vision") {
+			strings.Contains(deviceLower, "vision") {
 			visionOSCount++
 		} else if strings.Contains(deviceLower, "iphone") ||
-				  strings.Contains(deviceLower, "ipad") ||
-				  strings.Contains(deviceLower, "ipod") ||
-				  strings.Contains(deviceLower, "simulator") {
+			strings.Contains(deviceLower, "ipad") ||
+			strings.Contains(deviceLower, "ipod") ||
+			strings.Contains(deviceLower, "simulator") {
 			iosCount++
 		}
 	}
-	
+
 	// Return platform with highest count
 	maxCount := iosCount
 	platform := model.PlatformIOS
-	
+
 	if macOSCount > maxCount {
 		maxCount = macOSCount
 		platform = model.PlatformMacOS
@@ -157,7 +157,7 @@ func detectPlatformFromDevices(devices []string) model.Platform {
 	if visionOSCount > maxCount {
 		platform = model.PlatformVisionOS
 	}
-	
+
 	return platform
 }
 

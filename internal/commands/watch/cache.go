@@ -67,7 +67,38 @@ func NewMemoryCache(size int) (*MemoryCache, error) {
 }
 
 func (c *MemoryCache) Add(key string, value any) error {
-	c.cache.Add(key, value)
+	// Get existing item or create new one
+	var item CacheItem
+	if existingVal, found := c.cache.Get(key); found {
+		item = existingVal.(CacheItem)
+	}
+
+	// Update the appropriate field based on value type
+	switch v := value.(type) {
+	case Tags:
+		// Merge tags with existing ones
+		for _, tag := range v {
+			if !slices.Contains(item.Tags, tag) {
+				item.Tags = append(item.Tags, tag)
+			}
+		}
+	case Commits:
+		// Merge commits with existing ones
+		for _, commit := range v {
+			if !slices.Contains(item.Commits, commit) {
+				item.Commits = append(item.Commits, commit)
+			}
+		}
+	case Function:
+		if item.Functions == nil {
+			item.Functions = make(Function)
+		}
+		maps.Copy(item.Functions, v)
+	default:
+		return fmt.Errorf("unexpected cache item type %T", v)
+	}
+
+	c.cache.Add(key, item)
 	return nil
 }
 func (c *MemoryCache) Get(key string) *CacheItem {

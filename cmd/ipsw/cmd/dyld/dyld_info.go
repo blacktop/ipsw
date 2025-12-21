@@ -67,7 +67,20 @@ var dyldInfoCmd = &cobra.Command{
 	Use:     "info <DSC>",
 	Aliases: []string{"i"},
 	Short:   "Parse dyld_shared_cache",
-	Args:    cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		diff, _ := cmd.Flags().GetBool("diff")
+		delta, _ := cmd.Flags().GetBool("delta")
+		if diff || delta {
+			if len(args) != 2 {
+				return fmt.Errorf("accepts 2 arg(s) when using --diff or --delta, received %d", len(args))
+			}
+		} else {
+			if len(args) != 1 {
+				return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
+			}
+		}
+		return nil
+	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},

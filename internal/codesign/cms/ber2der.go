@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-var encodeIndent = 0
-
 type asn1Object interface {
 	encodeTo(writer *bytes.Buffer) error
 }
@@ -17,8 +15,6 @@ type asn1Structured struct {
 }
 
 func (s asn1Structured) encodeTo(out *bytes.Buffer) error {
-	//fmt.Printf("%s--> tag: % X\n", strings.Repeat("| ", encodeIndent), s.tagBytes)
-	encodeIndent++
 	inner := new(bytes.Buffer)
 	for _, obj := range s.content {
 		err := obj.encodeTo(inner)
@@ -26,7 +22,6 @@ func (s asn1Structured) encodeTo(out *bytes.Buffer) error {
 			return err
 		}
 	}
-	encodeIndent--
 	out.Write(s.tagBytes)
 	encodeLength(out, inner.Len())
 	out.Write(inner.Bytes())
@@ -47,8 +42,6 @@ func (p asn1Primitive) encodeTo(out *bytes.Buffer) error {
 	if err = encodeLength(out, p.length); err != nil {
 		return err
 	}
-	//fmt.Printf("%s--> tag: % X length: %d\n", strings.Repeat("| ", encodeIndent), p.tagBytes, p.length)
-	//fmt.Printf("%s--> content length: %d\n", strings.Repeat("| ", encodeIndent), len(p.content))
 	out.Write(p.content)
 
 	return nil
@@ -110,12 +103,10 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 	offset++
 	tag := b & 0x1F // last 5 bits
 	if tag == 0x1F {
-		tag = 0
+		// multi-byte tag: skip high tag number octets
 		for ber[offset] >= 0x80 {
-			tag = tag*128 + ber[offset] - 0x80
 			offset++
 		}
-		tag = tag*128 + ber[offset] - 0x80
 		offset++
 	}
 	tagEnd := offset
@@ -134,7 +125,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 		if numberOfBytes == 4 && (int)(ber[offset]) > 0x7F {
 			return nil, 0, fmt.Errorf("BER tag length is negative")
 		}
-		if 0x0 == (int)(ber[offset]) {
+		if (int)(ber[offset]) == 0x0 {
 			return nil, 0, fmt.Errorf("BER tag length has leading zero")
 		}
 		//fmt.Printf("--> (compute length) indicator byte: %x\n", l)

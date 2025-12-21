@@ -56,23 +56,22 @@ func init() {
 
 // dmgCmd represents the dmg command
 var dmgCmd = &cobra.Command{
-	Use:           "dmg DMG [OUTPUT]",
+	Use:           "dmg <DMG>",
 	Short:         "🚧 List/Extract DMG partiton/blocks",
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		// flags
 		pattern := viper.GetString("dmg.re")
 		partition := viper.GetInt("dmg.partition")
+		outfile := viper.GetString("dmg.output")
+
 		// validate args
 		if cmd.Flags().Changed("partition") && viper.GetString("dmg.re") != "" {
 			return fmt.Errorf("cannot specify both --partition and --re")
 		}
-		if len(args) > 1 && !cmd.Flags().Changed("partition") && viper.GetString("dmg.re") == "" {
-			return fmt.Errorf("no partition specified. (use --partition or --re)")
-		}
-		if len(args) == 1 && (cmd.Flags().Changed("partition") || viper.GetString("dmg.re") != "") {
-			return fmt.Errorf("no output file specified")
+		if (cmd.Flags().Changed("partition") || viper.GetString("dmg.re") != "") && outfile == "" {
+			return fmt.Errorf("no output file specified (use --output flag)")
 		}
 		if viper.GetString("dmg.password") != "" && viper.GetString("dmg.key") != "" {
 			return fmt.Errorf("cannot specify both --password and --key")
@@ -95,7 +94,11 @@ var dmgCmd = &cobra.Command{
 		}
 		defer d.Close()
 
-		if viper.GetBool("dmg.decrypt") || viper.GetString("dmg.output") != "" {
+		// Determine if this is a decryption operation (not partition extraction)
+		isDecryptOperation := viper.GetBool("dmg.decrypt") ||
+			(viper.GetString("dmg.output") != "" && !cmd.Flags().Changed("partition") && viper.GetString("dmg.re") == "")
+
+		if isDecryptOperation {
 			// If only c.Decrypt is set, overwrite the input file
 			if viper.GetBool("dmg.decrypt") && viper.GetString("dmg.output") == "" {
 				log.Info("Decrypting DMG in-place..")
@@ -135,38 +138,40 @@ var dmgCmd = &cobra.Command{
 
 		var p *dmg.Partition
 
-		if len(args) == 1 {
+		// If no partition selection and no output, just list partitions
+		if !cmd.Flags().Changed("partition") && viper.GetString("dmg.re") == "" && outfile == "" {
 			for idx, p := range d.Partitions {
 				log.Infof("%d) %s", idx, p.Name)
 			}
 			return nil
-		} else {
-			if cmd.Flags().Changed("partition") {
-				if partition > len(d.Partitions)-1 || partition < 0 {
-					return fmt.Errorf("partition number out of range (there are %d partitions)", len(d.Partitions))
-				}
-				p = &d.Partitions[partition]
-			} else if viper.GetString("dmg.re") != "" {
-				re, err := regexp.Compile(pattern)
-				if err != nil {
-					return fmt.Errorf("failed to compile regex '%s': %w", pattern, err)
-				}
-				for _, part := range d.Partitions {
-					if re.MatchString(part.Name) {
-						p = &part
-						break
-					}
-				}
-			} else {
-				return fmt.Errorf("no partition specified. (use --partition or --re)")
+		}
+
+		// Extract partition
+		if cmd.Flags().Changed("partition") {
+			if partition > len(d.Partitions)-1 || partition < 0 {
+				return fmt.Errorf("partition number out of range (there are %d partitions)", len(d.Partitions))
 			}
+			p = &d.Partitions[partition]
+		} else if viper.GetString("dmg.re") != "" {
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return fmt.Errorf("failed to compile regex '%s': %w", pattern, err)
+			}
+			for _, part := range d.Partitions {
+				if re.MatchString(part.Name) {
+					p = &part
+					break
+				}
+			}
+		} else {
+			return fmt.Errorf("no partition specified. (use --partition or --re)")
 		}
 
 		if p == nil {
 			return fmt.Errorf("no partition found matching criteria")
 		}
 
-		o, err := os.Create(args[1])
+		o, err := os.Create(outfile)
 		if err != nil {
 			return err
 		}
@@ -180,7 +185,7 @@ var dmgCmd = &cobra.Command{
 			return fmt.Errorf("failed to flush buffer: %w", err)
 		}
 
-		log.Infof("Extracted '%s' as %s", p.Name, args[1])
+		log.Infof("Extracted '%s' as %s", p.Name, outfile)
 
 		return nil
 	},

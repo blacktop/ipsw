@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_post:
-        description: 'Skip posting to Social Media'
+        description: "Skip posting to Social Media"
         required: false
         type: boolean
   schedule:
@@ -12,12 +12,15 @@ on:
     - cron: "*/30 * * * *" # every 30 minutes
     # - cron: "0 0 * * *"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Check Cache
@@ -26,10 +29,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.24"
-      - name: Run ipsw watch WebKit/WebKit (LOCKDOWN MODE)
+          go-version: "1.25"
+      - name: Run ipsw watch WebKit/WebKit (Security Features)
         run: |
-          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode' --days 1 \
+          go run ./cmd/ipsw/main.go watch WebKit/WebKit --pattern '(?i)Lockdown Mode|Memory Tagging|EnhancedSecurity|Enhanced Security|(?-i:MTE)' --days 1 \
           --cache hack/.watch_cache \
           --api ${{ secrets.GITHUB_TOKEN }} \
           --discord \
@@ -74,7 +77,7 @@ jobs:
         # --mastodon-client-id ${{ secrets.MASTODON_CLIENT_ID }} \
         # --mastodon-client-secret ${{ secrets.MASTODON_CLIENT_SECRET }} \
         # --mastodon-access-token ${{ secrets.MASTODON_ACCESS_TOKEN }}
-      - uses: stefanzweifel/git-auto-commit-action@28e16e81777b558cc906c8750092100bbb34c5e3 # v5
+      - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v5
         with:
           commit_message: Update .watch_cache
       # - name: Commit Cache Changes
