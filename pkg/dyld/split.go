@@ -60,7 +60,7 @@ type XCodeAppInfoPlist struct {
 }
 
 // GetHandle returns a handle to a library
-func GetHandle(libs []string) (*LibHandle, error) {
+func GetHandle(libs []string) *LibHandle {
 	for _, name := range libs {
 		libname := C.CString(name)
 		defer C.free(unsafe.Pointer(libname))
@@ -71,10 +71,10 @@ func GetHandle(libs []string) (*LibHandle, error) {
 				Handle:  handle,
 				Libname: name,
 			}
-			return h, nil
+			return h
 		}
 	}
-	return nil, fmt.Errorf("unable to open a handle to the Xcode library (use --xcode-path to specify the path to Xcode)")
+	return nil
 }
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
@@ -107,6 +107,7 @@ func (l *LibHandle) Close() error {
 // Split extracts all the dyld_shared_cache libraries
 func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bool) error {
 	var xcodeVersion string
+	var xcodePathProvided bool
 
 	if len(xcodePath) == 0 {
 		var err error
@@ -114,28 +115,65 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		if err != nil {
 			return fmt.Errorf("failed to get Xcode path: %v", err)
 		}
+		xcodePathProvided = false
 	} else {
 		if !strings.HasSuffix(xcodePath, "Contents/Developer") {
 			xcodePath = filepath.Join(xcodePath, "Contents/Developer")
 		}
+		xcodePathProvided = true
 	}
 
-	dscExtractor, err := GetHandle([]string{filepath.Join(xcodePath, "Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")})
+	dscExtractorPath := filepath.Join(xcodePath, "Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
+	_, err := os.Stat(dscExtractorPath)
 	if err != nil {
-		return fmt.Errorf("failed to split %s: %v", dyldSharedCachePath, err)
+		err_msg := "failed to find DSC extractor library in %s"
+		if !xcodePathProvided {
+			err_msg += " (use --xcode to specify the path to Xcode)"
+		}
+		return fmt.Errorf(err_msg, dscExtractorPath)
+	}
+
+	dscExtractor := GetHandle([]string{dscExtractorPath})
+	if dscExtractor == nil {
+		err_msg := "unable to open a handle to the DSC extractor library in %s"
+		if !xcodePathProvided {
+			err_msg += " (use --xcode to specify the path to Xcode)"
+		}
+
+		return fmt.Errorf(err_msg, dyldSharedCachePath, dscExtractorPath)
 	}
 
 	if xcodeCache {
 		// get ExtractorVersion
-		fat, err := macho.OpenFat(dscExtractor.Libname)
-		if err != nil && err != macho.ErrNotFat {
-			return fmt.Errorf("failed to open %s: %v", dscExtractor.Libname, err)
-		}
 		extVer := "1040.2.2.0.0"
-		if fat.Arches[0].SourceVersion() != nil {
-			extVer = fat.Arches[0].SourceVersion().Version.String()
+
+		fat, err := macho.OpenFat(dscExtractor.Libname)
+		switch err {
+		case nil:
+			// successfully opened fat mach-o
+			if len(fat.Arches) > 0 {
+				if sv := fat.Arches[0].SourceVersion(); sv != nil {
+					extVer = sv.Version.String()
+				}
+			}
+			fat.Close()
+
+		case macho.ErrNotFat:
+			// fall back on thin mach-o loading
+			m, err := macho.Open(dscExtractor.Libname)
+			if err != nil {
+				return fmt.Errorf("failed to open mach-o %s, %v", dscExtractor.Libname, err)
+			}
+			if sv := m.SourceVersion(); sv != nil {
+				extVer = sv.Version.String()
+			}
+			m.Close()
+
+		default:
+			// failed to load fat mach-o
+			return fmt.Errorf("failed to open fat mach-o %s: %v", dscExtractor.Libname, err)
 		}
-		fat.Close()
+
 		// get XCodeVersion
 		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
 		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")

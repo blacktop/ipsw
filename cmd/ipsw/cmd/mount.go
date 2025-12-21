@@ -26,8 +26,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"syscall"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -47,11 +45,13 @@ func init() {
 	mountCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	mountCmd.Flags().StringP("mount-point", "m", "", "Custom mount point (default: /tmp/<dmg>.mount)")
 	mountCmd.Flags().String("ident", "", "Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')")
+	mountCmd.Flags().BoolP("detach", "d", false, "Mount without blocking (leave mounted in background)")
 	viper.BindPFlag("mount.key", mountCmd.Flags().Lookup("key"))
 	viper.BindPFlag("mount.lookup", mountCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("mount.pem-db", mountCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("mount.mount-point", mountCmd.Flags().Lookup("mount-point"))
 	viper.BindPFlag("mount.ident", mountCmd.Flags().Lookup("ident"))
+	viper.BindPFlag("mount.detach", mountCmd.Flags().Lookup("detach"))
 }
 
 // mountCmd represents the mount command
@@ -79,6 +79,9 @@ var mountCmd = &cobra.Command{
 
 		# Mount a RestoreRamDisk by identity (defaults to the first if not specified)
 		$ ipsw mount rdisk iPhone.ipsw --ident Erase
+
+		# Mount in background without blocking (detach mode)
+		$ ipsw mount fs iPhone.ipsw --detach
 	`),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -98,6 +101,7 @@ var mountCmd = &cobra.Command{
 		pemDB := viper.GetString("mount.pem-db")
 		mountPoint := viper.GetString("mount.mount-point")
 		ident := viper.GetString("mount.ident")
+		detach := viper.GetBool("mount.detach")
 		// validate flags
 		if len(key) > 0 && lookupKeys {
 			return fmt.Errorf("cannot use --key AND --lookup flags together")
@@ -105,36 +109,10 @@ var mountCmd = &cobra.Command{
 
 		var keys any
 		if lookupKeys {
-			var (
-				device  string
-				version string
-				build   string
-			)
-			re := regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
-			if re.MatchString(args[1]) {
-				matches := re.FindStringSubmatch(args[1])
-				if len(matches) < 4 {
-					return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
-				}
-				device = filepath.Base(matches[1])
-				version = matches[2]
-				build = matches[3]
-			} else {
-				return fmt.Errorf("failed to parse IPSW filename: %s", args[1])
-			}
-			if device == "" || build == "" {
-				return fmt.Errorf("device or build information is missing from IPSW filename (required for key lookup)")
-			}
 			log.Info("Downloading Keys...")
-			wikiKeys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
-				Keys:    true,
-				Device:  strings.Replace(device, "ip", "iP", 1),
-				Version: version,
-				Build:   strings.ToUpper(build),
-				// Beta:    viper.GetBool("download.key.beta"),
-			}, "", false)
+			wikiKeys, err := download.LookupKeysFromPath(args[1], "", false)
 			if err != nil {
-				return fmt.Errorf("failed querying theapplewiki.com: %v", err)
+				return fmt.Errorf("failed to lookup keys: %v", err)
 			}
 			keys = wikiKeys
 		} else if len(key) > 0 {
@@ -157,13 +135,18 @@ var mountCmd = &cobra.Command{
 			log.Infof("Mounted %s DMG %s", args[0], filepath.Base(mctx.DmgPath))
 		}
 
-		// block until user hits ctrl-c
-		done := make(chan os.Signal, 1)
-		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Press Ctrl+C to unmount '%s' ...", mctx.MountPoint))
-		<-done
+		if detach {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Detaching, run `hdiutil detach %s` to unmount manually", mctx.MountPoint))
+			return nil
+		} else {
+			// block until user hits ctrl-c
+			done := make(chan os.Signal, 1)
+			signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Press Ctrl+C to unmount '%s' ...", mctx.MountPoint))
+			<-done
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", mctx.MountPoint))
-		return mctx.Unmount()
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", mctx.MountPoint))
+			return mctx.Unmount()
+		}
 	},
 }

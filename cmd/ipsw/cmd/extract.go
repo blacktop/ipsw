@@ -42,6 +42,7 @@ func init() {
 	extractCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
 	extractCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	extractCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	extractCmd.Flags().BoolP("lookup", "l", false, "Lookup decryption keys on theapplewiki.com")
 	extractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().Bool("dtree", false, "Extract DeviceTree")
@@ -78,6 +79,7 @@ func init() {
 	viper.BindPFlag("extract.proxy", extractCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("extract.insecure", extractCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("extract.remote", extractCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("extract.lookup", extractCmd.Flags().Lookup("lookup"))
 	viper.BindPFlag("extract.kernel", extractCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("extract.dyld", extractCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("extract.dtree", extractCmd.Flags().Lookup("dtree"))
@@ -187,6 +189,7 @@ var extractCmd = &cobra.Command{
 			Progress:     true,
 			Output:       viper.GetString("extract.output"),
 			JSON:         viper.GetBool("extract.json"),
+			Lookup:       viper.GetBool("extract.lookup"),
 		}
 
 		if viper.GetBool("extract.remote") {

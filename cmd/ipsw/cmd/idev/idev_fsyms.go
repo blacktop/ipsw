@@ -40,6 +40,7 @@ func init() {
 
 	FetchsymsCmd.Flags().StringP("output", "o", "", "Folder to save files")
 	FetchsymsCmd.MarkFlagDirname("output")
+	viper.BindPFlag("idev.fsyms.output", FetchsymsCmd.Flags().Lookup("output"))
 }
 
 // FetchsymsCmd represents the fetchsyms command

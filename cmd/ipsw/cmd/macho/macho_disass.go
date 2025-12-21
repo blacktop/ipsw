@@ -25,7 +25,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -157,7 +156,7 @@ var machoDisassCmd = &cobra.Command{
 			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
 		if viper.GetString("macho.disass.dec-llm") != "" {
-			if !slices.Contains(ai.Providers, viper.GetString("macho.disass.dec-llm")) {
+			if !ai.IsValidProvider(viper.GetString("macho.disass.dec-llm")) {
 				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.dec-llm"), strings.Join(ai.Providers, ", "))
 			}
 		}

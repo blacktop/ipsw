@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -15,6 +16,8 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 func Parse(dir string) (sigs []Symbolicator, err error) {
@@ -79,19 +82,18 @@ func (sm SymbolMap) Copy(m map[uint64]string) {
 	maps.Copy(sm, m)
 }
 
-func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, quiet bool) error {
-
-	sigs.Total += uint(len(sm))
-
+// symbolicateWithStats performs symbolication and returns (matched, missed, error).
+// When quiet=true, verbose per-file logs are suppressed.
+func (sm SymbolMap) symbolicateWithStats(m *macho.File, name string, sigs Symbolicator, quiet bool) (matched, missed int, err error) {
 	seen := make(map[string]bool)
 
 	text := m.Section("__TEXT_EXEC", "__text")
 	if text == nil {
-		return fmt.Errorf("failed to find __TEXT_EXEC.__text section")
+		return 0, 0, fmt.Errorf("failed to find __TEXT_EXEC.__text section")
 	}
 	data, err := text.Data()
 	if err != nil {
-		return fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
+		return 0, 0, fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
 	}
 
 	engine := disass.NewMachoDisass(m, &disass.Config{
@@ -100,15 +102,20 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 		Quiet:        true,
 	})
 
-	log.WithField("name", name).Info("Analyzing MachO...")
+	if !quiet {
+		log.WithField("name", name).Info("Analyzing MachO...")
+	}
 	if err := engine.Triage(); err != nil {
-		return fmt.Errorf("first pass triage failed: %v", err)
+		return 0, 0, fmt.Errorf("first pass triage failed: %v", err)
 	}
 
 	cstrs, err := m.GetCStrings()
 	if err != nil {
-		return fmt.Errorf("failed to get cstrings: %v", err)
+		return 0, 0, fmt.Errorf("failed to get cstrings: %v", err)
 	}
+
+	totalSigs := len(sigs.Signatures)
+	matchedSigs := 0
 
 	for _, sig := range sigs.Signatures {
 		found := false
@@ -132,6 +139,7 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 						// return fmt.Errorf("failed to add to symbol map: %v", err)
 					}
 					found = true
+					matchedSigs++
 					// attempt to symbolicate signature backtrace
 					callerLoc := fn.StartAddr
 					for _, caller := range sig.Backtrace {
@@ -197,14 +205,18 @@ func (sm SymbolMap) symbolicate(m *macho.File, name string, sigs Symbolicator, q
 		}
 	}
 
-	log.WithFields(log.Fields{
-		"total":   sigs.Total,
-		"matched": len(sm),
-		"missed":  int(sigs.Total) - len(sm),
-		"percent": fmt.Sprintf("%.4f%%", 100*float64(len(sm))/float64(sigs.Total)),
-	}).Info("📈 Symbolication STATS")
+	missedSigs := totalSigs - matchedSigs
 
-	return nil
+	if !quiet {
+		log.WithFields(log.Fields{
+			"total":   totalSigs,
+			"matched": matchedSigs,
+			"missed":  missedSigs,
+			"percent": fmt.Sprintf("%.4f%%", 100*float64(matchedSigs)/float64(totalSigs)),
+		}).Info("📈 Symbolication STATS")
+	}
+
+	return matchedSigs, missedSigs, nil
 }
 
 func (sm SymbolMap) getSyscalls(m *macho.File) error {
@@ -287,39 +299,106 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		log.WithError(err).Warn("failed to get MIG subsystems")
 	}
 
-	goodsig := false
-
+	// Count valid signatures to set up progress bar
+	var validSigs []Symbolicator
 	for _, sig := range sigs {
-		if ok, err := checkVersion(kv, sig); !ok {
-			continue
-		} else if err != nil {
-			return err
+		if ok, err := checkVersion(kv, sig); ok && err == nil {
+			validSigs = append(validSigs, sig)
 		}
+	}
+
+	if len(validSigs) == 0 {
+		return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
+	}
+
+	// Set up progress bar for quiet mode
+	var p *mpb.Progress
+	var bar *mpb.Bar
+	if quiet {
+		// Use same blue color as apex/log info level for consistency
+		blue := "\033[34m\033[1m"
+		reset := "\033[0m"
+		p = mpb.New(
+			mpb.WithWidth(60),
+			mpb.WithRefreshRate(180*time.Millisecond),
+		)
+		bar = p.AddBar(int64(len(validSigs)),
+			mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(blue+"   • Symbolicating signatures "+reset, decor.WC{C: decor.DindentRight}),
+			),
+			mpb.AppendDecorators(
+				decor.CountersNoUnit("%d/%d", decor.WCSyncWidth),
+			),
+		)
+	}
+
+	goodsig := false
+	var totalMatched, totalMissed int
+
+	for _, sig := range validSigs {
 		// TODO: add support for OLD non-fileset KEXTs
 		if kc.FileTOC.FileHeader.Type == types.MH_FILESET {
 			m, err := kc.GetFileSetFileByName(sig.Target)
 			if err != nil {
+				if bar != nil {
+					bar.Increment()
+				}
 				continue // fileset doesn't contain target
 			}
 			// symbolicate with signature
-			if err := sm.symbolicate(m, sig.Target, sig, quiet); err != nil {
+			matched, missed, err := sm.symbolicateWithStats(m, sig.Target, sig, quiet)
+			if err != nil {
+				if p != nil {
+					p.Wait()
+				}
 				return err
 			}
+			totalMatched += matched
+			totalMissed += missed
 		} else {
 			parts := strings.Split(sig.Target, ".")
 			if len(parts) > 1 {
 				// check if target macho file matches signature target
 				if !strings.HasPrefix(strings.ToLower(filepath.Base(infile)), strings.ToLower(parts[len(parts)-1])) {
+					if bar != nil {
+						bar.Increment()
+					}
 					continue
 				}
 			}
 			// symbolicate with signature
-			if err := sm.symbolicate(kc, sig.Target, sig, quiet); err != nil {
+			matched, missed, err := sm.symbolicateWithStats(kc, sig.Target, sig, quiet)
+			if err != nil {
+				if p != nil {
+					p.Wait()
+				}
 				return err
 			}
+			totalMatched += matched
+			totalMissed += missed
 		}
 
+		if bar != nil {
+			bar.Increment()
+		}
 		goodsig = true
+	}
+
+	if p != nil {
+		p.Wait()
+	}
+
+	// Print summary stats in quiet mode
+	if quiet && goodsig {
+		total := totalMatched + totalMissed
+		if total > 0 {
+			log.WithFields(log.Fields{
+				"matched": totalMatched,
+				"missed":  totalMissed,
+				"percent": fmt.Sprintf("%.2f%%", 100*float64(totalMatched)/float64(total)),
+			}).Info("📈 Symbolication complete")
+		}
 	}
 
 	if !goodsig {

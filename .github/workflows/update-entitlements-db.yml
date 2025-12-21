@@ -16,11 +16,14 @@ on:
         default: "ios,macos"
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   update-entitlements-db:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Set up Go
         uses: actions/setup-go@v6
         with:

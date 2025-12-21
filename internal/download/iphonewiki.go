@@ -1547,6 +1547,51 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, 
 	return otas, nil
 }
 
+// IPSWPathInfo contains device, version, and build information parsed from an IPSW path
+type IPSWPathInfo struct {
+	Device  string
+	Version string
+	Build   string
+}
+
+// ipswPathRegex matches IPSW filenames in the format: Device_Version_Build_Restore.ipsw
+var ipswPathRegex = regexp.MustCompile(`(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_(?i)Restore\.ipsw$`)
+
+// ParseIPSWPath extracts device, version, and build from an IPSW path or URL.
+// Returns nil if the path doesn't match the expected IPSW filename pattern.
+func ParseIPSWPath(ipswPath string) *IPSWPathInfo {
+	if !ipswPathRegex.MatchString(ipswPath) {
+		return nil
+	}
+	matches := ipswPathRegex.FindStringSubmatch(ipswPath)
+	if len(matches) < 4 {
+		return nil
+	}
+	return &IPSWPathInfo{
+		Device:  filepath.Base(matches[1]),
+		Version: matches[2],
+		Build:   matches[3],
+	}
+}
+
+// LookupKeysFromPath parses an IPSW path/URL and looks up firmware keys from theapplewiki.com.
+// Returns the wiki keys or an error. If the path cannot be parsed, returns an error.
+func LookupKeysFromPath(ipswPath, proxy string, insecure bool) (WikiFWKeys, error) {
+	info := ParseIPSWPath(ipswPath)
+	if info == nil {
+		return nil, fmt.Errorf("failed to parse IPSW path: %s (expected format: Device_Version_Build_Restore.ipsw)", ipswPath)
+	}
+	if info.Device == "" || info.Build == "" {
+		return nil, fmt.Errorf("device or build information is missing from IPSW path: %s", ipswPath)
+	}
+	return GetWikiFirmwareKeys(&WikiConfig{
+		Keys:    true,
+		Device:  strings.Replace(info.Device, "ip", "iP", 1),
+		Version: info.Version,
+		Build:   strings.ToUpper(info.Build),
+	}, proxy, insecure)
+}
+
 func GetWikiFirmwareKeys(cfg *WikiConfig, proxy string, insecure bool) (WikiFWKeys, error) {
 	// Check cache first
 	cacheKey := getCacheKey(cfg.Device, cfg.Build)

@@ -23,10 +23,12 @@ package idev
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	IDevCmd.PersistentFlags().StringP("udid", "u", "", "Device UniqueDeviceID to connect to")
+	viper.BindPFlag("idev.udid", IDevCmd.PersistentFlags().Lookup("udid"))
 }
 
 // IDevCmd represents the idev command

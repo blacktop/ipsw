@@ -35,11 +35,15 @@ $ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
 # Mount a RestoreRamDisk by identity (defaults to the first if not specified)
 $ ipsw mount rdisk iPhone.ipsw --ident Erase
 
+# Mount in background without blocking (detach mode)
+$ ipsw mount fs iPhone.ipsw --detach
+
 ```
 
 ### Options
 
 ```
+  -d, --detach               Mount without blocking (leave mounted in background)
   -h, --help                 help for mount
       --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
   -k, --key string           DMG key

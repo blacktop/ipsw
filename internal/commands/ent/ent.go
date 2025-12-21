@@ -103,7 +103,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 						log.Debugf("skipping path due to permission denied: %s", path)
 						return nil
 					}
-					log.Errorf("failed to walk mount %s: %v", conf.Folder, err)
+					log.Debugf("failed to walk mount %s: %v", conf.Folder, err)
 					return nil
 				}
 				if !info.IsDir() {
@@ -335,6 +335,7 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 			Input:    dmgPath,
 			Output:   filepath.Dir(dmgPath),
 			PemDB:    conf.PemDB,
+			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
 		})
 		if err != nil {
@@ -369,7 +370,7 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
-			log.Errorf("failed to walk mount %s: %v", mountPoint, err)
+			log.Debugf("failed to walk mount %s: %v", mountPoint, err)
 			return nil
 		}
 		if !info.IsDir() {

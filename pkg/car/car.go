@@ -269,12 +269,12 @@ func Parse(name string, conf *Config) (*Asset, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to read block %s: %v", v.Name, err)
 			}
-			
+
 			var maxTokenCount uint32
 			if err := binary.Read(br, binary.LittleEndian, &maxTokenCount); err != nil {
 				return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND max token count: %v", err)
 			}
-			
+
 			// Only parse if we don't already have a key format
 			if a.KeyFormat == nil && maxTokenCount > 0 {
 				a.KeyFormat = make([]renditionAttributeType, maxTokenCount)
@@ -282,7 +282,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 					return nil, fmt.Errorf("failed to read KEYFORMATWORKAROUND rendition attribute types: %v", err)
 				}
 			}
-			
+
 			if a.conf.Verbose {
 				log.Debugf("Parsed KEYFORMATWORKAROUND: %d rendition key tokens", maxTokenCount)
 			}

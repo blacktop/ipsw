@@ -39,8 +39,8 @@ func init() {
 	DyldCmd.AddCommand(machoO2aCmd)
 	machoO2aCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
 	machoO2aCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
-	viper.BindPFlag("macho.o2a.dec", machoO2aCmd.Flags().Lookup("dec"))
-	viper.BindPFlag("macho.o2a.hex", machoO2aCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("dyld.o2a.dec", machoO2aCmd.Flags().Lookup("dec"))
+	viper.BindPFlag("dyld.o2a.hex", machoO2aCmd.Flags().Lookup("hex"))
 }
 
 // machoO2aCmd represents the o2a command

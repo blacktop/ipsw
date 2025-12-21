@@ -17,6 +17,7 @@ ipsw ssh debugserver [flags]
 ### Options
 
 ```
+  -d, --dest string    destination directory on device (default "/usr/libexec")
   -f, --force          overwrite file on device
   -h, --help           help for debugserver
   -m, --image string   path to DeveloperDiskImage.dmg

@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -43,37 +42,6 @@ sidebar_label: %s
 description: %s
 ---
 `
-
-type link struct {
-	Type  string `json:"type,omitempty"`
-	Title string `json:"title,omitempty"`
-}
-
-type category struct {
-	Label       string `json:"label,omitempty"`
-	Collapsible bool   `json:"collapsible,omitempty"`
-	Collapsed   bool   `json:"collapsed,omitempty"`
-	Link        link   `json:"link"`
-}
-
-func createCategoryJSON(cmd *cobra.Command, dir string) error {
-	category, err := json.Marshal(&category{
-		Label:       cmd.Name(),
-		Collapsible: true,
-		Collapsed:   true,
-		Link: link{
-			Type:  "generated-index",
-			Title: cmd.Name(),
-		},
-	})
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "_category_.json"), category, 0644); err != nil {
-		return err
-	}
-	return nil
-}
 
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender func(string, string) string, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {

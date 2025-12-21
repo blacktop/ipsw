@@ -44,12 +44,16 @@ func ParseImg3Data(data []byte) (*DeviceTree, error) {
 func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	// NOTE: openssl asn1parse -i -inform DER -in DEVICETREE.im4p
-	var i Img4
-
 	im4p, err := img4.ParsePayload(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Img4 payload: %v", err)
 	}
+
+	// Check if the payload is encrypted before attempting to parse
+	if im4p.Encrypted {
+		return nil, ErrEncryptedDeviceTree
+	}
+
 	data, err = im4p.GetData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Img4 data: %v", err)
@@ -57,9 +61,6 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	dtree, err := parseDeviceTree(bytes.NewReader(data))
 	if err != nil {
-		if len(i.KbagData) > 0 {
-			return nil, ErrEncryptedDeviceTree
-		}
 		return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
 	}
 

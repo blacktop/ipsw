@@ -32,9 +32,9 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/pkg/swift"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
-	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -67,10 +67,26 @@ func init() {
 	MachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
 	MachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
 	MachoCmd.Flags().String("search", "", "Search for byte pattern")
-
 	MachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 	MachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
 	MachoCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
+
+	viper.BindPFlag("dyld.macho.all", MachoCmd.Flags().Lookup("all"))
+	viper.BindPFlag("dyld.macho.loads", MachoCmd.Flags().Lookup("loads"))
+	viper.BindPFlag("dyld.macho.json", MachoCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.macho.objc", MachoCmd.Flags().Lookup("objc"))
+	viper.BindPFlag("dyld.macho.objc-refs", MachoCmd.Flags().Lookup("objc-refs"))
+	viper.BindPFlag("dyld.macho.swift", MachoCmd.Flags().Lookup("swift"))
+	viper.BindPFlag("dyld.macho.swift-all", MachoCmd.Flags().Lookup("swift-all"))
+	viper.BindPFlag("dyld.macho.symbols", MachoCmd.Flags().Lookup("symbols"))
+	viper.BindPFlag("dyld.macho.demangle", MachoCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("dyld.macho.starts", MachoCmd.Flags().Lookup("starts"))
+	viper.BindPFlag("dyld.macho.strings", MachoCmd.Flags().Lookup("strings"))
+	viper.BindPFlag("dyld.macho.stubs", MachoCmd.Flags().Lookup("stubs"))
+	viper.BindPFlag("dyld.macho.search", MachoCmd.Flags().Lookup("search"))
+	viper.BindPFlag("dyld.macho.extract", MachoCmd.Flags().Lookup("extract"))
+	viper.BindPFlag("dyld.macho.output", MachoCmd.Flags().Lookup("output"))
+	viper.BindPFlag("dyld.macho.force", MachoCmd.Flags().Lookup("force"))
 }
 
 // MachoCmd represents the macho command
@@ -255,6 +271,7 @@ var MachoCmd = &cobra.Command{
 							Verbose:  verbose,
 							Addrs:    true,
 							ObjcRefs: showObjcRefs,
+							Demangle: doDemangle,
 							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
 							Theme:    "nord",
 						})

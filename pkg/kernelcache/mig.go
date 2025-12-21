@@ -278,9 +278,8 @@ func getMigInitFunc(m *macho.File) (*types.Function, error) {
 	return nil, fmt.Errorf("failed to find 'mig_init' address")
 }
 
-func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
+func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, error) {
 	var migE uint64
-	var sizeOfMigE uint64
 
 	var instrValue uint32
 	var results [1024]byte
@@ -294,7 +293,7 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 			if err == io.EOF {
 				break
 			}
-			return 0, 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
+			return 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
 		}
 
 		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
@@ -331,56 +330,100 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, uint64, error) {
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
-	// find RET instruction
-
-	for {
-		err := binary.Read(r, binary.LittleEndian, &instrValue)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return 0, 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
-		}
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
-			startAddr += uint64(binary.Size(uint32(0)))
-			continue
-		}
-		if strings.Contains(instruction.Encoding.String(), "RET") {
-			break
-		}
-		startAddr += uint64(binary.Size(uint32(0)))
+	if migE == 0 {
+		return 0, fmt.Errorf("failed to find 'mig_e' table address in mig_init")
 	}
 
-	// search backwards for the size of the migE struct via CMP (from for loop stop condition)
-	startAddr -= uint64(binary.Size(uint64(0)))
-	r.Seek(-int64(binary.Size(uint64(0))), io.SeekCurrent)
+	return migE, nil
+}
 
-	for {
-		err := binary.Read(r, binary.LittleEndian, &instrValue)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return 0, 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
-		}
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
-			startAddr += uint64(binary.Size(uint32(0)))
-			continue
-		}
-		if strings.Contains(instruction.Encoding.String(), "CMP") {
-			if len(instruction.Operands) < 2 {
-				return 0, 0, fmt.Errorf("failed to find size of migE struct")
-			}
-			sizeOfMigE = uint64(instruction.Operands[1].Immediate)
-			break
-		}
-		startAddr -= uint64(binary.Size(uint32(0)))
-		r.Seek(-int64(binary.Size(uint64(0))), io.SeekCurrent)
+// getMigSubsystemPointers discovers the list of mig_subsystem pointers in the
+// mig_e[] table by walking pointer-sized entries starting at migEAddr and
+// validating that each entry looks like a reasonable mig_subsystem header
+// within __DATA_CONST.__const. This avoids relying on brittle instruction
+// patterns (such as CMP-immediate) in mig_init, which can change between
+// kernel versions.
+func getMigSubsystemPointers(m *macho.File, migEAddr uint64) ([]uint64, error) {
+	const maxEntries = 64 // generous upper bound for number of MIG subsystems
+
+	dataConst := m.Section("__DATA_CONST", "__const")
+	if dataConst == nil {
+		return nil, macho.ErrMachOSectionNotFound
+	}
+	dataConstData, err := dataConst.Data()
+	if err != nil {
+		return nil, err
 	}
 
-	return migE, sizeOfMigE, nil
+	dataConstStart := dataConst.Addr
+	dataConstEnd := dataConstStart + uint64(len(dataConstData))
+
+	hdrSize := uint64(binary.Size(migKernSubsystemHdr{}))
+
+	var subsystems []uint64
+
+	for i := uint64(0); i < maxEntries; i++ {
+		ptr, err := m.GetPointerAtAddress(migEAddr + i*uint64(binary.Size(uint64(0))))
+		if err != nil {
+			// If we fail on the very first entry, something is wrong with migEAddr.
+			if i == 0 {
+				return nil, fmt.Errorf("failed to read mig_e entry at %#x: %v", migEAddr, err)
+			}
+			break
+		}
+
+		// A NULL entry is treated as the end of the table if we've already
+		// collected some subsystems.
+		if ptr == 0 {
+			if len(subsystems) == 0 {
+				continue
+			}
+			break
+		}
+
+		// mig_subsystem headers live in __DATA_CONST.__const.
+		if ptr < dataConstStart || ptr+hdrSize > dataConstEnd {
+			// If we haven't collected any valid entries yet, keep scanning in
+			// case the first few entries are something else.
+			if len(subsystems) == 0 {
+				continue
+			}
+			break
+		}
+
+		off := ptr - dataConstStart
+		r := bytes.NewReader(dataConstData[off:])
+
+		var hdr migKernSubsystemHdr
+		if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+			if len(subsystems) == 0 {
+				return nil, fmt.Errorf("failed to read mig subsystem header at %#x: %v", ptr, err)
+			}
+			break
+		}
+
+		// Basic sanity checks on the header:
+		if hdr.Start == 0 || hdr.End <= uint32(hdr.Start) {
+			if len(subsystems) == 0 {
+				continue
+			}
+			break
+		}
+		if hdr.End-uint32(hdr.Start) > 0x1000 {
+			if len(subsystems) == 0 {
+				continue
+			}
+			break
+		}
+
+		subsystems = append(subsystems, ptr)
+	}
+
+	if len(subsystems) == 0 {
+		return nil, fmt.Errorf("failed to infer mig subsystem table size from mig_e (addr=%#x)", migEAddr)
+	}
+
+	return subsystems, nil
 }
 
 func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
@@ -401,21 +444,17 @@ func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
 		return nil, err
 	}
 
-	migEAddr, sizeOfMigE, err := getMigE(bytes.NewReader(data), migInit)
+	migEAddr, err := getMigE(bytes.NewReader(data), migInit)
+	if err != nil {
+		return nil, err
+	}
+
+	subsystems, err := getMigSubsystemPointers(m, migEAddr)
 	if err != nil {
 		return nil, err
 	}
 
 	log.WithField("mig_kern_subsystem table", fmt.Sprintf("%#x", migEAddr)).Infof("Found")
-
-	var subsystems []uint64
-	for i := uint64(0); i < sizeOfMigE; i++ {
-		ptr, err := m.GetPointerAtAddress(migEAddr + i*uint64(binary.Size(uint64(0))))
-		if err != nil {
-			return nil, err
-		}
-		subsystems = append(subsystems, ptr)
-	}
 
 	dataConst := m.Section("__DATA_CONST", "__const")
 	if dataConst == nil {

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/disass"
 )
 
@@ -103,7 +103,11 @@ func (d DyldDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 // IsData returns if given address is a data variable address referenced in the disassembled function
 func (d DyldDisass) IsData(addr uint64) (bool, *disass.AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
-		if strings.Contains(strings.ToLower(detail.Segment), "data") && !strings.EqualFold(detail.Section, "__got") {
+		if detail.Flags.IsCstringLiterals() {
+			return true, &detail
+		}
+		segment := strings.ToLower(detail.Segment)
+		if strings.Contains(segment, "data") && !strings.EqualFold(detail.Section, "__got") {
 			return true, &detail
 		}
 	}
@@ -268,6 +272,7 @@ func (d *DyldDisass) Triage() error {
 						Segment: c.Seg,
 						Section: c.Name,
 						Pointer: ptr,
+						Flags:   c.Flags,
 					}
 				}
 			} else {
@@ -277,6 +282,7 @@ func (d *DyldDisass) Triage() error {
 						Segment: c.Seg,
 						Section: c.Name,
 						Pointer: ptr,
+						Flags:   c.Flags,
 					}
 				}
 			}

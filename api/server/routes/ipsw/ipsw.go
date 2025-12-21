@@ -57,7 +57,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 				pemDbPath = filepath.Clean(pemDB)
 			}
 		}
-		
+
 		mountPointParam, _ := c.GetQuery("mount_point")
 		if mountPointParam != "" {
 			mountPointParam = filepath.Clean(mountPointParam)
@@ -94,6 +94,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 				Input:    dmgPath,
 				Output:   filepath.Dir(dmgPath),
 				PemDB:    pemDbPath,
+				Proxy:    "",    // TODO: make proxy configurable
 				Insecure: false, // TODO: make insecure configurable
 			})
 			if err != nil {

@@ -6,7 +6,7 @@ on:
     paths:
       - "**/*.go"
       - "go.mod"
-      - "go.sum" 
+      - "go.sum"
       - "cmd/**"
       - "pkg/**"
       - "internal/**"
@@ -14,9 +14,15 @@ on:
       - "Makefile"
       - ".github/workflows/go.yml"
       - ".github/workflows/release.yml"
+      - ".github/workflows/prerelease.yml"
   pull_request:
     branches:
       - master
+
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
@@ -26,7 +32,7 @@ jobs:
   #   steps:
   #     - name: Cache beta IPSW
   #       id: cache-beta-ipsw
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         path: |
   #           ~/beta
@@ -49,7 +55,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Go
@@ -63,7 +69,7 @@ jobs:
       # - name: Cache beta IPSW
       #   id: cache-beta-ipsw
       #   if: matrix.platform == 'macos-13'
-      #   uses: actions/cache@v4
+      #   uses: actions/cache@v5
       #   with:
       #     path: |
       #       ~/beta
@@ -83,7 +89,7 @@ jobs:
       #     key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
       - name: Cache go.mod (macOS)
         if: matrix.platform == 'macos-13'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/go-build
@@ -93,7 +99,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Cache go.mod (Linux)
         if: matrix.platform == 'ubuntu-latest'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/go-build
@@ -103,7 +109,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Cache go.mod (Windows)
         if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~\AppData\Local\go-build

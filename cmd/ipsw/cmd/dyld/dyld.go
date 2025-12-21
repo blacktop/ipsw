@@ -30,7 +30,6 @@ import (
 )
 
 var symAddrColor = color.New(color.Faint).SprintfFunc()
-var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
 var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
 var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
 var symNameColor = color.New(color.Bold).SprintFunc()

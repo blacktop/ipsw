@@ -36,13 +36,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+const standardDebugserver = "/usr/libexec/debugserver" // NEW location in FS cryptex on device
+
 func init() {
 	SSHCmd.AddCommand(sshDebugserverCmd)
 
 	sshDebugserverCmd.Flags().BoolP("force", "f", false, "overwrite file on device")
 	sshDebugserverCmd.Flags().StringP("image", "m", "", "path to DeveloperDiskImage.dmg")
+	sshDebugserverCmd.Flags().StringP("dest", "d", "/usr/libexec", "destination directory on device")
 	viper.BindPFlag("ssh.debugserver.force", sshDebugserverCmd.Flags().Lookup("force"))
 	viper.BindPFlag("ssh.debugserver.image", sshDebugserverCmd.Flags().Lookup("image"))
+	viper.BindPFlag("ssh.debugserver.dest", sshDebugserverCmd.Flags().Lookup("dest"))
 }
 
 // sshDebugserverCmd represents the debugserver command
@@ -62,6 +66,9 @@ var sshDebugserverCmd = &cobra.Command{
 		viper.BindPFlag("ssh.key", cmd.Flags().Lookup("key"))
 		viper.BindPFlag("ssh.insecure", cmd.Flags().Lookup("insecure"))
 
+		// Always check standard locations, but copy to user-specified destination
+		destDebugserver := filepath.Join(viper.GetString("ssh.debugserver.dest"), "debugserver")
+
 		log.Infof("Connecting to %s@%s:%s", viper.GetString("ssh.user"), viper.GetString("ssh.host"), viper.GetString("ssh.port"))
 		cli, err := ssh.NewSSH(&ssh.Config{
 			Host:     viper.GetString("ssh.host"),
@@ -76,9 +83,9 @@ var sshDebugserverCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		if cli.FileExists("/usr/libexec/debugserver") { // NEW location in FS cryptex on device
-			utils.Indent(log.Info, 2)("Copying '/usr/libexec/debugserver' from device to '/tmp/debugserver'")
-			if err := cli.CopyFromDevice("/usr/libexec/debugserver", "/tmp/debugserver"); err != nil {
+		if cli.FileExists(standardDebugserver) {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Copying '%s' from device to '/tmp/debugserver'", standardDebugserver))
+			if err := cli.CopyFromDevice(standardDebugserver, "/tmp/debugserver"); err != nil {
 				return err
 			}
 
@@ -87,14 +94,14 @@ var sshDebugserverCmd = &cobra.Command{
 				return fmt.Errorf("failed to resign debugserver: %w", err)
 			}
 
-			utils.Indent(log.Info, 2)("Copying '/tmp/debugserver' back to device")
-			if err := cli.CopyToDevice("/tmp/debugserver", "/usr/libexec/debugserver"); err != nil {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Copying '/tmp/debugserver' back to device at '%s'", destDebugserver))
+			if err := cli.CopyToDevice("/tmp/debugserver", destDebugserver); err != nil {
 				return fmt.Errorf("failed to copy debugserver to device: %w", err)
 			}
 
-			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserver' on device")
-			if err := cli.RunCommand("chmod 0755 /usr/libexec/debugserver"); err != nil {
-				return fmt.Errorf("failed to chmod /usr/libexec/debugserver on device: %w", err)
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Running 'chmod 0755 %s' on device", destDebugserver))
+			if err := cli.RunCommand(fmt.Sprintf("chmod 0755 %s", destDebugserver)); err != nil {
+				return fmt.Errorf("failed to chmod %s on device: %w", destDebugserver, err)
 			}
 		} else if cli.FileExists("/usr/bin/debugserver") || viper.GetBool("ssh.debugserver.force") { // OLD location from DDI mount
 			if runtime.GOOS != "darwin" {
@@ -145,13 +152,13 @@ var sshDebugserverCmd = &cobra.Command{
 				return fmt.Errorf("failed to resign debugserver: %w", err)
 			}
 
-			utils.Indent(log.Info, 2)("Copying '/tmp/debugserver' back to device")
-			if err := cli.CopyToDevice("/tmp/debugserver", "/usr/bin/debugserver"); err != nil {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Copying '/tmp/debugserver' back to device at '%s'", destDebugserver))
+			if err := cli.CopyToDevice("/tmp/debugserver", destDebugserver); err != nil {
 				return fmt.Errorf("failed to copy debugserver to device: %w", err)
 			}
-			utils.Indent(log.Info, 2)("Running 'chmod 0755 /usr/libexec/debugserver' on device")
-			if err := cli.RunCommand("chmod 0755 /usr/bin/debugserver"); err != nil {
-				return fmt.Errorf("failed to chmod /usr/bin/debugserver on device: %w", err)
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Running 'chmod 0755 %s' on device", destDebugserver))
+			if err := cli.RunCommand(fmt.Sprintf("chmod 0755 %s", destDebugserver)); err != nil {
+				return fmt.Errorf("failed to chmod %s on device: %w", destDebugserver, err)
 			}
 		} else {
 			log.Warn("debugserver already on device")

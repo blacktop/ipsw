@@ -54,11 +54,6 @@ scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
 scoop install blacktop/ipsw
 ```
 
-#### Go Install
-```bash
-go install github.com/blacktop/ipsw/cmd/ipsw@latest
-```
-
 ### Basic Usage
 
 ```bash
@@ -282,7 +277,7 @@ Pre-computed firmware differences: [ipsw-diffs](https://github.com/blacktop/ipsw
 
 ### 💬 Community
 
-[![Discord](https://img.shields.io/badge/DISCORD-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/cg9ceu35)
+[![Discord](https://img.shields.io/badge/DISCORD-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/BEamsHAWAh)
 [![GitHub Discussions](https://img.shields.io/badge/GITHUB_DISCUSSION-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/blacktop/ipsw/discussions)
 
 ## Contributing

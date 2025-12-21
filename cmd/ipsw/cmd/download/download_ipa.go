@@ -112,8 +112,9 @@ var downloadIpaCmd = &cobra.Command{
 			ConfigDir:     filepath.Join(home, ".ipsw"),
 			VaultPassword: viper.GetString("download.ipa.vault-password"),
 			StoreFront:    viper.GetString("download.ipa.store-front"),
-			KeybagPlist:   viper.GetString("download.ipa.keybag-plist"),
-			Verbose:       viper.GetBool("verbose"),
+			// KeybagPlist:   viper.GetString("download.ipa.keybag-plist"),
+			KeybagPlist: "",
+			Verbose:     viper.GetBool("verbose"),
 		})
 
 		if err := as.Init(); err != nil {

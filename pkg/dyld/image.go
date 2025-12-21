@@ -19,6 +19,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/blacktop/ipsw/pkg/symbols"
 	"github.com/pkg/errors"
 )
 
@@ -580,9 +581,9 @@ func (i *CacheImage) Analyze() error {
 				target = slide
 			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%s", symName)
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName)
 			} else {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%x", target)
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target)
 			}
 		}
 	}
@@ -598,7 +599,7 @@ func (i *CacheImage) Analyze() error {
 				target = slide
 			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+				i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
@@ -606,17 +607,17 @@ func (i *CacheImage) Analyze() error {
 						log.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
 					if symName, ok := i.cache.AddressToSymbol[target]; ok {
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
 					} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
 						if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
-							i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+							i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
 						}
 					} else {
 						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x ; %s", target, filepath.Base(img.Name))
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x ; %s", symbols.PrefixGotFallback, target, filepath.Base(img.Name))
 					}
 				} else {
-					i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x", target)
+					i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target)
 				}
 			}
 		}
@@ -633,8 +634,8 @@ func (i *CacheImage) Analyze() error {
 				target = slide
 			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				if !strings.HasPrefix(symName, "j_") {
-					i.cache.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+				if !strings.HasPrefix(symName, symbols.PrefixJump) {
+					i.cache.AddressToSymbol[stub] = symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper)
 				} else {
 					i.cache.AddressToSymbol[stub] = symName
 				}
@@ -647,10 +648,10 @@ func (i *CacheImage) Analyze() error {
 					return fmt.Errorf("failed to lookup symbol stub target %#x: failed to analyze image %s: %w", target, img.Name, err)
 				}
 				if symName, ok := i.cache.AddressToSymbol[target]; ok {
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, symName)
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%x ; %s", symbols.PrefixStubFallback, target, filepath.Base(img.Name))
 				}
 			}
 		}
