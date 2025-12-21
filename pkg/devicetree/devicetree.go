@@ -733,16 +733,16 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 				}
 				data, err := DecryptIm4pData(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to decrypt Img4 DeviceTree: %w", err)
 				}
 				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %w", err)
 				}
 			} else {
 				dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %w", err)
 				}
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
@@ -757,11 +757,11 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 				}
 				data, err := img3.Decrypt(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to decrypt Img3 DeviceTree: %w", err)
 				}
 				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+					return nil, fmt.Errorf("failed to parse Img3 device tree data: %w", err)
 				}
 			} else {
 				dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
@@ -799,16 +799,16 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 				}
 				data, err := DecryptIm4pData(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to decrypt Img4 DeviceTree: %w", err)
 				}
 				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+					return nil, fmt.Errorf("failed to parse Img4 device tree data: %w", err)
 				}
 			} else {
 				dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %w", err)
 				}
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
@@ -823,11 +823,11 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 				}
 				data, err := img3.Decrypt(dtData, ivkey[:aes.BlockSize], ivkey[aes.BlockSize:])
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
+					return nil, fmt.Errorf("failed to decrypt Img3 DeviceTree: %w", err)
 				}
 				dt[filepath.Base(f.Name)], err = parseDeviceTree(bytes.NewReader(data))
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse Img4 device tree data: %v", err)
+					return nil, fmt.Errorf("failed to parse Img3 device tree data: %w", err)
 				}
 			} else {
 				dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
