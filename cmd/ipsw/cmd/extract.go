@@ -46,7 +46,7 @@ func init() {
 	extractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().Bool("dtree", false, "Extract DeviceTree")
-	extractCmd.Flags().String("dmg", "", "Extract DMG file (app, sys, fs)")
+	extractCmd.Flags().String("dmg", "", fmt.Sprintf("Extract DMG file (%s)", strings.Join(mount.DmgTypes, ", ")))
 	extractCmd.Flags().Bool("iboot", false, "Extract iBoot")
 	extractCmd.Flags().Bool("sep", false, "Extract sep-firmware")
 	extractCmd.Flags().Bool("sptm", false, "Extract SPTM and TXM Firmwares")
@@ -67,12 +67,14 @@ func init() {
 	})
 	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
 	extractCmd.Flags().String("device", "", "Device to extract kernel for (e.g. iPhone10,6)")
+	extractCmd.Flags().String("ident", "", "Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{
 			"app\tAppOS",
 			"sys\tSystemOS",
 			"fs\tFileSystem",
 			"exc\tExclave",
+			"rdisk\tRestoreRamDisk",
 		}, cobra.ShellCompDirectiveDefault
 	})
 
@@ -100,6 +102,7 @@ func init() {
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
 	viper.BindPFlag("extract.driverkit", extractCmd.Flags().Lookup("driverkit"))
 	viper.BindPFlag("extract.device", extractCmd.Flags().Lookup("device"))
+	viper.BindPFlag("extract.ident", extractCmd.Flags().Lookup("ident"))
 }
 
 // extractCmd represents the extract command
@@ -190,6 +193,7 @@ var extractCmd = &cobra.Command{
 			Output:       viper.GetString("extract.output"),
 			JSON:         viper.GetBool("extract.json"),
 			Lookup:       viper.GetBool("extract.lookup"),
+			Ident:        viper.GetString("extract.ident"),
 		}
 
 		if viper.GetBool("extract.remote") {

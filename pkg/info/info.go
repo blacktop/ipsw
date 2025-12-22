@@ -481,6 +481,30 @@ func (i *Info) GetRestoreRamDiskDmgByIdent(ident string) (string, error) {
 	}
 }
 
+// GetRestoreRamDiskDmg returns the best RestoreRamDisk DMG path.
+// If ident is non-empty, it finds a matching identity. Otherwise, it prefers
+// Erase, then Update, then falls back to the first available DMG.
+func (i *Info) GetRestoreRamDiskDmg(ident string) (string, error) {
+	if len(ident) > 0 {
+		return i.GetRestoreRamDiskDmgByIdent(ident)
+	}
+	// Prefer Erase -> Update -> first
+	if p, err := i.GetRestoreRamDiskDmgByIdent("Erase"); err == nil {
+		return p, nil
+	}
+	if p, err := i.GetRestoreRamDiskDmgByIdent("Update"); err == nil {
+		return p, nil
+	}
+	dmgs, err := i.GetRestoreRamDiskDmgs()
+	if err != nil {
+		return "", fmt.Errorf("failed to get RestoreRamDisk DMGs: %w", err)
+	}
+	if len(dmgs) == 0 {
+		return "", fmt.Errorf("no RestoreRamDisk DMG found")
+	}
+	return dmgs[0], nil
+}
+
 func (i *Info) GetExclaveOSDmg() (string, error) {
 	var dmgs []string
 	if i.Plists != nil && i.Plists.BuildManifest != nil {

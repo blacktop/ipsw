@@ -47,7 +47,7 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
 
 ```
       --device string           Device to extract kernel for (e.g. iPhone10,6)
-      --dmg string              Extract DMG file (app, sys, fs)
+      --dmg string              Extract DMG file (app, sys, fs, exc, rdisk)
       --driverkit               Extract DriverKit dyld_shared_cache
       --dtree                   Extract DeviceTree
   -d, --dyld                    Extract dyld_shared_cache
@@ -58,10 +58,12 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
       --flat                    Do NOT preserve directory structure when extracting
   -h, --help                    help for extract
       --iboot                   Extract iBoot
+      --ident string            Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
       --insecure                do not verify ssl certs
   -j, --json                    Output extracted paths as JSON
       --kbag                    Extract Im4p Keybags
   -k, --kernel                  Extract kernelcache
+  -l, --lookup                  Lookup decryption keys on theapplewiki.com
   -o, --output string           Folder to extract files to
   -p, --pattern string          Extract files that match regex
       --pem-db string           AEA pem DB JSON file
