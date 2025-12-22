@@ -78,6 +78,8 @@ type Config struct {
 	Info bool `json:"info,omitempty"`
 	// Lookup decryption keys from theapplewiki.com
 	Lookup bool `json:"lookup,omitempty"`
+	// BuildManifest identity selector (used for rdisk)
+	Ident string `json:"ident,omitempty"`
 
 	info     *info.Info
 	wikiKeys download.WikiFWKeys
@@ -646,6 +648,11 @@ func DMG(c *Config) ([]string, error) {
 		dmgPath, err = i.GetExclaveOSDmg()
 		if err != nil {
 			return nil, fmt.Errorf("failed to find exclaveOS DMG in IPSW: %v", err)
+		}
+	case "rdisk":
+		dmgPath, err = i.GetRestoreRamDiskDmg(c.Ident)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find RestoreRamDisk DMG in IPSW: %v", err)
 		}
 	}
 

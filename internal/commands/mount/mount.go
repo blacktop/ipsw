@@ -20,7 +20,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-var DmgTypes = []string{"fs", "sys", "app", "exc", "rdisk"}
+var DmgTypes = []string{"app", "sys", "fs", "exc", "rdisk"}
 
 // Config contains optional options for mounting a DMG from an IPSW
 type Config struct {
@@ -119,27 +119,9 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 			return nil, fmt.Errorf("failed to get ExclaveOS DMG: %v", err)
 		}
 	case "rdisk":
-		if len(cfg.Ident) > 0 {
-			dmgPath, err = i.GetRestoreRamDiskDmgByIdent(cfg.Ident)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get RestoreRamDisk DMG: %v", err)
-			}
-		} else {
-			// Prefer Erase -> Update -> first
-			if p, err := i.GetRestoreRamDiskDmgByIdent("Erase"); err == nil {
-				dmgPath = p
-			} else if p, err := i.GetRestoreRamDiskDmgByIdent("Update"); err == nil {
-				dmgPath = p
-			} else {
-				if dmgs, err := i.GetRestoreRamDiskDmgs(); err == nil {
-					if len(dmgs) == 0 {
-						return nil, fmt.Errorf("no RestoreRamDisk DMG found")
-					}
-					dmgPath = dmgs[0]
-				} else {
-					return nil, fmt.Errorf("failed to get RestoreRamDisk DMGs: %v", err)
-				}
-			}
+		dmgPath, err = i.GetRestoreRamDiskDmg(cfg.Ident)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get RestoreRamDisk DMG: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
