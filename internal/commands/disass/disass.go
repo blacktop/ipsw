@@ -97,11 +97,7 @@ func Decompile(asm string, cfg *Config) (string, error) {
 			log.Warn("Exiting...")
 			return "", nil
 		}
-		modelID := modelMap[choice]
-		if modelID == "" {
-			modelID = choice
-		}
-		if err := llm.SetModel(modelID); err != nil {
+		if err := llm.SetModel(choice); err != nil {
 			return "", fmt.Errorf("failed to set llm model: %v", err)
 		}
 	}
