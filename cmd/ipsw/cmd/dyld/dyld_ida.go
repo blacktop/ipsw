@@ -216,8 +216,8 @@ var idaCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		_, magic, ok := strings.Cut(f.Headers[f.UUID].Magic.String(), " ")
-		if !ok {
+		magic := strings.TrimSpace(strings.TrimPrefix(f.Headers[f.UUID].Magic.String(), dyld.DYLD_SHARED_CACHE_DYNAMIC_MAGIC_PREFIX))
+		if magic == "" {
 			return fmt.Errorf("failed to get arch from DSC magic %s", f.Headers[f.UUID].Magic.String())
 		}
 
