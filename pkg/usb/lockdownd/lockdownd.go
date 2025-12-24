@@ -3,14 +3,14 @@ package lockdownd
 import (
 	"fmt"
 
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/usb"
-	"github.com/fatih/color"
 )
 
 const lockdownPort = 62078
 
-var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
-var colorBold = color.New(color.Bold).SprintFunc()
+var colorFaint = colors.FaintHiBlue().SprintFunc()
+var colorBold = colors.Bold().SprintFunc()
 
 type Client struct {
 	*usb.Client

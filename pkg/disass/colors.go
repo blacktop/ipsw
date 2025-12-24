@@ -3,18 +3,18 @@ package disass
 import (
 	"regexp"
 
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
 // disassembly colors
-var colorOp = color.New(color.Bold).SprintfFunc()
-var colorRegs = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorImm = color.New(color.Bold, color.FgMagenta).SprintFunc()
-var colorAddr = color.New(color.Bold, color.FgMagenta).SprintfFunc()
-var colorOpCodes = color.New(color.Faint, color.FgHiWhite).SprintFunc()
-var colorComment = color.New(color.Faint, color.FgWhite).SprintFunc()
-var colorLocation = color.New(color.FgHiYellow).SprintfFunc()
-var printCurLine = color.New(color.Bold, color.FgBlack, color.BgHiWhite).PrintfFunc()
+var colorOp = colors.Bold().SprintfFunc()
+var colorRegs = colors.BoldHiBlue().SprintFunc()
+var colorImm = colors.BoldMagenta().SprintFunc()
+var colorAddr = colors.BoldMagenta().SprintfFunc()
+var colorOpCodes = colors.FaintHiWhite().SprintFunc()
+var colorComment = colors.FaintWhite().SprintFunc()
+var colorLocation = colors.HiYellow().SprintfFunc()
+var printCurLine = colors.BoldBlackOnHiWhite().PrintfFunc()
 
 func ColorOperands(operands string) string {
 	if len(operands) > 0 {

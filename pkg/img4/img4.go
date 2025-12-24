@@ -10,14 +10,14 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
 // Color variables are defined in manifest.go
 var (
-	colorTitle    = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-	colorField    = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-	colorSubField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
+	colorTitle    = colors.BoldHiMagenta().SprintFunc()
+	colorField    = colors.BoldHiBlue().SprintFunc()
+	colorSubField = colors.BoldHiCyan().SprintFunc()
 )
 
 // ComponentFourCCs is a map of component names to their four-character codes.
