@@ -63,6 +63,10 @@ checksums.txt.sha1
 mg.*
 btm.go
 
+# Integration test cache and data
+test/integration/cache/
+test/integration/testdata/
+
 # Docs
 public
 site/
