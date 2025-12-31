@@ -10,11 +10,6 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Group all deps into one weekly PR
-    groups:
-      all-cargo:
-        patterns:
-          - "*"
     rebase-strategy: "auto"
   - package-ecosystem: "github-actions"
     directory: "/"
