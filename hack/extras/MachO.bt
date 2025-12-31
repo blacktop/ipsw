@@ -356,6 +356,9 @@ typedef enum <uint> {
     LC_DYLD_CHAINED_FIXUPS 	    = 0x34 | REQ_DYLD,
     LC_FILESET_ENTRY 	        = 0x35 | REQ_DYLD,
     LC_ATOM_INFO                = 0x36,
+    LC_FUNCTION_VARIANTS        = 0x37,
+    LC_FUNCTION_VARIANT_FIXUPS  = 0x38,
+    LC_TARGET_TRIPLE            = 0x39,
     LC_SEP_CACHE_SLIDE          = 0x1 | REQ_SEP,
     LC_SEP_UNKNOWN2             = 0x2 | REQ_SEP,
     LC_SEP_UNKNOWN3             = 0x3 | REQ_SEP,
@@ -475,6 +478,12 @@ string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
             return "LC_FILESET_ENTRY";
         case LC_ATOM_INFO:
             return "LC_ATOM_INFO";
+        case LC_FUNCTION_VARIANTS:
+            return "LC_FUNCTION_VARIANTS";
+        case LC_FUNCTION_VARIANT_FIXUPS:
+            return "LC_FUNCTION_VARIANT_FIXUPS";
+        case LC_TARGET_TRIPLE:
+            return "LC_TARGET_TRIPLE";
         case LC_SEP_CACHE_SLIDE:    
             return "LC_SEP_CACHE_SLIDE";
         case LC_SEP_UNKNOWN2:
@@ -819,8 +828,14 @@ typedef struct {
     case FUNCTION_STARTS :
     case SEGMENT_SPLIT_INFO:
     case DATA_IN_CODE:
+    case LC_ATOM_INFO:
+    case LC_FUNCTION_VARIANTS:
+    case LC_FUNCTION_VARIANT_FIXUPS:
         uint32 data_offset;
         uint32 data_size;
+        break;
+    case LC_TARGET_TRIPLE:
+        LoadCommandString target_triple <comment="Target triple string">;
         break;
     case LC_FILESET_ENTRY:
         uint64 addr;      // memory address of the entry
