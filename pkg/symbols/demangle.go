@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	cxxTokenPattern = regexp.MustCompile(`_{1,2}Z[A-Za-z0-9_]+`)
+	cxxTokenPattern = regexp.MustCompile(`_{0,2}Z[A-Za-z0-9_]+`)
 )
 
 // demangleCoreSymbol runs the Swift and C++ demanglers against a core symbol.
@@ -17,6 +17,16 @@ func demangleCoreSymbol(name string) string {
 	out := swift.DemangleBlob(name)
 
 	out = cxxTokenPattern.ReplaceAllStringFunc(out, func(token string) string {
+		// Normalize bare Z to _Z:
+		// some symbols (notably .cold.N functions
+		// from hot/cold code splitting) appear without the conventional
+		// underscore prefix, remaining mangled.
+		// Example from kernelcache:
+		//		ZN18AppleMobileApNonce5startEP9IOService.cold.1
+		if token[0] == 'Z' {
+		    token = "_" + token
+		}
+
 		if demangled := demangle.Do(token, false, false); demangled != token {
 			return demangled
 		}
