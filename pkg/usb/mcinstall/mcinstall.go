@@ -5,18 +5,18 @@ import (
 	"os"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
 )
 
 const (
 	serviceName = "com.apple.mobile.MCInstall"
 )
 
-var colorHeader = color.New(color.FgHiBlue).SprintFunc()
-var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
-var colorBold = color.New(color.Bold).SprintFunc()
+var colorHeader = colors.HiBlue().SprintFunc()
+var colorFaint = colors.FaintHiBlue().SprintFunc()
+var colorBold = colors.Bold().SprintFunc()
 
 type Client struct {
 	c *usb.Client

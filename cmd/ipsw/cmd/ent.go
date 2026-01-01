@@ -28,7 +28,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/ent"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -233,8 +232,6 @@ var entCmd = &cobra.Command{
 			}
 			return ent.CreateSQLiteDatabase(sqliteDB, ipsws, inputs)
 		}
-
-		color.NoColor = viper.GetBool("no-color") || fileOnly
 
 		if showStats {
 			if pgHost != "" {

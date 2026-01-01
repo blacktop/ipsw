@@ -29,9 +29,9 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/emu"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -110,7 +110,7 @@ var dyldEmuCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Print(color.New(color.Bold).Sprintf("\n%s:", symbolName))
+			fmt.Print(colors.Bold().Sprintf("\n%s:", symbolName))
 		} else {
 			image, err = f.GetImageContainingVMAddr(startAddr)
 			if err != nil {

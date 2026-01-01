@@ -33,12 +33,12 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/commands/watch"
 	"github.com/blacktop/ipsw/internal/commands/watch/announce"
 	watchgit "github.com/blacktop/ipsw/internal/commands/watch/git"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -46,9 +46,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-var colorHeader = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorHighlight = color.New(color.Bold, color.BgHiYellow).SprintfFunc()
-var colorSeparator = color.New(color.Faint).SprintFunc()
+var colorHeader = colors.BoldHiBlue().SprintFunc()
+var colorHighlight = colors.BoldOnHiYellow().SprintfFunc()
+var colorSeparator = colors.Faint().SprintFunc()
 
 func highlightHeader(re *regexp.Regexp, input string) string {
 	parts := re.FindAllStringIndex(input, -1)
@@ -364,7 +364,7 @@ var watchCmd = &cobra.Command{
 					} else {
 						diff, err := utils.GitDiff(previousContent, latestChange.Content,
 							&utils.GitDiffConfig{
-								Color: viper.GetBool("color") && !viper.GetBool("no-color"),
+								Color: colors.Active(),
 								Tool:  viper.GetString("diff-tool"),
 							})
 						if err != nil {

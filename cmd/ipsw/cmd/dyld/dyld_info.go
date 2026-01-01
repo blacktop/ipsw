@@ -35,6 +35,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/colors"
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -326,7 +327,7 @@ var dyldInfoCmd = &cobra.Command{
 					}
 					w.Flush()
 
-					if viper.GetBool("color") && !viper.GetBool("no-color") {
+					if colors.Active() {
 						if err := quick.Highlight(os.Stdout, buf.String(), "md", "terminal256", "nord"); err != nil {
 							return err
 						}
@@ -359,7 +360,10 @@ var dyldInfoCmd = &cobra.Command{
 					out, err := utils.GitDiff(
 						strings.Join(dout1, "\n")+"\n",
 						strings.Join(dout2, "\n")+"\n",
-						&utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+						&utils.GitDiffConfig{
+							Color: colors.Active(),
+							Tool: viper.GetString("diff-tool"),
+						})
 					if err != nil {
 						return err
 					}

@@ -19,9 +19,9 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/download/pcc"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 )
@@ -81,12 +81,12 @@ type Ticket struct {
 	CryptexTickets []asn1.RawValue `asn1:"set"`
 }
 
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorTypeField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorHash = color.New(color.Faint).SprintfFunc()
-var colorName = color.New(color.Bold).SprintfFunc()
-var colorCreateTime = color.New(color.Faint, color.FgGreen).SprintFunc()
-var colorExpireTime = color.New(color.Faint, color.FgRed).SprintFunc()
+var colorField = colors.BoldHiBlue().SprintFunc()
+var colorTypeField = colors.BoldHiMagenta().SprintFunc()
+var colorHash = colors.Faint().SprintfFunc()
+var colorName = colors.Bold().SprintfFunc()
+var colorCreateTime = colors.FaintGreen().SprintFunc()
+var colorExpireTime = colors.FaintRed().SprintFunc()
 
 type PCCRelease struct {
 	Index uint64
@@ -127,7 +127,7 @@ func (r PCCRelease) String() string {
 	}
 	out += colorField("DarwinInit:\n")
 	dat, _ := json.MarshalIndent(r.DarwinInit.AsMap(), "", "  ")
-	if color.NoColor {
+	if !colors.Active() {
 		out += string(dat)
 	} else {
 		var buf strings.Builder
