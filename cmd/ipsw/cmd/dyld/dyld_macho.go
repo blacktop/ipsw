@@ -257,6 +257,9 @@ var MachoCmd = &cobra.Command{
 						}
 						fmt.Println(string(dat))
 					} else {
+						if err := m.Enrich(); err != nil {
+							return fmt.Errorf("failed to enrich MachO load commands: %v", err)
+						}
 						fmt.Println(m.FileTOC.String())
 					}
 				}
