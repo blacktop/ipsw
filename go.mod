@@ -74,13 +74,13 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20250911131444-c24c9ebe773c
 	github.com/vbauerster/mpb/v8 v8.11.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.47.0
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.49.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
-	golang.org/x/term v0.38.0
+	golang.org/x/term v0.39.0
 	google.golang.org/genai v1.41.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
@@ -255,7 +255,7 @@ require (
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/image v0.34.0 // indirect
 	golang.org/x/mod v0.31.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b // indirect
