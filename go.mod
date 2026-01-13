@@ -13,7 +13,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/alecthomas/chroma/v2 v2.21.1
+	github.com/alecthomas/chroma/v2 v2.22.0
 	github.com/anthropics/anthropic-sdk-go v1.19.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
@@ -47,7 +47,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.16.4
-	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
@@ -74,13 +74,13 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20250911131444-c24c9ebe773c
 	github.com/vbauerster/mpb/v8 v8.11.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.46.0
-	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
-	golang.org/x/net v0.48.0
+	golang.org/x/crypto v0.47.0
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
+	golang.org/x/net v0.49.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
-	golang.org/x/term v0.38.0
+	golang.org/x/term v0.39.0
 	google.golang.org/genai v1.41.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
@@ -254,9 +254,9 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/image v0.34.0 // indirect
-	golang.org/x/mod v0.31.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
+	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
