@@ -10,7 +10,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
 const (
@@ -19,8 +19,8 @@ const (
 	ClientVersionString = "ipsw-usbmux-0.0.1"
 )
 
-var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
-var colorBold = color.New(color.Bold).SprintFunc()
+var colorFaint = colors.FaintHiBlue().SprintFunc()
+var colorBold = colors.Bold().SprintFunc()
 
 type Header struct {
 	Length      uint32

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/blacktop/ipsw/internal/colors"
 )
 
-var colorBold = color.New(color.Bold).SprintFunc()
-var colorHeader = color.New(color.FgHiBlue).SprintFunc()
-var ColorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorBold = colors.Bold().SprintFunc()
+var colorHeader = colors.HiBlue().SprintFunc()
+var ColorFaint = colors.FaintHiBlue().SprintFunc()
 
 type Argument struct {
 	TypeString        string `json:"typeString,omitempty"`

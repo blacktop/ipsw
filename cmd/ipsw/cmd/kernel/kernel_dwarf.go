@@ -30,6 +30,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/colors"
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -273,7 +274,11 @@ var dwarfCmd = &cobra.Command{
 
 				for file2, typ2 := range t2 {
 					if typ1, found := t1[file2]; found {
-						out, err := utils.GitDiff(typ1, typ2, &utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+						out, err := utils.GitDiff(typ1, typ2,
+							&utils.GitDiffConfig{
+								Color: colors.Active(),
+								Tool: viper.GetString("diff-tool"),
+							})
 						if err != nil {
 							return err
 						}
@@ -289,7 +294,7 @@ var dwarfCmd = &cobra.Command{
 			} else { // diff ALL structs
 				out, err := dwarf.DiffEnums(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
 					Markdown:    viper.GetBool("kernel.dwarf.md"),
-					Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+					Color:       colors.Active(),
 					DiffTool:    viper.GetString("diff-tool"),
 					ShowOffsets: !noOffsets,
 				})
@@ -303,7 +308,7 @@ var dwarfCmd = &cobra.Command{
 				log.Info("Diffing all structs")
 				out, err = dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
 					Markdown:    viper.GetBool("kernel.dwarf.md"),
-					Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+					Color:       colors.Active(),
 					DiffTool:    viper.GetString("diff-tool"),
 					ShowOffsets: !noOffsets,
 				})
@@ -346,7 +351,7 @@ var dwarfCmd = &cobra.Command{
 						log.WithField("file", file).Info(viper.GetString("kernel.dwarf.type"))
 					}
 				}
-				fmt.Println(utils.ClangFormat(typ, viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
+				fmt.Println(utils.ClangFormat(typ, viper.GetString("kernel.dwarf.type")+".h", colors.Active()))
 			}
 		}
 
@@ -365,9 +370,9 @@ var dwarfCmd = &cobra.Command{
 					if strings.HasPrefix(n.LinkageName, "__Z") || strings.HasPrefix(n.LinkageName, "_Z") {
 						n.LinkageName = demangle.Do("_"+n.LinkageName, false, false)
 					}
-					fmt.Printf("%#x: %s", n.LowPC, utils.ClangFormat(n.LinkageName, viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
+					fmt.Printf("%#x: %s", n.LowPC, utils.ClangFormat(n.LinkageName, viper.GetString("kernel.dwarf.name")+".h", colors.Active()))
 				} else {
-					fmt.Printf("%#x: %s", n.LowPC, utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color") && !viper.GetBool("no-color")))
+					fmt.Printf("%#x: %s", n.LowPC, utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", colors.Active()))
 				}
 			}
 		}
@@ -375,7 +380,7 @@ var dwarfCmd = &cobra.Command{
 		if viper.GetBool("kernel.dwarf.all") {
 			if err := dwarf.DumpAllTypes(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+				Color:       colors.Active(),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			}); err != nil {
@@ -385,7 +390,7 @@ var dwarfCmd = &cobra.Command{
 		if viper.GetBool("kernel.dwarf.structs") {
 			if err := dwarf.DumpAllStructs(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+				Color:       colors.Active(),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			}); err != nil {
@@ -395,7 +400,7 @@ var dwarfCmd = &cobra.Command{
 		if viper.GetBool("kernel.dwarf.enums") {
 			if err := dwarf.DumpAllEnums(filepath.Clean(args[0]), &dwarf.Config{
 				Markdown:    viper.GetBool("kernel.dwarf.md"),
-				Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+				Color:       colors.Active(),
 				DiffTool:    viper.GetString("diff-tool"),
 				ShowOffsets: !noOffsets,
 			}); err != nil {

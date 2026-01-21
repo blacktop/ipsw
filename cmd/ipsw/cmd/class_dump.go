@@ -31,6 +31,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/colors"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -157,7 +158,7 @@ var classDumpCmd = &cobra.Command{
 			// Generic:     viper.GetBool("class-dump.generic"),
 			Demangle:    demangleOpt,
 			IpswVersion: fmt.Sprintf("Version: %s, BuildCommit: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildCommit)),
-			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
+			Color:       colors.Active(),
 			Theme:       viper.GetString("class-dump.theme"),
 			Output:      viper.GetString("class-dump.output"),
 		}

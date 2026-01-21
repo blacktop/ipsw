@@ -2,17 +2,17 @@
 
 package emu
 
-import "github.com/fatih/color"
+import "github.com/blacktop/ipsw/internal/colors"
 
 // disassembly colors
-var colorOp = color.New(color.Bold).SprintfFunc()
-var colorRegs = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorImm = color.New(color.Bold, color.FgMagenta).SprintFunc()
-var colorAddr = color.New(color.Bold, color.FgMagenta).SprintfFunc()
-var colorOpCodes = color.New(color.Faint, color.FgHiWhite).SprintFunc()
+var colorOp = colors.Bold().SprintfFunc()
+var colorRegs = colors.BoldHiBlue().SprintFunc()
+var colorImm = colors.BoldMagenta().SprintFunc()
+var colorAddr = colors.BoldMagenta().SprintfFunc()
+var colorOpCodes = colors.FaintHiWhite().SprintFunc()
 
 // hook colors
-var colorHook = color.New(color.Faint, color.FgHiBlue).SprintFunc()
-var colorDetails = color.New(color.Italic, color.Faint, color.FgWhite).SprintfFunc()
-var colorInterrupt = color.New(color.Italic, color.Bold, color.FgHiYellow).SprintfFunc()
-var colorChanged = color.New(color.FgHiYellow).SprintfFunc()
+var colorHook = colors.FaintHiBlue().SprintFunc()
+var colorDetails = colors.ItalicFaintWhite().SprintfFunc()
+var colorInterrupt = colors.ItalicBoldHiYellow().SprintfFunc()
+var colorChanged = colors.HiYellow().SprintfFunc()
