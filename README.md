@@ -262,6 +262,14 @@ int main(int argc, char *argv[]) {
 - **API Docs**: REST API documentation available at `/docs` when running `ipswd`
 - **Examples**: Comprehensive usage examples in the documentation
 
+### SKILL.md
+
+Super charge your AI agents with `ipsw` super powers
+
+```bash
+npx skills add https://github.com/blacktop/ipsw-skill --skill ipsw
+```
+
 ### 🆕 AI-Powered Wiki
 
 Ask questions about the repository using AI:
