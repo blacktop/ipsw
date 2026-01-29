@@ -1,0 +1,58 @@
+# Builds for arm64 darwin in macOS Big Sur compatibility mode
+# See: https://github.com/ink-splatters/darwin-sectrust-compat
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - ./hack/make/completions
+    - ./hack/make/manpages
+
+builds:
+  - id: darwin_arm64_extras_compat
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/opt/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include
+      - PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    tags:
+      - libusb
+      - unicorn
+      - sectrust_compat
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}}
+      - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+
+archives:
+  - id: darwin_arm64_extras_compat_archive
+    builds:
+      - darwin_arm64_extras_compat
+    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras_compat"
+    replacements:
+      darwin: macOS
+      ios: iOS
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+
+checksum:
+  name_template: "checksums.darwin_arm64_extras_compat.txt"
+
+sboms:
+  - artifacts: archive
