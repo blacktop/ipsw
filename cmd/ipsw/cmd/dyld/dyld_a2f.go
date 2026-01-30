@@ -51,11 +51,20 @@ func init() {
 	viper.BindPFlag("dyld.a2f.cache", AddrToFuncCmd.Flags().Lookup("cache"))
 }
 
+// stdinHasData checks if stdin is a pipe with data
+func stdinHasData() bool {
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) == 0
+}
+
 // AddrToFuncCmd represents the a2f command
 var AddrToFuncCmd = &cobra.Command{
-	Use:   "a2f <DSC> <ADDR>",
+	Use:   "a2f <DSC> [ADDR]",
 	Short: "Lookup function containing unslid address",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.RangeArgs(1, 2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -97,21 +106,25 @@ var AddrToFuncCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(ptrFile) > 0 {
+		if len(ptrFile) > 0 || stdinHasData() {
 			var fs []dscFunc
 			var enc *json.Encoder
+			var scanner *bufio.Scanner
 
 			imap := make(map[*dyld.CacheImage][]uint64)
 
-			pfile, err := os.Open(ptrFile)
-			if err != nil {
-				return err
+			if len(ptrFile) > 0 {
+				pfile, err := os.Open(ptrFile)
+				if err != nil {
+					return err
+				}
+				defer pfile.Close()
+				scanner = bufio.NewScanner(pfile)
+				log.Infof("Parsing functions for pointers in %s", ptrFile)
+			} else {
+				scanner = bufio.NewScanner(os.Stdin)
+				log.Info("Parsing functions for pointers from stdin")
 			}
-			defer pfile.Close()
-
-			scanner := bufio.NewScanner(pfile)
-
-			log.Infof("Parsing functions for pointers in %s", ptrFile)
 			for scanner.Scan() {
 				addr, err := utils.ConvertStrToInt(scanner.Text())
 				if err != nil {
