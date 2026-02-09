@@ -507,8 +507,7 @@ homebrew_casks:
     conflicts:
       - cask: ipsw-frida
     manpages:
-      # TODO: add ALL manpages back in
-      - "manpages/ipsw.1.gz"
+      - "manpages/*"
     completions:
       bash: "completions/ipsw/_bash"
       zsh: "completions/ipsw/_zsh"
