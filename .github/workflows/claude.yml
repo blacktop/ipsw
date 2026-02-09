@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0      
-      - uses: anthropics/claude-code-action@01e756b34ef7a1447e9508f674143b07d20c2631 # beta
+      - uses: anthropics/claude-code-action@6c61301d8e1ee91bef7b65172f93462bbb216394 # beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
