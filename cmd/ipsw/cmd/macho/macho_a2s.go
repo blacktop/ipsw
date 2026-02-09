@@ -152,6 +152,54 @@ func resolveGOTEntry(m *macho.File, addr uint64, sec *types.Section) (string, bo
 	return "", false
 }
 
+// resolveObjCMetadata resolves an address within an ObjC metadata section
+// to a human-readable name (e.g., class name, selector, protocol).
+func resolveObjCMetadata(m *macho.File, addr uint64, sec *types.Section) (string, bool) {
+	if !m.HasObjC() {
+		return "", false
+	}
+	switch sec.Name {
+	case "__objc_data":
+		// address is at a class struct (ObjcClass64 / SwiftClassMetadata64)
+		if cls, err := m.GetObjCClass2(addr); err == nil {
+			return "_OBJC_CLASS_$_" + cls.Name, true
+		}
+	case "__objc_classrefs":
+		if refs, err := m.GetObjCClassReferences(); err == nil {
+			if cls, ok := refs[addr]; ok {
+				return "_OBJC_CLASS_$_" + cls.Name, true
+			}
+		}
+	case "__objc_selrefs":
+		if refs, err := m.GetObjCSelectorReferences(); err == nil {
+			if sel, ok := refs[addr]; ok {
+				return "@selector(" + sel.Name + ")", true
+			}
+		}
+	case "__objc_superrefs":
+		if refs, err := m.GetObjCSuperReferences(); err == nil {
+			if cls, ok := refs[addr]; ok {
+				return "_OBJC_CLASS_$_" + cls.Name, true
+			}
+		}
+	case "__objc_protolist", "__objc_protorefs":
+		if refs, err := m.GetObjCProtoReferences(); err == nil {
+			if proto, ok := refs[addr]; ok {
+				return "_OBJC_PROTOCOL_$_" + proto.Name, true
+			}
+		}
+	case "__cfstring":
+		if cfstrings, err := m.GetCFStrings(); err == nil {
+			for _, cfs := range cfstrings {
+				if cfs.Address == addr {
+					return fmt.Sprintf("@%#v", cfs.Name), true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
 // machoA2sCmd represents the a2s command
 var machoA2sCmd = &cobra.Command{
 	Use:           "a2s",
@@ -265,6 +313,17 @@ var machoA2sCmd = &cobra.Command{
 			// try to resolve GOT/stub/symbol-pointer entries
 			if sec != nil {
 				if name, ok := resolveGOTEntry(m, addr, sec); ok {
+					if secondAttempt {
+						name = symbols.PrefixPointer + name
+					}
+					fmt.Printf("\n%#x: %s\n", addr, name)
+					return nil
+				}
+			}
+
+			// try to resolve ObjC metadata (classes, selectors, protocols, etc.)
+			if sec != nil {
+				if name, ok := resolveObjCMetadata(m, addr, sec); ok {
 					if secondAttempt {
 						name = symbols.PrefixPointer + name
 					}
