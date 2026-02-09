@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/alecthomas/chroma/v2 v2.23.1
-	github.com/anthropics/anthropic-sdk-go v1.20.0
+	github.com/anthropics/anthropic-sdk-go v1.22.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/blacktop/arm64-cgo v1.0.67
@@ -30,7 +30,7 @@ require (
 	github.com/briandowns/spinner v1.23.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/charmbracelet/bubbles v0.21.0
+	github.com/charmbracelet/bubbles v0.21.1
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/cloudflare/circl v1.6.3
@@ -40,7 +40,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0
-	github.com/frida/frida-go v1.0.1
+	github.com/frida/frida-go v1.0.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.11.2
@@ -58,7 +58,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-mastodon v0.0.10
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.15.2
+	github.com/ollama/ollama v0.15.6
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
@@ -77,11 +77,11 @@ require (
 	golang.org/x/crypto v0.47.0
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 	golang.org/x/net v0.49.0
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.19.0
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.41.0
 	golang.org/x/term v0.39.0
-	google.golang.org/genai v1.43.0
+	google.golang.org/genai v1.45.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
@@ -120,16 +120,16 @@ require (
 	github.com/charmbracelet/fang v0.4.4 // indirect
 	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251217160852-6b0c0e26fad9 // indirect
-	github.com/charmbracelet/x/ansi v0.11.3 // indirect
-	github.com/charmbracelet/x/cellbuf v0.0.14 // indirect
+	github.com/charmbracelet/x/ansi v0.11.5 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/charmtone v0.0.0-20251215102626-e0db08df7383 // indirect
 	github.com/charmbracelet/x/mosaic v0.0.0-20251215102626-e0db08df7383 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
-	github.com/clipperhouse/displaywidth v0.6.2 // indirect
+	github.com/clipperhouse/displaywidth v0.9.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
