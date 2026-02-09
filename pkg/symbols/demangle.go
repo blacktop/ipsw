@@ -24,7 +24,7 @@ func demangleCoreSymbol(name string) string {
 		// Example from kernelcache:
 		//		ZN18AppleMobileApNonce5startEP9IOService.cold.1
 		if token[0] == 'Z' {
-		    token = "_" + token
+			token = "_" + token
 		}
 
 		if demangled := demangle.Do(token, false, false); demangled != token {
