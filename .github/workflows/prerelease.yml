@@ -31,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: "1.26"
           cache: true
 
       # - name: Install Rosetta (for x86_64 cross-build)
