@@ -87,34 +87,49 @@ func ScanDmgWithMultipleHandlersAndCallback(ipswPath, dmgPath, dmgType, pemDB st
 
 // scanDmgMulti is the shared engine behind the helpers above.
 func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(string, string) error, betweenHandlers func(int)) error {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
-	} else {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
-	}
+	skipCleanup := false
+
+	// For AEA-encrypted DMGs, check if the decrypted version already exists
+	// (e.g. already extracted + mounted by a prior step like mountSystemOsDMGs).
+	// Reuse it to avoid overwriting a mounted DMG's backing file.
 	if filepath.Ext(dmgPath) == ".aea" {
-		var err error
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    dmgPath,
-			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		decryptedPath := strings.TrimSuffix(dmgPath, filepath.Ext(dmgPath))
+		if _, err := os.Stat(decryptedPath); err == nil {
+			dmgPath = decryptedPath
+			skipCleanup = true
 		}
-		defer os.Remove(dmgPath)
+	}
+
+	if !skipCleanup {
+		// check if filesystem DMG already exists (due to previous mount command)
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			}
+			if len(dmgs) == 0 {
+				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			}
+			defer os.Remove(dmgs[0])
+		} else {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+		}
+		if filepath.Ext(dmgPath) == ".aea" {
+			var err error
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:    dmgPath,
+				Output:   filepath.Dir(dmgPath),
+				PemDB:    pemDB,
+				Proxy:    "",    // TODO: make proxy configurable
+				Insecure: false, // TODO: make insecure configurable
+			})
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+			}
+			defer os.Remove(dmgPath)
+		}
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
 	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
@@ -206,34 +221,49 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 // scanDmg mounts a DMG and runs a single handler across files.
 // Why: simple case; multi-pass should use ScanDmgWithMultipleHandlers.
 func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, string) error) error {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
-	} else {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
-	}
+	skipCleanup := false
+
+	// For AEA-encrypted DMGs, check if the decrypted version already exists
+	// (e.g. already extracted + mounted by a prior step like mountSystemOsDMGs).
+	// Reuse it to avoid overwriting a mounted DMG's backing file.
 	if filepath.Ext(dmgPath) == ".aea" {
-		var err error
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    dmgPath,
-			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		decryptedPath := strings.TrimSuffix(dmgPath, filepath.Ext(dmgPath))
+		if _, err := os.Stat(decryptedPath); err == nil {
+			dmgPath = decryptedPath
+			skipCleanup = true
 		}
-		defer os.Remove(dmgPath)
+	}
+
+	if !skipCleanup {
+		// check if filesystem DMG already exists (due to previous mount command)
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			}
+			if len(dmgs) == 0 {
+				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			}
+			defer os.Remove(dmgs[0])
+		} else {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
+		}
+		if filepath.Ext(dmgPath) == ".aea" {
+			var err error
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:    dmgPath,
+				Output:   filepath.Dir(dmgPath),
+				PemDB:    pemDB,
+				Proxy:    "",    // TODO: make proxy configurable
+				Insecure: false, // TODO: make insecure configurable
+			})
+			if err != nil {
+				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+			}
+			defer os.Remove(dmgPath)
+		}
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
 	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
