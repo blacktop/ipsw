@@ -101,7 +101,7 @@ type modelsResponse struct {
 		Policy             struct {
 			State string `json:"state"`
 			Terms string `json:"terms"`
-		} `json:"policy,omitempty"`
+		} `json:"policy"`
 	} `json:"data"`
 	Object string `json:"object"`
 }

@@ -535,12 +535,12 @@ type ObjCBinaryInfo struct {
 }
 
 func (o ObjCBinaryInfo) String() string {
-	var out string
-	out += fmt.Sprintf("  __objc_imageinfo: %#08x\n", o.ImageInfoRuntimeOffset)
-	out += fmt.Sprintf("  __objc_selrefs:   %#08x (count=%d)\n", o.SelRefsRuntimeOffset, o.SelRefsCount)
-	out += fmt.Sprintf("  __objc_classlist: %#08x (count=%d)\n", o.ClassListRuntimeOffset, o.ClassListCount)
-	out += fmt.Sprintf("  __objc_catlist:   %#08x (count=%d)\n", o.CategoryListRuntimeOffset, o.CategoryCount)
-	out += fmt.Sprintf("  __objc_protolist: %#08x (count=%d)\n", o.ProtocolListRuntimeOffset, o.ProtocolListCount)
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("  __objc_imageinfo: %#08x\n", o.ImageInfoRuntimeOffset))
+	out.WriteString(fmt.Sprintf("  __objc_selrefs:   %#08x (count=%d)\n", o.SelRefsRuntimeOffset, o.SelRefsCount))
+	out.WriteString(fmt.Sprintf("  __objc_classlist: %#08x (count=%d)\n", o.ClassListRuntimeOffset, o.ClassListCount))
+	out.WriteString(fmt.Sprintf("  __objc_catlist:   %#08x (count=%d)\n", o.CategoryListRuntimeOffset, o.CategoryCount))
+	out.WriteString(fmt.Sprintf("  __objc_protolist: %#08x (count=%d)\n", o.ProtocolListRuntimeOffset, o.ProtocolListCount))
 	var flags []string
 	if o.HasClassStableSwiftFixups {
 		flags = append(flags, "class-stable-swift-fixups")
@@ -564,12 +564,12 @@ func (o ObjCBinaryInfo) String() string {
 		flags = append(flags, "protocol-method-lists-to-unique")
 	}
 	if len(flags) > 0 {
-		out += "\n  flags:\n"
+		out.WriteString("\n  flags:\n")
 		for _, f := range flags {
-			out += fmt.Sprintf("    - %s\n", f)
+			out.WriteString(fmt.Sprintf("    - %s\n", f))
 		}
 	}
-	return out
+	return out.String()
 }
 
 type PrebuiltLoader struct {
@@ -601,48 +601,48 @@ func (pl PrebuiltLoader) GetFileOffset(vmoffset uint64) uint64 {
 	return 0
 }
 func (pl PrebuiltLoader) String(f *File) string {
-	var out string
+	var out strings.Builder
 	if pl.Path != "" {
-		out += fmt.Sprintf("Path:    %s\n", pl.Path)
+		out.WriteString(fmt.Sprintf("Path:    %s\n", pl.Path))
 	}
 	if pl.AltPath != "" {
-		out += fmt.Sprintf("AltPath: %s\n", pl.AltPath)
+		out.WriteString(fmt.Sprintf("AltPath: %s\n", pl.AltPath))
 	}
 	if pl.Twin != "" {
-		out += fmt.Sprintf("Twin:    %s\n", pl.Twin)
+		out.WriteString(fmt.Sprintf("Twin:    %s\n", pl.Twin))
 	}
-	out += fmt.Sprintf("VM Size:       %#x\n", pl.Header.VmSize)
+	out.WriteString(fmt.Sprintf("VM Size:       %#x\n", pl.Header.VmSize))
 	if pl.Header.CodeSignature.Size > 0 {
-		out += fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.Header.CodeSignature.FileOffset, pl.Header.CodeSignature.Size)
+		out.WriteString(fmt.Sprintf("CodeSignature: off=%#08x, sz=%#x\n", pl.Header.CodeSignature.FileOffset, pl.Header.CodeSignature.Size))
 	}
 	if pl.FileValidation != nil {
 		if pl.FileValidation.CheckCDHash {
 			h := sha1.New()
 			h.Write(pl.FileValidation.CDHash[:])
-			out += fmt.Sprintf("CDHash:        %x\n", h.Sum(nil))
+			out.WriteString(fmt.Sprintf("CDHash:        %x\n", h.Sum(nil)))
 		}
 		if pl.FileValidation.CheckInodeMtime {
-			out += fmt.Sprintf("slice-offset:  %#x\n", pl.FileValidation.SliceOffset)
-			out += fmt.Sprintf("device-id:  %#x\n", pl.FileValidation.DeviceID)
-			out += fmt.Sprintf("inode          %#x\n", pl.FileValidation.Inode)
-			out += fmt.Sprintf("mod-time       %#x\n", pl.FileValidation.Mtime)
+			out.WriteString(fmt.Sprintf("slice-offset:  %#x\n", pl.FileValidation.SliceOffset))
+			out.WriteString(fmt.Sprintf("device-id:  %#x\n", pl.FileValidation.DeviceID))
+			out.WriteString(fmt.Sprintf("inode          %#x\n", pl.FileValidation.Inode))
+			out.WriteString(fmt.Sprintf("mod-time       %#x\n", pl.FileValidation.Mtime))
 		}
 		// if !pl.FileValidation.UUID.IsNull() {
 		// 	out += fmt.Sprintf("UUID:          %s\n", pl.FileValidation.UUID)
 		// }
 	}
-	out += fmt.Sprintf("Loader:        %s\n", pl.Loader)
+	out.WriteString(fmt.Sprintf("Loader:        %s\n", pl.Loader))
 	if len(pl.Header.GetInfo()) > 0 {
-		out += fmt.Sprintf("Info:          %s\n", pl.Header.GetInfo())
+		out.WriteString(fmt.Sprintf("Info:          %s\n", pl.Header.GetInfo()))
 	}
 	if pl.Header.ExportsTrieLoader.Size > 0 {
-		out += fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.Header.ExportsTrieLoader.Offset), pl.Header.ExportsTrieLoader.Size)
+		out.WriteString(fmt.Sprintf("ExportsTrie:   off=%#08x, sz=%#x\n", pl.GetFileOffset(pl.Header.ExportsTrieLoader.Offset), pl.Header.ExportsTrieLoader.Size))
 	}
 	if pl.Header.FixupsLoadCommandOffset > 0 {
-		out += fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.Header.FixupsLoadCommandOffset)
+		out.WriteString(fmt.Sprintf("FixupsLoadCmd: off=%#08x\n", pl.Header.FixupsLoadCommandOffset))
 	}
 	if len(pl.Regions) > 0 {
-		out += "\nRegions:\n\n"
+		out.WriteString("\nRegions:\n\n")
 		tableString := &strings.Builder{}
 		rdata := [][]string{}
 		for _, rg := range pl.Regions {
@@ -662,9 +662,9 @@ func (pl PrebuiltLoader) String(f *File) string {
 		tbl.AppendBulk(rdata)
 		tbl.SetAlignment(1)
 		tbl.Render()
-		out += tableString.String()
+		out.WriteString(tableString.String())
 	}
-	out += "\nSections:\n"
+	out.WriteString("\nSections:\n")
 	buf := &strings.Builder{}
 	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 	for idx, off := range pl.Header.Sections.Offsets {
@@ -674,43 +674,43 @@ func (pl PrebuiltLoader) String(f *File) string {
 		fmt.Fprintf(w, "    %s:\toff=%#x\tsz=%d\n", dyld_section_location_kind(idx), off, pl.Header.Sections.Sizes[idx])
 	}
 	w.Flush()
-	out += buf.String()
+	out.WriteString(buf.String())
 	if len(pl.Dependents) > 0 {
-		out += "\nDependents:\n"
+		out.WriteString("\nDependents:\n")
 		for _, dp := range pl.Dependents {
-			out += fmt.Sprintf("    %-10s) %s\n", dp.Kind, dp.Name)
+			out.WriteString(fmt.Sprintf("    %-10s) %s\n", dp.Kind, dp.Name))
 		}
 	}
 	if len(pl.BindTargets) > 0 {
-		out += "\nBindTargets:\n"
+		out.WriteString("\nBindTargets:\n")
 		for _, bt := range pl.BindTargets {
-			out += fmt.Sprintf("    %s\n", bt.String(f))
+			out.WriteString(fmt.Sprintf("    %s\n", bt.String(f)))
 		}
 	}
 	if len(pl.OverrideBindTargets) > 0 {
-		out += "\nOverride BindTargets:\n"
+		out.WriteString("\nOverride BindTargets:\n")
 		for _, bt := range pl.OverrideBindTargets {
-			out += fmt.Sprintf("    %s\n", bt.String(f))
+			out.WriteString(fmt.Sprintf("    %s\n", bt.String(f)))
 		}
 	}
 	if pl.ObjcFixupInfo != nil {
-		out += "\nObjC Fixup Info:\n"
-		out += fmt.Sprintln(pl.ObjcFixupInfo.String())
+		out.WriteString("\nObjC Fixup Info:\n")
+		out.WriteString(fmt.Sprintln(pl.ObjcFixupInfo.String()))
 	}
 	if len(pl.ObjcCanonicalProtocolFixups) > 0 {
-		out += "ObjC Canonical ProtocolFixups:\n"
+		out.WriteString("ObjC Canonical ProtocolFixups:\n")
 		for _, fixup := range pl.ObjcCanonicalProtocolFixups {
-			out += fmt.Sprintf("    %t\n", fixup)
+			out.WriteString(fmt.Sprintf("    %t\n", fixup))
 		}
 	}
 	if len(pl.ObjcSelectorFixups) > 0 {
-		out += "\nObjC SelectorFixups:\n"
+		out.WriteString("\nObjC SelectorFixups:\n")
 		for _, bt := range pl.ObjcSelectorFixups {
-			out += fmt.Sprintf("    %s\n", bt.String(f))
+			out.WriteString(fmt.Sprintf("    %s\n", bt.String(f)))
 		}
 	}
 
-	return out
+	return out.String()
 }
 
 type objCFlags uint32
@@ -766,115 +766,115 @@ func (pls PrebuiltLoaderSet) HasOptimizedSwift() bool {
 	return (pls.SwiftForeignTypeConformanceTableOffset != 0) || (pls.SwiftMetadataConformanceTableOffset != 0) || (pls.SwiftTypeConformanceTableOffset != 0)
 }
 func (pls PrebuiltLoaderSet) String(f *File) string {
-	var out string
-	out += "PrebuiltLoaderSet:\n"
-	out += fmt.Sprintf("  Version: %x\n", pls.VersionHash)
+	var out strings.Builder
+	out.WriteString("PrebuiltLoaderSet:\n")
+	out.WriteString(fmt.Sprintf("  Version: %x\n", pls.VersionHash))
 	if !pls.DyldCacheUUID.IsNull() {
-		out += fmt.Sprintf("  DyldCacheUUID: %s\n", pls.DyldCacheUUID)
+		out.WriteString(fmt.Sprintf("  DyldCacheUUID: %s\n", pls.DyldCacheUUID))
 	}
 	if len(pls.Loaders) > 0 {
-		out += "\nLoaders:\n"
+		out.WriteString("\nLoaders:\n")
 		for _, pl := range pls.Loaders {
 			if len(pls.Loaders) > 1 {
-				out += "---\n"
+				out.WriteString("---\n")
 			}
-			out += pl.String(f)
+			out.WriteString(pl.String(f))
 		}
 	}
 	if pls.SelectorTable != nil {
-		out += "\nObjC Selector Table:\n"
+		out.WriteString("\nObjC Selector Table:\n")
 		for _, bt := range pls.SelectorTable.Offsets {
 			if bt.IsAbsolute() {
 				continue
 			}
-			out += fmt.Sprintf("  %s\n", bt.String(f))
+			out.WriteString(fmt.Sprintf("  %s\n", bt.String(f)))
 		}
 	}
 	if pls.ClassTable != nil {
-		out += "\nObjC Class Table:\n"
+		out.WriteString("\nObjC Class Table:\n")
 		for idx, bt := range pls.ClassTable.Offsets {
 			if bt.IsAbsolute() {
 				continue
 			}
-			out += fmt.Sprintf("  %s name\n", bt.String(f))
-			out += fmt.Sprintf("    %s impl\n", pls.ClassTable.Classes[idx].String(f))
+			out.WriteString(fmt.Sprintf("  %s name\n", bt.String(f)))
+			out.WriteString(fmt.Sprintf("    %s impl\n", pls.ClassTable.Classes[idx].String(f)))
 		}
 	}
 	if pls.ProtocolTable != nil {
-		out += "\nObjC Protocol Table:\n"
+		out.WriteString("\nObjC Protocol Table:\n")
 		for idx, bt := range pls.ProtocolTable.Offsets {
 			if bt.IsAbsolute() {
 				continue
 			}
-			out += fmt.Sprintf("  %s name\n", bt.String(f))
-			out += fmt.Sprintf("    %s impl\n", pls.ProtocolTable.Classes[idx].String(f))
+			out.WriteString(fmt.Sprintf("  %s name\n", bt.String(f)))
+			out.WriteString(fmt.Sprintf("    %s impl\n", pls.ProtocolTable.Classes[idx].String(f)))
 		}
 	}
 	if pls.HasOptimizedObjC() && pls.ObjcProtocolClassCacheOffset != 0 {
-		out += fmt.Sprintf("\nObjC Protocol Class Cache Address: %#x\n", f.Headers[f.UUID].SharedRegionStart+pls.ObjcProtocolClassCacheOffset)
+		out.WriteString(fmt.Sprintf("\nObjC Protocol Class Cache Address: %#x\n", f.Headers[f.UUID].SharedRegionStart+pls.ObjcProtocolClassCacheOffset))
 	}
 	if len(pls.SwiftTypeProtocolTable) > 0 {
-		out += "\nSwift Type Protocol Table\n"
-		out += "-------------------------\n"
+		out.WriteString("\nSwift Type Protocol Table\n")
+		out.WriteString("-------------------------\n")
 		pls.SwiftTypeProtocolTable.ForEachEntry(func(key SwiftTypeProtocolConformanceDiskLocationKey, values []SwiftTypeProtocolConformanceDiskLocation) {
-			out += fmt.Sprintf("  %s type descriptor\n", key.TypeDescriptor.String(f))
-			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			out.WriteString(fmt.Sprintf("  %s type descriptor\n", key.TypeDescriptor.String(f)))
+			out.WriteString(fmt.Sprintf("    %s protocol\n", key.Protocol.String(f)))
 			for _, v := range values {
-				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+				out.WriteString(fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f)))
 			}
 		})
 	}
 	if len(pls.SwiftMetadataProtocolTable) > 0 {
-		out += "\nSwift Metadata Protocol Table\n"
-		out += "-----------------------------\n"
+		out.WriteString("\nSwift Metadata Protocol Table\n")
+		out.WriteString("-----------------------------\n")
 		pls.SwiftMetadataProtocolTable.ForEachEntry(func(key SwiftMetadataProtocolConformanceDiskLocationKey, values []SwiftMetadataProtocolConformanceDiskLocation) {
-			out += fmt.Sprintf("  %s metadata descriptor\n", key.MetadataDescriptor.String(f))
-			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			out.WriteString(fmt.Sprintf("  %s metadata descriptor\n", key.MetadataDescriptor.String(f)))
+			out.WriteString(fmt.Sprintf("    %s protocol\n", key.Protocol.String(f)))
 			for _, v := range values {
-				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+				out.WriteString(fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f)))
 			}
 		})
 	}
 	if len(pls.SwiftForeignTypeProtocolTable) > 0 {
-		out += "\nSwift Foreign Protocol Table\n"
-		out += "----------------------------\n"
+		out.WriteString("\nSwift Foreign Protocol Table\n")
+		out.WriteString("----------------------------\n")
 		pls.SwiftForeignTypeProtocolTable.ForEachEntry(func(key SwiftForeignTypeProtocolConformanceDiskLocationKey, values []SwiftForeignTypeProtocolConformanceDiskLocation) {
-			out += fmt.Sprintf("  %s foreign descriptor\n", key.ForeignDescriptor.String(f))
-			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			out.WriteString(fmt.Sprintf("  %s foreign descriptor\n", key.ForeignDescriptor.String(f)))
+			out.WriteString(fmt.Sprintf("    %s protocol\n", key.Protocol.String(f)))
 			for _, v := range values {
-				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+				out.WriteString(fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f)))
 			}
 		})
 	}
 	if len(pls.MustBeMissingPaths) > 0 {
-		out += "\nMustBeMissing:\n"
+		out.WriteString("\nMustBeMissing:\n")
 		for _, path := range pls.MustBeMissingPaths {
-			out += fmt.Sprintf("    %s\n", path)
+			out.WriteString(fmt.Sprintf("    %s\n", path))
 		}
 	}
 	if len(pls.Patches) > 0 {
-		out += "\nCache Overrides:\n"
+		out.WriteString("\nCache Overrides:\n")
 		for _, patch := range pls.Patches {
 			if len(pls.Patches) > 1 {
-				out += "---\n"
+				out.WriteString("---\n")
 			}
 			img := fmt.Sprintf("(index=%d)", patch.DylibIndex)
 			if patch.DylibIndex < uint32(len(f.Images)) {
 				img = f.Images[patch.DylibIndex].Name
 			}
-			out += fmt.Sprintf("  cache-dylib:    %s\n", img)
-			out += fmt.Sprintf("  dylib-offset:   %#08x\n", patch.DylibVMOffset)
+			out.WriteString(fmt.Sprintf("  cache-dylib:    %s\n", img))
+			out.WriteString(fmt.Sprintf("  dylib-offset:   %#08x\n", patch.DylibVMOffset))
 			if patch.PatchTo.LoaderRef().Index() < uint16(len(f.Images)) {
 				img = f.Images[patch.PatchTo.LoaderRef().Index()].Name
 			} else {
 				img = patch.PatchTo.LoaderRef().String()
 			}
-			out += fmt.Sprintf("  replace-loader: %s\n", img)
-			out += fmt.Sprintf("  replace-offset: %#08x\n", patch.PatchTo.Offset())
+			out.WriteString(fmt.Sprintf("  replace-loader: %s\n", img))
+			out.WriteString(fmt.Sprintf("  replace-offset: %#08x\n", patch.PatchTo.Offset()))
 		}
 	}
 
-	return out
+	return out.String()
 }
 
 type objCStringTable struct {

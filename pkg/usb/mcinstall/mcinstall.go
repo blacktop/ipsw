@@ -3,6 +3,7 @@ package mcinstall
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/pkg/usb"
@@ -45,21 +46,21 @@ type ProfileInfo struct {
 }
 
 func (p ProfileInfo) String() string {
-	var out string
+	var out strings.Builder
 	for _, id := range p.IDs {
-		out += fmt.Sprintf(colorHeader("[ %s ]\n"), id)
-		out += colorHeader("  Manifest:\n")
-		out += fmt.Sprintf(colorFaint("    Description: ")+colorBold("%s\n"), p.Manifests[id].Description)
-		out += fmt.Sprintf(colorFaint("    Active:      ")+colorBold("%t\n"), p.Manifests[id].IsActive)
-		out += colorHeader("  Metadata:\n")
-		out += fmt.Sprintf(colorFaint("    UUID:              ")+colorBold("%s\n"), p.Metadatas[id].UUID)
-		out += fmt.Sprintf(colorFaint("    Version:           ")+colorBold("%d\n"), p.Metadatas[id].Version)
-		out += fmt.Sprintf(colorFaint("    Name:              ")+colorBold("%s\n"), p.Metadatas[id].Name)
-		out += fmt.Sprintf(colorFaint("    Description:       ")+colorBold("%s\n"), p.Metadatas[id].Description)
-		out += fmt.Sprintf(colorFaint("    Organization:      ")+colorBold("%s\n"), p.Metadatas[id].Organization)
-		out += fmt.Sprintf(colorFaint("    RemovalDisallowed: ")+colorBold("%t\n"), p.Metadatas[id].RemovalDisallowed)
+		out.WriteString(fmt.Sprintf(colorHeader("[ %s ]\n"), id))
+		out.WriteString(colorHeader("  Manifest:\n"))
+		out.WriteString(fmt.Sprintf(colorFaint("    Description: ")+colorBold("%s\n"), p.Manifests[id].Description))
+		out.WriteString(fmt.Sprintf(colorFaint("    Active:      ")+colorBold("%t\n"), p.Manifests[id].IsActive))
+		out.WriteString(colorHeader("  Metadata:\n"))
+		out.WriteString(fmt.Sprintf(colorFaint("    UUID:              ")+colorBold("%s\n"), p.Metadatas[id].UUID))
+		out.WriteString(fmt.Sprintf(colorFaint("    Version:           ")+colorBold("%d\n"), p.Metadatas[id].Version))
+		out.WriteString(fmt.Sprintf(colorFaint("    Name:              ")+colorBold("%s\n"), p.Metadatas[id].Name))
+		out.WriteString(fmt.Sprintf(colorFaint("    Description:       ")+colorBold("%s\n"), p.Metadatas[id].Description))
+		out.WriteString(fmt.Sprintf(colorFaint("    Organization:      ")+colorBold("%s\n"), p.Metadatas[id].Organization))
+		out.WriteString(fmt.Sprintf(colorFaint("    RemovalDisallowed: ")+colorBold("%t\n"), p.Metadatas[id].RemovalDisallowed))
 	}
-	return out
+	return out.String()
 }
 
 type ProfileMetadata struct {

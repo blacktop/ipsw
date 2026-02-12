@@ -492,12 +492,13 @@ func (qs *Qualifiers) GoString() string {
 }
 
 func (qs *Qualifiers) goString(indent int, field string) string {
-	quals := fmt.Sprintf("%*s%s", indent, "", field)
+	var quals strings.Builder
+	quals.WriteString(fmt.Sprintf("%*s%s", indent, "", field))
 	for _, q := range qs.Qualifiers {
-		quals += "\n"
-		quals += q.goString(indent+2, "")
+		quals.WriteString("\n")
+		quals.WriteString(q.goString(indent+2, ""))
 	}
-	return quals
+	return quals.String()
 }
 
 // Qualifier is a single type qualifier.
@@ -563,14 +564,15 @@ func (q *Qualifier) GoString() string {
 }
 
 func (q *Qualifier) goString(indent int, field string) string {
-	qs := fmt.Sprintf("%*s%s%s", indent, "", field, q.Name)
+	var qs strings.Builder
+	qs.WriteString(fmt.Sprintf("%*s%s%s", indent, "", field, q.Name))
 	if len(q.Exprs) > 0 {
 		for i, e := range q.Exprs {
-			qs += "\n"
-			qs += e.goString(indent+2, fmt.Sprintf("%d: ", i))
+			qs.WriteString("\n")
+			qs.WriteString(e.goString(indent+2, fmt.Sprintf("%d: ", i)))
 		}
 	}
-	return qs
+	return qs.String()
 }
 
 // TypeWithQualifiers is a type with standard qualifiers.
@@ -1940,12 +1942,13 @@ func (ap *ArgumentPack) goString(indent int, field string) string {
 	if len(ap.Args) == 0 {
 		return fmt.Sprintf("%*s%sArgumentPack: nil", indent, "", field)
 	}
-	s := fmt.Sprintf("%*s%sArgumentPack:", indent, "", field)
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("%*s%sArgumentPack:", indent, "", field))
 	for i, a := range ap.Args {
-		s += "\n"
-		s += a.goString(indent+2, fmt.Sprintf("%d: ", i))
+		s.WriteString("\n")
+		s.WriteString(a.goString(indent+2, fmt.Sprintf("%d: ", i)))
 	}
-	return s
+	return s.String()
 }
 
 // SizeofPack is the sizeof operator applied to an argument pack.
@@ -3028,16 +3031,16 @@ func (so *Subobject) GoString() string {
 }
 
 func (so *Subobject) goString(indent int, field string) string {
-	var selectors string
+	var selectors strings.Builder
 	for _, s := range so.Selectors {
-		selectors += fmt.Sprintf(" %d", s)
+		selectors.WriteString(fmt.Sprintf(" %d", s))
 	}
 	return fmt.Sprintf("%*s%sSubobject:\n%s\n%s\n%*sOffset: %d\n%*sSelectors:%s\n%*sPastEnd: %t",
 		indent, "", field,
 		so.Type.goString(indent+2, "Type: "),
 		so.SubExpr.goString(indent+2, "SubExpr: "),
 		indent+2, "", so.Offset,
-		indent+2, "", selectors,
+		indent+2, "", selectors.String(),
 		indent+2, "", so.PastEnd)
 }
 
@@ -3445,12 +3448,13 @@ func (el *ExprList) goString(indent int, field string) string {
 	if len(el.Exprs) == 0 {
 		return fmt.Sprintf("%*s%sExprList: nil", indent, "", field)
 	}
-	s := fmt.Sprintf("%*s%sExprList:", indent, "", field)
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("%*s%sExprList:", indent, "", field))
 	for i, e := range el.Exprs {
-		s += "\n"
-		s += e.goString(indent+2, fmt.Sprintf("%d: ", i))
+		s.WriteString("\n")
+		s.WriteString(e.goString(indent+2, fmt.Sprintf("%d: ", i)))
 	}
-	return s
+	return s.String()
 }
 
 // InitializerList is an initializer list: an optional type with a

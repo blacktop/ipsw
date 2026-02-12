@@ -3,7 +3,9 @@ package aea
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/hpke"
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
@@ -20,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/cloudflare/circl/hpke"
 )
 
 //go:embed data/fcs-keys.gz
@@ -192,25 +193,19 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string, proxy string, insecu
 		privKey = append(bytes.Repeat([]byte{0}, delta), privKey...)
 	}
 
-	kemID := hpke.KEM_P256_HKDF_SHA256
-	kdfID := hpke.KDF_HKDF_SHA256
-	aeadID := hpke.AEAD_AES256GCM
+	kemID := hpke.DHKEM(ecdh.P256())
+	kdfID := hpke.HKDFSHA256()
+	aeadID := hpke.AES256GCM()
 
-	suite := hpke.NewSuite(kemID, kdfID, aeadID)
-
-	privateKey, err := kemID.Scheme().UnmarshalBinaryPrivateKey(privKey)
+	privateKey, err := kemID.NewPrivateKey(privKey)
 	if err != nil {
 		return nil, err
 	}
-	recv, err := suite.NewReceiver(privateKey, nil)
+	recv, err := hpke.NewRecipient(encRequestData, privateKey, kdfID, aeadID, nil)
 	if err != nil {
 		return nil, err
 	}
-	opener, err := recv.Setup(encRequestData)
-	if err != nil {
-		return nil, err
-	}
-	return opener.Open(wrappedKeyData, nil)
+	return recv.Open(nil, wrappedKeyData)
 }
 
 func Info(in string) (Metadata, error) {

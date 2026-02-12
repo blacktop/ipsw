@@ -1130,11 +1130,11 @@ func (st *state) javaResource() AST {
 		st.fail("not enough characters for java resource length")
 	}
 	str := st.str[:ln]
-	final := ""
+	var final strings.Builder
 	st.advance(ln)
 	for i := 0; i < len(str); i++ {
 		if str[i] != '$' {
-			final += string(str[i])
+			final.WriteString(string(str[i]))
 		} else {
 			if len(str) <= i+1 {
 				st.failEarlier("java resource escape at end of string", 1)
@@ -1148,10 +1148,10 @@ func (st *state) javaResource() AST {
 			if !ok {
 				st.failEarlier("unrecognized java resource escape", ln-i-1)
 			}
-			final += r
+			final.WriteString(r)
 		}
 	}
-	return &Special{Prefix: "java resource ", Val: &Name{Name: final}}
+	return &Special{Prefix: "java resource ", Val: &Name{Name: final.String()}}
 }
 
 // <special-name> ::= TV <type>

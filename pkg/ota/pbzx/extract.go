@@ -25,11 +25,9 @@ func Extract(ctx context.Context, src io.Reader, dst io.Writer, numWorker int) e
 
 	var wg1, wg2 sync.WaitGroup
 
-	wg1.Add(1)
-	go func() {
-		defer wg1.Done()
+	wg1.Go(func() {
 		cancelIfError(read(ctx, src, inflateCh, writeCh))
-	}()
+	})
 
 	if numWorker == 0 {
 		numWorker = runtime.NumCPU()
@@ -46,11 +44,9 @@ func Extract(ctx context.Context, src io.Reader, dst io.Writer, numWorker int) e
 		}()
 	}
 
-	wg2.Add(1)
-	go func() {
-		defer wg2.Done()
+	wg2.Go(func() {
 		cancelIfError(write(ctx, writeCh, dst))
-	}()
+	})
 
 	wg1.Wait()
 	close(writeCh)

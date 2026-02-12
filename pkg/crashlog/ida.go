@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -190,7 +190,7 @@ frames = [
 		for addr := range i.KernelSymbols {
 			addrs = append(addrs, addr)
 		}
-		sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
+		slices.Sort(addrs)
 
 		for _, addr := range addrs {
 			sym := escapePyString(i.KernelSymbols[addr])

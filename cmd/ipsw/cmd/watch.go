@@ -55,15 +55,15 @@ func highlightHeader(re *regexp.Regexp, input string) string {
 	if len(parts) == 0 {
 		return colorHeader(input)
 	}
-	highlighted := ""
+	var highlighted strings.Builder
 	lastIndex := 0
 	for _, part := range parts {
-		highlighted += colorHeader(input[lastIndex:part[0]])
-		highlighted += colorHighlight(input[part[0]:part[1]])
+		highlighted.WriteString(colorHeader(input[lastIndex:part[0]]))
+		highlighted.WriteString(colorHighlight(input[part[0]:part[1]]))
 		lastIndex = part[1]
 	}
-	highlighted += colorHeader(input[lastIndex:])
-	return highlighted
+	highlighted.WriteString(colorHeader(input[lastIndex:]))
+	return highlighted.String()
 }
 
 func init() {

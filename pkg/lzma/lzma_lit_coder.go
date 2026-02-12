@@ -114,7 +114,7 @@ func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 		// numPosBits:  numPosBits,
 		posMask: (1 << numPosBits) - 1,
 	}
-	for i := uint32(0); i < numStates; i++ {
+	for i := range numStates {
 		lc.coders[i] = newLitSubCoder()
 	}
 	return lc

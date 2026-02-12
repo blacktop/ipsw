@@ -41,7 +41,7 @@ func (rc *rangeBitTreeCoder) reverseDecode(rd *rangeDecoder) (res uint32) {
 func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex, numBitModels uint32) (res uint32) {
 	index := uint32(1)
 	res = 0
-	for bitIndex := uint32(0); bitIndex < numBitModels; bitIndex++ {
+	for bitIndex := range numBitModels {
 		bit := rd.decodeBit(models, startIndex+index)
 		index <<= 1
 		index += bit
@@ -108,7 +108,7 @@ func reverseGetPriceIndex(models []uint16, startIndex, numBitLevels, symbol uint
 
 func reverseEncodeIndex(re *rangeEncoder, models []uint16, startIndex, numBitLevels, symbol uint32) {
 	m := uint32(1)
-	for i := uint32(0); i < numBitLevels; i++ {
+	for range numBitLevels {
 		bit := symbol & 1
 		re.encode(models, startIndex+m, bit)
 		m = m<<1 | bit

@@ -117,7 +117,7 @@ func (iw *lzInWindow) moveBlock() {
 		offset--
 	}
 	numBytes := iw.bufOffset + iw.streamPos - offset
-	for i := uint32(0); i < numBytes; i++ {
+	for i := range numBytes {
 		iw.buf[i] = iw.buf[offset+i]
 	}
 	iw.bufOffset -= offset

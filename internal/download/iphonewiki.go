@@ -377,26 +377,26 @@ func stringToSlice(s string) []string {
 }
 
 func (k WikiFWKey) String() string {
-	var out string
+	var out strings.Builder
 	for i, fn := range k.Filename {
-		out += fmt.Sprintf("‣ %s\n", fn)
+		out.WriteString(fmt.Sprintf("‣ %s\n", fn))
 		if len(k.Device) > 0 && len(k.Device[i]) > 0 {
-			out += fmt.Sprintf("  Device: %s\n", k.Device[i])
+			out.WriteString(fmt.Sprintf("  Device: %s\n", k.Device[i]))
 		}
 		if len(k.Key) > 0 && len(k.Key[i]) > 0 {
-			out += fmt.Sprintf("  Key: %s\n", k.Key[i])
+			out.WriteString(fmt.Sprintf("  Key: %s\n", k.Key[i]))
 		}
 		if len(k.Devkbag) > 0 && len(k.Devkbag[i]) > 0 {
-			out += fmt.Sprintf("  DevKBAG: %s\n", k.Devkbag[i])
+			out.WriteString(fmt.Sprintf("  DevKBAG: %s\n", k.Devkbag[i]))
 		}
 		if len(k.Iv) > 0 && len(k.Iv[i]) > 0 {
-			out += fmt.Sprintf("  IV:  %s\n", k.Iv[i])
+			out.WriteString(fmt.Sprintf("  IV:  %s\n", k.Iv[i]))
 		}
 		if len(k.Kbag) > 0 && len(k.Kbag[i]) > 0 {
-			out += fmt.Sprintf("  KBAG: %s\n", k.Kbag[i])
+			out.WriteString(fmt.Sprintf("  KBAG: %s\n", k.Kbag[i]))
 		}
 	}
-	return out
+	return out.String()
 }
 
 func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, error) {

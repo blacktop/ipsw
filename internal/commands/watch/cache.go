@@ -24,12 +24,12 @@ type FcsKey struct {
 	IosBuild      string    `json:"ios_build,omitempty"`
 	MacOsBuild    string    `json:"macos_build,omitempty"`
 	VisionOsBuild string    `json:"visionos_build,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 type FcsKeys struct {
-	Beta    FcsKey `json:"beta,omitempty"`
-	RC      FcsKey `json:"rc,omitempty"`
-	Release FcsKey `json:"release,omitempty"`
+	Beta    FcsKey `json:"beta"`
+	RC      FcsKey `json:"rc"`
+	Release FcsKey `json:"release"`
 }
 
 type CacheItem struct {
@@ -37,7 +37,7 @@ type CacheItem struct {
 	Commits   Commits  `json:"commits,omitempty"`
 	Functions Function `json:"functions,omitempty"`
 	URL       string   `json:"url,omitempty"`
-	FcsKeys   FcsKeys  `json:"fcs_keys,omitempty"`
+	FcsKeys   FcsKeys  `json:"fcs_keys"`
 }
 
 type Cache map[string]CacheItem

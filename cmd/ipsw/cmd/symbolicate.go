@@ -136,10 +136,7 @@ var symbolicateCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("symbolicate.demangle")
 		asHex := viper.GetBool("symbolicate.hex")
 		peek := viper.GetBool("symbolicate.peek")
-		peekCount := viper.GetInt("symbolicate.peek-count")
-		if peekCount < 1 {
-			peekCount = 1
-		}
+		peekCount := max(viper.GetInt("symbolicate.peek-count"), 1)
 		pemDB := viper.GetString("symbolicate.pem-db")
 		signaturesDir := viper.GetString("symbolicate.signatures")
 		extrasDir := viper.GetString("symbolicate.extra")

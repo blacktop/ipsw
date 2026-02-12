@@ -197,14 +197,14 @@ func (tc TrustCacheEntryV2) MarshalJSON() ([]byte, error) {
 }
 
 func (tc TrustCache) String() string {
-	var out string
-	out += fmt.Sprintf("UUID:       %s\n", tc.UUID)
-	out += fmt.Sprintf("Version:    %d\n", tc.Version)
-	out += fmt.Sprintf("NumEntries: %d\n", tc.NumEntries)
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("UUID:       %s\n", tc.UUID))
+	out.WriteString(fmt.Sprintf("Version:    %d\n", tc.Version))
+	out.WriteString(fmt.Sprintf("NumEntries: %d\n", tc.NumEntries))
 	for _, entry := range tc.Entries {
-		out += fmt.Sprintf("    %s\n", entry)
+		out.WriteString(fmt.Sprintf("    %s\n", entry))
 	}
-	return out
+	return out.String()
 }
 
 func ParseTrustCache(data []byte) (*TrustCache, error) {

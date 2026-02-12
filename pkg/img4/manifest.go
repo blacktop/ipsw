@@ -1133,13 +1133,7 @@ func VerifyManifestDigests(im4m *Manifest, buildManifest *bm.BuildManifest, verb
 			if name, exists := FourCCToComponent[fourCC]; exists {
 				componentName = name
 				// Check if this component was found in the BuildManifest
-				found := false
-				for _, foundComp := range foundComponents {
-					if foundComp == componentName {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(foundComponents, componentName)
 				if !found {
 					im4mOnlyImages = append(im4mOnlyImages, componentName)
 				}

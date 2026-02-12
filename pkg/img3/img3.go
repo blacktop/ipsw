@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/blacktop/ipsw/pkg/lzfse"
 )
@@ -582,7 +583,8 @@ func decryptKBAGWithKey(data, key []byte) ([]byte, error) {
 }
 
 func (i Img3) String() string {
-	iStr := fmt.Sprintf(
+	var iStr strings.Builder
+	iStr.WriteString(fmt.Sprintf(
 		"[Img3 Info]\n"+
 			"===========\n"+
 			"Magic        = %s\n"+
@@ -591,34 +593,34 @@ func (i Img3) String() string {
 			"----\n",
 		reverseBytes(i.Magic[:]),
 		reverseBytes(i.Ident[:]),
-	)
+	))
 	for _, tag := range i.Tags {
 		magic := string(reverseBytes(tag.Magic[:]))
 		switch magic {
 		case "TYPE":
-			iStr += fmt.Sprintf("%s: %s\n", magic, reverseBytes(tag.Data[:]))
+			iStr.WriteString(fmt.Sprintf("%s: %s\n", magic, reverseBytes(tag.Data[:])))
 		case "DATA":
-			iStr += fmt.Sprintf("%s: %v (length: %d)\n", magic, tag.Data[0:15], len(tag.Data))
+			iStr.WriteString(fmt.Sprintf("%s: %v (length: %d)\n", magic, tag.Data[0:15], len(tag.Data)))
 		case "VERS":
-			iStr += fmt.Sprintf("%s: %s\n", magic, tag.Data)
+			iStr.WriteString(fmt.Sprintf("%s: %s\n", magic, tag.Data))
 		case "SEPO":
-			iStr += fmt.Sprintf("%s: %d\n", magic, binary.LittleEndian.Uint32(tag.Data))
+			iStr.WriteString(fmt.Sprintf("%s: %d\n", magic, binary.LittleEndian.Uint32(tag.Data)))
 		case "CHIP":
-			iStr += fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data))
+			iStr.WriteString(fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data)))
 		case "BORD":
-			iStr += fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data))
+			iStr.WriteString(fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data)))
 		case "KBAG":
 			if kbag, err := ParseKBag(tag.Data); err == nil {
-				iStr += fmt.Sprintf("%s: CryptState=%d, AESType=0x%x, IV=%x, Key=%x\n",
-					magic, kbag.CryptState, kbag.AESType, kbag.IV, kbag.Key)
+				iStr.WriteString(fmt.Sprintf("%s: CryptState=%d, AESType=0x%x, IV=%x, Key=%x\n",
+					magic, kbag.CryptState, kbag.AESType, kbag.IV, kbag.Key))
 			} else {
-				iStr += fmt.Sprintf("%s: %v (parse error: %v)\n", magic, tag.Data, err)
+				iStr.WriteString(fmt.Sprintf("%s: %v (parse error: %v)\n", magic, tag.Data, err))
 			}
 		default:
-			iStr += fmt.Sprintf("%s: %v\n", magic, tag.Data)
+			iStr.WriteString(fmt.Sprintf("%s: %v\n", magic, tag.Data))
 		}
 	}
-	return iStr
+	return iStr.String()
 }
 
 func reverseBytes(a []byte) []byte {

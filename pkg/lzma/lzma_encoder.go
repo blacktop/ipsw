@@ -387,7 +387,7 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 		availableBytes = kMatchMaxLen
 	}
 	repMaxIndex := uint32(0)
-	for i := uint32(0); i < kNumRepDistances; i++ {
+	for i := range uint32(kNumRepDistances) {
 		z.reps[i] = z.repDistances[i]
 		z.repLens[i] = z.mf.iw.getMatchLen(0-1, z.reps[i], kMatchMaxLen)
 		if z.repLens[i] > z.repLens[repMaxIndex] {
@@ -452,7 +452,7 @@ DoWhile1:
 		goto DoWhile1
 	}
 
-	for i := uint32(0); i < kNumRepDistances; i++ {
+	for i := range uint32(kNumRepDistances) {
 		repLen := z.repLens[i]
 		if repLen < 2 {
 			continue
@@ -655,7 +655,7 @@ DoWhile1:
 		}
 
 		startLen := uint32(2)
-		for repIndex := uint32(0); repIndex < kNumRepDistances; repIndex++ {
+		for repIndex := range uint32(kNumRepDistances) {
 			lenTest := z.mf.iw.getMatchLen(0-1, z.reps[repIndex], availableBytes)
 			if lenTest < 2 {
 				continue
@@ -802,7 +802,7 @@ func (z *encoder) fillDistancesPrices() {
 		baseVal := (2 | posSlot&1) << footerBits
 		tempPrices[i] = reverseGetPriceIndex(z.posCoders, baseVal-posSlot-1, footerBits, i-baseVal)
 	}
-	for lenToPosState := uint32(0); lenToPosState < kNumLenToPosStates; lenToPosState++ {
+	for lenToPosState := range uint32(kNumLenToPosStates) {
 		var posSlot uint32
 		st := lenToPosState << kNumPosSlotBits
 		for posSlot = range z.distTableSize {
@@ -824,7 +824,7 @@ func (z *encoder) fillDistancesPrices() {
 }
 
 func (z *encoder) fillAlignPrices() {
-	for i := uint32(0); i < kAlignTableSize; i++ {
+	for i := range uint32(kAlignTableSize) {
 		z.alignPrices[i] = z.posAlignCoder.reverseGetPrice(i)
 	}
 	z.alignPriceCount = 0
@@ -1013,10 +1013,10 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 
 	header := make([]byte, lzmaHeaderSize)
 	header[0] = byte((z.cl.posStateBits*5+z.cl.litPosStateBits)*9 + z.cl.litContextBits)
-	for i := uint32(0); i < 4; i++ {
+	for i := range uint32(4) {
 		header[i+1] = byte(z.cl.dictSize >> (8 * i))
 	}
-	for i := uint32(0); i < 8; i++ {
+	for i := range uint32(8) {
 		header[i+lzmaPropSize] = byte(z.size >> (8 * i))
 	}
 	n, err := w.Write(header)

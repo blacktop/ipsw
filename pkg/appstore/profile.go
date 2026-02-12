@@ -191,11 +191,11 @@ func (as *AppStore) GetProfiles() ([]Profile, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var profiles ProfilesResponse
@@ -237,11 +237,11 @@ func (as *AppStore) GetProfile(id string) (*Profile, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var profile ProfileResponse
@@ -282,11 +282,11 @@ func (as *AppStore) GetProfileBundleID(id string) (*BundleID, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var bundle BundleIdResponse
@@ -327,11 +327,11 @@ func (as *AppStore) GetProfileDevices(id string) ([]Device, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var devices DevicesResponse
@@ -372,11 +372,11 @@ func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var certs CertificatesResponse
@@ -444,11 +444,11 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var profileResponse ProfileResponse
@@ -490,11 +490,11 @@ func (as *AppStore) DeleteProfile(id string) error {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return fmt.Errorf("%s: %s", resp.Status, errOut)
+		return fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	return nil

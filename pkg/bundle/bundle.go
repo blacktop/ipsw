@@ -39,32 +39,33 @@ type Bundle struct {
 }
 
 func (b Bundle) String() string {
-	s := fmt.Sprintf("Bundle: %s\n", string(b.Magic[:]))
-	s += fmt.Sprintf("  Type: %d\n", b.Type)
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("Bundle: %s\n", string(b.Magic[:])))
+	s.WriteString(fmt.Sprintf("  Type: %d\n", b.Type))
 	switch b.Type {
 	case 3:
-		s += "  Config:\n"
-		s += fmt.Sprintf("    Unk1: %d\n", b.Config.Unk1)
-		s += fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2)
-		s += "    Assets:\n"
+		s.WriteString("  Config:\n")
+		s.WriteString(fmt.Sprintf("    Unk1: %d\n", b.Config.Unk1))
+		s.WriteString(fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2))
+		s.WriteString("    Assets:\n")
 		for i, h := range b.Config.Assets {
-			s += fmt.Sprintf("      %3s) %-20s\n", fmt.Sprintf("%d", i+1), h)
+			s.WriteString(fmt.Sprintf("      %3s) %-20s\n", fmt.Sprintf("%d", i+1), h))
 		}
-		s += "    TOC:\n"
+		s.WriteString("    TOC:\n")
 		for _, t := range b.Config.TOC {
-			s += fmt.Sprintf("      %s\n", t)
+			s.WriteString(fmt.Sprintf("      %s\n", t))
 		}
-		s += "Compartments:\n"
+		s.WriteString("Compartments:\n")
 		for _, f := range b.Files {
-			s += fmt.Sprintf("%s\n", f)
+			s.WriteString(fmt.Sprintf("%s\n", f))
 		}
 	case 4:
-		s += "  Ranges:\n"
+		s.WriteString("  Ranges:\n")
 		for i, f := range b.TypeHeader.(Type4).Ranges {
-			s += fmt.Sprintf("    %3s) %s\n", fmt.Sprintf("%d", i+1), f)
+			s.WriteString(fmt.Sprintf("    %3s) %s\n", fmt.Sprintf("%d", i+1), f))
 		}
 	}
-	return s
+	return s.String()
 }
 
 type Segment struct {
@@ -98,34 +99,35 @@ func (f File) Segment(name string) *Segment {
 }
 
 func (f File) String() string {
-	s := fmt.Sprintf("  %s (%s)\n", f.Name, f.Type)
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("  %s (%s)\n", f.Name, f.Type))
 	for _, seg := range f.Segments {
 		if seg.Size == 0 {
 			continue
 		}
 		if seg.Name == "HEADER" {
-			s += fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name)
+			s.WriteString(fmt.Sprintf("    sz=0x%08x off=0x%08x-0x%08x __%s\n", seg.Size, seg.Offset, seg.Offset+seg.Size, seg.Name))
 		}
 	}
 	for _, sec := range f.Sections {
 		if sec.Size == 0 {
 			continue
 		}
-		s += fmt.Sprintf("      sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name)
+		s.WriteString(fmt.Sprintf("      sz=0x%08x off=0x%08x-0x%08x __%s\n", sec.Size, sec.Offset, sec.Offset+sec.Size, sec.Name))
 	}
 	if len(f.Endpoints) > 0 {
-		s += "    endpoints:\n"
+		s.WriteString("    endpoints:\n")
 		for i, ep := range f.Endpoints {
-			s += fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), ep)
+			s.WriteString(fmt.Sprintf("      %3s) %s\n", fmt.Sprintf("%d", i+1), ep))
 		}
 	}
 	if len(f.Extra) > 0 {
-		s += "    extra:\n"
+		s.WriteString("    extra:\n")
 		for k, v := range f.Extra {
-			s += fmt.Sprintf("      %s: %v\n", k, v)
+			s.WriteString(fmt.Sprintf("      %s: %v\n", k, v))
 		}
 	}
-	return s
+	return s.String()
 }
 
 type Type3 struct {

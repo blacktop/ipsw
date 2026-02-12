@@ -18,7 +18,7 @@ func newLenCoder(numPosStates /*1 << pb*/ uint32) *lenCoder {
 		midCoder:  make([]*rangeBitTreeCoder, kNumPosStatesMax),
 		highCoder: newRangeBitTreeCoder(kNumHighLenBits),
 	}
-	for i := uint32(0); i < numPosStates; i++ {
+	for i := range numPosStates {
 		lc.lowCoder[i] = newRangeBitTreeCoder(kNumLowLenBits)
 		lc.midCoder[i] = newRangeBitTreeCoder(kNumMidLenBits)
 	}
@@ -101,7 +101,7 @@ func newLenPriceTableCoder(tableSize, numPosStates uint32) *lenPriceTableCoder {
 		counters:  make([]uint32, kNumPosStatesMax),
 		tableSize: tableSize,
 	}
-	for posState := uint32(0); posState < numPosStates; posState++ {
+	for posState := range numPosStates {
 		pc.updateTable(posState)
 	}
 	return pc

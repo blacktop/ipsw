@@ -43,7 +43,7 @@ func (e *StopRetryingError) Error() string {
 
 // RetryWithResult will retry a function f a number of attempts with a sleep duration in between, returning the result if successful
 func RetryWithResult[T any](attempts int, sleep time.Duration, f func() (T, error)) (result T, err error) {
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			Indent(log.Debug, 2)(fmt.Sprintf("retrying after error: %s", err))
 			time.Sleep(sleep)

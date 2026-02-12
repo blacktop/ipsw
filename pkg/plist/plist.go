@@ -54,30 +54,30 @@ type AssetDataInfo struct {
 
 // AssetDataInfo Stringer
 func (a *AssetDataInfo) String() string {
-	var out string
-	out += "[AssetData/Info.plist]\n"
-	out += "======================\n"
-	out += fmt.Sprintf("Build:                        %s\n", a.Build)
-	out += fmt.Sprintf("DeviceClass:                  %s\n", a.DeviceClass)
-	out += fmt.Sprintf("HardwareModel:                %s\n", a.HardwareModel)
-	out += fmt.Sprintf("MinimumSystemPartition:       %d\n", a.MinimumSystemPartition)
-	out += fmt.Sprintf("PackageVersion:               %s\n", a.PackageVersion)
-	out += fmt.Sprintf("ProductType:                  %s\n", a.ProductType)
-	out += fmt.Sprintf("ProductVersion:               %s\n", a.ProductVersion)
-	out += fmt.Sprintf("RequiredSpace:                %s\n", humanize.Bytes(uint64(a.RequiredSpace)))
-	out += fmt.Sprintf("ReserveFileAware:             %v\n", a.ReserveFileAware)
-	out += fmt.Sprintf("SizeArchiveRoot:              %s\n", humanize.Bytes(uint64(a.SizeArchiveRoot)))
-	out += fmt.Sprintf("SizePatchedBinaries:          %s\n", humanize.Bytes(uint64(a.SizePatchedBinaries)))
-	out += fmt.Sprintf("SizePatchedBinaries-Snapshot: %s\n", humanize.Bytes(uint64(a.SizePatchedBinariesSnapshot)))
+	var out strings.Builder
+	out.WriteString("[AssetData/Info.plist]\n")
+	out.WriteString("======================\n")
+	out.WriteString(fmt.Sprintf("Build:                        %s\n", a.Build))
+	out.WriteString(fmt.Sprintf("DeviceClass:                  %s\n", a.DeviceClass))
+	out.WriteString(fmt.Sprintf("HardwareModel:                %s\n", a.HardwareModel))
+	out.WriteString(fmt.Sprintf("MinimumSystemPartition:       %d\n", a.MinimumSystemPartition))
+	out.WriteString(fmt.Sprintf("PackageVersion:               %s\n", a.PackageVersion))
+	out.WriteString(fmt.Sprintf("ProductType:                  %s\n", a.ProductType))
+	out.WriteString(fmt.Sprintf("ProductVersion:               %s\n", a.ProductVersion))
+	out.WriteString(fmt.Sprintf("RequiredSpace:                %s\n", humanize.Bytes(uint64(a.RequiredSpace))))
+	out.WriteString(fmt.Sprintf("ReserveFileAware:             %v\n", a.ReserveFileAware))
+	out.WriteString(fmt.Sprintf("SizeArchiveRoot:              %s\n", humanize.Bytes(uint64(a.SizeArchiveRoot))))
+	out.WriteString(fmt.Sprintf("SizePatchedBinaries:          %s\n", humanize.Bytes(uint64(a.SizePatchedBinaries))))
+	out.WriteString(fmt.Sprintf("SizePatchedBinaries-Snapshot: %s\n", humanize.Bytes(uint64(a.SizePatchedBinariesSnapshot))))
 	if len(a.SystemUpdatePathMap) > 0 {
-		out += "SystemUpdatePathMap:\n"
+		out.WriteString("SystemUpdatePathMap:\n")
 		for k, v := range a.SystemUpdatePathMap {
-			out += fmt.Sprintf("  - %s: %s\n", k, v)
+			out.WriteString(fmt.Sprintf("  - %s: %s\n", k, v))
 		}
 	}
-	out += fmt.Sprintf("SystemVolumeSealingOverhead:  %d\n", a.SystemVolumeSealingOverhead)
-	out += fmt.Sprintf("TargetUpdate:                 %s\n", a.TargetUpdate)
-	return out
+	out.WriteString(fmt.Sprintf("SystemVolumeSealingOverhead:  %d\n", a.SystemVolumeSealingOverhead))
+	out.WriteString(fmt.Sprintf("TargetUpdate:                 %s\n", a.TargetUpdate))
+	return out.String()
 }
 
 // OTAInfo Info.plist object found in OTAs
@@ -323,8 +323,8 @@ func (p *Plists) GetDeviceForBoardConfig(boardConfig string) *restoreDeviceMap {
 }
 
 func (i *Plists) String() string {
-	var iStr string
-	iStr += fmt.Sprintf(
+	var iStr strings.Builder
+	iStr.WriteString(fmt.Sprintf(
 		"[Plists Info]\n"+
 			"===========\n"+
 			"Version        = %s\n"+
@@ -333,18 +333,18 @@ func (i *Plists) String() string {
 		i.BuildManifest.ProductVersion,
 		i.BuildManifest.ProductBuildVersion,
 		i.GetOSType(),
-	)
-	iStr += "FileSystem     = "
+	))
+	iStr.WriteString("FileSystem     = ")
 	for file, fsType := range i.Restore.SystemRestoreImageFileSystems {
-		iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
+		iStr.WriteString(fmt.Sprintf("%s (Type: %s)\n", file, fsType))
 	}
-	iStr += "\nSupported Products:\n"
+	iStr.WriteString("\nSupported Products:\n")
 	for _, prodType := range i.BuildManifest.SupportedProductTypes {
-		iStr += fmt.Sprintf(" - %s\n", prodType)
+		iStr.WriteString(fmt.Sprintf(" - %s\n", prodType))
 	}
-	iStr += "\nDeviceMap:\n"
+	iStr.WriteString("\nDeviceMap:\n")
 	for _, device := range i.Restore.DeviceMap {
-		iStr += fmt.Sprintf(
+		iStr.WriteString(fmt.Sprintf(
 			"BDID %d)\n"+
 				"  - BoardConfig = %s\n"+
 				"  - CPID        = %d\n"+
@@ -357,12 +357,12 @@ func (i *Plists) String() string {
 			device.Platform,
 			device.SCEP,
 			device.SDOM,
-		)
+		))
 	}
-	iStr += "\nKernelCaches:\n"
+	iStr.WriteString("\nKernelCaches:\n")
 	kcs := i.BuildManifest.GetKernelCaches()
 	for key, value := range kcs {
-		iStr += fmt.Sprintf(" - BoardConfig: %s => %s\n", key, value)
+		iStr.WriteString(fmt.Sprintf(" - BoardConfig: %s => %s\n", key, value))
 	}
-	return iStr
+	return iStr.String()
 }

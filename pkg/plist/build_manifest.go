@@ -19,18 +19,18 @@ type BuildManifest struct {
 }
 
 func (b *BuildManifest) String() string {
-	var out string
-	out += "[BuildManifest]\n"
-	out += "===============\n"
-	out += fmt.Sprintf("  ManifestVersion:       %d\n", b.ManifestVersion)
-	out += fmt.Sprintf("  ProductBuildVersion:   %s\n", b.ProductBuildVersion)
-	out += fmt.Sprintf("  ProductVersion:        %s\n", b.ProductVersion)
-	out += fmt.Sprintf("  SupportedProductTypes: %v\n", b.SupportedProductTypes)
-	out += "  BuildIdentities:\n"
+	var out strings.Builder
+	out.WriteString("[BuildManifest]\n")
+	out.WriteString("===============\n")
+	out.WriteString(fmt.Sprintf("  ManifestVersion:       %d\n", b.ManifestVersion))
+	out.WriteString(fmt.Sprintf("  ProductBuildVersion:   %s\n", b.ProductBuildVersion))
+	out.WriteString(fmt.Sprintf("  ProductVersion:        %s\n", b.ProductVersion))
+	out.WriteString(fmt.Sprintf("  SupportedProductTypes: %v\n", b.SupportedProductTypes))
+	out.WriteString("  BuildIdentities:\n")
 	for _, bID := range b.BuildIdentities {
-		out += fmt.Sprintf("   -\n%s", bID.String())
+		out.WriteString(fmt.Sprintf("   -\n%s", bID.String()))
 	}
-	return out
+	return out.String()
 }
 
 type BuildIdentity struct {
@@ -61,28 +61,28 @@ type BuildIdentity struct {
 }
 
 func (i BuildIdentity) String() string {
-	var out string
+	var out strings.Builder
 	if len(i.ApProductMarketingVersion) > 0 {
-		out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ApProductMarketingVersion)
+		out.WriteString(fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ApProductMarketingVersion))
 	}
 	if len(i.ApOSLongVersion) > 0 {
-		out += fmt.Sprintf("    Ap,OSLongVersion:        %s\n", i.ApOSLongVersion)
+		out.WriteString(fmt.Sprintf("    Ap,OSLongVersion:        %s\n", i.ApOSLongVersion))
 	}
-	out += fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID)
-	out += fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID)
-	out += fmt.Sprintf("    ApChipID:                %s\n", i.ApChipID)
-	out += fmt.Sprintf("    ApSecurityDomain:        %s\n", i.ApSecurityDomain)
-	out += fmt.Sprintf("    BbChipID:                %s\n", i.BbChipID)
-	out += fmt.Sprintf("    Info:\n%s", i.Info.String())
-	out += "    Manifest:\n"
+	out.WriteString(fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID))
+	out.WriteString(fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID))
+	out.WriteString(fmt.Sprintf("    ApChipID:                %s\n", i.ApChipID))
+	out.WriteString(fmt.Sprintf("    ApSecurityDomain:        %s\n", i.ApSecurityDomain))
+	out.WriteString(fmt.Sprintf("    BbChipID:                %s\n", i.BbChipID))
+	out.WriteString(fmt.Sprintf("    Info:\n%s", i.Info.String()))
+	out.WriteString("    Manifest:\n")
 	for k, v := range i.Manifest {
 		if path, ok := v.Info["Path"]; ok {
 			if len(path.(string)) > 0 {
-				out += fmt.Sprintf("      %-34s%s\n", k+":", v.String())
+				out.WriteString(fmt.Sprintf("      %-34s%s\n", k+":", v.String()))
 			}
 		}
 	}
-	return out
+	return out.String()
 }
 
 type IdentityInfo struct {

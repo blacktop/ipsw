@@ -142,12 +142,9 @@ func CompareVersionStrings(a, b string) int {
 	aParts := parseVersionParts(a)
 	bParts := parseVersionParts(b)
 
-	maxLen := len(aParts)
-	if len(bParts) > maxLen {
-		maxLen = len(bParts)
-	}
+	maxLen := max(len(bParts), len(aParts))
 
-	for i := 0; i < maxLen; i++ {
+	for i := range maxLen {
 		aVal := 0
 		bVal := 0
 

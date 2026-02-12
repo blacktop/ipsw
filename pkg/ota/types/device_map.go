@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 )
@@ -159,11 +160,11 @@ func ParseDeviceMap(data []byte) (*DeviceMap, error) {
 }
 
 func (dm DeviceMap) String() string {
-	var out string
+	var out strings.Builder
 	for boardconfig, device := range dm {
-		out += fmt.Sprintf("%s, board_config: %s\n", device, boardconfig)
+		out.WriteString(fmt.Sprintf("%s, board_config: %s\n", device, boardconfig))
 	}
-	return out
+	return out.String()
 }
 
 func (d Device) String() string {

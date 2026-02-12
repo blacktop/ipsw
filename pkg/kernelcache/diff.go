@@ -105,14 +105,14 @@ func InsertStringToFile(path, str string, index int) error {
 		return err
 	}
 
-	fileContent := ""
+	var fileContent strings.Builder
 	for i, line := range lines {
 		if i == index {
-			fileContent += str
+			fileContent.WriteString(str)
 		}
-		fileContent += line
-		fileContent += "\n"
+		fileContent.WriteString(line)
+		fileContent.WriteString("\n")
 	}
 
-	return os.WriteFile(path, []byte(fileContent), 0660)
+	return os.WriteFile(path, []byte(fileContent.String()), 0660)
 }
