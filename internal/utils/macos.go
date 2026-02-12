@@ -618,18 +618,26 @@ func MountEncrypted(image, mountPoint, password string) error {
 func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 	switch runtime.GOOS {
 	case "darwin":
+		img := filepath.Clean(image)
+		if abs, err := filepath.Abs(img); err == nil {
+			img = abs
+		}
+
 		info, err := MountInfo()
 		if err != nil {
 			return "", false, err
 		}
 		for _, i := range info.Images {
-			if strings.Contains(i.ImagePath, image) {
+			ip := filepath.Clean(i.ImagePath)
+			if ip == img {
 				for _, entry := range i.SystemEntities {
 					if entry.MountPoint != "" {
 						return entry.MountPoint, true, nil
 					}
 				}
-				return "", true, nil
+				// Image matches, but no mounted filesystem entity was reported.
+				// Treat as not mounted so callers can attempt to (re)attach.
+				break
 			}
 		}
 	case "linux":
@@ -641,11 +649,17 @@ func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 }
 
 func MountDMG(image string, customMountPoint string) (string, bool, error) {
+	image = filepath.Clean(image)
+	if abs, err := filepath.Abs(image); err == nil {
+		image = abs
+	}
+
 	var mountPoint string
 	if customMountPoint != "" {
 		mountPoint = customMountPoint
 	} else {
-		mountPoint = fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
+		base := filepath.Base(image)
+		mountPoint = fmt.Sprintf("/tmp/%s.mount", base)
 	}
 
 	if runtime.GOOS == "darwin" {

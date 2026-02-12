@@ -71,20 +71,34 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 }
 
 func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+	skipCleanup := false
 
+	// For AEA-encrypted DMGs, check if the decrypted version already exists
+	// (e.g. already extracted + mounted by a prior step).
+	// Reuse it to avoid overwriting a mounted DMG's backing file.
 	if filepath.Ext(dmgPath) == ".aea" {
-		var err error
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    dmgPath,
-			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+		decryptedPath := strings.TrimSuffix(dmgPath, filepath.Ext(dmgPath))
+		if _, err := os.Stat(decryptedPath); err == nil {
+			dmgPath = decryptedPath
+			skipCleanup = true
 		}
-		defer os.Remove(dmgPath)
+	}
+
+	if !skipCleanup {
+		if filepath.Ext(dmgPath) == ".aea" {
+			var err error
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:    dmgPath,
+				Output:   filepath.Dir(dmgPath),
+				PemDB:    pemDB,
+				Proxy:    "",    // TODO: make proxy configurable
+				Insecure: false, // TODO: make insecure configurable
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+			}
+			defer os.Remove(dmgPath)
+		}
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))

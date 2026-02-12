@@ -216,34 +216,65 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 }
 
 func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	skipCleanup := false
+	tmpExtractDir := ""
+
+	// For AEA-encrypted DMGs, check if the decrypted version already exists
+	// (e.g. already extracted + mounted by a prior step like mountSystemOsDMGs).
+	// Reuse it to avoid overwriting a mounted DMG's backing file.
+	if filepath.Ext(dmgPath) == ".aea" {
+		decryptedPath := strings.TrimSuffix(dmgPath, filepath.Ext(dmgPath))
+		// Only reuse if this is a real path (not a bare IPSW-internal filename).
+		if filepath.IsAbs(decryptedPath) || filepath.Dir(decryptedPath) != "." {
+			if _, err := os.Stat(decryptedPath); err == nil {
+				dmgPath = decryptedPath
+				skipCleanup = true
+			}
 		}
-		if len(dmgs) == 0 {
-			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		dmgPath = dmgs[0] // update dmgPath to the actual extracted file path
-		defer os.Remove(filepath.Clean(dmgPath))
 	}
 
-	if filepath.Ext(dmgPath) == ".aea" {
-		var err error
-		dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    dmgPath,
-			Output:   filepath.Dir(dmgPath),
-			PemDB:    pemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+	if !skipCleanup {
+		// If dmgPath is a bare filename (e.g. 043-....dmg.aea), treat it as an IPSW-internal
+		// identifier and always extract it into a fresh temp dir. This avoids collisions with
+		// same-named files left in the current working directory from prior runs.
+		dmgNameOnly := !filepath.IsAbs(dmgPath) && filepath.Dir(dmgPath) == "."
+		if dmgNameOnly || func() bool {
+			_, err := os.Stat(dmgPath)
+			return os.IsNotExist(err)
+		}() {
+			tmpDIR, err := os.MkdirTemp("", "ipsw_extract_dmg")
+			if err != nil {
+				return nil, fmt.Errorf("failed to create temp dir: %v", err)
+			}
+			tmpExtractDir = tmpDIR
+			defer os.RemoveAll(tmpExtractDir)
+
+			dmgs, err := utils.Unzip(ipswPath, tmpExtractDir, func(f *zip.File) bool {
+				return strings.EqualFold(filepath.Base(f.Name), filepath.Base(dmgPath))
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			}
+			if len(dmgs) == 0 {
+				return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			}
+			dmgPath = dmgs[0] // update dmgPath to the actual extracted file path
 		}
-		defer os.Remove(dmgPath)
+
+		if filepath.Ext(dmgPath) == ".aea" {
+			var err error
+			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
+				Input:    dmgPath,
+				Output:   filepath.Dir(dmgPath),
+				PemDB:    pemDB,
+				Proxy:    "",    // TODO: make proxy configurable
+				Insecure: false, // TODO: make insecure configurable
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+			}
+			defer os.Remove(dmgPath)
+		}
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
@@ -265,31 +296,72 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 	}
 
 	var artifacts []string
-	// extract files that match regex pattern
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.WithError(err).Debugf("failed to walk %s", mountPoint)
-			return nil // keep going
-		}
-		if info.IsDir() {
-			return nil // skip directories
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return nil // skip symlinks
-		}
-		if pattern.MatchString(strings.TrimPrefix(path, mountPoint)) {
-			fname := strings.TrimPrefix(path, mountPoint)
-			fname = filepath.Join(destPath, fname)
+	// Track visited to avoid loops/duplicates (symlinks)
+	visited := make(map[string]bool)
+
+	extractMatchingFile := func(path string) error {
+		rel := strings.TrimPrefix(path, mountPoint)
+		rel = strings.TrimPrefix(rel, string(os.PathSeparator))
+		rel = filepath.Clean(rel)
+		if pattern.MatchString(string(os.PathSeparator) + rel) || pattern.MatchString(rel) {
+			fname := filepath.Join(destPath, rel)
 			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
 			}
 			utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting to %s", fname))
 			if err := utils.Copy(path, fname); err != nil {
-				// return fmt.Errorf("failed to extract %s: %v", fname, err)
 				log.WithError(err).Errorf("failed to copy %s to %s", path, fname)
 				return nil // keep going
 			}
 			artifacts = append(artifacts, fname)
+		}
+		return nil
+	}
+
+	// extract files that match regex pattern (follows symlinked directories)
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				log.Debugf("skipping path due to permission denied: %s", path)
+				return nil
+			}
+			log.WithError(err).Debugf("failed to walk %s", mountPoint)
+			return nil // keep going
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Follow symlinked directories to find files reachable only through symlinks
+			// (e.g. /sbin -> /usr/sbin on modern Apple firmwares)
+			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
+				linfo, err := os.Stat(linkPath)
+				if err != nil {
+					return nil
+				}
+				if linfo.IsDir() && !visited[linkPath] {
+					visited[linkPath] = true
+					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
+						if subErr != nil {
+							log.WithError(subErr).Debug("failed to walk symlinked path")
+							return nil
+						}
+						if !subInfo.IsDir() && !visited[subPath] {
+							visited[subPath] = true
+							return extractMatchingFile(subPath)
+						}
+						return nil
+					})
+				} else if !linfo.IsDir() {
+					// Symlink to a file — check against pattern
+					return extractMatchingFile(linkPath)
+				}
+			}
+			return nil
+		}
+		if info.IsDir() {
+			return nil // skip directories
+		}
+		if !visited[path] {
+			visited[path] = true
+			return extractMatchingFile(path)
 		}
 		return nil
 	}); err != nil {
