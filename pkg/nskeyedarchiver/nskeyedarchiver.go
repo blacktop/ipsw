@@ -316,7 +316,7 @@ func (p *NSKeyedArchiverParser) parseArray() ([]any, error) {
 
 	// Parse the elements in the array
 	array := make([]any, numElements)
-	for i := int64(0); i < numElements; i++ {
+	for i := range numElements {
 		// Parse the element
 		element, err := p.NextObject()
 		if err != nil {
@@ -340,7 +340,7 @@ func (p *NSKeyedArchiverParser) parseSet() (map[any]struct{}, error) {
 
 	// Parse the elements in the set
 	set := make(map[any]struct{}, numElements)
-	for i := int64(0); i < numElements; i++ {
+	for range numElements {
 		// Parse the element
 		element, err := p.NextObject()
 		if err != nil {
@@ -364,7 +364,7 @@ func (p *NSKeyedArchiverParser) parseDictionary() (map[string]any, error) {
 
 	// Parse the key-value pairs in the dictionary
 	dictionary := make(map[string]any, numPairs)
-	for i := int64(0); i < numPairs; i++ {
+	for range numPairs {
 		// Parse the key
 		key, err := p.parseASCIIString()
 		if err != nil {

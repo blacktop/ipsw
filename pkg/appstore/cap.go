@@ -194,11 +194,11 @@ func (as *AppStore) EnableCapability(id, ctype string) (*BundleIdCapability, err
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	var bcap BundleIdCapabilityResponse

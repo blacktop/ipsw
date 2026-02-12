@@ -3,6 +3,7 @@ package img4
 import (
 	"bytes"
 	"encoding/hex"
+	"maps"
 	"testing"
 )
 
@@ -41,9 +42,7 @@ func TestRestoreInfoCreation(t *testing.T) {
 			if tt.properties != nil {
 				props := make(map[string]any)
 				props["BNCN"] = tt.nonce
-				for k, v := range tt.properties {
-					props[k] = v
-				}
+				maps.Copy(props, tt.properties)
 				restoreInfo = New(props)
 			} else {
 				restoreInfo = NewWithBootNonce(tt.nonce)

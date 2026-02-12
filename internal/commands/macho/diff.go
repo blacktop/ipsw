@@ -163,19 +163,20 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 }
 
 func (i *DiffInfo) String() string {
-	out := i.Version + "\n"
+	var out strings.Builder
+	out.WriteString(i.Version + "\n")
 	for _, sec := range i.Sections {
-		out += fmt.Sprintf("  %s: %#x\n", sec.Name, sec.Size)
+		out.WriteString(fmt.Sprintf("  %s: %#x\n", sec.Name, sec.Size))
 	}
 	slices.Sort(i.Imports)
 	for _, i := range i.Imports {
-		out += fmt.Sprintf("  - %s\n", i)
+		out.WriteString(fmt.Sprintf("  - %s\n", i))
 	}
-	out += fmt.Sprintf("  UUID: %s\n", i.UUID)
-	out += fmt.Sprintf("  Functions: %d\n", i.Functions)
-	out += fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols))
-	out += fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings))
-	return out
+	out.WriteString(fmt.Sprintf("  UUID: %s\n", i.UUID))
+	out.WriteString(fmt.Sprintf("  Functions: %d\n", i.Functions))
+	out.WriteString(fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols)))
+	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings)))
+	return out.String()
 }
 
 func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfig) error {

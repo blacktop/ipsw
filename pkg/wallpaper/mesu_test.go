@@ -1,3 +1,5 @@
+//go:build darwin && cgo && wallpaper
+
 package wallpaper
 
 import (

@@ -268,34 +268,34 @@ type Sep struct {
 }
 
 func (s Sep) String() string {
-	var out string
-	out += fmt.Sprintf(
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf(
 		"Legion: %s uuid=%s\n"+
 			"Kernel:    start=%#x end=%#x\n"+
 			"%s:        uuid=%s\n",
 		s.Legion.Legion[:], s.Legion.UUID,
 		s.Hdr.KernelTextOffset, s.Hdr.KernelTextOffset+s.Hdr.KernelDataOffset,
 		s.SepOS.Name[:], s.SepOS.UUID,
-	)
+	))
 	if len(s.Apps) > 0 {
-		out += "\n\nAPPS"
+		out.WriteString("\n\nAPPS")
 		for _, app := range s.Apps {
-			out += fmt.Sprintf("\n\n%s\n", app)
+			out.WriteString(fmt.Sprintf("\n\n%s\n", app))
 			if m, err := macho.NewFile(bytes.NewReader(s.data[app.TextOffset:])); err == nil {
-				out += fmt.Sprintf("\n%s\n", m.FileTOC.String())
+				out.WriteString(fmt.Sprintf("\n%s\n", m.FileTOC.String()))
 			}
 		}
 	}
 	if len(s.Libs) > 0 {
-		out += "\n\nLIBS"
+		out.WriteString("\n\nLIBS")
 		for _, lib := range s.Libs {
-			out += fmt.Sprintf("\n\n%s\n", lib)
+			out.WriteString(fmt.Sprintf("\n\n%s\n", lib))
 			if m, err := macho.NewFile(bytes.NewReader(s.data[lib.TextOffset:])); err == nil {
-				out += fmt.Sprintf("\n%s\n", m.FileTOC.String())
+				out.WriteString(fmt.Sprintf("\n%s\n", m.FileTOC.String()))
 			}
 		}
 	}
-	return out
+	return out.String()
 }
 
 // Parse parses a SEP firmware image

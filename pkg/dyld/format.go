@@ -532,11 +532,11 @@ func (f *File) getRosetta(uuid types.UUID) string {
 }
 
 func (f *File) getMappings(slideVersion uint32, verbose bool) string {
-	var output string
+	var output strings.Builder
 	if f.Headers[f.UUID].SlideInfoOffsetUnused > 0 {
 		for uuid, cacheMappings := range f.Mappings {
-			output += fmt.Sprintf("\n> SubCache %s", uuid)
-			output += cacheMappings.String()
+			output.WriteString(fmt.Sprintf("\n> SubCache %s", uuid))
+			output.WriteString(cacheMappings.String())
 		}
 	} else {
 		// sort mappings map by address
@@ -549,21 +549,21 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 		})
 		for _, uuid := range uuids {
 			if uuid == f.symUUID {
-				output += fmt.Sprintf("\n> Cache (.symbols) UUID: %s\n\n", uuid)
+				output.WriteString(fmt.Sprintf("\n> Cache (.symbols) UUID: %s\n\n", uuid))
 			} else {
 				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
 				if err != nil {
-					output += fmt.Sprintf("\n> Cache UUID: %s\n\n", uuid)
+					output.WriteString(fmt.Sprintf("\n> Cache UUID: %s\n\n", uuid))
 				} else {
-					output += fmt.Sprintf("\n> Cache (%s) UUID: %s\n\n", ext, uuid)
+					output.WriteString(fmt.Sprintf("\n> Cache (%s) UUID: %s\n\n", ext, uuid))
 				}
 			}
-			output += "Mappings\n--------\n\n"
-			output += f.MappingsWithSlideInfo[uuid].String(slideVersion, verbose)
-			output += fmt.Sprintln()
-			output += f.getCodeSignature(uuid)
-			output += f.getRosetta(uuid)
+			output.WriteString("Mappings\n--------\n\n")
+			output.WriteString(f.MappingsWithSlideInfo[uuid].String(slideVersion, verbose))
+			output.WriteString(fmt.Sprintln())
+			output.WriteString(f.getCodeSignature(uuid))
+			output.WriteString(f.getRosetta(uuid))
 		}
 	}
-	return output
+	return output.String()
 }

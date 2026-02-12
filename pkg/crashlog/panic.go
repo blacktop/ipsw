@@ -127,11 +127,11 @@ func (t TPIDRx_ELy) String() string {
 	if len(t) == 0 {
 		return ""
 	}
-	var tpidrx string
+	var tpidrx strings.Builder
 	for key, val := range t {
-		tpidrx += fmt.Sprintf(colorImage("    %-3s", key)+": %#016x\n", val)
+		tpidrx.WriteString(fmt.Sprintf(colorImage("    %-3s", key)+": %#016x\n", val))
 	}
-	return fmt.Sprintf(colorField("TPIDRx_ELy")+"\n%s\n", tpidrx)
+	return fmt.Sprintf(colorField("TPIDRx_ELy")+"\n%s\n", tpidrx.String())
 }
 
 type Core struct {
@@ -186,9 +186,10 @@ type PanickedThread struct {
 }
 
 func (p PanickedThread) String() string {
-	callstack := "\n"
+	var callstack strings.Builder
+	callstack.WriteString("\n")
 	for _, state := range p.CallStack {
-		callstack += fmt.Sprintf("    %s\n", state)
+		callstack.WriteString(fmt.Sprintf("    %s\n", state))
 	}
 	kexts := ""
 	if len(p.Kexts) > 0 {
@@ -197,7 +198,7 @@ func (p PanickedThread) String() string {
 	for _, kext := range p.Kexts {
 		kexts += fmt.Sprintf("    %s (%v) %s @ %s\n", kext.Name, kext.Version, kext.UUID, kext.Range)
 	}
-	return fmt.Sprintf(colorField("Panicked Thread")+": %#016x, "+colorField("backtrace")+": %#016x, "+colorField("tid")+": %d%s%s", p.Address, p.Backtrace, p.TID, callstack, kexts)
+	return fmt.Sprintf(colorField("Panicked Thread")+": %#016x, "+colorField("backtrace")+": %#016x, "+colorField("tid")+": %d%s%s", p.Address, p.Backtrace, p.TID, callstack.String(), kexts)
 }
 
 type LastStartedKext struct {
@@ -229,11 +230,11 @@ func (l LoadedKexts) String() string {
 	if len(l) == 0 {
 		return ""
 	}
-	loadedKexts := ""
+	var loadedKexts strings.Builder
 	for _, kext := range l {
-		loadedKexts += fmt.Sprintf("    %s\n", kext)
+		loadedKexts.WriteString(fmt.Sprintf("    %s\n", kext))
 	}
-	return fmt.Sprintf(colorField("Loaded Kexts:")+"\n%s\n", loadedKexts)
+	return fmt.Sprintf(colorField("Loaded Kexts:")+"\n%s\n", loadedKexts.String())
 }
 
 type LoadedKext struct {
@@ -836,9 +837,9 @@ func (p *Panic210) String() string {
 	if ok {
 		panic = colorField("Panic") + fmt.Sprintf("\n%s\n  %s", start, rest)
 	}
-	var cores string
+	var cores strings.Builder
 	for _, core := range p.Cores {
-		cores += fmt.Sprintf("%s\n", core)
+		cores.WriteString(fmt.Sprintf("%s\n", core))
 	}
 	return fmt.Sprintf(
 		"%s\n\n"+ // panic
@@ -909,7 +910,7 @@ func (p *Panic210) String() string {
 		p.EpochTime,
 		p.ZoneInfo,
 		p.TPIDRx_ELy,
-		cores,
+		cores.String(),
 		p.CompressorInfo,
 		p.PanickedTask,
 		p.PanickedThread,

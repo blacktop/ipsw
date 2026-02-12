@@ -263,17 +263,17 @@ func (ku ExtKeyUsage) String() string {
 }
 
 func ReprData(dat []byte, tabs, width int) string {
-	var out string
+	var out strings.Builder
 	var parts []string
 	for _, id := range dat {
 		parts = append(parts, fmt.Sprintf("%02x", id))
 		if len(parts) == width {
-			out += fmt.Sprintf("%s%s\n", strings.Repeat("\t", tabs), strings.Join(parts, ":")+":")
+			out.WriteString(fmt.Sprintf("%s%s\n", strings.Repeat("\t", tabs), strings.Join(parts, ":")+":"))
 			parts = []string{}
 		}
 	}
 	if len(parts) > 0 {
-		out += strings.Repeat("\t", tabs) + strings.Join(parts, ":")
+		out.WriteString(strings.Repeat("\t", tabs) + strings.Join(parts, ":"))
 	}
-	return out
+	return out.String()
 }

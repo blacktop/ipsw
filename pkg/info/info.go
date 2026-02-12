@@ -201,63 +201,63 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 }
 
 func (i *Info) String() string {
-	var iStr string
+	var iStr strings.Builder
 	var verextra string
 	if i.Plists.OTAInfo != nil {
 		verextra = fmt.Sprintf(" %s", i.Plists.OTAInfo.MobileAssetProperties.ProductVersionExtra)
 	}
 	if i.Plists.BuildManifest != nil {
-		iStr += fmt.Sprintf(
+		iStr.WriteString(fmt.Sprintf(
 			"Version        = %s\n"+
 				"BuildVersion   = %s\n"+
 				"OS Type        = %s\n",
 			i.Plists.BuildManifest.ProductVersion+verextra,
 			i.Plists.BuildManifest.ProductBuildVersion,
 			i.Plists.GetOSType(),
-		)
+		))
 	}
 	if i.Plists.Restore != nil {
 		foundFS := false
 		if fsDMG, err := i.GetFileSystemOsDmg(); err == nil {
 			foundFS = true
-			iStr += fmt.Sprintf("FileSystem     = %s\n", fsDMG)
+			iStr.WriteString(fmt.Sprintf("FileSystem     = %s\n", fsDMG))
 		}
 		if fsDMG, err := i.GetSystemOsDmg(); err == nil {
-			iStr += fmt.Sprintf("SystemOS       = %s\n", fsDMG)
+			iStr.WriteString(fmt.Sprintf("SystemOS       = %s\n", fsDMG))
 		}
 		if fsDMG, err := i.GetAppOsDmg(); err == nil {
-			iStr += fmt.Sprintf("AppOS          = %s\n", fsDMG)
+			iStr.WriteString(fmt.Sprintf("AppOS          = %s\n", fsDMG))
 		}
 		if fsDMG, err := i.GetExclaveOSDmg(); err == nil {
-			iStr += fmt.Sprintf("ExclaveOS      = %s\n", fsDMG)
+			iStr.WriteString(fmt.Sprintf("ExclaveOS      = %s\n", fsDMG))
 		}
 		if ramDisk, err := i.GetRestoreRamDiskDmgs(); err == nil {
-			iStr += fmt.Sprintf("RestoreRamDisk = %s\n", ramDisk)
+			iStr.WriteString(fmt.Sprintf("RestoreRamDisk = %s\n", ramDisk))
 		}
 		if !foundFS {
 			if len(i.Plists.Restore.SystemRestoreImageFileSystems) > 0 {
 				for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
-					iStr += fmt.Sprintf("FileSystem     = %s (Type: %s)\n", file, fsType)
+					iStr.WriteString(fmt.Sprintf("FileSystem     = %s (Type: %s)\n", file, fsType))
 				}
 			}
 		}
 	}
 	if i.Plists.OTAInfo != nil {
 		if len(i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion) > 0 {
-			iStr += fmt.Sprintf("RestoreVersion = %s\n", i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion)
+			iStr.WriteString(fmt.Sprintf("RestoreVersion = %s\n", i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion))
 		}
 		if len(i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild) > 0 {
-			iStr += fmt.Sprintf("PrereqBuild    = %s\n", i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild)
+			iStr.WriteString(fmt.Sprintf("PrereqBuild    = %s\n", i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild))
 		}
 		if i.Plists.OTAInfo.MobileAssetProperties.SplatOnly {
-			iStr += "IsRSR          = ✅\n"
+			iStr.WriteString("IsRSR          = ✅\n")
 		}
 	}
 	if len(i.DeviceTrees) > 0 {
 		kcs := i.Plists.BuildManifest.GetKernelCaches()
 		bls := i.Plists.BuildManifest.GetBootLoaders()
-		iStr += "\nDevices\n"
-		iStr += "-------\n"
+		iStr.WriteString("\nDevices\n")
+		iStr.WriteString("-------\n")
 		for _, dtree := range i.DeviceTrees {
 			dt, _ := dtree.Summary()
 			prodName := dt.ProductName
@@ -274,34 +274,34 @@ func (i *Info) String() string {
 					prodName = dt.ProductType
 				}
 			}
-			iStr += fmt.Sprintf("\n%s\n", prodName)
-			iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+			iStr.WriteString(fmt.Sprintf("\n%s\n", prodName))
+			iStr.WriteString(fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
 			if !dt.Timestamp.IsZero() {
-				iStr += fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST"))
+				iStr.WriteString(fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST")))
 			}
 			if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
-				iStr += fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", "))
+				iStr.WriteString(fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", ")))
 			}
 			if cpu := i.GetCPU(dt.BoardConfig); len(cpu) > 0 {
-				iStr += fmt.Sprintf("   - %s\n", cpu)
+				iStr.WriteString(fmt.Sprintf("   - %s\n", cpu))
 			}
 			if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
-				iStr += "   - BootLoaders\n"
+				iStr.WriteString("   - BootLoaders\n")
 				for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
-					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
+					iStr.WriteString(fmt.Sprintf("       * %s\n", filepath.Base(bl)))
 				}
 			}
 		}
 	} else {
 		if i.Plists.BuildManifest != nil {
-			iStr += "\nDevices\n"
-			iStr += "-------\n"
+			iStr.WriteString("\nDevices\n")
+			iStr.WriteString("-------\n")
 			for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
-				iStr += fmt.Sprintf(" > %s_%s\n", dev, i.Plists.BuildManifest.ProductBuildVersion)
+				iStr.WriteString(fmt.Sprintf(" > %s_%s\n", dev, i.Plists.BuildManifest.ProductBuildVersion))
 			}
 		}
 	}
-	return iStr
+	return iStr.String()
 }
 
 type InfoJSON struct {
@@ -749,7 +749,7 @@ func (i *Info) GetKernelCacheForDevice(device string) []string {
 }
 
 func getAbbreviatedDevList(devices []string) string {
-	var devList string
+	var devList strings.Builder
 
 	if len(devices) == 0 {
 		return ""
@@ -759,23 +759,23 @@ func getAbbreviatedDevList(devices []string) string {
 
 	currentDev := devices[0]
 	devPrefix := strings.Split(currentDev, ",")[0]
-	devList += currentDev
+	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {
 		if strings.HasPrefix(dev, devPrefix) {
-			devList += fmt.Sprintf("_%s", strings.Split(dev, ",")[1])
+			devList.WriteString(fmt.Sprintf("_%s", strings.Split(dev, ",")[1]))
 		} else {
 			currentDev = dev
 			devPrefix = strings.Split(currentDev, ",")[0]
-			devList += "_" + currentDev
+			devList.WriteString("_" + currentDev)
 		}
 	}
 
-	return devList
+	return devList.String()
 }
 
 func getAbbreviatedDevListFolder(devices []string) string {
-	var devList string
+	var devList strings.Builder
 
 	if len(devices) == 0 {
 		return ""
@@ -787,19 +787,19 @@ func getAbbreviatedDevListFolder(devices []string) string {
 
 	currentDev := devices[0]
 	devPrefix := strings.Split(currentDev, ",")[0]
-	devList += currentDev
+	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {
 		if strings.HasPrefix(dev, devPrefix) {
-			devList += fmt.Sprintf("_%s", strings.Split(dev, ",")[1])
+			devList.WriteString(fmt.Sprintf("_%s", strings.Split(dev, ",")[1]))
 		} else {
 			currentDev = dev
 			devPrefix = strings.Split(currentDev, ",")[0]
-			devList += "_" + currentDev
+			devList.WriteString("_" + currentDev)
 		}
 	}
 
-	return devList
+	return devList.String()
 }
 
 // Parse parses plist files in a local ipsw file

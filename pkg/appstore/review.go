@@ -97,11 +97,11 @@ func (as *AppStore) GetReviews(appID string) (ReviewsListResponse, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
 			return nilResponse, fmt.Errorf("failed to JSON decode http response: %v", err)
 		}
-		var errOut string
+		var errOut strings.Builder
 		for idx, e := range eresp.Errors {
-			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+			errOut.WriteString(fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail))
 		}
-		return nilResponse, fmt.Errorf("%s: %s", resp.Status, errOut)
+		return nilResponse, fmt.Errorf("%s: %s", resp.Status, errOut.String())
 	}
 
 	// For debugging, print the response body

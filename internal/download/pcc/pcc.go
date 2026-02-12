@@ -337,7 +337,7 @@ func file_ATResearcherApi_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_ATResearcherApi_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   3,
@@ -966,7 +966,7 @@ func file_ATServiceApi_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_ATServiceApi_proto_rawDesc,
 			NumEnums:      1,
 			NumMessages:   6,
@@ -2586,7 +2586,7 @@ func file_AuditorApi_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_AuditorApi_proto_rawDesc,
 			NumEnums:      1,
 			NumMessages:   17,
@@ -3413,7 +3413,7 @@ func file_KtClientApi_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_KtClientApi_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   8,
@@ -3918,7 +3918,7 @@ func file_ReleaseMetadata_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_ReleaseMetadata_proto_rawDesc,
 			NumEnums:      3,
 			NumMessages:   3,
@@ -5712,7 +5712,7 @@ func file_Transparency_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: file_Transparency_proto_rawDesc,
 			NumEnums:      8,
 			NumMessages:   16,

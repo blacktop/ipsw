@@ -106,7 +106,7 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 func initBitModels(length uint32) (probs []uint16) {
 	probs = make([]uint16, length)
 	val := uint16(kBitModelTotal) >> 1
-	for i := uint32(0); i < length; i++ {
+	for i := range length {
 		probs[i] = val // 1 << 10
 	}
 	return

@@ -13,10 +13,10 @@ import (
 )
 
 func (a *Asset) String() string {
-	var out string
-	out += "Asset\n" + "=====\n" // title
-	out += "Header:\n"
-	out += fmt.Sprintf(
+	var out strings.Builder
+	out.WriteString("Asset\n" + "=====\n") // title
+	out.WriteString("Header:\n")
+	out.WriteString(fmt.Sprintf(
 		"  Version:             %s"+
 			"  CoreUI Version:      %d\n"+
 			"  Storage Version:     %d\n"+
@@ -37,9 +37,9 @@ func (a *Asset) String() string {
 		a.Header.SchemaVersion,
 		a.Header.ColorSpaceID,
 		a.Header.KeySemantics,
-	)
-	out += "Metadata:\n"
-	out += fmt.Sprintf(
+	))
+	out.WriteString("Metadata:\n")
+	out.WriteString(fmt.Sprintf(
 		"  Authoring Tool:      %s"+
 			"  Thinning Args:       %s\n"+
 			"  Deployment Platform: %s %s\n",
@@ -47,17 +47,17 @@ func (a *Asset) String() string {
 		strings.ReplaceAll(string(bytes.Trim(a.Metadata.ThinningArguments[:], "\x00")), "<", "\n    <"),
 		string(bytes.Trim(a.Metadata.DeploymentPlatform[:], "\x00")),
 		string(bytes.Trim(a.Metadata.DeploymentPlatformVersion[:], "\x00")),
-	)
+	))
 	if len(a.KeyFormat) > 0 {
-		out += "KeyFormats:\n"
+		out.WriteString("KeyFormats:\n")
 		for _, k := range a.KeyFormat {
-			out += fmt.Sprintf("  - %s\n", k)
+			out.WriteString(fmt.Sprintf("  - %s\n", k))
 		}
 	}
 	if len(a.AppearanceDB) > 0 {
-		out += "Appearances:\n"
+		out.WriteString("Appearances:\n")
 		for k, v := range a.AppearanceDB {
-			out += fmt.Sprintf("  %s: %d\n", k, v)
+			out.WriteString(fmt.Sprintf("  %s: %d\n", k, v))
 		}
 	}
 	// if len(a.FacetKeyDB) > 0 {
@@ -70,62 +70,62 @@ func (a *Asset) String() string {
 	// 	}
 	// }
 	if len(a.ColorDB) > 0 {
-		out += "Colors:\n"
+		out.WriteString("Colors:\n")
 		for k, v := range a.ColorDB {
 			if a.conf.Verbose {
 				if tout, err := colorInTerminal(v); err == nil {
-					out += fmt.Sprintf("- %s:\n  %s", k, tout)
+					out.WriteString(fmt.Sprintf("- %s:\n  %s", k, tout))
 				}
 			} else {
-				out += fmt.Sprintf("  %s: %#v\n", k, v)
+				out.WriteString(fmt.Sprintf("  %s: %#v\n", k, v))
 
 			}
 		}
 	}
 	if len(a.Localizations) > 0 {
-		out += "Localizations:\n"
+		out.WriteString("Localizations:\n")
 		for k, v := range a.Localizations {
-			out += fmt.Sprintf("  %s: %d\n", k, v)
+			out.WriteString(fmt.Sprintf("  %s: %d\n", k, v))
 		}
 	}
 	if len(a.ImageDB) > 0 {
-		out += "Assets:\n"
+		out.WriteString("Assets:\n")
 		for _, ass := range a.ImageDB {
-			out += "-\n"
-			var asset string
+			out.WriteString("-\n")
+			var asset strings.Builder
 			switch t := ass.Asset.(type) {
 			case csiColor:
 				if a.conf.Verbose {
 					if tout, err := t.ToTerminal(); err == nil {
-						out += tout
+						out.WriteString(tout)
 					}
 				}
-				asset += fmt.Sprintf("Colorspace: %s\n", t.Info.ColorSpaceID())
+				asset.WriteString(fmt.Sprintf("Colorspace: %s\n", t.Info.ColorSpaceID()))
 				if len(t.Components) > 0 {
-					asset += "Components:\n"
+					asset.WriteString("Components:\n")
 					for _, c := range t.Components {
-						asset += fmt.Sprintf("  - %v\n", c)
+						asset.WriteString(fmt.Sprintf("  - %v\n", c))
 					}
 				}
 			default:
 			}
-			var attrs string
+			var attrs strings.Builder
 			if len(ass.Attributes) > 0 {
-				attrs += "Attributes:\n"
+				attrs.WriteString("Attributes:\n")
 				for _, kf := range a.KeyFormat {
 					if value, ok := ass.Attributes[kf.String()]; ok {
-						attrs += fmt.Sprintf("  %-23s\t%d\n", kf.String()+":", value)
+						attrs.WriteString(fmt.Sprintf("  %-23s\t%d\n", kf.String()+":", value))
 					}
 				}
 			}
-			var rscs string
+			var rscs strings.Builder
 			if len(ass.Resources) > 0 {
-				rscs += "Resources:\n"
+				rscs.WriteString("Resources:\n")
 				for _, rsc := range ass.Resources {
-					rscs += fmt.Sprintf("  %s\n", rsc.ID)
+					rscs.WriteString(fmt.Sprintf("  %s\n", rsc.ID))
 				}
 			}
-			out += fmt.Sprintf(
+			out.WriteString(fmt.Sprintf(
 				"Name: %s\n"+
 					"Type: %s\n"+
 					"Size: %s\n"+
@@ -134,13 +134,13 @@ func (a *Asset) String() string {
 				ass.Name,
 				ass.Type,
 				humanize.Bytes(uint64(ass.Size)),
-				asset,
-				attrs,
-				rscs,
-			)
+				asset.String(),
+				attrs.String(),
+				rscs.String(),
+			))
 		}
 	}
-	return out
+	return out.String()
 }
 
 // KeyFormatName converts renditionAttributeType to its Apple name

@@ -303,7 +303,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 		rel := strings.TrimPrefix(path, mountPoint)
 		rel = strings.TrimPrefix(rel, string(os.PathSeparator))
 		rel = filepath.Clean(rel)
-		if pattern.MatchString(string(os.PathSeparator) + rel) || pattern.MatchString(rel) {
+		if pattern.MatchString(string(os.PathSeparator)+rel) || pattern.MatchString(rel) {
 			fname := filepath.Join(destPath, rel)
 			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)

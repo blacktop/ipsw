@@ -203,30 +203,30 @@ func (m MigKernSubsystem) LookupRoutineName(idx int) string {
 }
 
 func (m MigKernSubsystem) String() string {
-	var out string
-	out += fmt.Sprintf("%s: %s\t%s=%d %s=%d %s=%d\n",
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("%s: %s\t%s=%d %s=%d %s=%d\n",
 		colorAddr("%#x", m.KServer),
 		colorSubSystem(m.Start.String()),
 		colorField("start"), m.Start,
 		colorField("end"), m.End,
 		colorField("max_sz"), m.Maxsize,
-	)
+	))
 	for idx, r := range m.Routines {
 		if r.KStubRoutine == 0 {
 			continue // skip empty routines
 		}
-		out += fmt.Sprintf("    %s: ", colorAddr("%#x", r.KStubRoutine))
-		out += colorBold(m.LookupRoutineName(idx))
-		out += fmt.Sprintf("\t%s=%02d %s=%#x %s=%02d %s=%d %s=%d %s=%d\n",
+		out.WriteString(fmt.Sprintf("    %s: ", colorAddr("%#x", r.KStubRoutine)))
+		out.WriteString(colorBold(m.LookupRoutineName(idx)))
+		out.WriteString(fmt.Sprintf("\t%s=%02d %s=%#x %s=%02d %s=%d %s=%d %s=%d\n",
 			colorName("num"), idx+int(m.Start),
 			colorName("impl"), r.ImplRoutine,
 			colorName("argc"), r.ArgC,
 			colorName("descr"), r.DescrCount,
 			colorName("reply_descr"), r.ReplyDescrCount,
 			colorName("max_reply_msg"), r.MaxReplyMsg,
-		)
+		))
 	}
-	return out
+	return out.String()
 }
 
 func getMigInitFunc(m *macho.File) (*types.Function, error) {
@@ -362,7 +362,7 @@ func getMigSubsystemPointers(m *macho.File, migEAddr uint64) ([]uint64, error) {
 
 	var subsystems []uint64
 
-	for i := uint64(0); i < maxEntries; i++ {
+	for i := range uint64(maxEntries) {
 		ptr, err := m.GetPointerAtAddress(migEAddr + i*uint64(binary.Size(uint64(0))))
 		if err != nil {
 			// If we fail on the very first entry, something is wrong with migEAddr.

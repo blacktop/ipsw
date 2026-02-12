@@ -83,7 +83,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 }
 
 func normalizeLinks(items []uint32, numItems, subValue uint32) {
-	for i := uint32(0); i < numItems; i++ {
+	for i := range numItems {
 		value := items[i]
 		if value <= subValue {
 			value = kEmptyHashValue
@@ -253,7 +253,7 @@ func (bt *lzBinTree) getMatches(distances []uint32) uint32 {
 }
 
 func (bt *lzBinTree) skip(num uint32) {
-	for i := uint32(0); i < num; i++ {
+	for range num {
 		var lenLimit uint32
 		if bt.iw.pos+bt.matchMaxLen <= bt.iw.streamPos {
 			lenLimit = bt.matchMaxLen
@@ -340,7 +340,7 @@ var crcTable []uint32 = make([]uint32, 256)
 
 // should be called in the encoder's contructor
 func initCrcTable() {
-	for i := uint32(0); i < 256; i++ {
+	for i := range uint32(256) {
 		r := i
 		for range 8 {
 			if r&1 != 0 {

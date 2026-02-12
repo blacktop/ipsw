@@ -564,15 +564,16 @@ func (e *Enum) ParentID() int {
 }
 func (e *Enum) Type() string { return "enum " + e.name }
 func (e *Enum) String() string {
-	eout := fmt.Sprintf("enum %s {\n", e.name)
+	var eout strings.Builder
+	eout.WriteString(fmt.Sprintf("enum %s {\n", e.name))
 	for _, f := range e.Fields {
-		eout += fmt.Sprintf("\t%s = %d\n",
+		eout.WriteString(fmt.Sprintf("\t%s = %d\n",
 			f.Name,
 			f.Value,
-		)
+		))
 	}
-	eout += "};"
-	return eout
+	eout.WriteString("};")
+	return eout.String()
 }
 func (e *Enum) Dump() string {
 	var edump string
