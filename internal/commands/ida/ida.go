@@ -17,6 +17,7 @@ import (
 
 const (
 	DarwinPathGlob      = "/Applications/IDA\\ Pro\\ */ida64.app/Contents/MacOS"
+	DarwinPathGlobAlt   = "/Applications/IDA\\ Professional\\ *.app/Contents/MacOS"
 	LinuxPath           = ""
 	WindowsPath         = ""
 	IDAProCompleteImage = "Apple DYLD cache for %s (complete image)"

@@ -132,6 +132,11 @@ var idaCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to search for IDA Pro: %w", err)
 				}
+				altMatches, err := filepath.Glob(ida.DarwinPathGlobAlt)
+				if err != nil {
+					return fmt.Errorf("failed to search for IDA Professional: %w", err)
+				}
+				matches = append(matches, altMatches...)
 				if len(matches) == 0 {
 					return fmt.Errorf("IDA Pro not found: supply IDA Pro path via '--ida-path' (e.g. /Applications/IDA\\ Pro\\ 8.2/ida64.app/Contents/MacOS)")
 				}
