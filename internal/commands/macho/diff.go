@@ -488,18 +488,25 @@ func diffIPSWLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *MachoDif
 	}
 	defer os.RemoveAll(cacheDir)
 
-	prevKeys := make(map[string]struct{})
+	prevKeys := make(map[string]bool) // value==true => already matched
 
 	if err := search.ForEachMachoInIPSW(oldIPSW, conf.PemDB, func(path string, m *macho.File) error {
-		prevKeys[path] = struct{}{}
+		prevKeys[path] = false
 		return writeCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
 	if err := search.ForEachMachoInIPSW(newIPSW, conf.PemDB, func(path string, m *macho.File) error {
-		if _, ok := prevKeys[path]; !ok {
+		matched, ok := prevKeys[path]
+		if !ok {
 			diff.New = append(diff.New, path)
+			return nil
+		}
+
+		// If we've already matched this old entry earlier in the walk,
+		// skip duplicate occurrences (avoid false-New classification).
+		if matched {
 			return nil
 		}
 
@@ -509,7 +516,7 @@ func diffIPSWLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *MachoDif
 		}
 		newInfo := GenerateDiffInfo(m, conf)
 		if newInfo.Equal(*oldInfo) {
-			delete(prevKeys, path)
+			prevKeys[path] = true
 			return nil
 		}
 		formatted, err := FormatUpdatedDiff(oldInfo, newInfo, conf)
@@ -519,14 +526,16 @@ func diffIPSWLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *MachoDif
 		if formatted != "" {
 			diff.Updated[path] = formatted
 		}
-		delete(prevKeys, path)
+		prevKeys[path] = true
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse machos in 'New' IPSW: %v", err)
 	}
 
-	for path := range prevKeys {
-		diff.Removed = append(diff.Removed, path)
+	for path, matched := range prevKeys {
+		if !matched {
+			diff.Removed = append(diff.Removed, path)
+		}
 	}
 	sort.Strings(diff.New)
 	sort.Strings(diff.Removed)
@@ -579,26 +588,34 @@ func diffFirmwaresLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *Mac
 	}
 	defer os.RemoveAll(cacheDir)
 
-	prevKeys := make(map[string]struct{})
+	prevKeys := make(map[string]bool) // value==true => already matched
 	if err := search.ForEachIm4pInIPSW(oldIPSW, func(path string, m *macho.File) error {
-		prevKeys[path] = struct{}{}
+		prevKeys[path] = false
 		return writeCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
 	if err := search.ForEachIm4pInIPSW(newIPSW, func(path string, m *macho.File) error {
-		if _, ok := prevKeys[path]; !ok {
+		matched, ok := prevKeys[path]
+		if !ok {
 			diff.New = append(diff.New, path)
 			return nil
 		}
+
+		// If we've already matched this old entry earlier in the walk,
+		// skip duplicate occurrences (avoid false-New classification).
+		if matched {
+			return nil
+		}
+
 		oldInfo, err := readCachedDiffInfo(cacheDir, path)
 		if err != nil {
 			return err
 		}
 		newInfo := GenerateDiffInfo(m, conf)
 		if newInfo.Equal(*oldInfo) {
-			delete(prevKeys, path)
+			prevKeys[path] = true
 			return nil
 		}
 		formatted, err := FormatUpdatedDiff(oldInfo, newInfo, conf)
@@ -608,14 +625,16 @@ func diffFirmwaresLowMemory(oldIPSW, newIPSW string, conf *DiffConfig, diff *Mac
 		if formatted != "" {
 			diff.Updated[path] = formatted
 		}
-		delete(prevKeys, path)
+		prevKeys[path] = true
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse firmwares in 'New' IPSW: %v", err)
 	}
 
-	for path := range prevKeys {
-		diff.Removed = append(diff.Removed, path)
+	for path, matched := range prevKeys {
+		if !matched {
+			diff.Removed = append(diff.Removed, path)
+		}
 	}
 	sort.Strings(diff.New)
 	sort.Strings(diff.Removed)

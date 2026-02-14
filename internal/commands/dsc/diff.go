@@ -62,6 +62,23 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff,
 			continue
 		}
 
+		// Parse local/private symbols for better symbol identity when available
+		if err := img1.ParseLocalSymbols(false); err != nil {
+			// non-fatal: continue using whatever public symbols we have
+			log.Debugf("failed to parse local symbols for image %s: %v", img1.Name, err)
+		} else {
+			if m1 != nil && m1.Symtab != nil {
+				m1.Symtab.Syms = append(m1.Symtab.Syms, img1.GetLocalSymbolsAsMachoSymbols()...)
+			}
+		}
+		if err := img2.ParseLocalSymbols(false); err != nil {
+			log.Debugf("failed to parse local symbols for image %s: %v", img2.Name, err)
+		} else {
+			if m2 != nil && m2.Symtab != nil {
+				m2.Symtab.Syms = append(m2.Symtab.Syms, img2.GetLocalSymbolsAsMachoSymbols()...)
+			}
+		}
+
 		info1 := mcmd.GenerateDiffInfo(m1, conf)
 		info2 := mcmd.GenerateDiffInfo(m2, conf)
 		if info2.Equal(*info1) {
