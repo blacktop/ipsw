@@ -158,34 +158,22 @@
   },
   "fcs_keys_rc": {
     "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
       "rc": {
-        "fingerprint": "23D127_22H730_23N620",
+        "fingerprint": "23D127_25D125_23N620",
         "ios_build": "23D127",
-        "macos_build": "22H730",
-        "updated_at": "2026-02-11T19:26:16Z",
+        "macos_build": "25D125",
+        "updated_at": "2026-02-18T19:23:27Z",
         "visionos_build": "23N620"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
       }
     }
   },
   "fcs_keys_stable": {
     "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
       "release": {
-        "fingerprint": "23D127_22H730_23N620",
+        "fingerprint": "23D127_25D125_23N620",
         "ios_build": "23D127",
-        "macos_build": "22H730",
-        "updated_at": "2026-02-11T19:26:16Z",
+        "macos_build": "25D125",
+        "updated_at": "2026-02-18T19:23:27Z",
         "visionos_build": "23N620"
       }
     }
