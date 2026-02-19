@@ -111,7 +111,7 @@ importers:
         specifier: ^0.7.0
         version: 0.7.1
       clsx:
-        specifier: ^2.1.1
+        specifier: ^2.0.0
         version: 2.1.1
       lucide-react:
         specifier: ^0.263.1
