@@ -149,67 +149,64 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 		}()
 	}
 
-	var files []string
-	// Use a map to keep track of visited directories to avoid infinite loops
-	visited := make(map[string]bool)
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			// Skip paths with permission errors gracefully
-			if os.IsPermission(err) {
-				log.Debugf("skipping path due to permission denied: %s", path)
+	// walkFilesStreaming walks the mount and streams file paths to the callback.
+	// Re-walking per handler avoids caching millions of paths in RAM.
+	walkFilesStreaming := func(handle func(string) error) error {
+		visited := make(map[string]bool)
+		return filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				if os.IsPermission(err) {
+					log.Debugf("skipping path due to permission denied: %s", path)
+					return nil
+				}
+				log.Debugf("failed to walk mount %s: %v", path, err)
 				return nil
 			}
-			log.Debugf("failed to walk mount %s: %v", path, err)
-			return nil
-		}
-		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
-			// Resolve the symlink
-			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-				// Get the info of the target file/directory
-				info, err = os.Stat(linkPath)
-				if err != nil {
-					return err
-				}
-				// If it's a directory and not visited, follow it
-				if info.IsDir() && !visited[linkPath] {
-					visited[linkPath] = true
-					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
-						if subErr != nil {
-							log.WithError(subErr).Debug("failed to walk symlinked path")
-							return nil
-						}
-						// Avoid adding duplicate file paths discovered via symlinks
-						if !visited[subPath] {
-							visited[subPath] = true
-							files = append(files, subPath)
-						}
+			if info.Mode()&os.ModeSymlink != 0 {
+				if linkPath, err := filepath.EvalSymlinks(path); err == nil {
+					info, err = os.Stat(linkPath)
+					if err != nil {
 						return nil
-					})
+					}
+					if info.IsDir() && !visited[linkPath] {
+						visited[linkPath] = true
+						return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
+							if subErr != nil {
+								log.WithError(subErr).Debug("failed to walk symlinked path")
+								return nil
+							}
+							if subInfo == nil || subInfo.IsDir() {
+								return nil
+							}
+							if visited[subPath] {
+								return nil
+							}
+							visited[subPath] = true
+							return handle(subPath)
+						})
+					}
 				}
-			}
-		} else {
-			if !info.IsDir() {
-				if !visited[path] {
-					visited[path] = true
-					files = append(files, path)
+			} else {
+				if info == nil || info.IsDir() {
+					return nil
 				}
+				if visited[path] {
+					return nil
+				}
+				visited[path] = true
+				return handle(path)
 			}
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+			return nil
+		})
 	}
 
-	// Run all handlers on the same file list (single mount)
+	// Run handlers with a re-walk per handler (avoids huge in-memory file list)
 	for i, handler := range handlers {
-		for _, file := range files {
-			if err := func() error {
-				return handler(mountPoint, file)
-			}(); err != nil {
-				return err
-			}
+		if err := walkFilesStreaming(func(file string) error {
+			return handler(mountPoint, file)
+		}); err != nil {
+			return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
 		}
-		// Let caller update UI/state between passes
 		if betweenHandlers != nil {
 			betweenHandlers(i)
 		}
@@ -283,12 +280,10 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		}()
 	}
 
-	var files []string
-	// Track visited to avoid loops/duplicates (symlinks)
+	// Stream file paths directly to handler to avoid huge in-memory file list
 	visited := make(map[string]bool)
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// Ignore permission errors
 			if os.IsPermission(err) {
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
@@ -296,15 +291,12 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 			log.Debugf("failed to walk mount %s: %v", path, err)
 			return nil
 		}
-		if info.Mode()&os.ModeSymlink != 0 { // follow symlinked dirs
-			// Resolve symlink target
+		if info.Mode()&os.ModeSymlink != 0 {
 			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-				// Stat target
 				info, err = os.Stat(linkPath)
 				if err != nil {
-					return err
+					return nil
 				}
-				// Recurse once per target
 				if info.IsDir() && !visited[linkPath] {
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
@@ -312,34 +304,30 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
-						// De-dupe discovered files via visited
-						if !visited[subPath] {
-							visited[subPath] = true
-							files = append(files, subPath)
+						if subInfo == nil || subInfo.IsDir() {
+							return nil
 						}
-						return nil
+						if visited[subPath] {
+							return nil
+						}
+						visited[subPath] = true
+						return handler(mountPoint, subPath)
 					})
 				}
 			}
 		} else {
-			if !info.IsDir() {
-				if !visited[path] {
-					visited[path] = true
-					files = append(files, path)
-				}
+			if info == nil || info.IsDir() {
+				return nil
 			}
+			if visited[path] {
+				return nil
+			}
+			visited[path] = true
+			return handler(mountPoint, path)
 		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
-	}
-
-	for _, file := range files {
-		if err := func() error {
-			return handler(mountPoint, file)
-		}(); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -410,28 +398,46 @@ func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.
 
 // ForEachMacho walks the folder and calls the handler for each macho file found
 func ForEachMacho(folder string, handler func(string, *macho.File) error) error {
-	var files []string
-	// Use a map to keep track of visited directories to avoid infinite loops
+	// Stream file paths directly instead of collecting them into memory
 	visited := make(map[string]bool)
-	if err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+
+	handleMacho := func(file string) error {
+		if ok, _ := magic.IsMachO(file); !ok {
+			return nil
+		}
+		var m *macho.File
+		// UNIVERSAL MACHO
+		if fat, err := macho.OpenFat(file); err == nil {
+			m = fat.Arches[len(fat.Arches)-1].File
+			defer fat.Close()
+		} else if errors.Is(err, macho.ErrNotFat) {
+			var err2 error
+			m, err2 = macho.Open(file)
+			if err2 != nil {
+				return nil
+			}
+			defer m.Close()
+		} else {
+			return nil
+		}
+		return handler(file, m)
+	}
+
+	return filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// Skip paths with permission errors gracefully
 			if os.IsPermission(err) {
 				log.Debugf("skipping path due to permission denied: %s", path)
 				return nil
 			}
-			log.Debugf("failed to walk mount %s: %v", path, err)
+			log.Debugf("failed to walk folder %s: %v", path, err)
 			return nil
 		}
-		if info.Mode()&os.ModeSymlink != 0 { // follow symlinks
-			// Resolve the symlink
+		if info.Mode()&os.ModeSymlink != 0 {
 			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-				// Get the info of the target file/directory
 				info, err = os.Stat(linkPath)
 				if err != nil {
-					return err
+					return nil
 				}
-				// If it's a directory and not visited, follow it
 				if info.IsDir() && !visited[linkPath] {
 					visited[linkPath] = true
 					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
@@ -439,49 +445,29 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 							log.WithError(subErr).Debug("failed to walk symlinked path")
 							return nil
 						}
-						files = append(files, subPath)
-						return nil
+						if subInfo == nil || subInfo.IsDir() {
+							return nil
+						}
+						if visited[subPath] {
+							return nil
+						}
+						visited[subPath] = true
+						return handleMacho(subPath)
 					})
 				}
 			}
 		} else {
-			if !info.IsDir() {
-				if !visited[path] {
-					visited[path] = true
-					files = append(files, path)
-				}
+			if info == nil || info.IsDir() {
+				return nil
 			}
+			if visited[path] {
+				return nil
+			}
+			visited[path] = true
+			return handleMacho(path)
 		}
 		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk files in dir %s: %v", folder, err)
-	}
-
-	for _, file := range files {
-		if ok, _ := magic.IsMachO(file); ok {
-			var m *macho.File
-			// UNIVERSAL MACHO
-			if fat, err := macho.OpenFat(file); err == nil {
-				defer fat.Close()
-				m = fat.Arches[len(fat.Arches)-1].File
-			} else { // SINGLE MACHO
-				if errors.Is(err, macho.ErrNotFat) {
-					m, err = macho.Open(file)
-					if err != nil {
-						return nil
-					}
-					defer m.Close()
-				} else { // NOT a macho file
-					return nil
-				}
-			}
-			if err := handler(file, m); err != nil {
-				return fmt.Errorf("failed to handle macho %s: %w", file, err)
-			}
-		}
-	}
-
-	return nil
+	})
 }
 
 // ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p firmware macho file found
