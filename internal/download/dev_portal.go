@@ -137,6 +137,8 @@ type credentials struct {
 	Password      string `json:"password,omitempty"`
 	DsPersonID    string `json:"directory_services_id,omitempty"`
 	PasswordToken string `json:"password_token,omitempty"`
+	Pod           string `json:"pod,omitempty"`
+	StoreFront    string `json:"store_front,omitempty"`
 }
 
 type session struct {
