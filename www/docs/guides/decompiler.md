@@ -132,6 +132,18 @@ ipsw macho disass binary --dec --dec-llm ollama --dec-model "qwen2.5:32b-instruc
 Local LLMs require significant computational resources. Smaller models (7B-13B) may produce lower quality results compared to cloud-based models.
 :::
 
+### LM Studio / vLLM / Other OpenAI-Compatible Servers
+
+Any server that exposes an **OpenAI-compatible API** (LM Studio, vLLM, text-generation-inference, LocalAI, etc.) can be used with the `openai` provider by setting the `OPENAI_BASE_URL` environment variable:
+
+```bash
+# Point the OpenAI provider at LM Studio (default port 1234)
+export OPENAI_BASE_URL="http://localhost:1234/v1"
+export OPENAI_API_KEY="lm-studio"  # LM Studio ignores this but the SDK requires it
+
+ipsw macho disass binary --dec --dec-llm openai --dec-model "my-local-model"
+```
+
 ### OpenRouter (Multi-Provider Access)
 
 ```bash
@@ -330,6 +342,30 @@ ipsw macho disass kernelcache.* --symbol "_panic" --dec --dec-llm copilot
 # 2. Analyze specific iOS framework function
 ipsw dsc extract dyld_shared_cache_arm64e --dylib Foundation
 ipsw macho disass Foundation --symbol "NSStringFromClass" --dec --dec-lang "Objective-C"
+```
+
+## Custom Endpoints
+
+Since ipsw uses official provider SDKs, you can override the default API endpoint for each provider using environment variables. This is useful for proxies, self-hosted instances, or API-compatible servers.
+
+| Provider | Environment Variable | Default |
+|----------|---------------------|---------|
+| OpenAI | `OPENAI_BASE_URL` | `https://api.openai.com/v1` |
+| Anthropic | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` |
+| Ollama | `OLLAMA_HOST` | `http://localhost:11434` |
+
+```bash
+# Example: Ollama running on a remote machine
+export OLLAMA_HOST="http://192.168.1.100:11434"
+ipsw macho disass binary --dec --dec-llm ollama --dec-model "qwen2.5:32b-instruct"
+
+# Example: OpenAI-compatible proxy or gateway
+export OPENAI_BASE_URL="https://my-proxy.example.com/v1"
+ipsw macho disass binary --dec --dec-llm openai
+
+# Example: Self-hosted Anthropic-compatible endpoint
+export ANTHROPIC_BASE_URL="https://my-gateway.example.com"
+ipsw macho disass binary --dec --dec-llm anthropic
 ```
 
 ## 🔍 Troubleshooting
