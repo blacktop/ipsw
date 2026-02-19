@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  styled-components: 6.1.17
+
 importers:
 
   .:
@@ -5671,7 +5674,7 @@ packages:
       mobx: ^6.0.4
       react: ^16.8.4 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.4 || ^17.0.0 || ^18.0.0 || ^19.0.0
-      styled-components: ^4.1.1 || ^5.1.1 || ^6.0.5
+      styled-components: 6.1.17
 
   redocusaurus@2.5.0:
     resolution: {integrity: sha512-QWJX2hgnEfSDb7fZzS4iZe6aqdAvm/XLCsNv6RkgDw6Pl/lsTZKipP2n1r5QS1CC5hY8eAwsjVXeF7B03vkz2g==}
