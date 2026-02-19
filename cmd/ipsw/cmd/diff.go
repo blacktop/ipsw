@@ -47,6 +47,7 @@ func init() {
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
 	diffCmd.Flags().Bool("starts", false, "Diff MachO function starts")
 	diffCmd.Flags().Bool("ent", false, "Diff MachO entitlements")
+	diffCmd.Flags().Bool("low-memory", false, "Use disk caching to reduce RAM usage")
 	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
 	diffCmd.Flags().StringP("signatures", "s", "", "Path to symbolicator signatures folder")
@@ -66,6 +67,7 @@ func init() {
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
 	viper.BindPFlag("diff.starts", diffCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("diff.ent", diffCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("diff.low-memory", diffCmd.Flags().Lookup("low-memory"))
 	viper.BindPFlag("diff.files", diffCmd.Flags().Lookup("files"))
 	viper.BindPFlag("diff.allow-list", diffCmd.Flags().Lookup("allow-list"))
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
@@ -114,6 +116,7 @@ var diffCmd = &cobra.Command{
 			Signatures:   viper.GetString("diff.signatures"),
 			Output:       viper.GetString("diff.output"),
 			Verbose:      Verbose,
+			LowMemory:    viper.GetBool("diff.low-memory"),
 		})
 		if err := d.Diff(); err != nil {
 			return err
