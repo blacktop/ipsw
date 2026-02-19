@@ -39,7 +39,7 @@ ipsw diff <IPSW> <IPSW> [flags]
       --json                 Save diff as JSON file
   -k, --kdk stringArray      Path to KDKs to diff
       --launchd              Diff launchd configs
-      --low-memory           Use disk caching to reduce RAM usage (slower, for low memory machines)
+      --low-memory           Use disk caching to reduce RAM usage
   -m, --markdown             Save diff as Markdown file
   -o, --output string        Folder to save diff output
   -s, --signatures string    Path to symbolicator signatures folder
