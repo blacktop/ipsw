@@ -302,7 +302,7 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, error) {
 			continue
 		}
 
-		if strings.Contains(instruction.Encoding.String(), "loadlit") {
+		if disass.IsLoadLiteral(instruction) {
 			migE = uint64(instruction.Operands[1].Immediate)
 			break
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&

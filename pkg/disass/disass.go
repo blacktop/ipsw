@@ -152,6 +152,34 @@ type Triage struct {
 	Locations map[uint64][]uint64
 }
 
+// IsBranchOp returns true if the operation is a branch with a PC-relative target
+func IsBranchOp(op disassemble.Operation) bool {
+	switch op {
+	case disassemble.ARM64_B, disassemble.ARM64_BL,
+		disassemble.ARM64_CBZ, disassemble.ARM64_CBNZ,
+		disassemble.ARM64_TBZ, disassemble.ARM64_TBNZ,
+		disassemble.ARM64_B_EQ, disassemble.ARM64_B_NE,
+		disassemble.ARM64_B_CS, disassemble.ARM64_B_CC,
+		disassemble.ARM64_B_MI, disassemble.ARM64_B_PL,
+		disassemble.ARM64_B_VS, disassemble.ARM64_B_VC,
+		disassemble.ARM64_B_HI, disassemble.ARM64_B_LS,
+		disassemble.ARM64_B_GE, disassemble.ARM64_B_LT,
+		disassemble.ARM64_B_GT, disassemble.ARM64_B_LE,
+		disassemble.ARM64_B_AL, disassemble.ARM64_B_NV:
+		return true
+	}
+	return false
+}
+
+// IsLoadLiteral returns true if the instruction is a PC-relative literal load
+func IsLoadLiteral(instr *disassemble.Instruction) bool {
+	switch instr.Operation {
+	case disassemble.ARM64_LDR, disassemble.ARM64_LDRSW, disassemble.ARM64_PRFM:
+		return len(instr.Operands) > 1 && instr.Operands[1].Class == disassemble.LABEL
+	}
+	return false
+}
+
 const maxCStringCommentLen = 200
 
 func cstringComment(d Disass, addr uint64) string {
@@ -364,13 +392,13 @@ func Disassemble(d Disass) string {
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, display)
 						comment = appendComment(comment, cstringComment(d, target))
 					}
-				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
+				} else if IsLoadLiteral(instruction) {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
 						display := symbols.FormatSymbol(name, d.Demangle())
 						comment = fmt.Sprintf(" ; %s", display)
 						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[1].Immediate)))
 					}
-				} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
+				} else if instruction.Operation == disassemble.ARM64_CBZ || instruction.Operation == disassemble.ARM64_CBNZ {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
 						display := symbols.FormatSymbol(name, d.Demangle())
 						comment = fmt.Sprintf(" ; %s", display)
@@ -651,7 +679,7 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 			}
 		} else if (queue[1] != nil && queue[1].Operation == disassemble.ARM64_ADRP) &&
 			(queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
-			strings.Contains(instruction.Encoding.String(), "branch") {
+			IsBranchOp(instruction.Operation) || instruction.Operation == disassemble.ARM64_BR {
 			// adrp     x16, 0x19089b000
 			adrpRegister := queue[1].Operands[0].Registers[0] // x16
 			adrpImm = queue[1].Operands[1].Immediate          // #0x221baf000

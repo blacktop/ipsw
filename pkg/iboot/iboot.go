@@ -12,6 +12,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/lzfse-cgo"
 )
 
@@ -171,7 +172,7 @@ func getBaseAddress(r *bytes.Reader) (uint64, error) {
 			return 0, fmt.Errorf("failed to decompose instruction @ %#x: %v", startAddr, err)
 		}
 
-		if strings.Contains(instruction.Encoding.String(), "loadlit") {
+		if disass.IsLoadLiteral(instruction) {
 			if _, err := r.Seek(int64(instruction.Operands[1].Immediate), io.SeekStart); err != nil {
 				return 0, fmt.Errorf("failed to seek to base address: %v", err)
 			}

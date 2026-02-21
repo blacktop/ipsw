@@ -93,13 +93,13 @@ func (d *MachoDisass) Triage() error {
 			continue
 		}
 
-		if strings.Contains(instruction.Encoding.String(), "branch") {
+		if IsBranchOp(instruction.Operation) {
 			for _, op := range instruction.Operands {
 				if op.Class == disassemble.LABEL {
 					d.tr.Addresses[instruction.Address] = uint64(op.Immediate)
 				}
 			}
-		} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
+		} else if IsLoadLiteral(instruction) {
 			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD ||
