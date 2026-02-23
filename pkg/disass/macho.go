@@ -106,22 +106,29 @@ func (d *MachoDisass) Triage() error {
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW) {
-			// Ensure operands have registers before accessing
-			if len(prevInstr.Operands[0].Registers) == 0 {
+			adrpRegister, ok := operandRegister(prevInstr, 0)
+			if !ok {
 				prevInstr = instruction
 				startAddr += uint64(binary.Size(uint32(0)))
 				continue
 			}
-			adrpRegister := prevInstr.Operands[0].Registers[0]
-			adrpImm := prevInstr.Operands[1].Immediate
-			if instruction.Operation == disassemble.ARM64_LDR && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRB && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_ADD && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[2].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRSW && len(instruction.Operands[1].Registers) > 0 && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
+			adrpImm, ok := operandImmediate(prevInstr, 1)
+			if !ok {
+				prevInstr = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
+			}
+			if srcRegister, ok := operandRegister(instruction, 1); ok && adrpRegister == srcRegister {
+				switch instruction.Operation {
+				case disassemble.ARM64_LDR, disassemble.ARM64_LDRB, disassemble.ARM64_LDRSW:
+					if imm, ok := operandImmediate(instruction, 1); ok {
+						adrpImm += imm
+					}
+				case disassemble.ARM64_ADD:
+					if imm, ok := operandImmediate(instruction, 2); ok {
+						adrpImm += imm
+					}
+				}
 			}
 			d.tr.Addresses[instruction.Address] = adrpImm
 		}
@@ -207,27 +214,37 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 		}
 
 		if instruction.Operation == disassemble.ARM64_MOV {
-			if reg == disassemble.REG_NONE {
-				strAddr = instruction.Address
-				reg = instruction.Operands[0].Registers[0]
-				regVal = instruction.Operands[1].Immediate
-			} else {
-				if regVal > 0 {
-					next = instruction.Operands[0].Registers[0]
-					nextVal = instruction.Operands[1].Immediate
-				} else {
-					strAddr = instruction.Address
-					reg = instruction.Operands[0].Registers[0]
-					regVal = instruction.Operands[1].Immediate
+			if dstRegister, ok := operandRegister(instruction, 0); ok {
+				if imm, ok := operandImmediate(instruction, 1); ok {
+					if reg == disassemble.REG_NONE {
+						strAddr = instruction.Address
+						reg = dstRegister
+						regVal = imm
+					} else {
+						if regVal > 0 {
+							next = dstRegister
+							nextVal = imm
+						} else {
+							strAddr = instruction.Address
+							reg = dstRegister
+							regVal = imm
+						}
+					}
 				}
 			}
 		} else if prevInstr != nil &&
 			((prevInstr.Operation == disassemble.ARM64_MOV && instruction.Operation == disassemble.ARM64_MOVK) ||
 				(prevInstr.Operation == disassemble.ARM64_MOVK && instruction.Operation == disassemble.ARM64_MOVK)) {
-			if reg == instruction.Operands[0].Registers[0] {
-				regVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
-			} else if next == instruction.Operands[0].Registers[0] {
-				nextVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
+			if dstRegister, ok := operandRegister(instruction, 0); ok {
+				if imm, ok := operandImmediate(instruction, 1); ok {
+					if shift, ok := operandShiftValue(instruction, 1); ok {
+						if reg == dstRegister {
+							regVal += imm << shift
+						} else if next == dstRegister {
+							nextVal += imm << shift
+						}
+					}
+				}
 			}
 		} else {
 			if regVal > 0 && nextVal > 0 {

@@ -124,6 +124,20 @@ func (d DyldDisass) IsPointer(imm uint64) (bool, *disass.AddrDetails) {
 	return false, nil
 }
 
+func operandRegister(instr *disassemble.Instruction, idx int) (disassemble.Register, bool) {
+	if instr == nil || len(instr.Operands) <= idx || len(instr.Operands[idx].Registers) == 0 {
+		return disassemble.REG_NONE, false
+	}
+	return instr.Operands[idx].Registers[0], true
+}
+
+func operandImmediate(instr *disassemble.Instruction, idx int) (uint64, bool) {
+	if instr == nil || len(instr.Operands) <= idx {
+		return 0, false
+	}
+	return instr.Operands[idx].Immediate, true
+}
+
 // Triage walks a function and analyzes all immediates
 func (d *DyldDisass) Triage() error {
 	var instrValue uint32
@@ -171,27 +185,44 @@ func (d *DyldDisass) Triage() error {
 				}
 			}
 		} else if disass.IsLoadLiteral(instruction) {
-			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
+			if imm, ok := operandImmediate(instruction, 1); ok {
+				d.tr.Addresses[instruction.Address] = imm
+			}
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD ||
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW ||
 				instruction.Operation == disassemble.ARM64_STRB) {
-			adrpRegister := prevInstr.Operands[0].Registers[0]
-			adrpImm := prevInstr.Operands[1].Immediate
-			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[2].Immediate
-			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_STRB && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
+			adrpRegister, ok := operandRegister(prevInstr, 0)
+			if ok {
+				adrpImm, ok := operandImmediate(prevInstr, 1)
+				if ok {
+					srcRegister, ok := operandRegister(instruction, 1)
+					if ok {
+						validPattern := true
+						if adrpRegister == srcRegister {
+							switch instruction.Operation {
+							case disassemble.ARM64_LDR, disassemble.ARM64_LDRB, disassemble.ARM64_LDRSW, disassemble.ARM64_STRB:
+								if imm, ok := operandImmediate(instruction, 1); ok {
+									adrpImm += imm
+								} else {
+									validPattern = false
+								}
+							case disassemble.ARM64_ADD:
+								if imm, ok := operandImmediate(instruction, 2); ok {
+									adrpImm += imm
+								} else {
+									validPattern = false
+								}
+							}
+						}
+						if validPattern {
+							d.tr.Addresses[instruction.Address] = adrpImm
+						}
+					}
+				}
 			}
-			d.tr.Addresses[instruction.Address] = adrpImm
 		}
 
 		// lookup adrp/ldr or add address as a cstring or symbol name
