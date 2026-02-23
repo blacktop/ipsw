@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -382,11 +381,8 @@ func NewDevPortal(config *DevConfig) *DevPortal {
 
 	dp := DevPortal{
 		Client: &http.Client{
-			Jar: jar,
-			Transport: &http.Transport{
-				Proxy:           GetProxy(config.Proxy),
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
-			},
+			Jar:       jar,
+			Transport: newAppleHTTPTransport(config.Proxy, config.Insecure),
 		},
 		config: config,
 	}
