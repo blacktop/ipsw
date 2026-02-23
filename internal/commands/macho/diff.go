@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -19,13 +20,45 @@ import (
 	"github.com/blacktop/ipsw/pkg/signature"
 )
 
+var xbsTemporaryBuildPathRE = regexp.MustCompile(`^/Library/Caches/com\.apple\.xbs/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/TemporaryDirectory\.[^/\s]+`)
+
+const xbsTemporaryBuildPathPlaceholder = "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>"
+
+func normalizeCStringForDiff(value string) string {
+	return xbsTemporaryBuildPathRE.ReplaceAllString(value, xbsTemporaryBuildPathPlaceholder)
+}
+
+func normalizeCStringsForDiff(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, len(values))
+	for idx, value := range values {
+		normalized[idx] = normalizeCStringForDiff(value)
+	}
+	return normalized
+}
+
+func diffNormalizedCStrings(oldValues, newValues []string) ([]string, []string) {
+	normalizedOldValues := normalizeCStringsForDiff(oldValues)
+	normalizedNewValues := normalizeCStringsForDiff(newValues)
+
+	added := utils.Difference(normalizedNewValues, normalizedOldValues)
+	sort.Strings(added)
+	removed := utils.Difference(normalizedOldValues, normalizedNewValues)
+	sort.Strings(removed)
+
+	return added, removed
+}
+
 type cachedDiffInfo struct {
 	Info *DiffInfo
 }
 
 func cacheFileForKey(cacheDir, key string) string {
 	sum := sha256.Sum256([]byte(key))
-	return filepath.Join(cacheDir, hex.EncodeToString(sum[:]) + ".gob")
+	return filepath.Join(cacheDir, hex.EncodeToString(sum[:])+".gob")
 }
 
 func writeCachedDiffInfo(cacheDir, key string, info *DiffInfo) error {
@@ -152,7 +185,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					if i+seekAhead < n1 {
 						matches := 0
 						for k := 1; k <= seekAhead && i+k < n1; k++ {
-							if (funcs1[i+k].EndAddr-funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr-funcs2[i+k].StartAddr) {
+							if (funcs1[i+k].EndAddr - funcs1[i+k].StartAddr) == (funcs2[i+k].EndAddr - funcs2[i+k].StartAddr) {
 								matches++
 								if matches >= 3 {
 									recovered = true
@@ -195,7 +228,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					continue
 				}
 
-				if (f1.EndAddr-f1.StartAddr) == (f2.EndAddr-f2.StartAddr) {
+				if (f1.EndAddr - f1.StartAddr) == (f2.EndAddr - f2.StartAddr) {
 					i++
 					j++
 					consecutiveNoise = 0
@@ -228,10 +261,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 
 	// CStrings
 	if conf.CStrings {
-		newStrs := utils.Difference(newInfo.CStrings, oldInfo.CStrings)
-		sort.Strings(newStrs)
-		rmStrs := utils.Difference(oldInfo.CStrings, newInfo.CStrings)
-		sort.Strings(rmStrs)
+		newStrs, rmStrs := diffNormalizedCStrings(oldInfo.CStrings, newInfo.CStrings)
 		if len(newStrs) > 0 || len(rmStrs) > 0 {
 			b.WriteString("CStrings:\n")
 			for _, s := range newStrs {
