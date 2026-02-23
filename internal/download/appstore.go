@@ -5,8 +5,6 @@ package download
 import (
 	"archive/zip"
 	"bytes"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -440,26 +438,6 @@ func (as *AppStore) appStoreSessionCookies() []*http.Cookie {
 	return cookies
 }
 
-func newAppStoreTransport(config *AppStoreConfig) *http.Transport {
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: config.Insecure,
-	}
-
-	if !config.Insecure {
-		pool, err := x509.SystemCertPool()
-		if err != nil {
-			log.WithError(err).Debug("Failed to load system cert pool; falling back to default TLS trust")
-		} else if pool != nil {
-			tlsConfig.RootCAs = pool
-		}
-	}
-
-	return &http.Transport{
-		Proxy:           GetProxy(config.Proxy),
-		TLSClientConfig: tlsConfig,
-	}
-}
-
 // NewAppStore returns a AppStore instance
 func NewAppStore(config *AppStoreConfig) *AppStore {
 	jar, _ := cookiejar.New(nil)
@@ -473,7 +451,7 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 				return nil
 			},
 			Jar:       jar,
-			Transport: newAppStoreTransport(config),
+			Transport: newAppleHTTPTransport(config.Proxy, config.Insecure),
 		},
 		config: config,
 	}
