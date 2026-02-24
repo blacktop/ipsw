@@ -912,12 +912,16 @@ func FcsKeys(c *Config) ([]string, error) {
 		if c.JSON {
 			// check if json file exists
 			if _, err := os.Stat(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")); !os.IsNotExist(err) {
-				data, err := os.ReadFile(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json"))
+				existingPath := filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")
+				data, err := os.ReadFile(existingPath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
 				}
-				if err := json.Unmarshal(data, &kmap); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal fcs-keys: %v", err)
+				existingKeys := make(map[string]aea.PrivateKey)
+				if err := json.Unmarshal(data, &existingKeys); err != nil {
+					log.WithError(err).Warnf("failed to parse existing fcs-keys JSON '%s'; rebuilding file", existingPath)
+				} else {
+					maps.Copy(kmap, existingKeys)
 				}
 			}
 			maps.Copy(kmap, pkmap)

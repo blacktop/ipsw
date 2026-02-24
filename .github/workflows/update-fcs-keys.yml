@@ -26,17 +26,39 @@ jobs:
       - name: Get all latest builds
         id: get-builds
         run: |
+          set -euo pipefail
           echo "Getting all latest build numbers..."
 
-          # Get stable builds
-          STABLE_IOS=$(./ipsw download ota --platform ios --show-latest-build --device iPhone16,2 --insecure 2>/dev/null || echo "")
-          STABLE_MACOS=$(./ipsw download ota --platform macos --show-latest-build --device Mac14,7 --insecure 2>/dev/null || echo "")
-          STABLE_VISIONOS=$(./ipsw download ota --platform visionOS --show-latest-build --device RealityDevice14,1 --insecure 2>/dev/null || echo "")
+          get_latest_build() {
+            platform="$1"
+            device="$2"
+            track="$3"
+            if [ "$track" = "beta" ]; then
+              build=$(./ipsw download ota --platform "$platform" --beta --show-latest-build --device "$device" --insecure)
+            else
+              build=$(./ipsw download ota --platform "$platform" --show-latest-build --device "$device" --insecure)
+            fi
+            build=$(printf '%s' "$build" | tr -d '\r\n')
+            if [ -z "$build" ]; then
+              echo "::error::No build returned for platform=$platform device=$device track=$track" >&2
+              exit 1
+            fi
+            if ! printf '%s' "$build" | grep -Eq '^[0-9A-Za-z]+$'; then
+              echo "::error::Invalid build identifier '$build' for platform=$platform device=$device track=$track" >&2
+              exit 1
+            fi
+            printf '%s' "$build"
+          }
+
+          # Get stable builds (use same probe devices as Makefile defaults)
+          STABLE_IOS=$(get_latest_build ios iPhone17,1 stable)
+          STABLE_MACOS=$(get_latest_build macos Mac14,7 stable)
+          STABLE_VISIONOS=$(get_latest_build visionos RealityDevice14,1 stable)
 
           # Get beta builds
-          BETA_IOS=$(./ipsw download ota --platform ios --beta --show-latest-build --device iPhone16,2 --insecure 2>/dev/null || echo "")
-          BETA_MACOS=$(./ipsw download ota --platform macos --beta --show-latest-build --device Mac14,7 --insecure 2>/dev/null || echo "")
-          BETA_VISIONOS=$(./ipsw download ota --platform visionOS --beta --show-latest-build --device RealityDevice14,1 --insecure 2>/dev/null || echo "")
+          BETA_IOS=$(get_latest_build ios iPhone17,1 beta)
+          BETA_MACOS=$(get_latest_build macos Mac14,7 beta)
+          BETA_VISIONOS=$(get_latest_build visionos RealityDevice14,1 beta)
 
           # RC builds use same endpoint as stable for now
           RC_IOS="$STABLE_IOS"
@@ -72,6 +94,14 @@ jobs:
       - name: Check for new builds
         id: check-builds
         run: |
+          set -euo pipefail
+          [ -n "${{ steps.get-builds.outputs.stable_ios }}" ] || { echo "::error::stable_ios output is empty" >&2; exit 1; }
+          [ -n "${{ steps.get-builds.outputs.stable_macos }}" ] || { echo "::error::stable_macos output is empty" >&2; exit 1; }
+          [ -n "${{ steps.get-builds.outputs.stable_visionos }}" ] || { echo "::error::stable_visionos output is empty" >&2; exit 1; }
+          [ -n "${{ steps.get-builds.outputs.beta_ios }}" ] || { echo "::error::beta_ios output is empty" >&2; exit 1; }
+          [ -n "${{ steps.get-builds.outputs.beta_macos }}" ] || { echo "::error::beta_macos output is empty" >&2; exit 1; }
+          [ -n "${{ steps.get-builds.outputs.beta_visionos }}" ] || { echo "::error::beta_visionos output is empty" >&2; exit 1; }
+
           # Get cached fingerprints from the nested FcsKeys structure
           LAST_STABLE=$(jq -r '.fcs_keys_stable.fcs_keys.release.fingerprint // ""' hack/.watch_cache)
           LAST_RC=$(jq -r '.fcs_keys_rc.fcs_keys.rc.fingerprint // ""' hack/.watch_cache)
@@ -130,6 +160,7 @@ jobs:
       - name: Check for changes and commit
         if: steps.check-builds.outputs.update_any == 'true'
         run: |
+          set -euo pipefail
           # Debug: Show file timestamps and git status
           echo "=== File timestamps ==="
           ls -la pkg/aea/data/fcs-keys*
@@ -217,6 +248,8 @@ jobs:
           # Also sort the main FCS keys JSON file before commit (if it exists)
           if [ -f pkg/aea/data/fcs-keys.json ]; then
             jq --sort-keys . pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.json.tmp && mv pkg/aea/data/fcs-keys.json.tmp pkg/aea/data/fcs-keys.json
+            jq -e 'type == "object" and length > 0' pkg/aea/data/fcs-keys.json >/dev/null
+            gzip -cn pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.gz
           fi
 
           # Configure git

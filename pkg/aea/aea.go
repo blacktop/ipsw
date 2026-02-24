@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 )
 
@@ -35,7 +37,7 @@ type fcsResponse struct {
 type Keys map[string][]byte
 
 func getKeys() (Keys, error) {
-	var keys Keys
+	keys := make(Keys)
 
 	zr, err := gzip.NewReader(bytes.NewReader(keyData))
 	if err != nil {
@@ -44,10 +46,30 @@ func getKeys() (Keys, error) {
 	defer zr.Close()
 
 	if err := json.NewDecoder(zr).Decode(&keys); err != nil {
-		return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return make(Keys), nil
+		}
+		return nil, fmt.Errorf("failed unmarshaling fcs-keys data: %w", err)
 	}
 
 	return keys, nil
+}
+
+func keyNameFromURL(privKeyURL []byte) (string, error) {
+	u, err := url.Parse(string(privKeyURL))
+	if err != nil {
+		return "", err
+	}
+	return path.Base(u.Path), nil
+}
+
+func lookupPrivateKey(keys Keys, keyName string) (string, PrivateKey, bool) {
+	for k, v := range keys {
+		if strings.EqualFold(k, keyName) {
+			return k, PrivateKey(v), true
+		}
+	}
+	return "", nil, false
 }
 
 type PrivateKey []byte
@@ -82,40 +104,44 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool, p
 	if !ok {
 		return nil, fmt.Errorf("fcs-key-url key NOT found")
 	}
+	keyName, err := keyNameFromURL(privKeyURL)
+	if err != nil {
+		return nil, err
+	}
 
 	if !skipEmbedded {
 		// check if keys are already loaded
 		if keys, err := getKeys(); err == nil {
-			u, err := url.Parse(string(privKeyURL))
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range keys {
-				if strings.EqualFold(k, path.Base(u.Path)) {
-					out[k] = PrivateKey(v)
+			if len(keys) == 0 {
+				log.Warn("embedded FCS keys DB is empty; falling back to PEM DB/online lookup")
+			} else {
+				if matchedKey, pk, found := lookupPrivateKey(keys, keyName); found {
+					out[matchedKey] = pk
 					return out, nil
 				}
 			}
+		} else {
+			log.WithError(err).Warn("failed to parse embedded FCS keys DB; falling back to PEM DB/online lookup")
 		}
 	}
 
 	if pemDB != "" {
 		pemData, err := os.ReadFile(pemDB)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read pem DB JSON '%s': %w", pemDB, err)
-		}
-		var keys Keys
-		if err := json.NewDecoder(bytes.NewReader(pemData)).Decode(&keys); err != nil {
-			return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
-		}
-		u, err := url.Parse(string(privKeyURL))
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range keys {
-			if strings.EqualFold(k, path.Base(u.Path)) {
-				out[k] = PrivateKey(v)
-				return out, nil
+			log.WithError(err).Warnf("failed to read PEM DB JSON '%s'; falling back to online lookup", pemDB)
+		} else {
+			var keys Keys
+			if err := json.NewDecoder(bytes.NewReader(pemData)).Decode(&keys); err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					log.Warnf("PEM DB JSON '%s' is empty/corrupt; falling back to online lookup", pemDB)
+				} else {
+					log.WithError(err).Warnf("failed to parse PEM DB JSON '%s'; falling back to online lookup", pemDB)
+				}
+			} else {
+				if matchedKey, pk, found := lookupPrivateKey(keys, keyName); found {
+					out[matchedKey] = pk
+					return out, nil
+				}
 			}
 		}
 	}
@@ -145,11 +171,7 @@ func (md Metadata) GetPrivateKey(data []byte, pemDB string, skipEmbedded bool, p
 		return nil, err
 	}
 
-	u, err := url.Parse(string(privKeyURL))
-	if err != nil {
-		return nil, err
-	}
-	out[path.Base(u.Path)] = PrivateKey(privKey)
+	out[keyName] = PrivateKey(privKey)
 
 	return out, nil
 }
