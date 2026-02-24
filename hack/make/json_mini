@@ -1,11 +1,33 @@
 #!/bin/sh
-set -e
+set -eu
 
-find ./pkg ./internal/download -type f -name '*.json' | while read -r item; do
+find ./pkg ./internal/download -type f -name '*.json' | while IFS= read -r item; do
   printf "Minimizing JSON: %s\n" "$item"
-  tmpfile="/tmp/$(basename -- "$item")"
-  cp "$item" "$tmpfile"
-  jq -c --sort-keys < "$tmpfile" > "$item"
-  rm "$tmpfile"
-  gzip -cn "$item" > "$(dirname "$item")/$(basename -- "$item" .json).gz"
+
+  item_dir="$(dirname "$item")"
+  item_base="$(basename -- "$item" .json)"
+  tmp_json="$(mktemp "$item_dir/$item_base.json.tmp.XXXXXX")"
+  tmp_gz="$(mktemp "$item_dir/$item_base.gz.tmp.XXXXXX")"
+  out_gz="$item_dir/$item_base.gz"
+  fail() {
+    echo "ERROR: $1" >&2
+    rm -f "$tmp_json" "$tmp_gz"
+    exit 1
+  }
+
+  # NOTE: jq returns success for empty input and writes no bytes; explicitly reject that.
+  if ! jq -c --sort-keys . "$item" >"$tmp_json"; then
+    fail "failed to parse JSON: $item"
+  fi
+
+  if [ ! -s "$tmp_json" ]; then
+    fail "minimized JSON is empty for $item"
+  fi
+
+  if ! gzip -cn "$tmp_json" >"$tmp_gz"; then
+    fail "failed to gzip JSON: $item"
+  fi
+
+  mv "$tmp_json" "$item"
+  mv "$tmp_gz" "$out_gz"
 done

@@ -125,16 +125,22 @@ update_fcs_keys_rc: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: FSC_FLAGS=--beta --latest ## Scrape the iPhoneWiki for AES keys
 update_fcs_keys_beta: update_fcs_keys ## Scrape the iPhoneWiki for AES keys
 
-FCS_IOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device iPhone17,1 --platform iOS)
-FCS_MOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device Mac14,7 --platform macOS)
-FCS_VOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device RealityDevice14,1 --platform visionOS)
+FCS_IOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device iPhone17,1 --platform ios)
+FCS_MOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device Mac14,7 --platform macos)
+FCS_VOS_BUILD ?= $(shell go run ./cmd/ipsw dl ota --show-latest-build --device RealityDevice14,1 --platform visionos)
 
 .PHONY: update_fcs_keys_release
 update_fcs_keys_release: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating fcs-keys.json"
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --build $(FCS_IOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --build $(FCS_MOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
-	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --build $(FCS_VOS_BUILD) --fcs-keys-json --output pkg/aea/data/ --confirm
+	@test -n "$(strip $(FCS_IOS_BUILD))" || (echo "ERROR: FCS_IOS_BUILD is empty" >&2; exit 1)
+	@test -n "$(strip $(FCS_MOS_BUILD))" || (echo "ERROR: FCS_MOS_BUILD is empty" >&2; exit 1)
+	@test -n "$(strip $(FCS_VOS_BUILD))" || (echo "ERROR: FCS_VOS_BUILD is empty" >&2; exit 1)
+	@printf '%s' "$(FCS_IOS_BUILD)" | grep -Eq '^[0-9A-Za-z]+$$' || (echo "ERROR: FCS_IOS_BUILD is not a valid build ID: $(FCS_IOS_BUILD)" >&2; exit 1)
+	@printf '%s' "$(FCS_MOS_BUILD)" | grep -Eq '^[0-9A-Za-z]+$$' || (echo "ERROR: FCS_MOS_BUILD is not a valid build ID: $(FCS_MOS_BUILD)" >&2; exit 1)
+	@printf '%s' "$(FCS_VOS_BUILD)" | grep -Eq '^[0-9A-Za-z]+$$' || (echo "ERROR: FCS_VOS_BUILD is not a valid build ID: $(FCS_VOS_BUILD)" >&2; exit 1)
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os iOS --build "$(FCS_IOS_BUILD)" --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os macOS --build "$(FCS_MOS_BUILD)" --fcs-keys-json --output pkg/aea/data/ --confirm
+	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --build "$(FCS_VOS_BUILD)" --fcs-keys-json --output pkg/aea/data/ --confirm
 	@hack/make/json_mini
 
 .PHONY: update_keys
