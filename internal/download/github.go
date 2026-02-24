@@ -576,7 +576,7 @@ func GetGithubCommits(org, repo, branch, file, pattern string, days int, proxy s
 			break
 		}
 
-		variables["endCursor"] = githubv4.NewString(q.Repository.Ref.Target.Commit.History.PageInfo.EndCursor)
+		variables["endCursor"] = new(q.Repository.Ref.Target.Commit.History.PageInfo.EndCursor)
 	}
 
 	return commits, nil
@@ -834,7 +834,7 @@ func WebKitGraphQLTags(proxy string, insecure bool, apikey string) ([]GithubTag,
 		if !q.Repository.Refs.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = githubv4.NewString(q.Repository.Refs.PageInfo.EndCursor)
+		variables["endCursor"] = new(q.Repository.Refs.PageInfo.EndCursor)
 	}
 
 	return tags, nil
