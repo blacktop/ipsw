@@ -123,8 +123,8 @@ func (c *Gemini) Chat() (string, error) {
 	chat, err := c.cli.Chats.Create(c.ctx,
 		c.models[c.conf.Model],
 		&genai.GenerateContentConfig{
-			Temperature: genai.Ptr(float32(c.conf.Temperature)),
-			TopP:        genai.Ptr(float32(c.conf.TopP)),
+			Temperature: new(float32(c.conf.Temperature)),
+			TopP:        new(float32(c.conf.TopP)),
 		},
 		nil, // history
 	)
