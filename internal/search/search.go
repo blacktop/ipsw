@@ -205,7 +205,7 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 		if err := walkFilesStreaming(func(file string) error {
 			return handler(mountPoint, file)
 		}); err != nil {
-			return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+			return fmt.Errorf("failed to walk files in dir %s: %w", mountPoint, err)
 		}
 		if betweenHandlers != nil {
 			betweenHandlers(i)
@@ -327,7 +327,7 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+		return fmt.Errorf("failed to walk files in dir %s: %w", mountPoint, err)
 	}
 
 	return nil
@@ -507,7 +507,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 				if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
 					name := "agx_" + filepath.Base(string(entry.Tag[:]))
 					if err := handler(name, m); err != nil {
-						return fmt.Errorf("failed to handle macho %s: %v", name, err)
+						return fmt.Errorf("failed to handle macho %s: %w", name, err)
 					}
 				}
 			}
@@ -528,7 +528,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			for _, f := range out {
 				if m, err := macho.Open(f); err == nil {
 					if err := handler("exclave_"+filepath.Base(f), m); err != nil {
-						return fmt.Errorf("failed to handle macho %s: %v", f, err)
+						return fmt.Errorf("failed to handle macho %s: %w", f, err)
 					}
 					m.Close()
 				}
@@ -544,7 +544,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			}
 			if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
 				if err := handler(filepath.Base(im4pFile), m); err != nil {
-					return fmt.Errorf("failed to handle macho %s: %v", im4pFile, err)
+					return fmt.Errorf("failed to handle macho %s: %w", im4pFile, err)
 				}
 				m.Close()
 			} else {
