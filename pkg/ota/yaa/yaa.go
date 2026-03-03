@@ -273,6 +273,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 					return nil, fmt.Errorf("failed to read FLG1 field: %w", err)
 				}
 				entry.Flag = uint32(flag)
+			case '2':
+				var flag uint16
+				if err := binary.Read(r, binary.LittleEndian, &flag); err != nil {
+					return nil, fmt.Errorf("failed to read FLG2 field: %w", err)
+				}
+				entry.Flag = uint32(flag)
 			case '4':
 				if err := binary.Read(r, binary.LittleEndian, &entry.Flag); err != nil {
 					return nil, fmt.Errorf("failed to read FLG4 field: %w", err)
