@@ -224,7 +224,7 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(filepath.Base(f.Name())) {
+					if re.MatchString(f.Name()) {
 						utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", filepath.Base(f.Name())))
 						bomFound = true
 					}
