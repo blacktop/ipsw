@@ -24,6 +24,7 @@ package ota
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,6 +42,73 @@ import (
 )
 
 var validCryptexes = []string{"app", "system"}
+
+func matchesPostBOMPattern(re *regexp.Regexp, name string) bool {
+	// Preserve compatibility with basename-anchored patterns while also
+	// supporting full-path matches.
+	return re.MatchString(name) || re.MatchString(filepath.Base(name))
+}
+
+func outputPathForExtraction(outputDir, name string, flat bool) string {
+	if flat {
+		return filepath.Join(outputDir, filepath.Base(name))
+	}
+	return filepath.Join(outputDir, name)
+}
+
+type otaOpenable interface {
+	Open(name string, decomp bool) (fs.File, error)
+}
+
+func copyOTAFileToPath(o otaOpenable, name string, decomp bool, outputPath string) error {
+	ff, err := o.Open(name, decomp)
+	if err != nil {
+		return fmt.Errorf("failed to open file '%s' in OTA: %w", name, err)
+	}
+	defer ff.Close()
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	out, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+
+	if _, err := io.Copy(out, ff); err != nil {
+		closeErr := out.Close()
+		removeErr := os.Remove(outputPath)
+		if closeErr != nil {
+			err = fmt.Errorf("%w (close: %v)", err, closeErr)
+		}
+		if removeErr != nil {
+			err = fmt.Errorf("%w (cleanup: %v)", err, removeErr)
+		}
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("failed to close output file '%s': %w", outputPath, err)
+	}
+
+	return nil
+}
+
+func readOTAFile(o otaOpenable, name string, decomp bool) ([]byte, error) {
+	ff, err := o.Open(name, decomp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file '%s' in OTA: %w", name, err)
+	}
+	defer ff.Close()
+
+	data, err := io.ReadAll(ff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file '%s' in OTA: %w", name, err)
+	}
+
+	return data, nil
+}
 
 func init() {
 	OtaCmd.AddCommand(otaExtractCmd)
@@ -151,11 +219,7 @@ var otaExtractCmd = &cobra.Command{
 						continue
 					}
 					if re.MatchString(f.Name()) {
-						ff, err := o.Open(f.Name(), false)
-						if err != nil {
-							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
-						}
-						data, err := io.ReadAll(ff)
+						data, err := readOTAFile(o, f.Name(), false)
 						if err != nil {
 							return fmt.Errorf("failed to read kernelcache: %v", err)
 						}
@@ -167,10 +231,7 @@ var otaExtractCmd = &cobra.Command{
 						if err != nil {
 							return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
 						}
-						fname := filepath.Join(output, f.Name())
-						if flat {
-							fname = filepath.Join(output, filepath.Base(f.Name()))
-						}
+						fname := outputPathForExtraction(output, f.Name(), flat)
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create output directory: %v", err)
 						}
@@ -196,26 +257,11 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(f.Name()) {
-						ff, err := o.Open(f.Name(), decomp)
-						if err != nil {
-							return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
-						}
-						fname := filepath.Join(output, f.Name())
-						if flat {
-							fname = filepath.Join(output, filepath.Base(f.Name()))
-						}
-						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-							return fmt.Errorf("failed to create output directory: %v", err)
-						}
-						out, err := os.Create(fname)
-						if err != nil {
-							return fmt.Errorf("failed to create file: %v", err)
-						}
-						defer out.Close()
+					if matchesPostBOMPattern(re, f.Name()) {
+						fname := outputPathForExtraction(output, f.Name(), flat)
 						utils.Indent(log.Info, 2)(fname)
-						if _, err := io.Copy(out, ff); err != nil {
-							return fmt.Errorf("failed to write file: %v", err)
+						if err := copyOTAFileToPath(o, f.Name(), decomp, fname); err != nil {
+							return err
 						}
 					}
 				}
@@ -224,7 +270,7 @@ var otaExtractCmd = &cobra.Command{
 					if f.IsDir() {
 						continue
 					}
-					if re.MatchString(f.Name()) {
+					if matchesPostBOMPattern(re, f.Name()) {
 						utils.Indent(log.Warn, 2)(fmt.Sprintf("Found '%s' in post.bom (most likely in payloadv2 files)", filepath.Base(f.Name())))
 						bomFound = true
 					}
@@ -257,49 +303,23 @@ var otaExtractCmd = &cobra.Command{
 				if f.IsDir() {
 					continue
 				}
-				fname := filepath.Join(output, f.Name())
-				if flat {
-					fname = filepath.Join(output, filepath.Base(f.Name()))
-				}
+				fname := outputPathForExtraction(output, f.Name(), flat)
 				if _, err := os.Stat(fname); err == nil {
 					log.Warnf("already exists: '%s' ", fname)
 					continue
 				}
-				ff, err := o.Open(f.Name(), decomp)
-				if err != nil {
-					return fmt.Errorf("failed to open file '%s' in OTA: %v", f.Name(), err)
-				}
-				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-					return fmt.Errorf("failed to create output directory: %v", err)
-				}
-				out, err := os.Create(fname)
-				if err != nil {
-					return fmt.Errorf("failed to create file: %v", err)
-				}
-				defer out.Close()
 				utils.Indent(log.Info, 2)(fname)
-				if _, err := io.Copy(out, ff); err != nil {
-					return fmt.Errorf("failed to write file: %v", err)
+				if err := copyOTAFileToPath(o, f.Name(), decomp, fname); err != nil {
+					return err
 				}
 			}
 			/* SINGLE FILE */
 		} else if len(args) > 1 {
-			f, err := o.Open(filepath.Clean(args[1]), decomp)
-			if err != nil {
-				return fmt.Errorf("failed to open file '%s' in OTA: %v", filepath.Clean(args[1]), err)
-			}
-			fname := filepath.Join(output, filepath.Clean(args[1]))
-			if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
-			}
-			out, err := os.Create(fname)
-			if err != nil {
-				return fmt.Errorf("failed to create file: %v", err)
-			}
-			defer out.Close()
-			log.Infof("Extracting to '%s'", out.Name())
-			if _, err := io.Copy(out, f); err != nil {
-				return fmt.Errorf("failed to write file: %v", err)
+			name := filepath.Clean(args[1])
+			fname := filepath.Join(output, name)
+			log.Infof("Extracting to '%s'", fname)
+			if err := copyOTAFileToPath(o, name, decomp, fname); err != nil {
+				return err
 			}
 		}
 

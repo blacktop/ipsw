@@ -867,8 +867,8 @@ func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 			return nil, err
 		}
 		if _, err := zf.Read(mdata[:]); err != nil {
+			zf.Close()
 			if err == io.EOF {
-				zf.Close()
 				return f.zfile.Open()
 			}
 			return nil, err
@@ -882,6 +882,7 @@ func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 				if err != nil {
 					return nil, err
 				}
+				defer zf.Close()
 				if err := pbzx.Extract(context.Background(), zf, &pbuf, runtime.NumCPU()); err != nil {
 					return nil, err
 				}
@@ -889,12 +890,10 @@ func (f *File) Open(decomp bool) (io.ReadCloser, error) {
 					rc: io.NopCloser(bytes.NewReader(pbuf.Bytes())),
 					f:  f,
 				}
-				zf.Close()
 				return rc, nil
 			}
 			fallthrough
 		default:
-			zf.Close()
 			return f.zfile.Open()
 		}
 	}
