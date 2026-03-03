@@ -93,7 +93,7 @@ func GetAEAKey(otaPath, keyDBPath string) (string, error) {
 }
 
 // ResolveAEAKey resolves the AEA decryption key using the priority chain:
-// keyDBPath → symmetricKey → filename embedded key → automatic AEA metadata lookup
+// symmetricKey → keyDBPath → filename embedded key → automatic AEA metadata lookup
 // Returns an ota.Config ready to be used with ota.Open
 //
 // Parameters can be empty strings to skip that resolution method:
@@ -106,8 +106,8 @@ func ResolveAEAKey(otaPath, keyDBPath, symmetricKey string, insecure bool) *ota.
 		Insecure:     insecure,
 	}
 
-	// Try key database first (highest priority after explicit key)
-	if keyDBPath != "" {
+	// Only use key DB when no explicit key is provided.
+	if conf.SymmetricKey == "" && keyDBPath != "" {
 		if dbKey, err := GetAEAKey(otaPath, keyDBPath); err == nil && dbKey != "" {
 			conf.SymmetricKey = dbKey
 			log.Debug("Using AEA key from database")
