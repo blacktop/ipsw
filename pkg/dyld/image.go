@@ -448,8 +448,8 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 			return nil, err
 		}
 
-		if opt.GetVersion() >= 16 {
-			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
+		rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
+		if _, ok := opt.(*ObjCOptimizationHeader); ok {
 			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
 		}
 	}
@@ -491,11 +491,20 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	}
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 	var rsBase uint64
-	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		opt, err := i.cache.GetOptimizations()
-		if err == nil && opt.GetVersion() >= 16 {
-			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
-			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart
+	// Skip rsBase resolution when this partial macho is libobjc itself:
+	// f.GetOptimizations() may call f.getOptimizationsOld() -> f.getLibObjC()
+	// -> image.GetPartialMacho() on the very same libobjc image, which would
+	// re-enter f.objcOptOnce and deadlock. libobjc's own selectors do not
+	// require rsBase resolution at the partial-macho stage.
+	if i.Name != "/usr/lib/libobjc.A.dylib" {
+		if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
+			opt, err := i.cache.GetOptimizations()
+			if err == nil {
+				rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
+				if _, ok := opt.(*ObjCOptimizationHeader); ok {
+					rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart
+				}
+			}
 		}
 	}
 	vma := types.VMAddrConverter{
