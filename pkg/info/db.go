@@ -385,13 +385,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 
 			if i.Plists.Restore != nil && i.Plists.BuildManifest != nil {
 				if dev := i.Plists.GetDeviceForBoardConfig(dt.BoardConfig); dev != nil {
-					proc, err := getProcessor(dev.Platform)
-					if err != nil {
-						return fmt.Errorf("failed to get processor for CPU ID %s: %v", dt.DeviceType, err)
-					}
-					if len(proc.Name) == 0 {
-						log.Errorf("no processor for %s for board %s: %s", dt.ProductType, dt.BoardConfig, dt.ProductName)
-					}
+					proc := resolveProcessor(dev.Platform, fmt.Sprintf("%s/%s", dt.ProductType, dt.BoardConfig))
 					(*devs)[dt.ProductType].Boards[dt.BoardConfig] = Board{
 						CPU:             proc.Name,
 						Platform:        dev.Platform,
@@ -436,13 +430,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 					}
 				}
 				if _, ok := (*devs)[prodType]; !ok {
-					proc, err := getProcessor(dev.Platform)
-					if err != nil {
-						return fmt.Errorf("failed to get processor for CPU ID %s: %v", dev.Platform, err)
-					}
-					if len(proc.Name) == 0 {
-						log.Errorf("no processor for %s for board %s: %s", dev.Platform, dev.BoardConfig, prodName)
-					}
+					proc := resolveProcessor(dev.Platform, fmt.Sprintf("%s/%s", prodType, strings.ToUpper(dev.BoardConfig)))
 					(*devs)[prodType] = Device{
 						Name: prodName,
 						Boards: map[string]Board{
@@ -473,6 +461,25 @@ func (i *Info) GetDevices(devs *Devices) error {
 
 func mLBTypeToBoardConfig(bc string, mlbType string) string {
 	return mlbType + strings.ToUpper(strings.TrimPrefix(bc, strings.ToLower(mlbType)))
+}
+
+func resolveProcessor(cpuid, context string) processors {
+	proc, err := getProcessor(cpuid)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"cpuid":   cpuid,
+			"context": context,
+		}).Warn("missing processor metadata; using CPU ID fallback")
+		return processors{Name: cpuid}
+	}
+	if len(proc.Name) == 0 {
+		log.WithFields(log.Fields{
+			"cpuid":   cpuid,
+			"context": context,
+		}).Warn("processor metadata missing name; using CPU ID fallback")
+		proc.Name = cpuid
+	}
+	return proc
 }
 
 func (i *Info) GetDevicesFromMap(dmap *types.DeviceMap, devs *Devices) error {
@@ -525,13 +532,7 @@ func (i *Info) GetDevicesFromMap(dmap *types.DeviceMap, devs *Devices) error {
 					}
 				}
 			}
-			proc, err := getProcessor(d.Platform)
-			if err != nil {
-				return fmt.Errorf("failed to get processor for CPU ID %s: %v", d.Platform, err)
-			}
-			if len(proc.Name) == 0 {
-				log.Errorf("no processor for %s for board %s: %s", d.Platform, bc, d.ProductName)
-			}
+			proc := resolveProcessor(d.Platform, fmt.Sprintf("%s/%s", d.ProductType, bc))
 			(*devs)[d.ProductType].Boards[mLBTypeToBoardConfig(bc, d.MLBType)] = Board{
 				CPU:               proc.Name,
 				Platform:          d.Platform,
