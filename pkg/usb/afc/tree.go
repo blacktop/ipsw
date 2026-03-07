@@ -116,12 +116,12 @@ func (p *printer) Print(t Tree) string {
 }
 
 func (p *printer) printText(text string, spaces []bool, last bool) string {
-	var result string
+	var result strings.Builder
 	for _, space := range spaces {
 		if space {
-			result += emptySpace
+			result.WriteString(emptySpace)
 		} else {
-			result += continueItem
+			result.WriteString(continueItem)
 		}
 	}
 
@@ -135,7 +135,7 @@ func (p *printer) printText(text string, spaces []bool, last bool) string {
 	for i := range lines {
 		text := lines[i]
 		if i == 0 {
-			out.WriteString(result + indicator + text + newLine)
+			out.WriteString(result.String() + indicator + text + newLine)
 			continue
 		}
 		if last {
@@ -143,7 +143,7 @@ func (p *printer) printText(text string, spaces []bool, last bool) string {
 		} else {
 			indicator = continueItem
 		}
-		out.WriteString(result + indicator + text + newLine)
+		out.WriteString(result.String() + indicator + text + newLine)
 	}
 
 	return out.String()
