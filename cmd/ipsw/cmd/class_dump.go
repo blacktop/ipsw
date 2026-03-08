@@ -56,6 +56,7 @@ func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
 	classDumpCmd.Flags().Bool("all", false, "Dump ALL dylbs from DSC")
+	classDumpCmd.Flags().Bool("skip-no-info", false, "Skip binaries with no ObjC information (defaults to true when --all is passed)")
 	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks as well")
 	classDumpCmd.Flags().BoolP("xcfw", "x", false, "🚧 Generate a XCFramework for the dylib")
 	// classDumpCmd.Flags().BoolP("generic", "g", false, "🚧 Generate a XCFramework for ALL targets")
@@ -77,6 +78,7 @@ func init() {
 	classDumpCmd.MarkFlagsMutuallyExclusive("headers", "xcfw", "spm")
 
 	viper.BindPFlag("class-dump.all", classDumpCmd.Flags().Lookup("all"))
+	viper.BindPFlag("class-dump.skip-no-info", classDumpCmd.Flags().Lookup("skip-no-info"))
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.xcfw", classDumpCmd.Flags().Lookup("xcfw"))
 	// viper.BindPFlag("class-dump.generic", classDumpCmd.Flags().Lookup("generic"))
@@ -160,6 +162,10 @@ var classDumpCmd = &cobra.Command{
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("class-dump.theme"),
 			Output:      viper.GetString("class-dump.output"),
+		}
+
+		if viper.GetBool("class-dump.all") {
+			viper.SetDefault("class-dump.skip-no-info", true)
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
@@ -247,10 +253,8 @@ var classDumpCmd = &cobra.Command{
 
 				o, err = mcmd.NewObjC(m, f, &conf)
 				if err != nil {
-					if errors.Is(err, mcmd.ErrNoObjc) {
-						if !viper.GetBool("class-dump.all") {
-							log.Warn("no ObjC data found in dylib")
-						}
+					if errors.Is(err, mcmd.ErrNoObjc) && viper.GetBool("class-dump.skip-no-info") {
+						log.Warnf("no ObjC data found in dylib '%s'", filepath.Base(img.Name))
 						continue
 					}
 					if viper.GetBool("class-dump.all") {
