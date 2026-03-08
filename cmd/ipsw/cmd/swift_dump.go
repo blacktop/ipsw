@@ -248,6 +248,13 @@ var swiftDumpCmd = &cobra.Command{
 
 				s, err = mcmd.NewSwift(m, f, &conf)
 				if err != nil {
+					if errors.Is(err, mcmd.ErrNoSwift) {
+						if !viper.GetBool("swift-dump.all") {
+							log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
+						}
+						continue
+					}
+
 					return err
 				}
 
@@ -289,6 +296,13 @@ var swiftDumpCmd = &cobra.Command{
 
 				if doDump {
 					if err := s.Dump(); err != nil {
+						if errors.Is(err, mcmd.ErrNoSwift) {
+							if !viper.GetBool("swift-dump.all") {
+								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
+							}
+							continue
+						}
+
 						return fmt.Errorf("failed to dump Swift info for dylib '%s': %v", filepath.Base(image.Name), err)
 					}
 				}

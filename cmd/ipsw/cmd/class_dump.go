@@ -249,7 +249,7 @@ var classDumpCmd = &cobra.Command{
 				if err != nil {
 					if errors.Is(err, mcmd.ErrNoObjc) {
 						if !viper.GetBool("class-dump.all") {
-							log.Warn("no ObjC data found in dylib")
+							log.Warnf("no ObjC data found in dylib '%s'", filepath.Base(img.Name))
 						}
 						continue
 					}
@@ -300,6 +300,12 @@ var classDumpCmd = &cobra.Command{
 
 				if doDump {
 					if err := o.Dump(); err != nil {
+						if errors.Is(err, mcmd.ErrNoObjc) {
+							if !viper.GetBool("class-dump.all") {
+								log.Warnf("no ObjC data found in dylib '%s'", filepath.Base(img.Name))
+							}
+							continue
+						}
 						return fmt.Errorf("failed to dump dylib '%s': %v", filepath.Base(img.Name), err)
 					}
 				}
