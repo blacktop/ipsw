@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             blacktop/ipsw
