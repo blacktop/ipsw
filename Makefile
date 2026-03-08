@@ -212,6 +212,7 @@ fmt: ## Format code
 	@goimports -w .
 	@gofmt -w -s .
 	@go mod tidy
+	@go fix ./...
 
 clean: ## Clean up artifacts
 	@echo " > Cleaning"
