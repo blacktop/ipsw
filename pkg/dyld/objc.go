@@ -145,10 +145,15 @@ type ObjCOptimizationHeader struct {
 	ClassHashTableCacheOffset               uint64
 	ProtocolHashTableCacheOffset            uint64
 	RelativeMethodSelectorBaseAddressOffset uint64
+	// v2 fields (iOS/macOS 26.4+)
+	// TODO: validate field names when Apple releases 26.4 dyld sources
+	SelectorStringsSize uint64 // byte size of relative method selector strings pool
+	Reserved            uint64
 }
 
 func (o *ObjCOptimizationHeader) GetVersion() uint32 {
-	if o.Version == 1 {
+	// Known header versions (1, 2) use stringHashV16 layout.
+	if o.Version <= 2 {
 		return 16
 	}
 	return o.Version
@@ -222,17 +227,67 @@ func (f *File) getOptimizationsOld() (Optimization, error) {
 }
 
 func (f *File) GetOptimizations() (Optimization, error) {
+	if f.objcOpt != nil {
+		return f.objcOpt, nil
+	}
+
+	opt, err := f.getOptimizations()
+	if err != nil {
+		return nil, err
+	}
+	f.objcOpt = opt
+	return opt, nil
+}
+
+func (f *File) getOptimizations() (Optimization, error) {
 	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].ObjcOptsSize)) { // check for NEW objc optimizations
-		if f.Headers[f.UUID].ObjcOptsOffset > 0 && f.Headers[f.UUID].ObjcOptsSize > 0 {
+		const (
+			objcOptHeaderV1Size = 56 // Version(4) + Flags(4) + 6×uint64(48)
+			objcOptHeaderV2Size = 72 // v1 + SelectorStringsSize(8) + Reserved(8)
+		)
+		if f.Headers[f.UUID].ObjcOptsOffset > 0 && f.Headers[f.UUID].ObjcOptsSize >= objcOptHeaderV1Size {
 			uuid, off, err := f.GetOffset(f.Headers[f.UUID].SharedRegionStart + f.Headers[f.UUID].ObjcOptsOffset)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get offset for NEW objc optimization header at addr %#x: %v",
 					f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].ObjcOptsOffset, err)
 			}
 
+			sr := io.NewSectionReader(f.r[uuid], int64(off), int64(f.Headers[f.UUID].ObjcOptsSize))
 			var o ObjCOptimizationHeader
-			if err := binary.Read(io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1), f.ByteOrder, &o); err != nil {
-				return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", err)
+			var readErr error
+			read := func(field any) {
+				if readErr != nil {
+					return
+				}
+				readErr = binary.Read(sr, f.ByteOrder, field)
+			}
+			read(&o.Version)
+			read(&o.Flags)
+			read(&o.HeaderInfoRoCacheOffset)
+			read(&o.HeaderInfoRwCacheOffset)
+			read(&o.SelectorHashTableCacheOffset)
+			read(&o.ClassHashTableCacheOffset)
+			read(&o.ProtocolHashTableCacheOffset)
+			read(&o.RelativeMethodSelectorBaseAddressOffset)
+			if readErr != nil {
+				return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", readErr)
+			}
+			if o.Version >= 2 {
+				read(&o.SelectorStringsSize)
+				read(&o.Reserved)
+				if readErr != nil {
+					return nil, fmt.Errorf("failed to read v2 objc optimization header fields: %v", readErr)
+				}
+			}
+			// Warn on unrecognized versions or unexpected sizes
+			if o.Version > 2 {
+				log.Warnf("objc optimization header version %d is newer than supported (max 2); parsing may be incomplete", o.Version)
+			}
+			if o.Version == 1 && f.Headers[f.UUID].ObjcOptsSize != objcOptHeaderV1Size {
+				log.Warnf("objc optimization header v1 expected %d bytes, got %d", objcOptHeaderV1Size, f.Headers[f.UUID].ObjcOptsSize)
+			}
+			if o.Version == 2 && f.Headers[f.UUID].ObjcOptsSize != objcOptHeaderV2Size {
+				log.Warnf("objc optimization header v2 expected %d bytes, got %d", objcOptHeaderV2Size, f.Headers[f.UUID].ObjcOptsSize)
 			}
 
 			return &o, nil

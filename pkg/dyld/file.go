@@ -91,6 +91,7 @@ type File struct {
 	dyldImageAddr   uint64
 	dyldStartFnAddr uint64
 	objcOptRoAddr   uint64
+	objcOpt         Optimization
 	islandStubs     map[uint64]uint64
 	prewarmData     *PrewarmingHeader
 	size            int64
