@@ -46,12 +46,16 @@ func init() {
 	SbCmd.AddCommand(sbDiffCmd)
 
 	sbDiffCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	sbDiffCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	sbDiffCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
 	sbDiffCmd.MarkZshCompPositionalArgumentFile(2, "*.ipsw", "*.zip")
 	sbDiffCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
 	viper.BindPFlag("sb.diff.pem-db", sbDiffCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("sb.diff.proxy", sbDiffCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("sb.diff.insecure", sbDiffCmd.Flags().Lookup("insecure"))
 }
 
 // sbDiffCmd represents the diff command
@@ -65,6 +69,8 @@ var sbDiffCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		pemDB := viper.GetString("sb.diff.pem-db")
+		proxy := viper.GetString("sb.diff.proxy")
+		insecure := viper.GetBool("sb.diff.insecure")
 
 		var sbDBs []map[string]string
 
@@ -117,8 +123,8 @@ var sbDiffCmd = &cobra.Command{
 						Input:    dmgPath,
 						Output:   filepath.Dir(dmgPath),
 						PemDB:    pemDB,
-						Proxy:    "",    // TODO: make proxy configurable
-						Insecure: false, // TODO: make insecure configurable
+						Proxy:    proxy,
+						Insecure: insecure,
 					})
 					if err != nil {
 						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
