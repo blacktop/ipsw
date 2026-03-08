@@ -36,6 +36,6 @@ jobs:
           check-latest: true
           cache: true
 
-      - uses: github/codeql-action/init@c793b717bc78562f491db7b0e93a3a178b099162 # v3
-      - uses: github/codeql-action/autobuild@c793b717bc78562f491db7b0e93a3a178b099162 # v3
-      - uses: github/codeql-action/analyze@c793b717bc78562f491db7b0e93a3a178b099162 # v3
+      - uses: github/codeql-action/init@0d579ffd059c29b07949a3cce3983f0780820c98 # v3
+      - uses: github/codeql-action/autobuild@0d579ffd059c29b07949a3cce3983f0780820c98 # v3
+      - uses: github/codeql-action/analyze@0d579ffd059c29b07949a3cce3983f0780820c98 # v3
