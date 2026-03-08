@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
@@ -79,6 +80,31 @@ type Version struct {
 	LLVMVersion `json:"llvm"`
 	rawKernel   string
 	rawLLVM     string
+}
+
+var (
+	reKernelVersion = regexp.MustCompile(`^Darwin Kernel Version (?P<darwin>.+): (?P<date>.+); root:xnu.*-(?P<xnu>.+)/(?P<type>.+)_(?P<arch>.+)_(?P<cpu>.+)$`)
+	reLLVMVersion   = regexp.MustCompile(`^Apple LLVM (?P<version>.+) \(clang-(?P<clang>.+)\) \[(?P<flags>.+)\]$`)
+	versionCache    sync.Map
+)
+
+func versionCacheKey(m *macho.File) string {
+	if m == nil {
+		return ""
+	}
+	if uuid := m.UUID(); uuid != nil {
+		return uuid.String()
+	}
+	return ""
+}
+
+func cloneVersion(v *Version) *Version {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	cp.LLVMVersion.Flags = slices.Clone(v.LLVMVersion.Flags)
+	return &cp
 }
 
 func (v *Version) String() string {
@@ -432,6 +458,14 @@ func GetVersion(m *macho.File) (*Version, error) {
 		}
 	}
 
+	if key := versionCacheKey(kc); key != "" {
+		if cached, ok := versionCache.Load(key); ok {
+			if v, ok := cached.(*Version); ok {
+				return cloneVersion(v), nil
+			}
+		}
+	}
+
 	if sec := kc.Section("__TEXT", "__const"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
@@ -458,31 +492,29 @@ func GetVersion(m *macho.File) (*Version, error) {
 
 			if len(s) > 0 {
 				if utils.IsASCII(s) {
-					reKV := regexp.MustCompile(`^Darwin Kernel Version (?P<darwin>.+): (?P<date>.+); root:xnu.*-(?P<xnu>.+)/(?P<type>.+)_(?P<arch>.+)_(?P<cpu>.+)$`)
-					if reKV.MatchString(s) {
+					if reKernelVersion.MatchString(s) {
 						foundKV = true
 						kv.rawKernel = s
-						matches := reKV.FindStringSubmatch(s)
-						kv.KernelVersion.Darwin = matches[reKV.SubexpIndex("darwin")]
+						matches := reKernelVersion.FindStringSubmatch(s)
+						kv.KernelVersion.Darwin = matches[reKernelVersion.SubexpIndex("darwin")]
 						// TODO: confirm that day is not in form 02 for day
-						kv.KernelVersion.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKV.SubexpIndex("date")])
+						kv.KernelVersion.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKernelVersion.SubexpIndex("date")])
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse date %s: %v", matches[reKV.SubexpIndex("date")], err)
+							return nil, fmt.Errorf("failed to parse date %s: %v", matches[reKernelVersion.SubexpIndex("date")], err)
 						}
-						kv.KernelVersion.XNU = matches[reKV.SubexpIndex("xnu")]
-						kv.KernelVersion.Type = matches[reKV.SubexpIndex("type")]
-						kv.KernelVersion.Arch = matches[reKV.SubexpIndex("arch")]
-						kv.KernelVersion.CPU = matches[reKV.SubexpIndex("cpu")]
+						kv.KernelVersion.XNU = matches[reKernelVersion.SubexpIndex("xnu")]
+						kv.KernelVersion.Type = matches[reKernelVersion.SubexpIndex("type")]
+						kv.KernelVersion.Arch = matches[reKernelVersion.SubexpIndex("arch")]
+						kv.KernelVersion.CPU = matches[reKernelVersion.SubexpIndex("cpu")]
 					}
 
-					reLLVM := regexp.MustCompile(`^Apple LLVM (?P<version>.+) \(clang-(?P<clang>.+)\) \[(?P<flags>.+)\]$`)
-					if reLLVM.MatchString(s) {
+					if reLLVMVersion.MatchString(s) {
 						foundLLVM = true
 						kv.rawLLVM = s
-						matches := reLLVM.FindStringSubmatch(s)
-						kv.LLVMVersion.Version = matches[reLLVM.SubexpIndex("version")]
-						kv.LLVMVersion.Clang = matches[reLLVM.SubexpIndex("clang")]
-						kv.LLVMVersion.Flags = strings.Split(matches[reLLVM.SubexpIndex("flags")], ", ")
+						matches := reLLVMVersion.FindStringSubmatch(s)
+						kv.LLVMVersion.Version = matches[reLLVMVersion.SubexpIndex("version")]
+						kv.LLVMVersion.Clang = matches[reLLVMVersion.SubexpIndex("clang")]
+						kv.LLVMVersion.Flags = strings.Split(matches[reLLVMVersion.SubexpIndex("flags")], ", ")
 					}
 
 					if foundKV && foundLLVM {
@@ -493,6 +525,10 @@ func GetVersion(m *macho.File) (*Version, error) {
 		}
 	} else {
 		return nil, fmt.Errorf("section __TEXT.__const not found in kernelcache (if this is a macOS kernel you might need to first extract the fileset entry)")
+	}
+
+	if key := versionCacheKey(kc); key != "" {
+		versionCache.Store(key, cloneVersion(&kv))
 	}
 
 	return &kv, nil
