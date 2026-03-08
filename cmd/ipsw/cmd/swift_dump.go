@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,6 +44,7 @@ func init() {
 	rootCmd.AddCommand(swiftDumpCmd)
 
 	swiftDumpCmd.Flags().Bool("all", false, "Dump ALL dylbs from DSC")
+	swiftDumpCmd.Flags().Bool("skip-no-info", false, "Skip binaries with no Swift information (defaults to true when --all is passed)")
 	swiftDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks as well")
 	swiftDumpCmd.Flags().Bool("demangle", false, "Demangle symbol names")
 	swiftDumpCmd.Flags().Bool("extra", false, "Dump all other Swift sections/info")
@@ -62,6 +64,7 @@ func init() {
 	swiftDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("swift-dump.all", swiftDumpCmd.Flags().Lookup("all"))
+	viper.BindPFlag("swift-dump.skip-no-info", swiftDumpCmd.Flags().Lookup("skip-no-info"))
 	viper.BindPFlag("swift-dump.deps", swiftDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("swift-dump.demangle", swiftDumpCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("swift-dump.extra", swiftDumpCmd.Flags().Lookup("extra"))
@@ -139,6 +142,10 @@ var swiftDumpCmd = &cobra.Command{
 			Theme:       viper.GetString("swift-dump.theme"),
 			Output:      viper.GetString("swift-dump.output"),
 			Headers:     viper.GetBool("swift-dump.headers"),
+		}
+
+		if viper.GetBool("swift-dump.all") {
+			viper.SetDefault("swift-dump.skip-no-info", true)
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
@@ -248,6 +255,11 @@ var swiftDumpCmd = &cobra.Command{
 
 				s, err = mcmd.NewSwift(m, f, &conf)
 				if err != nil {
+					if errors.Is(err, mcmd.ErrNoSwift) && viper.GetBool("swift-dump.skip-no-info") {
+						log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
+						continue
+					}
+
 					return err
 				}
 
@@ -289,6 +301,11 @@ var swiftDumpCmd = &cobra.Command{
 
 				if doDump {
 					if err := s.Dump(); err != nil {
+						if errors.Is(err, mcmd.ErrNoSwift) && viper.GetBool("swift-dump.skip-no-info") {
+							log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
+							continue;
+						}
+
 						return fmt.Errorf("failed to dump Swift info for dylib '%s': %v", filepath.Base(image.Name), err)
 					}
 				}
