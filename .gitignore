@@ -87,4 +87,5 @@ unicorn2/
 # 🤫
 cmd/ipsw/cmd/sb/sb_*.go
 !cmd/ipsw/cmd/sb/sb_diff.go
+internal/commands/sb/
 pkg/sandbox/
