@@ -82,18 +82,28 @@ func (sm SymbolMap) Copy(m map[uint64]string) {
 	maps.Copy(sm, m)
 }
 
+func resolveTextSection(m *macho.File) (*types.Section, error) {
+	for _, segment := range []string{"__TEXT_EXEC", "__TEXT"} {
+		text := m.Section(segment, "__text")
+		if text != nil {
+			return text, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find __text section in __TEXT_EXEC or __TEXT")
+}
+
 // symbolicateWithStats performs symbolication and returns (matched, missed, error).
 // When quiet=true, verbose per-file logs are suppressed.
 func (sm SymbolMap) symbolicateWithStats(m *macho.File, name string, sigs Symbolicator, quiet bool) (matched, missed int, err error) {
 	seen := make(map[string]bool)
 
-	text := m.Section("__TEXT_EXEC", "__text")
-	if text == nil {
-		return 0, 0, fmt.Errorf("failed to find __TEXT_EXEC.__text section")
+	text, err := resolveTextSection(m)
+	if err != nil {
+		return 0, 0, err
 	}
 	data, err := text.Data()
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get data from __TEXT_EXEC.__text section: %v", err)
+		return 0, 0, fmt.Errorf("failed to get data from resolved __text section: %v", err)
 	}
 
 	engine := disass.NewMachoDisass(m, &disass.Config{
