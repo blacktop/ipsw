@@ -48,8 +48,8 @@ type Swift struct {
 
 // NewSwift returns a new MachO Swift parser instance
 func NewSwift(file *macho.File, dsc *dyld.File, conf *SwiftConfig) (*Swift, error) {
-	if !file.HasObjC() {
-		return nil, ErrNoObjc
+	if !file.HasSwift() {
+		return nil, ErrNoSwift
 	}
 
 	s := &Swift{
