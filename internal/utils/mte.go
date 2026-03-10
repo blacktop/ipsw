@@ -33,7 +33,7 @@ var mteMnemonics = map[disassemble.Operation]bool{
 // Returns true and the first address if any MTE instructions are found in the executable sections.
 func HasMTEInstructions(m *macho.File) (bool, uint64) {
 	var instrValue uint32
-	var buffer [1024]byte
+	var decoder disassemble.Decoder
 
 	sections := m.GetSectionsForSegment("__TEXT")
 	if len(sections) == 0 {
@@ -60,8 +60,8 @@ func HasMTEInstructions(m *macho.File) (bool, uint64) {
 				break
 			}
 
-			inst, err := disassemble.Decompose(startAddr, instrValue, &buffer)
-			if err != nil || inst == nil {
+			var inst disassemble.Inst
+			if err := decoder.DecomposeInto(startAddr, instrValue, &inst); err != nil {
 				startAddr += uint64(binary.Size(uint32(0)))
 				continue
 			}
