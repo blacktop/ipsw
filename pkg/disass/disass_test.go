@@ -2,11 +2,37 @@ package disass
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
 )
+
+type stubDisass struct {
+	data      []byte
+	startAddr uint64
+	asJSON    bool
+}
+
+func (s stubDisass) Triage() error                          { return nil }
+func (s stubDisass) IsFunctionStart(uint64) (bool, string)  { return false, "" }
+func (s stubDisass) IsLocation(uint64) bool                 { return false }
+func (s stubDisass) IsBranchLocation(uint64) (bool, uint64) { return false, 0 }
+func (s stubDisass) IsData(uint64) (bool, *AddrDetails)     { return false, nil }
+func (s stubDisass) IsPointer(uint64) (bool, *AddrDetails)  { return false, nil }
+func (s stubDisass) FindSymbol(uint64) (string, bool)       { return "", false }
+func (s stubDisass) FindSwiftString(uint64) (string, bool)  { return "", false }
+func (s stubDisass) GetCString(uint64) (string, error)      { return "", fmt.Errorf("no cstring") }
+func (s stubDisass) Demangle() bool                         { return false }
+func (s stubDisass) Quite() bool                            { return true }
+func (s stubDisass) Color() bool                            { return false }
+func (s stubDisass) AsJSON() bool                           { return s.asJSON }
+func (s stubDisass) Data() []byte                           { return s.data }
+func (s stubDisass) StartAddr() uint64                      { return s.startAddr }
+func (s stubDisass) Middle() uint64                         { return 0 }
+func (s stubDisass) ReadAddr(uint64) (uint64, error)        { return 0, fmt.Errorf("no pointer") }
 
 func TestParseStubsASMADRPAndLDRStubDoesNotPanicOnTrailingBR(t *testing.T) {
 	data := []byte{
@@ -40,9 +66,9 @@ func TestParseStubsASMADRPAndAddBranchParsesStub(t *testing.T) {
 		0x00, 0x02, 0x1f, 0xd6, // br   x16
 	}
 
-	var results [1024]byte
-	adrp, err := disassemble.Decompose(begin, binary.LittleEndian.Uint32(data[0:4]), &results)
-	if err != nil {
+	var decoder disassemble.Decoder
+	var adrp disassemble.Inst
+	if err := decoder.DecomposeInto(begin, binary.LittleEndian.Uint32(data[0:4]), &adrp); err != nil {
 		t.Fatalf("failed to decompose adrp: %v", err)
 	}
 	want := adrp.Operands[1].Immediate + 0x8
@@ -111,4 +137,30 @@ func TestParseStubsASMMismatchedRegistersDoNotCreateStaleStubEntry(t *testing.T)
 			t.Fatalf("expected no stubs for mismatched ADRP/ADD registers, got %v", stubs)
 		}
 	})
+}
+
+func TestDisassembleJSONPreservesDisassemblyString(t *testing.T) {
+	out := Disassemble(stubDisass{
+		data:      []byte{0x1f, 0x20, 0x03, 0xd5}, // nop
+		startAddr: 0x1000,
+		asJSON:    true,
+	})
+
+	var got []map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &got); err != nil {
+		t.Fatalf("failed to unmarshal JSON disassembly output: %v\noutput=%s", err, out)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 instruction, got %d", len(got))
+	}
+	if addr, ok := got[0]["addr"].(float64); !ok || uint64(addr) != 0x1000 {
+		t.Fatalf("unexpected instruction address payload: %#v", got[0]["addr"])
+	}
+	disassText, ok := got[0]["disass"].(string)
+	if !ok {
+		t.Fatalf("expected disass string in JSON payload, got %#v", got[0]["disass"])
+	}
+	if !strings.Contains(disassText, "nop") {
+		t.Fatalf("expected JSON disassembly to contain nop, got %q", disassText)
+	}
 }

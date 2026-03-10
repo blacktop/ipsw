@@ -278,15 +278,15 @@ func getMigInitFunc(m *macho.File) (*types.Function, error) {
 	return nil, fmt.Errorf("failed to find 'mig_init' address")
 }
 
-func migOperandRegister(instr *disassemble.Instruction, idx int) (disassemble.Register, bool) {
-	if instr == nil || len(instr.Operands) <= idx || len(instr.Operands[idx].Registers) == 0 {
+func migOperandRegister(instr *disassemble.Inst, idx int) (disassemble.Register, bool) {
+	if instr == nil || int(instr.NumOps) <= idx || instr.Operands[idx].NumRegisters == 0 {
 		return disassemble.REG_NONE, false
 	}
 	return instr.Operands[idx].Registers[0], true
 }
 
-func migOperandImmediate(instr *disassemble.Instruction, idx int) (uint64, bool) {
-	if instr == nil || len(instr.Operands) <= idx {
+func migOperandImmediate(instr *disassemble.Inst, idx int) (uint64, bool) {
+	if instr == nil || int(instr.NumOps) <= idx {
 		return 0, false
 	}
 	return instr.Operands[idx].Immediate, true
@@ -296,8 +296,9 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, error) {
 	var migE uint64
 
 	var instrValue uint32
-	var results [1024]byte
-	var prevInstr *disassemble.Instruction
+	var decoder disassemble.Decoder
+	var prevInstr disassemble.Inst
+	var hasPrev bool
 
 	startAddr := migInit.StartAddr
 
@@ -310,39 +311,39 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, error) {
 			return 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
 		}
 
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
+		var instruction disassemble.Inst
+		if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 			startAddr += uint64(binary.Size(uint32(0)))
 			continue
 		}
 
-		if disass.IsLoadLiteral(instruction) {
-			if imm, ok := migOperandImmediate(instruction, 1); ok {
+		if disass.IsLoadLiteral(&instruction) {
+			if imm, ok := migOperandImmediate(&instruction, 1); ok {
 				migE = imm
 				break
 			}
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+		} else if hasPrev && prevInstr.Operation == disassemble.ARM64_ADRP &&
 			(instruction.Operation == disassemble.ARM64_ADD ||
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW) {
-			adrpRegister, ok := migOperandRegister(prevInstr, 0)
+			adrpRegister, ok := migOperandRegister(&prevInstr, 0)
 			if ok {
-				adrpImm, ok := migOperandImmediate(prevInstr, 1)
+				adrpImm, ok := migOperandImmediate(&prevInstr, 1)
 				if ok {
-					srcRegister, ok := migOperandRegister(instruction, 1)
+					srcRegister, ok := migOperandRegister(&instruction, 1)
 					if ok {
 						validPattern := true
 						if adrpRegister == srcRegister {
 							switch instruction.Operation {
 							case disassemble.ARM64_LDR, disassemble.ARM64_LDRB, disassemble.ARM64_LDRSW:
-								if imm, ok := migOperandImmediate(instruction, 1); ok {
+								if imm, ok := migOperandImmediate(&instruction, 1); ok {
 									adrpImm += imm
 								} else {
 									validPattern = false
 								}
 							case disassemble.ARM64_ADD:
-								if imm, ok := migOperandImmediate(instruction, 2); ok {
+								if imm, ok := migOperandImmediate(&instruction, 2); ok {
 									adrpImm += imm
 								} else {
 									validPattern = false
@@ -360,6 +361,7 @@ func getMigE(r *bytes.Reader, migInit *types.Function) (uint64, error) {
 		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction)
 
 		prevInstr = instruction
+		hasPrev = true
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 

@@ -156,7 +156,7 @@ func getBaseAddress(r *bytes.Reader) (uint64, error) {
 
 	var startAddr uint64 = 0
 	var instrValue uint32
-	var results [1024]byte
+	var decoder disassemble.Decoder
 
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -167,12 +167,12 @@ func getBaseAddress(r *bytes.Reader) (uint64, error) {
 			return 0, fmt.Errorf("failed to read instruction @ %#x: %v", startAddr, err)
 		}
 
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
+		var instruction disassemble.Inst
+		if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 			return 0, fmt.Errorf("failed to decompose instruction @ %#x: %v", startAddr, err)
 		}
 
-		if disass.IsLoadLiteral(instruction) {
+		if disass.IsLoadLiteral(&instruction) {
 			if _, err := r.Seek(int64(instruction.Operands[1].Immediate), io.SeekStart); err != nil {
 				return 0, fmt.Errorf("failed to seek to base address: %v", err)
 			}
