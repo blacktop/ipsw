@@ -18,8 +18,9 @@ func registerToIndex(reg disassemble.Register) (int, bool) {
 	}
 }
 
-func stackAddressFromOperand(state *microState, op disassemble.Operand) (uint64, bool) {
-	if len(op.Registers) == 0 || op.Registers[0] != disassemble.REG_SP {
+func stackAddressFromOperand(state *microState, op *disassemble.Op) (uint64, bool) {
+	baseReg, ok := operandRegister(op, 0)
+	if !ok || baseReg != disassemble.REG_SP {
 		return 0, false
 	}
 
@@ -36,33 +37,33 @@ func stackAddressFromOperand(state *microState, op disassemble.Operand) (uint64,
 	}
 }
 
-func captureX0Spill(state *microState, inst *disassemble.Instruction) (uint64, uint64, bool) {
+func captureX0Spill(state *microState, inst *disassemble.Inst) (uint64, uint64, bool) {
 	if inst == nil {
 		return 0, 0, false
 	}
 
 	switch inst.Operation {
 	case disassemble.ARM64_STR, disassemble.ARM64_STUR:
-		if len(inst.Operands) < 2 || !operandHasRegister(inst.Operands[0], disassemble.REG_X0) {
+		if operandCount(inst) < 2 || !operandHasRegister(&inst.Operands[0], disassemble.REG_X0) {
 			return 0, 0, false
 		}
-		addr, ok := stackAddressFromOperand(state, inst.Operands[1])
+		addr, ok := stackAddressFromOperand(state, &inst.Operands[1])
 		if !ok {
 			return 0, 0, false
 		}
 		return addr, state.GetX(0), true
 	case disassemble.ARM64_STP:
-		if len(inst.Operands) < 3 {
+		if operandCount(inst) < 3 {
 			return 0, 0, false
 		}
-		addr, ok := stackAddressFromOperand(state, inst.Operands[2])
+		addr, ok := stackAddressFromOperand(state, &inst.Operands[2])
 		if !ok {
 			return 0, 0, false
 		}
-		if operandHasRegister(inst.Operands[0], disassemble.REG_X0) {
+		if operandHasRegister(&inst.Operands[0], disassemble.REG_X0) {
 			return addr, state.GetX(0), true
 		}
-		if operandHasRegister(inst.Operands[1], disassemble.REG_X0) {
+		if operandHasRegister(&inst.Operands[1], disassemble.REG_X0) {
 			addr2, ok := addSignedOffset(addr, 8)
 			if !ok {
 				return addr, state.GetX(0), true
@@ -92,43 +93,41 @@ func recordTrackedSpill(spills *[4]trackedSpill, reg disassemble.Register, addr 
 	}
 }
 
-func captureRegisterSpills(state *microState, inst *disassemble.Instruction, spills *[4]trackedSpill) {
+func captureRegisterSpills(state *microState, inst *disassemble.Inst, spills *[4]trackedSpill) {
 	if inst == nil {
 		return
 	}
 
 	switch inst.Operation {
 	case disassemble.ARM64_STR, disassemble.ARM64_STUR:
-		if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+		reg, ok := operandRegister(&inst.Operands[0], 0)
+		if operandCount(inst) < 2 || !ok {
 			return
 		}
-		addr, ok := stackAddressFromOperand(state, inst.Operands[1])
+		addr, ok := stackAddressFromOperand(state, &inst.Operands[1])
 		if !ok {
 			return
 		}
-		reg := inst.Operands[0].Registers[0]
 		idx, ok := registerToIndex(reg)
 		if !ok || idx < 0 || idx >= len(spills) {
 			return
 		}
 		recordTrackedSpill(spills, reg, addr, state.GetX(idx))
 	case disassemble.ARM64_STP:
-		if len(inst.Operands) < 3 {
+		if operandCount(inst) < 3 {
 			return
 		}
-		addr, ok := stackAddressFromOperand(state, inst.Operands[2])
+		addr, ok := stackAddressFromOperand(state, &inst.Operands[2])
 		if !ok {
 			return
 		}
-		if len(inst.Operands[0].Registers) > 0 {
-			reg := inst.Operands[0].Registers[0]
+		if reg, ok := operandRegister(&inst.Operands[0], 0); ok {
 			if idx, ok := registerToIndex(reg); ok && idx < len(spills) {
 				recordTrackedSpill(spills, reg, addr, state.GetX(idx))
 			}
 		}
-		if len(inst.Operands[1].Registers) > 0 {
+		if reg, ok := operandRegister(&inst.Operands[1], 0); ok {
 			if addr2, ok := addSignedOffset(addr, 8); ok {
-				reg := inst.Operands[1].Registers[0]
 				if idx, ok := registerToIndex(reg); ok && idx < len(spills) {
 					recordTrackedSpill(spills, reg, addr2, state.GetX(idx))
 				}
@@ -356,22 +355,20 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 			continue
 		}
 
-		inst, err := decodeArm64Instruction(pc, raw)
-		if err != nil {
-			inst = nil
-		}
-		if inst != nil && isConditionalBranchOperation(inst.Operation) {
+		var inst disassemble.Inst
+		instOK := s.decodeArm64Instruction(pc, raw, &inst) == nil
+		if instOK && isConditionalBranchOperation(inst.Operation) {
 			break
 		}
-		if addr, val, ok := captureX0Spill(state, inst); ok {
+		if addr, val, ok := captureX0Spill(state, instPtr(instOK, &inst)); ok {
 			lastSpillAddr = addr
 			lastSpillValue = val
 			recordTrackedSpill(&state.spills, disassemble.REG_X0, addr, val)
 		}
-		s.applyMicroInstruction(state, inst)
+		s.applyMicroInstruction(state, instPtr(instOK, &inst))
 
 		if pending != nil && pending.metaVtableAddr == 0 {
-			if access, src, count, ok := state.classifyStore(inst); ok && access.addr == pending.metaPtr {
+			if access, src, count, ok := state.classifyStore(instPtr(instOK, &inst)); ok && access.addr == pending.metaPtr {
 				for i := range count {
 					if src[i] != 16 {
 						continue
@@ -393,7 +390,7 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 			}
 			break
 		}
-		if target, ok := branchTargetFromState(state, inst); ok {
+		if target, ok := branchTargetFromState(state, instPtr(instOK, &inst)); ok {
 			if branchOff, ok := localBranchOffset(path.fn.StartAddr, len(funcData), plan.maxOffset, target); ok {
 				off = branchOff
 				continue
@@ -567,17 +564,15 @@ func (s *Scanner) simulateWrapperContext(startFile *macho.File, startAddr uint64
 			}
 		}
 
-		inst, err := decodeArm64Instruction(pc, raw)
-		if err != nil {
-			inst = nil
-		}
-		if inst != nil && isConditionalBranchOperation(inst.Operation) {
+		var inst disassemble.Inst
+		instOK := s.decodeArm64Instruction(pc, raw, &inst) == nil
+		if instOK && isConditionalBranchOperation(inst.Operation) {
 			break
 		}
-		s.applyMicroInstruction(state, inst)
+		s.applyMicroInstruction(state, instPtr(instOK, &inst))
 
 		if captured != nil && captured.metaVtab == 0 {
-			if access, src, count, ok := state.classifyStore(inst); ok && access.addr == captured.x0 {
+			if access, src, count, ok := state.classifyStore(instPtr(instOK, &inst)); ok && access.addr == captured.x0 {
 				for i := range count {
 					if src[i] != 16 {
 						continue
@@ -605,7 +600,7 @@ func (s *Scanner) simulateWrapperContext(startFile *macho.File, startAddr uint64
 			}
 			break
 		}
-		if target, ok := branchTargetFromState(state, inst); ok {
+		if target, ok := branchTargetFromState(state, instPtr(instOK, &inst)); ok {
 			if target == canonicalStart {
 				return captureCtx(canonicalStart), true
 			}
@@ -712,21 +707,19 @@ func (s *Scanner) recoverCallsiteContext(m *macho.File, class *discoveredClass) 
 			continue
 		}
 
-		inst, err := decodeArm64Instruction(pc, raw)
-		if err != nil {
-			inst = nil
-		}
-		if inst != nil && isConditionalBranchOperation(inst.Operation) {
+		var inst disassemble.Inst
+		instOK := s.decodeArm64Instruction(pc, raw, &inst) == nil
+		if instOK && isConditionalBranchOperation(inst.Operation) {
 			break
 		}
-		s.applyMicroInstruction(state, inst)
+		s.applyMicroInstruction(state, instPtr(instOK, &inst))
 
 		if captured && recovered.metaVtab == 0 {
 			expected := expectedMetaPtr()
 			if expected == 0 {
 				continue
 			}
-			if access, src, count, ok := state.classifyStore(inst); ok && access.addr == expected {
+			if access, src, count, ok := state.classifyStore(instPtr(instOK, &inst)); ok && access.addr == expected {
 				for i := range count {
 					if src[i] != 16 {
 						continue
@@ -751,7 +744,7 @@ func (s *Scanner) recoverCallsiteContext(m *macho.File, class *discoveredClass) 
 			}
 			break
 		}
-		if target, ok := branchTargetFromState(state, inst); ok {
+		if target, ok := branchTargetFromState(state, instPtr(instOK, &inst)); ok {
 			if branchOff, ok := localBranchOffset(fn.StartAddr, len(data), plan.maxOffset, target); ok {
 				off = branchOff
 				continue
@@ -802,15 +795,15 @@ func (s *Scanner) recoverMetaVtableFromCtorPattern(m *macho.File, class *discove
 			}
 		}
 
-		ins, err := decodeArm64Instruction(pc, raw)
-		if err != nil || ins == nil {
+		var ins disassemble.Inst
+		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil {
 			continue
 		}
 
 		if ins.Operation == disassemble.ARM64_ADD &&
-			len(ins.Operands) >= 3 &&
-			operandHasRegister(ins.Operands[0], disassemble.REG_X16) &&
-			operandHasRegister(ins.Operands[1], disassemble.REG_X16) &&
+			operandCount(&ins) >= 3 &&
+			operandHasRegister(&ins.Operands[0], disassemble.REG_X16) &&
+			operandHasRegister(&ins.Operands[1], disassemble.REG_X16) &&
 			x16Base != 0 {
 			x16Base += uint64(ins.Operands[2].Immediate)
 			continue
@@ -818,8 +811,8 @@ func (s *Scanner) recoverMetaVtableFromCtorPattern(m *macho.File, class *discove
 
 		if candidate == 0 &&
 			isPACOperation(ins.Operation) &&
-			len(ins.Operands) > 0 &&
-			operandHasRegister(ins.Operands[0], disassemble.REG_X16) &&
+			operandCount(&ins) > 0 &&
+			operandHasRegister(&ins.Operands[0], disassemble.REG_X16) &&
 			validKernelPointer(x16Base) {
 			candidate = x16Base
 			continue
@@ -831,14 +824,14 @@ func (s *Scanner) recoverMetaVtableFromCtorPattern(m *macho.File, class *discove
 
 		switch ins.Operation {
 		case disassemble.ARM64_STR, disassemble.ARM64_STUR:
-			if len(ins.Operands) >= 2 &&
-				operandHasRegister(ins.Operands[0], disassemble.REG_X16) &&
+			if operandCount(&ins) >= 2 &&
+				operandHasRegister(&ins.Operands[0], disassemble.REG_X16) &&
 				ins.Operands[1].GetImmediate() == 0 {
 				return candidate
 			}
 		case disassemble.ARM64_STP:
-			if len(ins.Operands) >= 3 &&
-				(operandHasRegister(ins.Operands[0], disassemble.REG_X16) || operandHasRegister(ins.Operands[1], disassemble.REG_X16)) &&
+			if operandCount(&ins) >= 3 &&
+				(operandHasRegister(&ins.Operands[0], disassemble.REG_X16) || operandHasRegister(&ins.Operands[1], disassemble.REG_X16)) &&
 				ins.Operands[2].GetImmediate() == 0 {
 				return candidate
 			}

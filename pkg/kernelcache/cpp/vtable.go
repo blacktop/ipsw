@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/demangle"
@@ -417,32 +418,46 @@ func (s *Scanner) findCtorFunctionsByMetaPtr(owner *macho.File, metaPtr uint64) 
 	if owner == nil || metaPtr == 0 {
 		return nil
 	}
-	funcs, err := s.functionsForFile(owner)
+	idx := s.metaPtrToCtorIndex(owner)
+	return idx[metaPtr]
+}
+
+// metaPtrToCtorIndex builds a map from metaclass pointer → constructor
+// functions for a file.  The result is cached after the first call.
+func (s *Scanner) metaPtrToCtorIndex(m *macho.File) map[uint64][]types.Function {
+	if idx, ok := s.metaCtorIdx[m]; ok {
+		return idx
+	}
+	callerIdx, err := s.directCallerIndex(m)
 	if err != nil {
+		s.metaCtorIdx[m] = nil
 		return nil
 	}
-
-	out := make([]types.Function, 0, 4)
-	seen := make(map[uint64]bool, 4)
-	for _, fn := range funcs {
-		for anchor := range s.osMetaClassVariants {
-			found, ok := s.metaPtrAtDirectCall(owner, fn, anchor)
+	idx := make(map[uint64][]types.Function)
+	seen := make(map[uint64]bool)
+	for anchor := range s.osMetaClassVariants {
+		for _, callerStart := range callerIdx[anchor] {
+			if seen[callerStart] {
+				continue
+			}
+			seen[callerStart] = true
+			fn, err := s.functionForAddr(m, callerStart)
+			if err != nil {
+				continue
+			}
+			found, ok := s.metaPtrAtDirectCall(m, fn, anchor)
 			if !ok {
 				continue
 			}
-			found = s.normalizeLoadedPointer(owner, found)
-			if found != metaPtr {
+			found = s.normalizeLoadedPointer(m, found)
+			if !validMetaPointer(found) {
 				continue
 			}
-			if seen[fn.StartAddr] {
-				break
-			}
-			seen[fn.StartAddr] = true
-			out = append(out, fn)
-			break
+			idx[found] = append(idx[found], fn)
 		}
 	}
-	return out
+	s.metaCtorIdx[m] = idx
+	return idx
 }
 
 func (s *Scanner) inferClassNameFromSymbols(owner *macho.File, class *discoveredClass) string {
@@ -842,19 +857,17 @@ func (s *Scanner) captureVtableFromAllocFunction(m *macho.File, allocPtr uint64)
 			continue
 		}
 
-		inst, err := decodeArm64Instruction(pc, raw)
-		if err != nil {
-			inst = nil
-		}
-		if inst != nil && isConditionalBranchOperation(inst.Operation) {
+		var inst disassemble.Inst
+		instOK := s.decodeArm64Instruction(pc, raw, &inst) == nil
+		if instOK && isConditionalBranchOperation(inst.Operation) {
 			break
 		}
-		if inst != nil && isCallLikeOperation(inst.Operation) {
+		if instOK && isCallLikeOperation(inst.Operation) {
 			state.SetX(0, fakeAllocResult)
 			off = nextOff
 			continue
 		}
-		if access, src, count, ok := state.classifyStore(inst); ok && access.addr == state.GetX(0) && state.GetX(0) == fakeAllocResult {
+		if access, src, count, ok := state.classifyStore(instPtr(instOK, &inst)); ok && access.addr == state.GetX(0) && state.GetX(0) == fakeAllocResult {
 			for i := range count {
 				if src[i] < 0 {
 					continue
@@ -864,7 +877,7 @@ func (s *Scanner) captureVtableFromAllocFunction(m *macho.File, allocPtr uint64)
 				}
 			}
 		}
-		s.applyMicroInstruction(state, inst)
+		s.applyMicroInstruction(state, instPtr(instOK, &inst))
 		if plan.tags[idx]&microTagB != 0 {
 			if branchOff, ok := localBranchOffset(fn.StartAddr, len(data), plan.maxOffset, plan.targets[idx]); ok {
 				off = branchOff
@@ -872,7 +885,7 @@ func (s *Scanner) captureVtableFromAllocFunction(m *macho.File, allocPtr uint64)
 			}
 			break
 		}
-		if target, ok := branchTargetFromState(state, inst); ok {
+		if target, ok := branchTargetFromState(state, instPtr(instOK, &inst)); ok {
 			if branchOff, ok := localBranchOffset(fn.StartAddr, len(data), plan.maxOffset, target); ok {
 				off = branchOff
 				continue

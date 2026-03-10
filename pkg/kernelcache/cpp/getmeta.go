@@ -217,29 +217,17 @@ func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
 		}
 	}
 
-	if m == s.root {
-		sections := [][2]string{
-			{"__DATA_CONST", "__const"},
-			{"__AUTH_CONST", "__const"},
-			{"__DATA", "__const"},
+	for _, sec := range m.Sections {
+		if sec == nil || sec.Size < 8 {
+			continue
 		}
-		for _, pair := range sections {
-			sec := m.Section(pair[0], pair[1])
-			addSectionPointers(sec)
+		if sec.Seg == "__TEXT" || sec.Seg == "__TEXT_EXEC" {
+			continue
 		}
-	} else {
-		for _, sec := range m.Sections {
-			if sec == nil || sec.Size < 8 {
-				continue
-			}
-			if sec.Seg == "__TEXT" || sec.Seg == "__TEXT_EXEC" {
-				continue
-			}
-			if sec.Name == "__bss" || sec.Name == "__common" {
-				continue
-			}
-			addSectionPointers(sec)
+		if sec.Name == "__bss" || sec.Name == "__common" {
+			continue
 		}
+		addSectionPointers(sec)
 	}
 
 	s.pointerIndex[m] = index
