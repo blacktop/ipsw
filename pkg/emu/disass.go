@@ -27,9 +27,18 @@ func colorOperands(operands string) string {
 	return operands
 }
 
-func diss(startAddr uint64, data []byte) (instruction *disassemble.Instruction) {
+func printDecodeFailure(startAddr uint64, instrValue uint32, err error) {
+	fmt.Printf("%s:  %s\t%s\t%#-18x ; (%s)\n",
+		colorAddr("%#08x", uint64(startAddr)),
+		colorOp("%-7s", ".long"),
+		colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+		instrValue,
+		err.Error())
+}
+
+func diss(startAddr uint64, data []byte) {
 	var instrValue uint32
-	var results [1024]byte
+	var decoder disassemble.Decoder
 
 	r := bytes.NewReader(data)
 
@@ -40,17 +49,21 @@ func diss(startAddr uint64, data []byte) (instruction *disassemble.Instruction) 
 			break
 		}
 
-		instruction, err = disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
-			fmt.Printf("%s:  %s\t%s\t%#-18x ; (%s)\n",
-				colorAddr("%#08x", uint64(startAddr)),
-				colorOp("%-7s", ".long"),
-				colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
-				instrValue,
-				err.Error())
+		var instruction disassemble.Inst
+		if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
+			printDecodeFailure(startAddr, instrValue, err)
+			startAddr += uint64(binary.Size(uint32(0)))
+			continue
 		}
 
-		opStr := strings.TrimSpace(strings.TrimPrefix(instruction.String(), instruction.Operation.String()))
+		disass, err := instruction.Disassemble()
+		if err != nil {
+			printDecodeFailure(startAddr, instrValue, err)
+			startAddr += uint64(binary.Size(uint32(0)))
+			continue
+		}
+
+		opStr := strings.TrimSpace(strings.TrimPrefix(disass, instruction.Operation.String()))
 
 		fmt.Printf("%s:  %s   %s %s\n",
 			colorAddr("%#08x", uint64(startAddr)),
@@ -61,6 +74,4 @@ func diss(startAddr uint64, data []byte) (instruction *disassemble.Instruction) 
 
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
-
-	return
 }

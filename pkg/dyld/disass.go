@@ -16,10 +16,11 @@ import (
 )
 
 type DyldDisass struct {
-	f      *File
-	cfg    *disass.Config
-	tr     *disass.Triage
-	dylibs []*CacheImage
+	f       *File
+	cfg     *disass.Config
+	tr      *disass.Triage
+	dylibs  []*CacheImage
+	decoder disassemble.Decoder
 }
 
 func NewDyldDisass(f *File, cfg *disass.Config) *DyldDisass {
@@ -124,15 +125,15 @@ func (d DyldDisass) IsPointer(imm uint64) (bool, *disass.AddrDetails) {
 	return false, nil
 }
 
-func operandRegister(instr *disassemble.Instruction, idx int) (disassemble.Register, bool) {
-	if instr == nil || len(instr.Operands) <= idx || len(instr.Operands[idx].Registers) == 0 {
+func operandRegister(instr *disassemble.Inst, idx int) (disassemble.Register, bool) {
+	if instr == nil || int(instr.NumOps) <= idx || instr.Operands[idx].NumRegisters == 0 {
 		return disassemble.REG_NONE, false
 	}
 	return instr.Operands[idx].Registers[0], true
 }
 
-func operandImmediate(instr *disassemble.Instruction, idx int) (uint64, bool) {
-	if instr == nil || len(instr.Operands) <= idx {
+func operandImmediate(instr *disassemble.Inst, idx int) (uint64, bool) {
+	if instr == nil || int(instr.NumOps) <= idx {
 		return 0, false
 	}
 	return instr.Operands[idx].Immediate, true
@@ -141,8 +142,8 @@ func operandImmediate(instr *disassemble.Instruction, idx int) (uint64, bool) {
 // Triage walks a function and analyzes all immediates
 func (d *DyldDisass) Triage() error {
 	var instrValue uint32
-	var results [1024]byte
-	var prevInstr *disassemble.Instruction
+	var prevInstr disassemble.Inst
+	var hasPrev bool
 
 	d.tr = &disass.Triage{
 		Addresses: make(map[uint64]uint64),
@@ -172,45 +173,46 @@ func (d *DyldDisass) Triage() error {
 			break
 		}
 
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
+		var instruction disassemble.Inst
+		if err := d.decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 			startAddr += uint64(binary.Size(uint32(0)))
 			continue
 		}
 
 		if disass.IsBranchOp(instruction.Operation) {
-			for _, op := range instruction.Operands {
+			for idx := 0; idx < int(instruction.NumOps); idx++ {
+				op := instruction.Operands[idx]
 				if op.Class == disassemble.LABEL {
 					d.tr.Addresses[instruction.Address] = uint64(op.Immediate)
 				}
 			}
-		} else if disass.IsLoadLiteral(instruction) {
-			if imm, ok := operandImmediate(instruction, 1); ok {
+		} else if disass.IsLoadLiteral(&instruction) {
+			if imm, ok := operandImmediate(&instruction, 1); ok {
 				d.tr.Addresses[instruction.Address] = imm
 			}
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+		} else if hasPrev && prevInstr.Operation == disassemble.ARM64_ADRP &&
 			(instruction.Operation == disassemble.ARM64_ADD ||
 				instruction.Operation == disassemble.ARM64_LDR ||
 				instruction.Operation == disassemble.ARM64_LDRB ||
 				instruction.Operation == disassemble.ARM64_LDRSW ||
 				instruction.Operation == disassemble.ARM64_STRB) {
-			adrpRegister, ok := operandRegister(prevInstr, 0)
+			adrpRegister, ok := operandRegister(&prevInstr, 0)
 			if ok {
-				adrpImm, ok := operandImmediate(prevInstr, 1)
+				adrpImm, ok := operandImmediate(&prevInstr, 1)
 				if ok {
-					srcRegister, ok := operandRegister(instruction, 1)
+					srcRegister, ok := operandRegister(&instruction, 1)
 					if ok {
 						validPattern := true
 						if adrpRegister == srcRegister {
 							switch instruction.Operation {
 							case disassemble.ARM64_LDR, disassemble.ARM64_LDRB, disassemble.ARM64_LDRSW, disassemble.ARM64_STRB:
-								if imm, ok := operandImmediate(instruction, 1); ok {
+								if imm, ok := operandImmediate(&instruction, 1); ok {
 									adrpImm += imm
 								} else {
 									validPattern = false
 								}
 							case disassemble.ARM64_ADD:
-								if imm, ok := operandImmediate(instruction, 2); ok {
+								if imm, ok := operandImmediate(&instruction, 2); ok {
 									adrpImm += imm
 								} else {
 									validPattern = false
@@ -260,6 +262,7 @@ func (d *DyldDisass) Triage() error {
 		// }
 
 		prevInstr = instruction
+		hasPrev = true
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 

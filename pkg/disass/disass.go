@@ -172,33 +172,84 @@ func IsBranchOp(op disassemble.Operation) bool {
 }
 
 // IsLoadLiteral returns true if the instruction is a PC-relative literal load
-func IsLoadLiteral(instr *disassemble.Instruction) bool {
+func IsLoadLiteral(instr *disassemble.Inst) bool {
 	switch instr.Operation {
 	case disassemble.ARM64_LDR, disassemble.ARM64_LDRSW, disassemble.ARM64_PRFM:
-		return len(instr.Operands) > 1 && instr.Operands[1].Class == disassemble.LABEL
+		return instr != nil && instr.NumOps > 1 && instr.Operands[1].Class == disassemble.LABEL
 	}
 	return false
 }
 
-func operandRegister(instr *disassemble.Instruction, idx int) (disassemble.Register, bool) {
-	if instr == nil || len(instr.Operands) <= idx || len(instr.Operands[idx].Registers) == 0 {
+func operandRegister(instr *disassemble.Inst, idx int) (disassemble.Register, bool) {
+	if instr == nil || int(instr.NumOps) <= idx || instr.Operands[idx].NumRegisters == 0 {
 		return disassemble.REG_NONE, false
 	}
 	return instr.Operands[idx].Registers[0], true
 }
 
-func operandImmediate(instr *disassemble.Instruction, idx int) (uint64, bool) {
-	if instr == nil || len(instr.Operands) <= idx {
+func operandImmediate(instr *disassemble.Inst, idx int) (uint64, bool) {
+	if instr == nil || int(instr.NumOps) <= idx {
 		return 0, false
 	}
 	return instr.Operands[idx].Immediate, true
 }
 
-func operandShiftValue(instr *disassemble.Instruction, idx int) (uint64, bool) {
-	if instr == nil || len(instr.Operands) <= idx {
+func operandShiftValue(instr *disassemble.Inst, idx int) (uint64, bool) {
+	if instr == nil || int(instr.NumOps) <= idx {
 		return 0, false
 	}
 	return uint64(instr.Operands[idx].ShiftValue), true
+}
+
+func implSpecificSysReg(op *disassemble.Op) (string, bool) {
+	if op == nil || !op.HasImplSpec {
+		return "", false
+	}
+
+	sysReg := disassemble.SystemReg(op.ImplSpec[0])<<14 |
+		disassemble.SystemReg(op.ImplSpec[1])<<11 |
+		disassemble.SystemReg(op.ImplSpec[2])<<7 |
+		disassemble.SystemReg(op.ImplSpec[3])<<3 |
+		disassemble.SystemReg(op.ImplSpec[4])
+
+	name := sysReg.String()
+	if len(name) == 0 {
+		return "", false
+	}
+
+	return name, true
+}
+
+func invalidInstruction(addr uint64, raw uint32, err error) disassemble.Instruction {
+	return disassemble.Instruction{
+		Address:     addr,
+		Raw:         raw,
+		Encoding:    0,
+		Operation:   0,
+		Operands:    nil,
+		SetFlags:    0,
+		Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", raw, err.Error()),
+	}
+}
+
+func logStubDecodeContext(
+	instruction *disassemble.Inst,
+	queue *[2]disassemble.Inst,
+	queueValid *[2]bool,
+) {
+	if instruction != nil {
+		if text, err := instruction.Disassemble(); err == nil {
+			log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), text)
+		}
+	}
+
+	for idx := range queue {
+		if queueValid[idx] {
+			if text, err := queue[idx].Disassemble(); err == nil {
+				log.Debugf("%#08x:  %s\t%s", queue[idx].Address, disassemble.GetOpCodeByteString(queue[idx].Raw), text)
+			}
+		}
+	}
 }
 
 const maxCStringCommentLen = 200
@@ -237,8 +288,9 @@ func Disassemble(d Disass) string {
 	var sb strings.Builder
 	var instrStr string
 	var instrValue uint32
-	var results [1024]byte
-	var prevInstr *disassemble.Instruction
+	var decoder disassemble.Decoder
+	var prevInstr disassemble.Inst
+	var hasPrev bool
 	var instructions []disassemble.Instruction
 
 	r := bytes.NewReader(d.Data())
@@ -254,8 +306,8 @@ func Disassemble(d Disass) string {
 
 		if !d.AsJSON() {
 			var comment string
-			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-			if err != nil {
+			var instruction disassemble.Inst
+			if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 				var op string
 				var oprs string
 				if instrValue == 0xfeedfacf {
@@ -272,7 +324,7 @@ func Disassemble(d Disass) string {
 					op = ".long"
 					oprs = fmt.Sprintf("%#x", instrValue)
 					comment = " ; (probably a jump-table)"
-				} else if prevInstr != nil && strings.Contains(prevInstr.Operation.String(), "braa") {
+				} else if hasPrev && strings.Contains(prevInstr.Operation.String(), "braa") {
 					break // TODO: why did I do this again?
 				} else if (instrValue & 0xfffffC00) == 0x00201000 {
 					Xr := disassemble.Register((instrValue & 0x1F) + 34)
@@ -323,7 +375,20 @@ func Disassemble(d Disass) string {
 				goto INCR_ADDR
 			}
 
-			instrStr = instruction.String()
+			if instrStr, err = instruction.Disassemble(); err != nil {
+				if d.Color() {
+					fmt.Fprintf(&sb, "%s:  %s   %s %s%s\n",
+						colorAddr("%#08x", uint64(startAddr)),
+						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+						colorOp("%-7s", ".long"),
+						ColorOperands(fmt.Sprintf(" %#x", instrValue)),
+						colorComment(fmt.Sprintf(" ; (%s)", err.Error())),
+					)
+				} else {
+					fmt.Fprintf(&sb, "%#08x:  %s   .long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+				}
+				goto INCR_ADDR
+			}
 
 			if !d.Quite() {
 				// check for start of a new function
@@ -369,14 +434,14 @@ func Disassemble(d Disass) string {
 				if instruction.Operation == disassemble.ARM64_MRS || instruction.Operation == disassemble.ARM64_MSR {
 					var ops []string
 					replaced := false
-					for idx, op := range instruction.Operands {
+					for idx := 0; idx < int(instruction.NumOps); idx++ {
+						op := instruction.Operands[idx]
 						if op.Class == disassemble.REG {
-							if reg, ok := operandRegister(instruction, idx); ok {
+							if reg, ok := operandRegister(&instruction, idx); ok {
 								ops = append(ops, reg.String())
 							}
 						} else if op.Class == disassemble.IMPLEMENTATION_SPECIFIC {
-							sysRegFix := op.ImplSpec.GetSysReg().String()
-							if len(sysRegFix) > 0 {
+							if sysRegFix, ok := implSpecificSysReg(&op); ok {
 								ops = append(ops, sysRegFix)
 								replaced = true
 							}
@@ -387,7 +452,8 @@ func Disassemble(d Disass) string {
 					}
 				} else if ok, loc := d.IsBranchLocation(instruction.Address); ok {
 					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
-					for _, operand := range instruction.Operands {
+					for idx := 0; idx < int(instruction.NumOps); idx++ {
+						operand := instruction.Operands[idx]
 						if operand.Class == disassemble.LABEL {
 							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
 								display := symbols.FormatSymbol(name, d.Demangle())
@@ -409,21 +475,21 @@ func Disassemble(d Disass) string {
 					}
 					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
 				} else if instruction.Operation == disassemble.ARM64_BL || instruction.Operation == disassemble.ARM64_B {
-					if target, ok := operandImmediate(instruction, 0); ok {
+					if target, ok := operandImmediate(&instruction, 0); ok {
 						if name, ok := d.FindSymbol(target); ok {
 							display := symbols.FormatSymbol(name, d.Demangle())
 							instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, display)
 							comment = appendComment(comment, cstringComment(d, target))
 						}
 					}
-				} else if IsLoadLiteral(instruction) {
+				} else if IsLoadLiteral(&instruction) {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
 						display := symbols.FormatSymbol(name, d.Demangle())
 						comment = fmt.Sprintf(" ; %s", display)
 						comment = appendComment(comment, cstringComment(d, uint64(instruction.Operands[1].Immediate)))
 					}
 				} else if instruction.Operation == disassemble.ARM64_CBZ || instruction.Operation == disassemble.ARM64_CBNZ {
-					if target, ok := operandImmediate(instruction, 1); ok {
+					if target, ok := operandImmediate(&instruction, 1); ok {
 						if name, ok := d.FindSymbol(target); ok {
 							display := symbols.FormatSymbol(name, d.Demangle())
 							comment = fmt.Sprintf(" ; %s", display)
@@ -432,7 +498,8 @@ func Disassemble(d Disass) string {
 					}
 				} else if instruction.Operation == disassemble.ARM64_ADR {
 					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
-					for _, operand := range instruction.Operands {
+					for idx := 0; idx < int(instruction.NumOps); idx++ {
+						operand := instruction.Operands[idx]
 						if operand.Class == disassemble.LABEL {
 							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
 								display := symbols.FormatSymbol(name, d.Demangle())
@@ -450,29 +517,29 @@ func Disassemble(d Disass) string {
 						}
 					}
 					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
-				} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+				} else if hasPrev && prevInstr.Operation == disassemble.ARM64_ADRP &&
 					(instruction.Operation == disassemble.ARM64_ADD ||
 						instruction.Operation == disassemble.ARM64_LDR ||
 						instruction.Operation == disassemble.ARM64_LDRB ||
 						instruction.Operation == disassemble.ARM64_LDRSW ||
 						instruction.Operation == disassemble.ARM64_STRB) {
-					adrpRegister, ok := operandRegister(prevInstr, 0)
+					adrpRegister, ok := operandRegister(&prevInstr, 0)
 					if ok {
-						adrpImm, ok := operandImmediate(prevInstr, 1)
+						adrpImm, ok := operandImmediate(&prevInstr, 1)
 						if ok {
-							srcRegister, ok := operandRegister(instruction, 1)
+							srcRegister, ok := operandRegister(&instruction, 1)
 							if ok {
 								validPattern := true
 								if adrpRegister == srcRegister {
 									switch instruction.Operation {
 									case disassemble.ARM64_LDR, disassemble.ARM64_LDRB, disassemble.ARM64_LDRSW, disassemble.ARM64_STRB:
-										if imm, ok := operandImmediate(instruction, 1); ok {
+										if imm, ok := operandImmediate(&instruction, 1); ok {
 											adrpImm += imm
 										} else {
 											validPattern = false
 										}
 									case disassemble.ARM64_ADD:
-										if imm, ok := operandImmediate(instruction, 2); ok {
+										if imm, ok := operandImmediate(&instruction, 2); ok {
 											adrpImm += imm
 										} else {
 											validPattern = false
@@ -545,21 +612,19 @@ func Disassemble(d Disass) string {
 			}
 
 			prevInstr = instruction
+			hasPrev = true
 		} else { // output as JSON
-			instruction, err := disassemble.Decompose(startAddr, instrValue, &results) // TODO: it would probably be valuable to add a "comment" field and capture the analysis above for JSON peeps
-			if err != nil {
-				instructions = append(instructions, disassemble.Instruction{
-					Address:     startAddr,
-					Raw:         instrValue,
-					Encoding:    0,
-					Operation:   0,
-					Operands:    nil,
-					SetFlags:    0,
-					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()), // TODO: same with error enhancements above
-				})
+			var instruction disassemble.Inst
+			if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil { // TODO: it would probably be valuable to add a "comment" field and capture the analysis above for JSON peeps
+				instructions = append(instructions, invalidInstruction(startAddr, instrValue, err)) // TODO: same with error enhancements above
 				goto INCR_ADDR
 			}
-			instructions = append(instructions, *instruction)
+			converted := instruction.ToInstruction()
+			if converted.Disassembly, err = instruction.Disassemble(); err != nil {
+				instructions = append(instructions, invalidInstruction(startAddr, instrValue, err))
+				goto INCR_ADDR
+			}
+			instructions = append(instructions, *converted)
 		}
 	INCR_ADDR:
 		startAddr += uint64(binary.Size(uint32(0)))
@@ -661,9 +726,9 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 
 func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, error)) (map[uint64]uint64, error) {
 	var instrValue uint32
-	var results [1024]byte
-
-	queue := make([]*disassemble.Instruction, 2)
+	var decoder disassemble.Decoder
+	var queue [2]disassemble.Inst
+	var queueValid [2]bool
 
 	stubs := make(map[uint64]uint64)
 
@@ -678,22 +743,23 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 			break
 		}
 
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
+		var instruction disassemble.Inst
+		if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 			startAddr += uint64(binary.Size(uint32(0)))
 			queue[1] = queue[0] // push instruction onto const length FIFO queue
-			queue[0] = instruction
+			queueValid[1] = queueValid[0]
+			queueValid[0] = false
 			continue
 		}
 
-		if (queue[1] != nil && queue[1].Operation == disassemble.ARM64_ADRP) &&
-			(queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
+		if queueValid[1] && queue[1].Operation == disassemble.ARM64_ADRP &&
+			queueValid[0] && queue[0].Operation == disassemble.ARM64_ADD &&
 			instruction.Operation == disassemble.ARM64_LDR {
-			adrpRegister, ok := operandRegister(queue[1], 0)
+			adrpRegister, ok := operandRegister(&queue[1], 0)
 			if ok {
-				if addRegister, ok := operandRegister(queue[0], 0); ok {
-					if adrpBase, ok := operandImmediate(queue[1], 1); ok {
-						if addImm, ok := operandImmediate(queue[0], 2); ok {
+				if addRegister, ok := operandRegister(&queue[0], 0); ok {
+					if adrpBase, ok := operandImmediate(&queue[1], 1); ok {
+						if addImm, ok := operandImmediate(&queue[0], 2); ok {
 							if adrpRegister == addRegister {
 								// adrp     x17, 0x221baf000
 								stubTarget := adrpBase
@@ -701,19 +767,14 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 								stubTarget += addImm
 								stubAddr := queue[1].Address // address of beginning of stub (adrp)
 								// ldr      x16, [x17]
-								if ldrRegister, ok := operandRegister(instruction, 1); ok &&
+								if ldrRegister, ok := operandRegister(&instruction, 1); ok &&
 									(addRegister == ldrRegister) { // check add reg and ldr reg are the same
-									if ldrImm, ok := operandImmediate(instruction, 1); ok && ldrImm != 0 { // check for immediate
+									if ldrImm, ok := operandImmediate(&instruction, 1); ok && ldrImm != 0 { // check for immediate
 										stubTarget += ldrImm
 									}
 									addr, err := readPtr(stubTarget)
 									if err != nil {
-										log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), instruction) // TODO: DRY this up
-										for _, i := range queue {
-											if i != nil {
-												log.Debugf("%#08x:  %s\t%s", i.Address, disassemble.GetOpCodeByteString(i.Raw), i)
-											}
-										}
+										logStubDecodeContext(&instruction, &queue, &queueValid)
 										return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", stubTarget, err)
 									}
 									// braa     x16, x17
@@ -724,14 +785,14 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 					}
 				}
 			}
-		} else if (queue[1] != nil && queue[1].Operation == disassemble.ARM64_ADRP) &&
-			(queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
+		} else if queueValid[1] && queue[1].Operation == disassemble.ARM64_ADRP &&
+			queueValid[0] && queue[0].Operation == disassemble.ARM64_ADD &&
 			(IsBranchOp(instruction.Operation) || instruction.Operation == disassemble.ARM64_BR) {
-			adrpRegister, ok := operandRegister(queue[1], 0)
+			adrpRegister, ok := operandRegister(&queue[1], 0)
 			if ok {
-				if addRegister, ok := operandRegister(queue[0], 0); ok {
-					if adrpBase, ok := operandImmediate(queue[1], 1); ok {
-						if addImm, ok := operandImmediate(queue[0], 2); ok {
+				if addRegister, ok := operandRegister(&queue[0], 0); ok {
+					if adrpBase, ok := operandImmediate(&queue[1], 1); ok {
+						if addImm, ok := operandImmediate(&queue[0], 2); ok {
 							if adrpRegister == addRegister {
 								// adrp     x16, 0x19089b000
 								stubTarget := adrpBase
@@ -746,25 +807,20 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 				}
 			}
 			// brk      #0x1
-		} else if (queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADRP) &&
+		} else if queueValid[0] && queue[0].Operation == disassemble.ARM64_ADRP &&
 			instruction.Operation == disassemble.ARM64_LDR {
-			if adrpRegister, ok := operandRegister(queue[0], 0); ok {
-				if adrpBase, ok := operandImmediate(queue[0], 1); ok {
+			if adrpRegister, ok := operandRegister(&queue[0], 0); ok {
+				if adrpBase, ok := operandImmediate(&queue[0], 1); ok {
 					// adrp	x16, #0x1e3be9000
 					stubTarget := adrpBase // #0x1e3be9000
 					// ldr	x16, [x16, #0x560]
-					if ldrRegister, ok := operandRegister(instruction, 0); ok && adrpRegister == ldrRegister {
-						if ldrImm, ok := operandImmediate(instruction, 1); ok {
+					if ldrRegister, ok := operandRegister(&instruction, 0); ok && adrpRegister == ldrRegister {
+						if ldrImm, ok := operandImmediate(&instruction, 1); ok {
 							stubTarget += ldrImm
 							stubAddr := queue[0].Address
 							addr, err := readPtr(stubTarget)
 							if err != nil {
-								log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), instruction)
-								for _, i := range queue {
-									if i != nil {
-										log.Debugf("%#08x:  %s\t%s", i.Address, disassemble.GetOpCodeByteString(i.Raw), i)
-									}
-								}
+								logStubDecodeContext(&instruction, &queue, &queueValid)
 								return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", stubTarget, err)
 							}
 							stubs[stubAddr] = addr
@@ -777,7 +833,9 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 		// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
 
 		queue[1] = queue[0] // push instruction onto const length FIFO queue
+		queueValid[1] = queueValid[0]
 		queue[0] = instruction
+		queueValid[0] = true
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
@@ -786,7 +844,7 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 
 func ParseHelpersASM(m *macho.File) (map[uint64]uint64, error) {
 	var instrValue uint32
-	var results [1024]byte
+	var decoder disassemble.Decoder
 
 	helpers := make(map[uint64]uint64)
 
@@ -815,8 +873,8 @@ func ParseHelpersASM(m *macho.File) (map[uint64]uint64, error) {
 				break
 			}
 
-			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-			if err != nil {
+			var instruction disassemble.Inst
+			if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
 				startAddr += uint64(binary.Size(uint32(0)))
 				continue
 			}
@@ -829,7 +887,7 @@ func ParseHelpersASM(m *macho.File) (map[uint64]uint64, error) {
 				continue
 			}
 			if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM {
-				if target, ok := operandImmediate(instruction, 0); ok {
+				if target, ok := operandImmediate(&instruction, 0); ok {
 					helpers[stubHelperFnStart] = target
 				}
 			}
