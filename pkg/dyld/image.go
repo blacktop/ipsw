@@ -830,6 +830,39 @@ func (i *CacheImage) ParseStubs() error {
 	return nil
 }
 
+// ResolveStubAtAddr checks if addr is in a stub section (__stubs, __auth_stubs)
+// and if so, uses ParseStubs to find the target, then resolves it to a symbol.
+// Returns the target address and symbol name, or an error if not a stub or unresolvable.
+func (i *CacheImage) ResolveStubAtAddr(addr uint64) (uint64, string, error) {
+	if !i.Analysis.State.IsStubsDone() {
+		if err := i.ParseStubs(); err != nil {
+			return 0, "", err
+		}
+	}
+	target, ok := i.Analysis.SymbolStubs[addr]
+	if !ok {
+		return 0, "", fmt.Errorf("address %#x is not a known stub", addr)
+	}
+	// Resolve target symbol: search the target image's symtab + local symbols
+	if img, err := i.cache.GetImageContainingTextAddr(target); err == nil {
+		tm, err := img.GetMacho()
+		if err == nil {
+			defer tm.Close()
+			if syms, err := tm.FindAddressSymbols(target); err == nil {
+				for _, s := range syms {
+					if s.Name != "<redacted>" && s.Name != "" {
+						return target, s.Name, nil
+					}
+				}
+			}
+			if name, err := img.FindLocalSymbolAtAddr(target); err == nil && name != "" {
+				return target, name, nil
+			}
+		}
+	}
+	return target, "", fmt.Errorf("stub at %#x -> %#x: target symbol not found", addr, target)
+}
+
 // ParseHelpers parse symbol stub helpers in MachO
 func (i *CacheImage) ParseHelpers() error {
 
@@ -882,6 +915,58 @@ func (i *CacheImage) ParseSwiftStrings() error {
 	}
 
 	return nil
+}
+
+// FindLocalSymbolAtAddr searches only this image's DSC local symbol nlist entries
+// for a symbol at the given address, without populating the full a2s cache.
+// Returns the symbol name or an error if not found.
+func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
+	var uuid types.UUID
+	if i.cache.IsDyld4 {
+		uuid = i.cache.symUUID
+	} else {
+		uuid = i.cache.UUID
+	}
+	if i.cache.Headers[uuid].LocalSymbolsOffset == 0 {
+		return "", fmt.Errorf("no local symbols")
+	}
+	nlistCount := int(i.cache.Images[i.Index].NlistCount)
+	if nlistCount == 0 {
+		return "", fmt.Errorf("no local symbols for image")
+	}
+	// Compute direct offset to this image's nlist entries
+	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
+	for j := uint32(0); j < i.Index; j++ {
+		nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
+	}
+	// Bulk-read all nlist entries for this image
+	nlistBuf := make([]byte, nlistCount*nlist64Size)
+	if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
+		return "", fmt.Errorf("failed to read nlist entries: %w", err)
+	}
+	// Scan for matching address
+	strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
+	strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
+	for n := range nlistCount {
+		off := n * nlist64Size
+		nameIdx, value := parseNlist64(nlistBuf[off:])
+		if value == addr {
+			// Read just this one string from the string pool
+			readOff := strPoolBase + int64(nameIdx)
+			readLen := int64(512)
+			if readOff+readLen > strPoolBase+strPoolSize {
+				readLen = strPoolBase + strPoolSize - readOff
+			}
+			buf := make([]byte, readLen)
+			nr, _ := i.cache.r[uuid].ReadAt(buf[:readLen], readOff)
+			nullPos := bytes.IndexByte(buf[:nr], 0)
+			if nullPos < 0 {
+				nullPos = nr
+			}
+			return string(buf[:nullPos]), nil
+		}
+	}
+	return "", fmt.Errorf("no local symbol at %#x", addr)
 }
 
 // ParseLocalSymbols parses and caches, with the option to dump, all the local/private symbols for an image

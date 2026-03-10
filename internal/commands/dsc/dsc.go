@@ -367,6 +367,152 @@ retry:
 	goto retry
 }
 
+// DirectLookupSymbol resolves a symbol for an address without needing the a2s cache.
+// It uses binary search to find the image, then searches only that image's
+// symtab, export trie, and DSC local symbols for the symbol name.
+func DirectLookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
+	var secondAttempt bool
+
+	sym := &SymbolLookup{
+		Address: addr,
+	}
+	setSymbol := func(name string) (*SymbolLookup, error) {
+		sym.Symbol = name
+		sym.Demanged = symbols.DemangleSymbolName(name)
+		return sym, nil
+	}
+
+	uuid, mapping, err := f.GetMappingForVMAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	sym.UUID = uuid.String()
+	sym.Mapping = mapping.Name
+
+	sym.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+	if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+		sym.StubIsland = true
+	}
+
+retry:
+	// Try fast __TEXT binary search first, fall back to full segment scan
+	image, err := f.GetImageContainingTextAddr(addr)
+	if err != nil {
+		image, err = f.GetImageContainingVMAddr(addr)
+	}
+	if err == nil {
+		m, err := image.GetMacho()
+		if err != nil {
+			return nil, err
+		}
+		defer m.Close()
+
+		sym.Image = image.Name
+
+		if s := m.FindSegmentForVMAddr(addr); s != nil {
+			sym.Segment = s.Name
+			if s.Nsect > 0 {
+				if c := m.FindSectionForVMAddr(addr); c != nil {
+					sym.Section = c.Name
+				}
+			}
+		}
+
+		// Find the function containing this address
+		if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
+			delta := ""
+			if addr-fn.StartAddr != 0 {
+				delta = fmt.Sprintf(" + %d", addr-fn.StartAddr)
+			}
+			// Search symtab + export trie for the function start address
+			if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+				for _, s := range syms {
+					if s.Name != "<redacted>" && s.Name != "" {
+						name := s.Name
+						if secondAttempt {
+							name = symbols.PrefixPointer + name
+						}
+						return setSymbol(fmt.Sprintf("%s%s", name, delta))
+					}
+				}
+			}
+			// Search DSC local symbols for this image
+			if name, err := image.FindLocalSymbolAtAddr(fn.StartAddr); err == nil && name != "" {
+				if secondAttempt {
+					name = symbols.PrefixPointer + name
+				}
+				return setSymbol(fmt.Sprintf("%s%s", name, delta))
+			}
+			if secondAttempt {
+				return setSymbol(fmt.Sprintf("%sfunc_%x%s", symbols.PrefixPointer, fn.StartAddr, delta))
+			}
+			return setSymbol(fmt.Sprintf("func_%x%s", fn.StartAddr, delta))
+		}
+
+		if cstr, ok := m.IsCString(addr); ok {
+			if secondAttempt {
+				return setSymbol(fmt.Sprintf("%s%#v", symbols.PrefixPointer, cstr))
+			}
+			return setSymbol(fmt.Sprintf("%#v", cstr))
+		}
+
+		// Try stub resolution (__stubs, __auth_stubs)
+		if _, targetName, err := image.ResolveStubAtAddr(addr); err == nil && targetName != "" {
+			name := fmt.Sprintf("%s%s", symbols.PrefixJump, targetName)
+			if secondAttempt {
+				name = symbols.PrefixPointer + name
+			}
+			return setSymbol(name)
+		}
+	}
+
+	// Try exact address match in symtab/locals (for non-function addresses)
+	if image != nil {
+		m, _ := image.GetMacho()
+		if m != nil {
+			if syms, err := m.FindAddressSymbols(addr); err == nil {
+				for _, s := range syms {
+					if s.Name != "<redacted>" && s.Name != "" {
+						name := s.Name
+						if secondAttempt {
+							name = symbols.PrefixPointer + name
+						}
+						return setSymbol(name)
+					}
+				}
+			}
+		}
+		if name, err := image.FindLocalSymbolAtAddr(addr); err == nil && name != "" {
+			if secondAttempt {
+				name = symbols.PrefixPointer + name
+			}
+			return setSymbol(name)
+		}
+	}
+
+	if secondAttempt {
+		return setSymbol("?")
+	}
+
+	ptr, err := f.ReadPointerAtAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if f.SlideInfo.SlidePointer(ptr) == 0 {
+		return setSymbol("?")
+	}
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, f.SlideInfo.SlidePointer(ptr)))
+
+	addr = f.SlideInfo.SlidePointer(ptr)
+
+	secondAttempt = true
+
+	goto retry
+}
+
 // GetDylibsThatImport returns a list of dylibs that import the given dylib
 func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
 	var importedBy ImportedBy

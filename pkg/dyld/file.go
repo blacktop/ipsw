@@ -10,6 +10,7 @@ import (
 	"math/bits"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unsafe"
 
@@ -98,6 +99,9 @@ type File struct {
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
+
+	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
+	sortedImages []*CacheImage
 }
 
 // FormatError is returned by some operations if the data does
@@ -225,6 +229,13 @@ func Open(name string) (*File, error) {
 	}
 
 	ff.closers[ff.UUID] = f
+
+	// Build sorted image index for O(log N) text address lookups
+	ff.sortedImages = make([]*CacheImage, len(ff.Images))
+	copy(ff.sortedImages, ff.Images)
+	sort.Slice(ff.sortedImages, func(i, j int) bool {
+		return ff.sortedImages[i].LoadAddress < ff.sortedImages[j].LoadAddress
+	})
 
 	return ff, nil
 }
@@ -1887,11 +1898,21 @@ func (f *File) Search(search []byte) (map[mtypes.UUID][]uint64, error) {
 	return matches, nil
 }
 
-// GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address
+// GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address.
+// Uses binary search on the sorted image index for O(log N) performance.
 // NOTE: this can be faster than GetImageContainingVMAddr as it avoids parsing the MachO
 func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
-	for _, img := range f.Images {
-		if img.CacheImageTextInfo.LoadAddress <= addr && addr < img.CacheImageTextInfo.LoadAddress+uint64(img.TextSegmentSize) {
+	n := len(f.sortedImages)
+	if n == 0 {
+		return nil, fmt.Errorf("address %#x not in any dylib __TEXT", addr)
+	}
+	// Binary search: find the last image whose LoadAddress <= addr
+	idx := sort.Search(n, func(i int) bool {
+		return f.sortedImages[i].LoadAddress > addr
+	}) - 1
+	if idx >= 0 {
+		img := f.sortedImages[idx]
+		if addr < img.LoadAddress+uint64(img.TextSegmentSize) {
 			return img, nil
 		}
 	}
