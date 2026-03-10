@@ -14,6 +14,7 @@ import (
 
 const (
 	benchmarkKDKKernelEnv = "IPSW_BENCH_KDK_KERNEL"
+	benchmarkIOSKernelEnv = "IPSW_BENCH_IOS_KERNEL"
 	testKDKPathEnv        = "IPSW_TEST_KDK_PATH"
 )
 
@@ -45,7 +46,11 @@ func BenchmarkScannerScanKDK(b *testing.B) {
 }
 
 func BenchmarkScannerScanNearbyIOSKernelEntry(b *testing.B) {
-	fixture := openBenchmarkKernelFixtureAtPath(b, nearbyIOSFixture)
+	path := os.Getenv(benchmarkIOSKernelEnv)
+	if path == "" {
+		b.Skipf("set %s to an iOS kernelcache path", benchmarkIOSKernelEnv)
+	}
+	fixture := openBenchmarkKernelFixtureAtPath(b, path)
 	if fixture.root.FileHeader.Type != types.MH_FILESET {
 		b.Skip("kernel-entry scan is identical to full scan on non-fileset fixtures")
 	}
