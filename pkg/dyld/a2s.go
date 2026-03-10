@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,21 +12,21 @@ import (
 	"syscall"
 )
 
-var a2sMagic = [4]byte{'A', '2', 'S', 1}
+var a2sMagic = [4]byte{'A', '2', 'S', 2}
 
-const a2sEntrySize = 16 // uint64 + uint32 + uint32
+const a2sEntrySize = 12 // addr(8) + strOffset(4)
 const a2sHeaderSize = 12 // magic(4) + count(4) + strTabSize(4)
-
-type a2sEntry struct {
-	Addr      uint64
-	StrOffset uint32
-	StrLen    uint32
-}
 
 // A2STable is an address-to-symbol lookup table.
 // During cache creation it uses a map for read-write access.
 // When loaded from disk it uses mmap with binary search for O(log n) lookups
 // touching only the pages needed.
+//
+// File format (v2):
+//
+//	[12] header: magic "A2S\x02" (4) + count (4) + strTabSize (4)
+//	[12*N] entries sorted by addr: addr (8) + strOffset (4)
+//	[strTabSize] string table: null-terminated strings packed contiguously
 type A2STable struct {
 	// mmap mode (loaded from file)
 	data    []byte // mmap'd file data
@@ -72,10 +73,14 @@ func (t *A2STable) Get(addr uint64) (string, bool) {
 		entryAddr := binary.LittleEndian.Uint64(t.data[off:])
 		if entryAddr == addr {
 			strOff := binary.LittleEndian.Uint32(t.data[off+8:])
-			strLen := binary.LittleEndian.Uint32(t.data[off+12:])
 			start := t.strBase + int(strOff)
+			// find null terminator
+			end := bytes.IndexByte(t.data[start:], 0)
+			if end < 0 {
+				return "", false
+			}
 			// string() copies the bytes, safe after munmap
-			return string(t.data[start : start+int(strLen)]), true
+			return string(t.data[start : start+end]), true
 		}
 	}
 	return "", false
@@ -128,9 +133,12 @@ func (t *A2STable) Range(fn func(uint64, string) bool) {
 		off := a2sHeaderSize + i*a2sEntrySize
 		addr := binary.LittleEndian.Uint64(t.data[off:])
 		strOff := binary.LittleEndian.Uint32(t.data[off+8:])
-		strLen := binary.LittleEndian.Uint32(t.data[off+12:])
 		start := t.strBase + int(strOff)
-		if !fn(addr, string(t.data[start:start+int(strLen)])) {
+		end := bytes.IndexByte(t.data[start:], 0)
+		if end < 0 {
+			continue
+		}
+		if !fn(addr, string(t.data[start:start+end])) {
 			return
 		}
 	}
@@ -146,26 +154,31 @@ func (t *A2STable) Close() error {
 	return nil
 }
 
-// Save writes the table to w in binary format: sorted entries + packed string table.
+// Save writes the table to w in binary format v2: sorted entries + null-terminated string table.
 func (t *A2STable) Save(w io.Writer) error {
 	if t.m == nil {
 		return fmt.Errorf("a2s: nothing to save")
 	}
 
-	entries := make([]a2sEntry, 0, len(t.m))
+	type entry struct {
+		addr   uint64
+		strOff uint32
+	}
+
+	entries := make([]entry, 0, len(t.m))
 	var strBuf []byte
 
 	for addr, name := range t.m {
-		entries = append(entries, a2sEntry{
-			Addr:      addr,
-			StrOffset: uint32(len(strBuf)),
-			StrLen:    uint32(len(name)),
+		entries = append(entries, entry{
+			addr:   addr,
+			strOff: uint32(len(strBuf)),
 		})
 		strBuf = append(strBuf, name...)
+		strBuf = append(strBuf, 0) // null terminator
 	}
 
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Addr < entries[j].Addr
+		return entries[i].addr < entries[j].addr
 	})
 
 	bw := bufio.NewWriterSize(w, 1<<20)
@@ -179,19 +192,18 @@ func (t *A2STable) Save(w io.Writer) error {
 		return err
 	}
 
-	// Entries as raw bytes
+	// Entries as raw bytes (12 bytes each: addr + strOffset)
 	buf := make([]byte, len(entries)*a2sEntrySize)
 	for i, e := range entries {
 		off := i * a2sEntrySize
-		binary.LittleEndian.PutUint64(buf[off:], e.Addr)
-		binary.LittleEndian.PutUint32(buf[off+8:], e.StrOffset)
-		binary.LittleEndian.PutUint32(buf[off+12:], e.StrLen)
+		binary.LittleEndian.PutUint64(buf[off:], e.addr)
+		binary.LittleEndian.PutUint32(buf[off+8:], e.strOff)
 	}
 	if _, err := bw.Write(buf); err != nil {
 		return err
 	}
 
-	// String table
+	// String table (null-terminated strings)
 	if _, err := bw.Write(strBuf); err != nil {
 		return err
 	}
