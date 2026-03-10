@@ -37,6 +37,14 @@ body:
       options:
         - label: I did search for other open and closed issues before opening this
           required: true
+  - type: textarea
+    id: ai-assistance
+    attributes:
+      label: AI assistance
+      description: If AI tools helped draft or analyze this report, disclose the tool and extent. Otherwise write `none`.
+      placeholder: "none"
+    validations:
+      required: true
   - type: checkboxes
     id: terms
     attributes:
@@ -44,6 +52,14 @@ body:
       description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/blacktop/ipsw/blob/master/.github/CODE_OF_CONDUCT.md)
       options:
         - label: I agree to follow this project's Code of Conduct
+          required: true
+  - type: checkboxes
+    id: ai-policy
+    attributes:
+      label: AI Policy
+      description: By submitting this issue, you agree to follow this project's [AI Usage Policy](https://github.com/blacktop/ipsw/blob/master/AI_POLICY.md)
+      options:
+        - label: I understand and agree to follow this project's AI Usage Policy
           required: true
   - type: textarea
     id: ctx
