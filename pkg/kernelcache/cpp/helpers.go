@@ -91,54 +91,6 @@ func isPacibsp(raw uint32) bool {
 	return raw == 0xd503237f
 }
 
-// mayBeTrackedInstruction returns true when the raw ARM64
-// encoding *might* be an instruction that trackStaticValueInstruction
-// cares about (ADD, MOV, ORR, LDR, LDUR, LDP, SUB).  False positives
-// are OK (the full decoder handles those); false negatives are not.
-// The purpose is to avoid expensive CGo DecomposeInto calls for the
-// vast majority of instructions that the tracker ignores.
-func mayBeTrackedInstruction(raw uint32) bool {
-	switch {
-	// ADD (immediate): sf 0 0 10001 sh imm12 Rn Rd
-	case (raw & 0x7f000000) == 0x11000000:
-		return true
-	// SUB (immediate): sf 1 0 10001 sh imm12 Rn Rd
-	case (raw & 0x7f000000) == 0x51000000:
-		return true
-	// ORR (shifted register, 64-bit): 1 01 01010 sh 0 Rm imm6 Rn Rd
-	case (raw & 0xff200000) == 0xaa000000:
-		return true
-	// MOVZ (32/64): sf 10 100101 hw imm16 Rd
-	case (raw & 0x7f800000) == 0x52800000:
-		return true
-	// MOVN (32/64): sf 00 100101 hw imm16 Rd
-	case (raw & 0x7f800000) == 0x12800000:
-		return true
-	// MOVK (32/64): sf 11 100101 hw imm16 Rd
-	case (raw & 0x7f800000) == 0x72800000:
-		return true
-	// LDR (unsigned offset, 64-bit): 11 111 00101 imm12 Rn Rt
-	case (raw & 0xffc00000) == 0xf9400000:
-		return true
-	// LDR (unsigned offset, 32-bit): 10 111 00101 imm12 Rn Rt
-	case (raw & 0xffc00000) == 0xb9400000:
-		return true
-	// LDUR (64-bit): 11 111000 010 imm9 00 Rn Rt
-	case (raw & 0xffe00c00) == 0xf8400000:
-		return true
-	// LDUR (32-bit): 10 111000 010 imm9 00 Rn Rt
-	case (raw & 0xffe00c00) == 0xb8400000:
-		return true
-	// LDP (signed offset, 64-bit): x0 101 0 010 1 imm7 Rt2 Rn Rt
-	case (raw & 0x7fc00000) == 0xa9400000:
-		return true
-	// LDR (register, 64-bit): 11 111000 011 Rm opt S 10 Rn Rt
-	case (raw & 0xffe00c00) == 0xf8600800:
-		return true
-	}
-	return false
-}
-
 func (s *Scanner) decodeArm64Instruction(addr uint64, raw uint32, inst *disassemble.Inst) error {
 	return s.decoder.DecomposeInto(addr, raw, inst)
 }
@@ -1766,24 +1718,6 @@ func (s *Scanner) staticDirectCallContext(owner *macho.File, fn types.Function, 
 }
 
 func (s *Scanner) staticDirectCallTrackedContext(owner *macho.File, regBase [31]uint64, regLoadAddr [31]uint64, regValue [31]uint64, callsite uint64) wrapperContext {
-	for reg := range 4 {
-		if regValue[reg] == 0 && regBase[reg] != 0 {
-			regValue[reg] = regBase[reg]
-		}
-		if reg == 2 && regValue[reg] != 0 && !validKernelPointer(regValue[reg]) {
-			regValue[reg] = s.normalizeLoadedPointer(owner, regValue[reg])
-		}
-	}
-	return wrapperContext{
-		x0:       regValue[0],
-		x1:       regValue[1],
-		x2:       regValue[2],
-		x3:       regValue[3],
-		callsite: callsite,
-	}
-}
-
-func (s *Scanner) pureGoTrackedContext(owner *macho.File, regBase, regValue [31]uint64, callsite uint64) wrapperContext {
 	for reg := range 4 {
 		if regValue[reg] == 0 && regBase[reg] != 0 {
 			regValue[reg] = regBase[reg]
