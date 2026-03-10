@@ -27,6 +27,7 @@ type Config struct {
 	ClassName           string
 	MaxCtorInstructions int
 	MaxWrapperDepth     int
+	LogStats            bool
 }
 
 // Class is the phase-1 scanner output.
@@ -283,10 +284,12 @@ func (s *Scanner) Scan() ([]Class, error) {
 			s.stats.resolvedParentMeta++
 		}
 	}
-	log.Infof("scan stats: classes=%d vtables=%d parent_meta=%d ptr_index=%d engines=%d ptr_hits=%d ptr_misses=%d",
-		s.stats.discoveredClasses, s.stats.resolvedVtables,
-		s.stats.resolvedParentMeta, s.stats.pointerIndexEntries,
-		s.stats.engineCreations, s.stats.ptrCacheHits, s.stats.ptrCacheMisses)
+	if s.cfg.LogStats {
+		log.Infof("scan stats: classes=%d vtables=%d parent_meta=%d ptr_index=%d engines=%d ptr_hits=%d ptr_misses=%d",
+			s.stats.discoveredClasses, s.stats.resolvedVtables,
+			s.stats.resolvedParentMeta, s.stats.pointerIndexEntries,
+			s.stats.engineCreations, s.stats.ptrCacheHits, s.stats.ptrCacheMisses)
+	}
 
 	if s.cfg.ClassName == "" {
 		return out, nil
