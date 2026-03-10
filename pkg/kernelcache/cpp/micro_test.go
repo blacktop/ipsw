@@ -6,6 +6,41 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 )
 
+func testOp(op disassemble.Operand) disassemble.Op {
+	out := disassemble.Op{
+		Class:          op.Class,
+		ArrSpec:        op.ArrSpec,
+		Condition:      op.Condition,
+		SysReg:         op.SysReg,
+		LaneUsed:       op.LaneUsed,
+		Lane:           op.Lane,
+		Immediate:      op.Immediate,
+		ShiftType:      op.ShiftType,
+		ShiftValueUsed: op.ShiftValueUsed,
+		ShiftValue:     op.ShiftValue,
+		Extend:         op.Extend,
+		SignedImm:      op.SignedImm,
+		PredQual:       op.PredQual,
+		MulVl:          op.MulVl,
+		Tile:           op.Tile,
+		Slice:          op.Slice,
+	}
+	out.NumRegisters = uint8(copy(out.Registers[:], op.Registers))
+	return out
+}
+
+func testInst(addr uint64, op disassemble.Operation, operands ...disassemble.Operand) *disassemble.Inst {
+	inst := &disassemble.Inst{
+		Address:   addr,
+		Operation: op,
+		NumOps:    uint8(len(operands)),
+	}
+	for idx := range operands {
+		inst.Operands[idx] = testOp(operands[idx])
+	}
+	return inst
+}
+
 func TestBuildMicroPlanMarksAnchorStoreAndPAC(t *testing.T) {
 	start := uint64(0x2000)
 	anchor := uint64(0x2040)
@@ -49,15 +84,11 @@ func TestApplyMicroInstructionTracksAddressMaterializationAndMoves(t *testing.T)
 	state := newMicroState(nil, 0x1000)
 	state.setKnownBase(1, 0x1000)
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x1000,
-		Operation: disassemble.ARM64_ADD,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X0}},
-			{Registers: []disassemble.Register{disassemble.REG_X1}},
-			{Class: disassemble.IMM64, Immediate: 0x20},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x1000, disassemble.ARM64_ADD,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X0}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X1}},
+		disassemble.Operand{Class: disassemble.IMM64, Immediate: 0x20},
+	))
 	if got, want := state.GetX(0), uint64(0x1020); got != want {
 		t.Fatalf("x0 = %#x, want %#x", got, want)
 	}
@@ -65,27 +96,19 @@ func TestApplyMicroInstructionTracksAddressMaterializationAndMoves(t *testing.T)
 		t.Fatalf("regBase[x0] = %#x, want %#x", got, want)
 	}
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x1004,
-		Operation: disassemble.ARM64_MOV,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X2}},
-			{Registers: []disassemble.Register{disassemble.REG_X0}},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x1004, disassemble.ARM64_MOV,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X2}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X0}},
+	))
 	if got, want := state.GetX(2), uint64(0x1020); got != want {
 		t.Fatalf("x2 = %#x, want %#x", got, want)
 	}
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x1008,
-		Operation: disassemble.ARM64_ORR,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X3}},
-			{Registers: []disassemble.Register{disassemble.REG_XZR}},
-			{Registers: []disassemble.Register{disassemble.REG_X2}},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x1008, disassemble.ARM64_ORR,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X3}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_XZR}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X2}},
+	))
 	if got, want := state.GetX(3), uint64(0x1020); got != want {
 		t.Fatalf("x3 = %#x, want %#x", got, want)
 	}
@@ -100,14 +123,10 @@ func TestApplyMicroInstructionLoadsFromTrackedStackSlot(t *testing.T) {
 	state.sp = 0x4000
 	state.writeStack(0x4000, 0xfeedface)
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x3000,
-		Operation: disassemble.ARM64_LDR,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X2}},
-			{Class: disassemble.MEM_OFFSET, Registers: []disassemble.Register{disassemble.REG_SP}, Immediate: 0},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x3000, disassemble.ARM64_LDR,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X2}},
+		disassemble.Operand{Class: disassemble.MEM_OFFSET, Registers: []disassemble.Register{disassemble.REG_SP}, Immediate: 0},
+	))
 
 	if got, want := state.GetX(2), uint64(0xfeedface); got != want {
 		t.Fatalf("x2 = %#x, want %#x", got, want)
@@ -122,14 +141,10 @@ func TestApplyMicroInstructionDoesNotMaterializeUnknownDynamicLoad(t *testing.T)
 	state := newMicroState(nil, 0x5000)
 	state.setKnownValue(1, 0xfffffe0001234000)
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x5000,
-		Operation: disassemble.ARM64_LDR,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X0}},
-			{Class: disassemble.MEM_OFFSET, Registers: []disassemble.Register{disassemble.REG_X1}, Immediate: 0},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x5000, disassemble.ARM64_LDR,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X0}},
+		disassemble.Operand{Class: disassemble.MEM_OFFSET, Registers: []disassemble.Register{disassemble.REG_X1}, Immediate: 0},
+	))
 
 	if got := state.GetX(0); got != 0 {
 		t.Fatalf("x0 = %#x, want 0 for unsupported dynamic load", got)
@@ -144,14 +159,10 @@ func TestApplyMicroInstructionZeroExtendsWRegisterWrites(t *testing.T) {
 	state := newMicroState(nil, 0x6000)
 	state.setKnownValue(1, 0x1_0000_0001)
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x6000,
-		Operation: disassemble.ARM64_MOV,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_W0}},
-			{Registers: []disassemble.Register{disassemble.REG_X1}},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x6000, disassemble.ARM64_MOV,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_W0}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X1}},
+	))
 
 	if got, want := state.GetX(0), uint64(1); got != want {
 		t.Fatalf("x0 = %#x, want %#x after W write zero-extension", got, want)
@@ -166,15 +177,11 @@ func TestApplyMicroInstructionClearsUnsupportedDestination(t *testing.T) {
 	state := newMicroState(nil, 0x7000)
 	state.setKnownValue(0, 0xfeedface)
 
-	scanner.applyMicroInstruction(state, &disassemble.Instruction{
-		Address:   0x7000,
-		Operation: disassemble.ARM64_CSEL,
-		Operands: []disassemble.Operand{
-			{Registers: []disassemble.Register{disassemble.REG_X0}},
-			{Registers: []disassemble.Register{disassemble.REG_X1}},
-			{Registers: []disassemble.Register{disassemble.REG_X2}},
-		},
-	})
+	scanner.applyMicroInstruction(state, testInst(0x7000, disassemble.ARM64_CSEL,
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X0}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X1}},
+		disassemble.Operand{Registers: []disassemble.Register{disassemble.REG_X2}},
+	))
 
 	if got := state.GetX(0); got != 0 {
 		t.Fatalf("x0 = %#x, want 0 after unsupported destination write", got)

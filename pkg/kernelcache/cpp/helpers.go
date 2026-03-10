@@ -91,23 +91,110 @@ func isPacibsp(raw uint32) bool {
 	return raw == 0xd503237f
 }
 
-func decodeArm64Instruction(addr uint64, raw uint32) (*disassemble.Instruction, error) {
-	var results [1024]byte
-	return disassemble.Decompose(addr, raw, &results)
+// mayBeTrackedInstruction returns true when the raw ARM64
+// encoding *might* be an instruction that trackStaticValueInstruction
+// cares about (ADD, MOV, ORR, LDR, LDUR, LDP, SUB).  False positives
+// are OK (the full decoder handles those); false negatives are not.
+// The purpose is to avoid expensive CGo DecomposeInto calls for the
+// vast majority of instructions that the tracker ignores.
+func mayBeTrackedInstruction(raw uint32) bool {
+	switch {
+	// ADD (immediate): sf 0 0 10001 sh imm12 Rn Rd
+	case (raw & 0x7f000000) == 0x11000000:
+		return true
+	// SUB (immediate): sf 1 0 10001 sh imm12 Rn Rd
+	case (raw & 0x7f000000) == 0x51000000:
+		return true
+	// ORR (shifted register, 64-bit): 1 01 01010 sh 0 Rm imm6 Rn Rd
+	case (raw & 0xff200000) == 0xaa000000:
+		return true
+	// MOVZ (32/64): sf 10 100101 hw imm16 Rd
+	case (raw & 0x7f800000) == 0x52800000:
+		return true
+	// MOVN (32/64): sf 00 100101 hw imm16 Rd
+	case (raw & 0x7f800000) == 0x12800000:
+		return true
+	// MOVK (32/64): sf 11 100101 hw imm16 Rd
+	case (raw & 0x7f800000) == 0x72800000:
+		return true
+	// LDR (unsigned offset, 64-bit): 11 111 00101 imm12 Rn Rt
+	case (raw & 0xffc00000) == 0xf9400000:
+		return true
+	// LDR (unsigned offset, 32-bit): 10 111 00101 imm12 Rn Rt
+	case (raw & 0xffc00000) == 0xb9400000:
+		return true
+	// LDUR (64-bit): 11 111000 010 imm9 00 Rn Rt
+	case (raw & 0xffe00c00) == 0xf8400000:
+		return true
+	// LDUR (32-bit): 10 111000 010 imm9 00 Rn Rt
+	case (raw & 0xffe00c00) == 0xb8400000:
+		return true
+	// LDP (signed offset, 64-bit): x0 101 0 010 1 imm7 Rt2 Rn Rt
+	case (raw & 0x7fc00000) == 0xa9400000:
+		return true
+	// LDR (register, 64-bit): 11 111000 011 Rm opt S 10 Rn Rt
+	case (raw & 0xffe00c00) == 0xf8600800:
+		return true
+	}
+	return false
 }
 
-func operandHasRegister(op disassemble.Operand, reg disassemble.Register) bool {
-	return slices.Contains(op.Registers, reg)
+func (s *Scanner) decodeArm64Instruction(addr uint64, raw uint32, inst *disassemble.Inst) error {
+	return s.decoder.DecomposeInto(addr, raw, inst)
 }
 
-func trackedStaticAddress(regBase [31]uint64, op disassemble.Operand) (uint64, bool) {
+func operandCount(inst *disassemble.Inst) int {
+	if inst == nil {
+		return 0
+	}
+	return int(inst.NumOps)
+}
+
+func instPtr(ok bool, inst *disassemble.Inst) *disassemble.Inst {
+	if !ok {
+		return nil
+	}
+	return inst
+}
+
+func operandRegisterCount(op *disassemble.Op) int {
+	if op == nil {
+		return 0
+	}
+	return int(op.NumRegisters)
+}
+
+func operandRegister(op *disassemble.Op, idx int) (disassemble.Register, bool) {
+	if idx < 0 || idx >= operandRegisterCount(op) {
+		return 0, false
+	}
+	return op.Registers[idx], true
+}
+
+func operandHasRegister(op *disassemble.Op, reg disassemble.Register) bool {
+	if op == nil {
+		return false
+	}
+	for idx := 0; idx < int(op.NumRegisters); idx++ {
+		if op.Registers[idx] == reg {
+			return true
+		}
+	}
+	return false
+}
+
+func trackedStaticAddress(regBase [31]uint64, op *disassemble.Op) (uint64, bool) {
+	if op == nil {
+		return 0, false
+	}
 	if op.Class == disassemble.LABEL {
 		return op.GetImmediate(), true
 	}
-	if len(op.Registers) == 0 {
+	baseReg, ok := operandRegister(op, 0)
+	if !ok {
 		return 0, false
 	}
-	baseIdx, ok := registerToIndex(op.Registers[0])
+	baseIdx, ok := registerToIndex(baseReg)
 	if !ok || baseIdx >= 31 || regBase[baseIdx] == 0 {
 		return 0, false
 	}
@@ -119,11 +206,12 @@ func trackedStaticAddress(regBase [31]uint64, op disassemble.Operand) (uint64, b
 	}
 }
 
-func operandIsSPPreIndex(op disassemble.Operand) bool {
-	return op.Class == disassemble.MEM_PRE_IDX && len(op.Registers) > 0 && op.Registers[0] == disassemble.REG_SP
+func operandIsSPPreIndex(op *disassemble.Op) bool {
+	baseReg, ok := operandRegister(op, 0)
+	return ok && op.Class == disassemble.MEM_PRE_IDX && baseReg == disassemble.REG_SP
 }
 
-func isFrameSetupInstruction(inst *disassemble.Instruction) bool {
+func isFrameSetupInstruction(inst *disassemble.Inst) bool {
 	if inst == nil {
 		return false
 	}
@@ -131,22 +219,186 @@ func isFrameSetupInstruction(inst *disassemble.Instruction) bool {
 	case disassemble.ARM64_PACIBSP:
 		return true
 	case disassemble.ARM64_STP:
-		if len(inst.Operands) < 3 {
+		if operandCount(inst) < 3 {
 			return false
 		}
-		return operandHasRegister(inst.Operands[0], disassemble.REG_X29) &&
-			operandHasRegister(inst.Operands[1], disassemble.REG_X30) &&
-			operandIsSPPreIndex(inst.Operands[2])
+		return operandHasRegister(&inst.Operands[0], disassemble.REG_X29) &&
+			operandHasRegister(&inst.Operands[1], disassemble.REG_X30) &&
+			operandIsSPPreIndex(&inst.Operands[2])
 	case disassemble.ARM64_SUB:
-		if len(inst.Operands) < 3 {
+		if operandCount(inst) < 3 {
 			return false
 		}
-		return operandHasRegister(inst.Operands[0], disassemble.REG_SP) &&
-			operandHasRegister(inst.Operands[1], disassemble.REG_SP) &&
+		return operandHasRegister(&inst.Operands[0], disassemble.REG_SP) &&
+			operandHasRegister(&inst.Operands[1], disassemble.REG_SP) &&
 			inst.Operands[2].Class == disassemble.IMM64 &&
 			inst.Operands[2].GetImmediate() > 0
 	default:
 		return false
+	}
+}
+
+type staticValueTrackOptions struct {
+	acceptAnyLoadAddr      bool
+	propagateLoadAddrInAdd bool
+	handleLoadPairs        bool
+}
+
+func (s *Scanner) trackStaticValueInstruction(owner *macho.File, regBase, regLoadAddr, regValue *[31]uint64, ins *disassemble.Inst, opts staticValueTrackOptions) {
+	if ins == nil || operandCount(ins) == 0 {
+		return
+	}
+
+	switch ins.Operation {
+	case disassemble.ARM64_ADD:
+		dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+		srcReg, srcOK := operandRegister(&ins.Operands[1], 0)
+		if operandCount(ins) < 3 || !dstOK || !srcOK {
+			return
+		}
+		dstIdx, dstOK := registerToIndex(dstReg)
+		srcIdx, srcOK := registerToIndex(srcReg)
+		if !dstOK || !srcOK || dstIdx >= 31 || srcIdx >= 31 {
+			return
+		}
+		srcBase := regBase[srcIdx]
+		srcLoadAddr := regLoadAddr[srcIdx]
+		srcValue := regValue[srcIdx]
+		regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+		if srcBase != 0 {
+			if addr, ok := addSignedOffset(srcBase, int64(ins.Operands[2].GetImmediate())); ok {
+				regBase[dstIdx] = addr
+				regValue[dstIdx] = addr
+			}
+			return
+		}
+		if opts.propagateLoadAddrInAdd && srcLoadAddr != 0 {
+			if addr, ok := addSignedOffset(srcLoadAddr, int64(ins.Operands[2].GetImmediate())); ok {
+				regLoadAddr[dstIdx] = addr
+			}
+			return
+		}
+		if srcValue != 0 {
+			if value, ok := addSignedOffset(srcValue, int64(ins.Operands[2].GetImmediate())); ok {
+				regValue[dstIdx] = value
+			}
+		}
+	case disassemble.ARM64_MOV:
+		dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+		if !dstOK {
+			return
+		}
+		dstIdx, dstOK := registerToIndex(dstReg)
+		if !dstOK || dstIdx >= 31 {
+			return
+		}
+		regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+		if operandCount(ins) <= 1 {
+			return
+		}
+		srcReg, srcOK := operandRegister(&ins.Operands[1], 0)
+		if !srcOK {
+			regValue[dstIdx] = ins.Operands[1].GetImmediate()
+			return
+		}
+		srcIdx, srcOK := registerToIndex(srcReg)
+		if !srcOK || srcIdx >= 31 {
+			return
+		}
+		regBase[dstIdx] = regBase[srcIdx]
+		regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
+		regValue[dstIdx] = regValue[srcIdx]
+	case disassemble.ARM64_ORR:
+		dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+		if operandCount(ins) < 3 || !dstOK {
+			return
+		}
+		dstIdx, dstOK := registerToIndex(dstReg)
+		if !dstOK || dstIdx >= 31 {
+			return
+		}
+		regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+		reg1, reg1OK := operandRegister(&ins.Operands[1], 0)
+		reg2, reg2OK := operandRegister(&ins.Operands[2], 0)
+		switch {
+		case reg1OK && reg2OK && (reg1 == disassemble.REG_XZR || reg1 == disassemble.REG_WZR):
+			if srcIdx, ok := registerToIndex(reg2); ok && srcIdx < 31 {
+				regBase[dstIdx] = regBase[srcIdx]
+				regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
+				regValue[dstIdx] = regValue[srcIdx]
+			}
+		case reg1OK && reg2OK && (reg2 == disassemble.REG_XZR || reg2 == disassemble.REG_WZR):
+			if srcIdx, ok := registerToIndex(reg1); ok && srcIdx < 31 {
+				regBase[dstIdx] = regBase[srcIdx]
+				regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
+				regValue[dstIdx] = regValue[srcIdx]
+			}
+		}
+	case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
+		dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+		if operandCount(ins) < 2 || !dstOK {
+			return
+		}
+		dstIdx, dstOK := registerToIndex(dstReg)
+		if !dstOK || dstIdx >= 31 {
+			return
+		}
+		regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+		addr, ok := trackedStaticAddress(*regBase, &ins.Operands[1])
+		if !ok {
+			return
+		}
+		regLoadAddr[dstIdx] = addr
+		if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+			regValue[dstIdx] = ptr
+			return
+		}
+		if opts.acceptAnyLoadAddr || validKernelPointer(addr) {
+			regValue[dstIdx] = addr
+		}
+	case disassemble.ARM64_LDP:
+		if !opts.handleLoadPairs {
+			return
+		}
+		if operandCount(ins) < 3 {
+			return
+		}
+		if reg, ok := operandRegister(&ins.Operands[0], 0); ok {
+			if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
+				regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+			}
+		}
+		if reg, ok := operandRegister(&ins.Operands[1], 0); ok {
+			if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
+				regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+			}
+		}
+		addr, ok := trackedStaticAddress(*regBase, &ins.Operands[2])
+		if !ok {
+			return
+		}
+		if reg, ok := operandRegister(&ins.Operands[0], 0); ok {
+			if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
+				regLoadAddr[dstIdx] = addr
+				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+					regValue[dstIdx] = ptr
+				} else if opts.acceptAnyLoadAddr || validKernelPointer(addr) {
+					regValue[dstIdx] = addr
+				}
+			}
+		}
+		if reg, ok := operandRegister(&ins.Operands[1], 0); ok {
+			if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
+				if addr2, ok := addSignedOffset(addr, 8); ok {
+					regLoadAddr[dstIdx] = addr2
+					if ptr, ok := s.resolvePointerAt(owner, addr2); ok {
+						regValue[dstIdx] = ptr
+					} else if opts.acceptAnyLoadAddr || validKernelPointer(addr2) {
+						regValue[dstIdx] = addr2
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -157,6 +409,7 @@ func findFunctionStartInSection(sectionAddr uint64, data []byte, targetAddr uint
 	cursor := int(targetAddr - sectionAddr)
 	cursor -= cursor % 4
 	const maxScan = 256
+	var decoder disassemble.Decoder
 	for steps := 0; steps < maxScan && cursor >= 0; steps++ {
 		if cursor+4 > len(data) {
 			break
@@ -166,8 +419,8 @@ func findFunctionStartInSection(sectionAddr uint64, data []byte, targetAddr uint
 		if isPacibsp(raw) {
 			return addr, nil
 		}
-		inst, err := decodeArm64Instruction(addr, raw)
-		if err == nil && isFrameSetupInstruction(inst) {
+		var inst disassemble.Inst
+		if err := decoder.DecomposeInto(addr, raw, &inst); err == nil && isFrameSetupInstruction(&inst) {
 			return addr, nil
 		}
 		cursor -= 4
@@ -748,23 +1001,53 @@ func (s *Scanner) normalizeLoadedPointer(owner *macho.File, value uint64) uint64
 	return value
 }
 
+func pointerCacheCoversAddress(m *macho.File, addr uint64) bool {
+	if m == nil {
+		return false
+	}
+	sec := m.FindSectionForVMAddr(addr)
+	if sec == nil || sec.Size < 8 {
+		return false
+	}
+	if sec.Seg == "__TEXT" || sec.Seg == "__TEXT_EXEC" {
+		return false
+	}
+	if strings.HasSuffix(sec.Name, "__bss") || strings.HasSuffix(sec.Name, "__common") {
+		return false
+	}
+	return true
+}
+
 func (s *Scanner) resolvePointerAt(owner *macho.File, addr uint64) (uint64, bool) {
 	// Fast path: check forward pointer cache built by buildPointerIndex.
 	if fwd := s.forwardPointers[owner]; fwd != nil {
 		if ptr, ok := fwd[addr]; ok {
+			s.stats.ptrCacheHits++
 			return ptr, true
 		}
 	}
 	if s.root != nil && owner != s.root {
 		if fwd := s.forwardPointers[s.root]; fwd != nil {
 			if ptr, ok := fwd[addr]; ok {
+				s.stats.ptrCacheHits++
 				return ptr, true
 			}
 		}
 	}
-	// Slow path: I/O via go-macho.
-	// Try root first — in a fileset cache, the root MH_FILESET has
-	// the global chained fixup view and resolves cross-entry binds.
+	s.stats.ptrCacheMisses++
+	// The forward pointer cache (built by buildPointerIndex) covers
+	// every 8-byte-aligned slot in every DATA section.  If the addr
+	// isn't there, the I/O path (pread) almost certainly won't find
+	// a valid kernel pointer either — and the syscall cost is the
+	// dominant bottleneck.  Skip the slow path only for addresses the
+	// cache actually covers once it has been warmed for this file.
+	if s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
+		return 0, false
+	}
+	if s.root != nil && s.forwardPointers[s.root] != nil && pointerCacheCoversAddress(s.root, addr) {
+		return 0, false
+	}
+	// Slow path: I/O via go-macho (only reached before cache warm).
 	if s.root != nil {
 		if ptr, err := s.root.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
 			return ptr, true
@@ -801,7 +1084,14 @@ func (s *Scanner) fallbackPointerAt(owner *macho.File, addr uint64) (uint64, boo
 			}
 		}
 	}
-	// Slow path: I/O via go-macho.
+	// Skip slow I/O path only for addresses covered by the warmed cache.
+	if s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
+		return 0, false
+	}
+	if s.root != nil && s.forwardPointers[s.root] != nil && pointerCacheCoversAddress(s.root, addr) {
+		return 0, false
+	}
+	// Slow path: I/O via go-macho (only reached before cache warm).
 	if s.root != nil && s.root.FileHeader.Type == types.MH_FILESET {
 		if ptr, err := s.root.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
 			return ptr, true
@@ -927,21 +1217,20 @@ func (s *Scanner) recoverSuperMetaFromCtorPattern(m *macho.File, class *discover
 			continue
 		}
 
-		ins, err := decodeArm64Instruction(pc, raw)
-		if err != nil || ins == nil {
+		var ins disassemble.Inst
+		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil {
 			continue
 		}
 
 		switch ins.Operation {
 		case disassemble.ARM64_ADD:
-			if len(ins.Operands) < 3 {
+			dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+			srcReg, srcOK := operandRegister(&ins.Operands[1], 0)
+			if operandCount(&ins) < 3 || !dstOK || !srcOK {
 				continue
 			}
-			if len(ins.Operands[0].Registers) == 0 || len(ins.Operands[1].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOk := registerToIndex(ins.Operands[0].Registers[0])
-			srcIdx, srcOk := registerToIndex(ins.Operands[1].Registers[0])
+			dstIdx, dstOk := registerToIndex(dstReg)
+			srcIdx, srcOk := registerToIndex(srcReg)
 			if dstOk && srcOk && dstIdx < 31 && srcIdx < 31 {
 				srcBase := regBase[srcIdx]
 				regLoadAddr[dstIdx] = 0
@@ -953,95 +1242,99 @@ func (s *Scanner) recoverSuperMetaFromCtorPattern(m *macho.File, class *discover
 				}
 			}
 		case disassemble.ARM64_SUB, disassemble.ARM64_ADR:
-			if len(ins.Operands) > 0 && len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
+			if dstReg, ok := operandRegister(&ins.Operands[0], 0); operandCount(&ins) > 0 && ok {
+				if dstIdx, ok := registerToIndex(dstReg); ok && dstIdx < 31 {
 					regBase[dstIdx] = 0
 					regLoadAddr[dstIdx] = 0
 				}
 			}
 		case disassemble.ARM64_MOV:
-			if len(ins.Operands) < 2 || len(ins.Operands[0].Registers) == 0 {
+			dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+			if operandCount(&ins) < 2 || !dstOK {
 				continue
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
+			dstIdx, dstOK := registerToIndex(dstReg)
 			if !dstOK || dstIdx >= 31 {
 				continue
 			}
 			regBase[dstIdx] = 0
 			regLoadAddr[dstIdx] = 0
-			if len(ins.Operands[1].Registers) == 0 {
+			srcReg, srcOK := operandRegister(&ins.Operands[1], 0)
+			if !srcOK {
 				continue
 			}
-			srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
+			srcIdx, srcOK := registerToIndex(srcReg)
 			if !srcOK || srcIdx >= 31 {
 				continue
 			}
 			regBase[dstIdx] = regBase[srcIdx]
 			regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
 		case disassemble.ARM64_ORR:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 {
+			dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+			if operandCount(&ins) < 3 || !dstOK {
 				continue
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
+			dstIdx, dstOK := registerToIndex(dstReg)
 			if !dstOK || dstIdx >= 31 {
 				continue
 			}
 			regBase[dstIdx] = 0
 			regLoadAddr[dstIdx] = 0
+			reg1, reg1OK := operandRegister(&ins.Operands[1], 0)
+			reg2, reg2OK := operandRegister(&ins.Operands[2], 0)
 			switch {
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[1].Registers[0] == disassemble.REG_XZR || ins.Operands[1].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[2].Registers[0]); ok && srcIdx < 31 {
+			case reg1OK && reg2OK && (reg1 == disassemble.REG_XZR || reg1 == disassemble.REG_WZR):
+				if srcIdx, ok := registerToIndex(reg2); ok && srcIdx < 31 {
 					regBase[dstIdx] = regBase[srcIdx]
 					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
 				}
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[2].Registers[0] == disassemble.REG_XZR || ins.Operands[2].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && srcIdx < 31 {
+			case reg1OK && reg2OK && (reg2 == disassemble.REG_XZR || reg2 == disassemble.REG_WZR):
+				if srcIdx, ok := registerToIndex(reg1); ok && srcIdx < 31 {
 					regBase[dstIdx] = regBase[srcIdx]
 					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
 				}
 			}
 		case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
-			if len(ins.Operands) < 2 || len(ins.Operands[0].Registers) == 0 {
+			dstReg, dstOK := operandRegister(&ins.Operands[0], 0)
+			if operandCount(&ins) < 2 || !dstOK {
 				continue
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
+			dstIdx, dstOK := registerToIndex(dstReg)
 			if !dstOK || dstIdx >= 31 {
 				continue
 			}
 			regBase[dstIdx] = 0
 			regLoadAddr[dstIdx] = 0
-			if addr, ok := trackedStaticAddress(regBase, ins.Operands[1]); ok {
+			if addr, ok := trackedStaticAddress(regBase, &ins.Operands[1]); ok {
 				regLoadAddr[dstIdx] = addr
 			}
 		case disassemble.ARM64_LDP:
-			if len(ins.Operands) < 3 {
+			if operandCount(&ins) < 3 {
 				continue
 			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
+			if reg, ok := operandRegister(&ins.Operands[0], 0); ok {
+				if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
 					regBase[dstIdx] = 0
 					regLoadAddr[dstIdx] = 0
 				}
 			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
+			if reg, ok := operandRegister(&ins.Operands[1], 0); ok {
+				if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
 					regBase[dstIdx] = 0
 					regLoadAddr[dstIdx] = 0
 				}
 			}
-			addr, ok := trackedStaticAddress(regBase, ins.Operands[2])
+			addr, ok := trackedStaticAddress(regBase, &ins.Operands[2])
 			if !ok {
 				continue
 			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
+			if reg, ok := operandRegister(&ins.Operands[0], 0); ok {
+				if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
 					regLoadAddr[dstIdx] = addr
 				}
 			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
+			if reg, ok := operandRegister(&ins.Operands[1], 0); ok {
+				if dstIdx, ok := registerToIndex(reg); ok && dstIdx < 31 {
 					if addr2, ok := addSignedOffset(addr, 8); ok {
 						regLoadAddr[dstIdx] = addr2
 					}
@@ -1147,23 +1440,13 @@ func (s *Scanner) metaPtrAtDirectCall(owner *macho.File, fn types.Function, targ
 	for i := 0; i+4 <= len(data); i += 4 {
 		pc := fn.StartAddr + uint64(i)
 		raw := readUint32At(data, i)
+
+		// BL / B to target → return tracked x0.
 		if callTarget, ok := decodeBLTarget(pc, raw); ok && callTarget == target {
-			if validKernelPointer(regValue[0]) {
-				return regValue[0], true
-			}
-			if validKernelPointer(regBase[0]) {
-				return regBase[0], true
-			}
-			return 0, true
+			return metaPtrResult(regBase, regValue), true
 		}
 		if callTarget, ok := decodeBTarget(pc, raw); ok && callTarget == target {
-			if validKernelPointer(regValue[0]) {
-				return regValue[0], true
-			}
-			if validKernelPointer(regBase[0]) {
-				return regBase[0], true
-			}
-			return 0, true
+			return metaPtrResult(regBase, regValue), true
 		}
 
 		if (raw & 0x9f000000) == 0x90000000 {
@@ -1178,143 +1461,250 @@ func (s *Scanner) metaPtrAtDirectCall(owner *macho.File, fn types.Function, targ
 			continue
 		}
 
-		ins, err := decodeArm64Instruction(pc, raw)
-		if err != nil || ins == nil || len(ins.Operands) == 0 {
+		var ins disassemble.Inst
+		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil || operandCount(&ins) == 0 {
 			continue
 		}
 
-		switch ins.Operation {
-		case disassemble.ARM64_ADD:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 || len(ins.Operands[1].Registers) == 0 {
-				continue
+		s.trackStaticValueInstruction(owner, &regBase, &regLoadAddr, &regValue, &ins, staticValueTrackOptions{
+			acceptAnyLoadAddr:      false,
+			propagateLoadAddrInAdd: true,
+			handleLoadPairs:        true,
+		})
+	}
+	return 0, false
+}
+
+func metaPtrResult(regBase, regValue [31]uint64) uint64 {
+	if validKernelPointer(regValue[0]) {
+		return regValue[0]
+	}
+	if validKernelPointer(regBase[0]) {
+		return regBase[0]
+	}
+	return 0
+}
+
+// trackRegisterRaw performs register tracking using raw ARM64
+// instruction bitmasks, avoiding CGo entirely.  It handles the
+// instruction subset needed by metaPtrAtDirectCall and similar
+// callers: ADRP, ADD(imm), LDR(uoff/reg), LDUR, LDP, MOV, ORR, SUB(imm).
+func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regBase, regValue *[31]uint64) {
+	switch {
+	// ADRP: sf 1 0000 immlo immhi Rd
+	case (raw & 0x9f000000) == 0x90000000:
+		rd := int(raw & 0x1f)
+		if rd < 31 {
+			if addr, ok := decodeADRPImmediate(pc, raw); ok {
+				regBase[rd] = addr
+				regValue[rd] = 0
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-			if !dstOK || !srcOK || dstIdx >= 31 || srcIdx >= 31 {
-				continue
+		}
+
+	// ADR: sf 0 0000 immlo immhi Rd
+	case (raw & 0x9f000000) == 0x10000000:
+		rd := int(raw & 0x1f)
+		if rd < 31 {
+			immhi := int64((raw >> 5) & 0x7ffff)
+			immlo := int64((raw >> 29) & 0x3)
+			offset := (immhi << 2) | immlo
+			if offset&(1<<20) != 0 {
+				offset |= ^int64((1 << 21) - 1)
 			}
-			srcBase := regBase[srcIdx]
-			srcLoadAddr := regLoadAddr[srcIdx]
-			srcValue := regValue[srcIdx]
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+			addr := uint64(int64(pc) + offset)
+			regBase[rd] = addr
+			regValue[rd] = addr
+		}
+
+	// ADD (immediate, 64-bit): 1 00 10001 sh imm12 Rn Rd
+	case (raw & 0xff000000) == 0x91000000:
+		rd := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		if rd < 31 && rn < 31 {
+			imm := uint64((raw >> 10) & 0xfff)
+			if (raw>>22)&1 == 1 {
+				imm <<= 12
+			}
+			srcBase := regBase[rn]
+			regBase[rd] = 0
+			regValue[rd] = 0
 			if srcBase != 0 {
-				if addr, ok := addSignedOffset(srcBase, int64(ins.Operands[2].GetImmediate())); ok {
-					regBase[dstIdx] = addr
-					regValue[dstIdx] = addr
-				}
-			} else if srcLoadAddr != 0 {
-				if addr, ok := addSignedOffset(srcLoadAddr, int64(ins.Operands[2].GetImmediate())); ok {
-					regLoadAddr[dstIdx] = addr
-				}
-			} else if srcValue != 0 {
-				if value, ok := addSignedOffset(srcValue, int64(ins.Operands[2].GetImmediate())); ok {
-					regValue[dstIdx] = value
-				}
+				regBase[rd] = srcBase + imm
+				regValue[rd] = srcBase + imm
+			} else if regValue[rn] != 0 {
+				regValue[rd] = regValue[rn] + imm
 			}
-		case disassemble.ARM64_MOV:
-			if len(ins.Operands[0].Registers) == 0 {
-				continue
+		}
+
+	// SUB (immediate, 64-bit): 1 10 10001 sh imm12 Rn Rd
+	case (raw & 0xff000000) == 0xd1000000:
+		rd := int(raw & 0x1f)
+		if rd < 31 {
+			regBase[rd] = 0
+			regValue[rd] = 0
+		}
+
+	// ORR (shifted register, 64-bit): 1 01 01010 sh 0 Rm imm6 Rn Rd
+	// MOV register is ORR Xd, XZR, Xm (Rn == XZR, shift == 0, imm6 == 0)
+	case (raw & 0xff200000) == 0xaa000000:
+		rd := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		rm := int((raw >> 16) & 0x1f)
+		imm6 := (raw >> 10) & 0x3f
+		if rd < 31 {
+			regBase[rd] = 0
+			regValue[rd] = 0
+			if rn == 31 && imm6 == 0 && rm < 31 {
+				// MOV Xd, Xm
+				regBase[rd] = regBase[rm]
+				regValue[rd] = regValue[rm]
+			} else if rm == 31 && imm6 == 0 && rn < 31 {
+				// MOV Xd, Xn (rare but valid)
+				regBase[rd] = regBase[rn]
+				regValue[rd] = regValue[rn]
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
+		}
+
+	// MOVZ (32/64): sf 10 100101 hw imm16 Rd
+	case (raw & 0x7f800000) == 0x52800000:
+		rd := int(raw & 0x1f)
+		if rd < 31 {
+			imm := uint64((raw >> 5) & 0xffff)
+			hw := (raw >> 21) & 0x3
+			regBase[rd] = 0
+			regValue[rd] = imm << (hw * 16)
+			if (raw>>31)&1 == 0 {
+				regValue[rd] &= 0xffff_ffff
 			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if len(ins.Operands) > 1 && len(ins.Operands[1].Registers) > 0 {
-				srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-				if srcOK && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			} else if len(ins.Operands) > 1 {
-				regValue[dstIdx] = ins.Operands[1].GetImmediate()
+		}
+
+	// MOVK (32/64): sf 11 100101 hw imm16 Rd
+	case (raw & 0x7f800000) == 0x72800000:
+		rd := int(raw & 0x1f)
+		if rd < 31 {
+			imm := uint64((raw >> 5) & 0xffff)
+			hw := (raw >> 21) & 0x3
+			shift := hw * 16
+			mask := uint64(0xffff) << shift
+			regBase[rd] = 0
+			regValue[rd] = (regValue[rd] &^ mask) | (imm << shift)
+			if (raw>>31)&1 == 0 {
+				regValue[rd] &= 0xffff_ffff
 			}
-		case disassemble.ARM64_ORR:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 {
-				continue
+		}
+
+	// LDR (unsigned offset, 64-bit): 11 111 00101 imm12 Rn Rt
+	case (raw & 0xffc00000) == 0xf9400000:
+		rt := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		if rt < 31 && rn < 31 {
+			imm := uint64((raw>>10)&0xfff) * 8
+			regBase[rt] = 0
+			regValue[rt] = 0
+			base := regBase[rn]
+			if base == 0 {
+				base = regValue[rn]
 			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			switch {
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[1].Registers[0] == disassemble.REG_XZR || ins.Operands[1].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[2].Registers[0]); ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[2].Registers[0] == disassemble.REG_XZR || ins.Operands[2].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			}
-		case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
-			if len(ins.Operands) < 2 || len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if addr, ok := trackedStaticAddress(regBase, ins.Operands[1]); ok {
-				regLoadAddr[dstIdx] = addr
+			if base != 0 {
+				addr := base + imm
 				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
-					regValue[dstIdx] = ptr
+					regValue[rt] = ptr
 				} else if validKernelPointer(addr) {
-					regValue[dstIdx] = addr
+					regValue[rt] = addr
 				}
 			}
-		case disassemble.ARM64_LDP:
-			if len(ins.Operands) < 3 {
-				continue
+		}
+
+	// LDR (unsigned offset, 32-bit): 10 111 00101 imm12 Rn Rt
+	case (raw & 0xffc00000) == 0xb9400000:
+		rt := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		if rt < 31 && rn < 31 {
+			imm := uint64((raw>>10)&0xfff) * 4
+			regBase[rt] = 0
+			regValue[rt] = 0
+			base := regBase[rn]
+			if base == 0 {
+				base = regValue[rn]
 			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
-					regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+			if base != 0 {
+				addr := base + imm
+				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+					regValue[rt] = ptr
+				} else if validKernelPointer(addr) {
+					regValue[rt] = addr
 				}
 			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
-					regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
+		}
+
+	// LDUR (64-bit): 11 111000 010 imm9 00 Rn Rt
+	case (raw & 0xffe00c00) == 0xf8400000:
+		rt := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		if rt < 31 && rn < 31 {
+			imm9 := int64((raw >> 12) & 0x1ff)
+			if imm9&(1<<8) != 0 {
+				imm9 |= ^int64((1 << 9) - 1)
+			}
+			regBase[rt] = 0
+			regValue[rt] = 0
+			base := regBase[rn]
+			if base == 0 {
+				base = regValue[rn]
+			}
+			if base != 0 {
+				addr := uint64(int64(base) + imm9)
+				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+					regValue[rt] = ptr
+				} else if validKernelPointer(addr) {
+					regValue[rt] = addr
 				}
 			}
-			addr, ok := trackedStaticAddress(regBase, ins.Operands[2])
-			if !ok {
-				continue
+		}
+
+	// LDP (signed offset, 64-bit): x0 101 0 010 1 imm7 Rt2 Rn Rt
+	case (raw & 0x7fc00000) == 0xa9400000:
+		rt := int(raw & 0x1f)
+		rn := int((raw >> 5) & 0x1f)
+		rt2 := int((raw >> 10) & 0x1f)
+		if rn < 31 {
+			imm7 := int64((raw >> 15) & 0x7f)
+			if imm7&(1<<6) != 0 {
+				imm7 |= ^int64((1 << 7) - 1)
 			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
-					regLoadAddr[dstIdx] = addr
+			base := regBase[rn]
+			if base == 0 {
+				base = regValue[rn]
+			}
+			addr := uint64(0)
+			if base != 0 {
+				addr = uint64(int64(base) + imm7*8)
+			}
+			if rt < 31 {
+				regBase[rt] = 0
+				regValue[rt] = 0
+				if addr != 0 {
 					if ptr, ok := s.resolvePointerAt(owner, addr); ok {
-						regValue[dstIdx] = ptr
+						regValue[rt] = ptr
 					} else if validKernelPointer(addr) {
-						regValue[dstIdx] = addr
+						regValue[rt] = addr
 					}
 				}
 			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
-					if addr2, ok := addSignedOffset(addr, 8); ok {
-						regLoadAddr[dstIdx] = addr2
-						if ptr, ok := s.resolvePointerAt(owner, addr2); ok {
-							regValue[dstIdx] = ptr
-						} else if validKernelPointer(addr2) {
-							regValue[dstIdx] = addr2
-						}
+			if rt2 < 31 {
+				regBase[rt2] = 0
+				regValue[rt2] = 0
+				if addr != 0 {
+					addr2 := addr + 8
+					if ptr, ok := s.resolvePointerAt(owner, addr2); ok {
+						regValue[rt2] = ptr
+					} else if validKernelPointer(addr2) {
+						regValue[rt2] = addr2
 					}
 				}
 			}
 		}
 	}
-	return 0, false
 }
 
 func (s *Scanner) staticDirectCallContext(owner *macho.File, fn types.Function, callsite uint64, target uint64) (wrapperContext, bool) {
@@ -1360,147 +1750,40 @@ func (s *Scanner) staticDirectCallContext(owner *macho.File, fn types.Function, 
 			}
 		}
 
-		ins, err := decodeArm64Instruction(pc, raw)
-		if err != nil || ins == nil || len(ins.Operands) == 0 {
+		var ins disassemble.Inst
+		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil || operandCount(&ins) == 0 {
 			continue
 		}
 
-		switch ins.Operation {
-		case disassemble.ARM64_ADD:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 || len(ins.Operands[1].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-			if !dstOK || !srcOK || dstIdx >= 31 || srcIdx >= 31 {
-				continue
-			}
-			srcBase := regBase[srcIdx]
-			srcLoadAddr := regLoadAddr[srcIdx]
-			srcValue := regValue[srcIdx]
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if srcBase != 0 {
-				if addr, ok := addSignedOffset(srcBase, int64(ins.Operands[2].GetImmediate())); ok {
-					regBase[dstIdx] = addr
-					regValue[dstIdx] = addr
-				}
-			} else if srcLoadAddr != 0 {
-				if addr, ok := addSignedOffset(srcLoadAddr, int64(ins.Operands[2].GetImmediate())); ok {
-					regLoadAddr[dstIdx] = addr
-				}
-			} else if srcValue != 0 {
-				if value, ok := addSignedOffset(srcValue, int64(ins.Operands[2].GetImmediate())); ok {
-					regValue[dstIdx] = value
-				}
-			}
-		case disassemble.ARM64_MOV:
-			if len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if len(ins.Operands) > 1 && len(ins.Operands[1].Registers) > 0 {
-				srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-				if srcOK && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			} else if len(ins.Operands) > 1 {
-				regValue[dstIdx] = ins.Operands[1].GetImmediate()
-			}
-		case disassemble.ARM64_ORR:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			switch {
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[1].Registers[0] == disassemble.REG_XZR || ins.Operands[1].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[2].Registers[0]); ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[2].Registers[0] == disassemble.REG_XZR || ins.Operands[2].Registers[0] == disassemble.REG_WZR):
-				if srcIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			}
-		case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
-			if len(ins.Operands) < 2 || len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if addr, ok := trackedStaticAddress(regBase, ins.Operands[1]); ok {
-				regLoadAddr[dstIdx] = addr
-				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
-					regValue[dstIdx] = ptr
-				} else if validKernelPointer(addr) {
-					regValue[dstIdx] = addr
-				}
-			}
-		case disassemble.ARM64_LDP:
-			if len(ins.Operands) < 3 {
-				continue
-			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
-					regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-				}
-			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
-					regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-				}
-			}
-			addr, ok := trackedStaticAddress(regBase, ins.Operands[2])
-			if !ok {
-				continue
-			}
-			if len(ins.Operands[0].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[0].Registers[0]); ok && dstIdx < 31 {
-					regLoadAddr[dstIdx] = addr
-					if ptr, ok := s.resolvePointerAt(owner, addr); ok {
-						regValue[dstIdx] = ptr
-					} else if validKernelPointer(addr) {
-						regValue[dstIdx] = addr
-					}
-				}
-			}
-			if len(ins.Operands[1].Registers) > 0 {
-				if dstIdx, ok := registerToIndex(ins.Operands[1].Registers[0]); ok && dstIdx < 31 {
-					if addr2, ok := addSignedOffset(addr, 8); ok {
-						regLoadAddr[dstIdx] = addr2
-						if ptr, ok := s.resolvePointerAt(owner, addr2); ok {
-							regValue[dstIdx] = ptr
-						} else if validKernelPointer(addr2) {
-							regValue[dstIdx] = addr2
-						}
-					}
-				}
-			}
-		}
+		s.trackStaticValueInstruction(owner, &regBase, &regLoadAddr, &regValue, &ins, staticValueTrackOptions{
+			acceptAnyLoadAddr:      false,
+			propagateLoadAddrInAdd: true,
+			handleLoadPairs:        true,
+		})
 	}
 	s.staticCalls[key] = cachedWrapperContext{}
 	return wrapperContext{}, false
 }
 
 func (s *Scanner) staticDirectCallTrackedContext(owner *macho.File, regBase [31]uint64, regLoadAddr [31]uint64, regValue [31]uint64, callsite uint64) wrapperContext {
+	for reg := range 4 {
+		if regValue[reg] == 0 && regBase[reg] != 0 {
+			regValue[reg] = regBase[reg]
+		}
+		if reg == 2 && regValue[reg] != 0 && !validKernelPointer(regValue[reg]) {
+			regValue[reg] = s.normalizeLoadedPointer(owner, regValue[reg])
+		}
+	}
+	return wrapperContext{
+		x0:       regValue[0],
+		x1:       regValue[1],
+		x2:       regValue[2],
+		x3:       regValue[3],
+		callsite: callsite,
+	}
+}
+
+func (s *Scanner) pureGoTrackedContext(owner *macho.File, regBase, regValue [31]uint64, callsite uint64) wrapperContext {
 	for reg := range 4 {
 		if regValue[reg] == 0 && regBase[reg] != 0 {
 			regValue[reg] = regBase[reg]
@@ -1589,98 +1872,16 @@ func (s *Scanner) staticWrapperContextAlongPath(owner *macho.File, fn types.Func
 			continue
 		}
 
-		ins, err := decodeArm64Instruction(pc, raw)
-		if err != nil || ins == nil || len(ins.Operands) == 0 {
+		var ins disassemble.Inst
+		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil || operandCount(&ins) == 0 {
 			continue
 		}
 
-		switch ins.Operation {
-		case disassemble.ARM64_ADD:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 || len(ins.Operands[1].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-			if !dstOK || !srcOK || dstIdx >= 31 || srcIdx >= 31 {
-				continue
-			}
-			srcBase := regBase[srcIdx]
-			srcValue := regValue[srcIdx]
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if srcBase != 0 {
-				if addr, ok := addSignedOffset(srcBase, int64(ins.Operands[2].GetImmediate())); ok {
-					regBase[dstIdx] = addr
-					regValue[dstIdx] = addr
-				}
-			} else if srcValue != 0 {
-				if value, ok := addSignedOffset(srcValue, int64(ins.Operands[2].GetImmediate())); ok {
-					regValue[dstIdx] = value
-				}
-			}
-		case disassemble.ARM64_MOV:
-			if len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if len(ins.Operands) > 1 && len(ins.Operands[1].Registers) > 0 {
-				srcIdx, srcOK := registerToIndex(ins.Operands[1].Registers[0])
-				if srcOK && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			} else if len(ins.Operands) > 1 {
-				regValue[dstIdx] = ins.Operands[1].GetImmediate()
-			}
-		case disassemble.ARM64_ORR:
-			if len(ins.Operands) < 3 || len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			switch {
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[1].Registers[0] == disassemble.REG_XZR || ins.Operands[1].Registers[0] == disassemble.REG_WZR):
-				srcIdx, ok := registerToIndex(ins.Operands[2].Registers[0])
-				if ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			case len(ins.Operands[1].Registers) > 0 && len(ins.Operands[2].Registers) > 0 &&
-				(ins.Operands[2].Registers[0] == disassemble.REG_XZR || ins.Operands[2].Registers[0] == disassemble.REG_WZR):
-				srcIdx, ok := registerToIndex(ins.Operands[1].Registers[0])
-				if ok && srcIdx < 31 {
-					regBase[dstIdx] = regBase[srcIdx]
-					regLoadAddr[dstIdx] = regLoadAddr[srcIdx]
-					regValue[dstIdx] = regValue[srcIdx]
-				}
-			}
-		case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
-			if len(ins.Operands) < 2 || len(ins.Operands[0].Registers) == 0 {
-				continue
-			}
-			dstIdx, dstOK := registerToIndex(ins.Operands[0].Registers[0])
-			if !dstOK || dstIdx >= 31 {
-				continue
-			}
-			regBase[dstIdx], regLoadAddr[dstIdx], regValue[dstIdx] = 0, 0, 0
-			if addr, ok := trackedStaticAddress(regBase, ins.Operands[1]); ok {
-				regLoadAddr[dstIdx] = addr
-				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
-					regValue[dstIdx] = ptr
-				} else {
-					regValue[dstIdx] = addr
-				}
-			}
-		}
+		s.trackStaticValueInstruction(owner, &regBase, &regLoadAddr, &regValue, &ins, staticValueTrackOptions{
+			acceptAnyLoadAddr:      true,
+			propagateLoadAddrInAdd: false,
+			handleLoadPairs:        false,
+		})
 
 		for reg := range 4 {
 			if regValue[reg] == 0 && regBase[reg] != 0 {

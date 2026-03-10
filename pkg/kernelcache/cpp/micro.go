@@ -348,8 +348,12 @@ func buildMicroPlan(start uint64, data []byte, isAnchor func(uint64) bool, maxOf
 	return plan
 }
 
-func branchTargetFromState(state *microState, inst *disassemble.Instruction) (uint64, bool) {
-	if inst == nil || len(inst.Operands) == 0 || len(inst.Operands[0].Registers) == 0 {
+func branchTargetFromState(state *microState, inst *disassemble.Inst) (uint64, bool) {
+	if inst == nil || operandCount(inst) == 0 {
+		return 0, false
+	}
+	reg, ok := operandRegister(&inst.Operands[0], 0)
+	if !ok {
 		return 0, false
 	}
 	switch inst.Operation {
@@ -358,7 +362,7 @@ func branchTargetFromState(state *microState, inst *disassemble.Instruction) (ui
 		disassemble.ARM64_BRAAZ,
 		disassemble.ARM64_BRAB,
 		disassemble.ARM64_BRABZ:
-		if idx, ok := registerToIndex(inst.Operands[0].Registers[0]); ok {
+		if idx, ok := registerToIndex(reg); ok {
 			return state.GetX(idx), true
 		}
 	}
@@ -376,22 +380,26 @@ func localBranchOffset(funcStart uint64, dataLen int, maxOffset int, target uint
 	return off, true
 }
 
-func (s *microState) memoryAccess(op disassemble.Operand) (microMemAccess, bool) {
+func (s *microState) memoryAccess(op *disassemble.Op) (microMemAccess, bool) {
+	if op == nil {
+		return microMemAccess{}, false
+	}
 	if op.Class == disassemble.LABEL {
 		return microMemAccess{addr: op.GetImmediate()}, true
 	}
-	if len(op.Registers) == 0 {
+	baseReg, ok := operandRegister(op, 0)
+	if !ok {
 		return microMemAccess{}, false
 	}
 
 	var base uint64
 	access := microMemAccess{baseIdx: -1}
-	switch op.Registers[0] {
+	switch baseReg {
 	case disassemble.REG_SP:
 		base = s.sp
 		access.baseIsSP = true
 	default:
-		idx, ok := registerToIndex(op.Registers[0])
+		idx, ok := registerToIndex(baseReg)
 		if !ok || idx >= len(s.regs) {
 			return microMemAccess{}, false
 		}
@@ -450,7 +458,7 @@ func (s *microState) resetCallEvidence() {
 	s.x16Candidate = 0
 }
 
-func (s *microState) classifyStore(inst *disassemble.Instruction) (microMemAccess, [2]int, int, bool) {
+func (s *microState) classifyStore(inst *disassemble.Inst) (microMemAccess, [2]int, int, bool) {
 	var src [2]int
 	for i := range src {
 		src[i] = -1
@@ -460,34 +468,35 @@ func (s *microState) classifyStore(inst *disassemble.Instruction) (microMemAcces
 	}
 	switch inst.Operation {
 	case disassemble.ARM64_STR, disassemble.ARM64_STUR:
-		if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+		reg, ok := operandRegister(&inst.Operands[0], 0)
+		if operandCount(inst) < 2 || !ok {
 			return microMemAccess{}, src, 0, false
 		}
-		access, ok := s.memoryAccess(inst.Operands[1])
+		access, ok := s.memoryAccess(&inst.Operands[1])
 		if !ok {
 			return microMemAccess{}, src, 0, false
 		}
-		if idx, ok := registerToIndex(inst.Operands[0].Registers[0]); ok {
+		if idx, ok := registerToIndex(reg); ok {
 			src[0] = idx
 			return access, src, 1, true
 		}
 	case disassemble.ARM64_STP:
-		if len(inst.Operands) < 3 {
+		if operandCount(inst) < 3 {
 			return microMemAccess{}, src, 0, false
 		}
-		access, ok := s.memoryAccess(inst.Operands[2])
+		access, ok := s.memoryAccess(&inst.Operands[2])
 		if !ok {
 			return microMemAccess{}, src, 0, false
 		}
 		count := 0
-		if len(inst.Operands[0].Registers) > 0 {
-			if idx, ok := registerToIndex(inst.Operands[0].Registers[0]); ok {
+		if reg, ok := operandRegister(&inst.Operands[0], 0); ok {
+			if idx, ok := registerToIndex(reg); ok {
 				src[0] = idx
 				count++
 			}
 		}
-		if len(inst.Operands[1].Registers) > 0 {
-			if idx, ok := registerToIndex(inst.Operands[1].Registers[0]); ok {
+		if reg, ok := operandRegister(&inst.Operands[1], 0); ok {
+			if idx, ok := registerToIndex(reg); ok {
 				src[1] = idx
 				count++
 			}
@@ -507,20 +516,24 @@ func (s *Scanner) loadValueAt(owner *macho.File, state *microState, addr uint64)
 	return 0, false
 }
 
-func (s *Scanner) trackedLoadAddress(state *microState, op disassemble.Operand) (microMemAccess, bool) {
+func (s *Scanner) trackedLoadAddress(state *microState, op *disassemble.Op) (microMemAccess, bool) {
+	if op == nil {
+		return microMemAccess{}, false
+	}
 	if op.Class == disassemble.LABEL {
 		return microMemAccess{addr: op.GetImmediate()}, true
 	}
-	if len(op.Registers) == 0 {
+	baseReg, ok := operandRegister(op, 0)
+	if !ok {
 		return microMemAccess{}, false
 	}
 
-	switch op.Registers[0] {
+	switch baseReg {
 	case disassemble.REG_SP:
 		return state.memoryAccess(op)
 	}
 
-	baseIdx, ok := registerToIndex(op.Registers[0])
+	baseIdx, ok := registerToIndex(baseReg)
 	if !ok || baseIdx >= len(state.regBase) || state.regBase[baseIdx] == 0 {
 		return microMemAccess{}, false
 	}
@@ -559,7 +572,7 @@ func (s *Scanner) trackedLoadAddress(state *microState, op disassemble.Operand) 
 	}
 }
 
-func (s *Scanner) applyMicroInstruction(state *microState, inst *disassemble.Instruction) {
+func (s *Scanner) applyMicroInstruction(state *microState, inst *disassemble.Inst) {
 	if inst == nil {
 		return
 	}
@@ -569,8 +582,8 @@ func (s *Scanner) applyMicroInstruction(state *microState, inst *disassemble.Ins
 
 	switch inst.Operation {
 	case disassemble.ARM64_ADRP:
-		if len(inst.Operands) > 0 && len(inst.Operands[0].Registers) > 0 {
-			if idx, ok := registerToIndex(inst.Operands[0].Registers[0]); ok {
+		if reg, ok := operandRegister(&inst.Operands[0], 0); operandCount(inst) > 0 && ok {
+			if idx, ok := registerToIndex(reg); ok {
 				if addr, ok := decodeADRPImmediate(inst.Address, inst.Raw); ok {
 					s.stateWriteAddress(state, idx, addr)
 				} else {
@@ -579,8 +592,8 @@ func (s *Scanner) applyMicroInstruction(state *microState, inst *disassemble.Ins
 			}
 		}
 	case disassemble.ARM64_ADR:
-		if len(inst.Operands) > 1 && len(inst.Operands[0].Registers) > 0 {
-			if idx, ok := registerToIndex(inst.Operands[0].Registers[0]); ok {
+		if reg, ok := operandRegister(&inst.Operands[0], 0); operandCount(inst) > 1 && ok {
+			if idx, ok := registerToIndex(reg); ok {
 				s.stateWriteAddress(state, idx, inst.Operands[1].GetImmediate())
 			}
 		}
@@ -613,15 +626,15 @@ func (s *Scanner) applyMicroInstruction(state *microState, inst *disassemble.Ins
 	if !handled {
 		s.invalidateUnsupportedDestinations(state, inst)
 	}
-	if isPACOperation(inst.Operation) && len(inst.Operands) > 0 && operandHasRegister(inst.Operands[0], disassemble.REG_X16) {
+	if isPACOperation(inst.Operation) && operandCount(inst) > 0 && operandHasRegister(&inst.Operands[0], disassemble.REG_X16) {
 		if validKernelPointer(state.GetX(16)) {
 			state.x16Candidate = state.GetX(16)
 		}
 	}
 }
 
-func (s *Scanner) invalidateUnsupportedDestinations(state *microState, inst *disassemble.Instruction) {
-	if inst == nil || len(inst.Operands) == 0 {
+func (s *Scanner) invalidateUnsupportedDestinations(state *microState, inst *disassemble.Inst) {
+	if inst == nil || operandCount(inst) == 0 {
 		return
 	}
 	op := inst.Operands[0]
@@ -629,7 +642,8 @@ func (s *Scanner) invalidateUnsupportedDestinations(state *microState, inst *dis
 	case disassemble.MEM_OFFSET, disassemble.MEM_PRE_IDX, disassemble.MEM_POST_IDX, disassemble.LABEL:
 		return
 	}
-	for _, reg := range op.Registers {
+	for idx := 0; idx < int(op.NumRegisters); idx++ {
+		reg := op.Registers[idx]
 		if reg == disassemble.REG_SP {
 			state.sp = 0
 			continue
@@ -650,12 +664,12 @@ func (s *Scanner) stateWriteAddress(state *microState, idx int, value uint64) {
 	}
 }
 
-func (s *Scanner) applyMicroAdd(state *microState, inst *disassemble.Instruction) {
-	if len(inst.Operands) < 3 || len(inst.Operands[0].Registers) == 0 || len(inst.Operands[1].Registers) == 0 {
+func (s *Scanner) applyMicroAdd(state *microState, inst *disassemble.Inst) {
+	dstReg, dstOK := operandRegister(&inst.Operands[0], 0)
+	srcReg, srcOK := operandRegister(&inst.Operands[1], 0)
+	if operandCount(inst) < 3 || !dstOK || !srcOK {
 		return
 	}
-	dstReg := inst.Operands[0].Registers[0]
-	srcReg := inst.Operands[1].Registers[0]
 	dstIdx, dstOK := registerToIndex(dstReg)
 	srcIdx, srcOK := registerToIndex(srcReg)
 	if !dstOK || !srcOK {
@@ -701,18 +715,19 @@ func (s *Scanner) applyMicroAdd(state *microState, inst *disassemble.Instruction
 	}
 }
 
-func (s *Scanner) applyMicroSub(state *microState, inst *disassemble.Instruction) {
-	if len(inst.Operands) < 3 || len(inst.Operands[0].Registers) == 0 || len(inst.Operands[1].Registers) == 0 {
+func (s *Scanner) applyMicroSub(state *microState, inst *disassemble.Inst) {
+	dstReg, dstRegOK := operandRegister(&inst.Operands[0], 0)
+	srcReg, srcRegOK := operandRegister(&inst.Operands[1], 0)
+	if operandCount(inst) < 3 || !dstRegOK || !srcRegOK {
 		return
 	}
 	imm := inst.Operands[2].GetImmediate()
-	dstReg := inst.Operands[0].Registers[0]
-	if dstReg == disassemble.REG_SP && inst.Operands[1].Registers[0] == disassemble.REG_SP {
+	if dstReg == disassemble.REG_SP && srcReg == disassemble.REG_SP {
 		state.sp -= imm
 		return
 	}
-	dstIdx, dstOK := registerToIndex(inst.Operands[0].Registers[0])
-	srcIdx, srcOK := registerToIndex(inst.Operands[1].Registers[0])
+	dstIdx, dstOK := registerToIndex(dstReg)
+	srcIdx, srcOK := registerToIndex(srcReg)
 	if !dstOK || !srcOK {
 		return
 	}
@@ -722,18 +737,18 @@ func (s *Scanner) applyMicroSub(state *microState, inst *disassemble.Instruction
 	}
 }
 
-func (s *Scanner) applyMicroMov(state *microState, inst *disassemble.Instruction) {
-	if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+func (s *Scanner) applyMicroMov(state *microState, inst *disassemble.Inst) {
+	dstReg, dstRegOK := operandRegister(&inst.Operands[0], 0)
+	if operandCount(inst) < 2 || !dstRegOK {
 		return
 	}
-	dstReg := inst.Operands[0].Registers[0]
 	dstIdx, dstOK := registerToIndex(dstReg)
 	if !dstOK {
 		return
 	}
 	state.clearTracked(dstIdx)
-	if len(inst.Operands[1].Registers) > 0 {
-		srcIdx, srcOK := registerToIndex(inst.Operands[1].Registers[0])
+	if srcReg, ok := operandRegister(&inst.Operands[1], 0); ok {
+		srcIdx, srcOK := registerToIndex(srcReg)
 		if srcOK {
 			if is32BitReg(dstReg) {
 				if state.regKnown[srcIdx] {
@@ -751,11 +766,11 @@ func (s *Scanner) applyMicroMov(state *microState, inst *disassemble.Instruction
 	state.setKnownValue(dstIdx, normalizeRegWrite(dstReg, inst.Operands[1].GetImmediate()))
 }
 
-func (s *Scanner) applyMicroMovWide(state *microState, inst *disassemble.Instruction, invert bool, keep bool) {
-	if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+func (s *Scanner) applyMicroMovWide(state *microState, inst *disassemble.Inst, invert bool, keep bool) {
+	dstReg, dstRegOK := operandRegister(&inst.Operands[0], 0)
+	if operandCount(inst) < 2 || !dstRegOK {
 		return
 	}
-	dstReg := inst.Operands[0].Registers[0]
 	dstIdx, dstOK := registerToIndex(dstReg)
 	if !dstOK {
 		return
@@ -784,39 +799,41 @@ func (s *Scanner) applyMicroMovWide(state *microState, inst *disassemble.Instruc
 	}
 }
 
-func (s *Scanner) applyMicroOrr(state *microState, inst *disassemble.Instruction) {
-	if len(inst.Operands) < 3 || len(inst.Operands[0].Registers) == 0 {
+func (s *Scanner) applyMicroOrr(state *microState, inst *disassemble.Inst) {
+	dstReg, dstRegOK := operandRegister(&inst.Operands[0], 0)
+	if operandCount(inst) < 3 || !dstRegOK {
 		return
 	}
-	dstReg := inst.Operands[0].Registers[0]
 	dstIdx, dstOK := registerToIndex(dstReg)
 	if !dstOK {
 		return
 	}
 	state.clearTracked(dstIdx)
 	switch {
-	case len(inst.Operands[1].Registers) > 0 && len(inst.Operands[2].Registers) > 0 &&
-		(inst.Operands[1].Registers[0] == disassemble.REG_XZR || inst.Operands[1].Registers[0] == disassemble.REG_WZR):
-		srcIdx, ok := registerToIndex(inst.Operands[2].Registers[0])
-		if ok {
-			if is32BitReg(dstReg) {
-				if state.regKnown[srcIdx] {
-					state.setKnownValue(dstIdx, normalizeRegWrite(dstReg, state.regs[srcIdx]))
+	case operandRegisterCount(&inst.Operands[1]) > 0 && operandRegisterCount(&inst.Operands[2]) > 0:
+		reg1, _ := operandRegister(&inst.Operands[1], 0)
+		reg2, _ := operandRegister(&inst.Operands[2], 0)
+		if reg1 == disassemble.REG_XZR || reg1 == disassemble.REG_WZR {
+			srcIdx, ok := registerToIndex(reg2)
+			if ok {
+				if is32BitReg(dstReg) {
+					if state.regKnown[srcIdx] {
+						state.setKnownValue(dstIdx, normalizeRegWrite(dstReg, state.regs[srcIdx]))
+					}
+				} else {
+					state.copyTracked(dstIdx, srcIdx)
 				}
-			} else {
-				state.copyTracked(dstIdx, srcIdx)
 			}
-		}
-	case len(inst.Operands[1].Registers) > 0 && len(inst.Operands[2].Registers) > 0 &&
-		(inst.Operands[2].Registers[0] == disassemble.REG_XZR || inst.Operands[2].Registers[0] == disassemble.REG_WZR):
-		srcIdx, ok := registerToIndex(inst.Operands[1].Registers[0])
-		if ok {
-			if is32BitReg(dstReg) {
-				if state.regKnown[srcIdx] {
-					state.setKnownValue(dstIdx, normalizeRegWrite(dstReg, state.regs[srcIdx]))
+		} else if reg2 == disassemble.REG_XZR || reg2 == disassemble.REG_WZR {
+			srcIdx, ok := registerToIndex(reg1)
+			if ok {
+				if is32BitReg(dstReg) {
+					if state.regKnown[srcIdx] {
+						state.setKnownValue(dstIdx, normalizeRegWrite(dstReg, state.regs[srcIdx]))
+					}
+				} else {
+					state.copyTracked(dstIdx, srcIdx)
 				}
-			} else {
-				state.copyTracked(dstIdx, srcIdx)
 			}
 		}
 	}
@@ -825,17 +842,17 @@ func (s *Scanner) applyMicroOrr(state *microState, inst *disassemble.Instruction
 	}
 }
 
-func (s *Scanner) applyMicroLoad(state *microState, inst *disassemble.Instruction, pair bool) {
+func (s *Scanner) applyMicroLoad(state *microState, inst *disassemble.Inst, pair bool) {
 	if !pair {
-		if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+		dstReg, ok := operandRegister(&inst.Operands[0], 0)
+		if operandCount(inst) < 2 || !ok {
 			return
 		}
-		dstReg := inst.Operands[0].Registers[0]
 		dstIdx, ok := registerToIndex(dstReg)
 		if !ok {
 			return
 		}
-		access, ok := s.trackedLoadAddress(state, inst.Operands[1])
+		access, ok := s.trackedLoadAddress(state, &inst.Operands[1])
 		if !ok {
 			state.clearTracked(dstIdx)
 			return
@@ -860,10 +877,10 @@ func (s *Scanner) applyMicroLoad(state *microState, inst *disassemble.Instructio
 		return
 	}
 
-	if len(inst.Operands) < 3 {
+	if operandCount(inst) < 3 {
 		return
 	}
-	access, ok := s.trackedLoadAddress(state, inst.Operands[2])
+	access, ok := s.trackedLoadAddress(state, &inst.Operands[2])
 	if !ok {
 		return
 	}
@@ -871,10 +888,10 @@ func (s *Scanner) applyMicroLoad(state *microState, inst *disassemble.Instructio
 		state.applyMemWriteBack(access)
 	}
 	for i := range 2 {
-		if len(inst.Operands[i].Registers) == 0 {
+		dstReg, ok := operandRegister(&inst.Operands[i], 0)
+		if !ok {
 			continue
 		}
-		dstReg := inst.Operands[i].Registers[0]
 		dstIdx, ok := registerToIndex(dstReg)
 		if !ok {
 			continue
@@ -897,12 +914,13 @@ func (s *Scanner) applyMicroLoad(state *microState, inst *disassemble.Instructio
 	}
 }
 
-func (s *Scanner) applyMicroStore(state *microState, inst *disassemble.Instruction, pair bool) {
+func (s *Scanner) applyMicroStore(state *microState, inst *disassemble.Inst, pair bool) {
 	if !pair {
-		if len(inst.Operands) < 2 || len(inst.Operands[0].Registers) == 0 {
+		srcReg, ok := operandRegister(&inst.Operands[0], 0)
+		if operandCount(inst) < 2 || !ok {
 			return
 		}
-		access, ok := state.memoryAccess(inst.Operands[1])
+		access, ok := state.memoryAccess(&inst.Operands[1])
 		if !ok {
 			return
 		}
@@ -910,7 +928,7 @@ func (s *Scanner) applyMicroStore(state *microState, inst *disassemble.Instructi
 			state.applyMemWriteBack(access)
 		}
 		if access.baseIsSP {
-			srcIdx, ok := registerToIndex(inst.Operands[0].Registers[0])
+			srcIdx, ok := registerToIndex(srcReg)
 			if ok {
 				state.writeStack(access.addr, state.regs[srcIdx])
 			}
@@ -921,10 +939,10 @@ func (s *Scanner) applyMicroStore(state *microState, inst *disassemble.Instructi
 		return
 	}
 
-	if len(inst.Operands) < 3 {
+	if operandCount(inst) < 3 {
 		return
 	}
-	access, ok := state.memoryAccess(inst.Operands[2])
+	access, ok := state.memoryAccess(&inst.Operands[2])
 	if !ok {
 		return
 	}
@@ -933,10 +951,11 @@ func (s *Scanner) applyMicroStore(state *microState, inst *disassemble.Instructi
 	}
 	if access.baseIsSP {
 		for i := range 2 {
-			if len(inst.Operands[i].Registers) == 0 {
+			srcReg, ok := operandRegister(&inst.Operands[i], 0)
+			if !ok {
 				continue
 			}
-			srcIdx, ok := registerToIndex(inst.Operands[i].Registers[0])
+			srcIdx, ok := registerToIndex(srcReg)
 			if !ok {
 				continue
 			}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 )
@@ -46,6 +47,8 @@ type Scanner struct {
 	root *macho.File
 	cfg  Config
 
+	decoder disassemble.Decoder
+
 	targets         []scanTarget
 	fileEntries     map[*macho.File]string
 	functions       map[*macho.File][]types.Function
@@ -60,6 +63,7 @@ type Scanner struct {
 	staticCalls     map[staticCallKey]cachedWrapperContext
 	nameStrings     map[uint64]cachedCString
 	symbolNames     map[fileAddrKey]cachedCString
+	metaCtorIdx     map[*macho.File]map[uint64][]types.Function
 
 	osMetaClassVariants map[uint64]struct{}
 	cxaPureVirtual      uint64
@@ -137,6 +141,8 @@ type scanStats struct {
 	resolvedParentMeta  int
 	pointerIndexEntries int
 	engineCreations     int
+	ptrCacheHits        int
+	ptrCacheMisses      int
 }
 
 type cachedCString struct {
@@ -170,6 +176,7 @@ func NewScanner(root *macho.File, cfg Config) *Scanner {
 		staticCalls:         make(map[staticCallKey]cachedWrapperContext),
 		nameStrings:         make(map[uint64]cachedCString),
 		symbolNames:         make(map[fileAddrKey]cachedCString),
+		metaCtorIdx:         make(map[*macho.File]map[uint64][]types.Function),
 		osMetaClassVariants: make(map[uint64]struct{}),
 		allocIndex:          defaultAllocIndex,
 		getMetaClassIndex:   defaultGetMetaClassIndex,
@@ -192,6 +199,16 @@ func (s *Scanner) Scan() ([]Class, error) {
 
 	if err := s.resolveAnchors(); err != nil {
 		return nil, err
+	}
+
+	// Warm the forward pointer cache for every file we will scan so
+	// that resolvePointerAt hits the in-memory map instead of doing
+	// pread syscalls during constructor extraction.
+	s.buildPointerIndex(s.root)
+	for _, target := range targets {
+		if target.file != nil && target.file != s.root {
+			s.buildPointerIndex(target.file)
+		}
 	}
 
 	seen := make(map[fileAddrKey]bool)
@@ -266,10 +283,10 @@ func (s *Scanner) Scan() ([]Class, error) {
 			s.stats.resolvedParentMeta++
 		}
 	}
-	log.Infof("scan stats: classes=%d vtables=%d parent_meta=%d ptr_index=%d engines=%d",
+	log.Infof("scan stats: classes=%d vtables=%d parent_meta=%d ptr_index=%d engines=%d ptr_hits=%d ptr_misses=%d",
 		s.stats.discoveredClasses, s.stats.resolvedVtables,
 		s.stats.resolvedParentMeta, s.stats.pointerIndexEntries,
-		s.stats.engineCreations)
+		s.stats.engineCreations, s.stats.ptrCacheHits, s.stats.ptrCacheMisses)
 
 	if s.cfg.ClassName == "" {
 		return out, nil
