@@ -29,6 +29,9 @@ type Signature struct {
 
 	// The backtrace of single xref functions that call this function.
 	Backtrace []string `json:"backtrace,omitempty"`
+
+	// The confidence source for this signature.
+	Provenance string `json:"provenance,omitempty"`
 }
 
 type Version struct {
