@@ -320,4 +320,4 @@ Huge thanks to:
 
 ## License
 
-MIT Copyright (c) 2018-2025 **blacktop**
+MIT Copyright (c) 2018-2026 **blacktop**
