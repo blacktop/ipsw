@@ -28,6 +28,8 @@ import (
 
 const bagURL = "https://init-kt-prod.ess.apple.com/init/getBag?ix=5&p=atresearch"
 
+const pccLogLeavesBatchSize uint64 = 3000
+
 type BagResponse struct {
 	UUID                          string `plist:"uuid,omitempty"`
 	AtResearcherConsistencyProof  string `plist:"at-researcher-consistency-proof,omitempty"`
@@ -57,7 +59,7 @@ type pccInstance struct {
 }
 
 type TransparencyExtension struct {
-	Type uint32
+	Type uint8
 	Size uint16
 	Data []byte
 }
@@ -69,7 +71,7 @@ type ATLeaf struct {
 	Description     []byte
 	HashSize        uint8
 	Hash            []byte
-	ExpiryMS        int64
+	ExpiryMS        uint64
 	ExtensionsSize  uint16
 	Extensions      []TransparencyExtension
 }
@@ -88,6 +90,23 @@ var colorName = color.New(color.Bold).SprintfFunc()
 var colorCreateTime = color.New(color.Faint, color.FgGreen).SprintFunc()
 var colorExpireTime = color.New(color.Faint, color.FgRed).SprintFunc()
 
+func pccReleaseHash(release *PCCRelease) []byte {
+	if release == nil {
+		return nil
+	}
+	if hash := release.GetReleaseHash(); len(hash) > 0 {
+		return hash
+	}
+	if release.ATLeaf != nil {
+		return release.Hash
+	}
+	return nil
+}
+
+func pccReleaseHashString(release *PCCRelease) string {
+	return hex.EncodeToString(pccReleaseHash(release))
+}
+
 type PCCRelease struct {
 	Index uint64
 	pcc.ReleaseMetadata
@@ -95,15 +114,15 @@ type PCCRelease struct {
 	*ATLeaf
 }
 
-type ByPccIndex []PCCRelease
+type ByPccIndex []*PCCRelease
 
 func (a ByPccIndex) Len() int           { return len(a) }
 func (a ByPccIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByPccIndex) Less(i, j int) bool { return a[i].Index > a[j].Index }
 
-func (r PCCRelease) String() string {
+func (r *PCCRelease) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("%d) %s\n", r.Index, colorHash(hex.EncodeToString(r.GetReleaseHash()))))
+	out.WriteString(fmt.Sprintf("%d) %s\n", r.Index, colorHash(pccReleaseHashString(r))))
 	out.WriteString(fmt.Sprintf(colorField("Type")+":   %s\n", pcc.ATLogDataType(r.Type).String()))
 	out.WriteString(fmt.Sprintf(colorField("Schema")+": %s\n", string(r.SchemaVersion.String())))
 	out.WriteString(colorField("Assets\n"))
@@ -118,7 +137,7 @@ func (r PCCRelease) String() string {
 	hash.Write(r.Ticket.ApTicket.Bytes)
 	out.WriteString(fmt.Sprintf(colorField("    OS")+": %s\n", colorHash(hex.EncodeToString(hash.Sum(nil)))))
 	out.WriteString(fmt.Sprintf("        [%s: %s]\n", colorCreateTime("created"), r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05")))
-	out.WriteString(fmt.Sprintf("        [%s: %s]\n", colorExpireTime("expires"), time.UnixMilli(r.ExpiryMS).Format("2006-01-02 15:04:05")))
+	out.WriteString(fmt.Sprintf("        [%s: %s]\n", colorExpireTime("expires"), time.UnixMilli(int64(r.ExpiryMS)).Format("2006-01-02 15:04:05")))
 	out.WriteString(colorField("    Cryptexes\n"))
 	for i, ct := range r.Ticket.CryptexTickets {
 		hash.Reset()
@@ -140,16 +159,24 @@ func (r PCCRelease) String() string {
 	return out.String()
 }
 
-func (r PCCRelease) Download(output, proxy string, insecure bool) error {
+func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
+	}
+	releaseID := pccReleaseHashString(r)
+	releaseName := releaseID
+	if len(releaseName) > 7 {
+		releaseName = releaseName[:7]
+	}
+	if releaseName == "" {
+		releaseName = fmt.Sprintf("%d", r.Index)
 	}
 	pinst := pccInstance{
 		HttpService: struct {
 			Enabled bool `plist:"enabled,omitempty"`
 		}{Enabled: true},
-		Name:      hex.EncodeToString(r.GetReleaseHash())[:7],
-		ReleaseID: hex.EncodeToString(r.GetReleaseHash()),
+		Name:      releaseName,
+		ReleaseID: releaseID,
 	}
 	for _, asset := range r.GetAssets() {
 		assetURL := asset.GetUrl()
@@ -233,16 +260,21 @@ func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
 	if err := binary.Read(r, binary.BigEndian, &leaf.ExtensionsSize); err != nil {
 		return nil, fmt.Errorf("cannot read extensions size: %v", err)
 	}
-	for range int(leaf.ExtensionsSize) {
+	extensionData := make([]byte, leaf.ExtensionsSize)
+	if err := binary.Read(r, binary.BigEndian, &extensionData); err != nil {
+		return nil, fmt.Errorf("cannot read extensions: %v", err)
+	}
+	er := bytes.NewReader(extensionData)
+	for er.Len() > 0 {
 		var ext TransparencyExtension
-		if err := binary.Read(r, binary.BigEndian, &ext.Type); err != nil {
+		if err := binary.Read(er, binary.BigEndian, &ext.Type); err != nil {
 			return nil, fmt.Errorf("cannot read extension type: %v", err)
 		}
-		if err := binary.Read(r, binary.BigEndian, &ext.Size); err != nil {
+		if err := binary.Read(er, binary.BigEndian, &ext.Size); err != nil {
 			return nil, fmt.Errorf("cannot read extension size: %v", err)
 		}
 		ext.Data = make([]byte, ext.Size)
-		if err := binary.Read(r, binary.BigEndian, &ext.Data); err != nil {
+		if err := binary.Read(er, binary.BigEndian, &ext.Data); err != nil {
 			return nil, fmt.Errorf("cannot read extension data: %v", err)
 		}
 		leaf.Extensions = append(leaf.Extensions, ext)
@@ -250,9 +282,117 @@ func parseAtLeaf(r *bytes.Reader) (*ATLeaf, error) {
 	return &leaf, nil
 }
 
-func GetPCCReleases(proxy string, insecure bool) ([]PCCRelease, error) {
-	var releases []PCCRelease
+func hintedATLeafType(mutation []byte) (pcc.ATLogDataType, bool) {
+	if len(mutation) < 2 {
+		return 0, false
+	}
+	return pcc.ATLogDataType(mutation[1]), true
+}
 
+func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) {
+	if leaf.GetNodeType() != pcc.NodeType_ATL_NODE {
+		return nil, nil
+	}
+
+	var clnode pcc.ChangeLogNodeV2
+	if err := proto.Unmarshal(leaf.GetNodeBytes(), &clnode); err != nil {
+		if typ, ok := hintedATLeafType(clnode.GetMutation()); ok && typ != pcc.ATLogDataType_RELEASE {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("cannot unmarshal ChangeLogNodeV2: %v", err)
+	}
+
+	atLeaf, err := parseAtLeaf(bytes.NewReader(clnode.GetMutation()))
+	if err != nil {
+		if typ, ok := hintedATLeafType(clnode.GetMutation()); ok && typ != pcc.ATLogDataType_RELEASE {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("cannot parse ATLeaf: %v", err)
+	}
+	if pcc.ATLogDataType(atLeaf.Type) != pcc.ATLogDataType_RELEASE {
+		return nil, nil
+	}
+
+	if len(leaf.GetMetadata()) == 0 {
+		return nil, fmt.Errorf("release leaf missing metadata")
+	}
+	if len(leaf.GetRawData()) == 0 {
+		return nil, fmt.Errorf("release leaf missing raw ticket data")
+	}
+
+	release := &PCCRelease{
+		Index:  leaf.GetIndex(),
+		ATLeaf: atLeaf,
+	}
+
+	if err := proto.Unmarshal(leaf.GetMetadata(), &release.ReleaseMetadata); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal ReleaseMetadata: %v", err)
+	}
+	if _, err := asn1.Unmarshal(leaf.GetRawData(), &release.Ticket); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
+	}
+
+	return release, nil
+}
+
+func collectPCCReleases(logSize, batchSize uint64, fetchLeaves func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error)) ([]*PCCRelease, error) {
+	if logSize == 0 {
+		return nil, nil
+	}
+	if batchSize == 0 {
+		batchSize = pccLogLeavesBatchSize
+	}
+
+	var releases []*PCCRelease
+
+	for startIndex := uint64(0); startIndex < logSize; startIndex += batchSize {
+		endIndex := min(startIndex+batchSize, logSize)
+		leaves, err := fetchLeaves(startIndex, endIndex)
+		if err != nil {
+			return nil, err
+		}
+		for _, leaf := range leaves {
+			release, err := parsePCCReleaseLeaf(leaf)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse pcc log leaf %d: %w", leaf.GetIndex(), err)
+			}
+			if release != nil {
+				releases = append(releases, release)
+			}
+		}
+	}
+
+	return releases, nil
+}
+
+func UniquePCCReleases(releases []*PCCRelease) []*PCCRelease {
+	if len(releases) < 2 {
+		return releases
+	}
+
+	unique := make([]*PCCRelease, 0, len(releases))
+	seen := make(map[string]int, len(releases))
+
+	for _, release := range releases {
+		hash := pccReleaseHashString(release)
+		if hash == "" {
+			unique = append(unique, release)
+			continue
+		}
+		if idx, ok := seen[hash]; ok {
+			if release.Index > unique[idx].Index {
+				unique[idx] = release
+			}
+			continue
+		}
+		seen[hash] = len(unique)
+		unique = append(unique, release)
+	}
+
+	return unique
+}
+
+func GetPCCReleases(proxy string, insecure bool) ([]*PCCRelease, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			Proxy:           GetProxy(proxy),
@@ -324,6 +464,9 @@ func GetPCCReleases(proxy string, insecure bool) ([]PCCRelease, error) {
 	if err := proto.Unmarshal(body, &lt); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal ListTreesResponse: %v", err)
 	}
+	if lt.GetStatus() != pcc.Status_OK {
+		return nil, fmt.Errorf("pcc list trees returned status: %s", lt.GetStatus())
+	}
 
 	var tree *pcc.ListTreesResponse_Tree
 	for _, t := range lt.GetTrees() {
@@ -331,6 +474,9 @@ func GetPCCReleases(proxy string, insecure bool) ([]PCCRelease, error) {
 			t.GetApplication() == pcc.Application_PRIVATE_CLOUD_COMPUTE {
 			tree = t
 		}
+	}
+	if tree == nil {
+		return nil, fmt.Errorf("failed to find private cloud compute tree in list trees response")
 	}
 
 	data, err = proto.Marshal(&pcc.LogHeadRequest{
@@ -371,81 +517,62 @@ func GetPCCReleases(proxy string, insecure bool) ([]PCCRelease, error) {
 	if err := proto.Unmarshal(body, &lh); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal ListTreesResponse: %v", err)
 	}
+	if lh.GetStatus() != pcc.Status_OK {
+		return nil, fmt.Errorf("pcc log head returned status: %s", lh.GetStatus())
+	}
+	if lh.GetLogHead() == nil {
+		return nil, fmt.Errorf("pcc log head response missing log head object")
+	}
 	var logHead pcc.LogHead
 	if err := proto.Unmarshal(lh.GetLogHead().GetObject(), &logHead); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal LogHead: %v", err)
 	}
 
-	data, err = proto.Marshal(&pcc.LogLeavesRequest{
-		Version:         pcc.ProtocolVersion_V3,
-		TreeId:          tree.GetTreeId(),
-		StartIndex:      0,
-		EndIndex:        logHead.GetLogSize(),
-		RequestUuid:     uuid,
-		StartMergeGroup: 0,
-		EndMergeGroup:   uint32(tree.GetMergeGroups()),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal ListTreesRequest: %v", err)
-	}
-
-	req, err = http.NewRequest("POST", bag.AtResearcherLogLeaves, bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create http POST request: %v", err)
-	}
-	req.Header.Set("X-Apple-Request-UUID", uuid)
-	req.Header.Set("Content-Type", "application/protobuf")
-	req.Header.Add("User-Agent", utils.RandomAgent())
-
-	res, err = client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("returned status: %s", res.Status)
-	}
-
-	body, err = io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	res.Body.Close()
-
-	var lls pcc.LogLeavesResponse
-	if err := proto.Unmarshal(body, &lls); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal ListTreesResponse: %v", err)
-	}
-
-	for _, leave := range lls.GetLeaves() {
-		if leave.GetNodeType() == pcc.NodeType_ATL_NODE {
-			var clnode pcc.ChangeLogNodeV2
-			if err := proto.Unmarshal(leave.GetNodeBytes(), &clnode); err != nil {
-				return nil, fmt.Errorf("cannot unmarshal ChangeLogNodeV2: %v", err)
-			}
-			// peak at the first 2 bytes to see if it's a release
-			blob := make([]byte, 2)
-			if err := binary.Read(bytes.NewReader(clnode.GetMutation()), binary.BigEndian, &blob); err != nil {
-				return nil, fmt.Errorf("cannot read type: %v", err)
-			}
-			if pcc.ATLogDataType(blob[1]) != pcc.ATLogDataType_RELEASE {
-				continue
-			}
-			release := PCCRelease{Index: leave.GetIndex()}
-			release.ATLeaf, err = parseAtLeaf(bytes.NewReader(clnode.GetMutation()))
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse ATLeaf: %v", err)
-			}
-			if err := proto.Unmarshal(leave.GetMetadata(), &release.ReleaseMetadata); err != nil {
-				return nil, fmt.Errorf("cannot unmarshal ReleaseMetadata: %v", err)
-			}
-			if _, err := asn1.Unmarshal(leave.RawData, &release.Ticket); err != nil {
-				return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
-			}
-			releases = append(releases, release)
+	return collectPCCReleases(logHead.GetLogSize(), pccLogLeavesBatchSize, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+		data, err := proto.Marshal(&pcc.LogLeavesRequest{
+			Version:         pcc.ProtocolVersion_V3,
+			TreeId:          tree.GetTreeId(),
+			StartIndex:      startIndex,
+			EndIndex:        endIndex,
+			RequestUuid:     uuid,
+			StartMergeGroup: 0,
+			EndMergeGroup:   uint32(tree.GetMergeGroups()),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal LogLeavesRequest: %v", err)
 		}
-	}
 
-	return releases, nil
+		req, err = http.NewRequest("POST", bag.AtResearcherLogLeaves, bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("cannot create http POST request: %v", err)
+		}
+		req.Header.Set("X-Apple-Request-UUID", uuid)
+		req.Header.Set("Content-Type", "application/protobuf")
+		req.Header.Add("User-Agent", utils.RandomAgent())
+
+		res, err = client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("pcc log leaves [%d,%d) returned http status: %s", startIndex, endIndex, res.Status)
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var lls pcc.LogLeavesResponse
+		if err := proto.Unmarshal(body, &lls); err != nil {
+			return nil, fmt.Errorf("cannot unmarshal LogLeavesResponse: %v", err)
+		}
+		if lls.GetStatus() != pcc.Status_OK {
+			return nil, fmt.Errorf("pcc log leaves [%d,%d) returned status: %s", startIndex, endIndex, lls.GetStatus())
+		}
+
+		return lls.GetLeaves(), nil
+	})
 }

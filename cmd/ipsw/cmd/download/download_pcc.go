@@ -96,13 +96,7 @@ var downloadPccCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		sort.Sort(download.ByPccIndex(releases))
 
-		if len(releases) == 0 {
-			return fmt.Errorf("no PCC Releases found")
-		}
-
-		// Filter releases if user provided a specific index
 		if len(args) > 0 {
 			index, err := strconv.Atoi(args[0])
 			if err != nil {
@@ -124,12 +118,20 @@ var downloadPccCmd = &cobra.Command{
 
 			// Replace releases list with filtered single release
 			releases = releases[foundIndex : foundIndex+1]
+		} else {
+			releases = download.UniquePCCReleases(releases)
+		}
+
+		sort.Sort(download.ByPccIndex(releases))
+
+		if len(releases) == 0 {
+			return fmt.Errorf("no PCC Releases found")
 		}
 
 		if viper.GetBool("download.pcc.info") {
 			log.Infof("Found %d PCC Releases", len(releases))
 			for i := range releases {
-				release := &releases[i]
+				release := releases[i]
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				fmt.Println(release)
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
@@ -137,7 +139,7 @@ var downloadPccCmd = &cobra.Command{
 		} else {
 			var choices []string
 			for i := range releases {
-				r := &releases[i]
+				r := releases[i]
 				choices = append(choices, fmt.Sprintf("%04d: %s  [created: %s]",
 					r.Index,
 					hex.EncodeToString(r.GetReleaseHash()),
