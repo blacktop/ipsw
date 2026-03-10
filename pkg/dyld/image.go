@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -903,70 +902,79 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			return fmt.Errorf("failed to parse local syms for image %s: %w", filepath.Base(i.Name), ErrNoLocals)
 		}
 
-		sr := io.NewSectionReader(i.cache.r[uuid], 0, 1<<63-1)
-
-		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
-		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
-
-		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-
-		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
-			// skip over other images
-			if idx != i.Index {
-				sr.Seek(int64(int(i.cache.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), io.SeekCurrent)
-				continue
-			}
-
-			for range int(i.cache.Images[idx].NlistCount) {
-				nlist := types.Nlist64{}
-				if err := binary.Read(sr, i.cache.ByteOrder, &nlist); err != nil {
-					return err
-				}
-
-				stringPool.Seek(int64(nlist.Name), io.SeekStart)
-
-				s, err := bufio.NewReader(stringPool).ReadString('\x00')
-				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read string at: %d", i.cache.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
-				}
-
-				s = strings.Trim(s, "\x00")
-				i.cache.AddressToSymbol.Set(nlist.Value, s)
-				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-					Name:         s,
-					Nlist64:      nlist,
-					FoundInDylib: i.Name,
-				})
-
-				if dump {
-					m, err := i.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-					// fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
-					// 	Name:    s,
-					// 	Nlist64: nlist,
-					// 	Macho:   m,
-					// }.String(true))
-					fmt.Println(CacheLocalSymbol64{
-						Name:         s,
-						Nlist64:      nlist,
-						Macho:        m,
-						FoundInDylib: filepath.Base(i.Name),
-					}.String(true))
-				}
-			}
-
-			// w.Flush()
-
-			sort.Slice(i.LocalSymbols, func(j, k int) bool {
-				return i.LocalSymbols[j].Name < i.LocalSymbols[k].Name
-			})
-
+		nlistCount := int(i.cache.Images[i.Index].NlistCount)
+		if nlistCount == 0 {
 			i.Analysis.State.SetPrivates(true)
-
 			return nil
 		}
+
+		// Compute direct offset to this image's nlist entries (avoids O(N) seek per image)
+		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
+		for j := uint32(0); j < i.Index; j++ {
+			nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
+		}
+
+		// Bulk-read all nlist entries for this image at once
+		nlistBuf := make([]byte, nlistCount*nlist64Size)
+		if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
+			return fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
+		}
+
+		// Read strings from string pool using chunk-based ReadAt (one syscall per string)
+		strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
+		strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
+		strChunk := make([]byte, 512)
+
+		for n := range nlistCount {
+			off := n * nlist64Size
+			nameIdx, value := parseNlist64(nlistBuf[off:])
+
+			// Read a chunk from the string pool and find the null terminator
+			readOff := strPoolBase + int64(nameIdx)
+			readLen := int64(len(strChunk))
+			if readOff+readLen > strPoolBase+strPoolSize {
+				readLen = strPoolBase + strPoolSize - readOff
+			}
+			nr, _ := i.cache.r[uuid].ReadAt(strChunk[:readLen], readOff)
+			nullPos := bytes.IndexByte(strChunk[:nr], 0)
+			if nullPos < 0 {
+				nullPos = nr
+			}
+			s := string(strChunk[:nullPos])
+
+			nlist := types.Nlist64{}
+			nlist.Name = nameIdx
+			nlist.Type = types.NType(nlistBuf[off+4])
+			nlist.Sect = nlistBuf[off+5]
+			nlist.Desc = types.NDescType(binary.LittleEndian.Uint16(nlistBuf[off+6:]))
+			nlist.Value = value
+
+			i.cache.AddressToSymbol.Set(value, s)
+			i.cache.Images[i.Index].LocalSymbols = append(i.cache.Images[i.Index].LocalSymbols, &CacheLocalSymbol64{
+				Name:         s,
+				Nlist64:      nlist,
+				FoundInDylib: i.Name,
+			})
+
+			if dump {
+				m, err := i.GetPartialMacho()
+				if err != nil {
+					return err
+				}
+				fmt.Println(CacheLocalSymbol64{
+					Name:         s,
+					Nlist64:      nlist,
+					Macho:        m,
+					FoundInDylib: filepath.Base(i.Name),
+				}.String(true))
+			}
+		}
+
+		sort.Slice(i.LocalSymbols, func(j, k int) bool {
+			return i.LocalSymbols[j].Name < i.LocalSymbols[k].Name
+		})
+
+		i.Analysis.State.SetPrivates(true)
 	}
 
 	return nil
