@@ -287,6 +287,9 @@ func LookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
 		sym.StubIsland = true
 	}
 
+	// Default segment from mapping (refined below if an image is found)
+	sym.Segment = mapping.Name
+
 retry:
 	if image, err := f.GetImageContainingVMAddr(addr); err == nil {
 		m, err := image.GetMacho()
@@ -295,13 +298,17 @@ retry:
 		}
 		defer m.Close()
 
-		sym.Image = image.Name
+		// Only set image/segment/section on first attempt;
+		// on retry (pointer deref) we want to keep the original address's location.
+		if !secondAttempt {
+			sym.Image = image.Name
 
-		if s := m.FindSegmentForVMAddr(addr); s != nil {
-			sym.Segment = s.Name
-			if s.Nsect > 0 {
-				if c := m.FindSectionForVMAddr(addr); c != nil {
-					sym.Section = c.Name
+			if s := m.FindSegmentForVMAddr(addr); s != nil {
+				sym.Segment = s.Name
+				if s.Nsect > 0 {
+					if c := m.FindSectionForVMAddr(addr); c != nil {
+						sym.Section = c.Name
+					}
 				}
 			}
 		}
@@ -395,6 +402,9 @@ func DirectLookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
 		sym.StubIsland = true
 	}
 
+	// Default segment from mapping (refined below if an image is found)
+	sym.Segment = mapping.Name
+
 retry:
 	// Try fast __TEXT binary search first, fall back to full segment scan
 	image, err := f.GetImageContainingTextAddr(addr)
@@ -408,13 +418,17 @@ retry:
 		}
 		defer m.Close()
 
-		sym.Image = image.Name
+		// Only set image/segment/section on first attempt;
+		// on retry (pointer deref) we want to keep the original address's location.
+		if !secondAttempt {
+			sym.Image = image.Name
 
-		if s := m.FindSegmentForVMAddr(addr); s != nil {
-			sym.Segment = s.Name
-			if s.Nsect > 0 {
-				if c := m.FindSectionForVMAddr(addr); c != nil {
-					sym.Section = c.Name
+			if s := m.FindSegmentForVMAddr(addr); s != nil {
+				sym.Segment = s.Name
+				if s.Nsect > 0 {
+					if c := m.FindSectionForVMAddr(addr); c != nil {
+						sym.Section = c.Name
+					}
 				}
 			}
 		}
