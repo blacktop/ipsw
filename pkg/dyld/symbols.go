@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -209,14 +208,22 @@ func (f *File) FindPublicSymbol(name string) (*Symbol, error) {
 
 func (f *File) GetSymbolAddress(name string) (uint64, *CacheImage, error) {
 	// search the addr to symbol map cache
-	for addr, sym := range f.AddressToSymbol {
+	var foundAddr uint64
+	var foundImage *CacheImage
+	var foundErr error
+	f.AddressToSymbol.Range(func(addr uint64, sym string) bool {
 		if name == sym {
-			i, err := f.GetImageContainingVMAddr(addr)
-			if err != nil {
-				return 0, nil, err
-			}
-			return addr, i, nil
+			foundAddr = addr
+			foundImage, foundErr = f.GetImageContainingVMAddr(addr)
+			return false
 		}
+		return true
+	})
+	if foundErr != nil {
+		return 0, nil, foundErr
+	}
+	if foundImage != nil {
+		return foundAddr, foundImage, nil
 	}
 	// search each image
 	for _, image := range f.Images {
@@ -329,7 +336,7 @@ func (f *File) DumpStubIslands() error {
 		}
 	}
 	for stub, target := range f.islandStubs {
-		if symName, ok := f.AddressToSymbol[target]; ok {
+		if symName, ok := f.AddressToSymbol.Get(target); ok {
 			fmt.Printf("%#x: %s\n", stub, symName)
 		} else {
 			fmt.Printf("%#x: %#x\n", stub, target)
@@ -349,8 +356,8 @@ func (f *File) DumpPrewarmData() error {
 			return fmt.Errorf("failed to get cache VM address for entry %v: %v", entry, err)
 		}
 		target := addr + uint64(entry.NumPages()*DyldCachePrewarmingDataPageSize)
-		addrName, aok := f.AddressToSymbol[addr]
-		targetName, tok := f.AddressToSymbol[target]
+		addrName, aok := f.AddressToSymbol.Get(addr)
+		targetName, tok := f.AddressToSymbol.Get(target)
 		if aok || tok {
 			if addrName == "" {
 				addrName = "?"
@@ -374,7 +381,7 @@ func (f *File) GetStubIslands() (map[uint64]string, error) {
 		}
 	}
 	for stub, target := range f.islandStubs {
-		if symName, ok := f.AddressToSymbol[target]; ok {
+		if symName, ok := f.AddressToSymbol.Get(target); ok {
 			stubs[stub] = symName
 		}
 	}
@@ -406,8 +413,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 					return fmt.Errorf("failed to parse stub islands: %v", err)
 				}
 				for stub, target := range f.islandStubs {
-					if symName, ok := f.AddressToSymbol[target]; ok {
-						f.AddressToSymbol[stub] = symName + "_stub"
+					if symName, ok := f.AddressToSymbol.Get(target); ok {
+						f.AddressToSymbol.Set(stub, symName+"_stub")
 					}
 				}
 			}
@@ -429,18 +436,23 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	defer a2sFile.Close()
 
 	log.Infof("Loading symbol cache file...")
-	if err := gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol); err != nil {
+	fi, err := a2sFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat symbol cache file: %v", err)
+	}
+	if err := f.AddressToSymbol.Load(a2sFile, fi.Size()); err != nil {
 		a2sFile.Close()
-		return fmt.Errorf("failed to decode addr2sym map from binary: %v", err)
+		return fmt.Errorf("failed to load addr2sym cache: %v", err)
 	}
 
-	f.symCacheLoaded = true
+	f.SymCacheLoaded = true
 
 	return nil
 }
 
 // SaveAddrToSymMap saves the dyld address-to-symbol map to disk
 func (f *File) SaveAddrToSymMap(dest string) (err error) {
+	log.Infof("Saving symbol cache (%d symbols)...", f.AddressToSymbol.Len())
 	of, err := os.Create(dest)
 	if err != nil {
 		// check for permission error (read-only location)
@@ -462,34 +474,27 @@ func (f *File) SaveAddrToSymMap(dest string) (err error) {
 		}
 	}
 
-	buff := new(bytes.Buffer)
-
-	// Encoding the map
-	if err := gob.NewEncoder(buff).Encode(f.AddressToSymbol); err != nil {
-		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
-	}
-
-	if _, err = buff.WriteTo(of); err != nil {
+	if err := f.AddressToSymbol.Save(of); err != nil {
+		of.Close()
+		// check for out of space error (mounted IPSW dmgs return this)
 		var pathErr *os.PathError
-		if errors.As(err, &pathErr) {
-			// check for out of space error (mounted IPSW dmgs return this)
-			if errors.Is(pathErr.Err, syscall.ENOSPC) {
-				log.Errorf("failed to create symbol cache file %s (most likely a mounted IPSW dmg): %v", filepath.Base(pathErr.Path), pathErr.Err)
-				tmpcache := filepath.Join(os.TempDir(), f.UUID.String()+".a2s")
-				of, err = os.Create(tmpcache)
-				if err != nil {
-					return fmt.Errorf("failed to create temp cache file: %v", err)
-				}
-				utils.Indent(log.Warn, 2)("creating in the tmp folder")
-				utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcache))
-				if _, err = buff.WriteTo(of); err != nil {
-					return fmt.Errorf("failed to write addr2sym map to file: %v", err)
-				}
-				if err := os.Remove(dest); err != nil {
-					return fmt.Errorf("failed to remove old cache file %s: %v", dest, err)
-				}
-				return nil
+		if errors.As(err, &pathErr) && errors.Is(pathErr.Err, syscall.ENOSPC) {
+			log.Errorf("failed to create symbol cache file %s (most likely a mounted IPSW dmg): %v", filepath.Base(pathErr.Path), pathErr.Err)
+			tmpcache := filepath.Join(os.TempDir(), f.UUID.String()+".a2s")
+			of2, err := os.Create(tmpcache)
+			if err != nil {
+				return fmt.Errorf("failed to create temp cache file: %v", err)
 			}
+			defer of2.Close()
+			utils.Indent(log.Warn, 2)("creating in the tmp folder")
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcache))
+			if err := f.AddressToSymbol.Save(of2); err != nil {
+				return fmt.Errorf("failed to write addr2sym map to file: %v", err)
+			}
+			if err := os.Remove(dest); err != nil {
+				return fmt.Errorf("failed to remove old cache file %s: %v", dest, err)
+			}
+			return nil
 		}
 		return fmt.Errorf("failed to write addr2sym map to file: %v", err)
 	}

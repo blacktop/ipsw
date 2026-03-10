@@ -306,9 +306,11 @@ retry:
 			}
 		}
 
-		// Load all symbols
-		if err := image.Analyze(); err != nil {
-			return nil, err
+		// Load all symbols (skip if cache already loaded)
+		if !f.SymCacheLoaded {
+			if err := image.Analyze(); err != nil {
+				return nil, err
+			}
 		}
 
 		if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
@@ -316,7 +318,7 @@ retry:
 			if addr-fn.StartAddr != 0 {
 				delta = fmt.Sprintf(" + %d", addr-fn.StartAddr)
 			}
-			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+			if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 				if secondAttempt {
 					symName = symbols.PrefixPointer + symName
 				}
@@ -336,7 +338,7 @@ retry:
 		}
 	}
 
-	if symName, ok := f.AddressToSymbol[addr]; ok {
+	if symName, ok := f.AddressToSymbol.Get(addr); ok {
 		if secondAttempt {
 			symName = symbols.PrefixPointer + symName
 		}

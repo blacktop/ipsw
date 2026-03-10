@@ -580,10 +580,10 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[start]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName)
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+				i.cache.AddressToSymbol.Set(start, fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName))
 			} else {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target)
+				i.cache.AddressToSymbol.Set(start, fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target))
 			}
 		}
 	}
@@ -598,26 +598,26 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[entry]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+				i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
 						// FIXME: return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 						log.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
-					if symName, ok := i.cache.AddressToSymbol[target]; ok {
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+					if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+						i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 					} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
-						if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
-							i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+						if symName, ok := i.cache.AddressToSymbol.Get(laptr); ok {
+							i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 						}
 					} else {
 						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x ; %s", symbols.PrefixGotFallback, target, filepath.Base(img.Name))
+						i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%x ; %s", symbols.PrefixGotFallback, target, filepath.Base(img.Name)))
 					}
 				} else {
-					i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target)
+					i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target))
 				}
 			}
 		}
@@ -633,11 +633,11 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[stub]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
 				if !strings.HasPrefix(symName, symbols.PrefixJump) {
-					i.cache.AddressToSymbol[stub] = symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper)
+					i.cache.AddressToSymbol.Set(stub, symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper))
 				} else {
-					i.cache.AddressToSymbol[stub] = symName
+					i.cache.AddressToSymbol.Set(stub, symName)
 				}
 			} else {
 				img, err := i.cache.GetImageContainingVMAddr(target)
@@ -647,11 +647,11 @@ func (i *CacheImage) Analyze() error {
 				if err := img.Analyze(); err != nil {
 					return fmt.Errorf("failed to lookup symbol stub target %#x: failed to analyze image %s: %w", target, img.Name, err)
 				}
-				if symName, ok := i.cache.AddressToSymbol[target]; ok {
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, symName)
+				if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+					i.cache.AddressToSymbol.Set(stub, fmt.Sprintf("%s%s", symbols.PrefixJump, symName))
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%x ; %s", symbols.PrefixStubFallback, target, filepath.Base(img.Name))
+					i.cache.AddressToSymbol.Set(stub, fmt.Sprintf("%s%x ; %s", symbols.PrefixStubFallback, target, filepath.Base(img.Name)))
 				}
 			}
 		}
@@ -719,8 +719,8 @@ func (i *CacheImage) GetSlideInfo() (map[uint64]uint64, error) {
 func (i *CacheImage) ParseStarts() {
 	if i.m != nil {
 		for _, fn := range i.m.GetFunctions() {
-			if _, ok := i.cache.AddressToSymbol[fn.StartAddr]; !ok {
-				i.cache.AddressToSymbol[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
+			if ok := i.cache.AddressToSymbol.Has(fn.StartAddr); !ok {
+				i.cache.AddressToSymbol.Set(fn.StartAddr, fmt.Sprintf("sub_%x", fn.StartAddr))
 			}
 		}
 	}
@@ -878,7 +878,7 @@ func (i *CacheImage) ParseSwiftStrings() error {
 	}
 	for addr, str := range strs {
 		if len(str) > 0 {
-			i.cache.AddressToSymbol[addr] = fmt.Sprintf("%v", str)
+			i.cache.AddressToSymbol.Set(addr, fmt.Sprintf("%v", str))
 		}
 	}
 
@@ -931,7 +931,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 				}
 
 				s = strings.Trim(s, "\x00")
-				i.cache.AddressToSymbol[nlist.Value] = s
+				i.cache.AddressToSymbol.Set(nlist.Value, s)
 				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 					Name:         s,
 					Nlist64:      nlist,
@@ -1026,7 +1026,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%s\n", sym)
 				} else {
-					i.cache.AddressToSymbol[sym.Address] = sym.Name
+					i.cache.AddressToSymbol.Set(sym.Address, sym.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    sym.Name,
 						Address: sym.Address,
@@ -1054,7 +1054,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 			if dump {
 				fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			} else {
-				i.cache.AddressToSymbol[sym.Value] = sym.Name
+				i.cache.AddressToSymbol.Set(sym.Value, sym.Name)
 				i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 					Name:    sym.Name,
 					Address: sym.Value,
@@ -1070,7 +1070,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 				} else {
-					i.cache.AddressToSymbol[bind.Start+bind.SegOffset] = bind.Name
+					i.cache.AddressToSymbol.Set(bind.Start+bind.SegOffset, bind.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    bind.Name,
 						Address: bind.Start + bind.SegOffset,
@@ -1109,7 +1109,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%s\n", export)
 				} else {
-					i.cache.AddressToSymbol[export.Address] = export.Name
+					i.cache.AddressToSymbol.Set(export.Address, export.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    export.Name,
 						Address: export.Address,

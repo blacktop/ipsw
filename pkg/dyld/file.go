@@ -81,10 +81,10 @@ type File struct {
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
 
-	AddressToSymbol map[uint64]string
+	AddressToSymbol *A2STable
 
 	IsDyld4         bool
-	symCacheLoaded  bool
+	SymCacheLoaded  bool
 	SubCacheInfo    []SubcacheEntry
 	TPROMappings    []TPROMapping
 	symUUID         mtypes.UUID
@@ -233,6 +233,9 @@ func Open(name string) (*File, error) {
 // If the File was created using NewFile directly instead of Open,
 // Close has no effect.
 func (f *File) Close() error {
+	if f.AddressToSymbol != nil {
+		f.AddressToSymbol.Close()
+	}
 	var err error
 	for uuid, closer := range f.closers {
 		if closer != nil {
@@ -279,7 +282,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.CodeSignatures = make(map[mtypes.UUID]codesignature)
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
-	f.AddressToSymbol = make(map[uint64]string, 7000000)
+	f.AddressToSymbol = NewA2STable(7000000)
 	f.ImageArray = make(map[uint32]*CImage)
 	f.islandStubs = make(map[uint64]uint64)
 
@@ -969,7 +972,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
 
 					if dump {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = "?"
 						} else {
@@ -977,7 +980,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, startOffset, pointer, targetValue, symName)
 					} else {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = ""
 						} else {
@@ -1084,7 +1087,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				}
 
 				if dump {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = "?"
 					} else {
@@ -1092,7 +1095,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					}
 					fmt.Printf("    [% 5d + 0x%05X] (off: %#x @ vaddr: %#x; raw: %#x => target: %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), rebaseLocation, rebaseAddr, pointer.Raw(), targetValue, pointer, symName)
 				} else {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = ""
 					} else {
@@ -1176,7 +1179,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
 
 					if dump {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = "?"
 						} else {
@@ -1184,7 +1187,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#08x = %#08x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
 					} else {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = ""
 						} else {
@@ -1285,7 +1288,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				}
 
 				if dump {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = "?"
 					} else {
@@ -1293,7 +1296,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					}
 					fmt.Printf("    [% 5d + 0x%05X] (off: %#x @ vaddr: %#x; raw: %#x => target: %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), rebaseLocation, rebaseAddr, pointer.Raw(), targetValue, pointer, symName)
 				} else {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = ""
 					} else {
