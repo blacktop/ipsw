@@ -32,6 +32,7 @@ ipsw kernel [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw kernel cpp](/docs/cli/ipsw/kernel/cpp)	 - Discover C++ classes from kernelcache
 * [ipsw kernel ctfdump](/docs/cli/ipsw/kernel/ctfdump)	 - Dump CTF info
 * [ipsw kernel dec](/docs/cli/ipsw/kernel/dec)	 - Decompress a kernelcache
 * [ipsw kernel dwarf](/docs/cli/ipsw/kernel/dwarf)	 - 🚧 Dump DWARF debug information
