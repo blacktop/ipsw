@@ -27,10 +27,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/invopop/jsonschema"
@@ -88,15 +91,10 @@ var kernelSymbolicateCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create jsonschema: %w", err)
 			}
-			if viper.GetString("kernel.symbolicate.output") != "" {
-				if viper.GetString("kernel.symbolicate.output") == "-" {
-					fmt.Println(string(bts))
-					return nil
-				}
-				schemaFile := filepath.Join(output, "symbolicator.schema.json")
-				log.Infof("Writing JSON schema to %s", schemaFile)
-				return os.WriteFile(schemaFile, bts, 0o644)
+			if err := writeSymbolicatorSchema(viper.GetString("kernel.symbolicate.output"), output, bts); err != nil {
+				return err
 			}
+			return nil
 		}
 
 		if viper.GetUint64("kernel.symbolicate.lookup") != 0 {
@@ -113,21 +111,25 @@ var kernelSymbolicateCmd = &cobra.Command{
 			return fmt.Errorf("symbol not found at address %#x", addr)
 		}
 
-		if viper.GetString("kernel.symbolicate.signatures") == "" {
-			return fmt.Errorf("you must provide a path to the --signatures folder")
-		}
-
-		log.Info("Parsing Signatures")
-		sigs, err := signature.Parse(viper.GetString("kernel.symbolicate.signatures"))
-		if err != nil {
-			return fmt.Errorf("failed to parse signatures: %v", err)
+		var sigs []signature.Symbolicator
+		if sigDir := viper.GetString("kernel.symbolicate.signatures"); sigDir != "" {
+			log.Info("Parsing Signatures")
+			sigs, err = signature.Parse(sigDir)
+			if err != nil {
+				return fmt.Errorf("failed to parse signatures: %v", err)
+			}
 		}
 
 		smap := signature.NewSymbolMap()
+		m, err := mcmd.OpenMachO(args[0], selectedArch)
+		if err != nil {
+			return fmt.Errorf("failed to open kernelcache: %v", err)
+		}
+		defer m.Close()
 
 		// symbolicate kernelcache
 		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
-		if err := smap.Symbolicate(args[0], sigs, quiet); err != nil {
+		if err := smap.SymbolicateMachO(m.File, filepath.Base(args[0]), sigs, quiet); err != nil {
 			return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 		}
 
@@ -136,42 +138,24 @@ var kernelSymbolicateCmd = &cobra.Command{
 			match := 0
 			miss := 0
 			log.Warn("Testing symbol matches")
-			m, err := mcmd.OpenMachO(args[0]+".dSYM/Contents/Resources/DWARF/"+filepath.Base(args[0]), selectedArch)
+			dsym, err := mcmd.OpenMachO(args[0]+".dSYM/Contents/Resources/DWARF/"+filepath.Base(args[0]), selectedArch)
 			if err != nil {
 				return fmt.Errorf("failed to open kernelcache: %v", err)
 			}
-			defer m.Close()
+			defer dsym.Close()
 			for addr, sym := range smap {
-				syms, err := m.File.FindAddressSymbols(addr)
-				if err != nil {
-					log.WithError(err).Errorf("symbol '%s' with addr %#x not found in kernelcache", sym, addr)
-					continue
-				}
-				matched := false
-				for _, s := range syms {
-					s.Name = regexp.MustCompile(`\.\d+$`).ReplaceAllString(s.Name, "")
-					s.Name = strings.TrimPrefix(s.Name, "__kernelrpc")
-					switch {
-					case strings.TrimLeft(sym, "_") == strings.TrimLeft(s.Name, "_"):
-						fallthrough
-					case strings.TrimSuffix(sym, "_trap") == strings.TrimLeft(s.Name, "_"):
-						matched = true
-						if !quiet {
-							log.Infof("✅ Symbol '%s' matches", sym)
-						}
-					default:
-						// log.Debug(s.String(m.File))
-					}
-				}
+				matched, actual := matchKernelTestSymbol(dsym.File, addr, sym)
 				if matched {
 					match++
+					if !quiet {
+						log.Infof("✅ Symbol '%s' matches", sym)
+					}
 				} else {
-					var ss []string
-					for _, s := range syms {
-						ss = append(ss, s.Name)
+					if len(actual) == 0 {
+						actual = append(actual, "<not found>")
 					}
 					utils.Indent(log.Error, 2)(
-						fmt.Sprintf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, strings.Join(ss, ", ")),
+						fmt.Sprintf("❌ Symbol at address %#x mismatch: matched %s, actual %s", addr, sym, strings.Join(actual, ", ")),
 					)
 					miss++
 				}
@@ -217,4 +201,73 @@ var kernelSymbolicateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+var kernelSymbolSuffixRE = regexp.MustCompile(`\.\d+$`)
+
+const vtableHeaderSize uint64 = 16
+
+func matchKernelTestSymbol(m *macho.File, addr uint64, expected string) (bool, []string) {
+	actual := make([]string, 0, 4)
+	seen := make(map[string]struct{})
+
+	for _, candidate := range kernelTestLookupAddrs(addr, expected) {
+		syms, err := m.FindAddressSymbols(candidate)
+		if err != nil {
+			continue
+		}
+		for _, sym := range syms {
+			if _, ok := seen[sym.Name]; !ok {
+				actual = append(actual, sym.Name)
+				seen[sym.Name] = struct{}{}
+			}
+			if kernelSymbolMatches(expected, sym.Name) {
+				return true, actual
+			}
+		}
+	}
+
+	slices.Sort(actual)
+	return false, actual
+}
+
+func kernelTestLookupAddrs(addr uint64, expected string) []uint64 {
+	addrs := []uint64{addr}
+	if strings.HasPrefix(expected, "vtable for ") && addr >= vtableHeaderSize {
+		addrs = append(addrs, addr-vtableHeaderSize)
+	}
+	return addrs
+}
+
+func kernelSymbolMatches(expected, actual string) bool {
+	raw := kernelSymbolSuffixRE.ReplaceAllString(actual, "")
+	raw = strings.TrimPrefix(raw, "__kernelrpc")
+
+	switch {
+	case strings.TrimLeft(expected, "_") == strings.TrimLeft(raw, "_"):
+		return true
+	case strings.TrimSuffix(expected, "_trap") == strings.TrimLeft(raw, "_"):
+		return true
+	}
+
+	demangled := strings.TrimPrefix(demangle.Do(raw, false, false), "__kernelrpc")
+	if demangled == expected {
+		return true
+	}
+	if strings.HasPrefix(demangled, expected+"(") {
+		return true
+	}
+
+	return false
+}
+
+func writeSymbolicatorSchema(outputFlag, outputDir string, data []byte) error {
+	if outputFlag == "" || outputFlag == "-" {
+		fmt.Println(string(data))
+		return nil
+	}
+
+	schemaFile := filepath.Join(outputDir, "symbolicator.schema.json")
+	log.Infof("Writing JSON schema to %s", schemaFile)
+	return os.WriteFile(schemaFile, data, 0o644)
 }

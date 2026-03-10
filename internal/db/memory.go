@@ -117,24 +117,8 @@ func (m *Memory) GetDSCImage(uuid string, addr uint64) (*model.Macho, error) {
 
 func (m *Memory) GetMachO(uuid string) (*model.Macho, error) {
 	for _, ipsw := range m.IPSWs {
-		for _, dyld := range ipsw.DSCs {
-			for _, img := range dyld.Images {
-				if img.UUID == uuid {
-					return img, nil
-				}
-			}
-		}
-		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
-				return fs, nil
-			}
-		}
-		for _, fs := range ipsw.Kernels {
-			for _, kext := range fs.Kexts {
-				if kext.UUID == uuid {
-					return kext, nil
-				}
-			}
+		if macho := findMachOByUUID(ipsw, uuid); macho != nil {
+			return macho, nil
 		}
 	}
 	return nil, model.ErrNotFound
@@ -142,35 +126,9 @@ func (m *Memory) GetMachO(uuid string) (*model.Macho, error) {
 
 func (m *Memory) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
 	for _, ipsw := range m.IPSWs {
-		for _, dyld := range ipsw.DSCs {
-			for _, img := range dyld.Images {
-				if img.UUID == uuid {
-					for _, sym := range img.Symbols {
-						if addr >= sym.Start && addr < sym.End {
-							return sym, nil
-						}
-					}
-				}
-			}
-		}
-		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
-				for _, sym := range fs.Symbols {
-					if addr >= sym.Start && addr < sym.End {
-						return sym, nil
-					}
-				}
-			}
-		}
-		for _, fs := range ipsw.Kernels {
-			for _, kext := range fs.Kexts {
-				if fs.UUID == uuid {
-					for _, sym := range kext.Symbols {
-						if addr >= sym.Start && addr < sym.End {
-							return sym, nil
-						}
-					}
-				}
+		if macho := findMachOByUUID(ipsw, uuid); macho != nil {
+			if sym := findSymbolByAddr(macho.Symbols, addr); sym != nil {
+				return sym, nil
 			}
 		}
 	}
@@ -179,27 +137,43 @@ func (m *Memory) GetSymbol(uuid string, addr uint64) (*model.Symbol, error) {
 
 func (m *Memory) GetSymbols(uuid string) ([]*model.Symbol, error) {
 	for _, ipsw := range m.IPSWs {
-		for _, dyld := range ipsw.DSCs {
-			for _, img := range dyld.Images {
-				if img.UUID == uuid {
-					return img.Symbols, nil
-				}
-			}
-		}
-		for _, fs := range ipsw.FileSystem {
-			if fs.UUID == uuid {
-				return fs.Symbols, nil
-			}
-		}
-		for _, fs := range ipsw.Kernels {
-			for _, kext := range fs.Kexts {
-				if fs.UUID == uuid {
-					return kext.Symbols, nil
-				}
-			}
+		if macho := findMachOByUUID(ipsw, uuid); macho != nil {
+			return macho.Symbols, nil
 		}
 	}
 	return nil, model.ErrNotFound
+}
+
+func findMachOByUUID(ipsw *model.Ipsw, uuid string) *model.Macho {
+	for _, dyld := range ipsw.DSCs {
+		for _, img := range dyld.Images {
+			if img.UUID == uuid {
+				return img
+			}
+		}
+	}
+	for _, fs := range ipsw.FileSystem {
+		if fs.UUID == uuid {
+			return fs
+		}
+	}
+	for _, kc := range ipsw.Kernels {
+		for _, kext := range kc.Kexts {
+			if kext.UUID == uuid {
+				return kext
+			}
+		}
+	}
+	return nil
+}
+
+func findSymbolByAddr(symbols []*model.Symbol, addr uint64) *model.Symbol {
+	for _, sym := range symbols {
+		if addr >= sym.Start && addr < sym.End {
+			return sym
+		}
+	}
+	return nil
 }
 
 // Set sets the value for the given key.

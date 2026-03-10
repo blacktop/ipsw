@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -24,8 +25,100 @@ const (
 	isKernelMask   uint64 = 1 << 62
 )
 
+func appendModelSymbol(dst *[]*model.Symbol, seen map[uint64]struct{}, addr, end uint64, name string) {
+	if name == "" || addr == 0 {
+		return
+	}
+	if _, ok := seen[addr]; ok {
+		return
+	}
+	if end <= addr {
+		// Keep data symbols as exact-address matches for the existing
+		// start <= addr < end lookup contract used by the symbol DB.
+		end = addr + 1
+	}
+	*dst = append(*dst, &model.Symbol{
+		Name:  model.Name{Name: name},
+		Start: addr & highestBitMask,
+		End:   end & highestBitMask,
+	})
+	seen[addr] = struct{}{}
+}
+
+func appendExtraKernelSymbols(dst *[]*model.Symbol, m *macho.File, smap signature.SymbolMap, seen map[uint64]struct{}) {
+	if m == nil || len(smap) == 0 {
+		return
+	}
+
+	addrs := make([]uint64, 0, len(smap))
+	for addr := range smap {
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		if m.FindSegmentForVMAddr(addr) == nil {
+			continue
+		}
+		addrs = append(addrs, addr)
+	}
+	slices.Sort(addrs)
+
+	for _, addr := range addrs {
+		appendModelSymbol(dst, seen, addr, addr+1, smap[addr])
+	}
+}
+
+func kernelFunctionSymbolName(m *macho.File, fn types.Function, smap signature.SymbolMap) string {
+	if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+		// Preserve the historical behavior of keeping the last symbol
+		// returned for a shared address.
+		var name string
+		for _, sym := range syms {
+			name = sym.Name
+		}
+		if name != "" {
+			return name
+		}
+	}
+	if sym, ok := smap[fn.StartAddr]; ok {
+		return sym
+	}
+	return fmt.Sprintf("func_%x", fn.StartAddr)
+}
+
+func kernelFunctionSymbol(m *macho.File, fn types.Function, smap signature.SymbolMap) *model.Symbol {
+	return &model.Symbol{
+		Name:  model.Name{Name: kernelFunctionSymbolName(m, fn, smap)},
+		Start: fn.StartAddr & highestBitMask,
+		End:   fn.EndAddr & highestBitMask,
+	}
+}
+
+func collectKernelMachoSymbols(m *macho.File, smap signature.SymbolMap) []*model.Symbol {
+	funcs := m.GetFunctions()
+	symbols := make([]*model.Symbol, 0, len(funcs))
+	seen := make(map[uint64]struct{}, len(funcs))
+
+	for _, fn := range funcs {
+		symbols = append(symbols, kernelFunctionSymbol(m, fn, smap))
+		seen[fn.StartAddr] = struct{}{}
+	}
+
+	appendExtraKernelSymbols(&symbols, m, smap, seen)
+
+	return symbols
+}
+
 func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 	var kcs []*model.Kernelcache
+	var sigs []signature.Symbolicator
+
+	if sigDir != "" {
+		var err error
+		sigs, err = signature.Parse(sigDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse signatures: %v", err)
+		}
+	}
 
 	out, err := extract.Kernelcache(&extract.Config{
 		IPSW:   ipswPath,
@@ -41,16 +134,8 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 	}()
 	for k := range out {
 		smap := signature.NewSymbolMap()
-		if sigDir != "" {
-			// parse signatures
-			sigs, err := signature.Parse(sigDir)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse signatures: %v", err)
-			}
-			// symbolicate kernelcache
-			if err := smap.Symbolicate(k, sigs, true); err != nil {
-				return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
-			}
+		if err := smap.Symbolicate(k, sigs, true); err != nil {
+			return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 		}
 
 		m, err := macho.Open(k)
@@ -84,34 +169,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 					kext.TextStart = text.Addr & highestBitMask
 					kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 				}
-				for _, fn := range mfe.GetFunctions() {
-					var msym model.Symbol
-					if syms, err := mfe.FindAddressSymbols(fn.StartAddr); err == nil {
-						for _, sym := range syms {
-							fn.Name = sym.Name
-						}
-						msym = model.Symbol{
-							Name:  model.Name{Name: fn.Name},
-							Start: fn.StartAddr & highestBitMask,
-							End:   fn.EndAddr & highestBitMask,
-						}
-					} else {
-						if sym, ok := smap[fn.StartAddr]; ok {
-							kext.Symbols = append(kext.Symbols, &model.Symbol{
-								Name:  model.Name{Name: sym},
-								Start: fn.StartAddr & highestBitMask,
-								End:   fn.EndAddr & highestBitMask,
-							})
-						} else {
-							msym = model.Symbol{
-								Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
-								Start: fn.StartAddr & highestBitMask,
-								End:   fn.EndAddr & highestBitMask,
-							}
-						}
-					}
-					kext.Symbols = append(kext.Symbols, &msym)
-				}
+				kext.Symbols = collectKernelMachoSymbols(mfe, smap)
 				kc.Kexts = append(kc.Kexts, kext)
 			}
 		} else {
@@ -123,37 +181,7 @@ func scanKernels(ipswPath, sigDir string) ([]*model.Kernelcache, error) {
 				kext.TextStart = text.Addr & highestBitMask
 				kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 			}
-			for _, fn := range m.GetFunctions() {
-				var msym model.Symbol
-				if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
-					for _, sym := range syms {
-						fn.Name = sym.Name
-					}
-					msym = model.Symbol{
-						Name:  model.Name{Name: fn.Name},
-						Start: fn.StartAddr & highestBitMask,
-						End:   fn.EndAddr & highestBitMask,
-					}
-				} else {
-					found := false
-					if sym, ok := smap[fn.StartAddr]; ok {
-						kext.Symbols = append(kext.Symbols, &model.Symbol{
-							Name:  model.Name{Name: sym},
-							Start: fn.StartAddr & highestBitMask,
-							End:   fn.EndAddr & highestBitMask,
-						})
-						found = true
-					}
-					if !found {
-						msym = model.Symbol{
-							Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
-							Start: fn.StartAddr & highestBitMask,
-							End:   fn.EndAddr & highestBitMask,
-						}
-					}
-				}
-				kext.Symbols = append(kext.Symbols, &msym)
-			}
+			kext.Symbols = collectKernelMachoSymbols(m, smap)
 			kc.Kexts = append(kc.Kexts, kext)
 		}
 		kcs = append(kcs, kc)

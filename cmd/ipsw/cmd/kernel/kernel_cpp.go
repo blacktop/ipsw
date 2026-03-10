@@ -190,6 +190,7 @@ var kernelCppCmd = &cobra.Command{
 		classes, err := cpp.NewScanner(m.File, cpp.Config{
 			Entries:   viper.GetStringSlice("kernel.cpp.entry"),
 			ClassName: scannerClassFilter(className, showInheritance),
+			LogStats:  showTimings,
 		}).Scan()
 		if err != nil {
 			return fmt.Errorf("scan: %w", err)

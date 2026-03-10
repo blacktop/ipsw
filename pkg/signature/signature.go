@@ -284,6 +284,16 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 	}
 	defer kc.Close()
 
+	return sm.SymbolicateMachO(kc, filepath.Base(infile), sigs, quiet)
+}
+
+// SymbolicateMachO builds a kernel symbol map from built-in sources, optional
+// signature packs, and recovered C++ metadata for an already-open Mach-O.
+func (sm SymbolMap) SymbolicateMachO(kc *macho.File, kernelName string, sigs []Symbolicator, quiet bool) error {
+	if kc == nil {
+		return fmt.Errorf("nil kernelcache")
+	}
+
 	kv, err := kernelcache.GetVersion(kc)
 	if err != nil {
 		return fmt.Errorf("failed to get kernelcache version: %v", err)
@@ -298,6 +308,10 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 	if err := sm.getMig(kc); err != nil {
 		log.WithError(err).Warn("failed to get MIG subsystems")
 	}
+	cppAdded, err := sm.addKernelCPPSymbols(kc, quiet)
+	if err != nil {
+		log.WithError(err).Warn("failed to discover C++ kernel symbols")
+	}
 
 	// Count valid signatures to set up progress bar
 	var validSigs []Symbolicator
@@ -307,14 +321,10 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		}
 	}
 
-	if len(validSigs) == 0 {
-		return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
-	}
-
 	// Set up progress bar for quiet mode
 	var p *mpb.Progress
 	var bar *mpb.Bar
-	if quiet {
+	if quiet && len(validSigs) > 0 {
 		// Use same blue color as apex/log info level for consistency
 		blue := "\033[34m\033[1m"
 		reset := "\033[0m"
@@ -333,7 +343,7 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		)
 	}
 
-	goodsig := false
+	processedSignature := false
 	var totalMatched, totalMissed int
 
 	for _, sig := range validSigs {
@@ -358,9 +368,9 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 			totalMissed += missed
 		} else {
 			parts := strings.Split(sig.Target, ".")
-			if len(parts) > 1 {
+			if kernelName != "" && len(parts) > 1 {
 				// check if target macho file matches signature target
-				if !strings.HasPrefix(strings.ToLower(filepath.Base(infile)), strings.ToLower(parts[len(parts)-1])) {
+				if !strings.HasPrefix(strings.ToLower(kernelName), strings.ToLower(parts[len(parts)-1])) {
 					if bar != nil {
 						bar.Increment()
 					}
@@ -382,7 +392,7 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		if bar != nil {
 			bar.Increment()
 		}
-		goodsig = true
+		processedSignature = true
 	}
 
 	if p != nil {
@@ -390,7 +400,7 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 	}
 
 	// Print summary stats in quiet mode
-	if quiet && goodsig {
+	if quiet && processedSignature {
 		total := totalMatched + totalMissed
 		if total > 0 {
 			log.WithFields(log.Fields{
@@ -401,8 +411,13 @@ func (sm SymbolMap) Symbolicate(infile string, sigs []Symbolicator, quiet bool) 
 		}
 	}
 
-	if !goodsig {
-		return fmt.Errorf("no valid signatures found for kernelcache (let author know and we can try add them)")
+	switch {
+	case len(validSigs) == 0 && len(sigs) > 0:
+		log.Warn("No valid signatures matched kernelcache version; using built-in and C++ symbols only")
+	case len(validSigs) > 0 && !processedSignature:
+		log.Warn("No signatures matched in kernelcache; using built-in and C++ symbols only")
+	case len(sigs) == 0 && cppAdded == 0 && !quiet:
+		log.Warn("No signature pack supplied; emitted only built-in kernel symbols")
 	}
 
 	return nil

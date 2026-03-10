@@ -32,6 +32,48 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       200: kernelKextsResponse
 	//       500: genericError
 	kg.GET("/kexts", listKexts)
+
+	// swagger:route GET /kernel/cpp Kernel getKernelCpp
+	//
+	// Cpp
+	//
+	// Discover C++ classes from a kernelcache.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: path
+	//         in: query
+	//         description: path to kernelcache
+	//         required: true
+	//         type: string
+	//       + name: arch
+	//         in: query
+	//         description: architecture for universal Mach-O inputs
+	//         required: false
+	//         type: string
+	//       + name: entry
+	//         in: query
+	//         description: fileset bundle/entry filter (repeatable)
+	//         required: false
+	//         type: array
+	//         items:
+	//           type: string
+	//       + name: class
+	//         in: query
+	//         description: return only the named class
+	//         required: false
+	//         type: string
+	//       + name: limit
+	//         in: query
+	//         description: maximum number of classes to return
+	//         required: false
+	//         type: integer
+	//     Responses:
+	//       200: kernelCPPResponse
+	//       500: genericError
+	kg.GET("/cpp", kernelCPP)
 	// kg.GET("/sbopts", handler)     // TODO: implement this
 	// kg.GET("/symbolsets", handler) // TODO: implement this
 
@@ -73,4 +115,34 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       200: kernelVersionResponse
 	//       500: genericError
 	kg.GET("/version", getVersion)
+
+	// swagger:route GET /kernel/symbolicate Kernel getKernelSymbolicate
+	//
+	// Symbolicate
+	//
+	// Build a kernel symbol map from built-in sources, the C++ scanner, and optional signatures.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: path
+	//         in: query
+	//         description: path to kernelcache
+	//         required: true
+	//         type: string
+	//       + name: arch
+	//         in: query
+	//         description: architecture for universal Mach-O inputs
+	//         required: false
+	//         type: string
+	//       + name: signatures
+	//         in: query
+	//         description: optional path to a kernel signature directory
+	//         required: false
+	//         type: string
+	//     Responses:
+	//       200: kernelSymbolicateResponse
+	//       500: genericError
+	kg.GET("/symbolicate", symbolicateKernel)
 }

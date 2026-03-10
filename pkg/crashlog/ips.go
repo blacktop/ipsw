@@ -117,7 +117,7 @@ type Ips struct {
 	Header        IpsMetadata
 	Payload       IPSPayload
 	Config        *Config
-	KernelSymbols signature.SymbolMap // Symbols discovered via --signatures flag
+	KernelSymbols signature.SymbolMap // Symbols discovered while analyzing the kernelcache
 }
 
 type Platform int
@@ -1211,22 +1211,22 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 			}
 		}
 
+		var sigs []signature.Symbolicator
+		if i.Config.SignaturesDir != "" {
+			sigs, err = signature.Parse(i.Config.SignaturesDir)
+			if err != nil {
+				return fmt.Errorf("failed to parse signatures: %v", err)
+			}
+		}
+
 		for k := range out {
 			smap := signature.NewSymbolMap()
-			if i.Config.SignaturesDir != "" {
-				// parse signatures
-				sigs, err := signature.Parse(i.Config.SignaturesDir)
-				if err != nil {
-					return fmt.Errorf("failed to parse signatures: %v", err)
-				}
-				// symbolicate kernelcache (quiet=true suppresses per-file logs, shows progress bar)
-				log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
-				if err := smap.Symbolicate(k, sigs, !i.Config.Verbose); err != nil {
-					return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
-				}
-				// Store symbols for IDA script generation
-				i.KernelSymbols = smap
+			log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
+			if err := smap.Symbolicate(k, sigs, !i.Config.Verbose); err != nil {
+				return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
 			}
+			// Store symbols for IDA script generation.
+			i.KernelSymbols = smap
 
 			kc, err = macho.Open(k)
 			if err != nil {
