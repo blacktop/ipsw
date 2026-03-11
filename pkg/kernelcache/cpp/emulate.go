@@ -2,6 +2,7 @@ package cpp
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
@@ -170,6 +171,11 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 		if target, ok := decodeBLTarget(pc, raw); ok && s.isOSMetaClassVariant(target) {
 			lastAnchorOffset = off
 			ctorCallCount++
+			continue
+		}
+		if target, ok := decodeBTarget(pc, raw); ok && s.isOSMetaClassVariant(target) {
+			lastAnchorOffset = off
+			ctorCallCount++
 		}
 	}
 	if lastAnchorOffset >= 0 {
@@ -244,7 +250,7 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 			break
 		}
 
-		if plan.tags[idx]&microTagBL != 0 && s.isOSMetaClassVariant(plan.targets[idx]) {
+		if plan.tags[idx]&(microTagBL|microTagB) != 0 && s.isOSMetaClassVariant(plan.targets[idx]) {
 			finalizePending()
 
 			metaPtr := recoveredTrackedValue(state, 0, true)
@@ -286,7 +292,7 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 				size := recoveredTrackedValue(state, 3, false)
 				superMeta := state.GetX(2)
 				if state.regLoadAddr[2] != 0 {
-					if resolved, ok := s.resolvePointerAt(path.owner, state.regLoadAddr[2]); ok {
+					if resolved, ok := s.resolvePointerAtReason(path.owner, state.regLoadAddr[2], pointerReasonX2LoadRecovery); ok {
 						superMeta = resolved
 					}
 				}
@@ -401,7 +407,9 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 	}
 
 	finalizePending()
+	tRecover := time.Now()
 	classes = s.recoverStaticAnchorClasses(path, plan, classes)
+	s.stats.phaseTimings.recoverStaticAnchorClasses += time.Since(tRecover)
 	return classes, nil
 }
 
@@ -413,12 +421,17 @@ func (s *Scanner) recoverStaticAnchorClasses(path ctorPath, plan microPlan, clas
 		}
 	}
 
+	// Batch: single pass through function data, capturing register
+	// state at every anchor callsite instead of re-scanning from
+	// byte 0 for each one.
+	ctxMap := s.batchStaticCallContexts(path.owner, path.fn, plan)
+
 	for idx, tag := range plan.tags {
-		if tag&microTagBL == 0 || !s.isOSMetaClassVariant(plan.targets[idx]) {
+		if tag&(microTagBL|microTagB) == 0 || !s.isOSMetaClassVariant(plan.targets[idx]) {
 			continue
 		}
 		pc := path.fn.StartAddr + uint64(idx*4)
-		ctx, ok := s.staticDirectCallContext(path.owner, path.fn, pc, plan.targets[idx])
+		ctx, ok := ctxMap[pc]
 		if !ok {
 			continue
 		}
@@ -506,7 +519,7 @@ func (s *Scanner) simulateWrapperContext(startFile *macho.File, startAddr uint64
 
 	resolveX2 := func(x2 uint64) uint64 {
 		if state.regLoadAddr[2] != 0 {
-			if ptr, ok := s.resolvePointerAt(owner, state.regLoadAddr[2]); ok && validMetaPointer(ptr) {
+			if ptr, ok := s.resolvePointerAtReason(owner, state.regLoadAddr[2], pointerReasonX2LoadRecovery); ok && validMetaPointer(ptr) {
 				return ptr
 			}
 		}
@@ -549,7 +562,7 @@ func (s *Scanner) simulateWrapperContext(startFile *macho.File, startAddr uint64
 		if plan.tags[idx]&microTagRET != 0 {
 			break
 		}
-		if plan.tags[idx]&microTagBL != 0 {
+		if plan.tags[idx]&(microTagBL|microTagB) != 0 {
 			target := plan.targets[idx]
 			if target == canonicalStart {
 				if captured == nil {
@@ -651,7 +664,7 @@ func (s *Scanner) recoverCallsiteContext(m *macho.File, class *discoveredClass) 
 
 	resolveX2 := func(x2 uint64) uint64 {
 		if state.regLoadAddr[2] != 0 {
-			if resolved, ok := s.resolvePointerAt(owner, state.regLoadAddr[2]); ok && validMetaPointer(resolved) {
+			if resolved, ok := s.resolvePointerAtReason(owner, state.regLoadAddr[2], pointerReasonX2LoadRecovery); ok && validMetaPointer(resolved) {
 				return resolved
 			}
 		}
@@ -693,7 +706,7 @@ func (s *Scanner) recoverCallsiteContext(m *macho.File, class *discoveredClass) 
 			break
 		}
 
-		if pc == class.Ctor && plan.tags[idx]&microTagBL != 0 {
+		if pc == class.Ctor && plan.tags[idx]&(microTagBL|microTagB) != 0 {
 			recovered.x0 = recoveredTrackedValue(state, 0, true)
 			recovered.x1 = recoveredTrackedValue(state, 1, true)
 			recovered.x2 = resolveX2(recoveredTrackedValue(state, 2, true))
