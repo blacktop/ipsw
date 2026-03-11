@@ -32,14 +32,6 @@ func getMetaHasBoundedTail(data []byte, start int) bool {
 	return false
 }
 
-func (s *Scanner) findClassGetMetaClass(m *macho.File, metaPtr uint64) uint64 {
-	candidates := s.findClassGetMetaClassCandidates(m, metaPtr)
-	if len(candidates) == 0 {
-		return 0
-	}
-	return candidates[0]
-}
-
 func (s *Scanner) findClassGetMetaClassCandidates(m *macho.File, metaPtr uint64) []uint64 {
 	if metaPtr == 0 {
 		return nil
@@ -160,14 +152,14 @@ func (s *Scanner) scanForGetMetaClassFunctions(m *macho.File) map[uint64][]uint6
 			if metaclassAddr == 0 && isLDR {
 				ldrRd := raw0 & 0x1f
 				isRET := raw1 == 0xd65f03c0
-				isBR := (raw1 & 0xfffffc1f) == 0xd61f0000
+				isBR := isBranchRegisterRaw(raw1)
 				if ldrRd == 0 && (isRET || isBR) {
 					imm19 := int64((raw0 >> 5) & 0x7ffff)
 					if imm19&(1<<18) != 0 {
 						imm19 |= ^int64((1 << 19) - 1)
 					}
 					literalAddr := uint64(int64(instrAddr) + (imm19 << 2))
-					if ptr, ok := s.resolvePointerAt(m, literalAddr); ok {
+					if ptr, ok := s.resolvePointerAtReason(m, literalAddr, pointerReasonGetMetaLiteral); ok {
 						metaclassAddr = ptr
 					}
 				}
@@ -187,12 +179,54 @@ func (s *Scanner) scanForGetMetaClassFunctions(m *macho.File) map[uint64][]uint6
 }
 
 func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
-	if index, ok := s.pointerIndex[m]; ok {
-		return index
+	if s.pointerBuilt[m] {
+		return s.pointerIndex[m]
 	}
 
-	index := make(map[uint64][]uint64)
-	fwd := make(map[uint64]uint64)
+	if s.root != nil && s.root.FileHeader.Type == types.MH_FILESET {
+		s.seedRootFixupIndexes()
+	}
+	index, fwd := s.ensurePointerMaps(m)
+
+	if m == nil {
+		return index
+	}
+	addFixupPointers := func() {
+		if !m.HasDyldChainedFixups() {
+			return
+		}
+		dcf, err := m.DyldChainedFixups()
+		if err != nil {
+			return
+		}
+		if _, err := dcf.Parse(); err != nil {
+			return
+		}
+		vmOwner := m
+		if s.root != nil {
+			vmOwner = s.root
+		}
+		for _, start := range dcf.Starts {
+			for _, fx := range start.Fixups {
+				slotAddr, err := vmOwner.GetVMAddress(fx.Offset())
+				if err != nil {
+					continue
+				}
+				if s.fileForVMAddr(slotAddr) != m {
+					continue
+				}
+				if _, seen := fwd[slotAddr]; seen {
+					continue
+				}
+				ptr := m.SlidePointer(fx.Raw())
+				if !validKernelPointer(ptr) {
+					continue
+				}
+				index[ptr] = append(index[ptr], slotAddr)
+				fwd[slotAddr] = ptr
+			}
+		}
+	}
 	addSectionPointers := func(sec *types.Section) {
 		if sec == nil || sec.Size < 8 {
 			return
@@ -210,6 +244,9 @@ func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
 				continue
 			}
 			addr := sec.Addr + uint64(off)
+			if _, seen := fwd[addr]; seen {
+				continue
+			}
 			if ptr, ok := ownerDecoder.decode(raw, off); ok && ptr != 0 {
 				index[ptr] = append(index[ptr], addr)
 				fwd[addr] = ptr
@@ -217,6 +254,7 @@ func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
 		}
 	}
 
+	addFixupPointers()
 	for _, sec := range m.Sections {
 		if sec == nil || sec.Size < 8 {
 			continue
@@ -232,8 +270,60 @@ func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
 
 	s.pointerIndex[m] = index
 	s.forwardPointers[m] = fwd
+	s.pointerBuilt[m] = true
 	s.stats.pointerIndexEntries += len(index)
 	return index
+}
+
+func (s *Scanner) seedRootFixupIndexes() {
+	if s.rootFixupsSeeded || s.root == nil || !s.root.HasDyldChainedFixups() {
+		return
+	}
+	dcf, err := s.root.DyldChainedFixups()
+	if err != nil {
+		return
+	}
+	if _, err := dcf.Parse(); err != nil {
+		return
+	}
+
+	for _, start := range dcf.Starts {
+		for _, fx := range start.Fixups {
+			slotAddr, err := s.root.GetVMAddress(fx.Offset())
+			if err != nil {
+				continue
+			}
+			owner := s.fileForVMAddr(slotAddr)
+			if owner == nil {
+				continue
+			}
+			ptr := s.root.SlidePointer(fx.Raw())
+			if !validKernelPointer(ptr) {
+				continue
+			}
+			index, fwd := s.ensurePointerMaps(owner)
+			if _, seen := fwd[slotAddr]; seen {
+				continue
+			}
+			index[ptr] = append(index[ptr], slotAddr)
+			fwd[slotAddr] = ptr
+		}
+	}
+	s.rootFixupsSeeded = true
+}
+
+func (s *Scanner) ensurePointerMaps(m *macho.File) (map[uint64][]uint64, map[uint64]uint64) {
+	index := s.pointerIndex[m]
+	if index == nil {
+		index = make(map[uint64][]uint64)
+		s.pointerIndex[m] = index
+	}
+	fwd := s.forwardPointers[m]
+	if fwd == nil {
+		fwd = make(map[uint64]uint64)
+		s.forwardPointers[m] = fwd
+	}
+	return index, fwd
 }
 
 type sectionPointerDecoder struct {
@@ -378,7 +468,7 @@ func (s *Scanner) findVtableViaGetMetaClass(m *macho.File, metaVtableAddr uint64
 }
 
 func (s *Scanner) validateVtableCandidate(m *macho.File, vtableAddr uint64, getMetaClassAddr uint64) bool {
-	ptr, ok := s.resolvePointerAt(m, vtableAddr+uint64(s.getMetaClassIndex*8))
+	ptr, ok := s.resolvePointerAtReason(m, vtableAddr+uint64(s.getMetaClassIndex*8), pointerReasonGetMetaLiteral)
 	if !ok {
 		return false
 	}

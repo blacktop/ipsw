@@ -137,6 +137,8 @@ var kernelCppCmd = &cobra.Command{
 		limit := viper.GetInt("kernel.cpp.limit")
 		showTimings := viper.GetBool("kernel.cpp.timings") ||
 			viper.GetBool("verbose")
+		showTrace := viper.GetBool("kernel.cpp.timings") &&
+			viper.GetBool("verbose")
 
 		tStart := time.Now()
 
@@ -187,11 +189,13 @@ var kernelCppCmd = &cobra.Command{
 
 		// --- scan ---
 		tScan := time.Now()
-		classes, err := cpp.NewScanner(m.File, cpp.Config{
+		scanner := cpp.NewScanner(m.File, cpp.Config{
 			Entries:   viper.GetStringSlice("kernel.cpp.entry"),
 			ClassName: scannerClassFilter(className, showInheritance),
 			LogStats:  showTimings,
-		}).Scan()
+			LogTrace:  showTrace,
+		})
+		classes, err := scanner.Scan()
 		if err != nil {
 			return fmt.Errorf("scan: %w", err)
 		}
@@ -245,12 +249,23 @@ var kernelCppCmd = &cobra.Command{
 		durOut := time.Since(tOut)
 
 		if showTimings {
-			log.Infof("timings: open=%s scan=%s output=%s total=%s",
-				durOpen, durScan, durOut, time.Since(tStart))
+			for _, line := range buildKernelCppTimingLogLines(scanner, showTrace, durOpen, durScan, durOut, time.Since(tStart)) {
+				log.Info(line)
+			}
 		}
 
 		return nil
 	},
+}
+
+func buildKernelCppTimingLogLines(scanner *cpp.Scanner, includeTrace bool, durOpen, durScan, durOut, total time.Duration) []string {
+	lines := []string{scanner.ScanStatsLine()}
+	if includeTrace {
+		lines = append(lines, scanner.TraceLogLines()...)
+	}
+	lines = append(lines, fmt.Sprintf("timings: open=%s scan=%s output=%s total=%s",
+		durOpen, durScan, durOut, total))
+	return lines
 }
 
 func formatClass(c cpp.Class) string {

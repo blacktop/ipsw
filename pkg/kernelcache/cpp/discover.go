@@ -21,6 +21,12 @@ var cxaPureVirtualNames = []string{
 	"___cxa_pure_virtual",
 }
 
+var osMetaClassSeedNames = []string{
+	"IORegistryEntry",
+	"IOService",
+	"IOUserClient",
+}
+
 const (
 	errorLogMessage     = "OSMetaClass: preModLoad() wasn't called for class %s (runtime internal error)."
 	cxaPureVirtualPanic = "__cxa_pure_virtual"
@@ -28,75 +34,133 @@ const (
 
 func (s *Scanner) resolveAnchors() error {
 	files := s.anchorFiles()
+	preferredFiles := s.preferredAnchorFiles()
 
 	for _, file := range files {
-		for _, name := range osMetaClassCtorNames {
-			if addr, err := file.FindSymbolAddress(name); err == nil {
-				s.osMetaClassVariants[addr] = struct{}{}
-			}
-			if addr, err := file.FindSymbolAddress(name + ".stub"); err == nil {
-				s.osMetaClassVariants[addr] = struct{}{}
-			}
-		}
-		if exports, err := file.DyldExports(); err == nil {
-			for _, export := range exports {
-				if isOSMetaClassCtorName(export.Name) {
-					s.osMetaClassVariants[export.Address] = struct{}{}
-				}
-			}
-		}
-		if file.Symtab != nil {
-			for _, sym := range file.Symtab.Syms {
-				if isOSMetaClassCtorName(sym.Name) {
-					s.osMetaClassVariants[sym.Value] = struct{}{}
-				}
-			}
+		s.addCtorVariantsFromFile(file)
+		if s.cxaPureVirtual == 0 {
+			s.setPureVirtualFromSymbols(file)
 		}
 		if s.cxaPureVirtual == 0 {
-			for _, name := range cxaPureVirtualNames {
-				if addr, err := file.FindSymbolAddress(name); err == nil {
-					s.cxaPureVirtual = addr
-					break
-				}
-			}
-		}
-		if s.cxaPureVirtual == 0 {
-			if exports, err := file.DyldExports(); err == nil {
-				for _, export := range exports {
-					if strings.Contains(export.Name, "cxa_pure_virtual") {
-						s.cxaPureVirtual = export.Address
-						break
-					}
-				}
-			}
+			s.setPureVirtualFromExports(file)
 		}
 	}
 
 	if s.cxaPureVirtual == 0 {
-		if exports, err := s.root.DyldExports(); err == nil {
-			for _, export := range exports {
-				if strings.Contains(export.Name, "cxa_pure_virtual") {
-					s.cxaPureVirtual = export.Address
-					break
-				}
-			}
+		s.setPureVirtualFromExports(s.root)
+	}
+	if len(s.osMetaClassVariants) == 0 {
+		if err := s.findAnchorsViaIntersection(preferredFiles); err == nil && len(s.osMetaClassVariants) > 0 {
+			s.stats.setAnchorMode(anchorModePreferredFileStringFallback)
+		} else if err := s.findAnchorsViaIntersection(files); err == nil && len(s.osMetaClassVariants) > 0 {
+			s.stats.setAnchorMode(anchorModeGlobalStringFallback)
+		}
+	}
+	if s.cxaPureVirtual == 0 {
+		_ = s.findPureVirtualViaStrings(preferredFiles)
+	}
+	if s.cxaPureVirtual == 0 {
+		_ = s.findPureVirtualViaStrings(files)
+	}
+	if len(s.osMetaClassVariants) > 0 && s.cxaPureVirtual != 0 {
+		if s.stats.anchorMode == anchorModeUnknown {
+			s.stats.setAnchorMode(anchorModeSymbolExportSymtab)
+		}
+		return nil
+	}
+
+	if len(s.osMetaClassVariants) == 0 || s.cxaPureVirtual == 0 {
+		if err := s.findAnchorsViaLegacyStrings(preferredFiles); err == nil && len(s.osMetaClassVariants) > 0 && s.cxaPureVirtual != 0 {
+			s.stats.setAnchorMode(anchorModePreferredFileStringFallback)
 		}
 	}
 	if len(s.osMetaClassVariants) == 0 || s.cxaPureVirtual == 0 {
-		if err := s.findAnchorsViaPreferredFiles(); err != nil {
-			if len(s.osMetaClassVariants) == 0 || s.cxaPureVirtual == 0 {
-				err = s.findAnchorsViaStrings()
-			}
-			if len(s.osMetaClassVariants) == 0 {
-				return err
-			}
+		if err := s.findAnchorsViaLegacyStrings(files); err == nil && len(s.osMetaClassVariants) > 0 && s.cxaPureVirtual != 0 {
+			s.stats.setAnchorMode(anchorModeGlobalStringFallback)
 		}
 	}
-
 	if len(s.osMetaClassVariants) == 0 {
 		return fmt.Errorf("failed to resolve OSMetaClass constructor variants")
 	}
+	if s.cxaPureVirtual == 0 {
+		return fmt.Errorf("failed to resolve __cxa_pure_virtual")
+	}
+	if s.stats.anchorMode == anchorModeUnknown {
+		s.stats.setAnchorMode(anchorModeSymbolExportSymtab)
+	}
 	return nil
+}
+
+func (s *Scanner) addCtorVariantsFromFile(file *macho.File) {
+	for _, name := range osMetaClassCtorNames {
+		if addr, err := file.FindSymbolAddress(name); err == nil {
+			s.osMetaClassVariants[addr] = struct{}{}
+		}
+		if addr, err := file.FindSymbolAddress(name + ".stub"); err == nil {
+			s.osMetaClassVariants[addr] = struct{}{}
+		}
+	}
+	if exports, err := file.DyldExports(); err == nil {
+		for _, export := range exports {
+			if isOSMetaClassCtorName(export.Name) {
+				s.osMetaClassVariants[export.Address] = struct{}{}
+			}
+		}
+	}
+	if file.Symtab != nil {
+		for _, sym := range file.Symtab.Syms {
+			if isOSMetaClassCtorName(sym.Name) {
+				s.osMetaClassVariants[sym.Value] = struct{}{}
+			}
+		}
+	}
+}
+
+func (s *Scanner) setPureVirtualFromSymbols(file *macho.File) {
+	for _, name := range cxaPureVirtualNames {
+		if addr, err := file.FindSymbolAddress(name); err == nil {
+			s.cxaPureVirtual = addr
+			return
+		}
+	}
+}
+
+func (s *Scanner) setPureVirtualFromExports(file *macho.File) {
+	if file == nil {
+		return
+	}
+	if exports, err := file.DyldExports(); err == nil {
+		for _, export := range exports {
+			if strings.Contains(export.Name, "cxa_pure_virtual") {
+				s.cxaPureVirtual = export.Address
+				return
+			}
+		}
+	}
+}
+
+func (s *Scanner) preferredAnchorFiles() []*macho.File {
+	files := make([]*macho.File, 0, 2)
+	seen := make(map[*macho.File]bool, 2)
+	if s.root != nil {
+		seen[s.root] = true
+		files = append(files, s.root)
+	}
+	if s.root != nil && s.root.FileHeader.Type == types.MH_FILESET {
+		for _, fs := range s.root.FileSets() {
+			if normalizeEntryID(fs.EntryID) != kernelBundleName {
+				continue
+			}
+			kernelFile, err := s.root.GetFileSetFileByName(fs.EntryID)
+			if err != nil || seen[kernelFile] {
+				break
+			}
+			seen[kernelFile] = true
+			files = append(files, kernelFile)
+			break
+		}
+	}
+	return files
 }
 
 func (s *Scanner) anchorFiles() []*macho.File {
@@ -130,30 +194,21 @@ func (s *Scanner) anchorFiles() []*macho.File {
 	return files
 }
 
-func (s *Scanner) findAnchorsViaPreferredFiles() error {
-	for _, file := range s.anchorFiles() {
-		if err := s.findAnchorsInFileViaStrings(file); err == nil && len(s.osMetaClassVariants) > 0 && s.cxaPureVirtual != 0 {
-			if expandErr := s.expandOSMetaClassWrappers([]*macho.File{file}); expandErr == nil {
-				return nil
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("preferred stripped-cache anchor scan did not resolve required anchors")
-}
-
-func (s *Scanner) findAnchorsViaStrings() error {
-	files := s.anchorFiles()
+func (s *Scanner) findAnchorsViaLegacyStrings(files []*macho.File) error {
+	var lastErr error
 	for _, file := range files {
 		if err := s.findAnchorsInFileViaStrings(file); err != nil {
+			lastErr = err
 			continue
 		}
 		if len(s.osMetaClassVariants) > 0 && s.cxaPureVirtual != 0 {
-			_ = s.expandOSMetaClassWrappers(files)
 			return nil
 		}
 	}
-	return fmt.Errorf("string-xref anchor fallback did not resolve required anchors")
+	if lastErr == nil {
+		lastErr = fmt.Errorf("string-xref anchor fallback did not resolve required anchors")
+	}
+	return lastErr
 }
 
 func (s *Scanner) findAnchorsInFileViaStrings(file *macho.File) error {
@@ -189,13 +244,13 @@ func (s *Scanner) findAnchorsInFileViaStrings(file *macho.File) error {
 	foundPure := s.cxaPureVirtual != 0
 	for _, fn := range funcs {
 		if errorStrAddr != 0 {
-			if referenced, err := s.functionReferencesAddress(file, fn, errorStrAddr); err == nil && referenced {
+			if referenced, err := s.functionReferencesAddressNoResolve(file, fn, errorStrAddr); err == nil && referenced {
 				s.osMetaClassVariants[fn.StartAddr] = struct{}{}
 				foundVariant = true
 			}
 		}
 		if panicStrAddr != 0 && s.cxaPureVirtual == 0 {
-			if referenced, err := s.functionReferencesAddress(file, fn, panicStrAddr); err == nil && referenced {
+			if referenced, err := s.functionReferencesAddressNoResolve(file, fn, panicStrAddr); err == nil && referenced {
 				s.cxaPureVirtual = fn.StartAddr
 				foundPure = true
 			}
@@ -207,33 +262,141 @@ func (s *Scanner) findAnchorsInFileViaStrings(file *macho.File) error {
 	return fmt.Errorf("no anchor xrefs found in file")
 }
 
-func (s *Scanner) expandOSMetaClassWrappers(files []*macho.File) error {
+func (s *Scanner) findPureVirtualViaStrings(files []*macho.File) error {
+	for _, file := range files {
+		strs, err := file.GetCStrings()
+		if err != nil {
+			continue
+		}
+		var panicStrAddr uint64
+		for _, str2addr := range strs {
+			for str, addr := range str2addr {
+				if str == cxaPureVirtualPanic {
+					panicStrAddr = addr
+					break
+				}
+			}
+			if panicStrAddr != 0 {
+				break
+			}
+		}
+		if panicStrAddr == 0 {
+			continue
+		}
+		funcs, err := s.functionsForFile(file)
+		if err != nil {
+			continue
+		}
+		for _, fn := range funcs {
+			if referenced, err := s.functionReferencesAddressNoResolve(file, fn, panicStrAddr); err == nil && referenced {
+				s.cxaPureVirtual = fn.StartAddr
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no pure virtual anchor xrefs found")
+}
+
+func collectSeedStringRefs(files []*macho.File) map[string]uint64Set {
+	refs := make(map[string]uint64Set, len(osMetaClassSeedNames))
+	for _, name := range osMetaClassSeedNames {
+		refs[name] = make(uint64Set)
+	}
+	for _, file := range files {
+		strs, err := file.GetCStrings()
+		if err != nil {
+			continue
+		}
+		for _, str2addr := range strs {
+			for str, addr := range str2addr {
+				if set, ok := refs[str]; ok {
+					set[addr] = struct{}{}
+				}
+			}
+		}
+	}
+	return refs
+}
+
+func (s *Scanner) findAnchorsViaIntersection(files []*macho.File) error {
+	refsByName := collectSeedStringRefs(files)
+	var candidates uint64Set
+	for _, name := range osMetaClassSeedNames {
+		refs := refsByName[name]
+		if len(refs) == 0 {
+			return fmt.Errorf("failed to find string: %s", name)
+		}
+		current := make(uint64Set)
+		for _, file := range files {
+			s.collectConstructorTargetsForStringRefs(file, refs, candidates, current)
+		}
+		if len(current) == 0 {
+			return fmt.Errorf("no constructor candidates found for %s", name)
+		}
+		candidates = current
+	}
+	if len(candidates) == 0 {
+		return fmt.Errorf("no common constructor candidates found")
+	}
+	for addr := range candidates {
+		s.osMetaClassVariants[addr] = struct{}{}
+	}
+	return nil
+}
+
+func (s *Scanner) collectConstructorTargetsForStringRefs(file *macho.File, refs uint64Set, prev uint64Set, out uint64Set) {
+	for _, sec := range file.Sections {
+		if sec == nil || sec.Size < 8 {
+			continue
+		}
+		if sec.Seg != "__TEXT_EXEC" && sec.Seg != "__TEXT" {
+			continue
+		}
+		data, err := s.readSectionData(file, sec)
+		if err != nil {
+			continue
+		}
+		targets := collectConstructorTargetsForStringRefs(sec.Addr, data, refs, prev)
+		for target := range targets {
+			out[target] = struct{}{}
+		}
+	}
+}
+
+func (s *Scanner) discoverAltConstructors(files []*macho.File) error {
 	if len(s.osMetaClassVariants) == 0 {
 		return nil
 	}
+	known := func() uint64Set {
+		out := make(uint64Set, len(s.osMetaClassVariants))
+		for addr := range s.osMetaClassVariants {
+			out[addr] = struct{}{}
+		}
+		return out
+	}
+
+	const maxRounds = 8
 	changed := true
-	for changed {
+	for round := 0; changed && round < maxRounds; round++ {
 		changed = false
+		current := known()
 		for _, file := range files {
 			funcs, err := s.functionsForFile(file)
 			if err != nil {
-				return err
+				continue
 			}
 			for _, fn := range funcs {
 				if s.isOSMetaClassVariant(fn.StartAddr) {
 					continue
 				}
 				data, err := s.functionDataFor(file, fn)
-				if err != nil {
+				if err != nil || len(data) == 0 {
 					continue
 				}
-				inspection := inspectFunctionData(fn.StartAddr, data, s.isOSMetaClassVariant)
-				if inspection.direct {
-					s.osMetaClassVariants[fn.StartAddr] = struct{}{}
-					changed = true
+				if !functionCallsAnyAnchor(fn.StartAddr, data, func(addr uint64) bool { return hasUint64Set(current, addr) }) {
 					continue
 				}
-				if len(inspection.nextTargets) == 1 && s.isOSMetaClassVariant(inspection.nextTargets[0]) {
+				if _, ok := findPassThroughConstructorTarget(fn.StartAddr, data, current); ok {
 					s.osMetaClassVariants[fn.StartAddr] = struct{}{}
 					changed = true
 				}
@@ -243,14 +406,54 @@ func (s *Scanner) expandOSMetaClassWrappers(files []*macho.File) error {
 	return nil
 }
 
-func (s *Scanner) functionReferencesAddress(m *macho.File, fn types.Function, target uint64) (bool, error) {
+func (s *Scanner) expandBoundedOSMetaClassAliases(files []*macho.File) error {
+	if len(s.osMetaClassVariants) == 0 {
+		return nil
+	}
+	refs := make(uint64Set)
+	for _, file := range files {
+		index := s.buildPointerIndex(file)
+		for target := range s.osMetaClassVariants {
+			for _, slot := range index[target] {
+				refs[slot] = struct{}{}
+			}
+		}
+	}
+	if len(refs) == 0 {
+		return nil
+	}
+	for _, file := range files {
+		for _, sec := range file.Sections {
+			if sec == nil || sec.Size < 12 {
+				continue
+			}
+			if sec.Seg != "__TEXT_EXEC" && sec.Seg != "__TEXT" {
+				continue
+			}
+			data, err := s.readSectionData(file, sec)
+			if err != nil {
+				continue
+			}
+			for off := 0; off+12 <= len(data); off += 4 {
+				alias := sec.Addr + uint64(off)
+				if s.isOSMetaClassVariant(alias) {
+					continue
+				}
+				if _, ok := importStubReferenceTarget(alias, data[off:], refs); ok {
+					s.osMetaClassVariants[alias] = struct{}{}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Scanner) functionReferencesAddressNoResolve(m *macho.File, fn types.Function, target uint64) (bool, error) {
 	data, err := s.functionDataFor(m, fn)
 	if err != nil {
 		return false, err
 	}
-	return rawWordReferencesAddress(fn.StartAddr, data, target, func(addr uint64) (uint64, bool) {
-		return s.resolvePointerAt(m, addr)
-	}), nil
+	return rawWordReferencesAddress(fn.StartAddr, data, target, nil), nil
 }
 
 type rawRefRegState struct {
@@ -399,9 +602,18 @@ func (s *Scanner) collectCtorCandidates(target scanTarget) ([]ctorPath, error) {
 	if err != nil {
 		return nil, err
 	}
-	direct, err := s.collectDirectCallers(target)
-	if err != nil {
-		return nil, err
+
+	// In MH_FILESET the kernel entry's function list includes
+	// infrastructure code (OSMetaClass impl, thunks) that calls
+	// OSMetaClass::OSMetaClass for non-kernel classes. Skip the
+	// direct-caller scan for the kernel entry; __mod_init_func
+	// is authoritative.
+	var direct []ctorPath
+	if !(target.entryID == kernelBundleName && s.root.FileHeader.Type == types.MH_FILESET) {
+		direct, err = s.collectDirectCallers(target)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	out := make([]ctorPath, 0, len(modInit)+len(direct))
@@ -451,6 +663,9 @@ func functionCallsAnyAnchor(start uint64, data []byte, isAnchor func(uint64) boo
 		if target, ok := decodeBLTarget(pc, raw); ok && isAnchor(target) {
 			return true
 		}
+		if target, ok := decodeBTarget(pc, raw); ok && isAnchor(target) {
+			return true
+		}
 	}
 	return false
 }
@@ -460,6 +675,7 @@ func (s *Scanner) collectModInitCtors(target scanTarget) ([]ctorPath, error) {
 	if err != nil {
 		return nil, nil
 	}
+
 	out := make([]ctorPath, 0, len(ptrs))
 	seen := make(map[fileAddrKey]bool, len(ptrs))
 	for _, ptr := range ptrs {
@@ -504,13 +720,8 @@ func (s *Scanner) modInitPointers(m *macho.File) ([]uint64, error) {
 	ptrs := make([]uint64, 0, len(data)/8)
 	for offset := 0; offset+8 <= len(data); offset += 8 {
 		addr := sec.Addr + uint64(offset)
-		var ptr uint64
-		if s.root.FileHeader.Type == types.MH_FILESET {
-			ptr, err = s.root.GetPointerAtAddress(addr)
-		} else {
-			ptr, err = m.GetPointerAtAddress(addr)
-		}
-		if err != nil || ptr == 0 {
+		ptr, ok := s.fallbackPointerAt(m, addr)
+		if !ok || ptr == 0 {
 			continue
 		}
 		ptrs = append(ptrs, ptr)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blacktop/ipsw/pkg/kernelcache/cpp"
 )
@@ -56,5 +57,42 @@ func TestPrintInheritanceWithFilteredDisplay(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "OSObject") {
 		t.Fatalf("missing ancestor in inheritance output: %q", rendered)
+	}
+}
+
+func TestBuildKernelCppTimingLogLinesWithoutTrace(t *testing.T) {
+	t.Parallel()
+
+	scanner := cpp.NewScanner(nil, cpp.Config{})
+	lines := buildKernelCppTimingLogLines(scanner, false, time.Second, 2*time.Second, 3*time.Second, 6*time.Second)
+
+	if len(lines) != 2 {
+		t.Fatalf("buildKernelCppTimingLogLines returned %d lines, want 2", len(lines))
+	}
+	if !strings.HasPrefix(lines[0], "scan stats:") {
+		t.Fatalf("first line = %q, want scan stats summary", lines[0])
+	}
+	if strings.Contains(strings.Join(lines, "\n"), "trace:") {
+		t.Fatalf("unexpected trace lines when includeTrace=false: %#v", lines)
+	}
+}
+
+func TestBuildKernelCppTimingLogLinesWithTrace(t *testing.T) {
+	t.Parallel()
+
+	scanner := cpp.NewScanner(nil, cpp.Config{})
+	lines := buildKernelCppTimingLogLines(scanner, true, time.Second, 2*time.Second, 3*time.Second, 6*time.Second)
+
+	if len(lines) < 4 {
+		t.Fatalf("buildKernelCppTimingLogLines returned %d lines, want trace block", len(lines))
+	}
+	if !strings.HasPrefix(lines[0], "scan stats:") {
+		t.Fatalf("first line = %q, want scan stats summary", lines[0])
+	}
+	if !strings.Contains(strings.Join(lines, "\n"), "trace: anchors") {
+		t.Fatalf("trace output missing anchors line: %#v", lines)
+	}
+	if !strings.HasPrefix(lines[len(lines)-1], "timings: open=") {
+		t.Fatalf("last line = %q, want timings summary", lines[len(lines)-1])
 	}
 }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
-	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
@@ -21,6 +21,16 @@ const (
 	maxReasonableClassSize     = 1 << 20
 )
 
+type uint64Set map[uint64]struct{}
+
+func hasUint64Set(src uint64Set, value uint64) bool {
+	if src == nil {
+		return false
+	}
+	_, ok := src[value]
+	return ok
+}
+
 // Config controls scanner behavior.
 type Config struct {
 	Entries             []string
@@ -28,6 +38,7 @@ type Config struct {
 	MaxCtorInstructions int
 	MaxWrapperDepth     int
 	LogStats            bool
+	LogTrace            bool
 }
 
 // Class is the phase-1 scanner output.
@@ -51,15 +62,19 @@ type Scanner struct {
 	decoder disassemble.Decoder
 
 	targets         []scanTarget
+	vmRanges        []vmRangeOwner
 	fileEntries     map[*macho.File]string
 	functions       map[*macho.File][]types.Function
 	functionData    map[fileFuncKey][]byte
 	sectionData     map[sectionKey][]byte
 	callerIndex     map[*macho.File]map[uint64][]uint64
 	pointerIndex    map[*macho.File]map[uint64][]uint64
+	pointerBuilt    map[*macho.File]bool
 	forwardPointers map[*macho.File]map[uint64]uint64
 	getMetaMap      map[*macho.File]map[uint64][]uint64
 	getMetaCands    map[fileAddrKey][]uint64
+	metaPtrInfer    map[metaInferKey]cachedMetaPtr
+	metaPtrBusy     map[metaInferKey]bool
 	callsiteCtx     map[fileAddrKey]wrapperContext
 	staticCalls     map[staticCallKey]cachedWrapperContext
 	nameStrings     map[uint64]cachedCString
@@ -72,11 +87,19 @@ type Scanner struct {
 	getMetaClassIndex   int
 
 	stats scanStats
+
+	rootFixupsSeeded bool
 }
 
 type scanTarget struct {
 	file    *macho.File
 	entryID string
+}
+
+type vmRangeOwner struct {
+	start uint64
+	end   uint64
+	file  *macho.File
 }
 
 type fileFuncKey struct {
@@ -99,6 +122,12 @@ type staticCallKey struct {
 	start    uint64
 	callsite uint64
 	target   uint64
+}
+
+type metaInferKey struct {
+	file  *macho.File
+	addr  uint64
+	depth int
 }
 
 type discoveredClass struct {
@@ -144,10 +173,30 @@ type scanStats struct {
 	engineCreations     int
 	ptrCacheHits        int
 	ptrCacheMisses      int
+	anchorMode          anchorMode
+	phaseTimings        scanPhaseTimings
+	inferCalls          uint64
+	inferCacheHits      uint64
+	inferBusyHits       uint64
+	inferMaxDepth       int
+	metaPtrDirectHits   uint64
+	metaPtrDirectMisses uint64
+	staticDirectCalls   uint64
+	staticDirectCache   uint64
+	staticResolvedX0    uint64
+	staticResolvedX1    uint64
+	staticResolvedX2    uint64
+	staticResolvedX3    uint64
+	pointerReasons      [pointerReasonCount]pointerReasonStats
 }
 
 type cachedCString struct {
 	value string
+	ok    bool
+}
+
+type cachedMetaPtr struct {
+	value uint64
 	ok    bool
 }
 
@@ -160,6 +209,9 @@ func NewScanner(root *macho.File, cfg Config) *Scanner {
 		cfg.MaxWrapperDepth = defaultMaxWrapperDepth
 	}
 	cfg.ClassName = strings.TrimSpace(cfg.ClassName)
+	if cfg.LogTrace {
+		cfg.LogStats = true
+	}
 
 	s := &Scanner{
 		root:                root,
@@ -170,9 +222,12 @@ func NewScanner(root *macho.File, cfg Config) *Scanner {
 		sectionData:         make(map[sectionKey][]byte),
 		callerIndex:         make(map[*macho.File]map[uint64][]uint64),
 		pointerIndex:        make(map[*macho.File]map[uint64][]uint64),
+		pointerBuilt:        make(map[*macho.File]bool),
 		forwardPointers:     make(map[*macho.File]map[uint64]uint64),
 		getMetaMap:          make(map[*macho.File]map[uint64][]uint64),
 		getMetaCands:        make(map[fileAddrKey][]uint64),
+		metaPtrInfer:        make(map[metaInferKey]cachedMetaPtr),
+		metaPtrBusy:         make(map[metaInferKey]bool),
 		callsiteCtx:         make(map[fileAddrKey]wrapperContext),
 		staticCalls:         make(map[staticCallKey]cachedWrapperContext),
 		nameStrings:         make(map[uint64]cachedCString),
@@ -192,34 +247,68 @@ func (s *Scanner) Scan() ([]Class, error) {
 		return nil, fmt.Errorf("nil macho file")
 	}
 
+	warmed := make(map[*macho.File]bool)
+	warm := func(files []*macho.File) {
+		for _, file := range files {
+			if file == nil || warmed[file] {
+				continue
+			}
+			s.buildPointerIndex(file)
+			warmed[file] = true
+		}
+	}
+
+	tPhase := time.Now()
 	targets, err := s.buildTargets()
 	if err != nil {
 		return nil, err
 	}
+	s.stats.phaseTimings.buildTargets += time.Since(tPhase)
 	s.targets = targets
 
+	tPhase = time.Now()
+	s.buildVMRangeIndex()
+	s.stats.phaseTimings.buildVMRangeIndex += time.Since(tPhase)
+
+	tPhase = time.Now()
+	s.seedRootFixupIndexes()
+	s.stats.phaseTimings.buildPointerIndex += time.Since(tPhase)
+
+	tPhase = time.Now()
+	warm(s.preferredAnchorFiles())
+	s.stats.phaseTimings.buildPointerIndex += time.Since(tPhase)
+
+	tPhase = time.Now()
 	if err := s.resolveAnchors(); err != nil {
 		return nil, err
 	}
+	s.stats.phaseTimings.resolveAnchors += time.Since(tPhase)
 
 	// Warm the forward pointer cache for every file we will scan so
 	// that resolvePointerAt hits the in-memory map instead of doing
-	// pread syscalls during constructor extraction.
-	s.buildPointerIndex(s.root)
-	for _, target := range targets {
-		if target.file != nil && target.file != s.root {
-			s.buildPointerIndex(target.file)
-		}
+	// pread syscalls during constructor extraction and alias expansion.
+	tPhase = time.Now()
+	aFiles := s.anchorFiles()
+	warm(aFiles)
+	s.stats.phaseTimings.buildPointerIndex += time.Since(tPhase)
+
+	if err := s.discoverAltConstructors(aFiles); err != nil {
+		return nil, err
+	}
+	if err := s.expandBoundedOSMetaClassAliases(aFiles); err != nil {
+		return nil, err
 	}
 
 	seen := make(map[fileAddrKey]bool)
 	discovered := make([]discoveredClass, 0, 512)
 
 	for _, target := range targets {
+		tCollect := time.Now()
 		candidates, err := s.collectCtorCandidates(target)
 		if err != nil {
 			return nil, err
 		}
+		s.stats.phaseTimings.collectCtorCandidates += time.Since(tCollect)
 		for _, candidate := range candidates {
 			key := fileAddrKey{file: candidate.owner, addr: candidate.fn.StartAddr}
 			if seen[key] {
@@ -227,10 +316,12 @@ func (s *Scanner) Scan() ([]Class, error) {
 			}
 			seen[key] = true
 
+			tExtract := time.Now()
 			classes, err := s.extractClassesFromCtor(candidate)
 			if err != nil {
 				return nil, err
 			}
+			s.stats.phaseTimings.extractClassesFromCtor += time.Since(tExtract)
 			discovered = append(discovered, classes...)
 		}
 	}
@@ -244,14 +335,18 @@ func (s *Scanner) Scan() ([]Class, error) {
 	s.recoverSuperMetaFromModInit(discovered)
 	s.validateSuperMeta(discovered)
 	s.clearDiscoveryCaches()
+	tResolve := time.Now()
 	if err := s.resolveVtables(discovered); err != nil {
 		return nil, err
 	}
+	s.stats.phaseTimings.resolveVtables += time.Since(tResolve)
 	discovered = s.recoverMissingParentClasses(discovered)
 	discovered = s.dedupe(discovered)
+	tResolve = time.Now()
 	if err := s.resolveVtables(discovered); err != nil {
 		return nil, err
 	}
+	s.stats.phaseTimings.resolveVtables += time.Since(tResolve)
 	s.repairClassesFromCallsite(discovered)
 	s.validateSuperMeta(discovered)
 	discovered = filterClearlyBogusClasses(discovered)
@@ -284,13 +379,6 @@ func (s *Scanner) Scan() ([]Class, error) {
 			s.stats.resolvedParentMeta++
 		}
 	}
-	if s.cfg.LogStats {
-		log.Infof("scan stats: classes=%d vtables=%d parent_meta=%d ptr_index=%d engines=%d ptr_hits=%d ptr_misses=%d",
-			s.stats.discoveredClasses, s.stats.resolvedVtables,
-			s.stats.resolvedParentMeta, s.stats.pointerIndexEntries,
-			s.stats.engineCreations, s.stats.ptrCacheHits, s.stats.ptrCacheMisses)
-	}
-
 	if s.cfg.ClassName == "" {
 		return out, nil
 	}

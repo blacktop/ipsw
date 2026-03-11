@@ -396,12 +396,17 @@ func (s *Scanner) includeEntry(entry string) bool {
 
 func (s *Scanner) buildTargets() ([]scanTarget, error) {
 	targets := make([]scanTarget, 0, 1+len(s.root.FileSets()))
-	if s.includeEntry(kernelBundleName) {
-		targets = append(targets, scanTarget{file: s.root, entryID: kernelBundleName})
-	}
 	if s.root.FileHeader.Type != types.MH_FILESET {
+		// Non-fileset: the root file IS the kernel.
+		if s.includeEntry(kernelBundleName) {
+			targets = append(targets, scanTarget{file: s.root, entryID: kernelBundleName})
+		}
 		return targets, nil
 	}
+	// MH_FILESET: each fileset entry (including com.apple.kernel)
+	// is a separate Mach-O scoped to its own code. Using the root
+	// file as a kernel target would scan every kext's functions and
+	// __mod_init_func pointers, mis-attributing them to com.apple.kernel.
 	for _, fs := range s.root.FileSets() {
 		entryID := normalizeEntryID(fs.EntryID)
 		if !s.includeEntry(entryID) {
@@ -417,26 +422,86 @@ func (s *Scanner) buildTargets() ([]scanTarget, error) {
 	return targets, nil
 }
 
-func (s *Scanner) fileForVMAddr(addr uint64) *macho.File {
-	if s.root.FileHeader.Type != types.MH_FILESET {
-		if fileOwnsVMAddr(s.root, addr) {
-			return s.root
+func (s *Scanner) buildVMRangeIndex() {
+	ranges := make([]vmRangeOwner, 0, len(s.root.Sections)+len(s.root.Segments()))
+	appendFileRanges := func(m *macho.File) {
+		if m == nil {
+			return
 		}
-		return nil
+		for _, seg := range m.Segments() {
+			if seg == nil || seg.Filesz == 0 || seg.Addr == 0 {
+				continue
+			}
+			ranges = append(ranges, vmRangeOwner{
+				start: seg.Addr,
+				end:   seg.Addr + seg.Memsz,
+				file:  m,
+			})
+		}
+		for _, sec := range m.Sections {
+			if sec == nil || sec.Size == 0 {
+				continue
+			}
+			ranges = append(ranges, vmRangeOwner{
+				start: sec.Addr,
+				end:   sec.Addr + sec.Size,
+				file:  m,
+			})
+		}
 	}
 
 	for _, target := range s.targets {
-		if target.file == s.root {
+		if target.file == nil || target.file == s.root {
 			continue
 		}
-		if fileOwnsVMAddr(target.file, addr) {
-			return target.file
+		appendFileRanges(target.file)
+	}
+	appendFileRanges(s.root)
+
+	sort.SliceStable(ranges, func(i, j int) bool {
+		if ranges[i].start != ranges[j].start {
+			return ranges[i].start < ranges[j].start
+		}
+		return ranges[i].end > ranges[j].end
+	})
+	s.vmRanges = ranges
+}
+
+func (s *Scanner) fileForVMAddr(addr uint64) *macho.File {
+	if s.root == nil {
+		return nil
+	}
+	if len(s.vmRanges) == 0 {
+		s.buildVMRangeIndex()
+	}
+	idx := sort.Search(len(s.vmRanges), func(i int) bool {
+		return s.vmRanges[i].start > addr
+	})
+	for i := idx - 1; i >= 0; i-- {
+		rng := s.vmRanges[i]
+		if rng.end <= addr {
+			break
+		}
+		if rng.start <= addr && addr < rng.end {
+			return rng.file
 		}
 	}
-	if fileOwnsVMAddr(s.root, addr) {
-		return s.root
-	}
 	return nil
+}
+
+func (s *Scanner) pointerLookupOwner(owner *macho.File, addr uint64) (*macho.File, pointerOwnerSource) {
+	if owner != nil && fileOwnsVMAddr(owner, addr) {
+		return owner, pointerOwnerSourceProvided
+	}
+	if s.root != nil {
+		if resolved := s.fileForVMAddr(addr); resolved != nil {
+			return resolved, pointerOwnerSourceIndexed
+		}
+	}
+	if owner != nil {
+		return owner, pointerOwnerSourceOwnerFallback
+	}
+	return s.root, pointerOwnerSourceRootFallback
 }
 
 func (s *Scanner) entryForFile(m *macho.File) string {
@@ -674,6 +739,14 @@ func hasStrongClassEvidence(class discoveredClass) bool {
 }
 
 func fileOwnsVMAddr(m *macho.File, addr uint64) bool {
+	for _, seg := range m.Segments() {
+		if seg == nil || seg.Memsz == 0 {
+			continue
+		}
+		if seg.Addr <= addr && addr < seg.Addr+seg.Memsz {
+			return true
+		}
+	}
 	for _, sec := range m.Sections {
 		if sec.Addr <= addr && addr < sec.Addr+sec.Size {
 			return true
@@ -688,7 +761,116 @@ func (s *Scanner) clearDiscoveryCaches() {
 	clear(s.callerIndex)
 	clear(s.callsiteCtx)
 	clear(s.getMetaCands)
+	clear(s.metaPtrInfer)
+	clear(s.metaPtrBusy)
 	clear(s.staticCalls)
+}
+
+func (s *Scanner) resolvePointerAtReason(owner *macho.File, addr uint64, reason pointerReason) (uint64, bool) {
+	stats := &s.stats.pointerReasons[reason]
+	stats.lookups++
+
+	// Fast path: check owner and root forward caches before doing
+	// any expensive owner lookup.
+	if owner != nil {
+		if fwd := s.forwardPointers[owner]; fwd != nil {
+			if ptr, ok := fwd[addr]; ok {
+				s.stats.ptrCacheHits++
+				stats.forwardHits++
+				stats.successes++
+				return ptr, true
+			}
+		}
+	}
+	if s.root != nil && s.root != owner {
+		if fwd := s.forwardPointers[s.root]; fwd != nil {
+			if ptr, ok := fwd[addr]; ok {
+				s.stats.ptrCacheHits++
+				stats.forwardHits++
+				stats.successes++
+				return ptr, true
+			}
+		}
+	}
+
+	// After root fixup seeding, all chained fixup pointers are in the
+	// per-file forward caches. Skip expensive owner lookup and pread.
+	if s.rootFixupsSeeded {
+		s.stats.ptrCacheMisses++
+		stats.misses++
+		return 0, false
+	}
+
+	// Slow path: find the owner via linear scan and fall through to
+	// pread if no cache entry exists (only reached before fixup seed).
+	lookupOwner, ownerSource := s.pointerLookupOwner(owner, addr)
+	if ownerSource == pointerOwnerSourceIndexed {
+		stats.ownerIndexHits++
+	}
+	if lookupOwner != nil && lookupOwner != owner && lookupOwner != s.root {
+		if fwd := s.forwardPointers[lookupOwner]; fwd != nil {
+			if ptr, ok := fwd[addr]; ok {
+				s.stats.ptrCacheHits++
+				stats.forwardHits++
+				stats.successes++
+				return ptr, true
+			}
+		}
+	}
+
+	s.stats.ptrCacheMisses++
+	if lookupOwner != nil && s.forwardPointers[lookupOwner] != nil && pointerCacheCoversAddress(lookupOwner, addr) {
+		stats.misses++
+		return 0, false
+	}
+	if lookupOwner != nil && lookupOwner != owner && s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
+		stats.misses++
+		return 0, false
+	}
+	if lookupOwner != nil && s.root != nil && lookupOwner != s.root && s.forwardPointers[s.root] != nil && fileOwnsVMAddr(s.root, addr) && pointerCacheCoversAddress(s.root, addr) {
+		stats.misses++
+		return 0, false
+	}
+
+	if lookupOwner != nil {
+		stats.slidAttempts++
+		if ptr, err := lookupOwner.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+		stats.rawAttempts++
+		if ptr, err := lookupOwner.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+	}
+	if owner != nil && owner != lookupOwner {
+		stats.slidAttempts++
+		if ptr, err := owner.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+		stats.rawAttempts++
+		if ptr, err := owner.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+	}
+	if s.root != nil && s.root != lookupOwner && s.root != owner {
+		stats.slidAttempts++
+		if ptr, err := s.root.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+		stats.rawAttempts++
+		if ptr, err := s.root.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+			stats.successes++
+			return ptr, true
+		}
+	}
+
+	stats.misses++
+	return 0, false
 }
 
 func (s *Scanner) repairClassesFromCallsite(classes []discoveredClass) {
@@ -885,7 +1067,7 @@ func (s *Scanner) extractModInitPair(owner *macho.File, funcAddr uint64) (uint64
 		} else if regs[2].adrpBase != 0 && !regs[2].isLoad {
 			x2 = regs[2].adrpBase
 		} else if regs[2].loadAddr != 0 {
-			if ptr, ok := s.resolvePointerAt(owner, regs[2].loadAddr); ok {
+			if ptr, ok := s.resolvePointerAtReason(owner, regs[2].loadAddr, pointerReasonX2LoadRecovery); ok {
 				x2 = ptr
 			}
 		}
@@ -957,58 +1139,76 @@ func pointerCacheCoversAddress(m *macho.File, addr uint64) bool {
 	if m == nil {
 		return false
 	}
-	sec := m.FindSectionForVMAddr(addr)
-	if sec == nil || sec.Size < 8 {
-		return false
+	for _, sec := range m.Sections {
+		if sec == nil || sec.Size < 8 {
+			continue
+		}
+		if sec.Addr > addr || addr >= sec.Addr+sec.Size {
+			continue
+		}
+		if sec.Seg == "__TEXT" || sec.Seg == "__TEXT_EXEC" {
+			return false
+		}
+		if strings.HasSuffix(sec.Name, "__bss") || strings.HasSuffix(sec.Name, "__common") {
+			return false
+		}
+		return true
 	}
-	if sec.Seg == "__TEXT" || sec.Seg == "__TEXT_EXEC" {
-		return false
-	}
-	if strings.HasSuffix(sec.Name, "__bss") || strings.HasSuffix(sec.Name, "__common") {
-		return false
-	}
-	return true
+	return false
 }
 
 func (s *Scanner) resolvePointerAt(owner *macho.File, addr uint64) (uint64, bool) {
+	return s.resolvePointerAtReason(owner, addr, pointerReasonOther)
+}
+
+func (s *Scanner) fallbackPointerAt(owner *macho.File, addr uint64) (uint64, bool) {
+	lookupOwner, _ := s.pointerLookupOwner(owner, addr)
+	if lookupOwner == nil {
+		return 0, false
+	}
 	// Fast path: check forward pointer cache built by buildPointerIndex.
-	if fwd := s.forwardPointers[owner]; fwd != nil {
+	if fwd := s.forwardPointers[lookupOwner]; fwd != nil {
 		if ptr, ok := fwd[addr]; ok {
-			s.stats.ptrCacheHits++
 			return ptr, true
 		}
 	}
-	if s.root != nil && owner != s.root {
-		if fwd := s.forwardPointers[s.root]; fwd != nil {
+	if lookupOwner != owner {
+		if fwd := s.forwardPointers[owner]; fwd != nil {
 			if ptr, ok := fwd[addr]; ok {
-				s.stats.ptrCacheHits++
 				return ptr, true
 			}
 		}
 	}
-	s.stats.ptrCacheMisses++
-	// The forward pointer cache (built by buildPointerIndex) covers
-	// every 8-byte-aligned slot in every DATA section.  If the addr
-	// isn't there, the I/O path (pread) almost certainly won't find
-	// a valid kernel pointer either — and the syscall cost is the
-	// dominant bottleneck.  Skip the slow path only for addresses the
-	// cache actually covers once it has been warmed for this file.
-	if s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
+	if s.root != nil && lookupOwner != s.root {
+		if fwd := s.forwardPointers[s.root]; fwd != nil {
+			if ptr, ok := fwd[addr]; ok {
+				return ptr, true
+			}
+		}
+	}
+	// After root fixup seeding, all chained fixup pointers are in the
+	// forward cache. Any address not found is genuinely absent.
+	if s.rootFixupsSeeded {
 		return 0, false
 	}
-	if s.root != nil && s.forwardPointers[s.root] != nil && pointerCacheCoversAddress(s.root, addr) {
+	// Skip slow I/O path only for addresses covered by the warmed cache.
+	if s.forwardPointers[lookupOwner] != nil && pointerCacheCoversAddress(lookupOwner, addr) {
+		return 0, false
+	}
+	if lookupOwner != owner && s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
+		return 0, false
+	}
+	if s.root != nil && lookupOwner != s.root && s.forwardPointers[s.root] != nil && fileOwnsVMAddr(s.root, addr) && pointerCacheCoversAddress(s.root, addr) {
 		return 0, false
 	}
 	// Slow path: I/O via go-macho (only reached before cache warm).
-	if s.root != nil {
-		if ptr, err := s.root.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
-			return ptr, true
-		}
-		if ptr, err := s.root.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
-			return ptr, true
-		}
+	if ptr, err := lookupOwner.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+		return ptr, true
 	}
-	if owner != nil && owner != s.root {
+	if ptr, err := lookupOwner.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
+		return ptr, true
+	}
+	if owner != nil && owner != lookupOwner {
 		if ptr, err := owner.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
 			return ptr, true
 		}
@@ -1016,56 +1216,15 @@ func (s *Scanner) resolvePointerAt(owner *macho.File, addr uint64) (uint64, bool
 			return ptr, true
 		}
 	}
-	return 0, false
-}
-
-func (s *Scanner) fallbackPointerAt(owner *macho.File, addr uint64) (uint64, bool) {
-	if owner == nil {
-		return 0, false
-	}
-	// Fast path: check forward pointer cache built by buildPointerIndex.
-	if fwd := s.forwardPointers[owner]; fwd != nil {
-		if ptr, ok := fwd[addr]; ok {
-			return ptr, true
-		}
-	}
-	if s.root != nil && owner != s.root {
-		if fwd := s.forwardPointers[s.root]; fwd != nil {
-			if ptr, ok := fwd[addr]; ok {
-				return ptr, true
-			}
-		}
-	}
-	// Skip slow I/O path only for addresses covered by the warmed cache.
-	if s.forwardPointers[owner] != nil && pointerCacheCoversAddress(owner, addr) {
-		return 0, false
-	}
-	if s.root != nil && s.forwardPointers[s.root] != nil && pointerCacheCoversAddress(s.root, addr) {
-		return 0, false
-	}
-	// Slow path: I/O via go-macho (only reached before cache warm).
-	if s.root != nil && s.root.FileHeader.Type == types.MH_FILESET {
+	if s.root != nil && s.root != lookupOwner && s.root != owner {
 		if ptr, err := s.root.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
 			return ptr, true
 		}
 		if ptr, err := s.root.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
 			return ptr, true
 		}
-		if owner != s.root {
-			if ptr, err := owner.GetSlidPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
-				return ptr, true
-			}
-			if ptr, err := owner.GetPointerAtAddress(addr); err == nil && validKernelPointer(ptr) {
-				return ptr, true
-			}
-		}
-		return 0, false
 	}
-	ptr, err := owner.GetPointerAtAddress(addr)
-	if err != nil {
-		return 0, false
-	}
-	return ptr, true
+	return 0, false
 }
 
 // isStubFor checks whether stubAddr is a small auth stub (ADRP+ADD+BR
@@ -1123,7 +1282,7 @@ func (s *Scanner) isStubFor(m *macho.File, stubAddr, targetFunc uint64) bool {
 		// LDR X, [X, #imm12] (unsigned offset, scale 8)
 		ldrOff := uint64((i1>>10)&0xFFF) * 8
 		gotSlot := page + ldrOff
-		ptr, ok := s.resolvePointerAt(m, gotSlot)
+		ptr, ok := s.resolvePointerAtReason(m, gotSlot, pointerReasonVtableStub)
 		if !ok {
 			return false
 		}
@@ -1296,7 +1455,7 @@ func (s *Scanner) recoverSuperMetaFromCtorPattern(m *macho.File, class *discover
 	}
 
 	if regLoadAddr[2] != 0 {
-		if ptr, ok := s.resolvePointerAt(owner, regLoadAddr[2]); ok {
+		if ptr, ok := s.resolvePointerAtReason(owner, regLoadAddr[2], pointerReasonX2LoadRecovery); ok {
 			return ptr
 		}
 	}
@@ -1319,8 +1478,25 @@ func (s *Scanner) inferMetaPtrFromDirectCallersDepth(owner *macho.File, target u
 	if owner == nil || target == 0 || depth > s.cfg.MaxWrapperDepth {
 		return 0
 	}
+	s.stats.inferCalls++
+	if depth > s.stats.inferMaxDepth {
+		s.stats.inferMaxDepth = depth
+	}
+	key := metaInferKey{file: owner, addr: target, depth: depth}
+	if cached, ok := s.metaPtrInfer[key]; ok && cached.ok {
+		s.stats.inferCacheHits++
+		return cached.value
+	}
+	if s.metaPtrBusy[key] {
+		s.stats.inferBusyHits++
+		return 0
+	}
+	s.metaPtrBusy[key] = true
+	defer delete(s.metaPtrBusy, key)
+
 	index, err := s.directCallerIndex(owner)
 	if err != nil {
+		s.metaPtrInfer[key] = cachedMetaPtr{ok: true}
 		return 0
 	}
 	for _, callerStart := range index[target] {
@@ -1336,9 +1512,11 @@ func (s *Scanner) inferMetaPtrFromDirectCallersDepth(owner *macho.File, target u
 			return metaPtr
 		}
 		if inferred := s.inferMetaPtrFromDirectCallersDepth(owner, callerStart, depth+1); validKernelPointer(inferred) {
+			s.metaPtrInfer[key] = cachedMetaPtr{value: inferred, ok: true}
 			return inferred
 		}
 	}
+	s.metaPtrInfer[key] = cachedMetaPtr{ok: true}
 	return 0
 }
 
@@ -1383,11 +1561,11 @@ func (s *Scanner) directCallerIndex(m *macho.File) (map[uint64][]uint64, error) 
 func (s *Scanner) metaPtrAtDirectCall(owner *macho.File, fn types.Function, target uint64) (uint64, bool) {
 	data, err := s.functionDataFor(owner, fn)
 	if err != nil {
+		s.stats.metaPtrDirectMisses++
 		return 0, false
 	}
 
 	var regBase [31]uint64
-	var regLoadAddr [31]uint64
 	var regValue [31]uint64
 	for i := 0; i+4 <= len(data); i += 4 {
 		pc := fn.StartAddr + uint64(i)
@@ -1395,35 +1573,17 @@ func (s *Scanner) metaPtrAtDirectCall(owner *macho.File, fn types.Function, targ
 
 		// BL / B to target → return tracked x0.
 		if callTarget, ok := decodeBLTarget(pc, raw); ok && callTarget == target {
+			s.stats.metaPtrDirectHits++
 			return metaPtrResult(regBase, regValue), true
 		}
 		if callTarget, ok := decodeBTarget(pc, raw); ok && callTarget == target {
+			s.stats.metaPtrDirectHits++
 			return metaPtrResult(regBase, regValue), true
 		}
 
-		if (raw & 0x9f000000) == 0x90000000 {
-			rd := int(raw & 0x1f)
-			if rd < 31 {
-				if addr, ok := decodeADRPImmediate(pc, raw); ok {
-					regBase[rd] = addr
-					regLoadAddr[rd] = 0
-					regValue[rd] = 0
-				}
-			}
-			continue
-		}
-
-		var ins disassemble.Inst
-		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil || operandCount(&ins) == 0 {
-			continue
-		}
-
-		s.trackStaticValueInstruction(owner, &regBase, &regLoadAddr, &regValue, &ins, staticValueTrackOptions{
-			acceptAnyLoadAddr:      false,
-			propagateLoadAddrInAdd: true,
-			handleLoadPairs:        true,
-		})
+		trackRegisterRawWithReason(s, owner, raw, pc, &regBase, &regValue, pointerReasonMetaPtrDirectCall)
 	}
+	s.stats.metaPtrDirectMisses++
 	return 0, false
 }
 
@@ -1441,7 +1601,11 @@ func metaPtrResult(regBase, regValue [31]uint64) uint64 {
 // instruction bitmasks, avoiding CGo entirely.  It handles the
 // instruction subset needed by metaPtrAtDirectCall and similar
 // callers: ADRP, ADD(imm), LDR(uoff/reg), LDUR, LDP, MOV, ORR, SUB(imm).
-func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regBase, regValue *[31]uint64) {
+func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regBase, regValue *[31]uint64) bool {
+	return trackRegisterRawWithReason(s, owner, raw, pc, regBase, regValue, pointerReasonOther)
+}
+
+func trackRegisterRawWithReason(s *Scanner, owner *macho.File, raw uint32, pc uint64, regBase, regValue *[31]uint64, reason pointerReason) bool {
 	switch {
 	// ADRP: sf 1 0000 immlo immhi Rd
 	case (raw & 0x9f000000) == 0x90000000:
@@ -1559,7 +1723,7 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 			}
 			if base != 0 {
 				addr := base + imm
-				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+				if ptr, ok := s.resolvePointerAtReason(owner, addr, reason); ok {
 					regValue[rt] = ptr
 				} else if validKernelPointer(addr) {
 					regValue[rt] = addr
@@ -1581,7 +1745,7 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 			}
 			if base != 0 {
 				addr := base + imm
-				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+				if ptr, ok := s.resolvePointerAtReason(owner, addr, reason); ok {
 					regValue[rt] = ptr
 				} else if validKernelPointer(addr) {
 					regValue[rt] = addr
@@ -1606,7 +1770,7 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 			}
 			if base != 0 {
 				addr := uint64(int64(base) + imm9)
-				if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+				if ptr, ok := s.resolvePointerAtReason(owner, addr, reason); ok {
 					regValue[rt] = ptr
 				} else if validKernelPointer(addr) {
 					regValue[rt] = addr
@@ -1636,7 +1800,7 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 				regBase[rt] = 0
 				regValue[rt] = 0
 				if addr != 0 {
-					if ptr, ok := s.resolvePointerAt(owner, addr); ok {
+					if ptr, ok := s.resolvePointerAtReason(owner, addr, reason); ok {
 						regValue[rt] = ptr
 					} else if validKernelPointer(addr) {
 						regValue[rt] = addr
@@ -1648,7 +1812,7 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 				regValue[rt2] = 0
 				if addr != 0 {
 					addr2 := addr + 8
-					if ptr, ok := s.resolvePointerAt(owner, addr2); ok {
+					if ptr, ok := s.resolvePointerAtReason(owner, addr2, reason); ok {
 						regValue[rt2] = ptr
 					} else if validKernelPointer(addr2) {
 						regValue[rt2] = addr2
@@ -1656,12 +1820,43 @@ func trackRegisterRaw(s *Scanner, owner *macho.File, raw uint32, pc uint64, regB
 				}
 			}
 		}
+	default:
+		return false
 	}
+	return true
+}
+
+// batchStaticCallContexts does a single linear pass through fn,
+// tracking register state and capturing wrapperContext at every
+// BL/B to an OSMetaClass variant. O(function_size) total instead
+// of O(N × function_size) when called per-callsite.
+func (s *Scanner) batchStaticCallContexts(owner *macho.File, fn types.Function, plan microPlan) map[uint64]wrapperContext {
+	data, err := s.functionDataFor(owner, fn)
+	if err != nil {
+		return nil
+	}
+	out := make(map[uint64]wrapperContext)
+	var regBase [31]uint64
+	var regValue [31]uint64
+	for i := 0; i+4 <= len(data); i += 4 {
+		pc := fn.StartAddr + uint64(i)
+		raw := readUint32At(data, i)
+		idx := i / 4
+		if idx < len(plan.tags) && plan.tags[idx]&(microTagBL|microTagB) != 0 && s.isOSMetaClassVariant(plan.targets[idx]) {
+			ctx := s.staticDirectCallTrackedContext(owner, regBase, regValue, pc)
+			out[pc] = ctx
+		}
+		trackRegisterRawWithReason(s, owner, raw, pc, &regBase, &regValue, pointerReasonStaticDirectCall)
+	}
+	return out
 }
 
 func (s *Scanner) staticDirectCallContext(owner *macho.File, fn types.Function, callsite uint64, target uint64) (wrapperContext, bool) {
+	s.stats.staticDirectCalls++
 	key := staticCallKey{file: owner, start: fn.StartAddr, callsite: callsite, target: target}
 	if cached, ok := s.staticCalls[key]; ok {
+		s.stats.staticDirectCache++
+		s.stats.recordStaticDirectResolution(cached.ctx, cached.ok)
 		return cached.ctx, cached.ok
 	}
 	data, err := s.functionDataFor(owner, fn)
@@ -1671,53 +1866,32 @@ func (s *Scanner) staticDirectCallContext(owner *macho.File, fn types.Function, 
 	}
 
 	var regBase [31]uint64
-	var regLoadAddr [31]uint64
 	var regValue [31]uint64
 	for i := 0; i+4 <= len(data); i += 4 {
 		pc := fn.StartAddr + uint64(i)
 		raw := readUint32At(data, i)
 
-		if (raw & 0x9f000000) == 0x90000000 {
-			rd := int(raw & 0x1f)
-			if rd < 31 {
-				if addr, ok := decodeADRPImmediate(pc, raw); ok {
-					regBase[rd] = addr
-					regLoadAddr[rd] = 0
-					regValue[rd] = 0
-				}
-			}
-			continue
-		}
-
 		if (callsite == 0 || pc == callsite) && target != 0 {
 			if callTarget, ok := decodeBLTarget(pc, raw); ok && callTarget == target {
-				ctx := s.staticDirectCallTrackedContext(owner, regBase, regLoadAddr, regValue, pc)
+				ctx := s.staticDirectCallTrackedContext(owner, regBase, regValue, pc)
 				s.staticCalls[key] = cachedWrapperContext{ctx: ctx, ok: true}
+				s.stats.recordStaticDirectResolution(ctx, true)
 				return ctx, true
 			}
 			if callTarget, ok := decodeBTarget(pc, raw); ok && callTarget == target {
-				ctx := s.staticDirectCallTrackedContext(owner, regBase, regLoadAddr, regValue, pc)
+				ctx := s.staticDirectCallTrackedContext(owner, regBase, regValue, pc)
 				s.staticCalls[key] = cachedWrapperContext{ctx: ctx, ok: true}
+				s.stats.recordStaticDirectResolution(ctx, true)
 				return ctx, true
 			}
 		}
-
-		var ins disassemble.Inst
-		if err := s.decodeArm64Instruction(pc, raw, &ins); err != nil || operandCount(&ins) == 0 {
-			continue
-		}
-
-		s.trackStaticValueInstruction(owner, &regBase, &regLoadAddr, &regValue, &ins, staticValueTrackOptions{
-			acceptAnyLoadAddr:      false,
-			propagateLoadAddrInAdd: true,
-			handleLoadPairs:        true,
-		})
+		trackRegisterRawWithReason(s, owner, raw, pc, &regBase, &regValue, pointerReasonStaticDirectCall)
 	}
 	s.staticCalls[key] = cachedWrapperContext{}
 	return wrapperContext{}, false
 }
 
-func (s *Scanner) staticDirectCallTrackedContext(owner *macho.File, regBase [31]uint64, regLoadAddr [31]uint64, regValue [31]uint64, callsite uint64) wrapperContext {
+func (s *Scanner) staticDirectCallTrackedContext(owner *macho.File, regBase [31]uint64, regValue [31]uint64, callsite uint64) wrapperContext {
 	for reg := range 4 {
 		if regValue[reg] == 0 && regBase[reg] != 0 {
 			regValue[reg] = regBase[reg]
