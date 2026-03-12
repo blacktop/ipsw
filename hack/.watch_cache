@@ -209,8 +209,8 @@
     }
   },
   "latest_ipsw": {
-    "ios_url": "https://updates.cdn-apple.com/2026WinterFCS/fullrestores/047-90340/9306A4A2-C849-42B8-BF39-1FD9E2A20CE1/iPhone17,1_26.3.1_23D8133_Restore.ipsw",
+    "ios_url": "https://updates.cdn-apple.com/2026WinterFCS/fullrestores/047-53989/8683F123-A494-4419-82A9-DE287B1B281D/iPhone17,1_26.3_23D127_Restore.ipsw",
     "macos_url": "",
-    "url": "https://updates.cdn-apple.com/2026WinterFCS/fullrestores/047-90340/9306A4A2-C849-42B8-BF39-1FD9E2A20CE1/iPhone17,1_26.3.1_23D8133_Restore.ipsw"
+    "url": "https://updates.cdn-apple.com/2026WinterFCS/fullrestores/047-53989/8683F123-A494-4419-82A9-DE287B1B281D/iPhone17,1_26.3_23D127_Restore.ipsw"
   }
 }
