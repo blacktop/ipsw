@@ -5,6 +5,10 @@ on:
     - cron: "0 19 * * *" # daily at 11:00 PST (19:00 UTC)
   workflow_dispatch:
     inputs:
+      version:
+        description: "Version to check (e.g. 18.0, leave empty for latest)"
+        required: false
+        type: string
       force_update:
         description: "Force update even if no new IPSWs detected"
         required: false
@@ -38,20 +42,32 @@ jobs:
         run: |
           # Determine which platforms to check
           PLATFORMS="${{ github.event.inputs.platforms || 'ios,macos' }}"
+          VERSION="${{ github.event.inputs.version }}"
           echo "Checking platforms: $PLATFORMS"
+          echo "Requested version: ${VERSION:-latest}"
 
           # Function to get latest IPSW URL for a platform
           get_ipsw_url() {
             local device="$1"
             local platform_name="$2"
+            local get_cmd=(./ipsw dl ipsw)
+
+            if [ "$platform_name" = "macOS" ]; then
+              get_cmd+=(--macos)
+            else
+              get_cmd+=(--device "$device")
+            fi
+
+            if [ -n "$VERSION" ]; then
+              get_cmd+=(--version "$VERSION")
+            else
+              get_cmd+=(--latest)
+            fi
+            
+            get_cmd+=(--urls)
 
             # Try to get latest IPSW URL, handle errors gracefully
-            if [ "$platform_name" = "macOS" ]; then
-              # macOS doesn't use device IDs, just get latest macOS IPSW
-              url=$(./ipsw dl ipsw --macos --latest --urls 2>/dev/null | head -1 || echo "")
-            else
-              url=$(./ipsw dl ipsw --device "$device" --latest --urls 2>/dev/null | head -1 || echo "")
-            fi
+            url=$("${get_cmd[@]}" 2>/dev/null | head -1 || echo "")
 
             if [ -n "$url" ] && [ "$url" != "null" ]; then
               echo "$url"
