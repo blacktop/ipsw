@@ -660,7 +660,7 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 				log.Errorf("failed to get vmaddr for objc object at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
 			s = strings.Trim(s, "\x00")
-			f.AddressToSymbol[addr] = s
+			f.AddressToSymbol.Set(addr, s)
 			if len(shash.ObjectOffsets) > 0 {
 				if !shash.ObjectOffsets[idx].IsDuplicate() {
 					_, addr, err := f.GetCacheVMAddress(shash.ObjectOffsets[idx].ObjectCacheOffset())
@@ -675,7 +675,7 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 						} else {
 							objcMap[addr] = objHashMap{Name: s}
 						}
-						f.AddressToSymbol[addr] = s
+						f.AddressToSymbol.Set(addr, s)
 					}
 				} else {
 					for i := uint16(0); i < shash.ObjectOffsets[idx].DuplicateCount(); i++ {
@@ -691,7 +691,7 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 							} else {
 								objcMap[addr] = objHashMap{Name: s}
 							}
-							f.AddressToSymbol[addr] = s
+							f.AddressToSymbol.Set(addr, s)
 						}
 					}
 				}
@@ -859,13 +859,13 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 		for ptr, class := range image.ObjC.ClassRefs {
 			if len(class.Name) > 0 {
-				f.AddressToSymbol[class.ClassPtr] = fmt.Sprintf("class_%s", class.Name)
-				if sym, ok := f.AddressToSymbol[ptr]; ok {
+				f.AddressToSymbol.Set(class.ClassPtr, fmt.Sprintf("class_%s", class.Name))
+				if sym, ok := f.AddressToSymbol.Get(ptr); ok {
 					if len(sym) < len(class.Name) {
-						f.AddressToSymbol[ptr] = class.Name
+						f.AddressToSymbol.Set(ptr, class.Name)
 					}
 				} else {
-					f.AddressToSymbol[ptr] = class.Name
+					f.AddressToSymbol.Set(ptr, class.Name)
 				}
 			}
 		}
@@ -877,13 +877,13 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 		for ptr, class := range image.ObjC.SuperRefs {
 			if len(class.Name) > 0 {
-				f.AddressToSymbol[class.ClassPtr] = fmt.Sprintf("class_%s", class.Name)
-				if sym, ok := f.AddressToSymbol[ptr]; ok {
+				f.AddressToSymbol.Set(class.ClassPtr, fmt.Sprintf("class_%s", class.Name))
+				if sym, ok := f.AddressToSymbol.Get(ptr); ok {
 					if len(sym) < len(class.Name) {
-						f.AddressToSymbol[ptr] = class.Name
+						f.AddressToSymbol.Set(ptr, class.Name)
 					}
 				} else {
-					f.AddressToSymbol[ptr] = class.Name
+					f.AddressToSymbol.Set(ptr, class.Name)
 				}
 			}
 		}
@@ -921,13 +921,13 @@ func (f *File) CategoriesForImage(imageNames ...string) error {
 
 		for _, cat := range cats {
 			if len(cat.Name) > 0 {
-				f.AddressToSymbol[cat.VMAddr] = fmt.Sprintf("cat_%s", cat.Name)
-				if sym, ok := f.AddressToSymbol[cat.VMAddr]; ok {
+				f.AddressToSymbol.Set(cat.VMAddr, fmt.Sprintf("cat_%s", cat.Name))
+				if sym, ok := f.AddressToSymbol.Get(cat.VMAddr); ok {
 					if len(sym) < len(cat.Name) {
-						f.AddressToSymbol[cat.VMAddr] = cat.Name
+						f.AddressToSymbol.Set(cat.VMAddr, cat.Name)
 					}
 				} else {
-					f.AddressToSymbol[cat.VMAddr] = cat.Name
+					f.AddressToSymbol.Set(cat.VMAddr, cat.Name)
 				}
 			}
 		}
@@ -964,8 +964,8 @@ func (f *File) ProtocolsForImage(imageNames ...string) error {
 			}
 		}
 		for k, v := range image.ObjC.ProtoRefs {
-			f.AddressToSymbol[v.Ptr] = v.Name
-			f.AddressToSymbol[k] = fmt.Sprintf("proto_%s", v.Name)
+			f.AddressToSymbol.Set(v.Ptr, v.Name)
+			f.AddressToSymbol.Set(k, fmt.Sprintf("proto_%s", v.Name))
 		}
 	}
 
@@ -1003,13 +1003,13 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 
 		for ptr, sel := range image.ObjC.SelRefs {
 			if len(sel.Name) > 0 {
-				f.AddressToSymbol[ptr] = fmt.Sprintf("sel_%s", sel.Name)
-				if sym, ok := f.AddressToSymbol[sel.VMAddr]; ok {
+				f.AddressToSymbol.Set(ptr, fmt.Sprintf("sel_%s", sel.Name))
+				if sym, ok := f.AddressToSymbol.Get(sel.VMAddr); ok {
 					if len(sym) < len(sel.Name) {
-						f.AddressToSymbol[sel.VMAddr] = sel.Name
+						f.AddressToSymbol.Set(sel.VMAddr, sel.Name)
 					}
 				} else {
-					f.AddressToSymbol[sel.VMAddr] = sel.Name
+					f.AddressToSymbol.Set(sel.VMAddr, sel.Name)
 				}
 			}
 		}
@@ -1056,12 +1056,12 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 		for _, meth := range image.ObjC.Methods {
 			if len(meth.Name) > 0 {
-				if sym, ok := f.AddressToSymbol[meth.ImpVMAddr]; ok {
+				if sym, ok := f.AddressToSymbol.Get(meth.ImpVMAddr); ok {
 					if len(sym) < len(meth.Name) {
-						f.AddressToSymbol[meth.ImpVMAddr] = meth.Name
+						f.AddressToSymbol.Set(meth.ImpVMAddr, meth.Name)
 					}
 				} else {
-					f.AddressToSymbol[meth.ImpVMAddr] = meth.Name
+					f.AddressToSymbol.Set(meth.ImpVMAddr, meth.Name)
 				}
 			}
 		}
@@ -1254,7 +1254,7 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 
 		for _, cfstr := range image.ObjC.CFStrings {
 			if len(cfstr.Name) > 0 {
-				f.AddressToSymbol[cfstr.Address] = fmt.Sprintf("\"%s\"", cfstr.Name)
+				f.AddressToSymbol.Set(cfstr.Address, fmt.Sprintf("\"%s\"", cfstr.Name))
 			}
 		}
 	}
@@ -1486,9 +1486,9 @@ func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 				return nil, err
 			}
 			for addr, sel := range addr2sel {
-				if f.AddressToSymbol[sel] != "_objc_msgSend" {
+				if f.AddressToSymbol.GetValue(sel) != "_objc_msgSend" {
 					stubs[addr] = &objc.Stub{
-						Name:        f.AddressToSymbol[sel],
+						Name:        f.AddressToSymbol.GetValue(sel),
 						SelectorRef: sel,
 					}
 				}
@@ -1501,7 +1501,7 @@ func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 
 		for addr, stub := range image.ObjC.Stubs {
 			if len(stub.Name) > 0 {
-				f.AddressToSymbol[addr] = fmt.Sprintf("j__objc_msgSend(x0, \"%s\")", stub.Name)
+				f.AddressToSymbol.Set(addr, fmt.Sprintf("j__objc_msgSend(x0, \"%s\")", stub.Name))
 			}
 		}
 	}

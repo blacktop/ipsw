@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -580,10 +579,10 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[start]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName)
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+				i.cache.AddressToSymbol.Set(start, fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName))
 			} else {
-				i.cache.AddressToSymbol[start] = fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target)
+				i.cache.AddressToSymbol.Set(start, fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target))
 			}
 		}
 	}
@@ -598,26 +597,26 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[entry]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+				i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
 						// FIXME: return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 						log.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
-					if symName, ok := i.cache.AddressToSymbol[target]; ok {
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+					if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+						i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 					} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
-						if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
-							i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
+						if symName, ok := i.cache.AddressToSymbol.Get(laptr); ok {
+							i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%s", symbols.PrefixGot, symName))
 						}
 					} else {
 						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
-						i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x ; %s", symbols.PrefixGotFallback, target, filepath.Base(img.Name))
+						i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%x ; %s", symbols.PrefixGotFallback, target, filepath.Base(img.Name)))
 					}
 				} else {
-					i.cache.AddressToSymbol[entry] = fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target)
+					i.cache.AddressToSymbol.Set(entry, fmt.Sprintf("%s%x", symbols.PrefixGotFallback, target))
 				}
 			}
 		}
@@ -633,11 +632,11 @@ func (i *CacheImage) Analyze() error {
 			if slide, ok := i.sinfo[stub]; ok {
 				target = slide
 			}
-			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
 				if !strings.HasPrefix(symName, symbols.PrefixJump) {
-					i.cache.AddressToSymbol[stub] = symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper)
+					i.cache.AddressToSymbol.Set(stub, symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper))
 				} else {
-					i.cache.AddressToSymbol[stub] = symName
+					i.cache.AddressToSymbol.Set(stub, symName)
 				}
 			} else {
 				img, err := i.cache.GetImageContainingVMAddr(target)
@@ -647,11 +646,11 @@ func (i *CacheImage) Analyze() error {
 				if err := img.Analyze(); err != nil {
 					return fmt.Errorf("failed to lookup symbol stub target %#x: failed to analyze image %s: %w", target, img.Name, err)
 				}
-				if symName, ok := i.cache.AddressToSymbol[target]; ok {
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%s", symbols.PrefixJump, symName)
+				if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
+					i.cache.AddressToSymbol.Set(stub, fmt.Sprintf("%s%s", symbols.PrefixJump, symName))
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("%s%x ; %s", symbols.PrefixStubFallback, target, filepath.Base(img.Name))
+					i.cache.AddressToSymbol.Set(stub, fmt.Sprintf("%s%x ; %s", symbols.PrefixStubFallback, target, filepath.Base(img.Name)))
 				}
 			}
 		}
@@ -719,8 +718,8 @@ func (i *CacheImage) GetSlideInfo() (map[uint64]uint64, error) {
 func (i *CacheImage) ParseStarts() {
 	if i.m != nil {
 		for _, fn := range i.m.GetFunctions() {
-			if _, ok := i.cache.AddressToSymbol[fn.StartAddr]; !ok {
-				i.cache.AddressToSymbol[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
+			if ok := i.cache.AddressToSymbol.Has(fn.StartAddr); !ok {
+				i.cache.AddressToSymbol.Set(fn.StartAddr, fmt.Sprintf("sub_%x", fn.StartAddr))
 			}
 		}
 	}
@@ -831,6 +830,39 @@ func (i *CacheImage) ParseStubs() error {
 	return nil
 }
 
+// ResolveStubAtAddr checks if addr is in a stub section (__stubs, __auth_stubs)
+// and if so, uses ParseStubs to find the target, then resolves it to a symbol.
+// Returns the target address and symbol name, or an error if not a stub or unresolvable.
+func (i *CacheImage) ResolveStubAtAddr(addr uint64) (uint64, string, error) {
+	if !i.Analysis.State.IsStubsDone() {
+		if err := i.ParseStubs(); err != nil {
+			return 0, "", err
+		}
+	}
+	target, ok := i.Analysis.SymbolStubs[addr]
+	if !ok {
+		return 0, "", fmt.Errorf("address %#x is not a known stub", addr)
+	}
+	// Resolve target symbol: search the target image's symtab + local symbols
+	if img, err := i.cache.GetImageContainingTextAddr(target); err == nil {
+		tm, err := img.GetMacho()
+		if err == nil {
+			defer tm.Close()
+			if syms, err := tm.FindAddressSymbols(target); err == nil {
+				for _, s := range syms {
+					if s.Name != "<redacted>" && s.Name != "" {
+						return target, s.Name, nil
+					}
+				}
+			}
+			if name, err := img.FindLocalSymbolAtAddr(target); err == nil && name != "" {
+				return target, name, nil
+			}
+		}
+	}
+	return target, "", fmt.Errorf("stub at %#x -> %#x: target symbol not found", addr, target)
+}
+
 // ParseHelpers parse symbol stub helpers in MachO
 func (i *CacheImage) ParseHelpers() error {
 
@@ -878,11 +910,63 @@ func (i *CacheImage) ParseSwiftStrings() error {
 	}
 	for addr, str := range strs {
 		if len(str) > 0 {
-			i.cache.AddressToSymbol[addr] = fmt.Sprintf("%v", str)
+			i.cache.AddressToSymbol.Set(addr, fmt.Sprintf("%v", str))
 		}
 	}
 
 	return nil
+}
+
+// FindLocalSymbolAtAddr searches only this image's DSC local symbol nlist entries
+// for a symbol at the given address, without populating the full a2s cache.
+// Returns the symbol name or an error if not found.
+func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
+	var uuid types.UUID
+	if i.cache.IsDyld4 {
+		uuid = i.cache.symUUID
+	} else {
+		uuid = i.cache.UUID
+	}
+	if i.cache.Headers[uuid].LocalSymbolsOffset == 0 {
+		return "", fmt.Errorf("no local symbols")
+	}
+	nlistCount := int(i.cache.Images[i.Index].NlistCount)
+	if nlistCount == 0 {
+		return "", fmt.Errorf("no local symbols for image")
+	}
+	// Compute direct offset to this image's nlist entries
+	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
+	for j := uint32(0); j < i.Index; j++ {
+		nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
+	}
+	// Bulk-read all nlist entries for this image
+	nlistBuf := make([]byte, nlistCount*nlist64Size)
+	if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
+		return "", fmt.Errorf("failed to read nlist entries: %w", err)
+	}
+	// Scan for matching address
+	strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
+	strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
+	for n := range nlistCount {
+		off := n * nlist64Size
+		nameIdx, value := parseNlist64(nlistBuf[off:])
+		if value == addr {
+			// Read just this one string from the string pool
+			readOff := strPoolBase + int64(nameIdx)
+			readLen := int64(512)
+			if readOff+readLen > strPoolBase+strPoolSize {
+				readLen = strPoolBase + strPoolSize - readOff
+			}
+			buf := make([]byte, readLen)
+			nr, _ := i.cache.r[uuid].ReadAt(buf[:readLen], readOff)
+			nullPos := bytes.IndexByte(buf[:nr], 0)
+			if nullPos < 0 {
+				nullPos = nr
+			}
+			return string(buf[:nullPos]), nil
+		}
+	}
+	return "", fmt.Errorf("no local symbol at %#x", addr)
 }
 
 // ParseLocalSymbols parses and caches, with the option to dump, all the local/private symbols for an image
@@ -903,70 +987,79 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			return fmt.Errorf("failed to parse local syms for image %s: %w", filepath.Base(i.Name), ErrNoLocals)
 		}
 
-		sr := io.NewSectionReader(i.cache.r[uuid], 0, 1<<63-1)
-
-		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
-		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
-
-		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-
-		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
-			// skip over other images
-			if idx != i.Index {
-				sr.Seek(int64(int(i.cache.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), io.SeekCurrent)
-				continue
-			}
-
-			for range int(i.cache.Images[idx].NlistCount) {
-				nlist := types.Nlist64{}
-				if err := binary.Read(sr, i.cache.ByteOrder, &nlist); err != nil {
-					return err
-				}
-
-				stringPool.Seek(int64(nlist.Name), io.SeekStart)
-
-				s, err := bufio.NewReader(stringPool).ReadString('\x00')
-				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read string at: %d", i.cache.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
-				}
-
-				s = strings.Trim(s, "\x00")
-				i.cache.AddressToSymbol[nlist.Value] = s
-				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-					Name:         s,
-					Nlist64:      nlist,
-					FoundInDylib: i.Name,
-				})
-
-				if dump {
-					m, err := i.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-					// fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
-					// 	Name:    s,
-					// 	Nlist64: nlist,
-					// 	Macho:   m,
-					// }.String(true))
-					fmt.Println(CacheLocalSymbol64{
-						Name:         s,
-						Nlist64:      nlist,
-						Macho:        m,
-						FoundInDylib: filepath.Base(i.Name),
-					}.String(true))
-				}
-			}
-
-			// w.Flush()
-
-			sort.Slice(i.LocalSymbols, func(j, k int) bool {
-				return i.LocalSymbols[j].Name < i.LocalSymbols[k].Name
-			})
-
+		nlistCount := int(i.cache.Images[i.Index].NlistCount)
+		if nlistCount == 0 {
 			i.Analysis.State.SetPrivates(true)
-
 			return nil
 		}
+
+		// Compute direct offset to this image's nlist entries (avoids O(N) seek per image)
+		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
+		for j := uint32(0); j < i.Index; j++ {
+			nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
+		}
+
+		// Bulk-read all nlist entries for this image at once
+		nlistBuf := make([]byte, nlistCount*nlist64Size)
+		if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
+			return fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
+		}
+
+		// Read strings from string pool using chunk-based ReadAt (one syscall per string)
+		strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
+		strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
+		strChunk := make([]byte, 512)
+
+		for n := range nlistCount {
+			off := n * nlist64Size
+			nameIdx, value := parseNlist64(nlistBuf[off:])
+
+			// Read a chunk from the string pool and find the null terminator
+			readOff := strPoolBase + int64(nameIdx)
+			readLen := int64(len(strChunk))
+			if readOff+readLen > strPoolBase+strPoolSize {
+				readLen = strPoolBase + strPoolSize - readOff
+			}
+			nr, _ := i.cache.r[uuid].ReadAt(strChunk[:readLen], readOff)
+			nullPos := bytes.IndexByte(strChunk[:nr], 0)
+			if nullPos < 0 {
+				nullPos = nr
+			}
+			s := string(strChunk[:nullPos])
+
+			nlist := types.Nlist64{}
+			nlist.Name = nameIdx
+			nlist.Type = types.NType(nlistBuf[off+4])
+			nlist.Sect = nlistBuf[off+5]
+			nlist.Desc = types.NDescType(binary.LittleEndian.Uint16(nlistBuf[off+6:]))
+			nlist.Value = value
+
+			i.cache.AddressToSymbol.Set(value, s)
+			i.cache.Images[i.Index].LocalSymbols = append(i.cache.Images[i.Index].LocalSymbols, &CacheLocalSymbol64{
+				Name:         s,
+				Nlist64:      nlist,
+				FoundInDylib: i.Name,
+			})
+
+			if dump {
+				m, err := i.GetPartialMacho()
+				if err != nil {
+					return err
+				}
+				fmt.Println(CacheLocalSymbol64{
+					Name:         s,
+					Nlist64:      nlist,
+					Macho:        m,
+					FoundInDylib: filepath.Base(i.Name),
+				}.String(true))
+			}
+		}
+
+		sort.Slice(i.LocalSymbols, func(j, k int) bool {
+			return i.LocalSymbols[j].Name < i.LocalSymbols[k].Name
+		})
+
+		i.Analysis.State.SetPrivates(true)
 	}
 
 	return nil
@@ -1026,7 +1119,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%s\n", sym)
 				} else {
-					i.cache.AddressToSymbol[sym.Address] = sym.Name
+					i.cache.AddressToSymbol.Set(sym.Address, sym.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    sym.Name,
 						Address: sym.Address,
@@ -1054,7 +1147,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 			if dump {
 				fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			} else {
-				i.cache.AddressToSymbol[sym.Value] = sym.Name
+				i.cache.AddressToSymbol.Set(sym.Value, sym.Name)
 				i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 					Name:    sym.Name,
 					Address: sym.Value,
@@ -1070,7 +1163,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.SegOffset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 				} else {
-					i.cache.AddressToSymbol[bind.Start+bind.SegOffset] = bind.Name
+					i.cache.AddressToSymbol.Set(bind.Start+bind.SegOffset, bind.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    bind.Name,
 						Address: bind.Start + bind.SegOffset,
@@ -1109,7 +1202,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%s\n", export)
 				} else {
-					i.cache.AddressToSymbol[export.Address] = export.Name
+					i.cache.AddressToSymbol.Set(export.Address, export.Name)
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    export.Name,
 						Address: export.Address,

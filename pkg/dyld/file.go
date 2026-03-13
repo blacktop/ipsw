@@ -10,6 +10,7 @@ import (
 	"math/bits"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unsafe"
 
@@ -81,10 +82,10 @@ type File struct {
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
 
-	AddressToSymbol map[uint64]string
+	AddressToSymbol *A2STable
 
 	IsDyld4         bool
-	symCacheLoaded  bool
+	SymCacheLoaded  bool
 	SubCacheInfo    []SubcacheEntry
 	TPROMappings    []TPROMapping
 	symUUID         mtypes.UUID
@@ -98,6 +99,9 @@ type File struct {
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
+
+	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
+	sortedImages []*CacheImage
 }
 
 // FormatError is returned by some operations if the data does
@@ -226,6 +230,13 @@ func Open(name string) (*File, error) {
 
 	ff.closers[ff.UUID] = f
 
+	// Build sorted image index for O(log N) text address lookups
+	ff.sortedImages = make([]*CacheImage, len(ff.Images))
+	copy(ff.sortedImages, ff.Images)
+	sort.Slice(ff.sortedImages, func(i, j int) bool {
+		return ff.sortedImages[i].LoadAddress < ff.sortedImages[j].LoadAddress
+	})
+
 	return ff, nil
 }
 
@@ -233,6 +244,9 @@ func Open(name string) (*File, error) {
 // If the File was created using NewFile directly instead of Open,
 // Close has no effect.
 func (f *File) Close() error {
+	if f.AddressToSymbol != nil {
+		f.AddressToSymbol.Close()
+	}
 	var err error
 	for uuid, closer := range f.closers {
 		if closer != nil {
@@ -279,7 +293,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.CodeSignatures = make(map[mtypes.UUID]codesignature)
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
-	f.AddressToSymbol = make(map[uint64]string, 7000000)
+	f.AddressToSymbol = NewA2STable(7000000)
 	f.ImageArray = make(map[uint32]*CImage)
 	f.islandStubs = make(map[uint64]uint64)
 
@@ -969,7 +983,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
 
 					if dump {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = "?"
 						} else {
@@ -977,7 +991,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, startOffset, pointer, targetValue, symName)
 					} else {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = ""
 						} else {
@@ -1084,7 +1098,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				}
 
 				if dump {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = "?"
 					} else {
@@ -1092,7 +1106,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					}
 					fmt.Printf("    [% 5d + 0x%05X] (off: %#x @ vaddr: %#x; raw: %#x => target: %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), rebaseLocation, rebaseAddr, pointer.Raw(), targetValue, pointer, symName)
 				} else {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = ""
 					} else {
@@ -1176,7 +1190,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
 
 					if dump {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = "?"
 						} else {
@@ -1184,7 +1198,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#08x = %#08x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
 					} else {
-						sym, ok := f.AddressToSymbol[targetValue]
+						sym, ok := f.AddressToSymbol.Get(targetValue)
 						if !ok {
 							symName = ""
 						} else {
@@ -1285,7 +1299,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				}
 
 				if dump {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = "?"
 					} else {
@@ -1293,7 +1307,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					}
 					fmt.Printf("    [% 5d + 0x%05X] (off: %#x @ vaddr: %#x; raw: %#x => target: %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), rebaseLocation, rebaseAddr, pointer.Raw(), targetValue, pointer, symName)
 				} else {
-					sym, ok := f.AddressToSymbol[targetValue]
+					sym, ok := f.AddressToSymbol.Get(targetValue)
 					if !ok {
 						symName = ""
 					} else {
@@ -1884,11 +1898,21 @@ func (f *File) Search(search []byte) (map[mtypes.UUID][]uint64, error) {
 	return matches, nil
 }
 
-// GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address
+// GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address.
+// Uses binary search on the sorted image index for O(log N) performance.
 // NOTE: this can be faster than GetImageContainingVMAddr as it avoids parsing the MachO
 func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
-	for _, img := range f.Images {
-		if img.CacheImageTextInfo.LoadAddress <= addr && addr < img.CacheImageTextInfo.LoadAddress+uint64(img.TextSegmentSize) {
+	n := len(f.sortedImages)
+	if n == 0 {
+		return nil, fmt.Errorf("address %#x not in any dylib __TEXT", addr)
+	}
+	// Binary search: find the last image whose LoadAddress <= addr
+	idx := sort.Search(n, func(i int) bool {
+		return f.sortedImages[i].LoadAddress > addr
+	}) - 1
+	if idx >= 0 {
+		img := f.sortedImages[idx]
+		if addr < img.LoadAddress+uint64(img.TextSegmentSize) {
 			return img, nil
 		}
 	}
