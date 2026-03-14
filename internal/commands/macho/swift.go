@@ -62,28 +62,16 @@ func NewSwift(file *macho.File, dsc *dyld.File, conf *SwiftConfig) (*Swift, erro
 		if dsc == nil {
 			return nil, fmt.Errorf("dyld shared cache is required to dump imported private frameworks")
 		}
-		var deps []string
-		for _, imp := range file.ImportedLibraries() {
-			if s.conf.Interface {
-				// only dump private frameworks when generating headers
-				if strings.Contains(imp, "PrivateFrameworks") {
-					deps = append(deps, imp)
-				}
-			} else {
-				deps = append(deps, imp)
-			}
+		deps, err := loadImportedMachODependencies(
+			s.cache,
+			s.conf.Name,
+			file.ImportedLibraries(),
+			s.conf.Interface,
+		)
+		if err != nil {
+			return nil, err
 		}
-		for _, imageName := range deps {
-			img, err := s.cache.Image(imageName)
-			if err != nil {
-				return nil, err
-			}
-			m, err := img.GetMacho()
-			if err != nil {
-				return nil, err
-			}
-			s.deps = append(s.deps, m)
-		}
+		s.deps = deps
 	}
 
 	return s, nil
