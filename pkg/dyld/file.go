@@ -1843,7 +1843,7 @@ func (f *File) Image(name string) (*CacheImage, error) {
 		}
 		return f.Image(choice)
 	}
-	return nil, fmt.Errorf("image %s not found in cache", name)
+	return nil, &ImageNotFoundError{Name: name}
 }
 
 func (f *File) Search(search []byte) (map[mtypes.UUID][]uint64, error) {

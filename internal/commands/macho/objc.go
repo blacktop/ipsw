@@ -134,28 +134,16 @@ func NewObjC(file *macho.File, dsc *dyld.File, conf *ObjcConfig) (*ObjC, error) 
 		if dsc == nil {
 			return nil, fmt.Errorf("dyld shared cache is required to dump imported private frameworks")
 		}
-		var deps []string
-		for _, imp := range file.ImportedLibraries() {
-			if o.conf.Headers {
-				// only dump private frameworks when generating headers
-				if strings.Contains(imp, "PrivateFrameworks") {
-					deps = append(deps, imp)
-				}
-			} else {
-				deps = append(deps, imp)
-			}
+		deps, err := loadImportedMachODependencies(
+			o.cache,
+			o.conf.Name,
+			file.ImportedLibraries(),
+			o.conf.Headers,
+		)
+		if err != nil {
+			return nil, err
 		}
-		for _, imageName := range deps {
-			img, err := o.cache.Image(imageName)
-			if err != nil {
-				return nil, err
-			}
-			m, err := img.GetMacho()
-			if err != nil {
-				return nil, err
-			}
-			o.deps = append(o.deps, m)
-		}
+		o.deps = deps
 	}
 
 	return o, nil
