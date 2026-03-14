@@ -58,7 +58,7 @@ require (
 	github.com/klauspost/compress v1.18.4
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.17.7
+	github.com/ollama/ollama v0.18.0
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
