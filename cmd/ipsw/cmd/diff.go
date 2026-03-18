@@ -77,11 +77,13 @@ func init() {
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
-	Use:   "diff <IPSW> <IPSW>",
-	Short: "Diff IPSWs",
+	Use:   "diff <IPSW|DIR> <IPSW|DIR>",
+	Short: "Diff IPSWs or patched OTA DMG directories",
 	Example: heredoc.Doc(`
 		# Diff two IPSWs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
+		# Diff two ota patch rsr output directories
+		❯ ipsw diff <old_rsr_dir> <new_rsr_dir> --files --output <output/folder> --markdown
 		# Diff two IPSWs with KDKs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
 			--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 

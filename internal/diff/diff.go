@@ -42,9 +42,10 @@ type kernel struct {
 }
 
 type mount struct {
-	DmgPath   string
-	MountPath string
-	IsMounted bool
+	DmgPath      string
+	MountPath    string
+	IsMounted    bool
+	CleanupPaths []string
 }
 
 type PlistDiff struct {
@@ -89,6 +90,7 @@ type Config struct {
 // Context is the context for the diff
 type Context struct {
 	IPSWPath        string
+	InputMode       inputMode
 	Info            *info.Info
 	Version         string
 	Build           string
@@ -202,6 +204,25 @@ func (d *Diff) Save() error {
 }
 
 func (d *Diff) getInfo() (err error) {
+	mode, err := detectInputMode(d.Old.IPSWPath, d.New.IPSWPath)
+	if err != nil {
+		return err
+	}
+	d.Old.InputMode = mode
+	d.Old.PemDB = d.conf.PemDB
+	d.New.PemDB = d.conf.PemDB
+
+	if mode == inputModeDirectory {
+		configureDirectoryContext(&d.Old)
+		configureDirectoryContext(&d.New)
+
+		if d.Title == "" {
+			d.Title = fmt.Sprintf("%s .vs %s", d.Old.Build, d.New.Build)
+		}
+
+		return nil
+	}
+
 	d.Old.Info, err = info.Parse(d.Old.IPSWPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse 'Old' IPSW: %v", err)
@@ -251,10 +272,25 @@ func (d *Diff) Diff() (err error) {
 	if err := d.getInfo(); err != nil {
 		return err
 	}
+	directoryMode := d.Old.InputMode == inputModeDirectory
+	if directoryMode {
+		if unsupported := unsupportedFlagsForDirectoryMode(d.conf); len(unsupported) > 0 {
+			return fmt.Errorf("directory inputs support dyld_shared_cache, MachO, file, and KDK diffs; unsupported flags: %s", strings.Join(unsupported, ", "))
+		}
+		log.Info("Mounting patched OTA DMGs")
+		if err := d.mountSystemOsDMGs(); err != nil {
+			return fmt.Errorf("failed to mount DMGs: %v", err)
+		}
+		defer d.unmountSystemOsDMGs()
+	}
 
-	log.Info("Diffing KERNELCACHES")
-	if err := d.parseKernelcache(); err != nil {
-		log.WithError(err).Error("failed to parse kernelcaches")
+	if directoryMode {
+		log.Debug("Skipping KERNELCACHES for directory inputs")
+	} else {
+		log.Info("Diffing KERNELCACHES")
+		if err := d.parseKernelcache(); err != nil {
+			log.WithError(err).Error("failed to parse kernelcaches")
+		}
 	}
 
 	if d.Old.KDK != "" && d.New.KDK != "" {
@@ -265,10 +301,12 @@ func (d *Diff) Diff() (err error) {
 	}
 
 	log.Info("Diffing DYLD_SHARED_CACHES")
-	if err := d.mountSystemOsDMGs(); err != nil {
-		return fmt.Errorf("failed to mount DMGs: %v", err)
+	if !directoryMode {
+		if err := d.mountSystemOsDMGs(); err != nil {
+			return fmt.Errorf("failed to mount DMGs: %v", err)
+		}
+		defer d.unmountSystemOsDMGs()
 	}
-	defer d.unmountSystemOsDMGs()
 
 	if err := d.parseDSC(); err != nil {
 		log.WithError(err).Error("failed to parse DSCs")
@@ -383,6 +421,17 @@ func mountDMG(ctx *Context) (err error) {
 }
 
 func (d *Diff) mountSystemOsDMGs() (err error) {
+	if d.Old.InputMode == inputModeDirectory {
+		log.Info("Mounting 'Old' patched OTA DMGs")
+		if err := mountDirectoryDMGs(&d.Old); err != nil {
+			return err
+		}
+		log.Info("Mounting 'New' patched OTA DMGs")
+		if err := mountDirectoryDMGs(&d.New); err != nil {
+			return err
+		}
+		return nil
+	}
 	log.Info("Mounting 'Old' SystemOS DMG")
 	if err := mountDMG(&d.Old); err != nil {
 		return err
@@ -395,6 +444,11 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 }
 
 func (d *Diff) unmountSystemOsDMGs() error {
+	if d.Old.InputMode == inputModeDirectory {
+		releaseDirectoryMounts("Old", d.Old.Mount)
+		releaseDirectoryMounts("New", d.New.Mount)
+		return nil
+	}
 	utils.Indent(log.Info, 2)("Unmounting 'Old' SystemOS DMG")
 	if err := utils.Retry(3, 2*time.Second, func() error {
 		return utils.Unmount(d.Old.MountPath, true)
@@ -671,7 +725,7 @@ func (d *Diff) parseEntitlements() (string, error) {
 }
 
 func (d *Diff) parseMachos() (err error) {
-	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+	conf := &mcmd.DiffConfig{
 		Markdown:   true,
 		Color:      false,
 		DiffTool:   "git",
@@ -680,8 +734,13 @@ func (d *Diff) parseMachos() (err error) {
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
-		LowMemory:  d.conf.LowMemory,
-	})
+	}
+	if d.Old.InputMode == inputModeDirectory {
+		d.Machos, err = diffMachosInMounts(d.Old.Mount, d.New.Mount, conf)
+		return
+	}
+	conf.LowMemory = d.conf.LowMemory
+	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, conf)
 	return
 }
 
@@ -880,6 +939,11 @@ func (d *Diff) parseFeatureFlags() (err error) {
 }
 
 func (d *Diff) parseFiles() error {
+	if d.Old.InputMode == inputModeDirectory {
+		var err error
+		d.Files, err = diffFilesInMounts(d.Old.Mount, d.New.Mount)
+		return err
+	}
 	d.Files = &FileDiff{
 		New:     make(map[string][]string),
 		Removed: make(map[string][]string),
