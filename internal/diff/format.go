@@ -23,7 +23,7 @@ import (
 
 const diffMarkdownTemplate = `
 - [{{ .Title }}](#{{ .Title | slug }})
-	- [IPSWs](#ipsws)
+	- [Inputs](#inputs)
 	- [Kernel](#kernel)
 		- [Version](#version)
 {{- if .Kexts }}
@@ -71,7 +71,7 @@ const diffMarkdownTemplate = `
 
 # {{ .Title }}
 
-## IPSWs
+## Inputs
 
 - {{ .Old.IPSWPath | base }}
 - {{ .New.IPSWPath | base }}

@@ -4,14 +4,14 @@ title: diff
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: diff
-description: Diff IPSWs
+description: Diff IPSWs or patched OTA DMG directories
 ---
 ## ipsw diff
 
-Diff IPSWs
+Diff IPSWs or patched OTA DMG directories
 
 ```
-ipsw diff <IPSW> <IPSW> [flags]
+ipsw diff <IPSW|DIR> <IPSW|DIR> [flags]
 ```
 
 ### Examples
@@ -19,6 +19,8 @@ ipsw diff <IPSW> <IPSW> [flags]
 ```bash
 # Diff two IPSWs
 ❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
+# Diff two ota patch rsr output directories
+❯ ipsw diff <old_rsr_dir> <new_rsr_dir> --files --output <output/folder> --markdown
 # Diff two IPSWs with KDKs
 ❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
 	--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
