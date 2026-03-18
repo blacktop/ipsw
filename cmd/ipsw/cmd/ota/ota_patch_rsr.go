@@ -24,7 +24,6 @@ THE SOFTWARE.
 package ota
 
 import (
-	"archive/zip"
 	"fmt"
 	"io"
 	"os"
@@ -35,12 +34,99 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/info"
+	otapkg "github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var rsrAppCryptexRE = regexp.MustCompile(`cryptex-app$`)
+
+func validateOTAPatchRSRArgs(cmd *cobra.Command, args []string, cryptex string) error {
+	if cryptex != "" {
+		if len(args) > 0 {
+			return fmt.Errorf("cannot use OTA path argument with cryptex mode")
+		}
+		return nil
+	}
+
+	return cobra.ExactArgs(1)(cmd, args)
+}
+
+func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
+	if len(dyldArches) == 0 {
+		return regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+	}
+
+	patterns := make([]string, 0, len(dyldArches))
+	for _, arch := range dyldArches {
+		patterns = append(patterns, regexp.QuoteMeta(arch))
+	}
+
+	return regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(patterns, "|")))
+}
+
+func rsrCryptexType(name string, systemCryptexRE *regexp.Regexp) string {
+	base := filepath.Base(name)
+
+	switch {
+	case rsrAppCryptexRE.MatchString(base):
+		return "app"
+	case systemCryptexRE.MatchString(base):
+		return "system"
+	default:
+		return ""
+	}
+}
+
+func rsrInputDMG(inFolder, subdir string) (string, error) {
+	matches, err := filepath.Glob(filepath.Join(inFolder, subdir, "*.dmg"))
+	if err != nil {
+		return "", fmt.Errorf("failed to find %s dmg in input folder: %w", subdir, err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("failed to find %s dmg (expected 1) in input folder %s", subdir, inFolder)
+	}
+	if len(matches) > 1 {
+		return "", fmt.Errorf("found too many %s DMGs (expected 1) in input folder %s", subdir, inFolder)
+	}
+
+	return matches[0], nil
+}
+
+func patchRSRCryptex(o *otapkg.AA, name, out, inDMG string, patchVerbose uint32) error {
+	pat, err := os.CreateTemp("", filepath.Base(name)+"-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for %s: %w", filepath.Base(name), err)
+	}
+	defer os.Remove(pat.Name())
+
+	src, err := o.Open(name, false)
+	if err != nil {
+		_ = pat.Close()
+		return fmt.Errorf("failed to open %s: %w", filepath.Base(name), err)
+	}
+	defer src.Close()
+
+	if _, err := io.Copy(pat, src); err != nil {
+		_ = pat.Close()
+		return fmt.Errorf("failed to copy %s to temp file: %w", filepath.Base(name), err)
+	}
+	if err := pat.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file for %s: %w", filepath.Base(name), err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
+		return fmt.Errorf("failed to create output folder: %w", err)
+	}
+
+	if err := ridiff.RawImagePatch(inDMG, pat.Name(), out, patchVerbose); err != nil {
+		return fmt.Errorf("failed to patch %s: %w", filepath.Base(name), err)
+	}
+
+	return nil
+}
 
 func init() {
 	otaPatchCmd.AddCommand(otaPatchRsrCmd)
@@ -65,7 +151,9 @@ var otaPatchRsrCmd = &cobra.Command{
 	Use:     "rsr",
 	Aliases: []string{"r"},
 	Short:   "Patch RSR OTAs",
-	// Args:          cobra.MinimumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		return validateOTAPatchRSRArgs(cmd, args, viper.GetString("ota.patch.cryptex"))
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -106,9 +194,6 @@ var otaPatchRsrCmd = &cobra.Command{
 
 		if len(cryptex) > 0 {
 			log.Infof("Patching cryptex to %s", cryptex+".dmg")
-			if _, err := os.Create(cryptex + ".dmg"); err != nil {
-				return fmt.Errorf("failed to create empty cryptex dmg: %v", err)
-			}
 			if err := ridiff.RawImagePatch("", cryptex, cryptex+".dmg", patchVerbose); err != nil {
 				return fmt.Errorf("failed to patch %s: %v", cryptex, err)
 			}
@@ -117,20 +202,20 @@ var otaPatchRsrCmd = &cobra.Command{
 
 		otaPath := filepath.Clean(args[0])
 
-		i, err := info.Parse(otaPath)
+		o, err := otapkg.Open(otaPath, ResolveAEAKeyFromFlags(otaPath))
 		if err != nil {
-			return fmt.Errorf("failed to parse IPSW: %v", err)
+			return fmt.Errorf("failed to open OTA: %w", err)
+		}
+		defer o.Close()
+
+		i, err := o.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get OTA info: %w", err)
 		}
 		infoFolder, err := i.GetFolder()
 		if err != nil {
 			return fmt.Errorf("failed to get OTA folder: %v", err)
 		}
-
-		zr, err := zip.OpenReader(otaPath)
-		if err != nil {
-			return fmt.Errorf("failed to open OTA: %v", err)
-		}
-		defer zr.Close()
 
 		if len(outFolder) > 0 {
 			outFolder = filepath.Join(outFolder, infoFolder)
@@ -138,104 +223,53 @@ var otaPatchRsrCmd = &cobra.Command{
 			outFolder = infoFolder
 		}
 
-		for _, zf := range zr.File {
-			if regexp.MustCompile(`cryptex-app$`).MatchString(zf.Name) {
+		systemCryptexRE := rsrSystemCryptexRE(dyldArches)
+
+		for _, file := range o.Files() {
+			if file.IsDir() {
+				continue
+			}
+
+			switch rsrCryptexType(file.Name(), systemCryptexRE) {
+			case "app":
 				appDMG, err := i.GetAppOsDmg()
 				if err != nil {
 					return fmt.Errorf("failed to get App DMG: %v", err)
 				}
 
-				pat, err := os.CreateTemp("", "cryptex-app")
-				if err != nil {
-					return fmt.Errorf("failed to create temp file for cryptex-app: %v", err)
-				}
-				defer os.Remove(pat.Name())
-
-				f, err := zf.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open cryptex-app: %v", err)
-				}
-				defer f.Close()
-
-				io.Copy(pat, f)
-
 				out := filepath.Join(outFolder, "AppOS", appDMG)
-				if err := os.MkdirAll(filepath.Dir(out), 0750); err != nil {
-					return fmt.Errorf("failed to create AppOS folder: %v", err)
-				}
-				if _, err := os.Create(out); err != nil {
-					return fmt.Errorf("failed to create AppOS dmg: %v", err)
-				}
 
 				var inDMG string
 				if len(inFolder) > 0 {
-					matches, err := filepath.Glob(filepath.Join(inFolder, "AppOS", "*.dmg"))
+					inDMG, err = rsrInputDMG(inFolder, "AppOS")
 					if err != nil {
-						return fmt.Errorf("failed to find AppOS dmg in input folder: %v", err)
+						return err
 					}
-					if len(matches) == 0 {
-						return fmt.Errorf("failed to find AppOS dmg (or found too many) to patch in input folder %s", inFolder)
-					} else if len(matches) > 1 {
-						return fmt.Errorf("found too many AppOS DMGs (expected 1) to patch in input folder %s", inFolder)
-					}
-					inDMG = matches[0]
 				}
 
 				log.Infof("Patching cryptex-app to %s", out)
-				if err := ridiff.RawImagePatch(inDMG, pat.Name(), out, patchVerbose); err != nil {
-					return fmt.Errorf("failed to patch cryptex-app: %v", err)
+				if err := patchRSRCryptex(o, file.Name(), out, inDMG, patchVerbose); err != nil {
+					return err
 				}
-			} else {
-				re := regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
-				if len(dyldArches) > 0 {
-					re = regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(dyldArches, "|")))
+			case "system":
+				systemDMG, err := i.GetSystemOsDmg()
+				if err != nil {
+					return fmt.Errorf("failed to get system DMG: %v", err)
 				}
-				if re.MatchString(zf.Name) {
-					systemDMG, err := i.GetSystemOsDmg()
+
+				out := filepath.Join(outFolder, "SystemOS", systemDMG)
+
+				var inDMG string
+				if len(inFolder) > 0 {
+					inDMG, err = rsrInputDMG(inFolder, "SystemOS")
 					if err != nil {
-						return fmt.Errorf("failed to get system DMG: %v", err)
+						return err
 					}
+				}
 
-					pat, err := os.CreateTemp("", "cryptex-system")
-					if err != nil {
-						return fmt.Errorf("failed to create temp file for cryptex-system: %v", err)
-					}
-					defer os.Remove(pat.Name())
-
-					f, err := zf.Open()
-					if err != nil {
-						return fmt.Errorf("failed to open cryptex-system: %v", err)
-					}
-					defer f.Close()
-
-					io.Copy(pat, f)
-
-					out := filepath.Join(outFolder, "SystemOS", systemDMG)
-					if err := os.MkdirAll(filepath.Dir(out), 0750); err != nil {
-						return fmt.Errorf("failed to create SystemOS folder: %v", err)
-					}
-					if _, err := os.Create(out); err != nil {
-						return fmt.Errorf("failed to create SystemOS dmg: %v", err)
-					}
-
-					var inDMG string
-					if len(inFolder) > 0 {
-						matches, err := filepath.Glob(filepath.Join(inFolder, "SystemOS", "*.dmg"))
-						if err != nil {
-							return fmt.Errorf("failed to find SystemOS dmg in input folder: %v", err)
-						}
-						if len(matches) == 0 {
-							return fmt.Errorf("failed to find SystemOS dmg (or found too many) to patch in input folder %s", inFolder)
-						} else if len(matches) > 1 {
-							return fmt.Errorf("found too many SystemOS DMGs (expected 1) to patch in input folder %s", inFolder)
-						}
-						inDMG = matches[0]
-					}
-
-					log.Infof("Patching %s to %s", zf.Name, out)
-					if err := ridiff.RawImagePatch(inDMG, pat.Name(), out, patchVerbose); err != nil {
-						return fmt.Errorf("failed to patch %s: %v", zf.Name, err)
-					}
+				log.Infof("Patching %s to %s", filepath.Base(file.Name()), out)
+				if err := patchRSRCryptex(o, file.Name(), out, inDMG, patchVerbose); err != nil {
+					return err
 				}
 			}
 		}
