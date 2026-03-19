@@ -55,6 +55,7 @@ func init() {
 	symbolicateCmd.Flags().Bool("peek", false, "Show disassembly instructions around each panicked frame")
 	symbolicateCmd.Flags().Int("peek-count", 5, "Number of instructions to show with --peek (centered on frame, respects function boundaries)")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
+	symbolicateCmd.Flags().Bool("force", false, "Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
 	symbolicateCmd.Flags().StringP("extra", "x", "", "Path to folder with extra files for symbolication")
@@ -72,6 +73,7 @@ func init() {
 	viper.BindPFlag("symbolicate.peek", symbolicateCmd.Flags().Lookup("peek"))
 	viper.BindPFlag("symbolicate.peek-count", symbolicateCmd.Flags().Lookup("peek-count"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
+	viper.BindPFlag("symbolicate.force", symbolicateCmd.Flags().Lookup("force"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbolicate.extra", symbolicateCmd.Flags().Lookup("extra"))
@@ -141,6 +143,7 @@ var symbolicateCmd = &cobra.Command{
 		signaturesDir := viper.GetString("symbolicate.signatures")
 		extrasDir := viper.GetString("symbolicate.extra")
 		idaScript := viper.GetBool("symbolicate.ida")
+		force := viper.GetBool("symbolicate.force")
 		kcSlideStr := viper.GetString("symbolicate.kc-slide")
 		dscSlideStr := viper.GetString("symbolicate.dsc-slide")
 		/* parse slide values (base 0 auto-detects hex 0x, octal 0o, or decimal) */
@@ -234,7 +237,15 @@ var symbolicateCmd = &cobra.Command{
 					if i.Plists.BuildManifest.ProductVersion != ips.Header.Version() ||
 						i.Plists.BuildManifest.ProductBuildVersion != ips.Header.Build() ||
 						!slices.Contains(i.Plists.Restore.SupportedProductTypes, ips.Payload.Product) {
-						return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s)",
+						if !force {
+							return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s) (use --force to override)",
+								filepath.Base(args[1]),
+								ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
+								strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
+								i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
+							)
+						}
+						log.Warnf("IPSW %s does not match crashlog (NEED %s; %s (%s), GOT %s; %s (%s)) - continuing anyway due to --force",
 							filepath.Base(args[1]),
 							ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
 							strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
