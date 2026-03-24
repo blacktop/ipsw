@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -923,14 +922,11 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					return err
 				}
 
-				stringPool.Seek(int64(nlist.Name), io.SeekStart)
-
-				s, err := bufio.NewReader(stringPool).ReadString('\x00')
+				s, err := readCStringAt(stringPool, int64(nlist.Name))
 				if err != nil {
 					log.Error(errors.Wrapf(err, "failed to read string at: %d", i.cache.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
 				}
 
-				s = strings.Trim(s, "\x00")
 				i.cache.AddressToSymbol[nlist.Value] = s
 				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 					Name:         s,

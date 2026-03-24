@@ -23,6 +23,17 @@ const (
 )
 
 var devices = []string{"iPad", "iPad_Air", "iPad_Pro", "iPad_mini", "iPhone", "iPod_touch", "Apple_Watch", "Mac", "HomePod"}
+
+// pre-compiled regular expressions
+var (
+	reIPSWURLString     = regexp.MustCompile(`^.*/(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_Restore\.ipsw$`)
+	reRestoreIPSWLink   = regexp.MustCompile(`\/(?P<device>i.+)_(?P<version>.+)_(?P<build>\w+)_Restore.ipsw$`)
+	reWikiFirmwareURL   = regexp.MustCompile(iphoneWikiFirmwareUrlRegex)
+	reWikiBetaFirmURL   = regexp.MustCompile(iphoneWikiBetaFirmwareUrlRegex)
+	reWikiOtaURL        = regexp.MustCompile(iphoneWikiOtaUrlRegex)
+	reWikiBetaOtaURL    = regexp.MustCompile(iphoneWikiBetaOtaUrlRegex)
+	reWikiKeysURL       = regexp.MustCompile("https://www.theiphonewiki.com/wiki/(.+)$")
+)
 var deviceMap = map[string][]string{ // FIXME: this is incomplete (NOTE: iPhoneSE maps to iPhone8,4 but so does iPhone_4.0_64bit ???)
 	"iPad8,11,iPad8,12":                {"iPad8,12", "iPad8,11"},
 	"iPadPro_12.9":                     {"iPad6,7", "iPad6,8"},
@@ -136,9 +147,8 @@ func GenerateDeviceMap(urls []string) {
 }
 
 func ParseIpswURLString(url string) (string, string, string) {
-	re := regexp.MustCompile(`^.*/(?P<device>.+)_(?P<version>.+)_(?P<build>.+)_Restore\.ipsw$`)
-	if re.MatchString(url) {
-		matches := re.FindStringSubmatch(url)
+	if reIPSWURLString.MatchString(url) {
+		matches := reIPSWURLString.FindStringSubmatch(url)
 		return matches[1], matches[2], matches[3]
 	}
 	return "", "", ""
@@ -177,8 +187,8 @@ func ScrapeIPSWs(beta bool) ([]string, error) {
 	c := colly.NewCollector(
 		colly.AllowedDomains(iphoneWikiURL),
 		colly.URLFilters(
-			regexp.MustCompile(iphoneWikiFirmwareUrlRegex),
-			regexp.MustCompile(iphoneWikiBetaFirmwareUrlRegex),
+			reWikiFirmwareURL,
+			reWikiBetaFirmURL,
 		),
 		colly.Async(true),
 		colly.MaxDepth(1),
@@ -224,8 +234,8 @@ func ScrapeOTAs(beta bool) ([]string, error) {
 	c := colly.NewCollector(
 		colly.AllowedDomains(iphoneWikiURL),
 		colly.URLFilters(
-			regexp.MustCompile(iphoneWikiOtaUrlRegex),
-			regexp.MustCompile(iphoneWikiBetaOtaUrlRegex),
+			reWikiOtaURL,
+			reWikiBetaOtaURL,
 		),
 		colly.Async(true),
 		colly.MaxDepth(1),
@@ -272,8 +282,8 @@ func ScrapeURLs(build string) (map[string]BetaIPSW, error) {
 	c := colly.NewCollector(
 		colly.AllowedDomains(iphoneWikiURL),
 		colly.URLFilters(
-			regexp.MustCompile(iphoneWikiFirmwareUrlRegex),
-			regexp.MustCompile(iphoneWikiBetaFirmwareUrlRegex),
+			reWikiFirmwareURL,
+			reWikiBetaFirmURL,
 		),
 		colly.Async(true),
 		colly.MaxDepth(1),
@@ -309,10 +319,9 @@ func ScrapeURLs(build string) (map[string]BetaIPSW, error) {
 						link := el.ChildAttr("a", "href")
 
 						if strings.Contains(link, "apple.com") {
-							r := regexp.MustCompile(`\/(?P<device>i.+)_(?P<version>.+)_(?P<build>\w+)_Restore.ipsw$`)
-							names := r.SubexpNames()
+							names := reRestoreIPSWLink.SubexpNames()
 
-							result := r.FindAllStringSubmatch(link, -1)
+							result := reRestoreIPSWLink.FindAllStringSubmatch(link, -1)
 							if result != nil {
 								m := map[string]string{}
 								for i, n := range result[0] {
@@ -363,7 +372,7 @@ func ScrapeKeys(version string) (map[string]map[string]map[string]string, error)
 	c := colly.NewCollector(
 		colly.AllowedDomains(iphoneWikiURL),
 		colly.URLFilters(
-			regexp.MustCompile("https://www.theiphonewiki.com/wiki/(.+)$"),
+			reWikiKeysURL,
 		),
 		// colly.Async(true),
 		colly.MaxDepth(1),
