@@ -25,10 +25,12 @@ import (
 
 // pre-compiled regular expressions
 var (
-	reArmFwIm4p        = regexp.MustCompile(`armfw_.*.im4p$`)
+	reArmFwIm4p         = regexp.MustCompile(`armfw_.*.im4p$`)
 	reExclaveBundleIm4p = regexp.MustCompile(`.*exclavecore_bundle.*im4p$`)
-	reDmgAeaFile       = regexp.MustCompile(`[0-9]{3}-[0-9]{5}-[0-9]{3}\.dmg(\.aea|\.trustcache)?(\.root_hash|\.trustcache|\.integrity_catalog|\.mtree)?$`)
+	reDmgAeaFile        = regexp.MustCompile(`[0-9]{3}-[0-9]{5}-[0-9]{3}\.dmg(\.aea|\.trustcache)?(\.root_hash|\.trustcache|\.integrity_catalog|\.mtree)?$`)
 )
+
+// DmgInfo provides a name/path pair for a DMG contained in an IPSW.
 type DmgInfo struct {
 	Name string
 	Path string
