@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"regexp"
 	"strings"
 
 	"github.com/apex/log"
@@ -120,8 +119,7 @@ func Extract(ipsw string) error {
 	log.Info("Extracting plists from IPSW")
 
 	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		var validPlist = regexp.MustCompile(`.*plist$`)
-		return validPlist.MatchString(f.Name)
+		return strings.HasSuffix(f.Name, "plist")
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to extract plists from ipsw")
@@ -165,7 +163,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 	ipsw := &Plists{Type: "IPSW"}
 
 	for _, f := range files {
-		if regexp.MustCompile(`.*plist$`).MatchString(f.Name) {
+		if strings.HasSuffix(f.Name, "plist") {
 			switch {
 			case strings.HasSuffix(f.Name, "Restore.plist"):
 				dat, err := readZipFile(f)

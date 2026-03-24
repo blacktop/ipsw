@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -446,10 +445,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			})
 		}
 		for idx, image := range f.Images {
-			sr.Seek(int64(image.Info.PathFileOffset), io.SeekStart)
-			r := bufio.NewReader(sr)
-			if name, err := r.ReadString(byte(0)); err == nil {
-				f.Images[idx].Name = strings.Trim(name, "\x00")
+			if name, err := readCStringAt(sr, int64(image.Info.PathFileOffset)); err == nil {
+				f.Images[idx].Name = name
 			}
 			// if offset, err := f.GetOffset(image.Info.Address); err == nil {
 			// 	f.Images[idx].CacheLocalSymbolsEntry.DylibOffset = offset
@@ -1438,12 +1435,11 @@ func (f *File) parsePatchInfoV1() error {
 				patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
 				var exportName string
 				if uint64(patchExport.ExportNameOffset) < patchInfo.PatchExportNamesSize {
-					exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
-					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					s, err := readCStringAt(exportNames, int64(patchExport.ExportNameOffset))
 					if err != nil {
 						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset, err)
 					}
-					exportName = strings.Trim(s, "\x00")
+					exportName = s
 				} else {
 					exportName = ""
 				}
@@ -1546,12 +1542,11 @@ func (f *File) parsePatchInfoV2() error {
 				imageExport := imageExports[clientExport.ImageExportIndex]
 				var exportName string
 				if uint64(imageExport.GetExportNameOffset()) < patchInfo.ExportNamesSize {
-					exportNames.Seek(int64(imageExport.GetExportNameOffset()), io.SeekStart)
-					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					s, err := readCStringAt(exportNames, int64(imageExport.GetExportNameOffset()))
 					if err != nil {
 						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
 					}
-					exportName = strings.Trim(s, "\x00")
+					exportName = s
 				} else {
 					exportName = ""
 				}
@@ -1611,12 +1606,11 @@ func (f *File) parsePatchInfoV2() error {
 				imageExport := imageExports[gcliexp.ImageExportIndex]
 				var exportName string
 				if uint64(imageExport.GetExportNameOffset()) < patchInfo.ExportNamesSize {
-					exportNames.Seek(int64(imageExport.GetExportNameOffset()), io.SeekStart)
-					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					s, err := readCStringAt(exportNames, int64(imageExport.GetExportNameOffset()))
 					if err != nil {
 						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
 					}
-					exportName = strings.Trim(s, "\x00")
+					exportName = s
 				} else {
 					exportName = ""
 				}
@@ -1720,12 +1714,11 @@ func (f *File) parsePatchInfoV4() error {
 				imageExport := imageExports[clientExport.ImageExportIndex]
 				var exportName string
 				if uint64(imageExport.GetExportNameOffset()) < patchInfo.ExportNamesSize {
-					exportNames.Seek(int64(imageExport.GetExportNameOffset()), io.SeekStart)
-					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					s, err := readCStringAt(exportNames, int64(imageExport.GetExportNameOffset()))
 					if err != nil {
 						return fmt.Errorf("failed to read patch info export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
 					}
-					exportName = strings.Trim(s, "\x00")
+					exportName = s
 				} else {
 					exportName = ""
 				}
@@ -1784,12 +1777,11 @@ func (f *File) parsePatchInfoV4() error {
 			imageExport := imageExports[gcliexp.ImageExportIndex]
 			var exportName string
 			if uint64(imageExport.GetExportNameOffset()) < patchInfo.ExportNamesSize {
-				exportNames.Seek(int64(imageExport.GetExportNameOffset()), io.SeekStart)
-				s, err := bufio.NewReader(exportNames).ReadString('\x00')
+				s, err := readCStringAt(exportNames, int64(imageExport.GetExportNameOffset()))
 				if err != nil {
 					return fmt.Errorf("failed to read patch info GOT export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
 				}
-				exportName = strings.Trim(s, "\x00")
+				exportName = s
 			} else {
 				exportName = ""
 			}

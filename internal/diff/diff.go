@@ -35,6 +35,11 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+// pre-compiled regular expressions
+var (
+	reIBootIm4p = regexp.MustCompile(`iBoot\..*\.im4p$`)
+)
+
 type kernel struct {
 	Path    string
 	Version *kernelcache.Version
@@ -620,11 +625,11 @@ func (d *Diff) parseDSC() error {
 	if len(oldDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
 	}
+	reDSCArm64e := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
 	if d.Old.IsMacOS {
 		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
 		for _, match := range oldDSCes {
-			if r.MatchString(match) {
+			if reDSCArm64e.MatchString(match) {
 				filtered = append(filtered, match)
 			}
 		}
@@ -651,9 +656,8 @@ func (d *Diff) parseDSC() error {
 	}
 	if d.New.IsMacOS {
 		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
 		for _, match := range newDSCes {
-			if r.MatchString(match) {
+			if reDSCArm64e.MatchString(match) {
 				filtered = append(filtered, match)
 			}
 		}
@@ -794,8 +798,8 @@ func (d *Diff) parseIBoot() (err error) {
 	defer os.RemoveAll(tmpDIR)
 	getIboot := func(ipswPath string) (*iboot.IBoot, error) {
 		iBootIm4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
-			// return regexp.MustCompile(`iBSS.*\.im4p$`).MatchString(f.Name) || regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
-			return regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
+			// return reIBootIm4p.MatchString(f.Name) || regexp.MustCompile(`iBSS.*\.im4p$`).MatchString(f.Name)
+			return reIBootIm4p.MatchString(f.Name)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to unzip iBoot im4p: %v", err)

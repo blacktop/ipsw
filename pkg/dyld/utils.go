@@ -1,8 +1,10 @@
 package dyld
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
@@ -12,6 +14,42 @@ func output(show bool, fmtStr string, args ...any) {
 	if show {
 		fmt.Printf(fmtStr, args...)
 	}
+}
+
+// readCStringAt reads a null-terminated C string from an io.ReaderAt at the
+// given byte offset. It avoids allocating a bufio.Reader on each call by using
+// a small stack buffer and falling back to a growing slice only for long strings.
+func readCStringAt(r io.ReaderAt, offset int64) (string, error) {
+	var buf [256]byte
+	n, err := r.ReadAt(buf[:], offset)
+	if n > 0 {
+		if end := bytes.IndexByte(buf[:n], 0); end >= 0 {
+			return string(buf[:end]), nil
+		}
+	}
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	// String is longer than the initial buffer; grow as needed.
+	result := make([]byte, n)
+	copy(result, buf[:n])
+	for {
+		n, err = r.ReadAt(buf[:], offset+int64(len(result)))
+		if n > 0 {
+			if end := bytes.IndexByte(buf[:n], 0); end >= 0 {
+				result = append(result, buf[:end]...)
+				return string(result), nil
+			}
+			result = append(result, buf[:n]...)
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return "", err
+		}
+	}
+	return string(result), nil
 }
 
 // Is64bit returns if dyld is 64bit or not
