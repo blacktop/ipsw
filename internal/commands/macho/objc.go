@@ -107,6 +107,18 @@ func (o *ObjC) maybeDemangle(text string) string {
 	return swift.DemangleBlob(text)
 }
 
+type objcDescriber interface {
+	Verbose() string
+	WithAddrs() string
+}
+
+func (o *ObjC) verboseOrAddrs(v objcDescriber) string {
+	if o.conf.Addrs {
+		return o.maybeDemangle(v.WithAddrs())
+	}
+	return o.maybeDemangle(v.Verbose())
+}
+
 // ObjC represents a MachO ObjC parser
 type ObjC struct {
 	conf  *ObjcConfig
@@ -175,18 +187,10 @@ func (o *ObjC) DumpClass(pattern string) error {
 		for _, class := range classes {
 			if re.MatchString(class.Name) {
 				if o.conf.Color {
-					if o.conf.Addrs {
-						quick.Highlight(os.Stdout, o.maybeDemangle(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-					} else {
-						quick.Highlight(os.Stdout, o.maybeDemangle(class.Verbose()), "objc", "terminal256", o.conf.Theme)
-					}
+					quick.Highlight(os.Stdout, o.verboseOrAddrs(&class), "objc", "terminal256", o.conf.Theme)
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 				} else {
-					if o.conf.Addrs {
-						fmt.Println(o.maybeDemangle(class.WithAddrs()))
-					} else {
-						fmt.Println(o.maybeDemangle(class.Verbose()))
-					}
+					fmt.Println(o.verboseOrAddrs(&class))
 				}
 			}
 		}
@@ -222,18 +226,10 @@ func (o *ObjC) DumpProtocol(pattern string) error {
 			if re.MatchString(proto.Name) {
 				if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
 					if o.conf.Color {
-						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, o.maybeDemangle(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-						} else {
-							quick.Highlight(os.Stdout, o.maybeDemangle(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
-						}
+						quick.Highlight(os.Stdout, o.verboseOrAddrs(&proto), "objc", "terminal256", o.conf.Theme)
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
-						if o.conf.Addrs {
-							fmt.Println(o.maybeDemangle(proto.WithAddrs()))
-						} else {
-							fmt.Println(o.maybeDemangle(proto.Verbose()))
-						}
+						fmt.Println(o.verboseOrAddrs(&proto))
 					}
 					seen[proto.Ptr] = true
 				}
@@ -269,18 +265,10 @@ func (o *ObjC) DumpCategory(pattern string) error {
 		for _, cat := range cats {
 			if re.MatchString(cat.Name) {
 				if o.conf.Color {
-					if o.conf.Addrs {
-						quick.Highlight(os.Stdout, o.maybeDemangle(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-					} else {
-						quick.Highlight(os.Stdout, o.maybeDemangle(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
-					}
+					quick.Highlight(os.Stdout, o.verboseOrAddrs(&cat), "objc", "terminal256", o.conf.Theme)
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 				} else {
-					if o.conf.Addrs {
-						fmt.Println(o.maybeDemangle(cat.WithAddrs()))
-					} else {
-						fmt.Println(o.maybeDemangle(cat.Verbose()))
-					}
+					fmt.Println(o.verboseOrAddrs(&cat))
 				}
 			}
 		}
@@ -313,18 +301,10 @@ func (o *ObjC) Dump() error {
 				if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
 					if o.conf.Verbose {
 						if o.conf.Color {
-							if o.conf.Addrs {
-								quick.Highlight(os.Stdout, o.maybeDemangle(proto.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-							} else {
-								quick.Highlight(os.Stdout, o.maybeDemangle(proto.Verbose()), "objc", "terminal256", o.conf.Theme)
-							}
+							quick.Highlight(os.Stdout, o.verboseOrAddrs(&proto), "objc", "terminal256", o.conf.Theme)
 							quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 						} else {
-							if o.conf.Addrs {
-								fmt.Println(o.maybeDemangle(proto.WithAddrs()))
-							} else {
-								fmt.Println(o.maybeDemangle(proto.Verbose()))
-							}
+							fmt.Println(o.verboseOrAddrs(&proto))
 						}
 					} else {
 						if o.conf.Color {
@@ -347,18 +327,10 @@ func (o *ObjC) Dump() error {
 			for _, class := range classes {
 				if o.conf.Verbose {
 					if o.conf.Color {
-						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, o.maybeDemangle(class.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-						} else {
-							quick.Highlight(os.Stdout, o.maybeDemangle(class.Verbose()), "objc", "terminal256", o.conf.Theme)
-						}
+						quick.Highlight(os.Stdout, o.verboseOrAddrs(&class), "objc", "terminal256", o.conf.Theme)
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
-						if o.conf.Addrs {
-							fmt.Println(o.maybeDemangle(class.WithAddrs()))
-						} else {
-							fmt.Println(o.maybeDemangle(class.Verbose()))
-						}
+						fmt.Println(o.verboseOrAddrs(&class))
 					}
 				} else {
 					if o.conf.Color {
@@ -379,18 +351,10 @@ func (o *ObjC) Dump() error {
 			for _, cat := range cats {
 				if o.conf.Verbose {
 					if o.conf.Color {
-						if o.conf.Addrs {
-							quick.Highlight(os.Stdout, o.maybeDemangle(cat.WithAddrs()), "objc", "terminal256", o.conf.Theme)
-						} else {
-							quick.Highlight(os.Stdout, o.maybeDemangle(cat.Verbose()), "objc", "terminal256", o.conf.Theme)
-						}
+						quick.Highlight(os.Stdout, o.verboseOrAddrs(&cat), "objc", "terminal256", o.conf.Theme)
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", o.conf.Theme)
 					} else {
-						if o.conf.Addrs {
-							fmt.Println(o.maybeDemangle(cat.WithAddrs()))
-						} else {
-							fmt.Println(o.maybeDemangle(cat.Verbose()))
-						}
+						fmt.Println(o.verboseOrAddrs(&cat))
 					}
 				} else {
 					if o.conf.Color {
@@ -529,7 +493,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion: sourceVersion,
 				Name:          class.Name,
 				Imports:       imps[class.Name],
-				Object:        o.maybeDemangle(class.Verbose()),
+				Object:        o.verboseOrAddrs(&class),
 			}); err != nil {
 				return err
 			}
@@ -577,7 +541,7 @@ func (o *ObjC) Headers() error {
 					SourceVersion: sourceVersion,
 					Name:          proto.Name + "_Protocol",
 					Imports:       imps[proto.Name+"-Protocol"],
-					Object:        o.maybeDemangle(proto.Verbose()),
+					Object:        o.verboseOrAddrs(&proto),
 				}); err != nil {
 					return err
 				}
@@ -614,7 +578,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion: sourceVersion,
 				Name:          name,
 				Imports:       imps[cat.Name],
-				Object:        o.maybeDemangle(cat.Verbose()),
+				Object:        o.verboseOrAddrs(&cat),
 			}); err != nil {
 				return err
 			}
