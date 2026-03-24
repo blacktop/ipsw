@@ -119,8 +119,9 @@ var classDumpCmd = &cobra.Command{
 			return fmt.Errorf("cannot dump --headers and use --class, --protocol or --category flags")
 		} else if viper.GetBool("class-dump.headers") && (viper.GetBool("class-dump.xcfw") || viper.GetBool("class-dump.spm")) {
 			return fmt.Errorf("cannot dump --headers and use --xcfw or --spm flags")
-		} else if viper.GetBool("class-dump.re") && !Verbose {
-			return fmt.Errorf("cannot use --re without --verbose")
+		} else if viper.GetBool("class-dump.re") && !Verbose &&
+			!viper.GetBool("class-dump.headers") && !viper.GetBool("class-dump.xcfw") && !viper.GetBool("class-dump.spm") {
+			return fmt.Errorf("cannot use --re without --verbose (or --headers/--xcfw/--spm)")
 		} else if len(viper.GetString("class-dump.output")) > 0 && (!viper.GetBool("class-dump.headers") && !viper.GetBool("class-dump.xcfw") && !viper.GetBool("class-dump.spm")) {
 			return fmt.Errorf("cannot set --output without setting --headers, --xcfw or --spm")
 		}
