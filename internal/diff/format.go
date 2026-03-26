@@ -281,7 +281,7 @@ func (d *Diff) ToJSON() error {
 		if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
 			return err
 		}
-		fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.json", d.Title))
+		fname := filepath.Join(d.conf.Output, d.TitleToFilename()+".json")
 		log.Infof("Creating JSON diff file: %s", fname)
 		return os.WriteFile(fname, dat, 0644)
 	}
@@ -1303,7 +1303,7 @@ func (d *Diff) ToHTML() error {
 		return err
 	}
 
-	fname := filepath.Join(d.conf.Output, fmt.Sprintf("%s.html", d.Title))
+	fname := filepath.Join(d.conf.Output, d.TitleToFilename()+".html")
 	log.Infof("Creating HTML diff file: %s", fname)
 	return os.WriteFile(fname, []byte(rendered), 0644)
 }

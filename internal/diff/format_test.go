@@ -8,17 +8,27 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 )
 
-func TestRenderHTMLUsesStaticShellAndStripsMarkdownTOC(t *testing.T) {
-	d := New(&Config{
-		Title:   "Example Diff",
+func newHTMLTestDiff(title string) *Diff {
+	return New(&Config{
+		Title:   title,
 		IpswOld: "old.ipsw",
 		IpswNew: "new.ipsw",
 	})
+}
+
+func mustRenderHTML(t *testing.T, d *Diff) string {
+	t.Helper()
 
 	rendered, err := d.renderHTML()
 	if err != nil {
 		t.Fatalf("renderHTML returned error: %v", err)
 	}
+
+	return rendered
+}
+
+func TestRenderHTMLUsesStaticShellAndStripsMarkdownTOC(t *testing.T) {
+	rendered := mustRenderHTML(t, newHTMLTestDiff("Example Diff"))
 
 	if !strings.Contains(rendered, `class="report-shell"`) {
 		t.Fatalf("rendered HTML missing report shell")
@@ -32,16 +42,10 @@ func TestRenderHTMLUsesStaticShellAndStripsMarkdownTOC(t *testing.T) {
 }
 
 func TestRenderHTMLTitleNotCorrupted(t *testing.T) {
-	d := New(&Config{
-		Title:   "23D8133__iPhone17,1 .vs 23D771330a__iPhone17,1",
-		IpswOld: "/path/to/23D8133__iPhone17,1",
-		IpswNew: "/path/to/23D771330a__iPhone17,1",
-	})
-
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
+	d := newHTMLTestDiff("23D8133__iPhone17,1 .vs 23D771330a__iPhone17,1")
+	d.Old.IPSWPath = "/path/to/23D8133__iPhone17,1"
+	d.New.IPSWPath = "/path/to/23D771330a__iPhone17,1"
+	rendered := mustRenderHTML(t, d)
 
 	if strings.Contains(rendered, "<strong>") {
 		t.Fatalf("title corrupted: __ interpreted as markdown bold")
@@ -52,16 +56,7 @@ func TestRenderHTMLTitleNotCorrupted(t *testing.T) {
 }
 
 func TestRenderHTMLTOCAnchorsWork(t *testing.T) {
-	d := New(&Config{
-		Title:   "Test Diff",
-		IpswOld: "old.ipsw",
-		IpswNew: "new.ipsw",
-	})
-
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
+	rendered := mustRenderHTML(t, newHTMLTestDiff("Test Diff"))
 
 	if !strings.Contains(rendered, `href="#inputs"`) {
 		t.Fatalf("TOC missing #inputs link")
@@ -78,21 +73,13 @@ func TestRenderHTMLTOCAnchorsWork(t *testing.T) {
 }
 
 func TestRenderHTMLDiffHighlighting(t *testing.T) {
-	d := New(&Config{
-		Title:   "Test Diff",
-		IpswOld: "old.ipsw",
-		IpswNew: "new.ipsw",
-	})
+	d := newHTMLTestDiff("Test Diff")
 	d.Dylibs = &mcmd.MachoDiff{
 		Updated: map[string]string{
 			"/System/Library/Frameworks/WebCore.framework/WebCore": "```diff\n+added line\n-removed line\n~modified line\n unchanged line\n```",
 		},
 	}
-
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
+	rendered := mustRenderHTML(t, d)
 
 	if !strings.Contains(rendered, `class="diff-add"`) {
 		t.Fatalf("missing diff-add highlighting")
@@ -109,21 +96,13 @@ func TestRenderHTMLDiffHighlighting(t *testing.T) {
 }
 
 func TestRenderHTMLDetailsRendered(t *testing.T) {
-	d := New(&Config{
-		Title:   "Test Diff",
-		IpswOld: "old.ipsw",
-		IpswNew: "new.ipsw",
-	})
+	d := newHTMLTestDiff("Test Diff")
 	d.Dylibs = &mcmd.MachoDiff{
 		Updated: map[string]string{
 			"/System/Library/Frameworks/Test.framework/Test": "some diff content",
 		},
 	}
-
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
+	rendered := mustRenderHTML(t, d)
 
 	if !strings.Contains(rendered, "<details>") {
 		t.Fatalf("missing details element")
@@ -140,11 +119,7 @@ func TestRenderHTMLDetailsRendered(t *testing.T) {
 }
 
 func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
-	d := New(&Config{
-		Title:   "Test Diff",
-		IpswOld: "old.ipsw",
-		IpswNew: "new.ipsw",
-	})
+	d := newHTMLTestDiff("Test Diff")
 	d.Old.Version = "18.3.1"
 	d.Old.Build = "23D8133"
 	d.New.Version = "18.3.2"
@@ -172,11 +147,7 @@ func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
 			"/System/Library/FeatureFlags/Changed.plist": "```diff\n- old\n+ new\n```",
 		},
 	}
-
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
+	rendered := mustRenderHTML(t, d)
 
 	for _, needle := range []string{
 		`id="iboot"`,
@@ -192,16 +163,24 @@ func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
 	}
 }
 
+func TestTitleToFilenameSanitizesDiffReportName(t *testing.T) {
+	d := New(&Config{
+		Title: "23D8133__iPhone17,1 .vs 23D771330a__iPhone17,1",
+	})
+
+	if got := d.TitleToFilename(); got != "23D8133__iPhone17,1_vs_23D771330a__iPhone17,1" {
+		t.Fatalf("TitleToFilename() = %q, want %q", got, "23D8133__iPhone17,1_vs_23D771330a__iPhone17,1")
+	}
+}
+
 func TestGeneratePreviewHTML(t *testing.T) {
 	if os.Getenv("GENERATE_PREVIEW") == "" {
 		t.Skip("set GENERATE_PREVIEW=1 to generate preview HTML")
 	}
 
-	d := New(&Config{
-		Title:   "23D8133__iPhone17,1 .vs 23D771330a__iPhone17,1",
-		IpswOld: "/path/to/23D8133__iPhone17,1",
-		IpswNew: "/path/to/23D771330a__iPhone17,1",
-	})
+	d := newHTMLTestDiff("23D8133__iPhone17,1 .vs 23D771330a__iPhone17,1")
+	d.Old.IPSWPath = "/path/to/23D8133__iPhone17,1"
+	d.New.IPSWPath = "/path/to/23D771330a__iPhone17,1"
 	d.Old.Version = "18.3.1"
 	d.Old.Build = "23D8133"
 	d.Old.Webkit = "623.2.7.10.4"
@@ -243,11 +222,7 @@ Symbols:
 		},
 	}
 
-	rendered, err := d.renderHTML()
-	if err != nil {
-		t.Fatalf("renderHTML returned error: %v", err)
-	}
-
+	rendered := mustRenderHTML(t, d)
 	outPath := "/tmp/ipsw-diff-preview.html"
 	if err := os.WriteFile(outPath, []byte(rendered), 0644); err != nil {
 		t.Fatalf("failed to write preview: %v", err)
