@@ -36,9 +36,9 @@ func init() {
 	rootCmd.AddCommand(diffCmd)
 	// diffCmd.Flags().StringP("in", "i", "", "Path to IPSW .idiff file")
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
-	diffCmd.Flags().BoolP("markdown", "m", false, "Save diff as Markdown file")
-	diffCmd.Flags().Bool("json", false, "Save diff as JSON file")
-	diffCmd.Flags().Bool("html", false, "Save diff as HTML file")
+	diffCmd.Flags().BoolP("markdown", "m", false, "Output diff as Markdown")
+	diffCmd.Flags().Bool("json", false, "Output diff as JSON")
+	diffCmd.Flags().Bool("html", false, "Output diff as HTML")
 	diffCmd.Flags().StringArrayP("kdk", "k", []string{}, "Path to KDKs to diff")
 	diffCmd.Flags().Bool("launchd", false, "Diff launchd configs")
 	diffCmd.Flags().Bool("fw", false, "Diff other firmwares")
@@ -73,6 +73,35 @@ func init() {
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
 	viper.BindPFlag("diff.signatures", diffCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
+}
+
+func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) error {
+	switch {
+	case markdownOut:
+		if hasOutput {
+			if err := d.Markdown(); err != nil {
+				return fmt.Errorf("failed to save Markdown diff: %s", err)
+			}
+			return nil
+		}
+		fmt.Println(d.String())
+	case jsonOut:
+		if err := d.ToJSON(); err != nil {
+			return fmt.Errorf("failed to output JSON diff: %s", err)
+		}
+	case htmlOut:
+		if err := d.ToHTML(); err != nil {
+			return fmt.Errorf("failed to output HTML diff: %s", err)
+		}
+	case hasOutput:
+		if err := d.Save(); err != nil {
+			return fmt.Errorf("failed to save diff: %w", err)
+		}
+	default:
+		fmt.Println(d.String())
+	}
+
+	return nil
 }
 
 // diffCmd represents the diff command
@@ -124,27 +153,13 @@ var diffCmd = &cobra.Command{
 			return err
 		}
 
-		if viper.GetString("diff.output") != "" {
-			switch {
-			case viper.GetBool("diff.markdown"):
-				if err := d.Markdown(); err != nil {
-					return fmt.Errorf("failed to save Markdown diff: %s", err)
-				}
-			case viper.GetBool("diff.json"):
-				if err := d.ToJSON(); err != nil {
-					return fmt.Errorf("failed to create JSON diff: %s", err)
-				}
-			case viper.GetBool("diff.html"):
-				if err := d.ToHTML(); err != nil {
-					return fmt.Errorf("failed to save HTML diff: %s", err)
-				}
-			default:
-				if err := d.Save(); err != nil {
-					return fmt.Errorf("failed to save diff: %w", err)
-				}
-			}
-		} else {
-			fmt.Println(d.String())
+		markdownOut := viper.GetBool("diff.markdown")
+		jsonOut := viper.GetBool("diff.json")
+		htmlOut := viper.GetBool("diff.html")
+		hasOutput := viper.GetString("diff.output") != ""
+
+		if err := outputDiff(d, hasOutput, markdownOut, jsonOut, htmlOut); err != nil {
+			return err
 		}
 
 		return nil
