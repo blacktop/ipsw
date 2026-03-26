@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -171,10 +172,34 @@ func (d *Diff) SetOutput(output string) {
 }
 
 func (d *Diff) TitleToFilename() string {
-	out := strings.ReplaceAll(d.Title, " ", "_")
-	out = strings.ReplaceAll(out, ".", "_")
-	out = strings.ReplaceAll(out, "(", "")
-	return strings.ReplaceAll(out, ")", "")
+	var out strings.Builder
+	lastUnderscore := false
+	writeUnderscore := func() {
+		if lastUnderscore {
+			return
+		}
+		out.WriteByte('_')
+		lastUnderscore = true
+	}
+
+	for _, r := range d.Title {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r), r == '_', r == '-', r == ',':
+			out.WriteRune(r)
+			lastUnderscore = false
+		case unicode.IsSpace(r), r == '.', r == '(', r == ')', r == '/', r == '\\', r == ':':
+			writeUnderscore()
+		default:
+			writeUnderscore()
+		}
+	}
+
+	filename := strings.Trim(out.String(), "_")
+	if filename == "" {
+		return "diff"
+	}
+
+	return filename
 }
 
 // Save saves the diff
