@@ -195,7 +195,7 @@ var XrefCmd = &cobra.Command{
 				}
 
 				if ok, loc := engine.Contains(unslidAddr); ok {
-					if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+					if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {
 						xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
@@ -215,7 +215,7 @@ var XrefCmd = &cobra.Command{
 					"dylib": img.Name,
 				}).Debug("No XREFS found")
 			} else {
-				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+				if symName, ok := f.AddressToSymbol.Get(unslidAddr); ok {
 					log.WithFields(log.Fields{
 						"sym":   symName,
 						"dylib": img.Name,

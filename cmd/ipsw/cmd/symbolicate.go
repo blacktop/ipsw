@@ -318,7 +318,7 @@ var symbolicateCmd = &cobra.Command{
 					defer m.Close()
 
 					// check if symbol is cached
-					if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+					if symName, ok := f.AddressToSymbol.Get(unslidAddr); ok {
 						if demangleFlag {
 							symName = demangle.Do(symName, false, false)
 						}
@@ -327,7 +327,7 @@ var symbolicateCmd = &cobra.Command{
 					}
 
 					if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-						if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+						if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 							if demangleFlag {
 								symName = demangle.Do(symName, false, false)
 							}
@@ -345,10 +345,10 @@ var symbolicateCmd = &cobra.Command{
 						if err != nil {
 							return err
 						}
-						f.AddressToSymbol[addr] = patch.GetName()
+						f.AddressToSymbol.Set(addr, patch.GetName())
 					}
 
-					if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+					if symName, ok := f.AddressToSymbol.Get(unslidAddr); ok {
 						if demangleFlag {
 							symName = demangle.Do(symName, false, false)
 						}
@@ -357,7 +357,7 @@ var symbolicateCmd = &cobra.Command{
 					}
 
 					if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-						if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+						if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 							if demangleFlag {
 								symName = demangle.Do(symName, false, false)
 							}

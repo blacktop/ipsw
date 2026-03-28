@@ -232,7 +232,7 @@ func scanDSCs(ipswPath, pemDB string) ([]*model.DyldSharedCache, error) {
 			}
 			for _, fn := range m.GetFunctions() {
 				var msym *model.Symbol
-				if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+				if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 					msym = &model.Symbol{
 						Name:  model.Name{Name: sym},
 						Start: fn.StartAddr,
