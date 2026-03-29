@@ -607,8 +607,9 @@ func GetKeybagsFromIPSW(files []*zip.File, meta KeybagMetaData, pattern string) 
 		rePattern = pattern
 	}
 
+	re := regexp.MustCompile(rePattern)
 	for _, f := range files {
-		if regexp.MustCompile(rePattern).MatchString(f.Name) {
+		if re.MatchString(f.Name) {
 			rc, err := f.Open()
 			if err != nil {
 				return nil, fmt.Errorf("error opening zipped file %s: %v", f.Name, err)

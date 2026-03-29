@@ -17,7 +17,6 @@ import (
 	"math"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/apex/log"
@@ -715,7 +714,7 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 	defer zr.Close()
 
 	for _, f := range zr.File {
-		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
+		if strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "im4p") {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, err := f.Open()
 			if err != nil {
@@ -745,7 +744,7 @@ func Parse(ipswPath string, keys ...string) (map[string]*DeviceTree, error) {
 					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %w", err)
 				}
 			}
-		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
+		} else if strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "img3") {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
@@ -781,7 +780,7 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 	dt = make(map[string]*DeviceTree)
 
 	for _, f := range files {
-		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
+		if strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "im4p") {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, err := f.Open()
 			if err != nil {
@@ -811,7 +810,7 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 					return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %w", err)
 				}
 			}
-		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
+		} else if strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "img3") {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
@@ -844,10 +843,10 @@ func ParseZipFiles(files []*zip.File, keys ...string) (dt map[string]*DeviceTree
 // Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw, destPath string) error {
 	_, err := utils.Unzip(ipsw, destPath, func(f *zip.File) bool {
-		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
+		if strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "im4p") {
 			return true
 		}
-		return regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name)
+		return strings.Contains(f.Name, "DeviceTree") && strings.HasSuffix(f.Name, "img3")
 	})
 
 	if err != nil {

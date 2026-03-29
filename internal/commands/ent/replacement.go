@@ -33,6 +33,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// pre-compiled regular expressions for build ID parsing
+var (
+	reNumericBuild  = regexp.MustCompile(`^\d+[A-Z]+\d+$`)
+	reBuildParts    = regexp.MustCompile(`^(\d+)[A-Z]+(\d+)$`)
+)
+
 // VersionComparator represents an iOS version for comparison purposes
 type VersionComparator struct {
 	MajorMinor string // e.g., "26.0", "18.5"
@@ -213,8 +219,7 @@ func compareBetaBuilds(a, b string) int {
 
 // isNumericBuild checks if a build ID follows numeric pattern (e.g., 22G87)
 func isNumericBuild(build string) bool {
-	match, _ := regexp.MatchString(`^\d+[A-Z]+\d+$`, build)
-	return match
+	return reNumericBuild.MatchString(build)
 }
 
 // compareNumericBuilds compares numeric build IDs
@@ -242,8 +247,7 @@ func compareNumericBuilds(a, b string) int {
 
 // extractBuildParts extracts numeric parts from build ID (e.g., "22G87" -> 22, 87)
 func extractBuildParts(build string) (int, int) {
-	regex := regexp.MustCompile(`^(\d+)[A-Z]+(\d+)$`)
-	matches := regex.FindStringSubmatch(build)
+	matches := reBuildParts.FindStringSubmatch(build)
 
 	if len(matches) < 3 {
 		return 0, 0

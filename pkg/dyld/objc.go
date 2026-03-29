@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -473,8 +472,7 @@ func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
-			sr.Seek(int64(int32(shash.FileOffset)+ptr), io.SeekStart)
-			s, err := bufio.NewReader(sr).ReadString('\x00')
+			s, err := readCStringAt(sr, int64(int32(shash.FileOffset)+ptr))
 			if err != nil {
 				log.Errorf("failed to read selector name at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
@@ -486,9 +484,9 @@ func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 						log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 					}
 					if img, ok := shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()]; ok {
-						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(img)))
+						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), s, symImageColor(filepath.Base(img)))
 					} else {
-						fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+						fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), s)
 					}
 				} else {
 					for i := uint16(0); i < shash.ObjectOffsets[idx].DuplicateCount(); i++ {
@@ -497,15 +495,15 @@ func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 							log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 						}
 						if img, ok := shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()]; ok {
-							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(img)))
+							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), s, symImageColor(filepath.Base(img)))
 						} else {
-							fmt.Printf("    %s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+							fmt.Printf("    %s: %s\n", symAddrColor("%#09x", addr), s)
 						}
 					}
 				}
 			} else {
 				addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(shash.FileOffset)+ptr))
-				fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+				fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), s)
 			}
 		}
 	}
@@ -650,8 +648,7 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 
 	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
-			sr.Seek(int64(int32(shash.FileOffset)+ptr), io.SeekStart)
-			s, err := bufio.NewReader(sr).ReadString('\x00')
+			s, err := readCStringAt(sr, int64(int32(shash.FileOffset)+ptr))
 			if err != nil {
 				log.Errorf("failed to read objc name at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
@@ -659,7 +656,6 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 			if err != nil {
 				log.Errorf("failed to get vmaddr for objc object at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
-			s = strings.Trim(s, "\x00")
 			f.AddressToSymbol[addr] = s
 			if len(shash.ObjectOffsets) > 0 {
 				if !shash.ObjectOffsets[idx].IsDuplicate() {
