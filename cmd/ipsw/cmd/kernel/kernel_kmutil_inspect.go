@@ -22,15 +22,11 @@ THE SOFTWARE.
 package kernel
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
@@ -99,32 +95,11 @@ var inspectCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", kcpath)
 		}
 
-		var m *macho.File
-
-		isImg4, err := magic.IsImg4(kcpath)
+		m, err := openKernelCollection(kcpath)
 		if err != nil {
-			return fmt.Errorf("failed to check if kernelcache is img4: %w", err)
+			return err
 		}
-
-		if isImg4 {
-			log.Info("Decompressing KernelManagement kernelcache")
-			data, err := kernelcache.DecompressKernelManagementData(kcpath)
-			if err != nil {
-				return fmt.Errorf("failed to decompress kernelcache (kernel management data): %v", err)
-			}
-			m, err = macho.NewFile(bytes.NewReader(data))
-			if err != nil {
-				return fmt.Errorf("failed to parse kernelcache (kernel management data): %v", err)
-			}
-			defer m.Close()
-		} else {
-			log.Info("Parsing KernelManagement kernelcache")
-			m, err = macho.Open(kcpath)
-			if err != nil {
-				return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
-			}
-			defer m.Close()
-		}
+		defer m.Close()
 
 		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("kernelcache type is not MH_FILESET (kext collection)")
