@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -92,6 +93,8 @@ type File struct {
 	dyldStartFnAddr uint64
 	objcOptRoAddr   uint64
 	objcOpt         Optimization
+	objcOptOnce     sync.Once
+	objcOptErr      error
 	islandStubs     map[uint64]uint64
 	prewarmData     *PrewarmingHeader
 	size            int64
