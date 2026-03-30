@@ -26,6 +26,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"sync"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -113,7 +115,12 @@ var dyldSearchSwiftCmd = &cobra.Command{
 		if len(searchImages) == 0 {
 			images = f.Images
 		} else {
+			seen := make(map[string]bool)
 			for _, img := range searchImages {
+				if seen[img] {
+					continue
+				}
+				seen[img] = true
 				image, err := f.Image(img)
 				if err != nil {
 					return fmt.Errorf("failed to find image %s in %s: %v", img, dscPath, err)
@@ -122,42 +129,54 @@ var dyldSearchSwiftCmd = &cobra.Command{
 			}
 		}
 
+		lines := make(chan []string, len(images))
+		sem := make(chan struct{}, runtime.NumCPU())
+		var wg sync.WaitGroup
+
 		for _, image := range images {
-			m, err := image.GetMacho()
-			if err != nil {
-				return err
-			}
-			if m.HasSwift() {
-				if err := m.PreCache(); err != nil { // cache fields and types
-					log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
+			wg.Add(1)
+			image := image
+			sem <- struct{}{}
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				var out []string
+
+				m, err := image.GetPartialMacho()
+				if err != nil {
+					log.Errorf("failed to parse %s: %v", image.Name, err)
+					return
 				}
-				if classRE != nil || protocolRE != nil {
+				if !m.HasSwift() {
+					image.Free()
+					return
+				}
+
+				imgBase := filepath.Base(image.Name)
+
+				// Only call GetSwiftTypes when searching for classes; protocols are covered by GetSwiftProtocols below.
+				if classRE != nil {
 					if typs, err := m.GetSwiftTypes(); err == nil {
 						for _, typ := range typs {
-							switch typ.Kind {
-							case swift.CDKindClass:
-								if classRE != nil && classRE.MatchString(typ.Name) {
-									fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(filepath.Base(image.Name)), colorField("class"), typ.Name)
-								}
-							case swift.CDKindProtocol:
-								if protocolRE != nil && protocolRE.MatchString(typ.Name) {
-									fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(filepath.Base(image.Name)), colorField("protocol"), typ.Name)
-								}
+							if typ.Kind == swift.CDKindClass && classRE.MatchString(typ.Name) {
+								out = append(out, fmt.Sprintf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(imgBase), colorField("class"), typ.Name))
 							}
 						}
 					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift types for %s: %v", filepath.Base(image.Name), err)
+						log.Errorf("failed to parse swift types for %s: %v", imgBase, err)
 					}
 				}
+
 				if protocolRE != nil {
 					if prots, err := m.GetSwiftProtocols(); err == nil {
 						for _, typ := range prots {
 							if protocolRE.MatchString(typ.Name) {
-								fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(filepath.Base(image.Name)), colorField("protocol"), typ.Name)
+								out = append(out, fmt.Sprintf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(imgBase), colorField("protocol"), typ.Name))
 							}
 						}
 					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift protocols for %s: %v", filepath.Base(image.Name), err)
+						log.Errorf("failed to parse swift protocols for %s: %v", imgBase, err)
 					}
 					if confs, err := m.GetSwiftProtocolConformances(); err == nil {
 						for _, conf := range confs {
@@ -169,13 +188,25 @@ var dyldSearchSwiftCmd = &cobra.Command{
 										typName = conf.TypeRef.Parent.Parent.Name + "." + typName
 									}
 								}
-								fmt.Printf("%s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", conf.Address), colorImage(filepath.Base(image.Name)), colorField("conformance"), conf.Protocol, colorField("type"), typName)
+								out = append(out, fmt.Sprintf("%s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", conf.Address), colorImage(imgBase), colorField("conformance"), conf.Protocol, colorField("type"), typName))
 							}
 						}
 					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-						log.Errorf("failed to parse swift protocols for %s: %v", filepath.Base(image.Name), err)
+						log.Errorf("failed to parse swift protocols for %s: %v", imgBase, err)
 					}
 				}
+
+				image.Free()
+				if len(out) > 0 {
+					lines <- out
+				}
+			}()
+		}
+
+		go func() { wg.Wait(); close(lines) }()
+		for ls := range lines {
+			for _, l := range ls {
+				fmt.Print(l)
 			}
 		}
 
