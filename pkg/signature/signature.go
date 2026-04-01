@@ -230,9 +230,13 @@ func (sm SymbolMap) symbolicateWithStats(m *macho.File, name string, sigs Symbol
 }
 
 func (sm SymbolMap) getSyscalls(m *macho.File) error {
-	syscalls, err := kernelcache.GetSyscallTable(m)
+	addr, syscalls, err := kernelcache.GetSyscallTable(m)
 	if err != nil {
 		return err
+	}
+	err = sm.Add(addr, "bsd_syscall_table")
+	if err != nil {
+		return fmt.Errorf("failed to add bsd_syscall_table symbol to map: %v", err)
 	}
 
 	for _, syscall := range syscalls {
@@ -248,9 +252,13 @@ func (sm SymbolMap) getSyscalls(m *macho.File) error {
 }
 
 func (sm SymbolMap) getMachTraps(m *macho.File) error {
-	machtraps, err := kernelcache.GetMachTrapTable(m)
+	addr, machtraps, err := kernelcache.GetMachTrapTable(m)
 	if err != nil {
 		return fmt.Errorf("failed to get mach trap table: %v", err)
+	}
+	err = sm.Add(addr, "mach_trap_table")
+	if err != nil {
+		return fmt.Errorf("failed to add mach_trap_table symbol to map: %v", err)
 	}
 
 	for _, machtrap := range machtraps {
@@ -266,9 +274,13 @@ func (sm SymbolMap) getMachTraps(m *macho.File) error {
 }
 
 func (sm SymbolMap) getMig(m *macho.File) error {
-	migs, err := kernelcache.GetMigSubsystems(m)
+	addr, migs, err := kernelcache.GetMigSubsystems(m)
 	if err != nil {
 		return fmt.Errorf("failed to get MIG subsystems: %v", err)
+	}
+	err = sm.Add(addr, "mig_kern_subsystem")
+	if err != nil {
+		return fmt.Errorf("failed to add mig_kern_subsystem table symbol to map: %v", err)
 	}
 
 	for _, mig := range migs {

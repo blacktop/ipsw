@@ -73,7 +73,7 @@ var syscallCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		syscalls, err := kernelcache.GetSyscallTable(m.File)
+		_, syscalls, err := kernelcache.GetSyscallTable(m.File)
 		if err != nil {
 			return err
 		}
