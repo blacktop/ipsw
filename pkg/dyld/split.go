@@ -140,7 +140,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			err_msg += " (use --xcode to specify the path to Xcode)"
 		}
 
-		return fmt.Errorf(err_msg, dyldSharedCachePath, dscExtractorPath)
+		return fmt.Errorf(err_msg, dscExtractorPath)
 	}
 
 	if xcodeCache {
@@ -182,7 +182,9 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			return fmt.Errorf("failed to read %s: %v", xcodeContentPath, err)
 		}
 		appInfo := XCodeAppInfoPlist{}
-		plist.NewDecoder(bytes.NewReader(data)).Decode(&appInfo)
+		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&appInfo); err != nil {
+			return fmt.Errorf("failed to decode %s: %v", xcodeContentPath, err)
+		}
 		xcodeVersion = "14.0"
 		if len(appInfo.CFBundleShortVersionString) > 0 {
 			xcodeVersion = appInfo.CFBundleShortVersionString
@@ -195,9 +197,11 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			XCodeVersion:     xcodeVersion,
 		}, plist.XMLFormat, "\t")
 		if err != nil {
-			return fmt.Errorf("failed to marshal stop session request: %v", err)
+			return fmt.Errorf("failed to marshal Xcode cache Info.plist: %v", err)
 		}
-		os.WriteFile(infoPlistPath, data, 0644)
+		if err := os.WriteFile(infoPlistPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %v", infoPlistPath, err)
+		}
 
 		destinationPath = filepath.Join(destinationPath, "Symbols")
 
@@ -215,7 +219,9 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			if err != nil {
 				return fmt.Errorf("failed to create .copied_%s: %v", match, err)
 			}
-			f.Close()
+			if err := f.Close(); err != nil {
+				return fmt.Errorf("failed to close %s: %v", f.Name(), err)
+			}
 			if err := utils.Copy(match, filepath.Join(dscCopyPath, filepath.Base(match))); err != nil {
 				return fmt.Errorf("failed to copy %s to %s: %v", match, dscCopyPath, err)
 			}
