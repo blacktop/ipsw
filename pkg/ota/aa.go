@@ -35,6 +35,15 @@ import (
 	"golang.org/x/sys/execabs"
 )
 
+var (
+	reOTADeviceTreeIm4p = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+	reOTAInfoPlist      = regexp.MustCompile(`^Info\.plist$`)
+	reOTAAssetDataInfo  = regexp.MustCompile(`^AssetData/Info\.plist$`)
+	reOTARestorePlist   = regexp.MustCompile(`Restore\.plist$`)
+	reOTABuildManifest  = regexp.MustCompile(`BuildManifest\.plist$`)
+	reOTASystemVersion  = regexp.MustCompile(`SystemVersion\.plist$`)
+)
+
 type File struct {
 	name  string
 	isDir bool
@@ -180,17 +189,17 @@ func (a *AA) Info() (*info.Info, error) {
 	var pfiles []fs.File
 	for _, file := range a.Files() {
 		switch {
-		case regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(file.Name()):
+		case reOTADeviceTreeIm4p.MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`^Info.plist$`).MatchString(file.Name()):
+		case reOTAInfoPlist.MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`^AssetData/Info.plist$`).MatchString(file.Name()):
+		case reOTAAssetDataInfo.MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`Restore.plist$`).MatchString(file.Name()):
+		case reOTARestorePlist.MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`BuildManifest.plist$`).MatchString(file.Name()):
+		case reOTABuildManifest.MatchString(file.Name()):
 			fallthrough
-		case regexp.MustCompile(`SystemVersion.plist$`).MatchString(file.Name()):
+		case reOTASystemVersion.MatchString(file.Name()):
 			f, err := a.Open(file.Name(), true)
 			if err != nil {
 				return nil, err
