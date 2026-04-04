@@ -227,16 +227,10 @@ func (f *File) getOptimizationsOld() (Optimization, error) {
 }
 
 func (f *File) GetOptimizations() (Optimization, error) {
-	if f.objcOpt != nil {
-		return f.objcOpt, nil
-	}
-
-	opt, err := f.getOptimizations()
-	if err != nil {
-		return nil, err
-	}
-	f.objcOpt = opt
-	return opt, nil
+	f.objcOptOnce.Do(func() {
+		f.objcOpt, f.objcOptErr = f.getOptimizations()
+	})
+	return f.objcOpt, f.objcOptErr
 }
 
 func (f *File) getOptimizations() (Optimization, error) {
