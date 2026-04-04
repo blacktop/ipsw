@@ -232,10 +232,11 @@ func patternMatch(m *macho.File) (uint64, error) {
 }
 
 // GetMachTrapTable returns the mach trap table for the given kernel.
-func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
+func GetMachTrapTable(m *macho.File) (uint64, []MachTrap, error) {
+	var tableAddr uint64
 	syscalls, err := getSyscallsData()
 	if err != nil {
-		return nil, err
+		return tableAddr, nil, err
 	}
 
 	var mtraps []MachTrap
@@ -244,7 +245,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		var err error
 		m, err = m.GetFileSetFileByName("com.apple.kernel")
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse fileset entry com.apple.kernel; %v", err)
+			return tableAddr, nil, fmt.Errorf("failed to parse fileset entry com.apple.kernel; %v", err)
 		}
 	}
 
@@ -253,7 +254,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		log.Warn("failed to find mach trap table using pattern match, falling back to slower emulation method")
 		kernelInvalidAddr, err = getKernelInvalidAddress(m)
 		if err != nil {
-			return nil, err
+			return tableAddr, nil, err
 		}
 	}
 
@@ -263,7 +264,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 	if sec := m.Section("__DATA_CONST", "__const"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
-			return nil, err
+			return tableAddr, nil, err
 		}
 
 		r := bytes.NewReader(dat)
@@ -271,7 +272,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		var match uint64
 		for {
 			if err := binary.Read(r, binary.LittleEndian, &match); err != nil {
-				return nil, err
+				return tableAddr, nil, err
 			}
 			if m.SlidePointer(match) == kernelInvalidAddr {
 				break
@@ -283,10 +284,11 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		curr, _ := r.Seek(0, io.SeekCurrent)
 
 		log.WithField("mach_trap_table", fmt.Sprintf("%#x", uint64(curr)+sec.Addr)).Infof("Found")
+		tableAddr = uint64(curr) + sec.Addr
 
 		mtrapts := make([]machTrapT, MACH_TRAP_TABLE_COUNT)
 		if err := binary.Read(r, binary.LittleEndian, mtrapts); err != nil {
-			return nil, err
+			return tableAddr, nil, err
 		}
 
 		// TODO: after the mach_trap_table are the 'mach_trap_names' array (in macOS or non stripped kernels) we should parse to get NEW trap names etc
@@ -316,8 +318,8 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 			})
 		}
 
-		return mtraps, nil
+		return tableAddr, mtraps, nil
 	}
 
-	return nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
+	return tableAddr, nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
 }

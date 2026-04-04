@@ -64,7 +64,7 @@ var kernelMachCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		machTraps, err := kernelcache.GetMachTrapTable(m.File)
+		_, machTraps, err := kernelcache.GetMachTrapTable(m.File)
 		if err != nil {
 			return err
 		}

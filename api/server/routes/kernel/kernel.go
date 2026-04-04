@@ -105,7 +105,7 @@ func getSyscalls(c *gin.Context) {
 	}
 	defer m.Close()
 
-	syscalls, err := kernelcache.GetSyscallTable(m.File)
+	_, syscalls, err := kernelcache.GetSyscallTable(m.File)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return

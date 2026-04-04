@@ -55,7 +55,7 @@ var kernelMigCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		migs, err := kernelcache.GetMigSubsystems(m.File)
+		_, migs, err := kernelcache.GetMigSubsystems(m.File)
 		if err != nil {
 			return fmt.Errorf("failed to get mig subsystems (only tested on macOS 15.0/iOS 18.0): %v", err)
 		}

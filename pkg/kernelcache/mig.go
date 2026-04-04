@@ -461,43 +461,43 @@ func getMigSubsystemPointers(m *macho.File, migEAddr uint64) ([]uint64, error) {
 	return subsystems, nil
 }
 
-func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
+func GetMigSubsystems(m *macho.File) (uint64, []MigKernSubsystem, error) {
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
 		m, err = m.GetFileSetFileByName("com.apple.kernel")
 		if err != nil {
-			return nil, fmt.Errorf("failed to get fileset entry 'com.apple.kernel': %v", err)
+			return 0, nil, fmt.Errorf("failed to get fileset entry 'com.apple.kernel': %v", err)
 		}
 	}
 
 	migInit, err := getMigInitFunc(m)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	data, err := m.GetFunctionData(*migInit)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	migEAddr, err := getMigE(bytes.NewReader(data), migInit)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	subsystems, err := getMigSubsystemPointers(m, migEAddr)
 	if err != nil {
-		return nil, err
+		return migEAddr, nil, err
 	}
 
 	log.WithField("mig_kern_subsystem table", fmt.Sprintf("%#x", migEAddr)).Infof("Found")
 
 	dataConst := m.Section("__DATA_CONST", "__const")
 	if dataConst == nil {
-		return nil, macho.ErrMachOSectionNotFound
+		return migEAddr, nil, macho.ErrMachOSectionNotFound
 	}
 	dataConstData, err := dataConst.Data()
 	if err != nil {
-		return nil, err
+		return migEAddr, nil, err
 	}
 
 	r := bytes.NewReader(dataConstData)
@@ -509,12 +509,12 @@ func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
 
 		var mig MigKernSubsystem
 		if err := binary.Read(r, binary.LittleEndian, &mig.migKernSubsystemHdr); err != nil {
-			return nil, err
+			return migEAddr, nil, err
 		}
 		mig.migKernSubsystemHdr.KServer = m.SlidePointer(mig.migKernSubsystemHdr.KServer)
 		mig.Routines = make([]KernRoutineDescriptor, mig.End-uint32(mig.Start))
 		if err := binary.Read(r, binary.LittleEndian, &mig.Routines); err != nil {
-			return nil, err
+			return migEAddr, nil, err
 		}
 		for i, routine := range mig.Routines {
 			routine.ImplRoutine = m.SlidePointer(routine.ImplRoutine)
@@ -525,5 +525,5 @@ func GetMigSubsystems(m *macho.File) ([]MigKernSubsystem, error) {
 		migs = append(migs, mig)
 	}
 
-	return migs, nil
+	return migEAddr, migs, nil
 }
