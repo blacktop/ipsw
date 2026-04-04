@@ -370,7 +370,7 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 	}
 	for _, fn := range m.GetFunctions() {
 		if addr == fn.StartAddr {
-			if symName, ok := d.f.AddressToSymbol[addr]; ok {
+			if symName, ok := d.f.AddressToSymbol.Get(addr); ok {
 				if d.Demangle() {
 					if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
 						symName, _ = swift.Demangle(symName)
@@ -388,7 +388,7 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
 func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
-	if symName, ok := d.f.AddressToSymbol[addr]; ok {
+	if symName, ok := d.f.AddressToSymbol.Get(addr); ok {
 		if d.cfg.Demangle {
 			if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
 				symName, _ = swift.DemangleSimple(symName)
@@ -402,7 +402,7 @@ func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
 }
 
 func (d DyldDisass) FindSwiftString(addr uint64) (string, bool) {
-	if str, ok := d.f.AddressToSymbol[addr]; ok {
+	if str, ok := d.f.AddressToSymbol.Get(addr); ok {
 		return str, true
 	}
 	return "", false

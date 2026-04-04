@@ -303,7 +303,7 @@ var MachoCmd = &cobra.Command{
 							for idx, sym := range m.Symtab.Syms {
 								if sym.Value != 0 {
 									if sym.Name == "<redacted>" {
-										if name, ok := f.AddressToSymbol[sym.Value]; ok {
+										if name, ok := f.AddressToSymbol.Get(sym.Value); ok {
 											m.Symtab.Syms[idx].Name = name
 										}
 									}
@@ -370,7 +370,7 @@ var MachoCmd = &cobra.Command{
 								undeflush = true
 							}
 							if !fixedLocals && sym.Name == "<redacted>" {
-								if name, ok := f.AddressToSymbol[sym.Value]; ok {
+								if name, ok := f.AddressToSymbol.Get(sym.Value); ok {
 									sym.Name = name
 								}
 							}
@@ -502,7 +502,7 @@ var MachoCmd = &cobra.Command{
 						log.WithError(err).Warn("failed to analyze image")
 					}
 					for stubAddr, addr := range image.Analysis.SymbolStubs {
-						if symName, ok := f.AddressToSymbol[addr]; ok {
+						if symName, ok := f.AddressToSymbol.Get(addr); ok {
 							fmt.Printf("%#x => %#x: %s\n", stubAddr, addr, symName)
 						}
 					}
