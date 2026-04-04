@@ -485,6 +485,7 @@ retry:
 	if image != nil {
 		m, _ := image.GetMacho()
 		if m != nil {
+			defer m.Close()
 			if syms, err := m.FindAddressSymbols(addr); err == nil {
 				for _, s := range syms {
 					if s.Name != "<redacted>" && s.Name != "" {
