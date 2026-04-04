@@ -167,19 +167,20 @@ func getSyscallData() (*SyscallData, error) {
 }
 
 // GetSyscallTable returns a map of system call table as array of sysent structs
-func GetSyscallTable(m *macho.File) ([]Sysent, error) {
+func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 	var syscalls []Sysent
 	var sysnoAddr uint64
 	var maxSyscall int
+	var tableAddr uint64
 
 	srcdata, err := getSyscallData()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get embedded syscall data: %v", err)
+		return tableAddr, nil, fmt.Errorf("failed to get embedded syscall data: %v", err)
 	}
 
 	sdata, err := getSyscallsData()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get embedded syscall JSON data: %v", err)
+		return tableAddr, nil, fmt.Errorf("failed to get embedded syscall JSON data: %v", err)
 	}
 
 	maxSyscall = len(sdata.BsdSyscalls)
@@ -188,29 +189,29 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 		var err error
 		m, err = m.GetFileSetFileByName("com.apple.kernel")
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse fileset entry com.apple.kernel; %v", err)
+			return tableAddr, nil, fmt.Errorf("failed to parse fileset entry com.apple.kernel; %v", err)
 		}
 	}
 
 	if sec := m.Section("__DATA_CONST", "__const"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
-			return nil, err
+			return tableAddr, nil, err
 		}
 
 		sysents := make([]sysent, maxSyscall+20)
 
 		pattern, err := hex.DecodeString(syscall2Pattern)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode pattern: %v", err)
+			return tableAddr, nil, fmt.Errorf("failed to decode pattern: %v", err)
 		}
 
 		if found := bytes.Index(dat, pattern); found > 0 {
 			found -= (binary.Size(uint64(0)) * 5) // rewind to beginning of syscall table
 			log.WithField("bsd_syscall_table", fmt.Sprintf("%#x", sec.Addr+uint64(found))).Infof("Found")
-
+			tableAddr = sec.Addr + uint64(found)
 			if err := binary.Read(bytes.NewReader(dat[found:]), binary.LittleEndian, &sysents); err != nil {
-				return nil, fmt.Errorf("failed to read syscalls sysent data: %v", err)
+				return tableAddr, nil, fmt.Errorf("failed to read syscalls sysent data: %v", err)
 			}
 
 			// fixup syscall table call/munge addresses
@@ -265,13 +266,13 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 				})
 			}
 		} else {
-			return nil, fmt.Errorf("failed to find begining of syscalls sysent data")
+			return tableAddr, nil, fmt.Errorf("failed to find begining of syscalls sysent data")
 		}
 	} else {
-		return nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
+		return tableAddr, nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
 	}
 
-	return syscalls, nil
+	return tableAddr, syscalls, nil
 }
 
 func ParseSyscallFiles(output string) error {
