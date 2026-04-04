@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -92,6 +93,8 @@ type File struct {
 	dyldStartFnAddr uint64
 	objcOptRoAddr   uint64
 	objcOpt         Optimization
+	objcOptOnce     sync.Once
+	objcOptErr      error
 	islandStubs     map[uint64]uint64
 	prewarmData     *PrewarmingHeader
 	size            int64
@@ -134,29 +137,25 @@ func getUUID(r io.ReaderAt) (mtypes.UUID, error) {
 	return uuid, nil
 }
 
-// Open opens the named file using os.Open and prepares it for use as a dyld binary.
+// Open opens the named file and prepares it for use as a dyld binary.
 func Open(name string) (*File, error) {
 
 	log.WithFields(log.Fields{
 		"cache": name,
 	}).Debug("Parsing Cache")
-	f, err := os.Open(name)
+
+	r, closer, size, err := openCacheFile(name)
 	if err != nil {
 		return nil, err
 	}
 
-	ff, err := NewFile(f)
+	ff, err := NewFile(r)
 	if err != nil {
-		f.Close()
+		closer.Close()
 		return nil, err
 	}
 
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	ff.size = fi.Size()
+	ff.size = size
 
 	if ff.IsDyld4 {
 
@@ -170,26 +169,22 @@ func Open(name string) (*File, error) {
 			// 	"cache": subCacheName,
 			// }).Debug("Parsing SubCache")
 
-			fsub, err := os.Open(subCacheName)
+			sr, sc, subSize, err := openCacheFile(subCacheName)
 			if err != nil {
 				return nil, err
 			}
 
-			fi, err := fsub.Stat()
+			ff.size += subSize
+
+			uuid, err := getUUID(sr)
 			if err != nil {
+				sc.Close()
 				return nil, err
 			}
 
-			ff.size += fi.Size()
+			ff.parseCache(sr, uuid)
 
-			uuid, err := getUUID(fsub)
-			if err != nil {
-				return nil, err
-			}
-
-			ff.parseCache(fsub, uuid)
-
-			ff.closers[uuid] = fsub
+			ff.closers[uuid] = sc
 
 			if ff.Headers[uuid].UUID != ff.SubCacheInfo[i-1].UUID {
 				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", subCacheName,
@@ -202,29 +197,31 @@ func Open(name string) (*File, error) {
 			// log.WithFields(log.Fields{
 			// 	"cache": name + ".symbols",
 			// }).Debug("Parsing SubCache")
-			fsym, err := os.Open(name + ".symbols")
+			sr, sc, _, err := openCacheFile(name + ".symbols")
 			if err != nil {
 				return nil, err
 			}
 
-			uuid, err := getUUID(fsym)
+			uuid, err := getUUID(sr)
 			if err != nil {
+				sc.Close()
 				return nil, err
 			}
 
 			if uuid != ff.Headers[ff.UUID].SymbolFileUUID {
+				sc.Close()
 				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid.String(), ff.Headers[ff.UUID].SymbolFileUUID.String())
 			}
 
 			ff.symUUID = uuid
 
-			ff.parseCache(fsym, uuid)
+			ff.parseCache(sr, uuid)
 
-			ff.closers[uuid] = fsym
+			ff.closers[uuid] = sc
 		}
 	}
 
-	ff.closers[ff.UUID] = f
+	ff.closers[ff.UUID] = closer
 
 	return ff, nil
 }
