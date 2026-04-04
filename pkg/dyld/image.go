@@ -643,7 +643,7 @@ func (i *CacheImage) Analyze() error {
 			}
 			if symName, ok := i.cache.AddressToSymbol.Get(target); ok {
 				if !strings.HasPrefix(symName, symbols.PrefixJump) {
-					i.cache.AddressToSymbol.Set(stub, symbols.PrefixJump + strings.TrimPrefix(symName, symbols.PrefixStubHelper))
+					i.cache.AddressToSymbol.Set(stub, symbols.PrefixJump+strings.TrimPrefix(symName, symbols.PrefixStubHelper))
 				} else {
 					i.cache.AddressToSymbol.Set(stub, symName)
 				}
@@ -943,11 +943,9 @@ func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
 	if nlistCount == 0 {
 		return "", fmt.Errorf("no local symbols for image")
 	}
-	// Compute direct offset to this image's nlist entries
-	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
-	for j := uint32(0); j < i.Index; j++ {
-		nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
-	}
+	// Compute direct offset to this image's nlist entries using NlistStartIndex
+	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
+		int64(i.cache.Images[i.Index].NlistStartIndex)*nlist64Size
 	// Bulk-read all nlist entries for this image
 	nlistBuf := make([]byte, nlistCount*nlist64Size)
 	if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
@@ -960,19 +958,11 @@ func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
 		off := n * nlist64Size
 		nameIdx, value := parseNlist64(nlistBuf[off:])
 		if value == addr {
-			// Read just this one string from the string pool
-			readOff := strPoolBase + int64(nameIdx)
-			readLen := int64(512)
-			if readOff+readLen > strPoolBase+strPoolSize {
-				readLen = strPoolBase + strPoolSize - readOff
+			s, _, err := readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nameIdx), nil)
+			if err != nil {
+				return "", err
 			}
-			buf := make([]byte, readLen)
-			nr, _ := i.cache.r[uuid].ReadAt(buf[:readLen], readOff)
-			nullPos := bytes.IndexByte(buf[:nr], 0)
-			if nullPos < 0 {
-				nullPos = nr
-			}
-			return string(buf[:nullPos]), nil
+			return s, nil
 		}
 	}
 	return "", fmt.Errorf("no local symbol at %#x", addr)
@@ -1002,11 +992,9 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			return nil
 		}
 
-		// Compute direct offset to this image's nlist entries (avoids O(N) seek per image)
-		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset)
-		for j := uint32(0); j < i.Index; j++ {
-			nlistOffset += int64(i.cache.Images[j].NlistCount) * nlist64Size
-		}
+		// Compute direct offset to this image's nlist entries using NlistStartIndex
+		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
+			int64(i.cache.Images[i.Index].NlistStartIndex)*nlist64Size
 
 		// Bulk-read all nlist entries for this image at once
 		nlistBuf := make([]byte, nlistCount*nlist64Size)
@@ -1014,27 +1002,24 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			return fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
 		}
 
-		// Read strings from string pool using chunk-based ReadAt (one syscall per string)
+		// Read strings from string pool (reuse buffer across iterations)
 		strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
 		strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
-		strChunk := make([]byte, 512)
+		var (
+			strBuf  = make([]byte, 512)
+			s       string
+			readErr error
+		)
 
 		for n := range nlistCount {
 			off := n * nlist64Size
 			nameIdx, value := parseNlist64(nlistBuf[off:])
 
-			// Read a chunk from the string pool and find the null terminator
-			readOff := strPoolBase + int64(nameIdx)
-			readLen := int64(len(strChunk))
-			if readOff+readLen > strPoolBase+strPoolSize {
-				readLen = strPoolBase + strPoolSize - readOff
+			s, strBuf, readErr = readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nameIdx), strBuf)
+			if readErr != nil {
+				log.Errorf("failed to read local symbol name for image %s: %v", filepath.Base(i.Name), readErr)
+				continue
 			}
-			nr, _ := i.cache.r[uuid].ReadAt(strChunk[:readLen], readOff)
-			nullPos := bytes.IndexByte(strChunk[:nr], 0)
-			if nullPos < 0 {
-				nullPos = nr
-			}
-			s := string(strChunk[:nullPos])
 
 			nlist := types.Nlist64{}
 			nlist.Name = nameIdx

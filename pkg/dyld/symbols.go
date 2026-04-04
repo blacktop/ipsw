@@ -473,9 +473,9 @@ func (f *File) SaveAddrToSymMap(dest string) (err error) {
 			return fmt.Errorf("failed to create symbol cache file %s: %v", dest, err)
 		}
 	}
+	defer of.Close()
 
 	if err := f.AddressToSymbol.Save(of); err != nil {
-		of.Close()
 		// check for out of space error (mounted IPSW dmgs return this)
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) && errors.Is(pathErr.Err, syscall.ENOSPC) {
