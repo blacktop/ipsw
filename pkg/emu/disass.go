@@ -13,14 +13,17 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 )
 
+var (
+	emuReColorImm  = regexp.MustCompile(`#?-?0x[0-9a-z]+`)
+	emuReColorRegs = regexp.MustCompile(`\W([wxvbhsdqzp][0-9]{1,2}|(c|s)psr(_c)?|pc|sl|sb|fp|ip|sp|lr|fpsid|fpscr|fpexc)`)
+)
+
 func colorOperands(operands string) string {
 	if len(operands) > 0 {
-		immMatch := regexp.MustCompile(`#?-?0x[0-9a-z]+`)
-		operands = immMatch.ReplaceAllStringFunc(operands, func(s string) string {
+		operands = emuReColorImm.ReplaceAllStringFunc(operands, func(s string) string {
 			return colorImm(s)
 		})
-		regMatch := regexp.MustCompile(`\W([wxvbhsdqzp][0-9]{1,2}|(c|s)psr(_c)?|pc|sl|sb|fp|ip|sp|lr|fpsid|fpscr|fpexc)`)
-		operands = regMatch.ReplaceAllStringFunc(operands, func(s string) string {
+		operands = emuReColorRegs.ReplaceAllStringFunc(operands, func(s string) string {
 			return string(s[0]) + colorRegs(s[1:])
 		})
 	}

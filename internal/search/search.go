@@ -23,6 +23,12 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
+var (
+	reArmFwIm4p         = regexp.MustCompile(`armfw_.*.im4p$`)
+	reExclaveBundleIm4p = regexp.MustCompile(`.*exclavecore_bundle.*im4p$`)
+	reDmgAeaFile        = regexp.MustCompile(`[0-9]{3}-[0-9]{5}-[0-9]{3}\.dmg(\.aea|\.trustcache)?(\.root_hash|\.trustcache|\.integrity_catalog|\.mtree)?$`)
+)
+
 // DmgInfo provides a name/path pair for a DMG contained in an IPSW.
 type DmgInfo struct {
 	Name string
@@ -486,7 +492,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 	}
 
 	for _, im4pFile := range im4ps {
-		if regexp.MustCompile(`armfw_.*.im4p$`).MatchString(im4pFile) {
+		if reArmFwIm4p.MatchString(im4pFile) {
 			im4p, err := img4.OpenPayload(im4pFile)
 			if err != nil {
 				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
@@ -512,7 +518,7 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 				}
 			}
 			ftab.Close()
-		} else if regexp.MustCompile(`.*exclavecore_bundle.*im4p$`).MatchString(im4pFile) {
+		} else if reExclaveBundleIm4p.MatchString(im4pFile) {
 			im4p, err := img4.OpenPayload(im4pFile)
 			if err != nil {
 				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
@@ -660,7 +666,7 @@ func ForEachFileInIPSW(ipswPath, directory, pemDB string, handler func(string, s
 			continue
 		}
 		// skip DMGs/cryptexes as they always have a different name (i.e. 090-43228-337.dmg.aea)
-		if regexp.MustCompile(`[0-9]{3}-[0-9]{5}-[0-9]{3}\.dmg(\.aea|\.trustcache)?(\.root_hash|\.trustcache|.integrity_catalog|\.mtree)?$`).MatchString(f.Name) {
+		if reDmgAeaFile.MatchString(f.Name) {
 			continue
 		}
 		if err := scanFile("", f.Name); err != nil {
