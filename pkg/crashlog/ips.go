@@ -1496,7 +1496,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 								return fmt.Errorf("failed to get macho from image: %w", err)
 							}
 							if fn, err := m.GetFunctionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset); err == nil {
-								if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+								if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = demangleSym(i.Config.Demangle, sym)
 									if i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset-fn.StartAddr != 0 {
 										i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset - fn.StartAddr

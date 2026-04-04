@@ -175,7 +175,7 @@ var AddrToFuncCmd = &cobra.Command{
 
 				for _, ptr := range ptrs {
 					if fn, err := m.GetFunctionForVMAddr(ptr); err == nil {
-						if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+						if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 							fn.Name = symName
 						}
 						fs = append(fs, dscFunc{
@@ -225,7 +225,7 @@ var AddrToFuncCmd = &cobra.Command{
 
 			if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
 				if asJSON {
-					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+					if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 						fn.Name = symName
 					}
 					if err := json.NewEncoder(os.Stdout).Encode(dscFunc{
@@ -239,7 +239,7 @@ var AddrToFuncCmd = &cobra.Command{
 						return err
 					}
 				} else {
-					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+					if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 						if unslidAddr-fn.StartAddr == 0 {
 							fmt.Printf("\n%#x: %s (start: %#x, end: %#x)\n", addr, symName, fn.StartAddr, fn.EndAddr)
 						} else {

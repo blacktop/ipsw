@@ -230,7 +230,7 @@ var swiftDumpCmd = &cobra.Command{
 					for idx, sym := range m.Symtab.Syms {
 						if sym.Value != 0 {
 							if sym.Name == "<redacted>" {
-								if name, ok := f.AddressToSymbol[sym.Value]; ok {
+								if name, ok := f.AddressToSymbol.Get(sym.Value); ok {
 									m.Symtab.Syms[idx].Name = name
 								}
 							}

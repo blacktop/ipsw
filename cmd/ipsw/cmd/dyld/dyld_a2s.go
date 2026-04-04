@@ -69,7 +69,6 @@ var AddrToSymCmd = &cobra.Command{
 		showImage := viper.GetBool("dyld.a2s.image")
 		showMapping := viper.GetBool("dyld.a2s.mapping")
 		doDemangle := viper.GetBool("dyld.a2s.demangle")
-		cacheFile := viper.GetString("dyld.a2s.cache")
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
@@ -107,14 +106,17 @@ var AddrToSymCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(cacheFile) == 0 {
-			cacheFile = dscPath + ".a2s"
+		// Use direct symbol resolution (no a2s cache needed for single lookups)
+		var sym *dsc.SymbolLookup
+		cacheFile := viper.GetString("dyld.a2s.cache")
+		if len(cacheFile) > 0 {
+			if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+				return err
+			}
+			sym, err = dsc.LookupSymbol(f, unslidAddr)
+		} else {
+			sym, err = dsc.DirectLookupSymbol(f, unslidAddr)
 		}
-		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
-			return err
-		}
-
-		sym, err := dsc.LookupSymbol(f, unslidAddr)
 		if err != nil {
 			return err
 		}

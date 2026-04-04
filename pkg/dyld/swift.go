@@ -368,7 +368,7 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 					imgName = ""
 				}
 				var typeName string
-				if sym, ok := f.AddressToSymbol[addr]; !ok {
+				if sym, ok := f.AddressToSymbol.Get(addr); !ok {
 					typeName = "n/a"
 				} else {
 					if h.Demangle {
@@ -442,7 +442,7 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				imgName = ""
 			}
 			var protoName string
-			if sym, ok := f.AddressToSymbol[addr]; !ok {
+			if sym, ok := f.AddressToSymbol.Get(addr); !ok {
 				protoName = "n/a"
 			} else {
 				if h.Demangle {
@@ -469,7 +469,7 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				imgName = ""
 			}
 			var protoConfName string
-			if sym, ok := f.AddressToSymbol[addr]; !ok {
+			if sym, ok := f.AddressToSymbol.Get(addr); !ok {
 				protoConfName = "n/a"
 			} else {
 				if h.Demangle {
@@ -514,13 +514,13 @@ func (f *File) swiftOffsetsToMap(h *SwiftHashTable) error {
 					continue
 				}
 
-				if sym, ok := f.AddressToSymbol[addr]; ok {
+				if sym, ok := f.AddressToSymbol.Get(addr); ok {
 					out, err := iswift.DemangleSimple(sym) // NOTE: only works on darwin for now
 					if err != nil {
 						log.Errorf("failed to demangle: %v", err)
-						f.AddressToSymbol[addr] = sym
+						f.AddressToSymbol.Set(addr, sym)
 					} else {
-						f.AddressToSymbol[addr] = out
+						f.AddressToSymbol.Set(addr, out)
 					}
 				}
 			case ForeignTypeConformance:
@@ -556,9 +556,9 @@ func (f *File) swiftOffsetsToMap(h *SwiftHashTable) error {
 				out, err := iswift.DemangleSimple(strings.Join(names, " "))
 				if err != nil {
 					log.Errorf("failed to demangle: %v", err)
-					f.AddressToSymbol[addr] = strings.Join(names, " ")
+					f.AddressToSymbol.Set(addr, strings.Join(names, " "))
 				} else {
-					f.AddressToSymbol[addr] = out
+					f.AddressToSymbol.Set(addr, out)
 				}
 			}
 
@@ -568,13 +568,13 @@ func (f *File) swiftOffsetsToMap(h *SwiftHashTable) error {
 				continue
 			}
 			var protoName string
-			if sym, ok := f.AddressToSymbol[addr]; ok {
+			if sym, ok := f.AddressToSymbol.Get(addr); ok {
 				protoName, err = iswift.DemangleSimple(sym)
 				if err != nil {
 					log.Errorf("failed to demangle: %v", err)
-					f.AddressToSymbol[addr] = sym
+					f.AddressToSymbol.Set(addr, sym)
 				} else {
-					f.AddressToSymbol[addr] = protoName
+					f.AddressToSymbol.Set(addr, protoName)
 				}
 			}
 
@@ -584,13 +584,13 @@ func (f *File) swiftOffsetsToMap(h *SwiftHashTable) error {
 				continue
 			}
 
-			if sym, ok := f.AddressToSymbol[addr]; ok {
+			if sym, ok := f.AddressToSymbol.Get(addr); ok {
 				protoConfName, err := iswift.DemangleSimple(sym)
 				if err != nil {
 					log.Errorf("failed to demangle: %v", err)
-					f.AddressToSymbol[addr] = sym
+					f.AddressToSymbol.Set(addr, sym)
 				} else {
-					f.AddressToSymbol[addr] = protoConfName
+					f.AddressToSymbol.Set(addr, protoConfName)
 				}
 			}
 
