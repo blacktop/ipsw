@@ -519,7 +519,17 @@ checksum:
   name_template: "checksums.txt"
 
 signs:
-  - artifacts: checksum
+  - cmd: ssh-keygen
+    args:
+      - "-Y"
+      - "sign"
+      - "-f"
+      - "{{ .Env.HOME }}/.ssh/id_ecdsa_sk_rk.pub"
+      - "-n"
+      - "file"
+      - "${artifact}"
+    signature: "${artifact}.sig"
+    artifacts: checksum
 
 sboms:
   - artifacts: archive
