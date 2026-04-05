@@ -143,11 +143,6 @@ update_fcs_keys_release: ## Scrape the iPhoneWiki for AES keys
 	@CGO_ENABLED=1 go run ./cmd/ipsw/main.go  dl appledb --os visionOS --build "$(FCS_VOS_BUILD)" --fcs-keys-json --output pkg/aea/data/ --confirm
 	@hack/make/json_mini
 
-.PHONY: update_keys
-update_keys: ## Scrape the iPhoneWiki for AES keys
-	@echo " > Updating firmware_keys.json"
-	CGO_ENABLED=0 go run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
-
 .PHONY: update_frida
 update_frida: ## Updates the frida-core-devkits used in the frida cmd
 	@echo " > Updating frida-core-devkits"

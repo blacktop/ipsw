@@ -22,38 +22,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	//go:embed data/procs.gz
-	procsData []byte
-	//go:embed data/firmware_keys.gz
-	keysJSONData []byte
-	//go:embed data/t8030_ap_keys.gz
-	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b - A13 Bionic
-	//go:embed data/t8101_ap_keys.gz
-	t8101APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/fd627adebaa4120269754cd613e81877 - A14 Bionic
-	//go:embed data/t8103_ap_keys.gz
-	t8103APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/a12ff77d9cf38fa70e6238794896093d - M1
-)
+//go:embed data/procs.gz
+var procsData []byte
 
 var ErrorCryptexNotFound = errors.New("cryptex not found")
-
-type apKey struct {
-	Device   string `json:"device,omitempty"`
-	Build    string `json:"build,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Filename string `json:"filename,omitempty"`
-	File     string `json:"file,omitempty"`
-	IPSW     string `json:"fw,omitempty"`
-	KBag     string `json:"kbag,omitempty"`
-	Key      string `json:"key,omitempty"`
-}
-
-func (a apKey) Name() string {
-	if len(a.Filename) == 0 {
-		return a.File
-	}
-	return a.Filename
-}
 
 // Info in the info object
 type Info struct {
@@ -126,78 +98,6 @@ func getProcessor(cpuid string) (processors, error) {
 	}
 
 	return processors{}, fmt.Errorf("failed to find processor for %s", cpuid)
-}
-
-func getFirmwareKeys(device, build string) (map[string]string, error) {
-	var keys map[string]map[string]map[string]string
-
-	zr, err := gzip.NewReader(bytes.NewReader(keysJSONData))
-	if err != nil {
-		return nil, err
-	}
-	defer zr.Close()
-
-	if err := json.NewDecoder(zr).Decode(&keys); err != nil {
-		return nil, fmt.Errorf("failed unmarshaling firmware_keys.gz data: %w", err)
-	}
-
-	return keys[device][build], nil
-}
-
-func getApFirmwareKey(device, build, filename string) (string, string, error) {
-	var m1Keys []apKey
-	var a13Keys []apKey
-	var a14Keys []apKey
-
-	zr1, err := gzip.NewReader(bytes.NewReader(t8030APKeysJSONData))
-	if err != nil {
-		return "", "", err
-	}
-	defer zr1.Close()
-
-	if err := json.NewDecoder(zr1).Decode(&a13Keys); err != nil {
-		return "", "", fmt.Errorf("failed unmarshaling t8030_ap_keys.gz data: %w", err)
-	}
-
-	for _, key := range a13Keys {
-		if key.Device == device && key.Build == build && key.Filename == filename {
-			return key.KBag, key.Key, nil
-		}
-	}
-
-	zr2, err := gzip.NewReader(bytes.NewReader(t8101APKeysJSONData))
-	if err != nil {
-		return "", "", err
-	}
-	defer zr2.Close()
-
-	if err := json.NewDecoder(zr2).Decode(&a14Keys); err != nil {
-		return "", "", fmt.Errorf("failed unmarshaling t8101_ap_keys.gz data: %w", err)
-	}
-
-	for _, key := range a14Keys {
-		if key.Device == device && key.Build == build && key.Filename == filename {
-			return key.KBag, key.Key, nil
-		}
-	}
-
-	zr3, err := gzip.NewReader(bytes.NewReader(t8103APKeysJSONData))
-	if err != nil {
-		return "", "", err
-	}
-	defer zr3.Close()
-
-	if err := json.NewDecoder(zr3).Decode(&m1Keys); err != nil {
-		return "", "", fmt.Errorf("failed unmarshaling t8101_ap_keys.gz data: %w", err)
-	}
-
-	for _, key := range m1Keys {
-		if key.Name() == filename {
-			return key.KBag, key.Key, nil
-		}
-	}
-
-	return "", "", fmt.Errorf("failed to find key for device: %s, build: %s, filename: %s", device, build, filename)
 }
 
 func (i *Info) String() string {
