@@ -160,11 +160,18 @@ In macOS12+/iOS15+ caches replaced this data with `prebuilt loader sets` which c
 
 ### **dyld extract**
 
-Extract dylib from *dyld_shared_cache*
+Extract a dylib from *dyld_shared_cache*
 
 ```bash
 ❯ ipsw dyld extract dyld_shared_cache_arm64e JavaScriptCore
    • Created JavaScriptCore
+```
+
+Extract to a specific directory
+
+```bash
+❯ ipsw dyld extract dyld_shared_cache_arm64e JavaScriptCore -o /tmp/extracted
+   • Created /tmp/extracted/JavaScriptCore
 ```
 
 Extract all dylibs from *dyld_shared_cache*
@@ -175,24 +182,16 @@ Extract all dylibs from *dyld_shared_cache*
       ✅  [=============================================================| 2700/2700 ]
 ```
 
-:::info note
-This command allows you to extract dylibs on non-darwin systems and it will add all local symbols to the symbol table as well as apply the DSC slide info for the pages included in the dylib if you supply the `--slide` flag *(this removes PACed pointers)*
- 
-🆕 We recently added 2 new flags:
- - `--objc` that "symbolicates" ObjC runtime info *(classes, class methods instance methods, categories, etc.)*
- - `--stubs` that "symbolicates" all the addresses that point to StubIsland stubs *(**NOTE:** right now this adds ALL them, in the future we'll try and only add the needed stubs)*
+:::info
+This command works on **all platforms** (not just macOS) and produces standalone MachO dylibs with correct segment layout, section offsets, and symbol tables. Extracted dylibs load cleanly in IDA Pro, Ghidra, and other analysis tools.
 
-> **NOTE:** This isn't repairing the ObjC runtime data or patching stubs, it's just adding the symbols to the symbol table so you can use them in your analysis.
-:::
+Additional flags:
+ - `--slide` applies DSC slide info to resolve PACed pointers
+ - `--objc` adds ObjC runtime symbols *(classes, methods, categories, protocols)* to the symbol table
+ - `--stubs` adds stub island symbols to the symbol table
+ - `--force` overwrites existing extracted dylib(s)
 
-:::caution
-
-This command isn't 💯 done yet and is missing some features:
-- [ ] Repairing the ObjC runtime data
-- [ ] Patching the stubs  
-- [ ] 🤔 Create an [issue](https://github.com/blacktop/ipsw/issues) if you would like something else added
-
-The goal with this command is to 1) create "near" perfect dylibs that can be used as stand alone frameworks and 2) create dylibs for reverse engineering *(packed with symbols etc)* for use in tools like Ghidra.
+> **NOTE:** `--objc` and `--stubs` add symbols for analysis, they do not repair ObjC runtime data or patch stubs.
 :::
 
 ### **dyld macho**
@@ -689,7 +688,7 @@ This commnd calls into Xcode's `dsc_extractor.bundle` so will ALWAYS work as lon
 :::
 
 :::info note
-If you are on a **non-darwin** system use the `ipsw dyld extract` command instead.  You can use the `ipsw dyld extract` command on **darwin** systems as well, however, it will be slower than using the `dsc_extractor.bundle` based `ipsw dyld split` command and *(for now)* only improves on the output by also applying the DSC slide-info if you use the `--slide` flag.  Eventually `ipsw dyld extract` will be able to create **near** perfect dylib extractions and will be the preferred command and this one will only be useful when Apple releases the next major OS version and inevitably breaks everyones DSC parsing 😏 again, but you can count on `ipsw` to once again be the FIRST to figure it out again 😁
+On **non-darwin** systems, use `ipsw dyld extract` instead. On **macOS**, `ipsw dyld split` uses Xcode's `dsc_extractor.bundle` and is faster for bulk extraction, but `ipsw dyld extract` produces richer output (local symbols, ObjC metadata, stub islands) and works cross-platform.
 :::
 
 ### **dyld webkit**

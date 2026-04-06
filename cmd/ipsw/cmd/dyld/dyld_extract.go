@@ -23,6 +23,7 @@ package dyld
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -33,7 +34,6 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v8"
@@ -92,12 +92,11 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 
 func init() {
 	DyldCmd.AddCommand(dyldExtractCmd)
-	dyldExtractCmd.Flags().BoolP("all", "a", false, "Split ALL dylibs")
+	dyldExtractCmd.Flags().BoolP("all", "a", false, "Extract all dylibs")
 	dyldExtractCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
 	dyldExtractCmd.Flags().Bool("slide", false, "Apply slide info to extracted dylib(s)")
 	dyldExtractCmd.Flags().Bool("objc", false, "Add ObjC metadata to extracted dylib(s) symtab")
 	dyldExtractCmd.Flags().Bool("stubs", false, "Add stub islands to extracted dylib(s) symtab")
-	// dyldExtractCmd.Flags().Bool("imports", false, "Add imported dylibs sym into to extracted symtab (will make BIG symtabs)")
 	dyldExtractCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
 	dyldExtractCmd.MarkFlagDirname("output")
@@ -106,7 +105,6 @@ func init() {
 	viper.BindPFlag("dyld.extract.slide", dyldExtractCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.extract.objc", dyldExtractCmd.Flags().Lookup("objc"))
 	viper.BindPFlag("dyld.extract.stubs", dyldExtractCmd.Flags().Lookup("stubs"))
-	// viper.BindPFlag("dyld.extract.imports", dyldExtractCmd.Flags().Lookup("imports"))
 	viper.BindPFlag("dyld.extract.cache", dyldExtractCmd.Flags().Lookup("cache"))
 	viper.BindPFlag("dyld.extract.output", dyldExtractCmd.Flags().Lookup("output"))
 }
@@ -115,7 +113,7 @@ func init() {
 var dyldExtractCmd = &cobra.Command{
 	Use:     "extract <DSC> <DYLIB>",
 	Aliases: []string{"e"},
-	Short:   "Extract dylib from dyld_shared_cache",
+	Short:   "Extract dylib(s) for reverse engineering",
 	Args:    cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
@@ -124,7 +122,6 @@ var dyldExtractCmd = &cobra.Command{
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
-	Hidden:        true, // FIXME: remove when extraction is fixed (is creating machos w/ incorrect headers/segment/section boundaries)
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var bar *mpb.Bar
@@ -137,17 +134,13 @@ var dyldExtractCmd = &cobra.Command{
 		slide := viper.GetBool("dyld.extract.slide")
 		addObjc := viper.GetBool("dyld.extract.objc")
 		addStubs := viper.GetBool("dyld.extract.stubs")
-		// addImports := viper.GetBool("dyld.extract.imports")
 		output := viper.GetString("dyld.extract.output")
 		cacheFile := viper.GetString("dyld.extract.cache")
-		// validate flags
 		if dumpALL && len(args) > 1 {
 			return fmt.Errorf("cannot specify DYLIB(s) when using --all")
 		} else if !dumpALL && len(args) < 2 {
 			return fmt.Errorf("must specify at least one DYLIB to extract")
 		}
-
-		log.Warn("This command is currently experimental and may not work as expected. https://github.com/blacktop/ipsw/issues/467")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -156,22 +149,9 @@ var dyldExtractCmd = &cobra.Command{
 			folder = output
 		}
 
-		fileInfo, err := os.Lstat(dscPath)
+		dscPath, err := filepath.EvalSymlinks(dscPath)
 		if err != nil {
-			return fmt.Errorf("file %s does not exist", dscPath)
-		}
-
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			symlinkPath, err := os.Readlink(dscPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
-			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(dscPath)
-			linkRoot := filepath.Dir(linkParent)
-
-			dscPath = filepath.Join(linkRoot, symlinkPath)
+			return fmt.Errorf("failed to resolve path %s: %w", dscPath, err)
 		}
 
 		f, err := dyld.Open(dscPath)
@@ -257,7 +237,6 @@ var dyldExtractCmd = &cobra.Command{
 								Value: proto.Ptr,
 								Desc:  0xa00,
 							})
-							// fmt.Println(proto.Verbose())
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
@@ -283,7 +262,6 @@ var dyldExtractCmd = &cobra.Command{
 									Desc:  0xa00,
 								})
 							}
-							// fmt.Println(class.Verbose())
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
@@ -302,7 +280,6 @@ var dyldExtractCmd = &cobra.Command{
 									Desc:  0xa00,
 								})
 							}
-							// fmt.Println(cat.Verbose())
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
@@ -323,25 +300,6 @@ var dyldExtractCmd = &cobra.Command{
 						})
 					}
 				}
-
-				// if addImports {
-				// 	log.Info("Adding Imported Dylib's symbols")
-				// 	for _, lib := range m.ImportedLibraries() {
-				// 		img, err := f.Image(lib)
-				// 		if err != nil {
-				// 			return err
-				// 		}
-				// 		img.ParseLocalSymbols(false)
-				// 		syms = append(syms, img.GetLocalSymbolsAsMachoSymbols()...)
-				// 		mm, err := img.GetMacho()
-				// 		if err != nil {
-				// 			return err
-				// 		}
-				// 		if mm.Symtab != nil {
-				// 			syms = append(syms, mm.Symtab.Syms...)
-				// 		}
-				// 	}
-				// }
 
 				if err := m.Export(fname, dcf, m.GetBaseAddress(), syms); err != nil {
 					var perr *fs.PathError

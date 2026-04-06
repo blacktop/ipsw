@@ -12,7 +12,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	semver "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,8 +34,13 @@ func init() {
 // SplitCmd represents the split command
 var SplitCmd = &cobra.Command{
 	Use:   "split <DSC>",
-	Short: "Extracts all the dylibs using Xcode's dsc_extractor",
-	Args:  cobra.ExactArgs(1),
+	Short: "Split DSC into dylibs using Xcode's dsc_extractor (macOS only)",
+	Long: `Split a dyld_shared_cache into individual dylibs using Apple's dsc_extractor.bundle.
+
+This is a fast bulk operation but the output is not enriched for reverse engineering.
+For RE use, prefer 'ipsw dyld extract' which adds local symbols, ObjC metadata,
+and stub island symbols, works cross-platform, and produces IDA/Ghidra-ready MachOs.`,
+	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
@@ -65,22 +69,9 @@ var SplitCmd = &cobra.Command{
 
 		dscPath := filepath.Clean(args[0])
 
-		fileInfo, err := os.Lstat(dscPath)
+		dscPath, err := filepath.EvalSymlinks(dscPath)
 		if err != nil {
-			return fmt.Errorf("file %s does not exist", dscPath)
-		}
-
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			symlinkPath, err := os.Readlink(dscPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
-			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(dscPath)
-			linkRoot := filepath.Dir(linkParent)
-
-			dscPath = filepath.Join(linkRoot, symlinkPath)
+			return fmt.Errorf("failed to resolve path %s: %w", dscPath, err)
 		}
 
 		if viper.GetBool("dyld.split.cache") {
@@ -95,7 +86,7 @@ var SplitCmd = &cobra.Command{
 
 			f, err := dyld.Open(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to open %s", dscPath)
+				return fmt.Errorf("failed to open %s: %w", dscPath, err)
 			}
 
 			var arm64e string
