@@ -25,10 +25,10 @@ var (
 )
 
 func (a *Asset) String() string {
-	var out string
-	out += colorTitle("Asset\n") + "=====\n" // title
-	out += colorField("Header") + ":\n"
-	out += fmt.Sprintf(
+	var out strings.Builder
+	out.WriteString(colorTitle("Asset\n") + "=====\n") // title
+	out.WriteString(colorField("Header") + ":\n")
+	out.WriteString(fmt.Sprintf(
 		colorSubField("  Version")+":             %s"+
 			colorSubField("  CoreUI Version")+":      %d\n"+
 			colorSubField("  Storage Version")+":     %d\n"+
@@ -49,9 +49,9 @@ func (a *Asset) String() string {
 		a.SchemaVersion,
 		a.ColorSpaceID,
 		a.KeySemantics,
-	)
-	out += colorField("Metadata") + ":\n"
-	out += fmt.Sprintf(
+	))
+	out.WriteString(colorField("Metadata") + ":\n")
+	out.WriteString(fmt.Sprintf(
 		"  Authoring Tool:      %s"+
 			"  Thinning Args:       %s\n"+
 			"  Deployment Platform: %s %s\n",
@@ -59,91 +59,91 @@ func (a *Asset) String() string {
 		strings.ReplaceAll(string(bytes.Trim(a.Metadata.ThinningArguments[:], "\x00")), "<", "\n    <"),
 		string(bytes.Trim(a.Metadata.DeploymentPlatform[:], "\x00")),
 		string(bytes.Trim(a.Metadata.DeploymentPlatformVersion[:], "\x00")),
-	)
+	))
 	if len(a.KeyFormat) > 0 {
-		out += colorField("KeyFormats") + ":\n"
+		out.WriteString(colorField("KeyFormats") + ":\n")
 		for _, k := range a.KeyFormat {
-			out += fmt.Sprintf("  - %s\n", k)
+			out.WriteString(fmt.Sprintf("  - %s\n", k))
 		}
 	}
 	if len(a.AppearanceDB) > 0 {
-		out += colorField("Appearances") + ":\n"
+		out.WriteString(colorField("Appearances") + ":\n")
 		for k, v := range a.AppearanceDB {
-			out += fmt.Sprintf("  %s: %d\n", colorSubField(k), v)
+			out.WriteString(fmt.Sprintf("  %s: %d\n", colorSubField(k), v))
 		}
 	}
 	if len(a.ColorDB) > 0 {
-		out += colorField("Colors") + ":\n"
+		out.WriteString(colorField("Colors") + ":\n")
 		for k, v := range a.ColorDB {
 			if a.conf.Verbose {
 				if tout, err := colorInTerminal(v); err == nil {
-					out += fmt.Sprintf("- %s:\n\n%s\n\n", k, tout)
+					out.WriteString(fmt.Sprintf("- %s:\n\n%s\n\n", k, tout))
 				}
 			} else {
-				out += fmt.Sprintf("  %s: %#v\n", colorSubField(k), v)
+				out.WriteString(fmt.Sprintf("  %s: %#v\n", colorSubField(k), v))
 
 			}
 		}
 	}
 	if len(a.Localizations) > 0 {
-		out += colorField("Localizations") + ":\n"
+		out.WriteString(colorField("Localizations") + ":\n")
 		for k, v := range a.Localizations {
-			out += fmt.Sprintf("  %s: %d\n", colorSubField(k), v)
+			out.WriteString(fmt.Sprintf("  %s: %d\n", colorSubField(k), v))
 		}
 	}
 	if len(a.ImageDB) > 0 {
-		out += fmt.Sprintf(colorTitle("Assets")+": (%d)\n", len(a.ImageDB))
+		out.WriteString(fmt.Sprintf(colorTitle("Assets")+": (%d)\n", len(a.ImageDB)))
 		for _, ass := range a.ImageDB {
-			out += " ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n"
-			var asset string
+			out.WriteString(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n")
+			var asset strings.Builder
 			switch t := ass.Asset.(type) {
 			case csiColor:
-				asset += fmt.Sprintf(colorField("Colorspace")+": %s\n", t.Info.ColorSpaceID())
+				asset.WriteString(fmt.Sprintf(colorField("Colorspace")+": %s\n", t.Info.ColorSpaceID()))
 				if len(t.Components) > 0 {
-					asset += "  " + colorSubField("Components") + ":\n"
+					asset.WriteString("  " + colorSubField("Components") + ":\n")
 					for _, c := range t.Components {
-						asset += fmt.Sprintf("    - %v\n", c)
+						asset.WriteString(fmt.Sprintf("    - %v\n", c))
 					}
 					if a.conf.Verbose {
 						if tout, err := t.ToTerminal(); err == nil {
-							asset += fmt.Sprintf(colorField("Color Preview")+":\n%s\n", tout)
+							asset.WriteString(fmt.Sprintf(colorField("Color Preview")+":\n%s\n", tout))
 						}
 					}
 				}
 			case *BGRA:
-				asset += fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y)
+				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
 				if a.conf.Verbose {
 					if tout, err := termimg.New(t).Render(); err == nil {
-						asset += fmt.Sprintf("Image Preview:\n%s\n", tout)
+						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
 					}
 				}
 			case *GA8:
-				asset += fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y)
+				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
 				if a.conf.Verbose {
 					if tout, err := termimg.New(t).Render(); err == nil {
-						asset += fmt.Sprintf("Image Preview:\n%s\n", tout)
+						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
 					}
 				}
 			case *image.RGBA:
-				asset += fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y)
+				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
 				if a.conf.Verbose {
 					if tout, err := termimg.New(t).Render(); err == nil {
-						asset += fmt.Sprintf("Image Preview:\n%s\n", tout)
+						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
 					}
 				}
 			case csiNamedGradient:
-				asset += colorField("Gradient") + ":\n"
+				asset.WriteString(colorField("Gradient") + ":\n")
 				for i := range t.ColorCount {
-					asset += fmt.Sprintf("  - %s (%.3f, %.3f)\n", bytes.Trim(t.Stops[i].Name, "\x00"), float32(t.StartStops[i].Start), float32(t.StartStops[i].Stop))
+					asset.WriteString(fmt.Sprintf("  - %s (%.3f, %.3f)\n", bytes.Trim(t.Stops[i].Name, "\x00"), float32(t.StartStops[i].Start), float32(t.StartStops[i].Stop)))
 				}
 			case csiMultisizeImageSet:
-				asset += colorField("MultiSized") + ":\n"
+				asset.WriteString(colorField("MultiSized") + ":\n")
 				for _, size := range t.ImageSizes {
-					asset += fmt.Sprintf("  - index %d: %dx%d\n", size.Index, size.Width, size.Height)
+					asset.WriteString(fmt.Sprintf("  - index %d: %dx%d\n", size.Index, size.Width, size.Height))
 				}
 			case []byte:
 				// Raw data (PDF, JPEG, HEIF, etc.)
-				asset += fmt.Sprintf(colorField("Data Size")+": %s (%d bytes)\n", humanize.Bytes(uint64(len(t))), len(t))
+				asset.WriteString(fmt.Sprintf(colorField("Data Size")+": %s (%d bytes)\n", humanize.Bytes(uint64(len(t))), len(t)))
 			default:
 				log.Debugf("%s has unknown asset type: %T", ass.RenditionName, t)
 			}
@@ -237,7 +237,7 @@ func (a *Asset) String() string {
 			} else if len(ass.RenditionName) > 0 {
 				nameStr = colorField("Rendition") + fmt.Sprintf(": %s\n", ass.RenditionName)
 			}
-			out += fmt.Sprintf(
+			out.WriteString(fmt.Sprintf(
 				"%s"+
 					colorField("Type")+": %s\n"+
 					colorField("Size")+": %s (%d)\n"+
@@ -246,14 +246,14 @@ func (a *Asset) String() string {
 				nameStr,
 				ass.Type,
 				humanize.Bytes(uint64(ass.Size)), ass.Size,
-				asset,
+				asset.String(),
 				attrs,
 				rscs,
-			)
-			out += " ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n"
+			))
+			out.WriteString(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n")
 		}
 	}
-	return out
+	return out.String()
 }
 
 // KeyFormatName converts renditionAttributeType to its Apple name

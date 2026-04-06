@@ -429,10 +429,7 @@ func decodeImage(r io.Reader, ci csiHeader, conf *Config, rowBytesOverride int) 
 				if rdm.Len() > 0 {
 					frag := make([]byte, rdm.Len())
 					if _, err := io.ReadFull(rdm, frag); err == nil {
-						toCopy := len(frag)
-						if toCopy > need {
-							toCopy = need
-						}
+						toCopy := min(len(frag), need)
 						copy(compressed[0:toCopy], frag[:toCopy])
 						readSoFar += toCopy
 					}
@@ -454,10 +451,7 @@ func decodeImage(r io.Reader, ci csiHeader, conf *Config, rowBytesOverride int) 
 						break
 					}
 					remain := int(dm2.CompressedBlock) - readSoFar
-					toCopy := remain
-					if len(buf) < toCopy {
-						toCopy = len(buf)
-					}
+					toCopy := min(len(buf), remain)
 					copy(compressed[readSoFar:readSoFar+toCopy], buf[:toCopy])
 					readSoFar += toCopy
 					extraChunks++
@@ -727,10 +721,7 @@ func decodeImage(r io.Reader, ci csiHeader, conf *Config, rowBytesOverride int) 
 				if dmr.Len() > 0 {
 					frag := make([]byte, dmr.Len())
 					if _, err := io.ReadFull(dmr, frag); err == nil {
-						toCopy := len(frag)
-						if toCopy > need {
-							toCopy = need
-						}
+						toCopy := min(len(frag), need)
 						copy(compressed[0:], frag[:toCopy])
 						readSoFar += toCopy
 					}
@@ -889,7 +880,7 @@ func decodeImage(r io.Reader, ci csiHeader, conf *Config, rowBytesOverride int) 
 				in := out.Bytes()
 				px := rect.Dx() * rect.Dy()
 				dst := make([]byte, px*4)
-				for i := 0; i < px; i++ {
+				for i := range px {
 					j := i * 8
 					// take high byte of each 16-bit LE component
 					r := in[j+1]
@@ -1066,7 +1057,7 @@ func decodeAppIconARGB(data []byte, width, height int) (image.Image, error) {
 	blueChannel := data[pixelCount*3 : pixelCount*4]
 
 	// Reconstruct interleaved RGBA pixels
-	for i := 0; i < pixelCount; i++ {
+	for i := range pixelCount {
 		pixelIndex := i * 4
 		img.Pix[pixelIndex+0] = redChannel[i]   // R
 		img.Pix[pixelIndex+1] = greenChannel[i] // G
