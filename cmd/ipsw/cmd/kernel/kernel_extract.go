@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
@@ -36,17 +37,43 @@ import (
 	"github.com/spf13/viper"
 )
 
+// resolveImports resolves a KEXT's undefined symbols against the parent
+// kernelcache's symbol table, returning them as defined symbols suitable
+// for injection into the KEXT's own symbol table during export.
+func resolveImports(kext *macho.File, kcSymMap map[string]macho.Symbol) []macho.Symbol {
+	if kext.Symtab == nil || kcSymMap == nil {
+		return nil
+	}
+	var resolved []macho.Symbol
+	for _, sym := range kext.Symtab.Syms {
+		if sym.Type.IsUndefinedSym() && sym.Name != "" {
+			if kcSym, ok := kcSymMap[sym.Name]; ok {
+				resolved = append(resolved, macho.Symbol{
+					Name:  sym.Name,
+					Type:  types.N_ABS | types.N_EXT,
+					Sect:  0,
+					Desc:  sym.Desc,
+					Value: kcSym.Value,
+				})
+			}
+		}
+	}
+	return resolved
+}
+
 func init() {
 	KernelcacheCmd.AddCommand(kerExtractCmd)
 
 	kerExtractCmd.Flags().BoolP("all", "a", false, "Extract all KEXTs")
 	kerExtractCmd.Flags().Bool("force", false, "Overwrite existing extracted KEXT(s)")
+	kerExtractCmd.Flags().Bool("imports", false, "Resolve imported symbol names from kernelcache")
 	kerExtractCmd.Flags().StringP("output", "o", "", "Directory to extract KEXTs to")
 	kerExtractCmd.MarkFlagDirname("output")
 	kerExtractCmd.Flags().StringP("arch", "e", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("kernel.extract.all", kerExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("kernel.extract.force", kerExtractCmd.Flags().Lookup("force"))
+	viper.BindPFlag("kernel.extract.imports", kerExtractCmd.Flags().Lookup("imports"))
 	viper.BindPFlag("kernel.extract.output", kerExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("kernel.extract.arch", kerExtractCmd.Flags().Lookup("arch"))
 }
@@ -62,6 +89,7 @@ var kerExtractCmd = &cobra.Command{
 
 		dumpAll := viper.GetBool("kernel.extract.all")
 		forceExtract := viper.GetBool("kernel.extract.force")
+		addImports := viper.GetBool("kernel.extract.imports")
 		extractPath := viper.GetString("kernel.extract.output")
 		selectedArch := viper.GetString("kernel.extract.arch")
 
@@ -100,6 +128,28 @@ var kerExtractCmd = &cobra.Command{
 
 		baseAddress := m.File.GetBaseAddress()
 
+		// build a name→symbol map of all defined symbols across all fileset
+		// entries for resolving imported symbols in extracted KEXTs
+		var kcSymMap map[string]macho.Symbol
+		if addImports {
+			kcSymMap = make(map[string]macho.Symbol)
+			log.Info("Building kernelcache symbol map...")
+			for _, fse := range m.File.FileSets() {
+				mfse, err := m.File.GetFileSetFileByName(fse.EntryID)
+				if err != nil {
+					continue
+				}
+				if mfse.Symtab != nil {
+					for _, sym := range mfse.Symtab.Syms {
+						if sym.Type.IsExternalSym() && !sym.Type.IsUndefinedSym() && sym.Value != 0 {
+							kcSymMap[sym.Name] = sym
+						}
+					}
+				}
+			}
+			log.Infof("Built kernelcache symbol map (%d defined symbols)", len(kcSymMap))
+		}
+
 		if dumpAll {
 			log.Info("Extracting all KEXTs...")
 			for _, fse := range m.File.FileSets() {
@@ -114,7 +164,8 @@ var kerExtractCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to parse KEXT %s: %v", fse.EntryID, err)
 				}
-				if err := mfse.Export(fname, dcf, baseAddress, nil); err != nil {
+				syms := resolveImports(mfse, kcSymMap)
+				if err := mfse.Export(fname, dcf, baseAddress, syms); err != nil {
 					return fmt.Errorf("failed to export KEXT %s: %v", fse.EntryID, err)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
@@ -131,7 +182,8 @@ var kerExtractCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse KEXT %s: %v", args[1], err)
 			}
-			if err := mfse.Export(fname, dcf, baseAddress, nil); err != nil {
+			syms := resolveImports(mfse, kcSymMap)
+			if err := mfse.Export(fname, dcf, baseAddress, syms); err != nil {
 				return fmt.Errorf("failed to export KEXT %s: %v", args[1], err)
 			}
 			log.Infof("Created %s", fname)
