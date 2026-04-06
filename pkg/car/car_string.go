@@ -43,10 +43,11 @@ const _renditionAttributeType_name = "ThemeLookElementPartSizeDirectionPlacehold
 var _renditionAttributeType_index = [...]uint16{0, 9, 16, 20, 24, 33, 44, 49, 64, 74, 84, 89, 94, 99, 111, 128, 133, 140, 150, 163, 176, 195, 212, 228, 251, 263, 279, 290, 299}
 
 func (i renditionAttributeType) String() string {
-	if i >= renditionAttributeType(len(_renditionAttributeType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_renditionAttributeType_index)-1 {
 		return "renditionAttributeType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _renditionAttributeType_name[_renditionAttributeType_index[i]:_renditionAttributeType_index[i+1]]
+	return _renditionAttributeType_name[_renditionAttributeType_index[idx]:_renditionAttributeType_index[idx+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -147,11 +148,11 @@ const _resourceID_name = "SliceIDSampleIDMetricsIDCompositingOptionsIDMetaDataID
 var _resourceID_index = [...]uint16{0, 7, 15, 24, 44, 54, 79, 94, 108, 134, 148, 163, 179, 192, 215, 229, 248, 264}
 
 func (i resourceID) String() string {
-	i -= 1001
-	if i >= resourceID(len(_resourceID_index)-1) {
-		return "resourceID(" + strconv.FormatInt(int64(i+1001), 10) + ")"
+	idx := int(i) - 1001
+	if i < 1001 || idx >= len(_resourceID_index)-1 {
+		return "resourceID(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _resourceID_name[_resourceID_index[i]:_resourceID_index[i+1]]
+	return _resourceID_name[_resourceID_index[idx]:_resourceID_index[idx+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -177,8 +178,9 @@ const _compressionType_name = "UncompressedRLEZIPLZVNLZFSEJPEGLZFSEBlurredImageA
 var _compressionType_index = [...]uint8{0, 12, 15, 18, 22, 27, 36, 48, 57, 69, 73, 85, 93, 97}
 
 func (i compressionType) String() string {
-	if i >= compressionType(len(_compressionType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_compressionType_index)-1 {
 		return "compressionType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _compressionType_name[_compressionType_index[i]:_compressionType_index[i+1]]
+	return _compressionType_name[_compressionType_index[idx]:_compressionType_index[idx+1]]
 }

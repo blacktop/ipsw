@@ -1073,7 +1073,7 @@ func decodeRLE(src []byte) []byte {
 			b := src[i]
 			i++
 			count := 1 - n
-			for j := 0; j < count; j++ {
+			for range count {
 				dst = append(dst, b)
 			}
 		}
