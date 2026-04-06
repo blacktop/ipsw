@@ -861,24 +861,25 @@ func (s *Swift) setAutoDemangle(enabled bool) func() {
 
 /* UTILS */
 
+var filenameSanitizer = strings.NewReplacer(
+	".", "_",
+	"<", "_",
+	">", "_",
+	" ", "_",
+	",", "_",
+	"(", "_",
+	")", "_",
+	"/", "_",
+	":", "_",
+)
+
 // safeSwiftFileName sanitizes a Swift type/protocol name for use as a
 // filename and truncates to fit within the 255-byte filesystem limit.
 // When truncation is required a short FNV-1a hash of the original name
 // is embedded so that two long names sharing the same prefix produce
 // distinct filenames.
 func safeSwiftFileName(name, suffix string) string {
-	r := strings.NewReplacer(
-		".", "_",
-		"<", "_",
-		">", "_",
-		" ", "_",
-		",", "_",
-		"(", "_",
-		")", "_",
-		"/", "_",
-		":", "_",
-	)
-	safe := r.Replace(name)
+	safe := filenameSanitizer.Replace(name)
 	full := safe + suffix
 	// APFS/HFS+ filename limit is 255 bytes
 	if len(full) > 255 {
