@@ -111,13 +111,10 @@ func IsImg4(filePath string) (bool, error) {
 
 	var hdr Asn1Header
 	if _, err := asn1.Unmarshal(data, &hdr); err != nil {
-		return false, fmt.Errorf("failed to ASN.1 parse header: %v", err)
+		return false, nil // not ASN.1 → not IMG4
 	}
 
-	if hdr.Name == "IMG4" {
-		return true, nil
-	}
-	return false, nil
+	return hdr.Name == "IMG4", nil
 }
 
 func IsIm4p(filePath string) (bool, error) {
@@ -132,13 +129,10 @@ func IsIm4p(filePath string) (bool, error) {
 
 	var hdr Asn1Header
 	if _, err := asn1.Unmarshal(data, &hdr); err != nil {
-		return false, fmt.Errorf("failed to ASN.1 parse header: %v", err)
+		return false, nil // not ASN.1 → not IM4P
 	}
 
-	if hdr.Name == "IM4P" {
-		return true, nil
-	}
-	return false, nil
+	return hdr.Name == "IM4P", nil
 }
 
 func IsImg3(filePath string) (bool, error) {
