@@ -64,6 +64,7 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
   -d, --demangle            Demangle symbol names
       --dsc-slide string    Apply custom slide to dyld_shared_cache frames for live debugging (hex, e.g. 0x1a000000)
   -x, --extra string        Path to folder with extra files for symbolication
+      --force               Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)
   -h, --help                help for symbolicate
       --hex                 Display function offsets in hexadecimal
       --ida                 Generate IDAPython script to mark panic frames in IDA Pro

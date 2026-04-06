@@ -37,12 +37,12 @@ ipsw diff <IPSW|DIR> <IPSW|DIR> [flags]
       --files                Diff files
       --fw                   Diff other firmwares
   -h, --help                 help for diff
-      --html                 Save diff as HTML file
-      --json                 Save diff as JSON file
+      --html                 Output diff as HTML
+      --json                 Output diff as JSON
   -k, --kdk stringArray      Path to KDKs to diff
       --launchd              Diff launchd configs
       --low-memory           Use disk caching to reduce RAM usage
-  -m, --markdown             Save diff as Markdown file
+  -m, --markdown             Output diff as Markdown
   -o, --output string        Folder to save diff output
   -s, --signatures string    Path to symbolicator signatures folder
       --starts               Diff MachO function starts
