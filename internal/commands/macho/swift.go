@@ -4,6 +4,7 @@ package macho
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -680,19 +681,14 @@ func (s *Swift) WriteHeaders() error {
 					}
 				}
 
-				// Create a safe filename from the type name
-				safeName := strings.ReplaceAll(typ.Name, ".", "_")
-				safeName = strings.ReplaceAll(safeName, "<", "_")
-				safeName = strings.ReplaceAll(safeName, ">", "_")
-				safeName = strings.ReplaceAll(safeName, " ", "_")
-
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+".swift")
+				safeName := safeSwiftFileName(typ.Name, ".swift")
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
-					Name:          safeName,
+					Name:          strings.TrimSuffix(safeName, ".swift"),
 					Object:        sout,
 				}); err != nil {
 					return err
@@ -719,19 +715,14 @@ func (s *Swift) WriteHeaders() error {
 					}
 				}
 
-				// Create a safe filename from the protocol name
-				safeName := strings.ReplaceAll(proto.Name, ".", "_")
-				safeName = strings.ReplaceAll(safeName, "<", "_")
-				safeName = strings.ReplaceAll(safeName, ">", "_")
-				safeName = strings.ReplaceAll(safeName, " ", "_")
-
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Protocol.swift")
+				safeName := safeSwiftFileName(proto.Name, "-Protocol.swift")
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
-					Name:          safeName + "_Protocol",
+					Name:          strings.TrimSuffix(safeName, ".swift"),
 					Object:        sout,
 				}); err != nil {
 					return err
@@ -758,19 +749,14 @@ func (s *Swift) WriteHeaders() error {
 					}
 				}
 
-				// Create a safe filename from the extension info
-				safeName := strings.ReplaceAll(ext.Protocol, ".", "_")
-				safeName = strings.ReplaceAll(safeName, "<", "_")
-				safeName = strings.ReplaceAll(safeName, ">", "_")
-				safeName = strings.ReplaceAll(safeName, " ", "_")
-
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-Extension.swift")
+				safeName := safeSwiftFileName(ext.Protocol, "-Extension.swift")
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
-					Name:          safeName + "_Extension",
+					Name:          strings.TrimSuffix(safeName, ".swift"),
 					Object:        sout,
 				}); err != nil {
 					return err
@@ -797,19 +783,14 @@ func (s *Swift) WriteHeaders() error {
 					}
 				}
 
-				// Create a safe filename from the associated type info
-				safeName := strings.ReplaceAll(at.ConformingTypeName, ".", "_")
-				safeName = strings.ReplaceAll(safeName, "<", "_")
-				safeName = strings.ReplaceAll(safeName, ">", "_")
-				safeName = strings.ReplaceAll(safeName, " ", "_")
-
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName+"-AssociatedType.swift")
+				safeName := safeSwiftFileName(at.ConformingTypeName, "-AssociatedType.swift")
+				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
-					Name:          safeName + "_AssociatedType",
+					Name:          strings.TrimSuffix(safeName, ".swift"),
 					Object:        sout,
 				}); err != nil {
 					return err
@@ -879,6 +860,38 @@ func (s *Swift) setAutoDemangle(enabled bool) func() {
 }
 
 /* UTILS */
+
+// safeSwiftFileName sanitizes a Swift type/protocol name for use as a
+// filename and truncates to fit within the 255-byte filesystem limit.
+// When truncation is required a short FNV-1a hash of the original name
+// is embedded so that two long names sharing the same prefix produce
+// distinct filenames.
+func safeSwiftFileName(name, suffix string) string {
+	r := strings.NewReplacer(
+		".", "_",
+		"<", "_",
+		">", "_",
+		" ", "_",
+		",", "_",
+		"(", "_",
+		")", "_",
+		"/", "_",
+		":", "_",
+	)
+	safe := r.Replace(name)
+	full := safe + suffix
+	// APFS/HFS+ filename limit is 255 bytes
+	if len(full) > 255 {
+		// Append an 8-char FNV-1a hash of the original (pre-sanitised) name so
+		// that two long names with the same sanitised prefix remain distinct.
+		h := fnv.New32a()
+		h.Write([]byte(name))
+		hashSuffix := fmt.Sprintf("_%08x", h.Sum32()) + suffix
+		maxName := max(255-len(hashSuffix), 1)
+		full = safe[:maxName] + hashSuffix
+	}
+	return full
+}
 
 func writeSwiftHeader(hdr *headerInfo) error {
 	out := fmt.Sprintf(
