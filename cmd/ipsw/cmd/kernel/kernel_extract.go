@@ -23,6 +23,7 @@ package kernel
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
@@ -39,10 +40,13 @@ func init() {
 	KernelcacheCmd.AddCommand(kerExtractCmd)
 
 	kerExtractCmd.Flags().BoolP("all", "a", false, "Extract all KEXTs")
-	kerExtractCmd.Flags().String("output", "", "Directory to extract KEXTs to")
+	kerExtractCmd.Flags().Bool("force", false, "Overwrite existing extracted KEXT(s)")
+	kerExtractCmd.Flags().StringP("output", "o", "", "Directory to extract KEXTs to")
+	kerExtractCmd.MarkFlagDirname("output")
 	kerExtractCmd.Flags().StringP("arch", "e", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("kernel.extract.all", kerExtractCmd.Flags().Lookup("all"))
+	viper.BindPFlag("kernel.extract.force", kerExtractCmd.Flags().Lookup("force"))
 	viper.BindPFlag("kernel.extract.output", kerExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("kernel.extract.arch", kerExtractCmd.Flags().Lookup("arch"))
 }
@@ -57,6 +61,7 @@ var kerExtractCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		dumpAll := viper.GetBool("kernel.extract.all")
+		forceExtract := viper.GetBool("kernel.extract.force")
 		extractPath := viper.GetString("kernel.extract.output")
 		selectedArch := viper.GetString("kernel.extract.arch")
 
@@ -82,7 +87,7 @@ var kerExtractCmd = &cobra.Command{
 		defer m.Close()
 
 		if m.File.FileTOC.FileHeader.Type != types.MH_FILESET {
-			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT-xtraction not supported yet)")
+			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT extraction not supported yet)")
 		}
 
 		var dcf *fixupchains.DyldChainedFixups
@@ -98,25 +103,38 @@ var kerExtractCmd = &cobra.Command{
 		if dumpAll {
 			log.Info("Extracting all KEXTs...")
 			for _, fse := range m.File.FileSets() {
+				fname := filepath.Join(folder, fse.EntryID)
+				if _, err := os.Stat(fname); err == nil && !forceExtract {
+					utils.Indent(log.Warn, 2)(fmt.Sprintf("KEXT already exists: %s (use --force to overwrite)", fname))
+					continue
+				} else if err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("failed to stat %s: %w", fname, err)
+				}
 				mfse, err := m.File.GetFileSetFileByName(fse.EntryID)
 				if err != nil {
 					return fmt.Errorf("failed to parse KEXT %s: %v", fse.EntryID, err)
 				}
-				if err := mfse.Export(filepath.Join(folder, fse.EntryID), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
-					return fmt.Errorf("failed to export KEXT %s; %v", fse.EntryID, err)
+				if err := mfse.Export(fname, dcf, baseAddress, nil); err != nil {
+					return fmt.Errorf("failed to export KEXT %s: %v", fse.EntryID, err)
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", filepath.Join(folder, fse.EntryID)))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
 			}
 		} else {
+			fname := filepath.Join(folder, args[1])
+			if _, err := os.Stat(fname); err == nil && !forceExtract {
+				log.Warnf("KEXT already exists: %s (use --force to overwrite)", fname)
+				return nil
+			} else if err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to stat %s: %w", fname, err)
+			}
 			mfse, err := m.File.GetFileSetFileByName(args[1])
 			if err != nil {
 				return fmt.Errorf("failed to parse KEXT %s: %v", args[1], err)
 			}
-
-			if err := mfse.Export(filepath.Join(folder, args[1]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
-				return fmt.Errorf("failed to export KEXT %s; %v", args[1], err)
+			if err := mfse.Export(fname, dcf, baseAddress, nil); err != nil {
+				return fmt.Errorf("failed to export KEXT %s: %v", args[1], err)
 			}
-			log.Infof("Created %s", filepath.Join(folder, args[1]))
+			log.Infof("Created %s", fname)
 		}
 
 		return nil
