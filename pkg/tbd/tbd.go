@@ -11,17 +11,76 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 )
 
-var macOs32bitTargets = []string{"i386-macos"}
-var macOs64bitIntelTargets = []string{"x86_64-macos", "x86_64h-macos"}
-var macOs64bitArmTargets = []string{"arm64-macos", "arm64e-macos"}
-var macCatalyst32bitTargets = []string{"i386-maccatalyst"}
-var macCatalyst64bitIntelTargets = []string{"x86_64-maccatalyst", "x86_64h-maccatalyst"}
-var macCatalyst64bitArmTargets = []string{"arm64-maccatalyst", "arm64e-maccatalyst"}
-var iOS32bitTargets = []string{"armv7-ios", "armv7s-ios", "i386-ios-simulator"}
-var iOS64bitTargets = []string{"arm64-ios", "arm64e-ios", "x86_64-ios-simulator", "arm64-ios-simulator"}
+// tbdArch returns the TBD architecture string for a given CPU
+// type and subtype (e.g. "arm64e", "x86_64h").
+func tbdArch(cpu types.CPU, sub types.CPUSubtype) string {
+	sub = sub & types.CpuSubtypeMask
+	switch cpu {
+	case types.CPUI386:
+		return "i386"
+	case types.CPUAmd64:
+		if sub == types.CPUSubtypeX86_64H {
+			return "x86_64h"
+		}
+		return "x86_64"
+	case types.CPUArm:
+		switch sub {
+		case types.CPUSubtypeArmV7K:
+			return "armv7k"
+		case types.CPUSubtypeArmV7S:
+			return "armv7s"
+		default:
+			return "armv7"
+		}
+	case types.CPUArm64:
+		if sub == types.CPUSubtypeArm64E {
+			return "arm64e"
+		}
+		return "arm64"
+	case types.CPUArm6432:
+		return "arm64_32"
+	}
+	return "unknown"
+}
+
+// tbdPlatform returns the TBD platform string for a given
+// LC_BUILD_VERSION platform (e.g. "ios", "bridgeos").
+// Returns ("", error) for platforms without a known TBD target triple.
+func tbdPlatform(p types.Platform) (string, error) {
+	switch p {
+	case types.Platform_macOS:
+		return "macos", nil
+	case types.Platform_iOS:
+		return "ios", nil
+	case types.Platform_tvOS:
+		return "tvos", nil
+	case types.Platform_watchOS:
+		return "watchos", nil
+	case types.Platform_bridgeOS:
+		return "bridgeos", nil
+	case types.Platform_macCatalyst:
+		return "maccatalyst", nil
+	case types.Platform_iOsSimulator:
+		return "ios-simulator", nil
+	case types.Platform_tvOsSimulator:
+		return "tvos-simulator", nil
+	case types.Platform_watchOsSimulator:
+		return "watchos-simulator", nil
+	case types.Platform_Driverkit:
+		return "driverkit", nil
+	case types.Platform_visionOS:
+		return "xros", nil
+	case types.Platform_visionOsSimulator:
+		return "xros-simulator", nil
+	case types.Platform_Firmware:
+		return "firmware", nil
+	case types.Platform_sepOS:
+		return "sepos", nil
+	}
+	return "", fmt.Errorf("unsupported TBD platform: %s", p)
+}
 
 // TBD object
 type TBD struct {
@@ -50,56 +109,52 @@ func NewTBD(image *dyld.CacheImage, reexports []string, generic bool) (*TBD, err
 	}
 	defer m.Close()
 
+	arch := tbdArch(m.CPU, m.SubCPU)
+
 	if generic {
-		targets = append(targets, macOs32bitTargets...)
-		targets = append(targets, macCatalyst32bitTargets...)
-		targets = append(targets, macOs64bitIntelTargets...)
-		targets = append(targets, macCatalyst64bitIntelTargets...)
-		targets = append(targets, macOs64bitArmTargets...)
-		targets = append(targets, macCatalyst64bitArmTargets...)
-		targets = append(targets, iOS32bitTargets...)
-		targets = append(targets, iOS64bitTargets...)
+		// Generic TBD: list all arch+platform combinations that could
+		// link against this dylib.
+		for _, a := range []string{"i386", "x86_64", "x86_64h", "arm64", "arm64e"} {
+			for _, p := range []string{"macos", "maccatalyst"} {
+				targets = append(targets, a+"-"+p)
+			}
+		}
+		for _, a := range []string{"armv7", "armv7s", "arm64", "arm64e"} {
+			targets = append(targets, a+"-ios")
+		}
+		for _, a := range []string{"i386", "x86_64", "arm64"} {
+			targets = append(targets, a+"-ios-simulator")
+		}
 	} else {
-		if bvs := m.BuildVersions(); len(bvs) > 0 {
+		bvs := m.BuildVersions()
+		if len(bvs) > 0 {
 			for _, bv := range bvs {
-				switch bv.Platform {
-				case types.Platform_macOS:
-					if m.FileHeader.Magic == types.Magic64 {
-						if m.CPU == types.CPUAmd64 {
-							targets = append(targets, macOs64bitIntelTargets...)
-						} else {
-							targets = append(targets, macOs64bitArmTargets...)
-						}
-					} else {
-						targets = append(targets, macOs32bitTargets...)
-					}
-				case types.Platform_iOS:
-					if m.FileHeader.Magic == types.Magic64 {
-						targets = append(targets, iOS64bitTargets...)
-					} else {
-						targets = append(targets, iOS32bitTargets...)
-					}
-				case types.Platform_macCatalyst:
-					if m.FileHeader.Magic == types.Magic64 {
-						if m.CPU == types.CPUAmd64 {
-							targets = append(targets, macCatalyst64bitIntelTargets...)
-						} else {
-							targets = append(targets, macCatalyst64bitArmTargets...)
-						}
-					} else {
-						targets = append(targets, macCatalyst32bitTargets...)
-					}
+				plat, err := tbdPlatform(bv.Platform)
+				if err != nil {
+					return nil, fmt.Errorf("TBD generation for %s: %w", image.Name, err)
 				}
+				targets = append(targets, arch+"-"+plat)
 			}
 		} else {
-			targets = append(targets, macOs32bitTargets...)
-			targets = append(targets, macCatalyst32bitTargets...)
-			targets = append(targets, macOs64bitIntelTargets...)
-			targets = append(targets, macCatalyst64bitIntelTargets...)
-			targets = append(targets, macOs64bitArmTargets...)
-			targets = append(targets, macCatalyst64bitArmTargets...)
-			targets = append(targets, iOS32bitTargets...)
-			targets = append(targets, iOS64bitTargets...)
+			// No LC_BUILD_VERSION — derive platform from LC_VERSION_MIN_* load commands
+			for _, l := range m.Loads {
+				switch l.(type) {
+				case *macho.VersionMinMacOSX:
+					targets = append(targets, arch+"-macos")
+				case *macho.VersionMiniPhoneOS:
+					targets = append(targets, arch+"-ios")
+				case *macho.VersionMinTvOS:
+					targets = append(targets, arch+"-tvos")
+				case *macho.VersionMinWatchOS:
+					targets = append(targets, arch+"-watchos")
+				}
+			}
+			if len(targets) == 0 {
+				targets = append(targets, arch+"-macos")
+			}
+		}
+		if len(targets) == 0 {
+			return nil, fmt.Errorf("unable to determine TBD targets for %s (cpu=%s, build versions=%v)", image.Name, m.CPU, bvs)
 		}
 	}
 
@@ -115,8 +170,6 @@ func NewTBD(image *dyld.CacheImage, reexports []string, generic bool) (*TBD, err
 			break
 		}
 	}
-
-	// TODO: what other fields are there?
 
 	// get public symbols
 	for _, sym := range m.Symtab.Syms {
@@ -174,9 +227,8 @@ func (t *TBD) Generate() (string, error) {
 
 	tmpl := template.Must(template.New("tbd").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(tbdTemplate))
 
-	err := tmpl.Execute(&tplOut, t)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to execute template")
+	if err := tmpl.Execute(&tplOut, t); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return tplOut.String(), nil
