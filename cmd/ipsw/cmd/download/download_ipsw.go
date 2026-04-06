@@ -25,6 +25,7 @@ import (
 	"crypto/aes"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,6 +142,7 @@ var downloadIpswCmd = &cobra.Command{
 		var itunes *download.ITunesVersionMaster
 		var builds []download.Build
 		var filteredBuilds []download.Build
+		var urlDevices map[string][]string
 
 		// settings
 		proxy := viper.GetString("download.ipsw.proxy")
@@ -395,10 +397,15 @@ var downloadIpswCmd = &cobra.Command{
 				filteredIPSWs = furtherFilteredIPSWs
 			}
 
+			// Deduplicate by URL, but collect all device identifiers per URL
+			// (e.g., iBridge IPSWs bundle firmware for 16+ device variants
+			// behind a single URL).
+			urlDevices = make(map[string][]string, len(filteredIPSWs))
 			unique := make(map[string]bool, len(filteredIPSWs))
 			var uniqueIPSWs []download.IPSW
 			for _, i := range filteredIPSWs {
 				if len(i.URL) != 0 {
+					urlDevices[i.URL] = append(urlDevices[i.URL], i.Identifier)
 					if !unique[i.URL] {
 						uniqueIPSWs = append(uniqueIPSWs, i)
 						unique[i.URL] = true
@@ -515,54 +522,68 @@ var downloadIpswCmd = &cobra.Command{
 							}
 							if decrypt {
 								log.Info("Searching for keys to decrypt files")
-								if keys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
-									Keys:    true,
-									Device:  ipsw.Identifier,
-									Version: ipsw.Version,
-									Build:   ipsw.BuildID,
-								}, proxy, insecure); err == nil {
-									for _, key := range keys {
-										for idx, f := range key.Filename {
-											var in string
-											for _, o := range out {
-												if strings.HasSuffix(strings.ToLower(o), strings.ToLower(strings.ReplaceAll(f, " ", "_"))) {
-													in = o
-													break
-												}
+								// Fetch keys for ALL device identifiers that share this URL
+								// (e.g., iBridge IPSWs bundle firmware for 16+ T2 variants).
+								devices := urlDevices[ipsw.URL]
+								if len(devices) == 0 {
+									devices = []string{ipsw.Identifier}
+								}
+								allKeys := make(download.WikiFWKeys)
+								for _, dev := range devices {
+									keys, err := download.GetWikiFirmwareKeys(&download.WikiConfig{
+										Keys:    true,
+										Device:  dev,
+										Version: ipsw.Version,
+										Build:   ipsw.BuildID,
+									}, proxy, insecure)
+									if err != nil {
+										log.Debugf("no keys for %s %s: %v", dev, ipsw.BuildID, err)
+										continue
+									}
+									maps.Copy(allKeys, keys)
+								}
+								if len(allKeys) == 0 {
+									return fmt.Errorf("failed to get firmware keys for any device variant of %s %s", ipsw.BuildID, ipsw.Version)
+								}
+								for _, key := range allKeys {
+									for idx, f := range key.Filename {
+										var in string
+										for _, o := range out {
+											if strings.HasSuffix(strings.ToLower(o), strings.ToLower(strings.ReplaceAll(f, " ", "_"))) {
+												in = o
+												break
 											}
-											if len(in) == 0 {
-												continue // not found
+										}
+										if len(in) == 0 {
+											continue // not found
+										}
+										if len(key.Key) > 0 && len(key.Key[idx]) > 0 && key.Key[idx] != "Unknown" &&
+											len(key.Iv) > 0 && len(key.Iv[idx]) > 0 && key.Iv[idx] != "Unknown" {
+											iv, err := hex.DecodeString(key.Iv[idx])
+											if err != nil {
+												return fmt.Errorf("failed to decode iv: %v", err)
 											}
-											if len(key.Key) > 0 && len(key.Key[idx]) > 0 && key.Key[idx] != "Unknown" &&
-												len(key.Iv) > 0 && len(key.Iv[idx]) > 0 && key.Iv[idx] != "Unknown" {
-												iv, err := hex.DecodeString(key.Iv[idx])
-												if err != nil {
-													return fmt.Errorf("failed to decode iv: %v", err)
-												}
-												k, err := hex.DecodeString(key.Key[idx])
-												if err != nil {
-													return fmt.Errorf("failed to decode key: %v", err)
-												}
-												utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
-												if err := img4.DecryptPayload(in, in+".dec", iv, k); err != nil {
-													return fmt.Errorf("failed to decrypt %s: %v", in, err)
-												}
-											} else if len(key.Kbag) > 0 && len(key.Kbag[idx]) > 0 && key.Kbag[idx] != "Unknown" {
-												kbag, err := hex.DecodeString(key.Kbag[idx])
-												if err != nil {
-													return fmt.Errorf("failed to decode kbag: %v", err)
-												}
-												iv := kbag[:aes.BlockSize]
-												key := kbag[aes.BlockSize:]
-												utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
-												if err := img4.DecryptPayload(in, in+".dec", iv, key); err != nil {
-													return fmt.Errorf("failed to decrypt %s: %v", in, err)
-												}
+											k, err := hex.DecodeString(key.Key[idx])
+											if err != nil {
+												return fmt.Errorf("failed to decode key: %v", err)
+											}
+											utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
+											if err := img4.DecryptPayload(in, in+".dec", iv, k); err != nil {
+												return fmt.Errorf("failed to decrypt %s: %v", in, err)
+											}
+										} else if len(key.Kbag) > 0 && len(key.Kbag[idx]) > 0 && key.Kbag[idx] != "Unknown" {
+											kbag, err := hex.DecodeString(key.Kbag[idx])
+											if err != nil {
+												return fmt.Errorf("failed to decode kbag: %v", err)
+											}
+											iv := kbag[:aes.BlockSize]
+											key := kbag[aes.BlockSize:]
+											utils.Indent(log.Info, 2)("Decrypted " + strings.TrimPrefix(in, cwd) + ".dec")
+											if err := img4.DecryptPayload(in, in+".dec", iv, key); err != nil {
+												return fmt.Errorf("failed to decrypt %s: %v", in, err)
 											}
 										}
 									}
-								} else {
-									return fmt.Errorf("failed to get decrypt files: %v", err)
 								}
 							}
 						}
