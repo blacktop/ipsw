@@ -55,35 +55,31 @@ This only works when you have pull them directly out of the IPSW zip as a im4p f
 Extract KEXT(s) from kernelcache
 
 ```bash
-❯ ipsw kernel extract kernelcache.release.iPhone15,2 sandbox
-   • Created sandbox
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 com.apple.security.sandbox
+   • Created com.apple.security.sandbox
 ```
 
-Dump them all
+Extract to a specific directory
 
 ```bash
-❯ ipsw kernel extract kernelcache.release.iPhone15,2 --all --output /tmp/KEXTs
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 com.apple.security.sandbox -o /tmp/KEXTs
+   • Created /tmp/KEXTs/com.apple.security.sandbox
+```
+
+Extract all KEXTs
+
+```bash
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 --all -o /tmp/KEXTs
    • Extracting all KEXTs...
       • Created /tmp/KEXTs/com.apple.kernel
       • Created /tmp/KEXTs/com.apple.AGXFirmwareKextG15P_A0RTBuddy
       • Created /tmp/KEXTs/com.apple.AGXFirmwareKextRTBuddy64
       • Created /tmp/KEXTs/com.apple.AGXG15P_A0
-      • Created /tmp/KEXTs/com.apple.driver.AOPTouchKext
-      • Created /tmp/KEXTs/com.apple.driver.ASIOKit
-      • Created /tmp/KEXTs/com.apple.AUC
-      • Created /tmp/KEXTs/com.apple.driver.AppleA7IOP
-      • Created /tmp/KEXTs/com.apple.driver.AppleALSColorSensor
-      • Created /tmp/KEXTs/com.apple.driver.AppleAOPAudio
-      • Created /tmp/KEXTs/com.apple.driver.AppleAOPVoiceTrigger
-      • Created /tmp/KEXTs/com.apple.iokit.AppleARMIISAudio
-      • Created /tmp/KEXTs/com.apple.driver.AppleARMPMU
-      • Created /tmp/KEXTs/com.apple.driver.AppleARMPlatform
-      • Created /tmp/KEXTs/com.apple.driver.AppleARMWatchdogTimer
       <SNIP>
 ```
 
 :::info
-This only works on the modern `MH_FILESET` kernelcaches and is the same thing as `ipsw macho info KERNELCACHE --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry`
+This works on modern `MH_FILESET` kernelcaches. Extracted KEXTs are standalone MachO files with correct segment layout that load cleanly in IDA Pro and Ghidra. Use `--force` to overwrite existing files.
 :::
 
 ### **kernel kexts**
