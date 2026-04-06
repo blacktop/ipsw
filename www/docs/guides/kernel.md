@@ -78,8 +78,19 @@ Extract all KEXTs
       <SNIP>
 ```
 
+Extract with resolved import symbols for reverse engineering
+
+```bash
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 com.apple.security.sandbox --imports -o /tmp/KEXTs
+   • Building kernelcache symbol map...
+   • Built kernelcache symbol map (286053 defined symbols)
+   • Created /tmp/KEXTs/com.apple.security.sandbox
+```
+
 :::info
-This works on modern `MH_FILESET` kernelcaches. Extracted KEXTs are standalone MachO files with correct segment layout that load cleanly in IDA Pro and Ghidra. Use `--force` to overwrite existing files.
+This works on modern `MH_FILESET` kernelcaches. Extracted KEXTs are standalone MachO files with correct segment layout that load cleanly in IDA Pro and Ghidra.
+ - `--imports` resolves undefined symbols (kernel APIs, other KEXT exports) by scanning all fileset entries and adding the resolved names to the KEXT's symbol table
+ - `--force` overwrites existing files
 :::
 
 ### **kernel kexts**
