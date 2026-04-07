@@ -67,17 +67,18 @@ func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(patterns, "|")))
 }
 
-func rsrCryptexType(name string, systemCryptexRE *regexp.Regexp) string {
+// rsrCryptexType returns ("app", "") for app cryptexes, ("system", arch) for
+// system cryptexes (where arch is e.g. "arm64e" or "x86_64h"), or ("", "").
+func rsrCryptexType(name string, systemCryptexRE *regexp.Regexp) (string, string) {
 	base := filepath.Base(name)
 
-	switch {
-	case rsrAppCryptexRE.MatchString(base):
-		return "app"
-	case systemCryptexRE.MatchString(base):
-		return "system"
-	default:
-		return ""
+	if rsrAppCryptexRE.MatchString(base) {
+		return "app", ""
 	}
+	if m := systemCryptexRE.FindStringSubmatch(base); m != nil {
+		return "system", m[1]
+	}
+	return "", ""
 }
 
 func rsrInputDMG(inFolder, subdir string) (string, error) {
@@ -230,7 +231,8 @@ var otaPatchRsrCmd = &cobra.Command{
 				continue
 			}
 
-			switch rsrCryptexType(file.Name(), systemCryptexRE) {
+			ctype, arch := rsrCryptexType(file.Name(), systemCryptexRE)
+			switch ctype {
 			case "app":
 				appDMG, err := i.GetAppOsDmg()
 				if err != nil {
@@ -257,17 +259,23 @@ var otaPatchRsrCmd = &cobra.Command{
 					return fmt.Errorf("failed to get system DMG: %v", err)
 				}
 
-				out := filepath.Join(outFolder, "SystemOS", systemDMG)
+				// Use arch-specific subdirectory so that arm64e and x86_64h
+				// cryptexes don't overwrite each other.
+				subdir := "SystemOS"
+				if arch != "" {
+					subdir = filepath.Join("SystemOS", arch)
+				}
+				out := filepath.Join(outFolder, subdir, systemDMG)
 
 				var inDMG string
 				if len(inFolder) > 0 {
-					inDMG, err = rsrInputDMG(inFolder, "SystemOS")
+					inDMG, err = rsrInputDMG(inFolder, subdir)
 					if err != nil {
 						return err
 					}
 				}
 
-				log.Infof("Patching %s to %s", filepath.Base(file.Name()), out)
+				log.Infof("Patching %s (%s) to %s", filepath.Base(file.Name()), arch, out)
 				if err := patchRSRCryptex(o, file.Name(), out, inDMG, patchVerbose); err != nil {
 					return err
 				}
