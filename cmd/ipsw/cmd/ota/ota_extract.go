@@ -43,6 +43,28 @@ import (
 
 var validCryptexes = []string{"app", "system"}
 
+func validateOTAExtractArgs(args []string, pattern, payloadRange string, confirm bool, cryptex string, dyld, kernel bool) error {
+	if err := cobra.RangeArgs(1, 2)(nil, args); err != nil {
+		return err
+	}
+
+	filenameProvided := len(args) == 2
+	if filenameProvided && pattern != "" {
+		return fmt.Errorf("cannot use both FILENAME and --pattern")
+	}
+	if filenameProvided && (cryptex != "" || dyld || kernel) {
+		return fmt.Errorf("cannot use FILENAME with --cryptex, --dyld, or --kernel")
+	}
+	if payloadRange != "" && pattern == "" {
+		return fmt.Errorf("--range requires --pattern")
+	}
+	if confirm && pattern == "" {
+		return fmt.Errorf("--confirm requires --pattern")
+	}
+
+	return nil
+}
+
 func matchesPostBOMPattern(re *regexp.Regexp, name string) bool {
 	// Preserve compatibility with basename-anchored patterns while also
 	// supporting full-path matches.
@@ -120,8 +142,8 @@ func init() {
 	otaExtractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache files")
 	otaExtractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	otaExtractCmd.Flags().StringP("pattern", "p", "", "Regex pattern to match files")
-	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern control the payloadv2 file range to search")
-	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Confirm searching for pattern in payloadv2 files")
+	otaExtractCmd.Flags().StringP("range", "r", "", "Regex pattern to limit payloadv2 files searched (requires --pattern)")
+	otaExtractCmd.Flags().BoolP("confirm", "y", false, "Skip prompt and search payloadv2 files (requires --pattern)")
 	otaExtractCmd.Flags().BoolP("decomp", "x", false, "Decompress pbzx files")
 	otaExtractCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when extracting")
 	otaExtractCmd.Flags().StringP("output", "o", "", "Output folder")
@@ -139,10 +161,10 @@ func init() {
 
 // otaExtractCmd represents the extract command
 var otaExtractCmd = &cobra.Command{
-	Use:           "extract <OTA> [FILENAME]>",
+	Use:           "extract <OTA> [FILENAME]",
 	Aliases:       []string{"e"},
 	Short:         "Extract OTA payload files",
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.RangeArgs(1, 2),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -150,11 +172,16 @@ var otaExtractCmd = &cobra.Command{
 		decomp := viper.GetBool("ota.extract.decomp")
 		cryptex := viper.GetString("ota.extract.cryptex")
 		flat := viper.GetBool("ota.extract.flat")
+		pattern := viper.GetString("ota.extract.pattern")
+		payloadRange := viper.GetString("ota.extract.range")
+		confirm := viper.GetBool("ota.extract.confirm")
+		dyldExtract := viper.GetBool("ota.extract.dyld")
+		kernelExtract := viper.GetBool("ota.extract.kernel")
 		// validate flags
-		if len(args) > 1 && viper.GetString("ota.extract.pattern") != "" {
-			return fmt.Errorf("cannot use both FILENAME and flag for --pattern")
+		if err := validateOTAExtractArgs(args, pattern, payloadRange, confirm, cryptex, dyldExtract, kernelExtract); err != nil {
+			return err
 		}
-		if viper.GetString("ota.extract.cryptex") != "" && !slices.Contains(validCryptexes, cryptex) {
+		if cryptex != "" && !slices.Contains(validCryptexes, cryptex) {
 			return fmt.Errorf("invalid --cryptex: '%s' (must be one of: %s)", cryptex, strings.Join(validCryptexes, ", "))
 		}
 
@@ -179,10 +206,10 @@ var otaExtractCmd = &cobra.Command{
 			}
 		}
 
-		if viper.GetString("ota.extract.cryptex") != "" || viper.GetBool("ota.extract.dyld") || viper.GetBool("ota.extract.kernel") || viper.GetString("ota.extract.pattern") != "" {
+		if cryptex != "" || dyldExtract || kernelExtract || pattern != "" {
 			cwd, _ := os.Getwd()
 			/* CRYPTEX */
-			if viper.GetString("ota.extract.cryptex") != "" {
+			if cryptex != "" {
 				log.Infof("Extracting %s Cryptex", cryptex)
 				out, err := o.ExtractCryptex(cryptex, output)
 				if err != nil {
@@ -195,8 +222,8 @@ var otaExtractCmd = &cobra.Command{
 				}
 			}
 			/* DYLD_SHARED_CACHE */
-			if viper.GetBool("ota.extract.dyld") {
-				log.Info("Extracting dyld_shared_cache Files")
+			if dyldExtract {
+				log.Info("Extracting dyld_shared_cache files")
 				out, err := o.ExtractFromCryptexes(dyld.CacheUberRegex, output)
 				if err != nil {
 					log.WithError(err).Error("failed to extract dyld_shared_cache from cryptexes; falling back to OTA asset files/payloads")
@@ -211,7 +238,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 			}
 			/* KERNELCACHE */
-			if viper.GetBool("ota.extract.kernel") {
+			if kernelExtract {
 				log.Info("Extracting kernelcache(s)")
 				re := regexp.MustCompile(`kernelcache.*$`)
 				for _, f := range o.Files() { // search in OTA asset files
@@ -247,10 +274,10 @@ var otaExtractCmd = &cobra.Command{
 				}
 			}
 			/* PATTERN */
-			if viper.GetString("ota.extract.pattern") != "" {
-				re, err := regexp.Compile(viper.GetString("ota.extract.pattern"))
+			if pattern != "" {
+				re, err := regexp.Compile(pattern)
 				if err != nil {
-					return fmt.Errorf("failed to compile regex pattern '%s': %v", viper.GetString("ota.extract.pattern"), err)
+					return fmt.Errorf("failed to compile regex pattern '%s': %v", pattern, err)
 				}
 				log.WithField("pattern", re.String()).Info("Extracting Files Matching Pattern")
 				for _, f := range o.Files() { // search in OTA asset files
@@ -277,7 +304,7 @@ var otaExtractCmd = &cobra.Command{
 				}
 				if bomFound {
 					cont := true
-					if !viper.GetBool("ota.extract.confirm") {
+					if !confirm {
 						cont = false
 						prompt := &survey.Confirm{
 							Message: fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()),
@@ -287,8 +314,8 @@ var otaExtractCmd = &cobra.Command{
 					if cont {
 						utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
 						return o.GetPayloadFiles(
-							viper.GetString("ota.extract.pattern"),
-							viper.GetString("ota.extract.range"),
+							pattern,
+							payloadRange,
 							output)
 					}
 				}
@@ -297,8 +324,8 @@ var otaExtractCmd = &cobra.Command{
 		}
 
 		/* ALL FILES */
-		if len(args) == 1 && viper.GetString("ota.extract.pattern") == "" {
-			log.Info("Extracting All Files From OTA")
+		if len(args) == 1 && pattern == "" {
+			log.Info("Extracting all files from OTA")
 			for _, f := range o.Files() {
 				if f.IsDir() {
 					continue

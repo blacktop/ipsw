@@ -43,15 +43,24 @@ import (
 
 var rsrAppCryptexRE = regexp.MustCompile(`cryptex-app$`)
 
-func validateOTAPatchRSRArgs(cmd *cobra.Command, args []string, cryptex string) error {
+func validateOTAPatchRSRArgs(cmd *cobra.Command, args []string, cryptex, input, output string, dyldArches []string) error {
 	if cryptex != "" {
 		if len(args) > 0 {
 			return fmt.Errorf("cannot use OTA path argument with cryptex mode")
 		}
+		if input != "" {
+			return fmt.Errorf("--input cannot be used with --cryptex")
+		}
+		if output != "" {
+			return fmt.Errorf("--output cannot be used with --cryptex")
+		}
+		if len(dyldArches) > 0 {
+			return fmt.Errorf("--dyld-arch cannot be used with --cryptex")
+		}
 		return nil
 	}
 
-	return cobra.ExactArgs(1)(cmd, args)
+	return cobra.ExactArgs(1)(nil, args)
 }
 
 func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
@@ -132,10 +141,10 @@ func patchRSRCryptex(o *otapkg.AA, name, out, inDMG string, patchVerbose uint32)
 func init() {
 	otaPatchCmd.AddCommand(otaPatchRsrCmd)
 
-	otaPatchRsrCmd.Flags().StringP("cryptex", "c", "", "Cryptex file from OTA")
-	otaPatchRsrCmd.Flags().StringP("input", "i", "", "Input folder")
-	otaPatchRsrCmd.Flags().StringP("output", "o", "", "Output folder")
-	otaPatchRsrCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
+	otaPatchRsrCmd.Flags().StringP("cryptex", "c", "", "Patch a local cryptex RIDIFF file directly (no OTA argument)")
+	otaPatchRsrCmd.Flags().StringP("input", "i", "", "Input folder containing base DMGs to patch against")
+	otaPatchRsrCmd.Flags().StringP("output", "o", "", "Output folder for patched DMGs")
+	otaPatchRsrCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "Limit OTA system cryptex patching to these dyld_shared_cache architectures")
 	otaPatchRsrCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return dyld.DscArches, cobra.ShellCompDirectiveDefault
 	})
@@ -149,11 +158,18 @@ func init() {
 
 // otaPatchRsrCmd represents the rsr command
 var otaPatchRsrCmd = &cobra.Command{
-	Use:     "rsr",
+	Use:     "rsr <OTA> | --cryptex <PATCH>",
 	Aliases: []string{"r"},
 	Short:   "Patch RSR OTAs",
 	Args: func(cmd *cobra.Command, args []string) error {
-		return validateOTAPatchRSRArgs(cmd, args, viper.GetString("ota.patch.cryptex"))
+		return validateOTAPatchRSRArgs(
+			cmd,
+			args,
+			viper.GetString("ota.patch.cryptex"),
+			viper.GetString("ota.patch.input"),
+			viper.GetString("ota.patch.output"),
+			viper.GetStringSlice("ota.patch.dyld-arch"),
+		)
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -166,7 +166,7 @@ func extractZipEntry(zf *zip.File) (string, error) {
 	}
 	defer rc.Close()
 
-	tmp, err := os.CreateTemp("", "ipsw-bxdiff-*")
+	tmp, err := os.CreateTemp("", "ota-bxdiff-*")
 	if err != nil {
 		return "", err
 	}
