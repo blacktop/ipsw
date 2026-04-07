@@ -12,17 +12,14 @@ release:
   name_template: "prerelease {{ .CommitDate }} ({{ .ShortCommit }})"
 
 builds:
-  - id: darwin_arm64_extras
+  - id: darwin_arm64
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/opt/homebrew/lib
-      - CGO_CFLAGS=-I/opt/homebrew/include
-      - PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
     goos: [darwin]
     goarch: [arm64]
-    tags: [libusb, unicorn]
+    tags: []
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags: [-trimpath]
     ldflags:
@@ -79,9 +76,9 @@ builds:
       - -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
 
 archives:
-  - id: darwin_arm64_extras_archive
-    ids: [darwin_arm64_extras]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64_extras"
+  - id: darwin_arm64_archive
+    ids: [darwin_arm64]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_macOS_arm64"
     format_overrides:
       - goos: windows
         formats: [zip]
