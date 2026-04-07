@@ -375,6 +375,7 @@ func (as *AppStore) RegisterBundleID(name, id string) (*BundleIdResponse, error)
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+as.token)
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{

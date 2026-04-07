@@ -8,6 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +21,7 @@ import (
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fullsailor/pkcs7"
-	// "software.sslmate.com/src/go-pkcs12"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 const rsaKeySize = 2048 // Standard key size
@@ -85,17 +87,14 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	}
 	log.Infof("%s Certificate ID: %s (Saved to %s)", typeLabel, certResource.ID, certPath)
 	if generatedKeyPath != "" {
-		log.Warnf("Generated Private Key saved to: %s", generatedKeyPath)
-		utils.Indent(log.Warn, 2)("‼️ Private key file saved locally. Ensure it is secured or deleted after import.")
-		// TODO: Export certificate and key as a password protected .p12 file
-		// // Export certificate and key as a .p12 file
-		// p12Filename := fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID)
-		// p12Path := filepath.Join(conf.Output, p12Filename)
-		// if err := exportToP12(certPath, generatedKeyPath, p12Path, "ipsw"); err != nil {
-		// 	log.Warnf("Failed to export certificate and key to P12: %v", err)
-		// } else {
-		// 	log.Infof("Certificate and key exported to %s", p12Path)
-		// }
+		log.Infof("Generated Private Key saved to: %s", generatedKeyPath)
+		p12Filename := fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID)
+		p12Path := filepath.Join(conf.Output, p12Filename)
+		if err := bundlePKCS12(certPath, generatedKeyPath, p12Path, "ipsw"); err != nil {
+			log.Warnf("Failed to bundle cert+key as P12: %v (cert and key saved separately)", err)
+		} else {
+			log.Infof("Certificate + key bundled as %s (password: \"ipsw\")", p12Path)
+		}
 	}
 
 	log.Infof("Checking for %s Provisioning Profile...", typeLabel)
@@ -122,17 +121,28 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 
 	if conf.Install {
 		log.Info("Installing assets locally...")
-		err = InstallCertificateAndKey(certPath, generatedKeyPath) // Pass generated key path
-		if err != nil {
-			log.Warnf("Failed to install certificate/key into Keychain: %v", err)
-			utils.Indent(log.Warn, 2)("You may need to install them manually")
-			// Continue to profile installation even if cert install fails
-		} else {
-			log.Infof("Certificate %s and associated key installed into login keychain.", certFilename)
-			if generatedKeyPath != "" {
-				log.Infof("Deleting temporary private key file: %s", generatedKeyPath)
-				os.Remove(generatedKeyPath) // Best effort
+		// Use P12 import for proper cert+key pairing in Keychain
+		p12Path := filepath.Join(conf.Output, fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID))
+		if _, err := os.Stat(p12Path); err == nil {
+			if err := installP12(p12Path, "ipsw"); err != nil {
+				log.Warnf("Failed to install P12 into Keychain: %v", err)
+				utils.Indent(log.Warn, 2)("You may need to install manually: security import " + p12Path + " -k login.keychain-db -P ipsw -T /usr/bin/codesign")
+			} else {
+				log.Infof("Certificate + key identity installed from %s", p12Path)
 			}
+		} else {
+			// Fallback to separate import if P12 wasn't created
+			if err := InstallCertificateAndKey(certPath, generatedKeyPath); err != nil {
+				log.Warnf("Failed to install certificate/key into Keychain: %v", err)
+				utils.Indent(log.Warn, 2)("You may need to install them manually")
+			} else {
+				log.Infof("Certificate %s and associated key installed into login keychain.", certFilename)
+			}
+		}
+		// Ensure WWDR G3 intermediate is present for chain validation
+		if err := ensureWWDRG3(); err != nil {
+			log.Warnf("Failed to install Apple WWDR G3 intermediate: %v", err)
+			utils.Indent(log.Warn, 2)("Download from https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer and import manually")
 		}
 		log.Info("Installing Provisioning Profile...")
 		if installedName, err := InstallProvisioningProfile(profilePath); err != nil {
@@ -701,3 +711,124 @@ func extractProfileUUID(profileData []byte) (string, error) {
 // 	log.Infof("Successfully exported certificate and key to %s", p12Path)
 // 	return nil
 // }
+
+// bundlePKCS12 creates a PKCS#12 file from a DER certificate and PEM private key.
+// Uses legacy 3DES/SHA1 encoding for macOS Keychain compatibility.
+func bundlePKCS12(certPath, keyPath, p12Path, password string) error {
+	certDER, err := os.ReadFile(certPath)
+	if err != nil {
+		return fmt.Errorf("reading certificate: %w", err)
+	}
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return fmt.Errorf("parsing certificate: %w", err)
+	}
+
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		return fmt.Errorf("reading private key: %w", err)
+	}
+	block, _ := pem.Decode(keyPEM)
+	if block == nil {
+		return fmt.Errorf("failed to decode PEM private key")
+	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		// Try PKCS1 as fallback
+		key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("parsing private key: %w", err)
+		}
+	}
+
+	p12Data, err := pkcs12.LegacyDES.Encode(key, cert, nil, password)
+	if err != nil {
+		return fmt.Errorf("encoding PKCS#12: %w", err)
+	}
+
+	if err := os.WriteFile(p12Path, p12Data, 0600); err != nil {
+		return fmt.Errorf("writing P12 file: %w", err)
+	}
+	return nil
+}
+
+// installP12 imports a PKCS#12 file into the login keychain.
+func installP12(p12Path, password string) error {
+	keychainPath, err := loginKeychainPath()
+	if err != nil {
+		return err
+	}
+	log.Infof("Importing P12 %s into keychain %s", p12Path, keychainPath)
+	cmd := exec.Command("security", "import", p12Path,
+		"-k", keychainPath,
+		"-P", password,
+		"-T", "/usr/bin/codesign",
+		"-T", "/usr/bin/security",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("security import P12 failed: %w\nOutput: %s", err, string(out))
+	}
+	return nil
+}
+
+const wwdrG3URL = "https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer"
+
+// ensureWWDRG3 downloads and imports the Apple WWDR G3 intermediate certificate
+// into the login keychain. This is needed for the codesigning trust chain.
+func ensureWWDRG3() error {
+	keychainPath, err := loginKeychainPath()
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Get(wwdrG3URL)
+	if err != nil {
+		return fmt.Errorf("downloading WWDR G3: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("downloading WWDR G3: HTTP %s", resp.Status)
+	}
+
+	tmp, err := os.CreateTemp("", "wwdrg3-*.cer")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		tmp.Close()
+		return fmt.Errorf("saving WWDR G3: %w", err)
+	}
+	tmp.Close()
+
+	cmd := exec.Command("security", "import", tmp.Name(), "-k", keychainPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// "already exists" is fine
+		if strings.Contains(string(out), "already exists") {
+			log.Debug("WWDR G3 intermediate already in keychain")
+			return nil
+		}
+		return fmt.Errorf("importing WWDR G3: %w\nOutput: %s", err, string(out))
+	}
+	log.Info("Installed Apple WWDR G3 intermediate certificate")
+	return nil
+}
+
+// loginKeychainPath returns the path to the user's login keychain.
+func loginKeychainPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("getting user home directory: %w", err)
+	}
+	path := filepath.Join(home, "Library", "Keychains", "login.keychain-db")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		path = filepath.Join(home, "Library", "Keychains", "login.keychain")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return "", fmt.Errorf("cannot find login keychain at default locations")
+		}
+	}
+	return path, nil
+}
