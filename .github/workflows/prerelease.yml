@@ -38,7 +38,7 @@ jobs:
       #   run: softwareupdate --install-rosetta --agree-to-license || true
       - name: Install dependencies (arm64)
         run: |
-          brew install --quiet pkg-config libusb unicorn libheif zig
+          brew install --quiet pkg-config zig
         env:
           HOMEBREW_NO_AUTO_UPDATE: 1
         # x86_64 homebrew (Rosetta) bootstrap kept for later use; uncomment if/when Intel builds are needed.
