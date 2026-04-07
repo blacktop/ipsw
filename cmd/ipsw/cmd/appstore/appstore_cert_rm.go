@@ -35,20 +35,19 @@ import (
 
 func init() {
 	ASCertCmd.AddCommand(ASCertRevokeCmd)
-
-	ASCertRevokeCmd.Flags().String("id", "", "Profile ID to renew")
-	viper.BindPFlag("appstore.cert.rm.id", ASCertRevokeCmd.Flags().Lookup("id"))
 }
 
-// ASCertRevokeCmd represents the appstore cert ls command
+// ASCertRevokeCmd represents the appstore cert rm command
 var ASCertRevokeCmd = &cobra.Command{
-	Use:           "rm",
-	Short:         "Revoke a lost, stolen, compromised, or expiring signing certificate",
-	Args:          cobra.NoArgs,
+	Use:           "rm [<ID>]",
+	Short:         "Revoke a signing certificate",
+	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// flags
-		id := viper.GetString("appstore.cert.rm.id")
+		var id string
+		if len(args) > 0 {
+			id = args[0]
+		}
 		// Validate flags
 		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
 			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
