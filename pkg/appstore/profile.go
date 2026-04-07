@@ -400,12 +400,15 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 	profileCreateRequest.Data.Attributes.OfflineProfile = offline
 	profileCreateRequest.Data.Relationships.BundleID.Data.Type = "bundleIds"
 	profileCreateRequest.Data.Relationships.BundleID.Data.ID = bundleID
+	// Initialize slices so json.Marshal produces [] instead of null when empty
+	profileCreateRequest.Data.Relationships.Certificates.Data = make([]Data, 0, len(cerIDs))
 	for _, cerID := range cerIDs {
 		profileCreateRequest.Data.Relationships.Certificates.Data = append(profileCreateRequest.Data.Relationships.Certificates.Data, Data{
 			ID:   cerID,
 			Type: "certificates",
 		})
 	}
+	profileCreateRequest.Data.Relationships.Devices.Data = make([]Data, 0, len(devicesIDs))
 	for _, devicesID := range devicesIDs {
 		profileCreateRequest.Data.Relationships.Devices.Data = append(profileCreateRequest.Data.Relationships.Devices.Data, Data{
 			ID:   devicesID,

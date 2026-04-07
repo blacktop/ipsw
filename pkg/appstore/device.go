@@ -42,8 +42,8 @@ type DeviceCreateRequest struct {
 		Type       string `json:"type"` // devices
 		Attributes struct {
 			Name        string           `json:"name"`
-			DeviceClass string           `json:"deviceClass"`
-			Model       string           `json:"model"`
+			DeviceClass string           `json:"deviceClass,omitempty"`
+			Model       string           `json:"model,omitempty"`
 			Udid        string           `json:"udid"`
 			Platform    bundleIdPlatform `json:"platform"`
 		} `json:"attributes"`
@@ -105,8 +105,6 @@ func (as *AppStore) RegisterDevice(name, platform, udid string) (*Device, error)
 	var deviceCreateRequest DeviceCreateRequest
 	deviceCreateRequest.Data.Type = "devices"
 	deviceCreateRequest.Data.Attributes.Name = name
-	deviceCreateRequest.Data.Attributes.DeviceClass = "IPHONE"
-	deviceCreateRequest.Data.Attributes.Model = "iPhone 15 Pro"
 	deviceCreateRequest.Data.Attributes.Udid = udid
 	deviceCreateRequest.Data.Attributes.Platform = bundleIdPlatform(platform)
 
