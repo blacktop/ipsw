@@ -147,84 +147,84 @@ func (a *Asset) String() string {
 			default:
 				log.Debugf("%s has unknown asset type: %T", ass.RenditionName, t)
 			}
-			var attrs string
+			var attrs strings.Builder
 			if len(ass.Attributes) > 0 {
-				attrs += colorField("Attributes") + ":\n"
+				attrs.WriteString(colorField("Attributes") + ":\n")
 				for _, kf := range a.KeyFormat {
 					if value, ok := ass.Attributes[kf.String()]; ok {
-						attrs += fmt.Sprintf("  %s%d\n", colorSubField(fmt.Sprintf("%-20s", kf.String())), value)
+						attrs.WriteString(fmt.Sprintf("  %s%d\n", colorSubField(fmt.Sprintf("%-20s", kf.String())), value))
 					}
 				}
 			}
-			var rscs string
+			var rscs strings.Builder
 			if len(ass.Resources) > 0 {
-				rscs += colorField("Resources") + ":\n"
+				rscs.WriteString(colorField("Resources") + ":\n")
 				for _, rsc := range ass.Resources {
 					switch rsc.ID {
 					case SliceID:
 						var slice sliceResource
 						if err := slice.UnmarshalBinary(rsc.Data); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), slice.NumSlices)
+						rscs.WriteString(fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), slice.NumSlices))
 						for _, s := range slice.Slices {
-							rscs += fmt.Sprintf("    - pos(%03d,%03d) size(%03d,%03d)\n", s.X, s.Y, s.Width, s.Height)
+							rscs.WriteString(fmt.Sprintf("    - pos(%03d,%03d) size(%03d,%03d)\n", s.X, s.Y, s.Width, s.Height))
 						}
 					case MetricsID:
 						var metrics metricsResource
 						if err := metrics.UnmarshalBinary(rsc.Data); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), metrics.NumMetrics)
+						rscs.WriteString(fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), metrics.NumMetrics))
 						for _, m := range metrics.Metrics {
-							rscs += fmt.Sprintf("    - %s(%d,%d,%d,%d) %s(%03d,%03d)\n", colorField("insets"), m.LeftInset, m.TopInset, m.RightInset, m.BottomInset, colorField("size"), m.Width, m.Height)
+							rscs.WriteString(fmt.Sprintf("    - %s(%d,%d,%d,%d) %s(%03d,%03d)\n", colorField("insets"), m.LeftInset, m.TopInset, m.RightInset, m.BottomInset, colorField("size"), m.Width, m.Height))
 						}
 					case LayerReferenceID:
 						layer := new(layerResource)
 						if err := layer.UnmarshalBinary(rsc.Data); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: (%d):\n", colorSubField("Layers"), layer.NumLayers)
+						rscs.WriteString(fmt.Sprintf("  %s: (%d):\n", colorSubField("Layers"), layer.NumLayers))
 						for _, layer := range layer.Layers {
-							rscs += fmt.Sprintf("    %s(%03d,%03d) %s(%03d,%03d) %s=%d %s=%.2f\n",
-								colorField("pos"), layer.Frame.X, layer.Frame.Y, colorField("size"), layer.Frame.Width, layer.Frame.Height, colorField("blend"), layer.BlendMode, colorField("opacity"), layer.Opacity)
-							rscs += fmt.Sprintf("    %s", utils.HexDump(layer.Data, 0))
+							rscs.WriteString(fmt.Sprintf("    %s(%03d,%03d) %s(%03d,%03d) %s=%d %s=%.2f\n",
+								colorField("pos"), layer.Frame.X, layer.Frame.Y, colorField("size"), layer.Frame.Width, layer.Frame.Height, colorField("blend"), layer.BlendMode, colorField("opacity"), layer.Opacity))
+							rscs.WriteString(fmt.Sprintf("    %s", utils.HexDump(layer.Data, 0)))
 						}
 					case InternalLinkID:
 						var link csiInternalLinkData
 						if err := link.UnmarshalBinary(bytes.NewReader(rsc.Data)); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: %s(%d,%d) %s(%d)\n", colorSubField(rsc.ID), colorSubField("frame"), link.Frame.X, link.Frame.Y, colorSubField("layout"), link.Layout)
+						rscs.WriteString(fmt.Sprintf("  %s: %s(%d,%d) %s(%d)\n", colorSubField(rsc.ID), colorSubField("frame"), link.Frame.X, link.Frame.Y, colorSubField("layout"), link.Layout))
 						for _, ref := range link.Reference {
-							rscs += fmt.Sprintf("    %s: %d\n", colorSubField(renditionAttributeType(ref.Name)), ref.Value)
+							rscs.WriteString(fmt.Sprintf("    %s: %d\n", colorSubField(renditionAttributeType(ref.Name)), ref.Value))
 						}
 					case CompositingOptionsID:
 						var comp compositingResource
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &comp); err != nil {
-							rscs += fmt.Sprintf("  %s:\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s:\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s:\n    %s: %d\n    %s:   %.2f\n", colorSubField(rsc.ID), colorField("BlendMode"), comp.BlendMode, colorField("Opacity"), comp.Opacity)
+						rscs.WriteString(fmt.Sprintf("  %s:\n    %s: %d\n    %s:   %.2f\n", colorSubField(rsc.ID), colorField("BlendMode"), comp.BlendMode, colorField("Opacity"), comp.Opacity))
 					case MetaDataID:
 						var meta metadataResource
 						if err := meta.UnmarshalBinary(rsc.Data); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: %s\n", colorSubField(rsc.ID), bytes.Trim(meta.Data[:], "\x00"))
+						rscs.WriteString(fmt.Sprintf("  %s: %s\n", colorSubField(rsc.ID), bytes.Trim(meta.Data[:], "\x00")))
 					case MetaDataEXIFOrientationID:
 						var orient uint32
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &orient); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: %d\n", colorSubField(rsc.ID), orient)
+						rscs.WriteString(fmt.Sprintf("  %s: %d\n", colorSubField(rsc.ID), orient))
 					case ImageRowBytesID:
 						var rowBytes uint32
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &rowBytes); err != nil {
-							rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 						}
-						rscs += fmt.Sprintf("  %s: %s (%d)\n", colorSubField(rsc.ID), humanize.Bytes(uint64(rowBytes)), rowBytes)
+						rscs.WriteString(fmt.Sprintf("  %s: %s (%d)\n", colorSubField(rsc.ID), humanize.Bytes(uint64(rowBytes)), rowBytes))
 					default:
-						rscs += fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0))
+						rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
 					}
 				}
 			}
@@ -247,8 +247,8 @@ func (a *Asset) String() string {
 				ass.Type,
 				humanize.Bytes(uint64(ass.Size)), ass.Size,
 				asset.String(),
-				attrs,
-				rscs,
+				attrs.String(),
+				rscs.String(),
 			))
 			out.WriteString(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n")
 		}
