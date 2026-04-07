@@ -38,7 +38,7 @@ func init() {
 	ASProvisionCmd.AddCommand(ASProvisionGenerateCmd)
 
 	ASProvisionGenerateCmd.Flags().StringP("type", "t", "development", "Type of profile to manage (development, adhoc, distribution)")
-	ASProvisionGenerateCmd.Flags().StringP("platform", "p", "ios", "Target platform (ios, macos, tvos, catalyst)")
+	ASProvisionGenerateCmd.Flags().String("platform", "ios", "Target platform (ios, macos, tvos, catalyst)")
 	ASProvisionGenerateCmd.Flags().Bool("csr", false, "Create a NEW Certificate Signing Request")
 	ASProvisionGenerateCmd.Flags().StringP("email", "e", "", "Email address to use for the certificate")
 	ASProvisionGenerateCmd.Flags().StringP("country", "c", "US", "Country code for certificate subject (e.g., US, GB)")
