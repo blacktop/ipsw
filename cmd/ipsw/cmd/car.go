@@ -36,11 +36,9 @@ var profileFlags profile.ProfilingFlags
 
 func init() {
 	rootCmd.AddCommand(carCmd)
-	carCmd.Flags().StringP("output", "o", "", "Output folder to save renditions")
-	carCmd.Flags().BoolP("export", "x", false, "Export all renditions (requires -o)")
+	carCmd.Flags().StringP("output", "o", "", "Output folder to extract renditions")
 	carCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	carCmd.MarkFlagDirname("output")
-	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
 	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
 	viper.BindPFlag("car.json", carCmd.Flags().Lookup("json"))
 	profile.AddFlags(carCmd, &profileFlags)
@@ -59,11 +57,9 @@ var carCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if viper.GetBool("car.export") && viper.GetString("car.output") == "" {
-			return fmt.Errorf("--export (-x) requires --output (-o) directory")
-		}
-		if out := viper.GetString("car.output"); out != "" {
-			if err := os.MkdirAll(out, 0755); err != nil {
+		outDir := viper.GetString("car.output")
+		if outDir != "" {
+			if err := os.MkdirAll(outDir, 0755); err != nil {
 				return fmt.Errorf("failed to create output directory: %v", err)
 			}
 		}
@@ -81,10 +77,9 @@ var carCmd = &cobra.Command{
 				prof.PrintStats()
 			}
 		}()
-
 		asset, err := car.Parse(args[0], &car.Config{
-			Export:  viper.GetBool("car.export"),
-			Output:  viper.GetString("car.output"),
+			Export:  outDir != "",
+			Output:  outDir,
 			Verbose: Verbose,
 		})
 		if err != nil {
