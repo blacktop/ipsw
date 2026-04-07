@@ -101,10 +101,14 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	log.Infof("Checking for %s Provisioning Profile...", typeLabel)
 	profileResource, err := as.ensureProvisioningProfile(conf.BundleID, certResource.ID, requiredProfileType, typeLabel)
 	if err != nil {
-		// Attempt cleanup
-		os.Remove(certPath)
+		// Don't delete cert+key: the certificate already exists on Apple's side.
+		// Deleting the private key would make it permanently unusable.
 		if generatedKeyPath != "" {
-			os.Remove(generatedKeyPath)
+			log.Warnf("Profile step failed but cert + key are saved at %s and %s; "+
+				"retry with `ipsw appstore profile create`", certPath, generatedKeyPath)
+		} else {
+			log.Warnf("Profile step failed but cert is saved at %s; "+
+				"retry with `ipsw appstore profile create`", certPath)
 		}
 		return fmt.Errorf("failed to ensure %s provisioning profile: %w", typeLabel, err)
 	}
@@ -112,11 +116,6 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	profileFilename := fmt.Sprintf("ipsw_%s_%s.mobileprovision", typeLabel, conf.BundleID)
 	profilePath := filepath.Join(conf.Output, profileFilename)
 	if err = os.WriteFile(profilePath, profileResource.Attributes.ProfileContent, 0644); err != nil {
-		// Attempt cleanup
-		os.Remove(certPath)
-		if generatedKeyPath != "" {
-			os.Remove(generatedKeyPath)
-		}
 		return fmt.Errorf("failed saving %s provisioning profile file %s: %w", typeLabel, profilePath, err)
 	}
 	log.Infof("%s Provisioning Profile ID: %s (Saved to %s)", typeLabel, profileResource.ID, profilePath)
@@ -248,9 +247,18 @@ func (as *AppStore) ensureCertificate(requiredCertType CertificateType, typeLabe
 func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID string, requiredProfileType ProfileType, typeLabel string) (prof *Profile, err error) {
 
 	log.Debugf("Looking up Bundle ID resource for identifier: %s", bundleIDIdentifier)
-	bundle, err := as.GetBundleID(bundleIDIdentifier)
+	bundle, err := as.GetBundleIDByIdentifier(bundleIDIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("finding bundle ID '%s': %w", bundleIDIdentifier, err)
+	}
+	if bundle == nil {
+		log.Infof("Bundle ID '%s' not found, registering...", bundleIDIdentifier)
+		resp, err := as.RegisterBundleID(bundleIDIdentifier, bundleIDIdentifier)
+		if err != nil {
+			return nil, fmt.Errorf("registering bundle ID '%s': %w", bundleIDIdentifier, err)
+		}
+		bundle = &resp.Data
+		log.Infof("Registered Bundle ID: %s (resource ID: %s)", bundleIDIdentifier, bundle.ID)
 	}
 
 	log.Debug("Listing all devices...")
