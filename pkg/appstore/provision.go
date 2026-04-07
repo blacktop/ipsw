@@ -28,6 +28,7 @@ const rsaKeySize = 2048 // Standard key size
 
 type ProvisionSigningFilesConfig struct {
 	CertType string
+	Platform string // "ios" (default), "macos", "tvos", "catalyst"
 	BundleID string
 	CSR      bool
 	Email    string
@@ -51,20 +52,48 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	// Determine required certificate type and profile type based on input
 	var requiredCertType CertificateType
 	var requiredProfileType ProfileType
-	var typeLabel string // For logging and filenames
+	var typeLabel string
+
+	platform := strings.ToLower(conf.Platform)
+	if platform == "" {
+		platform = "ios"
+	}
 
 	switch strings.ToLower(conf.CertType) {
 	case "development":
 		requiredCertType = CT_DEVELOPMENT
-		requiredProfileType = IOS_APP_DEVELOPMENT
+		switch platform {
+		case "macos":
+			requiredProfileType = MAC_APP_DEVELOPMENT
+		case "tvos":
+			requiredProfileType = TVOS_APP_DEVELOPMENT
+		case "catalyst":
+			requiredProfileType = MAC_CATALYST_APP_DEVELOPMENT
+		default:
+			requiredProfileType = IOS_APP_DEVELOPMENT
+		}
 		typeLabel = "Development"
 	case "adhoc":
-		requiredCertType = CT_DISTRIBUTION // AdHoc uses Distribution cert
-		requiredProfileType = IOS_APP_ADHOC
+		requiredCertType = CT_DISTRIBUTION
+		switch platform {
+		case "tvos":
+			requiredProfileType = TVOS_APP_ADHOC
+		default:
+			requiredProfileType = IOS_APP_ADHOC
+		}
 		typeLabel = "AdHoc"
 	case "distribution":
-		requiredCertType = CT_DISTRIBUTION // App Store uses Distribution cert
-		requiredProfileType = IOS_APP_STORE
+		requiredCertType = CT_DISTRIBUTION
+		switch platform {
+		case "macos":
+			requiredProfileType = MAC_APP_STORE
+		case "tvos":
+			requiredProfileType = TVOS_APP_STORE
+		case "catalyst":
+			requiredProfileType = MAC_CATALYST_APP_STORE
+		default:
+			requiredProfileType = IOS_APP_STORE
+		}
 		typeLabel = "AppStore"
 	default:
 		return fmt.Errorf("invalid certificate type specified: %s", conf.CertType)
@@ -124,7 +153,7 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	}
 
 	log.Infof("Checking for %s Provisioning Profile...", typeLabel)
-	profileResource, err := as.ensureProvisioningProfile(conf.BundleID, certResource.ID, requiredProfileType, typeLabel)
+	profileResource, err := as.ensureProvisioningProfile(conf.BundleID, certResource.ID, requiredProfileType, typeLabel, platform)
 	if err != nil {
 		if generatedKeyPath != "" {
 			log.Warnf("Profile step failed but cert + key are saved at %s and %s; "+
@@ -254,7 +283,7 @@ func (as *AppStore) ensureCertificate(requiredCertType CertificateType, typeLabe
 
 // ensureProvisioningProfile finds or creates a provisioning profile of the specified type.
 // Takes the required ProfileType constant and a label for logging/filenames.
-func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID string, requiredProfileType ProfileType, typeLabel string) (prof *Profile, err error) {
+func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID string, requiredProfileType ProfileType, typeLabel, platform string) (prof *Profile, err error) {
 
 	log.Debugf("Looking up Bundle ID resource for identifier: %s", bundleIDIdentifier)
 	bundle, err := as.GetBundleIDByIdentifier(bundleIDIdentifier)
@@ -283,7 +312,7 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 	enabledDeviceCount := 0
 	// Only include devices for Development and AdHoc profiles
 	// AppStore profiles don't include specific devices
-	if requiredProfileType == IOS_APP_DEVELOPMENT || requiredProfileType == IOS_APP_ADHOC {
+	if profileTypeNeedsDevices(requiredProfileType) {
 		for _, dev := range allDevices {
 			if dev.Attributes.Status == "ENABLED" { // Filter for enabled status
 				deviceIDs = append(deviceIDs, dev.ID)
@@ -291,7 +320,30 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 			}
 		}
 		if enabledDeviceCount == 0 {
-			log.Warnf("No enabled devices found in the account. %s profile might not work or will be created without devices.", typeLabel)
+			// Attempt to register the host Mac as a development device
+			if udid, err := getHostProvisioningUDID(); err == nil {
+				hostname, _ := os.Hostname()
+				devPlatform := "MAC_OS"
+				if platform == "ios" || platform == "tvos" {
+					devPlatform = "IOS" // won't auto-register for iOS — user must register manually
+					log.Warnf("No enabled devices found. Register your iOS device manually.")
+				} else {
+					log.Infof("No devices registered. Registering this Mac (%s)...", udid)
+					dev, err := as.RegisterDevice(hostname, devPlatform, udid)
+					if err != nil {
+						log.Warnf("Device registration failed: %v (profile will be created without devices)", err)
+					} else {
+						deviceIDs = append(deviceIDs, dev.ID)
+						enabledDeviceCount++
+						log.Infof("Registered device: %s (%s)", hostname, udid)
+					}
+				}
+			} else {
+				log.Warnf("No enabled devices found and could not determine host UDID: %v", err)
+			}
+		}
+		if enabledDeviceCount == 0 {
+			log.Warnf("No enabled devices. %s profile will be created without devices.", typeLabel)
 		} else {
 			log.Infof("Found %d enabled devices to include in %s profile.", enabledDeviceCount, typeLabel)
 		}
@@ -339,7 +391,7 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 				// AdHoc/Dev profiles should ideally have the devices we found earlier
 				// AppStore profiles should have zero devices associated
 				devicesMatch := true
-				if requiredProfileType == IOS_APP_DEVELOPMENT || requiredProfileType == IOS_APP_ADHOC {
+				if profileTypeNeedsDevices(requiredProfileType) {
 					profileDevices, err := as.GetProfileDevices(p.ID)
 					if err != nil {
 						log.Warnf("Could not verify devices for existing profile %s: %v", p.ID, err)
@@ -833,4 +885,32 @@ func loginKeychainPath() (string, error) {
 		}
 	}
 	return path, nil
+}
+
+// profileTypeNeedsDevices returns true for profile types that include device IDs.
+func profileTypeNeedsDevices(pt ProfileType) bool {
+	switch pt {
+	case IOS_APP_DEVELOPMENT, IOS_APP_ADHOC,
+		MAC_APP_DEVELOPMENT,
+		TVOS_APP_DEVELOPMENT, TVOS_APP_ADHOC,
+		MAC_CATALYST_APP_DEVELOPMENT:
+		return true
+	}
+	return false
+}
+
+// getHostProvisioningUDID returns the Provisioning UDID of this Mac
+// by parsing system_profiler output.
+func getHostProvisioningUDID() (string, error) {
+	out, err := exec.Command("system_profiler", "SPHardwareDataType").Output()
+	if err != nil {
+		return "", fmt.Errorf("running system_profiler: %w", err)
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if after, ok := strings.CutPrefix(line, "Provisioning UDID:"); ok {
+			return strings.TrimSpace(after), nil
+		}
+	}
+	return "", fmt.Errorf("Provisioning UDID not found in system_profiler output")
 }

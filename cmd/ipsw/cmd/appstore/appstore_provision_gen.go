@@ -38,6 +38,7 @@ func init() {
 	ASProvisionCmd.AddCommand(ASProvisionGenerateCmd)
 
 	ASProvisionGenerateCmd.Flags().StringP("type", "t", "development", "Type of profile to manage (development, adhoc, distribution)")
+	ASProvisionGenerateCmd.Flags().StringP("platform", "p", "ios", "Target platform (ios, macos, tvos, catalyst)")
 	ASProvisionGenerateCmd.Flags().Bool("csr", false, "Create a NEW Certificate Signing Request")
 	ASProvisionGenerateCmd.Flags().StringP("email", "e", "", "Email address to use for the certificate")
 	ASProvisionGenerateCmd.Flags().StringP("country", "c", "US", "Country code for certificate subject (e.g., US, GB)")
@@ -45,6 +46,7 @@ func init() {
 	ASProvisionGenerateCmd.Flags().StringP("output", "o", "", "Folder to save files to")
 	ASProvisionGenerateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.provision.gen.type", ASProvisionGenerateCmd.Flags().Lookup("type"))
+	viper.BindPFlag("appstore.provision.gen.platform", ASProvisionGenerateCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("appstore.provision.gen.csr", ASProvisionGenerateCmd.Flags().Lookup("csr"))
 	viper.BindPFlag("appstore.provision.gen.email", ASProvisionGenerateCmd.Flags().Lookup("email"))
 	viper.BindPFlag("appstore.provision.gen.country", ASProvisionGenerateCmd.Flags().Lookup("country"))
@@ -137,6 +139,7 @@ for Xcode code signing.`,
 
 		if err := as.ProvisionSigningFiles(&appstore.ProvisionSigningFilesConfig{
 			CertType: certType,
+			Platform: viper.GetString("appstore.provision.gen.platform"),
 			BundleID: bundleID,
 			CSR:      csr,
 			Email:    email,
