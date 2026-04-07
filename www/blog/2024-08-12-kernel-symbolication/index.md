@@ -9,6 +9,8 @@ hide_table_of_contents: true
 
 ![kernel-symbolication](./kernel-symbolication.webp)
 
+<!-- truncate -->
+
 ## 🔐 Unlocking the Power of Kernelcache Symbolication
 
 In the world of reverse engineering and kernel analysis, being able to **symbolicate** a stripped Apple **kernelcache** is a game-changer. With the latest feature added to `ipsw`, you can now effortlessly symbolicate a kernelcache, even when it’s stripped of symbols. To make it even better, we’ve integrated this functionality directly into IDA Pro via a brand new [plugin](https://github.com/blacktop/symbolicator/tree/main/plugins/ida), streamlining the entire process for you.
