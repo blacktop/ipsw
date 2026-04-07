@@ -53,10 +53,10 @@ func init() {
 
 // otaPayloadCmd represents the payload command
 var otaPayloadCmd = &cobra.Command{
-	Use:           "payload <PAYLOAD>|<OTA> <PAYLOAD>",
+	Use:           "payload <PAYLOAD> | <OTA> <PAYLOAD>",
 	Aliases:       []string{"p"},
 	Short:         "List contents of a payloadv2 file",
-	Args:          cobra.MaximumNArgs(2),
+	Args:          cobra.RangeArgs(1, 2),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

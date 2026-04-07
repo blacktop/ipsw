@@ -39,12 +39,12 @@ func writeAEAKeyDB(t *testing.T, entries []types.AEAKeyEntry) string {
 func TestResolveAEAKeyPrefersExplicitKeyOverDatabase(t *testing.T) {
 	dbPath := writeAEAKeyDB(t, []types.AEAKeyEntry{
 		{
-			Filename: "iPhone18,1_26.4_23E5218e_Restore.ipsw",
+			Filename: "iPhone18,1_26.4_23E5218e_Restore.ota",
 			Key:      "db-key",
 		},
 	})
 
-	otaPath := filepath.Join("/tmp", "iPhone18,1_26.4_23E5218e_Restore.ipsw")
+	otaPath := filepath.Join("/tmp", "iPhone18,1_26.4_23E5218e_Restore.ota")
 	conf := ResolveAEAKey(otaPath, dbPath, "explicit-key", false)
 
 	if conf.SymmetricKey != "explicit-key" {
@@ -55,12 +55,12 @@ func TestResolveAEAKeyPrefersExplicitKeyOverDatabase(t *testing.T) {
 func TestResolveAEAKeyUsesDatabaseWhenExplicitKeyMissing(t *testing.T) {
 	dbPath := writeAEAKeyDB(t, []types.AEAKeyEntry{
 		{
-			Filename: "iPhone18,1_26.4_23E5218e_Restore.ipsw",
+			Filename: "iPhone18,1_26.4_23E5218e_Restore.ota",
 			Key:      "db-key",
 		},
 	})
 
-	otaPath := filepath.Join("/tmp", "iPhone18,1_26.4_23E5218e_Restore.ipsw")
+	otaPath := filepath.Join("/tmp", "iPhone18,1_26.4_23E5218e_Restore.ota")
 	conf := ResolveAEAKey(otaPath, dbPath, "", false)
 
 	if conf.SymmetricKey != "db-key" {
