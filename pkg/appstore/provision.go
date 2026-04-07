@@ -86,6 +86,9 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 		return fmt.Errorf("failed saving %s certificate file %s: %w", typeLabel, certPath, err)
 	}
 	log.Infof("%s Certificate ID: %s (Saved to %s)", typeLabel, certResource.ID, certPath)
+	// Bundle cert+key as P12 and optionally install the identity into Keychain.
+	// This runs BEFORE the profile step so that even if profile creation fails,
+	// the codesigning identity is available for manual use.
 	if generatedKeyPath != "" {
 		log.Infof("Generated Private Key saved to: %s", generatedKeyPath)
 		p12Filename := fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID)
@@ -94,14 +97,35 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 			log.Warnf("Failed to bundle cert+key as P12: %v (cert and key saved separately)", err)
 		} else {
 			log.Infof("Certificate + key bundled as %s (password: \"ipsw\")", p12Path)
+			if conf.Install {
+				if err := installP12(p12Path, "ipsw"); err != nil {
+					log.Warnf("Failed to install P12 into Keychain: %v", err)
+					utils.Indent(log.Warn, 2)("Install manually: security import " + p12Path + " -k login.keychain-db -P ipsw -T /usr/bin/codesign")
+				} else {
+					log.Infof("Certificate + key identity installed from %s", p12Path)
+				}
+				if err := ensureWWDRG3(); err != nil {
+					log.Warnf("Failed to install Apple WWDR G3 intermediate: %v", err)
+					utils.Indent(log.Warn, 2)("Download from https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer and import manually")
+				}
+			}
+		}
+	} else if conf.Install {
+		// No generated key — install cert only (user provided their own key)
+		if err := InstallCertificateAndKey(certPath, ""); err != nil {
+			log.Warnf("Failed to install certificate into Keychain: %v", err)
+		} else {
+			log.Infof("Certificate %s installed into login keychain.", certFilename)
+		}
+		if err := ensureWWDRG3(); err != nil {
+			log.Warnf("Failed to install Apple WWDR G3 intermediate: %v", err)
+			utils.Indent(log.Warn, 2)("Download from https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer and import manually")
 		}
 	}
 
 	log.Infof("Checking for %s Provisioning Profile...", typeLabel)
 	profileResource, err := as.ensureProvisioningProfile(conf.BundleID, certResource.ID, requiredProfileType, typeLabel)
 	if err != nil {
-		// Don't delete cert+key: the certificate already exists on Apple's side.
-		// Deleting the private key would make it permanently unusable.
 		if generatedKeyPath != "" {
 			log.Warnf("Profile step failed but cert + key are saved at %s and %s; "+
 				"retry with `ipsw appstore profile create`", certPath, generatedKeyPath)
@@ -120,30 +144,6 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	log.Infof("%s Provisioning Profile ID: %s (Saved to %s)", typeLabel, profileResource.ID, profilePath)
 
 	if conf.Install {
-		log.Info("Installing assets locally...")
-		// Use P12 import for proper cert+key pairing in Keychain
-		p12Path := filepath.Join(conf.Output, fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID))
-		if _, err := os.Stat(p12Path); err == nil {
-			if err := installP12(p12Path, "ipsw"); err != nil {
-				log.Warnf("Failed to install P12 into Keychain: %v", err)
-				utils.Indent(log.Warn, 2)("You may need to install manually: security import " + p12Path + " -k login.keychain-db -P ipsw -T /usr/bin/codesign")
-			} else {
-				log.Infof("Certificate + key identity installed from %s", p12Path)
-			}
-		} else {
-			// Fallback to separate import if P12 wasn't created
-			if err := InstallCertificateAndKey(certPath, generatedKeyPath); err != nil {
-				log.Warnf("Failed to install certificate/key into Keychain: %v", err)
-				utils.Indent(log.Warn, 2)("You may need to install them manually")
-			} else {
-				log.Infof("Certificate %s and associated key installed into login keychain.", certFilename)
-			}
-		}
-		// Ensure WWDR G3 intermediate is present for chain validation
-		if err := ensureWWDRG3(); err != nil {
-			log.Warnf("Failed to install Apple WWDR G3 intermediate: %v", err)
-			utils.Indent(log.Warn, 2)("Download from https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer and import manually")
-		}
 		log.Info("Installing Provisioning Profile...")
 		if installedName, err := InstallProvisioningProfile(profilePath); err != nil {
 			log.Warnf("Failed to install provisioning profile: %v", err)
@@ -263,7 +263,9 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 	}
 	if bundle == nil {
 		log.Infof("Bundle ID '%s' not found, registering...", bundleIDIdentifier)
-		resp, err := as.RegisterBundleID(bundleIDIdentifier, bundleIDIdentifier)
+		// ASC name field requires alphanumeric+spaces only; replace dots.
+		displayName := strings.ReplaceAll(bundleIDIdentifier, ".", " ")
+		resp, err := as.RegisterBundleID(displayName, bundleIDIdentifier)
 		if err != nil {
 			return nil, fmt.Errorf("registering bundle ID '%s': %w", bundleIDIdentifier, err)
 		}
