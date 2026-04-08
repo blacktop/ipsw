@@ -43,6 +43,7 @@ func init() {
 	ASProvisionGenerateCmd.Flags().StringP("email", "e", "", "Email address to use for the certificate")
 	ASProvisionGenerateCmd.Flags().StringP("country", "c", "US", "Country code for certificate subject (e.g., US, GB)")
 	ASProvisionGenerateCmd.Flags().Bool("install", false, "Install the certificate and profile")
+	ASProvisionGenerateCmd.Flags().Bool("keep-key", false, "Keep private key files on disk after Keychain import")
 	ASProvisionGenerateCmd.Flags().StringP("output", "o", "", "Folder to save files to")
 	ASProvisionGenerateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.provision.gen.type", ASProvisionGenerateCmd.Flags().Lookup("type"))
@@ -51,6 +52,7 @@ func init() {
 	viper.BindPFlag("appstore.provision.gen.email", ASProvisionGenerateCmd.Flags().Lookup("email"))
 	viper.BindPFlag("appstore.provision.gen.country", ASProvisionGenerateCmd.Flags().Lookup("country"))
 	viper.BindPFlag("appstore.provision.gen.install", ASProvisionGenerateCmd.Flags().Lookup("install"))
+	viper.BindPFlag("appstore.provision.gen.keep-key", ASProvisionGenerateCmd.Flags().Lookup("keep-key"))
 	viper.BindPFlag("appstore.provision.gen.output", ASProvisionGenerateCmd.Flags().Lookup("output"))
 }
 
@@ -145,6 +147,7 @@ for Xcode code signing.`,
 			Email:    email,
 			Country:  country,
 			Install:  install,
+			KeepKey:  viper.GetBool("appstore.provision.gen.keep-key"),
 			Output:   outputDir,
 		}); err != nil {
 			return fmt.Errorf("failed to get provision signing files: %w", err)
