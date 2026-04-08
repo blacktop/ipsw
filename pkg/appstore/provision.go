@@ -436,10 +436,14 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 			}
 		}
 		log.Infof("No suitable active profile found named '%s'. Proceeding to create.", profileName)
-		// Clean up INVALID profiles with the same name to avoid 409 on create
+		// Every profile with this name failed the find-suitable checks above
+		// (wrong cert, INVALID, wrong bundle, etc). The name is taken Apple-side;
+		// create will 409. Delete all name-matches — they're all stale.
+		// (Apple's INVALID propagation is async after cert revoke, so checking
+		// IsInvalid() alone misses the immediate-rerun race window.)
 		for _, p := range allProfiles {
-			if p.Attributes.Name == profileName && p.IsInvalid() {
-				log.Infof("Deleting stale INVALID profile %s", p.ID)
+			if p.Attributes.Name == profileName {
+				log.Infof("Deleting stale profile %s (%s)", p.ID, p.Attributes.ProfileState)
 				if err := as.DeleteProfile(p.ID); err != nil {
 					log.Warnf("Could not delete stale profile %s: %v (create may 409)", p.ID, err)
 				}
