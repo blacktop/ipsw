@@ -7,13 +7,16 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
+	"github.com/ulikunitz/xz"
 )
 
 const magic = "BXDIFF50"
@@ -48,22 +51,56 @@ func readOffset(data []byte) int64 {
 	return offset
 }
 
+// xzMagic identifies an XZ stream (fd 37 7a 58 5a 00).
+var xzMagic = []byte{0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00}
+
+// decompressStream handles both PBZX and raw XZ compressed data.
+func decompressStream(data []byte) ([]byte, error) {
+	if len(data) >= 6 && bytes.Equal(data[:6], xzMagic) {
+		// Raw XZ stream
+		r, err := xz.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create XZ reader: %w", err)
+		}
+		return io.ReadAll(r)
+	}
+	// Try PBZX
+	var buf bytes.Buffer
+	if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &buf, runtime.NumCPU()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func Patch(patch, target, output string) (err error) {
-	dat, err := os.ReadFile(patch)
+	f, err := os.Open(patch)
 	if err != nil {
 		return err
 	}
-
-	r := bytes.NewReader(dat)
+	defer f.Close()
 
 	var header Header
-	if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
+	if err := binary.Read(f, binary.LittleEndian, &header); err != nil {
 		return err
 	}
 
 	if string(header.Magic[:]) != magic {
 		return errors.New("patch has invalid BXDIFF50 magic")
 	}
+
+	// Full-replacement mode: controlSize=0 means the data after the header
+	// is PBZX-format chunks. Stream directly without loading into memory.
+	if header.ControlSize == 0 {
+		return extractFullReplacement(f, header, output, filepath.Base(target))
+	}
+
+	// For delta patches, load into memory (they need random access via bsdiff)
+	f.Seek(int64(binary.Size(header)), io.SeekStart)
+	dat, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	r := bytes.NewReader(dat)
 
 	tf, err := os.Open(target)
 	if err != nil {
@@ -86,11 +123,11 @@ func Patch(patch, target, output string) (err error) {
 	if _, err := r.Read(compControl); err != nil {
 		return err
 	}
-	var cbuf bytes.Buffer
-	if err := pbzx.Extract(context.Background(), bytes.NewReader(compControl), &cbuf, runtime.NumCPU()); err != nil {
-		return err
+	controlData, err := decompressStream(compControl)
+	if err != nil {
+		return fmt.Errorf("failed to decompress control data: %w", err)
 	}
-	cr := bytes.NewReader(cbuf.Bytes())
+	cr := bytes.NewReader(controlData)
 
 	// parse controls
 	in := make([]byte, 8)
@@ -126,11 +163,11 @@ func Patch(patch, target, output string) (err error) {
 	if _, err := r.Read(compDiff); err != nil {
 		return err
 	}
-	var dbuf bytes.Buffer
-	if err := pbzx.Extract(context.Background(), bytes.NewReader(compDiff), &dbuf, runtime.NumCPU()); err != nil {
-		return err
+	diffData, err := decompressStream(compDiff)
+	if err != nil {
+		return fmt.Errorf("failed to decompress diff data: %w", err)
 	}
-	dr := bytes.NewReader(dbuf.Bytes())
+	dr := bytes.NewReader(diffData)
 
 	// parse extra data
 	compExtra := make([]byte, header.ExtraSize)
@@ -138,11 +175,11 @@ func Patch(patch, target, output string) (err error) {
 		return err
 	}
 
-	var ebuf bytes.Buffer
-	if err := pbzx.Extract(context.Background(), bytes.NewReader(compExtra), &ebuf, runtime.NumCPU()); err != nil {
-		return err
+	extraData, err := decompressStream(compExtra)
+	if err != nil {
+		return fmt.Errorf("failed to decompress extra data: %w", err)
 	}
-	er := bytes.NewReader(ebuf.Bytes())
+	er := bytes.NewReader(extraData)
 
 	var obuf bytes.Buffer
 
@@ -199,6 +236,89 @@ func Patch(patch, target, output string) (err error) {
 		return err
 	}
 	fname := filepath.Join(output, filepath.Base(target)+".patched")
-	log.Infof("Writing patched file to: %s", fname)
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
 	return os.WriteFile(fname, obuf.Bytes(), 0o660)
+}
+
+// extractFullReplacement handles BXDIFF50 patches with controlSize=0.
+// The data is PBZX-format chunks (inflateSize/deflateSize BE pairs + XZ data)
+// but the first chunk has no size pair — it starts with XZ directly.
+// We find the first chunk boundary, synthesize a PBZX header, and delegate
+// to the existing PBZX extractor.
+func extractFullReplacement(r io.Reader, _ Header, output, baseName string) error {
+	utils.Indent(log.Info, 2)("Decompressing full-replacement BXDIFF50 patch...")
+
+	if err := os.MkdirAll(output, 0o750); err != nil {
+		return err
+	}
+
+	fname := filepath.Join(output, baseName)
+	outFile, err := os.Create(fname)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	// Read enough data to find the first XZ stream's end.
+	// The first chunk is typically ~16KB compressed for 1MB decompressed.
+	// Read 256KB to be safe, then find the YZ footer.
+	probe := make([]byte, 256*1024)
+	n, err := io.ReadFull(r, probe)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return fmt.Errorf("failed to read patch data: %w", err)
+	}
+	probe = probe[:n]
+
+	firstEnd := findXZStreamEnd(probe)
+	if firstEnd <= 0 {
+		// Single small XZ stream or can't find boundary — try direct XZ
+		combined := io.MultiReader(bytes.NewReader(probe), r)
+		xzr, err := xz.NewReader(combined)
+		if err != nil {
+			return fmt.Errorf("failed to read XZ stream: %w", err)
+		}
+		if _, err := io.Copy(outFile, xzr); err != nil {
+			return fmt.Errorf("XZ decompression failed: %w", err)
+		}
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
+		return nil
+	}
+
+	// Synthesize PBZX header + first chunk size pair, then stream the rest
+	var hdr bytes.Buffer
+	hdr.WriteString("pbzx")
+	binary.Write(&hdr, binary.BigEndian, uint64(0x100000)) // blockSize = 1MB
+	binary.Write(&hdr, binary.BigEndian, uint64(0x100000)) // first inflateSize
+	binary.Write(&hdr, binary.BigEndian, uint64(firstEnd)) // first deflateSize
+
+	// Assemble: [synth header][probe data][remaining stream data]
+	pbzxStream := io.MultiReader(&hdr, bytes.NewReader(probe), r)
+
+	if err := pbzx.Extract(context.Background(), pbzxStream, outFile, runtime.NumCPU()); err != nil {
+		return fmt.Errorf("decompression failed: %w", err)
+	}
+
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
+	return nil
+}
+
+// findXZStreamEnd scans for the end of the first XZ stream.
+// XZ footers end with 'YZ' (0x59, 0x5a). We verify by checking that
+// the bytes following (aligned to 4) look like a PBZX chunk header.
+func findXZStreamEnd(data []byte) int {
+	for i := 10; i < len(data)-16; i++ {
+		if data[i] == 0x59 && data[i+1] == 0x5a {
+			end := (i + 2 + 3) &^ 3
+			if end+16 > len(data) {
+				continue
+			}
+			inflateSize := binary.BigEndian.Uint64(data[end : end+8])
+			deflateSize := binary.BigEndian.Uint64(data[end+8 : end+16])
+			if inflateSize > 0 && inflateSize <= 0x4000000 &&
+				deflateSize > 0 && deflateSize <= inflateSize {
+				return end
+			}
+		}
+	}
+	return -1
 }

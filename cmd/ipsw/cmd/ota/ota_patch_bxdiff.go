@@ -113,46 +113,7 @@ var otaPatchBxdiffCmd = &cobra.Command{
 			m := bxdiffPatchRE.FindStringSubmatch(zf.Name)
 			subdir := m[1] // "patches" or "basesystem_patches"
 
-			// Find corresponding base file in input folder
-			if input == "" {
-				// No input folder — extract the raw BXDIFF patch for the user
-				outDir := filepath.Join(output, subdir)
-				if err := os.MkdirAll(outDir, 0o755); err != nil {
-					return fmt.Errorf("failed to create output directory: %v", err)
-				}
-				outPath := filepath.Join(outDir, patchName)
-				rc, err := zf.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open %s in zip: %v", zf.Name, err)
-				}
-				outFile, err := os.Create(outPath)
-				if err != nil {
-					rc.Close()
-					return fmt.Errorf("failed to create %s: %v", outPath, err)
-				}
-				if _, err := io.Copy(outFile, rc); err != nil {
-					outFile.Close()
-					rc.Close()
-					os.Remove(outPath)
-					return fmt.Errorf("failed to extract %s: %v", zf.Name, err)
-				}
-				outFile.Close()
-				rc.Close()
-				log.Infof("Extracted %s/%s (BXDIFF50 — use -s with a base file to patch, or -i to batch patch)", subdir, patchName)
-				patched++
-				continue
-			}
-
-			basePath := filepath.Join(input, patchName)
-			if _, err := os.Stat(basePath); os.IsNotExist(err) {
-				basePath = filepath.Join(input, subdir, patchName)
-				if _, err := os.Stat(basePath); os.IsNotExist(err) {
-					log.Warnf("Skipping %s: no base file found at %s", zf.Name, patchName)
-					continue
-				}
-			}
-
-			// Extract patch from ZIP to temp file
+			// Extract patch from ZIP to temp
 			tmpPatch, err := extractZipEntry(zf)
 			if err != nil {
 				return fmt.Errorf("failed to extract patch %s: %v", zf.Name, err)
@@ -164,7 +125,37 @@ var otaPatchBxdiffCmd = &cobra.Command{
 				return fmt.Errorf("failed to create output directory: %v", err)
 			}
 
-			log.Infof("Patching %s/%s", subdir, patchName)
+			if input == "" {
+				// No input folder — Patch() handles controlSize=0 (full replacement)
+				// by decompressing the XZ stream directly. For delta patches,
+				// it will fail — that's expected (need -i with base files).
+				log.Infof("Processing %s/%s...", subdir, patchName)
+				// Create a dummy empty target with the right name for output naming
+				dummyTarget := filepath.Join(os.TempDir(), patchName)
+				os.WriteFile(dummyTarget, nil, 0o644)
+				if err := bxdiff50.Patch(tmpPatch, dummyTarget, outDir); err != nil {
+					os.Remove(tmpPatch)
+					os.Remove(dummyTarget)
+					log.Errorf("failed to process %s: %v (may need -i with base files for delta patches)", patchName, err)
+					continue
+				}
+				os.Remove(tmpPatch)
+				os.Remove(dummyTarget)
+				patched++
+				continue
+			}
+
+			basePath := filepath.Join(input, patchName)
+			if _, err := os.Stat(basePath); os.IsNotExist(err) {
+				basePath = filepath.Join(input, subdir, patchName)
+				if _, err := os.Stat(basePath); os.IsNotExist(err) {
+					os.Remove(tmpPatch)
+					log.Warnf("Skipping %s: no base file found at %s", zf.Name, patchName)
+					continue
+				}
+			}
+
+			log.Infof("Patching %s/%s...", subdir, patchName)
 			if err := bxdiff50.Patch(tmpPatch, basePath, outDir); err != nil {
 				os.Remove(tmpPatch)
 				log.Errorf("failed to patch %s: %v", patchName, err)
