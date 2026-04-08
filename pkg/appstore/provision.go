@@ -34,6 +34,7 @@ type ProvisionSigningFilesConfig struct {
 	Email    string
 	Country  string
 	Install  bool
+	KeepKey  bool
 	Output   string
 }
 
@@ -119,24 +120,36 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 	// This runs BEFORE the profile step so that even if profile creation fails,
 	// the codesigning identity is available for manual use.
 	if generatedKeyPath != "" {
-		log.Infof("Generated Private Key saved to: %s", generatedKeyPath)
 		p12Filename := fmt.Sprintf("%s_%s.p12", strings.ToLower(typeLabel), certResource.ID)
 		p12Path := filepath.Join(conf.Output, p12Filename)
 		if err := bundlePKCS12(certPath, generatedKeyPath, p12Path, "ipsw"); err != nil {
 			log.Warnf("Failed to bundle cert+key as P12: %v (cert and key saved separately)", err)
+			log.Warnf("‼️  Private key saved to %s — secure or delete after manual import", generatedKeyPath)
 		} else {
-			log.Infof("Certificate + key bundled as %s (password: \"ipsw\")", p12Path)
+			log.Infof("Certificate + key bundled as %s", p12Path)
 			if conf.Install {
 				if err := installP12(p12Path, "ipsw"); err != nil {
 					log.Warnf("Failed to install P12 into Keychain: %v", err)
 					utils.Indent(log.Warn, 2)("Install manually: security import " + p12Path + " -k login.keychain-db -P ipsw -T /usr/bin/codesign")
+					log.Warnf("‼️  Private key files retained at %s and %s (p12 password: \"ipsw\")", generatedKeyPath, p12Path)
 				} else {
-					log.Infof("Certificate + key identity installed from %s", p12Path)
+					log.Infof("Certificate + key identity installed into Keychain")
+					if !conf.KeepKey {
+						os.Remove(generatedKeyPath)
+						os.Remove(p12Path)
+						log.Infof("Removed on-disk private key files (Keychain is canonical). Use --keep-key to retain.")
+					} else {
+						log.Warnf("‼️  Private key files retained at %s and %s (p12 password: \"ipsw\"). Back up offline then delete.",
+							generatedKeyPath, p12Path)
+					}
 				}
 				if err := ensureWWDRG3(); err != nil {
 					log.Warnf("Failed to install Apple WWDR G3 intermediate: %v", err)
 					utils.Indent(log.Warn, 2)("Download from https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer and import manually")
 				}
+			} else {
+				log.Warnf("‼️  Private key files saved at %s and %s (p12 password: \"ipsw\"). Secure or delete after import.",
+					generatedKeyPath, p12Path)
 			}
 		}
 	} else if conf.Install {
