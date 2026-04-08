@@ -137,6 +137,7 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 					if !conf.KeepKey {
 						os.Remove(generatedKeyPath)
 						os.Remove(p12Path)
+						generatedKeyPath = "" // nothing on disk to reference
 						log.Infof("Removed on-disk private key files (Keychain is canonical). Use --keep-key to retain.")
 					} else {
 						log.Warnf("‼️  Private key files retained at %s and %s (p12 password: \"ipsw\"). Back up offline then delete.",
@@ -171,6 +172,10 @@ func (as *AppStore) ProvisionSigningFiles(conf *ProvisionSigningFilesConfig) err
 		if generatedKeyPath != "" {
 			log.Warnf("Profile step failed but cert + key are saved at %s and %s; "+
 				"retry with `ipsw appstore profile create`", certPath, generatedKeyPath)
+		} else if conf.Install {
+			log.Warnf("Profile step failed. Cert identity is in Keychain; "+
+				"retry with `ipsw appstore profile create --bundle-id %s --certs %s`",
+				conf.BundleID, certResource.ID)
 		} else {
 			log.Warnf("Profile step failed but cert is saved at %s; "+
 				"retry with `ipsw appstore profile create`", certPath)
@@ -431,6 +436,15 @@ func (as *AppStore) ensureProvisioningProfile(bundleIDIdentifier string, certID 
 			}
 		}
 		log.Infof("No suitable active profile found named '%s'. Proceeding to create.", profileName)
+		// Clean up INVALID profiles with the same name to avoid 409 on create
+		for _, p := range allProfiles {
+			if p.Attributes.Name == profileName && p.IsInvalid() {
+				log.Infof("Deleting stale INVALID profile %s", p.ID)
+				if err := as.DeleteProfile(p.ID); err != nil {
+					log.Warnf("Could not delete stale profile %s: %v (create may 409)", p.ID, err)
+				}
+			}
+		}
 	}
 
 	log.Infof("Attempting to create a new %s Provisioning Profile...", typeLabel)
