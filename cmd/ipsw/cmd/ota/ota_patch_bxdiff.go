@@ -37,7 +37,8 @@ import (
 )
 
 // bxdiffPatchRE matches BXDIFF patch files in both patches/ and basesystem_patches/
-var bxdiffPatchRE = regexp.MustCompile(`AssetData/payloadv2/(patches|basesystem_patches)/[^/]+$`)
+// Excludes .ecc (error correction) files.
+var bxdiffPatchRE = regexp.MustCompile(`AssetData/payloadv2/(patches|basesystem_patches)/[^/]+\.dmg$`)
 
 func init() {
 	otaPatchCmd.AddCommand(otaPatchBxdiffCmd)
@@ -73,10 +74,6 @@ var otaPatchBxdiffCmd = &cobra.Command{
 
 		if single {
 			return bxdiff50.Patch(args[0], args[1], output)
-		}
-
-		if input == "" {
-			return fmt.Errorf("batch mode requires --input (-i) folder containing base files to patch against")
 		}
 
 		patchPath := filepath.Clean(args[0])
@@ -117,9 +114,37 @@ var otaPatchBxdiffCmd = &cobra.Command{
 			subdir := m[1] // "patches" or "basesystem_patches"
 
 			// Find corresponding base file in input folder
+			if input == "" {
+				// No input folder — extract the raw BXDIFF patch for the user
+				outDir := filepath.Join(output, subdir)
+				if err := os.MkdirAll(outDir, 0o755); err != nil {
+					return fmt.Errorf("failed to create output directory: %v", err)
+				}
+				outPath := filepath.Join(outDir, patchName)
+				rc, err := zf.Open()
+				if err != nil {
+					return fmt.Errorf("failed to open %s in zip: %v", zf.Name, err)
+				}
+				outFile, err := os.Create(outPath)
+				if err != nil {
+					rc.Close()
+					return fmt.Errorf("failed to create %s: %v", outPath, err)
+				}
+				if _, err := io.Copy(outFile, rc); err != nil {
+					outFile.Close()
+					rc.Close()
+					os.Remove(outPath)
+					return fmt.Errorf("failed to extract %s: %v", zf.Name, err)
+				}
+				outFile.Close()
+				rc.Close()
+				log.Infof("Extracted %s/%s (BXDIFF50 — use -s with a base file to patch, or -i to batch patch)", subdir, patchName)
+				patched++
+				continue
+			}
+
 			basePath := filepath.Join(input, patchName)
 			if _, err := os.Stat(basePath); os.IsNotExist(err) {
-				// Try with subdir prefix
 				basePath = filepath.Join(input, subdir, patchName)
 				if _, err := os.Stat(basePath); os.IsNotExist(err) {
 					log.Warnf("Skipping %s: no base file found at %s", zf.Name, patchName)
