@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/blacktop/ipsw/internal/utils"
 )
@@ -363,6 +364,7 @@ var propertyTypeMap = map[int]PropType{
 	// Hash/binary properties (stored as OCTET STRING, display as hex)
 	fourCCtoInt("srvn"): PropTypeHash, // srvn - Security revision number
 	fourCCtoInt("snon"): PropTypeHash, // snon - Security nonce
+	fourCCtoInt("ynon"): PropTypeHash, // ynon - Yonkers nonce
 	fourCCtoInt("BNCH"): PropTypeHash, // BNCH - Boot nonce hash
 	fourCCtoInt("DGST"): PropTypeHash, // DGST - Digest (hash value)
 	fourCCtoInt("tbmr"): PropTypeHash, // tbmr - Trusted boot measurement register
@@ -470,8 +472,14 @@ func getPropertyType(tag int) PropType {
 	return PropTypeAuto // Auto-detect for unknown properties
 }
 
-// isPrintableString checks if a string contains only printable characters
+// isPrintableString checks if a string contains only printable characters.
+// Invalid UTF-8 must be rejected first: ranging over it yields RuneError (U+FFFD)
+// per bad byte, and IsPrint(U+FFFD) is true — so e.g. 0xAA*16 (a nonce) would
+// otherwise pass and render as garbage.
 func isPrintableString(s string) bool {
+	if !utf8.ValidString(s) {
+		return false
+	}
 	for _, r := range s {
 		if !unicode.IsPrint(r) && !unicode.IsSpace(r) {
 			return false
