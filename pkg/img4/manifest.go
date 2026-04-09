@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"slices"
 	"strconv"
@@ -486,6 +487,24 @@ func (m *Manifest) String() string {
 			if len(cert.Subject.Organization) > 0 {
 				sb.WriteString(fmt.Sprintf("    %s:  %s\n", colorField("Organization"), cert.Subject.Organization[0]))
 			}
+			if cs := extractCertConstraints(cert); len(cs) > 0 {
+				sb.WriteString(fmt.Sprintf("    %s (1.2.840.113635.100.6.1.15):\n", colorField("Constraints")))
+				writeConstraints(&sb, cs, "      ")
+			}
+		} else if im4c, err := parseIM4C(m.CertChain.Bytes); err == nil {
+			sb.WriteString(fmt.Sprintf("    %s:        IM4C\n", colorField("Type")))
+			sb.WriteString(fmt.Sprintf("    %s:     %d\n", colorField("Version"), im4c.Version))
+			if len(im4c.PublicKey) > 0 {
+				sb.WriteString(fmt.Sprintf("    %s:  %d bytes (%s)\n", colorField("Public Key"), len(im4c.PublicKey), describePublicKey(im4c.PublicKey)))
+				sb.WriteString(fmt.Sprintf("      %x\n", im4c.PublicKey))
+			}
+			if len(im4c.Signature) > 0 {
+				sb.WriteString(fmt.Sprintf("    %s:   %d bytes (%s)\n", colorField("Signature"), len(im4c.Signature), analyzeSignature(im4c.Signature)))
+			}
+			if len(im4c.Constraints) > 0 {
+				sb.WriteString(fmt.Sprintf("    %s (CRTP):\n", colorField("Constraints")))
+				writeConstraints(&sb, im4c.Constraints, "      ")
+			}
 		}
 	} else {
 		sb.WriteString("  Certificate Chain: none\n")
@@ -517,7 +536,27 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 		data["signature"] = m.Signature
 	}
 	if len(m.CertChain.Bytes) > 0 {
-		data["certificate_chain"] = m.CertChain.Bytes
+		chain := map[string]any{"raw": m.CertChain.Bytes}
+		if cert, err := parseCertificateFromChain(m.CertChain.Bytes); err == nil && cert != nil {
+			chain["type"] = "x509"
+			chain["subject"] = cert.Subject.CommonName
+			chain["issuer"] = cert.Issuer.CommonName
+			chain["serial"] = cert.SerialNumber.Text(16)
+			chain["not_before"] = cert.NotBefore
+			chain["not_after"] = cert.NotAfter
+			if cs := extractCertConstraints(cert); len(cs) > 0 {
+				chain["constraints"] = constraintGroupsToMap(cs)
+			}
+		} else if im4c, err := parseIM4C(m.CertChain.Bytes); err == nil {
+			chain["type"] = "im4c"
+			chain["version"] = im4c.Version
+			chain["public_key"] = im4c.PublicKey
+			chain["signature"] = im4c.Signature
+			if len(im4c.Constraints) > 0 {
+				chain["constraints"] = constraintGroupsToMap(im4c.Constraints)
+			}
+		}
+		data["certificate_chain"] = chain
 	}
 	return json.Marshal(data)
 }
@@ -647,15 +686,48 @@ func analyzeSignature(signature []byte) string {
 	case 512:
 		return "RSA-4096"
 	case 64:
-		return "ECDSA P-256 (or DER-encoded variable length)"
+		return "ECDSA P-256 (raw r||s)"
 	case 96:
-		return "ECDSA P-384 (or DER-encoded variable length)"
-	default:
-		// For DER-encoded ECDSA signatures, try to detect the format
-		if len(signature) > 6 && signature[0] == 0x30 {
-			return fmt.Sprintf("DER-encoded signature (%d bytes)", len(signature))
+		return "ECDSA P-384 (raw r||s)"
+	}
+	// DER-encoded ECDSA: SEQUENCE { INTEGER r, INTEGER s }. Each integer is up
+	// to curve-size bytes plus a possible leading 0x00 sign byte, so total
+	// length floats. Infer curve from the size of the larger integer.
+	if len(signature) > 6 && signature[0] == 0x30 {
+		var sig struct{ R, S *big.Int }
+		if _, err := asn1.Unmarshal(signature, &sig); err == nil && sig.R != nil && sig.S != nil {
+			n := max((sig.R.BitLen()+7)/8, (sig.S.BitLen()+7)/8)
+			switch {
+			case n <= 32:
+				return "ECDSA P-256 (DER)"
+			case n <= 48:
+				return "ECDSA P-384 (DER)"
+			case n <= 66:
+				return "ECDSA P-521 (DER)"
+			}
 		}
-		return fmt.Sprintf("Unknown (%d bytes)", len(signature))
+		return "DER-encoded signature"
+	}
+	return fmt.Sprintf("Unknown (%d bytes)", len(signature))
+}
+
+// describePublicKey returns a curve guess for a raw uncompressed/compressed EC point.
+func describePublicKey(pk []byte) string {
+	switch len(pk) {
+	case 64:
+		return "EC P-256 raw"
+	case 65:
+		return "EC P-256 uncompressed"
+	case 96:
+		return "EC P-384 raw"
+	case 97:
+		return "EC P-384 uncompressed"
+	case 33:
+		return "EC P-256 compressed"
+	case 49:
+		return "EC P-384 compressed"
+	default:
+		return "raw"
 	}
 }
 
