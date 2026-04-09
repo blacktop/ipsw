@@ -214,17 +214,8 @@
     }
   },
   "latest_ipsw": {
-    "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    },
+    "ios_url": "",
+    "macos_url": "https://updates.cdn-apple.com/2026WinterFCS/fullrestores/122-28781/DCB2FF13-06CB-44C2-BCA2-DFCAF3521D46/UniversalMac_26.4.1_25E253_Restore.ipsw",
     "url": "https://updates.cdn-apple.com/2026SpringFCS/fullrestores/122-03453/2D779380-A8AB-4612-B820-43A317AE66D1/iPhone17,1_26.4_23E246_Restore.ipsw"
   }
 }
