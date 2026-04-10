@@ -12,8 +12,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
@@ -114,15 +116,146 @@ type PCCRelease struct {
 	*ATLeaf
 }
 
-type ByPccIndex []*PCCRelease
+// CloudOSInfo returns the com.apple.cloudos.cloudOSInfo preference values
+// from DarwinInit. Build version is always populated; train and app appear
+// only on newer releases.
+func (r *PCCRelease) CloudOSInfo() (build, train, app string) {
+	di := r.GetDarwinInit()
+	if di == nil {
+		return
+	}
+	prefs, _ := di.AsMap()["preferences"].([]any)
+	for _, p := range prefs {
+		m, _ := p.(map[string]any)
+		if m["application_id"] != "com.apple.cloudos.cloudOSInfo" {
+			continue
+		}
+		v, _ := m["value"].(string)
+		switch m["key"] {
+		case "cloudOSBuildVersion":
+			build = v
+		case "cloudOSBuildTrain":
+			train = v
+		case "cloudOSApplicationName":
+			app = v
+		}
+	}
+	return
+}
 
-func (a ByPccIndex) Len() int           { return len(a) }
-func (a ByPccIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByPccIndex) Less(i, j int) bool { return a[i].Index > a[j].Index }
+// OSAssetURL returns the URL of the ASSET_TYPE_OS asset (the IPSW).
+func (r *PCCRelease) OSAssetURL() string {
+	for _, a := range r.GetAssets() {
+		if a.GetType() == pcc.ReleaseMetadata_ASSET_TYPE_OS {
+			return a.GetUrl()
+		}
+	}
+	return ""
+}
+
+// PCCVersion is the ProductVersion/Build pair from an OS asset's BuildManifest.
+type PCCVersion struct {
+	Version string `json:"v"`
+	Build   string `json:"b"`
+}
+
+// ResolvePCCVersions partial-zips each release's OS asset to read
+// BuildManifest.plist's ProductVersion. Results are cached by asset digest
+// (immutable URL path) so subsequent runs are instant. Failures (the newest
+// releases sometimes 403 before CDN sync) are not cached and retry next run.
+func ResolvePCCVersions(releases []*PCCRelease, fetch func(url string) (PCCVersion, error)) map[string]PCCVersion {
+	cache := loadPCCVersionCache()
+
+	type job struct{ digest, url string }
+	var jobs []job
+	out := make(map[string]PCCVersion, len(releases))
+	queued := make(map[string]bool)
+	for _, r := range releases {
+		url := r.OSAssetURL()
+		if url == "" {
+			continue
+		}
+		digest := path.Base(url)
+		if v, ok := cache[digest]; ok {
+			out[digest] = v
+			continue
+		}
+		// Many releases (TIE/TIE Proxy/PCC Agent variants) share one OS
+		// asset digest — fetch each digest once, not once per release.
+		if queued[digest] {
+			continue
+		}
+		queued[digest] = true
+		jobs = append(jobs, job{digest, url})
+	}
+	if len(jobs) == 0 {
+		return out
+	}
+
+	log.Infof("Resolving %d uncached PCC OS versions...", len(jobs))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for _, j := range jobs {
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			v, err := fetch(j.url)
+			if err != nil || v.Version == "" {
+				log.Debugf("resolve %s: %v", j.digest, err)
+				return
+			}
+			mu.Lock()
+			out[j.digest] = v
+			cache[j.digest] = v
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+
+	savePCCVersionCache(cache)
+	return out
+}
+
+func loadPCCVersionCache() map[string]PCCVersion {
+	cache := make(map[string]PCCVersion)
+	dir, err := getCacheDir()
+	if err != nil {
+		return cache
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "pcc_versions.json"))
+	if err != nil {
+		return cache
+	}
+	json.Unmarshal(data, &cache)
+	return cache
+}
+
+func savePCCVersionCache(cache map[string]PCCVersion) {
+	dir, err := getCacheDir()
+	if err != nil {
+		return
+	}
+	data, err := json.Marshal(cache)
+	if err != nil {
+		return
+	}
+	os.WriteFile(filepath.Join(dir, "pcc_versions.json"), data, 0o644)
+}
 
 func (r *PCCRelease) String() string {
 	var out strings.Builder
 	out.WriteString(fmt.Sprintf("%d) %s\n", r.Index, colorHash(pccReleaseHashString(r))))
+	if build, train, app := r.CloudOSInfo(); build != "" {
+		out.WriteString(fmt.Sprintf(colorField("Build")+":  %s", colorName(build)))
+		if train != "" {
+			out.WriteString(fmt.Sprintf(" (%s)", train))
+		}
+		if app != "" {
+			out.WriteString(fmt.Sprintf("  %s", colorTypeField(app)))
+		}
+		out.WriteString("\n")
+	}
 	out.WriteString(fmt.Sprintf(colorField("Type")+":   %s\n", pcc.ATLogDataType(r.Type).String()))
 	out.WriteString(fmt.Sprintf(colorField("Schema")+": %s\n", string(r.SchemaVersion.String())))
 	out.WriteString(colorField("Assets\n"))
@@ -160,6 +293,32 @@ func (r *PCCRelease) String() string {
 }
 
 func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
+	// Preflight: HEAD every asset before downloading anything. The newest
+	// releases sometimes 403 on the OS IPSW before CDN sync — fail now
+	// rather than after pulling several GB of other assets.
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+	for _, asset := range r.GetAssets() {
+		req, err := http.NewRequest(http.MethodHead, asset.GetUrl(), nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("preflight %s: %w", asset.GetType(), err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("asset %s unavailable (HTTP %d) — newest releases may not be on the CDN yet; try an older release or retry later",
+				strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), resp.StatusCode)
+		}
+	}
+
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
@@ -335,7 +494,7 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 	return release, nil
 }
 
-func collectPCCReleases(logSize, batchSize uint64, fetchLeaves func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error)) ([]*PCCRelease, error) {
+func collectPCCReleases(logSize, batchSize uint64, progress func(done, total uint64), fetchLeaves func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error)) ([]*PCCRelease, error) {
 	if logSize == 0 {
 		return nil, nil
 	}
@@ -359,6 +518,9 @@ func collectPCCReleases(logSize, batchSize uint64, fetchLeaves func(startIndex, 
 			if release != nil {
 				releases = append(releases, release)
 			}
+		}
+		if progress != nil {
+			progress(endIndex, logSize)
 		}
 	}
 
@@ -392,7 +554,7 @@ func UniquePCCReleases(releases []*PCCRelease) []*PCCRelease {
 	return unique
 }
 
-func GetPCCReleases(proxy string, insecure bool) ([]*PCCRelease, error) {
+func GetPCCReleases(proxy string, insecure bool, progress func(done, total uint64)) ([]*PCCRelease, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			Proxy:           GetProxy(proxy),
@@ -528,7 +690,7 @@ func GetPCCReleases(proxy string, insecure bool) ([]*PCCRelease, error) {
 		return nil, fmt.Errorf("cannot unmarshal LogHead: %v", err)
 	}
 
-	return collectPCCReleases(logHead.GetLogSize(), pccLogLeavesBatchSize, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+	return collectPCCReleases(logHead.GetLogSize(), pccLogLeavesBatchSize, progress, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
 		data, err := proto.Marshal(&pcc.LogLeavesRequest{
 			Version:         pcc.ProtocolVersion_V3,
 			TreeId:          tree.GetTreeId(),

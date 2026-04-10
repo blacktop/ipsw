@@ -24,14 +24,22 @@ package download
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
+	"path"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,6 +54,10 @@ func init() {
 	downloadPccCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
 	downloadPccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
+	downloadPccCmd.Flags().String("version", "", "Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached")
+	downloadPccCmd.Flags().String("build", "", "Filter by cloudOS build version prefix (e.g. 5E, 5E290)")
+	downloadPccCmd.Flags().String("train", "", "Filter by cloudOS build train substring (e.g. LuckE)")
+	downloadPccCmd.Flags().String("app", "", "Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')")
 	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/instances/<NAME>' to create a PCC VM w/o needing to set the csrutil first
 	downloadPccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
 	downloadPccCmd.MarkFlagDirname("output")
@@ -57,6 +69,10 @@ func init() {
 	viper.BindPFlag("download.pcc.restart-all", downloadPccCmd.Flags().Lookup("restart-all"))
 	// Bind command-specific flags
 	viper.BindPFlag("download.pcc.info", downloadPccCmd.Flags().Lookup("info"))
+	viper.BindPFlag("download.pcc.version", downloadPccCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.pcc.build", downloadPccCmd.Flags().Lookup("build"))
+	viper.BindPFlag("download.pcc.train", downloadPccCmd.Flags().Lookup("train"))
+	viper.BindPFlag("download.pcc.app", downloadPccCmd.Flags().Lookup("app"))
 	viper.BindPFlag("download.pcc.output", downloadPccCmd.Flags().Lookup("output"))
 }
 
@@ -76,6 +92,9 @@ var downloadPccCmd = &cobra.Command{
 		# Download specific PCC release by index
 		❯ ipsw download pcc 42
 
+		# Filter by cloudOS build prefix and pick interactively
+		❯ ipsw download pcc --build 5E --app TIE
+
 		# Download PCC VM files interactively
 		❯ ipsw download pcc
 
@@ -91,9 +110,28 @@ var downloadPccCmd = &cobra.Command{
 		// skipAll := viper.GetBool("download.pcc.skip-all")
 		// resumeAll := viper.GetBool("download.pcc.resume-all")
 		// restartAll := viper.GetBool("download.pcc.restart-all")
+		versionFilter := viper.GetString("download.pcc.version")
+		buildFilter := viper.GetString("download.pcc.build")
+		trainFilter := viper.GetString("download.pcc.train")
+		appFilter := viper.GetString("download.pcc.app")
 
-		releases, err := download.GetPCCReleases(proxy, insecure)
+		var bar func(done, total uint64)
+		var clearBar func()
+		if isatty.IsTerminal(os.Stderr.Fd()) {
+			p := progress.New(progress.WithDefaultGradient(), progress.WithWidth(40), progress.WithoutPercentage())
+			clearBar = func() { fmt.Fprint(os.Stderr, "\r\033[K") }
+			bar = func(done, total uint64) {
+				fmt.Fprintf(os.Stderr, "\r   • Fetching PCC log %s %d/%d", p.ViewAs(float64(done)/float64(total)), done, total)
+				if done >= total {
+					clearBar()
+				}
+			}
+		}
+		releases, err := download.GetPCCReleases(proxy, insecure, bar)
 		if err != nil {
+			if clearBar != nil {
+				clearBar()
+			}
 			return err
 		}
 
@@ -122,7 +160,43 @@ var downloadPccCmd = &cobra.Command{
 			releases = download.UniquePCCReleases(releases)
 		}
 
-		sort.Sort(download.ByPccIndex(releases))
+		if buildFilter != "" || trainFilter != "" || appFilter != "" {
+			filtered := releases[:0]
+			for _, r := range releases {
+				build, train, app := r.CloudOSInfo()
+				if buildFilter != "" && !strings.HasPrefix(build, buildFilter) {
+					continue
+				}
+				if trainFilter != "" && !strings.Contains(train, trainFilter) {
+					continue
+				}
+				if appFilter != "" && app != appFilter {
+					continue
+				}
+				filtered = append(filtered, r)
+			}
+			releases = filtered
+		}
+
+		// Version filter requires network on first use; runs after the cheap
+		// metadata filters so we resolve as few URLs as possible.
+		var versions map[string]download.PCCVersion
+		if versionFilter != "" {
+			versions = download.ResolvePCCVersions(releases, pccVersionFetcher(proxy, insecure))
+			filtered := releases[:0]
+			for _, r := range releases {
+				if v, ok := versions[path.Base(r.OSAssetURL())]; ok && strings.HasPrefix(v.Version, versionFilter) {
+					filtered = append(filtered, r)
+				}
+			}
+			releases = filtered
+		}
+
+		// Log index does not track chronology — releases can be appended out
+		// of build order. Sort by the metadata timestamp so newest is first.
+		sort.Slice(releases, func(i, j int) bool {
+			return releases[i].GetTimestamp().AsTime().After(releases[j].GetTimestamp().AsTime())
+		})
 
 		if len(releases) == 0 {
 			return fmt.Errorf("no PCC Releases found")
@@ -134,15 +208,36 @@ var downloadPccCmd = &cobra.Command{
 				release := releases[i]
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				fmt.Println(release)
+				if v, ok := versions[path.Base(release.OSAssetURL())]; ok {
+					utils.Indent(log.WithFields(log.Fields{"version": v.Version, "build": v.Build}).Info, 1)("OS IPSW")
+				} else if len(releases) == 1 {
+					if v, err := pccVersionFetcher(proxy, insecure)(release.OSAssetURL()); err == nil {
+						utils.Indent(log.WithFields(log.Fields{"version": v.Version, "build": v.Build}).Info, 1)("OS IPSW")
+					}
+				}
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 			}
 		} else {
 			var choices []string
 			for i := range releases {
 				r := releases[i]
-				choices = append(choices, fmt.Sprintf("%04d: %s  [created: %s]",
+				build, train, app := r.CloudOSInfo()
+				label := build
+				if v, ok := versions[path.Base(r.OSAssetURL())]; ok {
+					label = v.Version + " " + build
+				}
+				if train != "" {
+					label += " (" + train + ")"
+				}
+				if app != "" {
+					label += "  " + app
+				}
+				if label == "" {
+					label = hex.EncodeToString(r.GetReleaseHash())
+				}
+				choices = append(choices, fmt.Sprintf("%05d: %-52s [created: %s]",
 					r.Index,
-					hex.EncodeToString(r.GetReleaseHash()),
+					label,
 					r.GetTimestamp().AsTime().Format("2006-01-02 15:04:05"),
 				))
 			}
@@ -157,10 +252,52 @@ var downloadPccCmd = &cobra.Command{
 				log.Warn("Exiting...")
 				return nil
 			}
-			log.Infof("Downloading PCC Release for %d", releases[choice].Index)
-			return releases[choice].Download(viper.GetString("download.pcc.output"), proxy, insecure)
+			r := releases[choice]
+			out := viper.GetString("download.pcc.output")
+			if out == "" {
+				build, _, _ := r.CloudOSInfo()
+				out = fmt.Sprintf("PCC_%d_%s", r.Index, build)
+			}
+			log.Infof("Downloading PCC Release %d to %s", r.Index, out)
+			return r.Download(out, proxy, insecure)
 		}
 
 		return nil
 	},
+}
+
+// pccVersionFetcher returns a closure that partial-zips an OS asset to read
+// only BuildManifest.plist (info.ParseZipFiles would also pull every other
+// plist plus parse all DeviceTree im4p files). ~85% of releases serve Range
+// requests; the newest few sometimes 403 before CDN sync.
+func pccVersionFetcher(proxy string, insecure bool) func(url string) (download.PCCVersion, error) {
+	return func(url string) (download.PCCVersion, error) {
+		if url == "" {
+			return download.PCCVersion{}, fmt.Errorf("no OS asset URL")
+		}
+		zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{Proxy: proxy, Insecure: insecure})
+		if err != nil {
+			return download.PCCVersion{}, err
+		}
+		for _, f := range zr.File {
+			if path.Base(f.Name) != "BuildManifest.plist" {
+				continue
+			}
+			rc, err := f.Open()
+			if err != nil {
+				return download.PCCVersion{}, err
+			}
+			data, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				return download.PCCVersion{}, err
+			}
+			bm, err := plist.ParseBuildManifest(data)
+			if err != nil {
+				return download.PCCVersion{}, err
+			}
+			return download.PCCVersion{Version: bm.ProductVersion, Build: bm.ProductBuildVersion}, nil
+		}
+		return download.PCCVersion{}, fmt.Errorf("no BuildManifest in IPSW")
+	}
 }

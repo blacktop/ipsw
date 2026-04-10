@@ -20,7 +20,7 @@ func TestCollectPCCReleasesPagesThroughLogLeaves(t *testing.T) {
 	releaseLeaf := newTestLogLeaf(t, 4, pcc.ATLogDataType_RELEASE, true, true)
 
 	var gotRanges [][2]uint64
-	releases, err := collectPCCReleases(5, 2, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+	releases, err := collectPCCReleases(5, 2, nil, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
 		gotRanges = append(gotRanges, [2]uint64{startIndex, endIndex})
 		if startIndex == 4 {
 			return []*pcc.LogLeavesResponse_Leaf{releaseLeaf}, nil
