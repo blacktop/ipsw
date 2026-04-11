@@ -4,21 +4,20 @@ title: rm
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: rm
-description: Revoke a lost, stolen, compromised, or expiring signing certificate
+description: Revoke a signing certificate
 ---
 ## ipsw appstore cert rm
 
-Revoke a lost, stolen, compromised, or expiring signing certificate
+Revoke a signing certificate
 
 ```
-ipsw appstore cert rm [flags]
+ipsw appstore cert rm [<ID>] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help        help for rm
-      --id string   Profile ID to renew
+  -h, --help   help for rm
 ```
 
 ### Options inherited from parent commands

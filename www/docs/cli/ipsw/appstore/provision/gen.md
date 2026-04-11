@@ -24,13 +24,15 @@ ipsw appstore provision gen <BUNDLE_ID> [flags]
 ### Options
 
 ```
-  -c, --country string   Country code for certificate subject (e.g., US, GB) (default "US")
-      --csr              Create a NEW Certificate Signing Request
-  -e, --email string     Email address to use for the certificate
-  -h, --help             help for gen
-      --install          Install the certificate and profile
-  -o, --output string    Folder to save files to
-  -t, --type string      Type of profile to manage (development, adhoc, distribution) (default "development")
+  -c, --country string    Country code for certificate subject (e.g., US, GB) (default "US")
+      --csr               Create a NEW Certificate Signing Request
+  -e, --email string      Email address to use for the certificate
+  -h, --help              help for gen
+      --install           Install the certificate and profile
+      --keep-key          Keep private key files on disk after Keychain import
+  -o, --output string     Folder to save files to
+      --platform string   Target platform (ios, macos, tvos, catalyst) (default "ios")
+  -t, --type string       Type of profile to manage (development, adhoc, distribution) (default "development")
 ```
 
 ### Options inherited from parent commands

@@ -35,6 +35,6 @@ ipsw ota patch [flags]
 ### SEE ALSO
 
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
-* [ipsw ota patch bxdiff](/docs/cli/ipsw/ota/patch/bxdiff)	 - Patch BXDIFF50 OTAs
+* [ipsw ota patch bxdiff](/docs/cli/ipsw/ota/patch/bxdiff)	 - Patch BXDIFF50 OTAs (patches and basesystem_patches)
 * [ipsw ota patch rsr](/docs/cli/ipsw/ota/patch/rsr)	 - Patch RSR OTAs
 

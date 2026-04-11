@@ -4,11 +4,19 @@ title: split
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: split
-description: Extracts all the dylibs using Xcode's dsc_extractor
+description: Split DSC into dylibs using Xcode's dsc_extractor (macOS only)
 ---
 ## ipsw dyld split
 
-Extracts all the dylibs using Xcode's dsc_extractor
+Split DSC into dylibs using Xcode's dsc_extractor (macOS only)
+
+### Synopsis
+
+Split a dyld_shared_cache into individual dylibs using Apple's dsc_extractor.bundle.
+
+This is a fast bulk operation but the output is not enriched for reverse engineering.
+For RE use, prefer 'ipsw dyld extract' which adds local symbols, ObjC metadata,
+and stub island symbols, works cross-platform, and produces IDA/Ghidra-ready MachOs.
 
 ```
 ipsw dyld split <DSC> [flags]

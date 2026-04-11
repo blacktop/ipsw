@@ -11,13 +11,13 @@ description: Extract OTA payload files
 Extract OTA payload files
 
 ```
-ipsw ota extract <OTA> [FILENAME]> [flags]
+ipsw ota extract <OTA> [FILENAME] [flags]
 ```
 
 ### Options
 
 ```
-  -y, --confirm          Confirm searching for pattern in payloadv2 files
+  -y, --confirm          Skip prompt and search payloadv2 files (requires --pattern)
   -c, --cryptex string   Extract cryptex as DMG (requires full OTA)
   -x, --decomp           Decompress pbzx files
   -d, --dyld             Extract dyld_shared_cache files
@@ -26,7 +26,7 @@ ipsw ota extract <OTA> [FILENAME]> [flags]
   -k, --kernel           Extract kernelcache
   -o, --output string    Output folder
   -p, --pattern string   Regex pattern to match files
-  -r, --range string     Regex pattern control the payloadv2 file range to search
+  -r, --range string     Regex pattern to limit payloadv2 files searched (requires --pattern)
 ```
 
 ### Options inherited from parent commands

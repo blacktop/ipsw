@@ -11,17 +11,17 @@ description: Patch RSR OTAs
 Patch RSR OTAs
 
 ```
-ipsw ota patch rsr [flags]
+ipsw ota patch rsr <OTA> | --cryptex <PATCH> [flags]
 ```
 
 ### Options
 
 ```
-  -c, --cryptex string          Cryptex file from OTA
-  -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
+  -c, --cryptex string          Patch a local cryptex RIDIFF file directly (no OTA argument)
+  -a, --dyld-arch stringArray   Limit OTA system cryptex patching to these dyld_shared_cache architectures
   -h, --help                    help for rsr
-  -i, --input string            Input folder
-  -o, --output string           Output folder
+  -i, --input string            Input folder containing base DMGs to patch against
+  -o, --output string           Output folder for patched DMGs
 ```
 
 ### Options inherited from parent commands

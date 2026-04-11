@@ -4,11 +4,11 @@ title: extract
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: extract
-description: Extract dylib from dyld_shared_cache
+description: Extract dylib(s) for reverse engineering
 ---
 ## ipsw dyld extract
 
-Extract dylib from dyld_shared_cache
+Extract dylib(s) for reverse engineering
 
 ```
 ipsw dyld extract <DSC> <DYLIB> [flags]

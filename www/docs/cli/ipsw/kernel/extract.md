@@ -21,6 +21,7 @@ ipsw kernel extract <KERNELCACHE> <KEXT> [flags]
   -e, --arch string     Which architecture to use for fat/universal MachO
       --force           Overwrite existing extracted KEXT(s)
   -h, --help            help for extract
+      --imports         Resolve imported symbol names from kernelcache
   -o, --output string   Directory to extract KEXTs to
 ```
 

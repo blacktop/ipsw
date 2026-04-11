@@ -4,20 +4,21 @@ title: bxdiff
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: bxdiff
-description: Patch BXDIFF50 OTAs
+description: Patch BXDIFF50 OTAs (patches and basesystem_patches)
 ---
 ## ipsw ota patch bxdiff
 
-Patch BXDIFF50 OTAs
+Patch BXDIFF50 OTAs (patches and basesystem_patches)
 
 ```
-ipsw ota patch bxdiff <DELTA> <TARGET> [flags]
+ipsw ota patch bxdiff <OTA> | -s <DELTA> <TARGET> [flags]
 ```
 
 ### Options
 
 ```
   -h, --help            help for bxdiff
+  -i, --input string    Input folder containing base files to patch
   -o, --output string   Output folder
   -s, --single          Patch single file
 ```
