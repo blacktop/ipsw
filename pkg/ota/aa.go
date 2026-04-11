@@ -488,13 +488,20 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 						return err
 					}
 					if !f.IsDir() {
-						fname := filepath.Join(output, filepath.Clean(strings.TrimPrefix(path, tmpdir)))
+						rel, err := filepath.Rel(tmpdir, path)
+						if err != nil {
+							return fmt.Errorf("failed to compute relative path for %s: %v", path, err)
+						}
+						fname, err := utils.SanitizeArchivePath(output, rel)
+						if err != nil {
+							return err
+						}
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
 						}
 						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(f.Size())), fname))
 						if err := os.Rename(path, fname); err != nil {
-							return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, tmpdir), fname, err)
+							return fmt.Errorf("failed to mv file %s to %s: %v", rel, fname, err)
 						}
 					}
 					return nil

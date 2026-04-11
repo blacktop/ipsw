@@ -28,6 +28,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -105,7 +106,7 @@ func (s *Server) Start(db db.Database) error {
 	}
 
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.conf.Port),
+		Addr:    net.JoinHostPort(s.conf.Host, strconv.Itoa(s.conf.Port)),
 		Handler: s.router,
 	}
 

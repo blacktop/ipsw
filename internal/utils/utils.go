@@ -185,6 +185,34 @@ func Verify(sha1sum, name string) (bool, error) {
 	return match, nil
 }
 
+// SanitizeArchivePath joins an untrusted archive entry name to a destination
+// directory and verifies the result stays within that directory. Returns an
+// error if the entry name would escape via path traversal (zip-slip / tar-slip).
+//
+// This must be used instead of filepath.Join(dest, filepath.Clean(name)) when
+// name comes from an archive — filepath.Clean does NOT strip leading "../".
+//
+// Lexical check only: does NOT resolve symlinks. If dest already contains a
+// symlink pointing outside, writes through it will escape. Callers must not
+// create symlinks from untrusted archive entries (SearchZip writes them as
+// regular files; UnTarGz rejects tar.TypeSymlink via the default case).
+func SanitizeArchivePath(dest, name string) (string, error) {
+	target := filepath.Join(dest, name)
+	absDest, err := filepath.Abs(dest)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve destination: %w", err)
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve target: %w", err)
+	}
+	rel, err := filepath.Rel(absDest, absTarget)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("archive entry %q escapes destination directory", name)
+	}
+	return target, nil
+}
+
 // SearchZip searches for files in a zip.Reader
 func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, progress bool) ([]string, error) {
 	var fname string
@@ -205,7 +233,10 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 			if flat {
 				fname = filepath.Join(folder, filepath.Base(f.Name))
 			} else {
-				fname = filepath.Join(folder, filepath.Clean(f.Name))
+				fname, err = SanitizeArchivePath(folder, f.Name)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
@@ -295,7 +326,10 @@ func SearchPartialZip(files []*zip.File, pattern *regexp.Regexp, folder string, 
 			if flat {
 				fname = filepath.Join(folder, filepath.Base(f.Name))
 			} else {
-				fname = filepath.Join(folder, filepath.Clean(f.Name))
+				fname, err = SanitizeArchivePath(folder, f.Name)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
@@ -457,13 +491,21 @@ func UnTarGz(tarfile, destPath string) error {
 			return fmt.Errorf("tarReader.Next() failed: %v", err)
 		}
 
+		target, err := SanitizeArchivePath(destPath, header.Name)
+		if err != nil {
+			return err
+		}
+
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0755); err != nil {
-				return fmt.Errorf("os.Mkdir failed: %v", err)
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("os.MkdirAll failed: %v", err)
 			}
 		case tar.TypeReg:
-			outFile, err := os.Create(filepath.Join(destPath, header.Name))
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return fmt.Errorf("os.MkdirAll failed: %v", err)
+			}
+			outFile, err := os.Create(target)
 			if err != nil {
 				return fmt.Errorf("os.Create failed: %v", err)
 			}

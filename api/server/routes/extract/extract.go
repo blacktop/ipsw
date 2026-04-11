@@ -14,7 +14,6 @@ import (
 // swagger:response extractReponse
 type extractReponse struct {
 	// The list of extracted files
-	// min items: 0
 	Artifacts []string `json:"artifacts"`
 }
 
@@ -22,7 +21,6 @@ type extractReponse struct {
 // swagger:response extractKernelsReponse
 type extractKernelsReponse struct {
 	// The list of extracted kernels and what devices they are for
-	// min items: 0
 	Artifacts map[string][]string `json:"artifacts"`
 }
 

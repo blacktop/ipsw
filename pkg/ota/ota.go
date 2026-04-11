@@ -319,10 +319,13 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 					return false, "", err
 				}
 
-				if err := os.MkdirAll(folder, 0750); err != nil {
-					return false, "", fmt.Errorf("failed to create folder: %s", folder)
+				fname, err := utils.SanitizeArchivePath(folder, ent.Path)
+				if err != nil {
+					return false, "", err
 				}
-				fname := filepath.Join(folder, filepath.Clean(ent.Path))
+				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+					return false, "", fmt.Errorf("failed to create folder: %s", filepath.Dir(fname))
+				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), fname))
 				if err := os.WriteFile(fname, fileBytes, 0660); err != nil {
 					return false, "", err

@@ -59,20 +59,13 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: url
 	//         in: query
-	//         description: url to IPSW
+	//         description: url to IPSW (must resolve to a public address)
 	//         required: true
 	//         type: string
-	//       + name: proxy
-	//         in: query
-	//         description: http proxy to use
-	//         type: string
-	//       + name: insecure
-	//         in: query
-	//         description: ignore TLS errors
-	//         type: boolean
 	//
 	//     Responses:
 	//       200: infoRemoteResponse
+	//       400: genericError
 	//       500: genericError
 	ig.GET("/ipsw/remote", getRemoteInfo)
 	// swagger:route GET /info/ota/remote Info getRemoteOtaInfo
@@ -87,20 +80,13 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: url
 	//         in: query
-	//         description: url to OTA
+	//         description: url to OTA (must resolve to a public address)
 	//         required: true
 	//         type: string
-	//       + name: proxy
-	//         in: query
-	//         description: http proxy to use
-	//         type: string
-	//       + name: insecure
-	//         in: query
-	//         description: ignore TLS errors
-	//         type: boolean
 	//
 	//     Responses:
 	//       200: infoRemoteResponse
+	//       400: genericError
 	//       500: genericError
 	ig.GET("/ota/remote", getRemoteInfo)
 }

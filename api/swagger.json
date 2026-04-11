@@ -128,41 +128,6 @@
         }
       }
     },
-    "/diff/files": {
-      "post": {
-        "description": "This will return the diff of two text files.",
-        "tags": [
-          "Diff"
-        ],
-        "summary": "Files",
-        "operationId": "postDiffFiles",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "Previous",
-            "name": "prev",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "x-go-name": "Current",
-            "name": "curr",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/responses/diffResponse"
-          },
-          "400": {
-            "$ref": "#/responses/genericError"
-          },
-          "500": {
-            "$ref": "#/responses/genericError"
-          }
-        }
-      }
-    },
     "/download/ipsw/ios/latest/build": {
       "get": {
         "description": "Get latest iOS build.",
@@ -270,6 +235,12 @@
             "name": "addrs",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "toggle demangling of symbol names (defaults to true)",
+            "name": "demangle",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1037,27 +1008,18 @@
         "parameters": [
           {
             "type": "string",
-            "description": "url to IPSW",
+            "description": "url to IPSW (must resolve to a public address)",
             "name": "url",
             "in": "query",
             "required": true
-          },
-          {
-            "type": "string",
-            "description": "http proxy to use",
-            "name": "proxy",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "ignore TLS errors",
-            "name": "insecure",
-            "in": "query"
           }
         ],
         "responses": {
           "200": {
             "$ref": "#/responses/infoRemoteResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -1109,27 +1071,18 @@
         "parameters": [
           {
             "type": "string",
-            "description": "url to OTA",
+            "description": "url to OTA (must resolve to a public address)",
             "name": "url",
             "in": "query",
             "required": true
-          },
-          {
-            "type": "string",
-            "description": "http proxy to use",
-            "name": "proxy",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "ignore TLS errors",
-            "name": "insecure",
-            "in": "query"
           }
         ],
         "responses": {
           "200": {
             "$ref": "#/responses/infoRemoteResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -1245,6 +1198,60 @@
         }
       }
     },
+    "/kernel/cpp": {
+      "get": {
+        "description": "Discover C++ classes from a kernelcache.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
+        "summary": "Cpp",
+        "operationId": "getKernelCpp",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to kernelcache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "architecture for universal Mach-O inputs",
+            "name": "arch",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "fileset bundle/entry filter (repeatable)",
+            "name": "entry",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "return only the named class",
+            "name": "class",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "maximum number of classes to return",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/kernelCPPResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/kernel/kexts": {
       "get": {
         "description": "Get kernelcache KEXTs info.",
@@ -1268,6 +1275,48 @@
         "responses": {
           "200": {
             "$ref": "#/responses/kernelKextsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/kernel/symbolicate": {
+      "get": {
+        "description": "Build a kernel symbol map from built-in sources, the C++ scanner, and optional signatures.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
+        "summary": "Symbolicate",
+        "operationId": "getKernelSymbolicate",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to kernelcache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "architecture for universal Mach-O inputs",
+            "name": "arch",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "optional path to a kernel signature directory",
+            "name": "signatures",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/kernelSymbolicateResponse"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -1443,6 +1492,18 @@
             "type": "string",
             "description": "path to AEA pem DB JSON file",
             "name": "pem_db",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "custom mount point path",
+            "name": "mount_point",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "identity variant for rdisk (e.g. 'Erase', 'Update', or 'Recovery')",
+            "name": "ident",
             "in": "query"
           }
         ],
@@ -1978,6 +2039,9 @@
           "type": "string",
           "x-go-name": "Publisher"
         },
+        "SimulatorVersion": {
+          "type": "string"
+        },
         "SplatOnly": {
           "type": "boolean"
         },
@@ -2046,6 +2110,14 @@
           },
           "x-go-name": "Hash"
         },
+        "_Measurement-SHA256": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "Sha256Hash"
+        },
         "_MeasurementAlgorithm": {
           "type": "string",
           "x-go-name": "HashAlgorithm"
@@ -2081,6 +2153,148 @@
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
+    },
+    "BuildIdentity": {
+      "type": "object",
+      "properties": {
+        "ap_board_id": {
+          "type": "string",
+          "x-go-name": "ApBoardID"
+        },
+        "ap_chip_id": {
+          "type": "string",
+          "x-go-name": "ApChipID"
+        },
+        "ap_os_long_version": {
+          "type": "string",
+          "x-go-name": "ApOSLongVersion"
+        },
+        "ap_product_type": {
+          "type": "string",
+          "x-go-name": "ApProductType"
+        },
+        "ap_sdk_platform": {
+          "type": "string",
+          "x-go-name": "ApSDKPlatform"
+        },
+        "ap_security_domain": {
+          "type": "string",
+          "x-go-name": "ApSecurityDomain"
+        },
+        "ap_sika_fuse": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "ApSikaFuse"
+        },
+        "ap_target": {
+          "type": "string",
+          "x-go-name": "ApTarget"
+        },
+        "ap_target_type": {
+          "type": "string",
+          "x-go-name": "ApTargetType"
+        },
+        "bb_activation_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbActivationManifestKeyHash"
+        },
+        "bb_calibration_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbCalibrationManifestKeyHash"
+        },
+        "bb_chip_id": {
+          "type": "string",
+          "x-go-name": "BbChipID"
+        },
+        "bb_factory_activation_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbFactoryActivationManifestKeyHash"
+        },
+        "bb_fdr_security_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbFDRSecurityKeyHash"
+        },
+        "bb_gold_cert_id": {
+          "type": "string",
+          "x-go-name": "BbGoldCertId"
+        },
+        "bb_provisioning_manifest_key_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbProvisioningManifestKeyHash"
+        },
+        "bb_skey_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "BbSkeyId"
+        },
+        "info": {
+          "$ref": "#/definitions/IdentityInfo"
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/IdentityManifest"
+          },
+          "x-go-name": "Manifest"
+        },
+        "nerd_epoch": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "NeRDEpoch"
+        },
+        "pearl_certification_root_pub": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "PearlCertificationRootPub"
+        },
+        "permit_nerd_pivot": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "PermitNeRDPivot"
+        },
+        "product_marketing_version": {
+          "type": "string",
+          "x-go-name": "ApProductMarketingVersion"
+        },
+        "unique_build_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "UniqueBuildID"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
     },
     "ByteOrder": {
       "description": "It is implemented by [LittleEndian], [BigEndian], and [NativeEndian].",
@@ -2333,6 +2547,47 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/dyld"
     },
+    "Class": {
+      "type": "object",
+      "title": "Class is the phase-1 scanner output.",
+      "properties": {
+        "Bundle": {
+          "type": "string"
+        },
+        "Ctor": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "MetaPtr": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "MetaVtableAddr": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Size": {
+          "type": "integer",
+          "format": "uint32"
+        },
+        "SuperIndex": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "SuperMeta": {
+          "type": "integer",
+          "format": "uint64"
+        },
+        "VtableAddr": {
+          "type": "integer",
+          "format": "uint64"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache/cpp"
+    },
     "CodeDirectory": {
       "description": "CodeDirectory object",
       "type": "object",
@@ -2561,7 +2816,8 @@
         "errors": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "x-go-type": "error"
           },
           "x-go-name": "Errors"
         },
@@ -3417,6 +3673,11 @@
     "IdentityInfo": {
       "type": "object",
       "properties": {
+        "ap_timestamp": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ApTimestamp"
+        },
         "build_number": {
           "type": "string",
           "x-go-name": "BuildNumber"
@@ -3480,6 +3741,14 @@
           "type": "string",
           "x-go-name": "BuildString"
         },
+        "development_update_payload_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "DevelopmentUpdatePayloadHash"
+        },
         "digest": {
           "type": "array",
           "items": {
@@ -3487,6 +3756,11 @@
             "format": "uint8"
           },
           "x-go-name": "Digest"
+        },
+        "digest_list_size": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "DigestListSize"
         },
         "epro": {
           "type": "boolean",
@@ -3496,14 +3770,59 @@
           "type": "boolean",
           "x-go-name": "ESEC"
         },
+        "fab_revision": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "FabRevision"
+        },
         "info": {
           "type": "object",
           "additionalProperties": {},
           "x-go-name": "Info"
         },
+        "memory_map": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "MemoryMap"
+        },
         "name": {
           "type": "string",
           "x-go-name": "Name"
+        },
+        "object_payload_property_digest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "ObjectPayloadPropertyDigest"
+        },
+        "production_update_payload_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "ProductionUpdatePayloadHash"
+        },
+        "raw_data_digest": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "RawDataDigest"
+        },
+        "tbm_digests": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "TBMDigests"
         },
         "trusted": {
           "type": "boolean",
@@ -3603,6 +3922,9 @@
         "name": {
           "type": "string",
           "x-go-name": "Name"
+        },
+        "platform": {
+          "$ref": "#/definitions/Platform"
         },
         "version": {
           "type": "string",
@@ -3763,28 +4085,58 @@
     "Path": {
       "type": "object",
       "properties": {
-        "name": {
+        "path": {
           "type": "string",
           "x-go-name": "Path"
         }
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/model"
     },
+    "Platform": {
+      "description": "Platform represents supported Apple platforms",
+      "type": "string",
+      "x-go-package": "github.com/blacktop/ipsw/internal/model"
+    },
     "Plists": {
       "description": "Plists IPSW/OTA plists object",
       "type": "object",
       "properties": {
+        "DeviceClass": {
+          "type": "string"
+        },
         "DeviceMap": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/restoreDeviceMap"
           }
         },
+        "FirmwareDirectory": {
+          "type": "string"
+        },
+        "KernelCachesByPlatform": {
+          "type": "object",
+          "additionalProperties": {}
+        },
         "ProductBuildVersion": {
+          "type": "string"
+        },
+        "ProductType": {
           "type": "string"
         },
         "ProductVersion": {
           "type": "string"
+        },
+        "RamDisksByPlatform": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "RestoreKernelCaches": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "RestoreRamDisks": {
+          "type": "object",
+          "additionalProperties": {}
         },
         "SupportedProductTypeIDs": {
           "type": "object",
@@ -3808,6 +4160,12 @@
             "type": "string"
           }
         },
+        "SystemRestoreImages": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "actual_minimum_system_partition": {
           "type": "integer",
           "format": "int64",
@@ -3824,7 +4182,7 @@
         "build_identities": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/buildIdentity"
+            "$ref": "#/definitions/BuildIdentity"
           },
           "x-go-name": "BuildIdentities"
         },
@@ -4319,6 +4677,9 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
+    "SymbolMap": {
+      "x-go-package": "github.com/blacktop/ipsw/pkg/signature"
+    },
     "Symtab": {
       "type": "object",
       "title": "A Symtab represents a Mach-O LC_SYMTAB command.",
@@ -4564,86 +4925,6 @@
       },
       "x-go-package": "github.com/blacktop/ipsw/pkg/ota/types"
     },
-    "buildIdentity": {
-      "type": "object",
-      "properties": {
-        "ap_board_id": {
-          "type": "string",
-          "x-go-name": "ApBoardID"
-        },
-        "ap_chip_id": {
-          "type": "string",
-          "x-go-name": "ApChipID"
-        },
-        "ap_os_long_version": {
-          "type": "string",
-          "x-go-name": "ApOSLongVersion"
-        },
-        "ap_security_domain": {
-          "type": "string",
-          "x-go-name": "ApSecurityDomain"
-        },
-        "bb_activation_manifest_key_hash": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "BbActivationManifestKeyHash"
-        },
-        "bb_chip_id": {
-          "type": "string",
-          "x-go-name": "BbChipID"
-        },
-        "bb_fdr_security_key_hash": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "BbFDRSecurityKeyHash"
-        },
-        "bb_provisioning_manifest_key_hash": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "BbProvisioningManifestKeyHash"
-        },
-        "info": {
-          "$ref": "#/definitions/IdentityInfo"
-        },
-        "manifest": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/IdentityManifest"
-          },
-          "x-go-name": "Manifest"
-        },
-        "pearl_certification_root_pub": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "PearlCertificationRootPub"
-        },
-        "product_marketing_version": {
-          "type": "string",
-          "x-go-name": "ProductMarketingVersion"
-        },
-        "unique_build_id": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "UniqueBuildID"
-        }
-      },
-      "x-go-package": "github.com/blacktop/ipsw/pkg/plist"
-    },
     "cdPlatform": {
       "type": "integer",
       "format": "uint8",
@@ -4774,11 +5055,6 @@
           "description": "the DSC sub-cache mapping name",
           "type": "string",
           "x-go-name": "Mapping"
-        },
-        "stubs": {
-          "description": "is the offset in a DSC stub island",
-          "type": "boolean",
-          "x-go-name": "InStubs"
         },
         "uuid": {
           "description": "the DSC sub-cache UUID",
@@ -5090,6 +5366,27 @@
         }
       }
     },
+    "kernelCPPResponse": {
+      "description": "",
+      "headers": {
+        "arch": {
+          "type": "string"
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Class"
+          }
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
     "kernelKextsResponse": {
       "description": "",
       "headers": {
@@ -5102,6 +5399,21 @@
         "path": {
           "type": "string"
         }
+      }
+    },
+    "kernelSymbolicateResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/SymbolMap"
+      },
+      "headers": {
+        "arch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "symbols": {}
       }
     },
     "kernelSyscallsResponse": {

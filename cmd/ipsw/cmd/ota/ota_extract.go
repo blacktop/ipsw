@@ -71,11 +71,11 @@ func matchesPostBOMPattern(re *regexp.Regexp, name string) bool {
 	return re.MatchString(name) || re.MatchString(filepath.Base(name))
 }
 
-func outputPathForExtraction(outputDir, name string, flat bool) string {
+func outputPathForExtraction(outputDir, name string, flat bool) (string, error) {
 	if flat {
-		return filepath.Join(outputDir, filepath.Base(name))
+		return filepath.Join(outputDir, filepath.Base(name)), nil
 	}
-	return filepath.Join(outputDir, name)
+	return utils.SanitizeArchivePath(outputDir, name)
 }
 
 type otaOpenable interface {
@@ -258,7 +258,10 @@ var otaExtractCmd = &cobra.Command{
 						if err != nil {
 							return fmt.Errorf("failed to parse kernelcache compressed data: %v", err)
 						}
-						fname := outputPathForExtraction(output, f.Name(), flat)
+						fname, err := outputPathForExtraction(output, f.Name(), flat)
+						if err != nil {
+							return err
+						}
 						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
 							return fmt.Errorf("failed to create output directory: %v", err)
 						}
@@ -285,7 +288,10 @@ var otaExtractCmd = &cobra.Command{
 						continue
 					}
 					if matchesPostBOMPattern(re, f.Name()) {
-						fname := outputPathForExtraction(output, f.Name(), flat)
+						fname, err := outputPathForExtraction(output, f.Name(), flat)
+						if err != nil {
+							return err
+						}
 						utils.Indent(log.Info, 2)(fname)
 						if err := copyOTAFileToPath(o, f.Name(), decomp, fname); err != nil {
 							return err
@@ -330,7 +336,10 @@ var otaExtractCmd = &cobra.Command{
 				if f.IsDir() {
 					continue
 				}
-				fname := outputPathForExtraction(output, f.Name(), flat)
+				fname, err := outputPathForExtraction(output, f.Name(), flat)
+				if err != nil {
+					return err
+				}
 				if _, err := os.Stat(fname); err == nil {
 					log.Warnf("already exists: '%s' ", fname)
 					continue
