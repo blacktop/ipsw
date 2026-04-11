@@ -1,9 +1,49 @@
 package utils
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 )
+
+func TestSanitizeArchivePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		dest    string
+		entry   string
+		want    string
+		wantErr bool
+	}{
+		{"simple", "/tmp/out", "foo", filepath.Join("/tmp/out", "foo"), false},
+		{"nested", "/tmp/out", "a/b/c", filepath.Join("/tmp/out", "a/b/c"), false},
+		{"dotdot escape", "/tmp/out", "../../../etc/passwd", "", true},
+		{"deep dotdot to cron", "/tmp/ipsw-extract/iPhone99,1_99.0_99A1", "../../../../../../../../etc/cron.d/ipsw-pwn", "", true},
+		{"nested dotdot escape", "/tmp/out", "a/../../etc/passwd", "", true},
+		{"dotdot to parent", "/tmp/out", "..", "", true},
+		{"contained dotdot", "/tmp/out", "a/../b", filepath.Join("/tmp/out", "b"), false},
+		{"sibling prefix attack", "/tmp/out", "../outx/foo", "", true},
+		{"relative dest escape", "out", "../../etc", "", true},
+		{"relative dest ok", "out", "foo", filepath.Join("out", "foo"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SanitizeArchivePath(tt.dest, tt.entry)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("SanitizeArchivePath(%q, %q) = %q, want error", tt.dest, tt.entry, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SanitizeArchivePath(%q, %q) unexpected error: %v", tt.dest, tt.entry, err)
+			}
+			if got != tt.want {
+				t.Fatalf("SanitizeArchivePath(%q, %q) = %q, want %q", tt.dest, tt.entry, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestDifference(t *testing.T) {
 	type args struct {

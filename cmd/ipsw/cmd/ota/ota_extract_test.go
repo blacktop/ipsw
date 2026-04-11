@@ -50,6 +50,7 @@ func TestOutputPathForExtraction(t *testing.T) {
 		path      string
 		flat      bool
 		want      string
+		wantErr   bool
 	}{
 		{
 			name:      "preserve directory structure",
@@ -65,11 +66,42 @@ func TestOutputPathForExtraction(t *testing.T) {
 			flat:      true,
 			want:      filepath.Join("/tmp/out", "foo"),
 		},
+		{
+			name:      "reject traversal",
+			outputDir: "/tmp/out",
+			path:      "../../../etc/passwd",
+			flat:      false,
+			wantErr:   true,
+		},
+		{
+			name:      "reject nested traversal",
+			outputDir: "/tmp/out",
+			path:      "foo/../../../etc/passwd",
+			flat:      false,
+			wantErr:   true,
+		},
+		{
+			name:      "flat mode neutralizes traversal",
+			outputDir: "/tmp/out",
+			path:      "../../../etc/passwd",
+			flat:      true,
+			want:      filepath.Join("/tmp/out", "passwd"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := outputPathForExtraction(tt.outputDir, tt.path, tt.flat); got != tt.want {
+			got, err := outputPathForExtraction(tt.outputDir, tt.path, tt.flat)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("outputPathForExtraction(%q, %q, %t) = %q, want error", tt.outputDir, tt.path, tt.flat, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("outputPathForExtraction(%q, %q, %t) unexpected error: %v", tt.outputDir, tt.path, tt.flat, err)
+			}
+			if got != tt.want {
 				t.Fatalf("outputPathForExtraction(%q, %q, %t) = %q, want %q", tt.outputDir, tt.path, tt.flat, got, tt.want)
 			}
 		})
