@@ -37,7 +37,7 @@ ipsw dyld [flags]
 * [ipsw dyld a2s](/docs/cli/ipsw/dyld/a2s)	 - Lookup symbol at unslid address
 * [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble at symbol/vaddr
 * [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump data at given virtual address
-* [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dylib from dyld_shared_cache
+* [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dylib(s) for reverse engineering
 * [ipsw dyld ida](/docs/cli/ipsw/dyld/ida)	 - Analyze DSC in IDA Pro
 * [ipsw dyld image](/docs/cli/ipsw/dyld/image)	 - Dump image array info
 * [ipsw dyld imports](/docs/cli/ipsw/dyld/imports)	 - List all dylibs that load a given dylib
@@ -49,7 +49,7 @@ ipsw dyld [flags]
 * [ipsw dyld prewarm](/docs/cli/ipsw/dyld/prewarm)	 - Dump DSC prewarming data
 * [ipsw dyld search](/docs/cli/ipsw/dyld/search)	 - Find Dylib files for given search criteria
 * [ipsw dyld slide](/docs/cli/ipsw/dyld/slide)	 - Dump slide info
-* [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Extracts all the dylibs using Xcode's dsc_extractor
+* [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Split DSC into dylibs using Xcode's dsc_extractor (macOS only)
 * [ipsw dyld str](/docs/cli/ipsw/dyld/str)	 - Search dyld_shared_cache for string
 * [ipsw dyld stubs](/docs/cli/ipsw/dyld/stubs)	 - Dump Stub Islands
 * [ipsw dyld swift](/docs/cli/ipsw/dyld/swift)	 - Dump Swift Optimizations Info

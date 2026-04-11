@@ -38,5 +38,5 @@ ipsw appstore cert [flags]
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
 * [ipsw appstore cert add](/docs/cli/ipsw/appstore/cert/add)	 - Create a new certificate using a certificate signing request
 * [ipsw appstore cert ls](/docs/cli/ipsw/appstore/cert/ls)	 - List certificates
-* [ipsw appstore cert rm](/docs/cli/ipsw/appstore/cert/rm)	 - Revoke a lost, stolen, compromised, or expiring signing certificate
+* [ipsw appstore cert rm](/docs/cli/ipsw/appstore/cert/rm)	 - Revoke a signing certificate
 

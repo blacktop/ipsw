@@ -19,8 +19,8 @@ ipsw ota ls <OTA> [flags]
 ```
   -b, --bom              List the post.bom files
   -h, --help             help for ls
-  -j, --json             Output in JSON format
-  -r, --pattern string   Regex pattern to match payloadv2 files
+  -j, --json             Output payload listing as JSON (requires --payload)
+  -r, --pattern string   Regex pattern to match payloadv2 files (requires --payload)
   -p, --payload          List the payloadv2 files
 ```
 

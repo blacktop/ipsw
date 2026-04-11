@@ -11,7 +11,7 @@ description: List contents of a payloadv2 file
 List contents of a payloadv2 file
 
 ```
-ipsw ota payload <PAYLOAD>|<OTA> <PAYLOAD> [flags]
+ipsw ota payload <PAYLOAD> | <OTA> <PAYLOAD> [flags]
 ```
 
 ### Options
