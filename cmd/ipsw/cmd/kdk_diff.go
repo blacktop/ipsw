@@ -34,6 +34,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
@@ -140,6 +141,71 @@ func printSection(s diffSection) bool {
 type textDiff struct {
 	file string
 	diff string
+}
+
+var ignoredKDKPlistKeys = map[string]struct{}{
+	"BuildMachineOSBuild":        {},
+	"BuildVersion":               {},
+	"CFBundleGetInfoString":      {},
+	"CFBundleShortVersionString": {},
+	"CFBundleVersion":            {},
+	"DTCompiler":                 {},
+	"DTPlatformBuild":            {},
+	"DTPlatformName":             {},
+	"DTPlatformVersion":          {},
+	"DTSDKBuild":                 {},
+	"DTSDKName":                  {},
+	"DTXcode":                    {},
+	"DTXcodeBuild":               {},
+	"IOSourceVersion":            {},
+	"NSHumanReadableCopyright":   {},
+	"SourceVersion":              {},
+}
+
+func shouldNormalizeKDKPlist(rel string) bool {
+	switch filepath.Base(rel) {
+	case "Info.plist", "version.plist":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeKDKTextDiffInput(rel string, data []byte) ([]byte, error) {
+	if !shouldNormalizeKDKPlist(rel) {
+		return data, nil
+	}
+
+	var document map[string]any
+	if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&document); err != nil {
+		return data, nil
+	}
+
+	stripIgnoredKDKPlistKeys(document)
+
+	normalized, err := plist.MarshalIndent(document, plist.XMLFormat, "\t")
+	if err != nil {
+		return data, fmt.Errorf("failed to normalize plist %s: %w", rel, err)
+	}
+
+	return normalized, nil
+}
+
+func stripIgnoredKDKPlistKeys(value any) {
+	switch node := value.(type) {
+	case map[string]any:
+		for key, child := range node {
+			if _, ok := ignoredKDKPlistKeys[key]; ok {
+				delete(node, key)
+				continue
+			}
+			stripIgnoredKDKPlistKeys(child)
+		}
+	case []any:
+		for _, item := range node {
+			stripIgnoredKDKPlistKeys(item)
+		}
+	}
 }
 
 func init() {
@@ -272,9 +338,19 @@ var kdkDiffCmd = &cobra.Command{
 					log.WithError(err).Warnf("failed to read %s", oldPath)
 					continue
 				}
+				oldData, err = normalizeKDKTextDiffInput(rel, oldData)
+				if err != nil {
+					log.WithError(err).Warnf("failed to normalize %s", oldPath)
+					continue
+				}
 				newData, err := os.ReadFile(newPath)
 				if err != nil {
 					log.WithError(err).Warnf("failed to read %s", newPath)
+					continue
+				}
+				newData, err = normalizeKDKTextDiffInput(rel, newData)
+				if err != nil {
+					log.WithError(err).Warnf("failed to normalize %s", newPath)
 					continue
 				}
 
