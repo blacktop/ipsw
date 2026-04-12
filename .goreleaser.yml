@@ -405,7 +405,6 @@ brews:
         type: optional
       - name: git-delta
         type: optional
-      - name: libheif
     conflicts:
       - ipsw-frida
     install: |

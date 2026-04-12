@@ -1,4 +1,4 @@
-//go:build darwin && cgo && wallpaper
+//go:build darwin && wallpaper
 
 /*
 Copyright © 2026 blacktop

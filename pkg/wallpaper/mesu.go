@@ -1,21 +1,22 @@
-//go:build darwin && cgo && wallpaper
+//go:build darwin && wallpaper
 
 package wallpaper
 
 import (
 	"bytes"
 	"fmt"
-	"image"
 	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/disintegration/imaging"
-	_ "github.com/strukturag/libheif-go"
 )
 
 const (
@@ -54,6 +55,85 @@ type MESUAssets struct {
 	SigningKey    string           `plist:"SigningKey,omitempty"`
 }
 
+func resizeJPEGThumbnail(imgBytes []byte) ([]byte, error) {
+	img, err := jpeg.Decode(bytes.NewReader(imgBytes))
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode thumbnail.jpg: %v", err)
+	}
+
+	resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 90}); err != nil {
+		return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func resizePNGThumbnail(imgBytes []byte) ([]byte, error) {
+	img, err := png.Decode(bytes.NewReader(imgBytes))
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode thumbnail.png: %v", err)
+	}
+
+	resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, resizedImg); err != nil {
+		return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// convertWithSips uses macOS ImageIO via sips for HEIC-family wallpaper previews.
+func convertWithSips(imgBytes []byte, sourceExt string) ([]byte, error) {
+	tempDir, err := os.MkdirTemp("", "ipsw-wallpaper-*")
+	if err != nil {
+		return nil, fmt.Errorf("unable to create temporary directory for %s preview: %w", sourceExt, err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	sourcePath := filepath.Join(tempDir, "thumbnail"+sourceExt)
+	if err := os.WriteFile(sourcePath, imgBytes, 0o600); err != nil {
+		return nil, fmt.Errorf("unable to write temporary %s preview: %w", sourceExt, err)
+	}
+
+	outputPath := filepath.Join(tempDir, "thumbnail.png")
+	cmd := exec.Command("sips", "--resampleHeight", "700", "-s", "format", "png", sourcePath, "--out", outputPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("sips failed to convert %s preview: %w (%s)", sourceExt, err, strings.TrimSpace(string(output)))
+	}
+
+	converted, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read converted %s preview: %w", sourceExt, err)
+	}
+
+	return converted, nil
+}
+
+func extractThumbnailPreview(imgBytes []byte, thumbnailFile string) ([]byte, error) {
+	thumbnailExt := strings.ToLower(filepath.Ext(thumbnailFile))
+	if bytes.HasPrefix(imgBytes, []byte("\x89PNG")) {
+		thumbnailExt = ".png"
+	}
+
+	switch thumbnailExt {
+	case ".avif", ".heic", ".heif":
+		converted, err := convertWithSips(imgBytes, thumbnailExt)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode %s preview: %w", thumbnailExt, err)
+		}
+		return converted, nil
+	case ".jpeg", ".jpg":
+		return resizeJPEGThumbnail(imgBytes)
+	case ".png":
+		return resizePNGThumbnail(imgBytes)
+	default:
+		return nil, fmt.Errorf("unsupported thumbnail format: %s", thumbnailExt)
+	}
+}
+
 // FetchWallpaperPlist fetches and decodes the Apple wallpaper plist
 func FetchWallpaperPlist() (*MESUAssets, error) {
 	resp, err := http.Get(updateURL)
@@ -72,7 +152,7 @@ func FetchWallpaperPlist() (*MESUAssets, error) {
 	return &assets, nil
 }
 
-// ExtractThumbnailBytes downloads a wallpaper zip from the given URL and extracts the thumbnail.jpg to a byte slice,
+// ExtractThumbnailBytes downloads a wallpaper zip from the given URL and extracts the thumbnail image to a byte slice,
 // resizing it to a fixed height while preserving aspect ratio.
 func ExtractThumbnailBytes(url, proxy string, insecure bool) ([]byte, error) {
 	zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
@@ -118,58 +198,16 @@ func ExtractThumbnailBytes(url, proxy string, insecure bool) ([]byte, error) {
 		if filepath.Base(f.Name) == thumbnailFile {
 			rc, err := f.Open()
 			if err != nil {
-				return nil, fmt.Errorf("unable to open thumbnail.jpg: %v", err)
+				return nil, fmt.Errorf("unable to open thumbnail image %s: %v", thumbnailFile, err)
 			}
 			defer rc.Close()
 			imgBytes, err := io.ReadAll(rc)
 			if err != nil {
-				return nil, fmt.Errorf("unable to read thumbnail.jpg: %v", err)
+				return nil, fmt.Errorf("unable to read thumbnail image %s: %v", thumbnailFile, err)
 			}
-			if bytes.HasPrefix(imgBytes, []byte("\x89PNG")) {
-				thumbnailFile = "thumbnail.png"
-			}
-			switch filepath.Ext(thumbnailFile) {
-			case ".heic":
-				img, format, err := image.Decode(bytes.NewReader(imgBytes))
-				if err != nil {
-					return nil, fmt.Errorf("unable to decode thumbnail.heic: %v", err)
-				}
-				if format != "heif" && format != "heic" && format != "avif" {
-					return nil, fmt.Errorf("unsupported thumbnail format: %s", format)
-				}
-				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
-				var buf bytes.Buffer
-				if err := png.Encode(&buf, resizedImg); err != nil {
-					return nil, fmt.Errorf("could not encode image as PNG: %w", err)
-				}
-				return buf.Bytes(), nil
-			case ".jpeg", ".jpg":
-				img, err := jpeg.Decode(bytes.NewReader(imgBytes))
-				if err != nil {
-					return nil, fmt.Errorf("unable to decode thumbnail.jpg: %v", err)
-				}
-				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
-				var buf bytes.Buffer
-				if err := jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 90}); err != nil {
-					return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
-				}
-				return buf.Bytes(), nil
-			case ".png":
-				img, err := png.Decode(bytes.NewReader(imgBytes))
-				if err != nil {
-					return nil, fmt.Errorf("unable to decode thumbnail.jpg: %v", err)
-				}
-				resizedImg := imaging.Resize(img, 0, 700, imaging.Lanczos)
-				var buf bytes.Buffer
-				if err := png.Encode(&buf, resizedImg); err != nil {
-					return nil, fmt.Errorf("unable to encode resized thumbnail: %v", err)
-				}
-				return buf.Bytes(), nil
-			default:
-				return nil, fmt.Errorf("unsupported thumbnail format: %s", filepath.Ext(thumbnailFile))
-			}
+			return extractThumbnailPreview(imgBytes, thumbnailFile)
 		}
 	}
 
-	return nil, fmt.Errorf("unable to find thumbnail.jpg in wallpaper zip")
+	return nil, fmt.Errorf("unable to find thumbnail image in wallpaper zip")
 }
