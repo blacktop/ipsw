@@ -137,7 +137,6 @@ jobs:
           cd build
           cmake ..
           sudo make install
-          sudo apt-get install -yq --fix-missing libheif1 libheif-plugin-libde265 heif-gdk-pixbuf libheif-dev # for wallpaper downloader
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-13'
         run: |

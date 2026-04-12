@@ -47,7 +47,7 @@ jobs:
         #   mkdir /tmp/homebrew
         #   cd /tmp; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
         #   sudo mv /tmp/homebrew /usr/local/homebrew
-        #   arch -x86_64 /usr/local/homebrew/bin/brew install --quiet unicorn libusb libheif pkg-config
+        #   arch -x86_64 /usr/local/homebrew/bin/brew install --quiet unicorn libusb pkg-config
         # env:
         #   HOMEBREW_NO_AUTO_UPDATE: 1
 
