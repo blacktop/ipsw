@@ -284,8 +284,15 @@ func (o *Ota) QueryPublicXML() []types.Asset {
 			}
 		}
 		if o.Config.Build != "0" {
-			if !strings.EqualFold(o.Config.Build, asset.Build) {
-				continue
+			if o.Config.Delta {
+				// For delta, --build is the prerequisite build
+				if !strings.EqualFold(o.Config.Build, asset.PrerequisiteBuild) {
+					continue
+				}
+			} else {
+				if !strings.EqualFold(o.Config.Build, asset.Build) {
+					continue
+				}
 			}
 		}
 		if len(o.Config.Device) > 0 {
@@ -499,13 +506,25 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 
 func (o *Ota) getRequests(atype assetType, audienceID string) (reqs []pallasRequest, err error) {
 
+	// BuildVersion tells Pallas "what is currently installed" and
+	// drives what updates are returned. For regular (non-delta,
+	// non-RSR) downloads, --build is a *target* filter applied
+	// after the response, not a current-build hint. Sending it
+	// as BuildVersion would tell Pallas "I'm already on that
+	// build" and it would only return newer updates, causing the
+	// post-filter to drop everything. Send "0" so Pallas returns
+	// all available targets for the requested audience.
+	buildVersion := o.Config.Build
+	if !o.Config.Delta && !o.Config.RSR {
+		buildVersion = "0"
+	}
 	req := pallasRequest{
 		ClientVersion:        clientVersion,
 		AssetType:            atype,
 		AssetAudience:        audienceID,
 		CertIssuanceDay:      certIssuanceDay,
 		ProductVersion:       o.Config.Version.Original(),
-		BuildVersion:         o.Config.Build,
+		BuildVersion:         buildVersion,
 		ProductType:          o.Config.Device,
 		HWModelStr:           o.Config.Model,
 		CompatibilityVersion: 20,
@@ -815,12 +834,21 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 		otas = versionFiltered
 	}
 
-	// Apply build filtering for all platforms when build is specified
+	// Apply build filtering for all platforms when build is specified.
+	// Delta mode: --build is the prerequisite (source) build, so
+	// match PrerequisiteBuild. Regular mode: --build is the target
+	// build, so match Build.
 	if o.Config.Build != "0" && !o.Config.RSR {
 		var buildFiltered []types.Asset
 		for _, ota := range otas {
-			if strings.EqualFold(ota.Build, o.Config.Build) {
-				buildFiltered = append(buildFiltered, ota)
+			if o.Config.Delta {
+				if strings.EqualFold(ota.PrerequisiteBuild, o.Config.Build) {
+					buildFiltered = append(buildFiltered, ota)
+				}
+			} else {
+				if strings.EqualFold(ota.Build, o.Config.Build) {
+					buildFiltered = append(buildFiltered, ota)
+				}
 			}
 		}
 		otas = buildFiltered
