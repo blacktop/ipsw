@@ -27,10 +27,9 @@ import (
 
 // SbCmd represents the sb command
 var SbCmd = &cobra.Command{
-	Use:    "sb",
-	Short:  "Sandbox commands",
-	Args:   cobra.NoArgs,
-	Hidden: true,
+	Use:   "sb",
+	Short: "Sandbox commands",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

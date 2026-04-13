@@ -31,7 +31,7 @@ main() {
     fi
 
     rm -rf www/docs/cli/**/*.md
-    go run ./cmd/ipsw/main.go docs
+    go run -tags 'sandbox' ./cmd/ipsw/main.go docs
     # go run . schema -o ./www/docs/static/schema.json
     fd .md www/docs/cli/ | xargs $SED -i'' \
         -e ':a' -e 'N' -e '$!ba' -e 's/### Examples\n\n```/### Examples\n\n```bash/g'
