@@ -38,6 +38,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -54,6 +56,8 @@ builds:
       - arm64
     # goarm64:
     #   - v8.9
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -116,6 +120,7 @@ builds:
     tags:
       - frida
       - libusb
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -141,6 +146,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -220,6 +227,8 @@ builds:
       # - "386"
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
