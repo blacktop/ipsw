@@ -3,6 +3,12 @@ name: Pre-Release
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - "www/**"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+      - "*.md"
+      - "LICENSE"
   workflow_dispatch:
 
 permissions:
