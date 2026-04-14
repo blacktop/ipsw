@@ -39,7 +39,7 @@ jobs:
         run: pnpm build --locale en
 
       - name: Upload Build Artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: www/build
 
