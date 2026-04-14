@@ -54,6 +54,10 @@ func init() {
 	diffCmd.MarkFlagDirname("signatures")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	diffCmd.MarkFlagDirname("output")
+	diffCmd.Flags().String("key-db", "", "Path to AEA keys JSON database (for OTA diffs)")
+	diffCmd.MarkFlagFilename("key-db", "json")
+	diffCmd.Flags().String("key-val", "", "Base64 encoded AEA symmetric encryption key (for OTA diffs)")
+	diffCmd.Flags().Bool("insecure", false, "Allow insecure connections when fetching AEA keys")
 	diffCmd.MarkFlagsMutuallyExclusive("markdown", "json", "html")
 	// viper.BindPFlag("diff.in", diffCmd.Flags().Lookup("in"))
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
@@ -73,6 +77,9 @@ func init() {
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
 	viper.BindPFlag("diff.signatures", diffCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
+	viper.BindPFlag("diff.key-db", diffCmd.Flags().Lookup("key-db"))
+	viper.BindPFlag("diff.key-val", diffCmd.Flags().Lookup("key-val"))
+	viper.BindPFlag("diff.insecure", diffCmd.Flags().Lookup("insecure"))
 }
 
 func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) error {
@@ -106,16 +113,20 @@ func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) err
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
-	Use:   "diff <IPSW|DIR> <IPSW|DIR>",
-	Short: "Diff IPSWs or patched OTA DMG directories",
+	Use:   "diff <IPSW|OTA|DIR> <IPSW|OTA|DIR>",
+	Short: "Diff IPSWs, OTAs, or patched OTA DMG directories",
 	Example: heredoc.Doc(`
 		# Diff two IPSWs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
+		# Diff two OTAs (darwin only, requires full OTAs)
+		❯ ipsw diff <old.ota> <new.ota> --output <output/folder> --markdown
+		# Diff two OTAs with AEA key database
+		❯ ipsw diff <old.ota> <new.ota> --key-db keys.json --output <output/folder> --markdown
 		# Diff two ota patch rsr output directories
 		❯ ipsw diff <old_rsr_dir> <new_rsr_dir> --files --output <output/folder> --markdown
 		# Diff two IPSWs with KDKs
-		❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
-			--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
+		❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown
+			--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031
 			--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031`),
 	Args:          cobra.ExactArgs(2),
 	SilenceErrors: true,
@@ -148,6 +159,9 @@ var diffCmd = &cobra.Command{
 			Output:       viper.GetString("diff.output"),
 			Verbose:      Verbose,
 			LowMemory:    viper.GetBool("diff.low-memory"),
+			AEAKeyDB:     viper.GetString("diff.key-db"),
+			AEAKeyVal:    viper.GetString("diff.key-val"),
+			AEAInsecure:  viper.GetBool("diff.insecure"),
 		})
 		if err := d.Diff(); err != nil {
 			return err

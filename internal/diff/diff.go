@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	otapkg "github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"golang.org/x/exp/maps"
 )
@@ -86,6 +87,9 @@ type Config struct {
 	Output       string
 	Verbose      bool
 	LowMemory    bool
+	AEAKeyDB     string
+	AEAKeyVal    string
+	AEAInsecure  bool
 }
 
 // Context is the context for the diff
@@ -106,6 +110,14 @@ type Context struct {
 	Webkit          string
 	KDK             string
 	PemDB           string
+
+	// otaFile is unexported to avoid gob serialization issues
+	// in Diff.Save(). Nil unless InputMode == inputModeOTA.
+	otaFile *otapkg.AA
+	// payloadRoot is the extracted OTA payload filesystem root.
+	// Unexported so gob ignores it in Diff.Save().
+	payloadRoot  string
+	payloadReady bool
 
 	mu *sync.Mutex
 }
@@ -233,11 +245,12 @@ func (d *Diff) getInfo() (err error) {
 	if err != nil {
 		return err
 	}
-	d.Old.InputMode = mode
 	d.Old.PemDB = d.conf.PemDB
 	d.New.PemDB = d.conf.PemDB
 
 	if mode == inputModeDirectory {
+		d.Old.InputMode = inputModeDirectory
+		d.New.InputMode = inputModeDirectory
 		configureDirectoryContext(&d.Old)
 		configureDirectoryContext(&d.New)
 
@@ -247,6 +260,79 @@ func (d *Diff) getInfo() (err error) {
 
 		return nil
 	}
+
+	// Probe both sides for OTA before committing to IPSW mode.
+	oldOTA, oldInfo, oldErr := tryOpenOTA(d.Old.IPSWPath, d.conf)
+	newOTA, newInfo, newErr := tryOpenOTA(d.New.IPSWPath, d.conf)
+
+	// Handle fatal errors — clean up any opened handle.
+	if oldErr != nil {
+		if newOTA != nil {
+			newOTA.Close()
+		}
+		return fmt.Errorf("failed to probe 'Old' input: %w", oldErr)
+	}
+	if newErr != nil {
+		if oldOTA != nil {
+			oldOTA.Close()
+		}
+		return fmt.Errorf("failed to probe 'New' input: %w", newErr)
+	}
+
+	// Classify symmetrically.
+	switch {
+	case oldOTA != nil && newOTA != nil:
+		// Both are OTAs — validate scope (Phase 1: full OTAs only).
+		if err := validateOTAScope(oldInfo); err != nil {
+			oldOTA.Close()
+			newOTA.Close()
+			return fmt.Errorf("'Old' OTA: %w", err)
+		}
+		if err := validateOTAScope(newInfo); err != nil {
+			oldOTA.Close()
+			newOTA.Close()
+			return fmt.Errorf("'New' OTA: %w", err)
+		}
+
+		d.Old.otaFile = oldOTA
+		d.New.otaFile = newOTA
+		configureOTAContext(&d.Old, oldInfo, d.tmpDir)
+		configureOTAContext(&d.New, newInfo, d.tmpDir)
+
+		if isMacOSOTA(oldInfo) || isMacOSOTA(newInfo) {
+			d.Old.IsMacOS = true
+			d.New.IsMacOS = true
+		}
+
+		if d.Title == "" {
+			d.Title = fmt.Sprintf(
+				"%s (%s) .vs %s (%s)",
+				d.Old.Version, d.Old.Build,
+				d.New.Version, d.New.Build,
+			)
+		}
+		return nil
+
+	case oldOTA == nil && newOTA == nil:
+		// Neither is OTA — fall through to IPSW mode.
+
+	default:
+		// Mixed: one OTA, one not.
+		if oldOTA != nil {
+			oldOTA.Close()
+		}
+		if newOTA != nil {
+			newOTA.Close()
+		}
+		return fmt.Errorf(
+			"inputs must both be IPSW files, OTA files, " +
+				"or directories of patched OTA DMGs",
+		)
+	}
+
+	// IPSW mode.
+	d.Old.InputMode = inputModeIPSW
+	d.New.InputMode = inputModeIPSW
 
 	d.Old.Info, err = info.Parse(d.Old.IPSWPath)
 	if err != nil {
@@ -297,16 +383,33 @@ func (d *Diff) Diff() (err error) {
 	if err := d.getInfo(); err != nil {
 		return err
 	}
+
+	// Close OTA handles when done (after all extractions).
+	if d.Old.otaFile != nil {
+		defer d.Old.otaFile.Close()
+	}
+	if d.New.otaFile != nil {
+		defer d.New.otaFile.Close()
+	}
+
 	directoryMode := d.Old.InputMode == inputModeDirectory
+	otaMode := d.Old.InputMode == inputModeOTA
+
 	if directoryMode {
 		if unsupported := unsupportedFlagsForDirectoryMode(d.conf); len(unsupported) > 0 {
-			return fmt.Errorf("directory inputs support dyld_shared_cache, MachO, file, and KDK diffs; unsupported flags: %s", strings.Join(unsupported, ", "))
+			log.Warnf("Directory inputs do not support %s; skipping those sections", strings.Join(unsupported, ", "))
 		}
 		log.Info("Mounting patched OTA DMGs")
 		if err := d.mountSystemOsDMGs(); err != nil {
 			return fmt.Errorf("failed to mount DMGs: %v", err)
 		}
 		defer d.unmountSystemOsDMGs()
+	}
+
+	if otaMode {
+		if unsupported := unsupportedFlagsForOTAMode(d.conf); len(unsupported) > 0 {
+			log.Warnf("OTA mode does not support %s; skipping those sections", strings.Join(unsupported, ", "))
+		}
 	}
 
 	if directoryMode {
@@ -342,7 +445,7 @@ func (d *Diff) Diff() (err error) {
 		log.WithError(err).Error("failed to parse MachOs")
 	}
 
-	if d.conf.LaunchD {
+	if d.conf.LaunchD && !directoryMode {
 		log.Info("Diffing launchd PLIST")
 		if err := d.parseLaunchdPlists(); err != nil {
 			log.WithError(err).Error("failed to parse launchd plists")
@@ -354,9 +457,11 @@ func (d *Diff) Diff() (err error) {
 		if err := d.parseFirmwares(); err != nil {
 			log.WithError(err).Error("failed to parse firmwares")
 		}
-		log.Info("Diffing iBoot")
-		if err := d.parseIBoot(); err != nil {
-			log.WithError(err).Error("failed to parse iBoot")
+		if !directoryMode {
+			log.Info("Diffing iBoot")
+			if err := d.parseIBoot(); err != nil {
+				log.WithError(err).Error("failed to parse iBoot")
+			}
 		}
 	}
 
@@ -446,7 +551,8 @@ func mountDMG(ctx *Context) (err error) {
 }
 
 func (d *Diff) mountSystemOsDMGs() (err error) {
-	if d.Old.InputMode == inputModeDirectory {
+	switch d.Old.InputMode {
+	case inputModeDirectory:
 		log.Info("Mounting 'Old' patched OTA DMGs")
 		if err := mountDirectoryDMGs(&d.Old); err != nil {
 			return err
@@ -456,22 +562,39 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 			return err
 		}
 		return nil
+	case inputModeOTA:
+		log.Info("Extracting 'Old' OTA system cryptex")
+		if err := mountOTACryptexes(&d.Old); err != nil {
+			return err
+		}
+		log.Info("Extracting 'New' OTA system cryptex")
+		if err := mountOTACryptexes(&d.New); err != nil {
+			unmountOTACryptexes("Old", &d.Old)
+			return err
+		}
+		return nil
+	default:
+		log.Info("Mounting 'Old' SystemOS DMG")
+		if err := mountDMG(&d.Old); err != nil {
+			return err
+		}
+		log.Info("Mounting 'New' SystemOS DMG")
+		if err := mountDMG(&d.New); err != nil {
+			return err
+		}
+		return nil
 	}
-	log.Info("Mounting 'Old' SystemOS DMG")
-	if err := mountDMG(&d.Old); err != nil {
-		return err
-	}
-	log.Info("Mounting 'New' SystemOS DMG")
-	if err := mountDMG(&d.New); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (d *Diff) unmountSystemOsDMGs() error {
 	if d.Old.InputMode == inputModeDirectory {
 		releaseDirectoryMounts("Old", d.Old.Mount)
 		releaseDirectoryMounts("New", d.New.Mount)
+		return nil
+	}
+	if d.Old.InputMode == inputModeOTA {
+		unmountOTACryptexes("Old", &d.Old)
+		unmountOTACryptexes("New", &d.New)
 		return nil
 	}
 	utils.Indent(log.Info, 2)("Unmounting 'Old' SystemOS DMG")
@@ -493,7 +616,22 @@ func (d *Diff) unmountSystemOsDMGs() error {
 	return nil
 }
 
-func (d *Diff) parseKernelcache() error {
+func (d *Diff) extractKernelcaches() error {
+	if d.Old.InputMode == inputModeOTA {
+		oldMember, newMember, err := selectOTAKernelcachePair(&d.Old, &d.New)
+		if err != nil {
+			return fmt.Errorf("failed to select OTA kernelcache pair: %w", err)
+		}
+		if err := extractOTAKernelcache(&d.Old, oldMember, d.Old.Folder); err != nil {
+			return fmt.Errorf("failed to extract 'Old' OTA kernelcache: %w", err)
+		}
+		if err := extractOTAKernelcache(&d.New, newMember, d.New.Folder); err != nil {
+			return fmt.Errorf("failed to extract 'New' OTA kernelcache: %w", err)
+		}
+		return nil
+	}
+
+	// IPSW mode.
 	if d.Old.IsMacOS || d.New.IsMacOS {
 		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, "Macmini9,1"); err != nil {
 			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
@@ -529,12 +667,13 @@ func (d *Diff) parseKernelcache() error {
 			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
 			break // just use first kernelcache for now
 		}
-		// for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
-		// 	d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(d.Old.Info.Plists.GetKernelCaches()[kmodel][0]))
-		// }
-		// for kmodel := range d.New.Info.Plists.GetKernelCaches() {
-		// 	d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(d.New.Info.Plists.GetKernelCaches()[kmodel][0]))
-		// }
+	}
+	return nil
+}
+
+func (d *Diff) parseKernelcache() error {
+	if err := d.extractKernelcaches(); err != nil {
+		return err
 	}
 
 	m1, err := macho.Open(d.Old.Kernel.Path)
@@ -653,10 +792,12 @@ func (d *Diff) parseDSC() error {
 				filtered = append(filtered, match)
 			}
 		}
-		if len(filtered) == 0 {
+		if len(filtered) == 0 && d.Old.InputMode != inputModeOTA {
 			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
 		}
-		oldDSCes = filtered
+		if len(filtered) > 0 {
+			oldDSCes = filtered
+		}
 	}
 
 	dscOLD, err := dyld.Open(oldDSCes[0])
@@ -682,10 +823,12 @@ func (d *Diff) parseDSC() error {
 				filtered = append(filtered, match)
 			}
 		}
-		if len(filtered) == 0 {
+		if len(filtered) == 0 && d.New.InputMode != inputModeOTA {
 			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
 		}
-		newDSCes = filtered
+		if len(filtered) > 0 {
+			newDSCes = filtered
+		}
 	}
 
 	dscNEW, err := dyld.Open(newDSCes[0])
@@ -723,7 +866,66 @@ func (d *Diff) parseDSC() error {
 	return nil
 }
 
+func scanEntitlementsFromMounts(mounts map[string]mount, label string) (map[string]string, error) {
+	db := make(map[string]string)
+	for _, name := range sortedMountNames(mounts) {
+		mnt := mounts[name]
+		partial, err := ent.GetDatabase(&ent.Config{
+			Folder:            mnt.MountPath,
+			LaunchConstraints: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan entitlements in %s %s: %w", label, name, err)
+		}
+		maps.Copy(db, partial)
+	}
+	return db, nil
+}
+
+func (d *Diff) ensureOTAPayloadFilesystems() error {
+	if err := ensureOTAPayloadFilesystem(&d.Old); err != nil {
+		return fmt.Errorf("failed to extract old OTA payload filesystem: %w", err)
+	}
+	if err := ensureOTAPayloadFilesystem(&d.New); err != nil {
+		return fmt.Errorf("failed to extract new OTA payload filesystem: %w", err)
+	}
+	return nil
+}
+
 func (d *Diff) parseEntitlements() (string, error) {
+	if d.Old.InputMode == inputModeOTA {
+		if err := d.ensureOTAPayloadFilesystems(); err != nil {
+			return "", err
+		}
+		oldDB, err := scanEntitlementsFromMounts(otaDiffMounts(&d.Old), "old")
+		if err != nil {
+			return "", err
+		}
+		newDB, err := scanEntitlementsFromMounts(otaDiffMounts(&d.New), "new")
+		if err != nil {
+			return "", err
+		}
+		return ent.DiffDatabases(oldDB, newDB, &ent.Config{
+			Markdown: true,
+			Color:    false,
+			DiffTool: "git",
+		})
+	}
+	if d.Old.InputMode == inputModeDirectory {
+		oldDB, err := scanEntitlementsFromMounts(d.Old.Mount, "old")
+		if err != nil {
+			return "", err
+		}
+		newDB, err := scanEntitlementsFromMounts(d.New.Mount, "new")
+		if err != nil {
+			return "", err
+		}
+		return ent.DiffDatabases(oldDB, newDB, &ent.Config{
+			Markdown: true,
+			Color:    false,
+			DiffTool: "git",
+		})
+	}
 	oldDB, err := ent.GetDatabase(&ent.Config{
 		IPSW:              d.Old.IPSWPath,
 		PemDB:             d.conf.PemDB,
@@ -760,6 +962,13 @@ func (d *Diff) parseMachos() (err error) {
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
 	}
+	if d.Old.InputMode == inputModeOTA {
+		if err := d.ensureOTAPayloadFilesystems(); err != nil {
+			return err
+		}
+		d.Machos, err = diffMachosInMounts(otaDiffMounts(&d.Old), otaDiffMounts(&d.New), conf)
+		return
+	}
 	if d.Old.InputMode == inputModeDirectory {
 		d.Machos, err = diffMachosInMounts(d.Old.Mount, d.New.Mount, conf)
 		return
@@ -770,6 +979,33 @@ func (d *Diff) parseMachos() (err error) {
 }
 
 func (d *Diff) parseLaunchdPlists() error {
+	if d.Old.InputMode == inputModeOTA {
+		if err := d.ensureOTAPayloadFilesystems(); err != nil {
+			return fmt.Errorf("diff: parseLaunchdPlists: %v", err)
+		}
+		oldConfig, err := launchdConfigFromRoots(otaLaunchdSearchRoots(&d.Old))
+		if err != nil {
+			return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
+		}
+		newConfig, err := launchdConfigFromRoots(otaLaunchdSearchRoots(&d.New))
+		if err != nil {
+			return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
+		}
+		out, err := utils.GitDiff(
+			oldConfig+"\n",
+			newConfig+"\n",
+			&utils.GitDiffConfig{Color: false, Tool: "git"})
+		if err != nil {
+			return err
+		}
+		if len(out) > 0 {
+			d.Launchd = "```diff\n" + out + "\n```"
+		}
+		return nil
+	}
+	if d.Old.InputMode != inputModeIPSW {
+		return fmt.Errorf("diff: parseLaunchdPlists: launchd diff is only supported for IPSW and OTA payload inputs")
+	}
 	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath, d.conf.PemDB)
 	if err != nil {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
@@ -779,8 +1015,8 @@ func (d *Diff) parseLaunchdPlists() error {
 		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
 	}
 	out, err := utils.GitDiff(
-		string(oldConfig)+"\n",
-		string(newConfig)+"\n",
+		oldConfig+"\n",
+		newConfig+"\n",
 		&utils.GitDiffConfig{Color: false, Tool: "git"})
 	if err != nil {
 		return err
@@ -793,7 +1029,7 @@ func (d *Diff) parseLaunchdPlists() error {
 }
 
 func (d *Diff) parseFirmwares() (err error) {
-	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+	conf := &mcmd.DiffConfig{
 		Markdown:   true,
 		Color:      false,
 		DiffTool:   "git",
@@ -803,7 +1039,16 @@ func (d *Diff) parseFirmwares() (err error) {
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
 		LowMemory:  d.conf.LowMemory,
-	})
+	}
+	if d.Old.InputMode == inputModeOTA {
+		d.Firmwares, err = diffFirmwaresFromOTA(&d.Old, &d.New, conf)
+		return
+	}
+	if d.Old.InputMode == inputModeDirectory {
+		log.Warn("Firmware diff (--fw) not supported for directory inputs; skipping")
+		return nil
+	}
+	d.Firmwares, err = mcmd.DiffFirmwares(d.Old.IPSWPath, d.New.IPSWPath, conf)
 	return
 }
 
@@ -812,32 +1057,44 @@ func (d *Diff) parseIBoot() (err error) {
 		New:     make(map[string][]string),
 		Removed: make(map[string][]string),
 	}
-	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_iboot")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary directory to store im4ps: %v", err)
-	}
-	defer os.RemoveAll(tmpDIR)
-	getIboot := func(ipswPath string) (*iboot.IBoot, error) {
-		iBootIm4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
-			// return regexp.MustCompile(`iBSS.*\.im4p$`).MatchString(f.Name) || regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
-			return regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
-		})
+	var oldIBoot, newIBoot *iboot.IBoot
+	if d.Old.InputMode == inputModeOTA {
+		oldIBoot, err = parseOTAIBoot(&d.Old)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unzip iBoot im4p: %v", err)
+			return fmt.Errorf("failed to get iBoot from 'Old' OTA: %v", err)
 		}
-		im4p, err := img4.OpenPayload(iBootIm4ps[0])
+		newIBoot, err = parseOTAIBoot(&d.New)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open im4p: %v", err)
+			return fmt.Errorf("failed to get iBoot from 'New' OTA: %v", err)
 		}
-		return iboot.Parse(im4p.Data)
-	}
-	oldIBoot, err := getIboot(d.Old.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to get iBoot from 'Old' IPSW: %v", err)
-	}
-	newIBoot, err := getIboot(d.New.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to get iBoot from 'New' IPSW: %v", err)
+	} else {
+		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_iboot")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary directory to store im4ps: %v", err)
+		}
+		defer os.RemoveAll(tmpDIR)
+		getIboot := func(ipswPath string) (*iboot.IBoot, error) {
+			iBootIm4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
+				// return regexp.MustCompile(`iBSS.*\.im4p$`).MatchString(f.Name) || regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
+				return regexp.MustCompile(`iBoot\..*\.im4p$`).MatchString(f.Name)
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to unzip iBoot im4p: %v", err)
+			}
+			im4p, err := img4.OpenPayload(iBootIm4ps[0])
+			if err != nil {
+				return nil, fmt.Errorf("failed to open im4p: %v", err)
+			}
+			return iboot.Parse(im4p.Data)
+		}
+		oldIBoot, err = getIboot(d.Old.IPSWPath)
+		if err != nil {
+			return fmt.Errorf("failed to get iBoot from 'Old' IPSW: %v", err)
+		}
+		newIBoot, err = getIboot(d.New.IPSWPath)
+		if err != nil {
+			return fmt.Errorf("failed to get iBoot from 'New' IPSW: %v", err)
+		}
 	}
 	d.IBoot.Versions = []string{oldIBoot.Version, newIBoot.Version}
 	for name, strs := range newIBoot.Strings {
@@ -897,11 +1154,37 @@ func (d *Diff) parseFeatureFlags() (err error) {
 	}
 
 	oldPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
-		oldPlists[path] = content
-		return nil
-	}); err != nil {
-		return err
+	newPlists := make(map[string]string)
+	if d.Old.InputMode == inputModeOTA {
+		if err := d.ensureOTAPayloadFilesystems(); err != nil {
+			return err
+		}
+		if err := collectFeatureFlagsFromMounts(otaDiffMounts(&d.Old), oldPlists); err != nil {
+			return err
+		}
+		if err := collectFeatureFlagsFromMounts(otaDiffMounts(&d.New), newPlists); err != nil {
+			return err
+		}
+	} else if d.Old.InputMode == inputModeDirectory {
+		if err := collectFeatureFlagsFromMounts(d.Old.Mount, oldPlists); err != nil {
+			return err
+		}
+		if err := collectFeatureFlagsFromMounts(d.New.Mount, newPlists); err != nil {
+			return err
+		}
+	} else {
+		if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
+			oldPlists[path] = content
+			return nil
+		}); err != nil {
+			return err
+		}
+		if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
+			newPlists[path] = content
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 
 	var prevFiles []string
@@ -909,14 +1192,6 @@ func (d *Diff) parseFeatureFlags() (err error) {
 		prevFiles = append(prevFiles, f)
 	}
 	slices.Sort(prevFiles)
-
-	newPlists := make(map[string]string)
-	if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
-		newPlists[path] = content
-		return nil
-	}); err != nil {
-		return err
-	}
 
 	var nextFiles []string
 	for f := range newPlists {
@@ -964,6 +1239,14 @@ func (d *Diff) parseFeatureFlags() (err error) {
 }
 
 func (d *Diff) parseFiles() error {
+	if d.Old.InputMode == inputModeOTA {
+		if err := d.ensureOTAPayloadFilesystems(); err != nil {
+			return err
+		}
+		var err error
+		d.Files, err = diffFilesInMounts(otaDiffMounts(&d.Old), otaDiffMounts(&d.New))
+		return err
+	}
 	if d.Old.InputMode == inputModeDirectory {
 		var err error
 		d.Files, err = diffFilesInMounts(d.Old.Mount, d.New.Mount)

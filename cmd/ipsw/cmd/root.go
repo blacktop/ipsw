@@ -155,7 +155,7 @@ func expandPath(path string) string {
 // expandConfigPaths expands relative and tilde paths in all config values
 func expandConfigPaths() {
 	allSettings := viper.AllSettings()
-	expandSettings(allSettings, "")
+	expandSettings(allSettings, "", viper.GetBool("config-quiet"))
 
 	// Merge the expanded settings back into viper
 	for key, value := range allSettings {
@@ -164,7 +164,7 @@ func expandConfigPaths() {
 }
 
 // expandSettings recursively processes all configuration values and expands relative paths
-func expandSettings(settings map[string]any, prefix string) {
+func expandSettings(settings map[string]any, prefix string, quiet bool) {
 	for key, value := range settings {
 		fullKey := key
 		if prefix != "" {
@@ -175,18 +175,18 @@ func expandSettings(settings map[string]any, prefix string) {
 		case string:
 			if needsExpansion(v) {
 				expanded := expandPath(v)
-				if expanded != v {
+				if expanded != v && !quiet {
 					log.Warnf("Expanded config path %s: %s → %s (use full paths to avoid warnings)", fullKey, v, expanded)
 				}
 				settings[key] = expanded
 			}
 		case map[string]any:
-			expandSettings(v, fullKey)
+			expandSettings(v, fullKey, quiet)
 		case []any:
 			for i, item := range v {
 				if str, ok := item.(string); ok && needsExpansion(str) {
 					expanded := expandPath(str)
-					if expanded != str {
+					if expanded != str && !quiet {
 						log.Warnf("Expanded config path %s[%d]: %s → %s (use full paths to avoid warnings)", fullKey, i, str, expanded)
 					}
 					v[i] = expanded
