@@ -597,9 +597,13 @@ var downloadOtaCmd = &cobra.Command{
 						filesafe = strings.ReplaceAll(filesafe, "+", "-")
 						isAEA = "KEY_[" + filesafe + "]_"
 					}
-					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s", devices, isRSR, isAEA, getDestName(url, removeCommas)))
+					var buildPrefix string
+					if !o.SplatOnly && o.Build != "" {
+						buildPrefix = o.Build + "_"
+					}
+					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s%s", devices, isRSR, buildPrefix, isAEA, getDestName(url, removeCommas)))
 					if getSim {
-						destName = filepath.Join(folder, fmt.Sprintf("simulator_%s%s", isAEA, getDestName(url, removeCommas)))
+						destName = filepath.Join(folder, fmt.Sprintf("simulator_%s%s%s", buildPrefix, isAEA, getDestName(url, removeCommas)))
 					}
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						fields := log.Fields{
