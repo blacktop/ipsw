@@ -67,3 +67,19 @@ func TestResolveAEAKeyUsesDatabaseWhenExplicitKeyMissing(t *testing.T) {
 		t.Fatalf("expected database key, got %q", conf.SymmetricKey)
 	}
 }
+
+func TestResolveAEAKeyUsesArchiveStemFromDownloadedFilename(t *testing.T) {
+	dbPath := writeAEAKeyDB(t, []types.AEAKeyEntry{
+		{
+			Filename: "78217b63ce1d9586abf249db2937c1757d04d82d43285a51c6c405b2a36fca1f.aea",
+			Key:      "db-key",
+		},
+	})
+
+	otaPath := filepath.Join("/tmp", "iPhone18,1_23F5043k_78217b63ce1d9586abf249db2937c1757d04d82d43285a51c6c405b2a36fca1f.aea")
+	conf := ResolveAEAKey(otaPath, dbPath, "", false)
+
+	if conf.SymmetricKey != "db-key" {
+		t.Fatalf("expected database key from archive stem, got %q", conf.SymmetricKey)
+	}
+}

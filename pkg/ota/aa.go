@@ -31,9 +31,12 @@ import (
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"golang.org/x/exp/maps"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/execabs"
 )
+
+// ErrCryptexNotFound is returned by ExtractCryptex when the OTA
+// does not contain a matching cryptex member.
+var ErrCryptexNotFound = errors.New("cryptex not found")
 
 var (
 	reOTADeviceTreeIm4p = regexp.MustCompile(`.*DeviceTree.*im4p$`)
@@ -463,57 +466,59 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 	if payloadRange != "" {
 		pre = regexp.MustCompile(payloadRange)
 	}
-	eg, _ := errgroup.WithContext(context.Background())
 	for _, file := range r.Files() {
 		if file.isDir {
 			continue
 		}
 		if pre.MatchString(file.Base()) {
-			eg.Go(func() error {
-				f, err := r.Open(file.Name(), false)
+			f, err := r.Open(file.Name(), false)
+			if err != nil {
+				return err
+			}
+			tmpdir, err := os.MkdirTemp("", "ota_payload_extract")
+			if err != nil {
+				_ = f.Close()
+				return err
+			}
+			if err := aaExtractPattern(f, pattern, tmpdir); err != nil {
+				_ = f.Close()
+				_ = os.RemoveAll(tmpdir)
+				return err
+			}
+			if err := f.Close(); err != nil {
+				_ = os.RemoveAll(tmpdir)
+				return err
+			}
+			if err := filepath.Walk(tmpdir, func(path string, f os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
-				defer f.Close()
-				tmpdir, err := os.MkdirTemp("", "ota_payload_extract")
-				if err != nil {
-					return err
-				}
-				defer os.RemoveAll(tmpdir)
-				if err := aaExtractPattern(f, pattern, tmpdir); err != nil {
-					return err
-				}
-				if err := filepath.Walk(tmpdir, func(path string, f os.FileInfo, err error) error {
+				if !f.IsDir() {
+					rel, err := filepath.Rel(tmpdir, path)
+					if err != nil {
+						return fmt.Errorf("failed to compute relative path for %s: %v", path, err)
+					}
+					fname, err := utils.SanitizeArchivePath(output, rel)
 					if err != nil {
 						return err
 					}
-					if !f.IsDir() {
-						rel, err := filepath.Rel(tmpdir, path)
-						if err != nil {
-							return fmt.Errorf("failed to compute relative path for %s: %v", path, err)
-						}
-						fname, err := utils.SanitizeArchivePath(output, rel)
-						if err != nil {
-							return err
-						}
-						if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-							return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
-						}
-						utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(f.Size())), fname))
-						if err := os.Rename(path, fname); err != nil {
-							return fmt.Errorf("failed to mv file %s to %s: %v", rel, fname, err)
-						}
+					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+						return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
 					}
-					return nil
-				}); err != nil {
-					return fmt.Errorf("failed to read files in tmp folder: %v", err)
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(f.Size())), fname))
+					if err := os.Rename(path, fname); err != nil {
+						return fmt.Errorf("failed to mv file %s to %s: %v", rel, fname, err)
+					}
 				}
 				return nil
-			})
+			}); err != nil {
+				_ = os.RemoveAll(tmpdir)
+				return fmt.Errorf("failed to read files in tmp folder: %v", err)
+			}
+			if err := os.RemoveAll(tmpdir); err != nil {
+				return fmt.Errorf("failed to remove tmp OTA payload dir %s: %v", tmpdir, err)
+			}
 		}
-	}
-	if err := eg.Wait(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -521,32 +526,26 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 func (r *Reader) PayloadFiles(pattern string, json bool) error {
 	r.initFileList()
 	pre := regexp.MustCompile(`^payload.\d+$`)
-	// TODO: add mutex around writing to stdout
-	eg, _ := errgroup.WithContext(context.Background())
 	for _, file := range r.Files() {
 		if file.isDir {
 			continue
 		}
 		if pre.MatchString(file.Base()) {
-			eg.Go(func() error {
-				f, err := r.Open(file.Name(), false)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				out, err := aaList(f, pattern, json)
-				if err != nil {
-					return err
-				}
-				if len(out) > 0 && out != "[]" {
-					fmt.Println(out)
-				}
-				return nil
-			})
+			f, err := r.Open(file.Name(), false)
+			if err != nil {
+				return err
+			}
+			out, err := aaList(f, pattern, json)
+			if closeErr := f.Close(); closeErr != nil && err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				return err
+			}
+			if len(out) > 0 && out != "[]" {
+				fmt.Println(out)
+			}
 		}
-	}
-	if err := eg.Wait(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -600,6 +599,10 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 	switch cryptex {
 	case "system":
 		re = regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+	case "system-arm64e":
+		re = regexp.MustCompile(`cryptex-system-arm64e$`)
+	case "system-x86_64h":
+		re = regexp.MustCompile(`cryptex-system-x86_64h$`)
 	case "app":
 		re = regexp.MustCompile(`cryptex-app$`)
 	default:
@@ -642,7 +645,7 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("cryptex '%s' not found", cryptex)
+	return "", fmt.Errorf("%w: '%s'", ErrCryptexNotFound, cryptex)
 }
 
 func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) {
