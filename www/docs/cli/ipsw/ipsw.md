@@ -28,7 +28,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw decomp](/docs/cli/ipsw/decomp)	 - Decompress files using libcompression
 * [ipsw device-info](/docs/cli/ipsw/device-info)	 - Lookup device info
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
-* [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs or patched OTA DMG directories
+* [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs, OTAs, or patched OTA DMG directories
 * [ipsw disk](/docs/cli/ipsw/disk)	 - Disk commands
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree
