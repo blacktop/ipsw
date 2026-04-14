@@ -4,14 +4,14 @@ title: diff
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: diff
-description: Diff IPSWs or patched OTA DMG directories
+description: Diff IPSWs, OTAs, or patched OTA DMG directories
 ---
 ## ipsw diff
 
-Diff IPSWs or patched OTA DMG directories
+Diff IPSWs, OTAs, or patched OTA DMG directories
 
 ```
-ipsw diff <IPSW|DIR> <IPSW|DIR> [flags]
+ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
 ```
 
 ### Examples
@@ -19,11 +19,15 @@ ipsw diff <IPSW|DIR> <IPSW|DIR> [flags]
 ```bash
 # Diff two IPSWs
 ❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
+# Diff two OTAs (darwin only, requires full OTAs)
+❯ ipsw diff <old.ota> <new.ota> --output <output/folder> --markdown
+# Diff two OTAs with AEA key database
+❯ ipsw diff <old.ota> <new.ota> --key-db keys.json --output <output/folder> --markdown
 # Diff two ota patch rsr output directories
 ❯ ipsw diff <old_rsr_dir> <new_rsr_dir> --files --output <output/folder> --markdown
 # Diff two IPSWs with KDKs
-❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown 
-	--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031 
+❯ ipsw diff <old.ipsw> <new.ipsw> --output <output/folder> --markdown
+	--kdk /Library/Developer/KDKs/KDK_15.0_24A5264n.kdk/System/Library/Kernels/kernel.release.t6031
 	--kdk /Library/Developer/KDKs/KDK_15.0_24A5279h.kdk/System/Library/Kernels/kernel.release.t6031
 ```
 
@@ -38,8 +42,11 @@ ipsw diff <IPSW|DIR> <IPSW|DIR> [flags]
       --fw                   Diff other firmwares
   -h, --help                 help for diff
       --html                 Output diff as HTML
+      --insecure             Allow insecure connections when fetching AEA keys
       --json                 Output diff as JSON
   -k, --kdk stringArray      Path to KDKs to diff
+      --key-db string        Path to AEA keys JSON database (for OTA diffs)
+      --key-val string       Base64 encoded AEA symmetric encryption key (for OTA diffs)
       --launchd              Diff launchd configs
       --low-memory           Use disk caching to reduce RAM usage
   -m, --markdown             Output diff as Markdown
