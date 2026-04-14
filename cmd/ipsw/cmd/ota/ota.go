@@ -52,13 +52,9 @@ func GetAEAKey(otaPath, keyDBPath string) (string, error) {
 		return "", fmt.Errorf("otaPath cannot be empty")
 	}
 
-	// Get the base filename (with or without .aea/.zip extension)
-	otaFilename := filepath.Base(otaPath)
-	otaFilename = strings.TrimSuffix(otaFilename, filepath.Ext(otaFilename))
-
-	// filepath.Base("") returns ".", which is not a valid lookup key
-	if otaFilename == "" || otaFilename == "." {
-		return "", fmt.Errorf("invalid OTA path: %s", otaPath)
+	candidates, err := otaFilenameCandidates(otaPath)
+	if err != nil {
+		return "", err
 	}
 
 	// Read the key database JSON
@@ -79,17 +75,45 @@ func GetAEAKey(otaPath, keyDBPath string) (string, error) {
 		entryMap[baseName] = entry
 	}
 
-	// Look up key by filename
-	if entry, ok := entryMap[otaFilename]; ok {
-		log.WithFields(log.Fields{
-			"os":      entry.OS,
-			"version": entry.Version,
-			"build":   entry.Build,
-		}).Debug("Found AEA key in database")
-		return entry.Key, nil
+	// Look up key by filename candidates, preferring the full stem first
+	for _, otaFilename := range candidates {
+		if entry, ok := entryMap[otaFilename]; ok {
+			log.WithFields(log.Fields{
+				"os":      entry.OS,
+				"version": entry.Version,
+				"build":   entry.Build,
+			}).Debug("Found AEA key in database")
+			return entry.Key, nil
+		}
 	}
 
-	return "", fmt.Errorf("no AEA key found in database for OTA: %s", otaFilename)
+	return "", fmt.Errorf("no AEA key found in database for OTA: %s", candidates[0])
+}
+
+func otaFilenameCandidates(otaPath string) ([]string, error) {
+	otaFilename := filepath.Base(otaPath)
+	for {
+		ext := strings.ToLower(filepath.Ext(otaFilename))
+		if ext != ".aea" && ext != ".ota" && ext != ".zip" {
+			break
+		}
+		otaFilename = strings.TrimSuffix(otaFilename, filepath.Ext(otaFilename))
+	}
+
+	// filepath.Base("") returns ".", which is not a valid lookup key
+	if otaFilename == "" || otaFilename == "." {
+		return nil, fmt.Errorf("invalid OTA path: %s", otaPath)
+	}
+
+	candidates := []string{otaFilename}
+	if idx := strings.LastIndex(otaFilename, "_"); idx >= 0 && idx+1 < len(otaFilename) {
+		candidate := otaFilename[idx+1:]
+		if candidate != otaFilename {
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	return candidates, nil
 }
 
 // ResolveAEAKey resolves the AEA decryption key using the priority chain:
