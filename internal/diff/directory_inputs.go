@@ -22,6 +22,7 @@ type inputMode uint8
 const (
 	inputModeIPSW inputMode = iota
 	inputModeDirectory
+	inputModeOTA
 )
 
 var directoryInputDMGNames = []string{"SystemOS", "AppOS", "FileSystem", "ExclaveOS"}
@@ -58,19 +59,16 @@ func isDirectory(path string) (bool, error) {
 	return info.IsDir(), nil
 }
 
+// unsupportedFlagsForDirectoryMode returns CLI flag names that are
+// not fully supported when diffing pre-patched directory inputs.
+// These flags are skipped with a warning instead of hard-erroring.
 func unsupportedFlagsForDirectoryMode(conf *Config) []string {
 	var unsupported []string
 	if conf.LaunchD {
 		unsupported = append(unsupported, "--launchd")
 	}
-	if conf.Firmware {
-		unsupported = append(unsupported, "--fw")
-	}
-	if conf.Features {
-		unsupported = append(unsupported, "--feat")
-	}
-	if conf.Entitlements {
-		unsupported = append(unsupported, "--ent")
+	if conf.LowMemory {
+		unsupported = append(unsupported, "--low-memory")
 	}
 	return unsupported
 }
