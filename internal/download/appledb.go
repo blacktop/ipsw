@@ -103,15 +103,16 @@ func (p *PrerequisiteBuilds) UnmarshalJSON(b []byte) error {
 
 // AppleDbOsFiles is an AppleDB osFiles object
 type AppleDbOsFile struct {
-	OS        string         `json:"osStr"`
-	Version   string         `json:"version"`
-	Build     string         `json:"build"`
-	Released  ReleasedDate   `json:"released"`
-	Beta      bool           `json:"beta"`
-	RC        bool           `json:"rc"`
-	Internal  bool           `json:"internal"`
-	DeviceMap []string       `json:"deviceMap"`
-	Sources   []OsFileSource `json:"sources"`
+	OS                     string         `json:"osStr"`
+	Version                string         `json:"version"`
+	Build                  string         `json:"build"`
+	Released               ReleasedDate   `json:"released"`
+	Beta                   bool           `json:"beta"`
+	RC                     bool           `json:"rc"`
+	Internal               bool           `json:"internal"`
+	HideFromLatestVersions bool           `json:"hideFromLatestVersions"`
+	DeviceMap              []string       `json:"deviceMap"`
+	Sources                []OsFileSource `json:"sources"`
 }
 
 type OsFiles []AppleDbOsFile
@@ -148,6 +149,9 @@ func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 		if len(query.Version) > 0 && !strings.HasPrefix(f.Version, query.Version) {
 			continue
 		}
+		if query.Latest && f.HideFromLatestVersions {
+			continue
+		}
 		tmpFS = append(tmpFS, f)
 	}
 	if len(tmpFS) == 0 {
@@ -181,6 +185,9 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			continue
 		}
 		if len(query.Build) > 0 && f.Build != query.Build {
+			continue
+		}
+		if query.Latest && f.HideFromLatestVersions {
 			continue
 		}
 		tmpFS = append(tmpFS, f)
