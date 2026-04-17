@@ -33,7 +33,7 @@ require (
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/coder/acp-go-sdk v0.6.3
+	github.com/coder/acp-go-sdk v0.11.7
 	github.com/disintegration/imaging v1.6.2
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/dominikbraun/graph v0.23.0
@@ -56,7 +56,6 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.13.0
-	github.com/klauspost/compress v1.18.5
 	github.com/mattn/go-isatty v0.0.21
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
