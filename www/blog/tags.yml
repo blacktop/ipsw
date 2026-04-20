@@ -6,3 +6,15 @@ symbolication:
   label: Symbolication
   permalink: /symbolication
   description: IPSW symbolication
+sandbox:
+  label: Sandbox
+  permalink: /sandbox
+  description: Apple sandbox internals
+macos:
+  label: macOS
+  permalink: /macos
+  description: macOS-specific internals
+reversing:
+  label: Reversing
+  permalink: /reversing
+  description: Reverse engineering deep dives
