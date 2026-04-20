@@ -124,7 +124,7 @@ func (c *ACP) fetchModelsViaACP() (map[string]string, error) {
 			// The SDK uses `omitempty` on these booleans, so `false` would be omitted and
 			// the agent rejects the request. We advertise support but still enforce a
 			// deny-by-default policy in the handler implementations.
-			Fs:       acp.FileSystemCapability{ReadTextFile: true, WriteTextFile: true},
+			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
 			Terminal: false,
 		},
 	}); err != nil {
@@ -245,8 +245,8 @@ func (c *collectingClient) CreateTerminal(ctx context.Context, _ acp.CreateTermi
 	return acp.CreateTerminalResponse{}, fmt.Errorf("acp client: terminal not supported")
 }
 
-func (c *collectingClient) KillTerminalCommand(ctx context.Context, _ acp.KillTerminalCommandRequest) (acp.KillTerminalCommandResponse, error) {
-	return acp.KillTerminalCommandResponse{}, fmt.Errorf("acp client: terminal not supported")
+func (c *collectingClient) KillTerminal(ctx context.Context, _ acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
+	return acp.KillTerminalResponse{}, fmt.Errorf("acp client: terminal not supported")
 }
 
 func (c *collectingClient) ReleaseTerminal(ctx context.Context, _ acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
@@ -317,7 +317,7 @@ func (c *ACP) Chat() (string, error) {
 			// The SDK uses `omitempty` on these booleans, so `false` would be omitted and
 			// the agent rejects the request. We advertise support but still enforce a
 			// deny-by-default policy in the handler implementations.
-			Fs:       acp.FileSystemCapability{ReadTextFile: true, WriteTextFile: true},
+			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
 			Terminal: false,
 		},
 	}); err != nil {
@@ -339,9 +339,9 @@ func (c *ACP) Chat() (string, error) {
 
 	// Best-effort: attempt to set model if the agent supports it (UNSTABLE ACP API).
 	if m := strings.TrimSpace(c.conf.Model); m != "" && m != "default" {
-		if _, setErr := conn.SetSessionModel(ctx, acp.SetSessionModelRequest{SessionId: sess.SessionId, ModelId: acp.ModelId(m)}); setErr != nil {
+		if _, setErr := conn.UnstableSetSessionModel(ctx, acp.UnstableSetSessionModelRequest{SessionId: sess.SessionId, ModelId: acp.UnstableModelId(m)}); setErr != nil {
 			if c.conf.Verbose {
-				log.Debugf("acp: SetSessionModel failed (ignored): %v", setErr)
+				log.Debugf("acp: UnstableSetSessionModel failed (ignored): %v", setErr)
 			}
 		}
 	}

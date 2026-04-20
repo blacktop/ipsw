@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/alecthomas/chroma/v2 v2.23.1
-	github.com/anthropics/anthropic-sdk-go v1.36.0
+	github.com/anthropics/anthropic-sdk-go v1.37.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
@@ -33,7 +33,7 @@ require (
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/coder/acp-go-sdk v0.6.3
+	github.com/coder/acp-go-sdk v0.12.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/dominikbraun/graph v0.23.0
@@ -46,11 +46,11 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/glebarez/sqlite v1.11.0
-	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/gomarkdown/markdown v0.0.0-20260412113850-134a5b2cce7f
+	github.com/gomarkdown/markdown v0.0.0-20260417124207-7d523f7318df
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
@@ -60,7 +60,7 @@ require (
 	github.com/mattn/go-isatty v0.0.21
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.20.7
+	github.com/ollama/ollama v0.21.0
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
