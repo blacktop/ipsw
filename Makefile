@@ -16,6 +16,7 @@ dev-deps: ## Install the dev dependencies
 	@go mod download
 	@go install github.com/goreleaser/goreleaser@latest
 	@go install golang.org/x/perf/cmd/benchstat@latest
+	@go install golang.org/x/tools/cmd/goimports@latest
 
 .PHONY: x86-brew
 x86-brew: ## Install the x86_64 homebrew on Apple Silicon
