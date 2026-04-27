@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/alecthomas/chroma/v2 v2.23.1
-	github.com/anthropics/anthropic-sdk-go v1.37.0
+	github.com/anthropics/anthropic-sdk-go v1.38.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
@@ -56,11 +56,10 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.13.0
-	github.com/klauspost/compress v1.18.5
-	github.com/mattn/go-isatty v0.0.21
+	github.com/mattn/go-isatty v0.0.22
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.21.0
+	github.com/ollama/ollama v0.21.2
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
