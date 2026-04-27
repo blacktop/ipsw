@@ -143,12 +143,9 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 
 	if filepath.Ext(extractedDMG) == ".aea" {
 		encryptedDMG := extractedDMG
-		defer func() {
-			_ = os.Remove(encryptedDMG) // remove the original encrypted AEA DMG after decrypting and mounting
-		}()
 		extractedDMG, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    extractedDMG,
-			Output:   filepath.Dir(extractedDMG),
+			Input:    encryptedDMG,
+			Output:   filepath.Dir(encryptedDMG),
 			PemDB:    cfg.PemDB,
 			Proxy:    "",    // TODO: make proxy configurable
 			Insecure: false, // TODO: make insecure configurable
@@ -156,6 +153,7 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
+		_ = os.Remove(encryptedDMG)
 	}
 	if isEncrypted, err := magic.IsEncryptedDMG(extractedDMG); err != nil {
 		return nil, fmt.Errorf("failed to check if DMG is encrypted: %v", err)
