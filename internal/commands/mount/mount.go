@@ -142,8 +142,9 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 	}
 
 	if filepath.Ext(extractedDMG) == ".aea" {
+		encryptedDMG := extractedDMG
 		defer func() {
-			_ = os.Remove(extractedDMG) // remove the encrypted AEA DMG after decrypting and mounting
+			_ = os.Remove(encryptedDMG) // remove the original encrypted AEA DMG after decrypting and mounting
 		}()
 		extractedDMG, err = aea.Decrypt(&aea.DecryptConfig{
 			Input:    extractedDMG,
