@@ -2,6 +2,8 @@ package img4
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"os"
 	"path/filepath"
 	"strings"
@@ -121,6 +123,70 @@ func TestPayloadCreation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDecryptPayloadDecompressesLZSSAfterDecrypt(t *testing.T) {
+	plaintext := append([]byte{0xcf, 0xfa, 0xed, 0xfe, 0x0c, 0x00, 0x00, 0x01}, bytes.Repeat([]byte("kernel-data"), 512)...)
+	iv := bytes.Repeat([]byte{0x11}, aes.BlockSize)
+	key := bytes.Repeat([]byte{0x22}, 32)
+
+	payload, err := CreatePayload(&CreatePayloadConfig{
+		Type:        IM4P_KERNELCACHE,
+		Version:     "KernelCacheBuilder-test",
+		Data:        plaintext,
+		Compression: "lzss",
+		Keybags: []Keybag{
+			{
+				Type: PRODUCTION,
+				IV:   iv,
+				Key:  key,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreatePayload() error = %v", err)
+	}
+
+	if rem := len(payload.Data) % aes.BlockSize; rem != 0 {
+		payload.Data = append(payload.Data, bytes.Repeat([]byte{0}, aes.BlockSize-rem)...)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher() error = %v", err)
+	}
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(payload.Data, payload.Data)
+
+	data, err := payload.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	inPath := filepath.Join(tmpDir, "kernelcache.release.n66")
+	outPath := filepath.Join(tmpDir, "kernelcache.release.n66.dec")
+	if err := os.WriteFile(inPath, data, 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := DecryptPayload(inPath, outPath, iv, key); err != nil {
+		t.Fatalf("DecryptPayload() error = %v", err)
+	}
+
+	got, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !bytes.Equal(got, plaintext) {
+		t.Fatalf("decrypted payload mismatch: got %d bytes with prefix %x, want %d bytes with prefix %x",
+			len(got), firstBytes(got, 8), len(plaintext), firstBytes(plaintext, 8))
+	}
+}
+
+func firstBytes(data []byte, count int) []byte {
+	if len(data) < count {
+		return data
+	}
+	return data[:count]
 }
 
 func TestPayloadRoundtrip(t *testing.T) {
