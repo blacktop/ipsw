@@ -4,6 +4,7 @@ package extract
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -34,6 +35,19 @@ import (
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+var ErrNoDecryptionKey = errors.New("no decryption key found")
+
+type remoteKernelcacheMember struct {
+	file    *zip.File
+	devices []string
+	output  string
+	// iv/key are populated when a wiki key matches the member; payload is populated
+	// when the member was peeked and found unencrypted (already decompressed).
+	iv      []byte
+	key     []byte
+	payload []byte
+}
 
 // Config is the extract command configuration.
 type Config struct {
@@ -78,6 +92,8 @@ type Config struct {
 	Info bool `json:"info,omitempty"`
 	// Lookup decryption keys from theapplewiki.com
 	Lookup bool `json:"lookup,omitempty"`
+	// FirmwareKeys are caller-provided decryption keys from theapplewiki.com
+	FirmwareKeys download.WikiFWKeys `json:"-"`
 	// BuildManifest identity selector (used for rdisk)
 	Ident string `json:"ident,omitempty"`
 
@@ -96,37 +112,20 @@ func decryptExtractedIM4P(extractedPath string, wikiKeys download.WikiFWKeys) (s
 	if wikiKeys == nil {
 		return extractedPath, nil
 	}
-	// Get key by filename
-	keyStr, err := wikiKeys.GetKeyByFilename(extractedPath)
-	if err != nil {
-		log.Debugf("no key found for %s: %v", filepath.Base(extractedPath), err)
-		return extractedPath, nil // Not an error, just no key available
-	}
-	// Parse IV and Key from combined hex string (IV is first 32 chars, key is rest)
-	if len(keyStr) < 64 { // 32 hex for IV + at least 32 hex for key
-		log.Warnf("key string too short for %s", filepath.Base(extractedPath))
-		return extractedPath, nil
-	}
-	ivHex := keyStr[:32]
-	keyHex := keyStr[32:]
-
-	iv, err := hex.DecodeString(ivHex)
-	if err != nil {
-		return extractedPath, fmt.Errorf("failed to decode IV: %v", err)
-	}
-	key, err := hex.DecodeString(keyHex)
-	if err != nil {
-		return extractedPath, fmt.Errorf("failed to decode key: %v", err)
-	}
 
 	// Create decrypted output file without the .im4p/.img3 extension
 	// e.g., DeviceTree.n51ap.im4p -> DeviceTree.n51ap
 	decryptedPath := strings.TrimSuffix(extractedPath, filepath.Ext(extractedPath))
 
-	log.Infof("Decrypting %s", filepath.Base(extractedPath))
-	if err := img4.DecryptPayload(extractedPath, decryptedPath, iv, key); err != nil {
+	decrypted, err := DecryptPayloadWithKeys(extractedPath, decryptedPath, wikiKeys)
+	if err != nil {
 		return extractedPath, fmt.Errorf("failed to decrypt %s: %v", filepath.Base(extractedPath), err)
 	}
+	if !decrypted {
+		log.Debugf("no key found for %s", filepath.Base(extractedPath))
+		return extractedPath, nil
+	}
+	log.Infof("Decrypting %s", filepath.Base(extractedPath))
 
 	// Remove original encrypted file
 	if err := os.Remove(extractedPath); err != nil {
@@ -134,6 +133,80 @@ func decryptExtractedIM4P(extractedPath string, wikiKeys download.WikiFWKeys) (s
 	}
 
 	return decryptedPath, nil
+}
+
+// DecryptPayloadWithKeys decrypts an extracted IM4P/IMG3 payload if a matching wiki key exists.
+func DecryptPayloadWithKeys(inputPath, outputPath string, wikiKeys download.WikiFWKeys) (bool, error) {
+	iv, key, ok, err := firmwareKeyForFile(wikiKeys, inputPath)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0750); err != nil {
+		return false, fmt.Errorf("failed to create output directory: %v", err)
+	}
+	if err := img4.DecryptPayload(inputPath, outputPath, iv, key); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func firmwareKeyForFile(wikiKeys download.WikiFWKeys, filename string) ([]byte, []byte, bool, error) {
+	if wikiKeys == nil {
+		return nil, nil, false, nil
+	}
+	for _, fwKey := range wikiKeys {
+		for idx, keyFilename := range fwKey.Filename {
+			if !firmwareKeyFilenameMatches(filename, keyFilename) {
+				continue
+			}
+			iv, key, ok, err := decodeFirmwareKeyMaterial(fwKey, idx)
+			if err != nil || ok {
+				return iv, key, ok, err
+			}
+		}
+	}
+	return nil, nil, false, nil
+}
+
+func firmwareKeyFilenameMatches(path, keyFilename string) bool {
+	if len(keyFilename) == 0 {
+		return false
+	}
+	normalizedPath := strings.ToLower(strings.ReplaceAll(path, " ", "_"))
+	normalizedKeyFilename := strings.ToLower(strings.ReplaceAll(keyFilename, " ", "_"))
+	return strings.HasSuffix(normalizedPath, normalizedKeyFilename)
+}
+
+func decodeFirmwareKeyMaterial(fwKey download.WikiFWKey, idx int) ([]byte, []byte, bool, error) {
+	if idx < len(fwKey.Iv) && idx < len(fwKey.Key) && isKnownKeyPart(fwKey.Iv[idx]) && isKnownKeyPart(fwKey.Key[idx]) {
+		iv, err := hex.DecodeString(fwKey.Iv[idx])
+		if err != nil {
+			return nil, nil, false, fmt.Errorf("failed to decode iv: %v", err)
+		}
+		key, err := hex.DecodeString(fwKey.Key[idx])
+		if err != nil {
+			return nil, nil, false, fmt.Errorf("failed to decode key: %v", err)
+		}
+		return iv, key, true, nil
+	}
+	if idx < len(fwKey.Kbag) && isKnownKeyPart(fwKey.Kbag[idx]) {
+		kbag, err := hex.DecodeString(fwKey.Kbag[idx])
+		if err != nil {
+			return nil, nil, false, fmt.Errorf("failed to decode kbag: %v", err)
+		}
+		if len(kbag) <= aes.BlockSize {
+			return nil, nil, false, fmt.Errorf("kbag is too short: %d bytes", len(kbag))
+		}
+		return kbag[:aes.BlockSize], kbag[aes.BlockSize:], true, nil
+	}
+	return nil, nil, false, nil
+}
+
+func isKnownKeyPart(value string) bool {
+	return len(value) > 0 && !strings.EqualFold(value, "Unknown")
 }
 
 func getFolder(c *Config) (*info.Info, string, error) {
@@ -432,13 +505,144 @@ func Kernelcache(c *Config) (map[string][]string, error) {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
 		}
-		_, zr, folder, err := getRemoteFolder(c)
+		i, zr, folder, err := getRemoteFolder(c)
 		if err != nil {
 			return nil, err
+		}
+		keys := c.FirmwareKeys
+		if len(keys) == 0 {
+			keys = c.wikiKeys
+		}
+		if len(keys) > 0 {
+			return remoteKernelcacheWithKeys(i, zr, filepath.Join(filepath.Clean(c.Output), folder), c.KernelDevice, keys, c.Progress)
 		}
 		return kernelcache.RemoteParse(zr, filepath.Join(filepath.Clean(c.Output), folder), c.KernelDevice)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
+}
+
+func remoteKernelcacheWithKeys(i *info.Info, zr *zip.Reader, destPath, device string, wikiKeys download.WikiFWKeys, progress bool) (map[string][]string, error) {
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store kernelcache: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	artifacts := make(map[string][]string)
+	selected, err := selectRemoteKernelcacheMembers(i, zr.File, destPath, device, wikiKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, kc := range selected {
+		if err := os.MkdirAll(filepath.Dir(kc.output), 0750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory: %v", err)
+		}
+
+		if kc.payload != nil {
+			if err := os.WriteFile(kc.output, kc.payload, 0660); err != nil {
+				return nil, fmt.Errorf("failed to write kernelcache %s: %v", kc.file.Name, err)
+			}
+			artifacts[kc.output] = kc.devices
+			continue
+		}
+
+		extracted, err := utils.SearchZip([]*zip.File{kc.file}, regexp.MustCompile("^"+regexp.QuoteMeta(kc.file.Name)+"$"), tmpDIR, true, progress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract kernelcache %s: %v", kc.file.Name, err)
+		}
+		if len(extracted) == 0 {
+			return nil, fmt.Errorf("failed to extract kernelcache %s", kc.file.Name)
+		}
+		if err := img4.DecryptPayload(extracted[0], kc.output, kc.iv, kc.key); err != nil {
+			return nil, fmt.Errorf("failed to decrypt kernelcache %s: %v", kc.file.Name, err)
+		}
+		artifacts[kc.output] = kc.devices
+	}
+
+	return artifacts, nil
+}
+
+func readZipMember(f *zip.File) ([]byte, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open zip member %s: %v", f.Name, err)
+	}
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read zip member %s: %v", f.Name, err)
+	}
+	return data, nil
+}
+
+func selectRemoteKernelcacheMembers(i *info.Info, files []*zip.File, destPath, device string, wikiKeys download.WikiFWKeys) ([]remoteKernelcacheMember, error) {
+	var selected []remoteKernelcacheMember
+	var missingKeys []string
+	var foundKernelcache bool
+
+	for _, f := range files {
+		if !strings.Contains(f.Name, "kernelcache.") {
+			continue
+		}
+		devices := i.GetDevicesForKernelCache(f.Name)
+		if len(device) > 0 && !slices.Contains(devices, device) {
+			continue
+		}
+		foundKernelcache = true
+
+		fname := filepath.Join(destPath, filepath.Clean(i.GetKernelCacheFileName(f.Name)))
+		if _, err := os.Stat(fname); err == nil {
+			log.Warnf("kernelcache already exists: %s", fname)
+			continue
+		}
+
+		iv, key, ok, err := firmwareKeyForFile(wikiKeys, f.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve key for kernelcache %s: %w", f.Name, err)
+		}
+
+		var payload []byte
+		if !ok {
+			data, err := readZipMember(f)
+			if err != nil {
+				return nil, err
+			}
+			cc, err := kernelcache.ParseImg4Data(data)
+			if errors.Is(err, kernelcache.ErrEncryptedKernelCache) {
+				missingKeys = append(missingKeys, f.Name)
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse kernelcache %s: %v", f.Name, err)
+			}
+			payload, err = kernelcache.DecompressData(cc)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress kernelcache %s: %v", f.Name, err)
+			}
+		}
+
+		selected = append(selected, remoteKernelcacheMember{
+			file:    f,
+			devices: devices,
+			output:  fname,
+			iv:      iv,
+			key:     key,
+			payload: payload,
+		})
+	}
+
+	if !foundKernelcache {
+		if len(device) > 0 {
+			return nil, fmt.Errorf("no kernelcache found for device %s in IPSW", device)
+		}
+		return nil, fmt.Errorf("no kernelcache found in IPSW")
+	}
+	if len(missingKeys) > 0 {
+		return nil, fmt.Errorf("%w for %s", ErrNoDecryptionKey, strings.Join(missingKeys, ", "))
+	}
+
+	return selected, nil
 }
 
 // SPTM extracts the SPTM firmware from an IPSW

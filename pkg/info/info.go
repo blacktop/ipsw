@@ -603,7 +603,11 @@ func (i *Info) GetKernelCacheFolders(kc string) ([]string, error) {
 
 // GetKernelCacheFileName returns a short new kernelcache name including all the supported devices
 func (i *Info) GetKernelCacheFileName(kc string) string {
-	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(filepath.Base(kc)))
+	devices := i.GetDevicesForKernelCache(filepath.Base(kc))
+	if i.kernelCacheDeviceListCollides(filepath.Base(kc), devices) {
+		return filepath.Base(kc)
+	}
+	devList := getAbbreviatedDevList(devices)
 	if len(devList) == 0 {
 		return filepath.Base(kc)
 	}
@@ -613,14 +617,28 @@ func (i *Info) GetKernelCacheFileName(kc string) string {
 // GetDevicesForKernelCache returns a sorted array of devices that support the kernelcache
 func (i *Info) GetDevicesForKernelCache(kc string) []string {
 	var devices []string
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
+		return nil
+	}
 
 	for bconf, kcache := range i.Plists.BuildManifest.GetKernelCaches() {
 		if utils.StrSliceHas(kcache, filepath.Base(kc)) {
+			var matchedDeviceTree bool
 			for _, dtree := range i.DeviceTrees {
-				dt, _ := dtree.Summary()
+				if dtree == nil {
+					continue
+				}
+				dt, err := dtree.Summary()
+				if err != nil {
+					continue
+				}
 				if strings.EqualFold(bconf, dt.BoardConfig) {
+					matchedDeviceTree = true
 					devices = append(devices, dt.ProductType)
 				}
+			}
+			if !matchedDeviceTree {
+				devices = append(devices, i.getDevicesForBuildIdentityKernelCache(filepath.Base(kc), bconf)...)
 			}
 		}
 	}
@@ -630,22 +648,122 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 
 // GetKernelCacheForDevice returns the kernelcache path(s) for a given device ProductType (e.g., "Mac16,8", "iPhone17,1")
 func (i *Info) GetKernelCacheForDevice(device string) []string {
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
+		return nil
+	}
+
 	// Find the BoardConfig for this device
 	var boardConfig string
 	for _, dtree := range i.DeviceTrees {
-		dt, _ := dtree.Summary()
+		if dtree == nil {
+			continue
+		}
+		dt, err := dtree.Summary()
+		if err != nil {
+			continue
+		}
 		if dt.ProductType == device {
 			boardConfig = strings.ToLower(dt.BoardConfig)
 			break
 		}
 	}
-	if boardConfig == "" {
+	if boardConfig != "" {
+		// Get kernelcaches for this BoardConfig
+		kcs := i.Plists.BuildManifest.GetKernelCaches()
+		return kcs[boardConfig]
+	}
+
+	return i.getKernelCachesForDeviceFromBuildManifest(device)
+}
+
+func (i *Info) getKernelCachesForDeviceFromBuildManifest(device string) []string {
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
 		return nil
 	}
 
-	// Get kernelcaches for this BoardConfig
-	kcs := i.Plists.BuildManifest.GetKernelCaches()
-	return kcs[boardConfig]
+	var kcs []string
+	singleDeviceIPSW := len(i.Plists.BuildManifest.SupportedProductTypes) == 1 &&
+		strings.EqualFold(i.Plists.BuildManifest.SupportedProductTypes[0], device)
+	for _, ident := range i.Plists.BuildManifest.BuildIdentities {
+		if !singleDeviceIPSW && !strings.EqualFold(ident.ApProductType, device) {
+			continue
+		}
+		kernel, ok := ident.Manifest["KernelCache"]
+		if !ok {
+			continue
+		}
+		path, ok := getIdentityManifestPath(kernel)
+		if !ok {
+			continue
+		}
+		kcs = append(kcs, path)
+	}
+
+	return utils.Unique(kcs)
+}
+
+func (i *Info) getDevicesForBuildIdentityKernelCache(kc, deviceClass string) []string {
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
+		return nil
+	}
+
+	var devices []string
+	for _, ident := range i.Plists.BuildManifest.BuildIdentities {
+		if !strings.EqualFold(ident.Info.DeviceClass, deviceClass) {
+			continue
+		}
+		kernel, ok := ident.Manifest["KernelCache"]
+		if !ok {
+			continue
+		}
+		path, ok := getIdentityManifestPath(kernel)
+		if !ok || filepath.Base(path) != filepath.Base(kc) {
+			continue
+		}
+		if len(ident.ApProductType) > 0 {
+			devices = append(devices, ident.ApProductType)
+		} else if len(i.Plists.BuildManifest.SupportedProductTypes) == 1 {
+			devices = append(devices, i.Plists.BuildManifest.SupportedProductTypes[0])
+		}
+	}
+
+	return devices
+}
+
+func (i *Info) kernelCacheDeviceListCollides(kc string, devices []string) bool {
+	if i.Plists == nil || i.Plists.BuildManifest == nil || len(devices) == 0 {
+		return false
+	}
+
+	seen := make(map[string]struct{})
+	for _, kcaches := range i.Plists.BuildManifest.GetKernelCaches() {
+		for _, otherKC := range kcaches {
+			otherBase := filepath.Base(otherKC)
+			if otherBase == filepath.Base(kc) {
+				continue
+			}
+			if _, ok := seen[otherBase]; ok {
+				continue
+			}
+			seen[otherBase] = struct{}{}
+			if slices.Equal(devices, i.GetDevicesForKernelCache(otherBase)) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func getIdentityManifestPath(manifest plist.IdentityManifest) (string, bool) {
+	if manifest.Info == nil {
+		return "", false
+	}
+	path, ok := manifest.Info["Path"].(string)
+	if !ok || len(path) == 0 {
+		return "", false
+	}
+	return path, true
 }
 
 func getAbbreviatedDevList(devices []string) string {
@@ -715,7 +833,7 @@ func Parse(ipswPath string, keys ...string) (*Info, error) {
 	i.DeviceTrees, err = devicetree.Parse(ipswPath, keys...)
 	if err != nil {
 		if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
-			log.Error(err.Error())
+			log.Debug(err.Error())
 		} else {
 			log.Errorf("failed to parse devicetree: %v", err)
 		}
@@ -737,7 +855,7 @@ func ParseZipFiles(files []*zip.File, keys ...string) (*Info, error) {
 	i.DeviceTrees, err = devicetree.ParseZipFiles(files, keys...)
 	if err != nil {
 		if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
-			log.Error(err.Error())
+			log.Debug(err.Error())
 		} else {
 			log.Errorf("failed to parse devicetree: %v", err)
 		}
@@ -770,7 +888,7 @@ func ParseOTAFiles(files []fs.File) (*Info, error) {
 			dt, err := devicetree.ParseImg4Data(dat)
 			if err != nil {
 				if errors.Is(err, devicetree.ErrEncryptedDeviceTree) { // FIXME: this is a hack to avoid stopping the parsing of the metadata info
-					log.Error(err.Error())
+					log.Debug(err.Error())
 				} else {
 					log.Errorf("failed to parse devicetree: %v", err)
 				}

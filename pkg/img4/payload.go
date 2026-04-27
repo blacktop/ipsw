@@ -778,6 +778,21 @@ func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
 		return err
 	}
 
+	i.Data = data
+	i.Encrypted = false
+	i.Keybag = nil
+	i.Keybags = nil
+	i.decompressedData = nil
+	i.extraData = nil
+
+	payloadData, err := i.GetData()
+	if err != nil {
+		return fmt.Errorf("failed to get decrypted payload data: %v", err)
+	}
+	if len(payloadData) == 0 {
+		return fmt.Errorf("decrypted payload data is empty")
+	}
+
 	of, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %v", outputPath, err)
@@ -788,43 +803,7 @@ func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
 		}
 	}()
 
-	var r io.Reader
-
-	// Check for LZSS compression and decompress if needed
-	if isLzss, err := magic.IsLZSS(data); err != nil {
-		return fmt.Errorf("failed to check if data is LZSS: %v", err)
-	} else if isLzss {
-		log.Debug("Detected LZSS compression")
-		decompressed := lzss.Decompress(data)
-		if len(decompressed) == 0 {
-			return fmt.Errorf("failed to LZSS decompress %s", inputPath)
-		}
-		r = bytes.NewReader(decompressed)
-	} else if isLzfse, err := magic.IsLZFSE(data); err != nil { // Check for LZFSE compression and decompress if needed
-		return fmt.Errorf("failed to check if data is LZFSE: %v", err)
-	} else if isLzfse {
-		log.Debug("Detected LZFSE compression")
-		// Determine if it's LZFSE_IBOOT based on the payload type
-		// TODO: this is an assumption that Apple uses LZFSE_IBOOT for iBoot-related payloads (might be dumb)
-		var algo comp.Algorithm
-		if i.Type == IM4P_IBOOT || i.Type == IM4P_IBEC || i.Type == IM4P_IBSS || i.Type == IM4P_LLB {
-			algo = comp.LZFSE_IBOOT
-		} else {
-			algo = comp.LZFSE
-		}
-		decompressed, err := comp.Decompress(data, algo)
-		if err != nil {
-			return fmt.Errorf("failed to decompress %s: %v", inputPath, err)
-		}
-		if len(decompressed) == 0 {
-			return fmt.Errorf("failed to LZFSE decompress %s", inputPath)
-		}
-		r = bytes.NewReader(decompressed)
-	} else {
-		r = bytes.NewReader(data)
-	}
-
-	if _, err := io.Copy(of, r); err != nil {
+	if _, err := of.Write(payloadData); err != nil {
 		return fmt.Errorf("failed to write decrypted data to file %s: %v", outputPath, err)
 	}
 
