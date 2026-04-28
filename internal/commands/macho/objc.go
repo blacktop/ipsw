@@ -146,10 +146,8 @@ type ObjC struct {
 
 	baseFWs map[string][]string
 
-	// flatOutput suppresses the DSC-aware <framework-relative-path> routing
-	// in Headers() and writes headers directly under o.conf.Output. Used by
-	// XCFramework() so the generated <Name>.framework/Headers/ layout
-	// matches what the modulemap expects.
+	// flatOutput makes Headers() write directly under o.conf.Output
+	// instead of a DSC-relative subdirectory. Set by XCFramework().
 	flatOutput bool
 }
 
@@ -464,10 +462,8 @@ func (o *ObjC) Headers() error {
 
 		binaryName := filepath.Base(o.conf.Name)
 		frameworkRelPath := binaryName
-		// safeRelPath sanitizes a candidate path for joining under o.conf.Output.
-		// Returns binaryName as a fallback if the input would escape the output
-		// directory (e.g. via ".." segments, absolute paths, or symlink-style
-		// constructs) or is otherwise non-local.
+		// safeRelPath rejects paths that would escape o.conf.Output
+		// (absolute, contains "..", non-local), falling back to binaryName.
 		safeRelPath := func(p string) string {
 			cleaned := filepath.Clean(p)
 			if filepath.IsAbs(cleaned) {
@@ -492,17 +488,13 @@ func (o *ObjC) Headers() error {
 		} else if o.cache != nil && !o.flatOutput {
 			frameworkRelPath = safeRelPath(o.conf.Name)
 		}
-		// o.conf.Name is mutated below for downstream consumers (writeHeader name,
-		// umbrella filename); save/restore so iterations over o.deps don't carry
-		// the previous dylib's binaryName into the next frameworkRelPath
-		// derivation (which falls back to safeRelPath(o.conf.Name)).
+		// Save/restore o.conf.Name so a --deps iteration cannot leak the
+		// previous dylib's name into the next path derivation.
 		originalConfName := o.conf.Name
 		o.conf.Name = binaryName
 		defer func() { o.conf.Name = originalConfName }()
 		frameworkDir := filepath.Join(o.conf.Output, frameworkRelPath)
 		if o.flatOutput {
-			// XCFramework() expects headers directly under o.conf.Output so the
-			// generated modulemap's umbrella reference resolves.
 			frameworkDir = o.conf.Output
 		}
 		var buildVersions []string
@@ -679,8 +671,6 @@ func (o *ObjC) Headers() error {
 
 		/* generate umbrella header */
 		if len(headers) > 0 {
-			// Strip a trailing extension (e.g. ".dylib") so the umbrella file is
-			// named "<Stem>-Umbrella.h" rather than "<Foo>.dylib-Umbrella.h".
 			umbrellaBase := strings.TrimSuffix(o.conf.Name, filepath.Ext(o.conf.Name))
 			var umbrella = umbrellaBase + "-Umbrella"
 			slices.SortStableFunc(headers, func(a, b string) int {
@@ -772,7 +762,13 @@ type XCFrameworkConfig struct {
 func (o *ObjC) XCFramework() error {
 	var xcfw XCFrameworkConfig
 
-	xcfolder := filepath.Join(o.conf.Output, o.conf.Name+".xcframework")
+	// stem is o.conf.Name with any trailing extension stripped (e.g.
+	// "libMobileGestalt.dylib" -> "libMobileGestalt"). It is used for every
+	// on-disk bundle name (.xcframework / .framework / .tbd) and Info.plist
+	// field so the resulting tree never carries a ".dylib" segment.
+	stem := strings.TrimSuffix(o.conf.Name, filepath.Ext(o.conf.Name))
+
+	xcfolder := filepath.Join(o.conf.Output, stem+".xcframework")
 	if err := os.MkdirAll(xcfolder, 0o750); err != nil {
 		return fmt.Errorf("failed to create XCFramework folder: %w", err)
 	}
@@ -830,9 +826,9 @@ func (o *ObjC) XCFramework() error {
 	if err := enc.Encode(XCFrameworkInfoPlist{
 		AvailableLibraries: []XCFrameworkAvailableLibrary{
 			{
-				BinaryPath:               o.conf.Name + ".framework/" + o.conf.Name + ".tbd",
+				BinaryPath:               stem + ".framework/" + stem + ".tbd",
 				LibraryIdentifier:        xcfw.LibraryIdentifier,
-				LibraryPath:              o.conf.Name + ".framework",
+				LibraryPath:              stem + ".framework",
 				SupportedArchitectures:   xcfw.SupportedArchitectures,
 				SupportedPlatform:        xcfw.SupportedPlatform,
 				SupportedPlatformVariant: xcfw.SupportedPlatformVariant,
@@ -845,7 +841,7 @@ func (o *ObjC) XCFramework() error {
 	}
 
 	/* create folder structure */
-	fwfolder := filepath.Join(xcfolder, xcfw.LibraryIdentifier, o.conf.Name+".framework")
+	fwfolder := filepath.Join(xcfolder, xcfw.LibraryIdentifier, stem+".framework")
 	if err := os.MkdirAll(filepath.Join(fwfolder, "Headers"), 0o750); err != nil {
 		return fmt.Errorf("failed to create Headers folder: %w", err)
 	}
@@ -869,22 +865,20 @@ func (o *ObjC) XCFramework() error {
 		return fmt.Errorf("failed to generate tbd: %w", err)
 	}
 	outTBD += "...\n"
-	tbdFile := filepath.Join(fwfolder, o.conf.Name+".tbd")
+	tbdFile := filepath.Join(fwfolder, stem+".tbd")
 	if err = os.WriteFile(tbdFile, []byte(outTBD), 0o660); err != nil {
 		return fmt.Errorf("failed to write tbd file %s: %v", tbdFile, err)
 	}
 
 	/* generate modulemap */
-	// Headers() emits the umbrella file as "<Stem>-Umbrella.h" (with any
-	// trailing ".dylib"-style extension stripped). Keep the module name and
-	// the umbrella reference in sync; modulemap identifiers also can't
-	// contain '.', so the stem is required there too.
-	umbrellaBase := strings.TrimSuffix(o.conf.Name, filepath.Ext(o.conf.Name))
+	// Module name must be a valid C identifier; the umbrella header reference
+	// is a literal filename and may keep characters like '.' (e.g. "libobjc.A").
+	moduleName := sanitizeCIdent(stem)
 	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), fmt.Appendf(nil,
 		"module %s [system] {\n"+
 			"    umbrella header \"%s-Umbrella.h\"\n"+
 			"    export *\n"+
-			"}\n", umbrellaBase, umbrellaBase,
+			"}\n", moduleName, stem,
 	), 0o660); err != nil {
 		return fmt.Errorf("failed to write module.modulemap file: %v", err)
 	}
@@ -900,10 +894,10 @@ func (o *ObjC) XCFramework() error {
 	if err := enc.Encode(XCFrameworkLibraryInfoPlist{
 		BuildMachineOSBuild:           "23E224",
 		CFBundleDevelopmentRegion:     "en",
-		CFBundleExecutable:            o.conf.Name + ".tbd",
-		CFBundleIdentifier:            "com.apple." + strings.ToLower(o.conf.Name),
+		CFBundleExecutable:            stem + ".tbd",
+		CFBundleIdentifier:            "com.apple." + strings.ToLower(stem),
 		CFBundleInfoDictionaryVersion: "6.0",
-		CFBundleName:                  o.conf.Name,
+		CFBundleName:                  stem,
 		CFBundlePackageType:           "FMWK",
 		CFBundleShortVersionString:    "1.0",
 		CFBundleSignature:             "????",
@@ -925,10 +919,15 @@ func (o *ObjC) XCFramework() error {
 	/* generate Headers */
 	o.conf.Headers = true
 	o.conf.Output = filepath.Join(fwfolder, "Headers")
-	// XCFramework's modulemap references "<Name>-Umbrella.h" relative to
-	// Headers/, so headers must be flat there (no DSC framework-relative
-	// subdirectory routing).
+	// In flat mode every dep would land in the same Headers/ directory and
+	// would not be referenced by the umbrella, so suppress deps too.
+	prevFlatOutput, prevDeps := o.flatOutput, o.deps
 	o.flatOutput = true
+	o.deps = nil
+	defer func() {
+		o.flatOutput = prevFlatOutput
+		o.deps = prevDeps
+	}()
 	return o.Headers()
 }
 
@@ -938,8 +937,40 @@ func (o *ObjC) SwiftPackage() error {
 
 /* utils */
 
+// sanitizeCIdent maps s onto a valid C / Clang preprocessor identifier:
+// any rune outside [A-Za-z0-9_] becomes '_', and a leading digit is
+// prefixed with '_'. Empty input becomes "_". Used for #ifndef guards
+// and modulemap module names whose source strings (dylib stems, ObjC
+// class/category names) may contain '.', '+', '-', etc.
+func sanitizeCIdent(s string) string {
+	if s == "" {
+		return "_"
+	}
+	var b strings.Builder
+	b.Grow(len(s) + 1)
+	for i, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r == '_':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			if i == 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
+}
+
 func writeHeader(hdr *headerInfo) error {
 	var out strings.Builder
+	// hdr.Name comes from class/protocol/category names or umbrella stems;
+	// any of these may contain characters the preprocessor rejects.
+	guard := sanitizeCIdent(hdr.Name)
 	out.WriteString(fmt.Sprintf(
 		"//\n"+
 			"//   Generated by https://github.com/blacktop/ipsw (%s)\n"+
@@ -952,8 +983,8 @@ func writeHeader(hdr *headerInfo) error {
 		hdr.IpswVersion,
 		strings.Join(hdr.BuildVersions, "\n//    - LC_BUILD_VERSION:  "),
 		hdr.SourceVersion,
-		hdr.Name,
-		hdr.Name))
+		guard,
+		guard))
 	if !hdr.IsUmbrella {
 		out.WriteString("@import Foundation;\n")
 	}
@@ -981,7 +1012,7 @@ func writeHeader(hdr *headerInfo) error {
 		out.WriteString("\n")
 	}
 	out.WriteString(fmt.Sprintf("%s\n", hdr.Object))
-	out.WriteString(fmt.Sprintf("#endif /* %s_h */\n", hdr.Name))
+	out.WriteString(fmt.Sprintf("#endif /* %s_h */\n", guard))
 
 	if err := os.MkdirAll(filepath.Dir(hdr.FileName), 0o750); err != nil {
 		return err
