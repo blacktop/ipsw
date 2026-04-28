@@ -54,6 +54,24 @@ type Imports struct {
 	Protos  []string
 }
 
+func dedupeKeepLastByKey[T any](items []T, key func(T) string) []T {
+	if len(items) < 2 {
+		return items
+	}
+	seen := make(map[string]struct{}, len(items))
+	out := make([]T, 0, len(items))
+	for i := len(items) - 1; i >= 0; i-- {
+		k := key(items[i])
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, items[i])
+	}
+	slices.Reverse(out)
+	return out
+}
+
 func (i *Imports) uniq(foundation map[string][]string) {
 	slices.Sort(i.Imports)
 	slices.Sort(i.Locals)
@@ -438,9 +456,38 @@ func (o *ObjC) Headers() error {
 			return nil
 		}
 
-		if id := m.DylibID(); id != nil {
-			o.conf.Name = filepath.Base(id.Name)
+		binaryName := filepath.Base(o.conf.Name)
+		frameworkRelPath := binaryName
+		// safeRelPath sanitizes a candidate path for joining under o.conf.Output.
+		// Returns binaryName as a fallback if the input would escape the output
+		// directory (e.g. via ".." segments, absolute paths, or symlink-style
+		// constructs) or is otherwise non-local.
+		safeRelPath := func(p string) string {
+			cleaned := filepath.Clean(p)
+			if filepath.IsAbs(cleaned) {
+				cleaned = strings.TrimPrefix(cleaned, string(filepath.Separator))
+			}
+			if cleaned == "" || cleaned == "." || !filepath.IsLocal(cleaned) {
+				return binaryName
+			}
+			return cleaned
 		}
+		if id := m.DylibID(); id != nil {
+			binaryName = filepath.Base(id.Name)
+			if o.cache != nil {
+				if filepath.IsAbs(id.Name) {
+					frameworkRelPath = safeRelPath(id.Name)
+				} else {
+					frameworkRelPath = safeRelPath(o.conf.Name)
+				}
+			} else {
+				frameworkRelPath = binaryName
+			}
+		} else if o.cache != nil {
+			frameworkRelPath = safeRelPath(o.conf.Name)
+		}
+		o.conf.Name = binaryName
+		frameworkDir := filepath.Join(o.conf.Output, frameworkRelPath)
 		var buildVersions []string
 		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
 			for _, bv := range bvers {
@@ -468,24 +515,27 @@ func (o *ObjC) Headers() error {
 			return cmp.Compare(a.Name, b.Name)
 		})
 		for _, class := range classes {
-			var props []string
-			var setters []string
-			for _, prop := range class.Props {
-				props = append(props, prop.Name)
-				setters = append(setters, "set"+strings.ToUpper(prop.Name[:1])+prop.Name[1:]+":")
-			}
-			slices.Sort(props)
-			slices.Sort(setters)
-			// remove ivars that are properties
-			class.Ivars = slices.DeleteFunc(class.Ivars, func(i objc.Ivar) bool {
-				// return slices.Contains(props, i.Name) || slices.Contains(props, strings.TrimPrefix(i.Name, "_")) TODO: use this instead
-				return slices.Contains(props, strings.TrimPrefix(i.Name, "_"))
+			class.Ivars = dedupeKeepLastByKey(class.Ivars, func(ivar objc.Ivar) string { return ivar.Name })
+			class.Props = dedupeKeepLastByKey(class.Props, func(prop objc.Property) string { return prop.Name })
+			class.ClassMethods = dedupeKeepLastByKey(class.ClassMethods, func(method objc.Method) string { return method.Name })
+			class.InstanceMethods = dedupeKeepLastByKey(class.InstanceMethods, func(method objc.Method) string { return method.Name })
+			class.Protocols = dedupeKeepLastByKey(class.Protocols, func(proto objc.Protocol) string { return proto.Name })
+			slices.SortStableFunc(class.Ivars, func(a, b objc.Ivar) int {
+				return cmp.Compare(a.Name, b.Name)
 			})
-			// remove methods that are property getter/setter
-			class.InstanceMethods = slices.DeleteFunc(class.InstanceMethods, func(m objc.Method) bool {
-				return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
+			slices.SortStableFunc(class.Props, func(a, b objc.Property) int {
+				return cmp.Compare(a.Name, b.Name)
 			})
-			fname := filepath.Join(o.conf.Output, o.conf.Name, class.Name+".h")
+			slices.SortStableFunc(class.ClassMethods, func(a, b objc.Method) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			slices.SortStableFunc(class.InstanceMethods, func(a, b objc.Method) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			slices.SortStableFunc(class.Protocols, func(a, b objc.Protocol) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			fname := filepath.Join(frameworkDir, class.Name+".h")
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
@@ -512,28 +562,37 @@ func (o *ObjC) Headers() error {
 		})
 		seen := make(map[uint64]bool)
 		for _, proto := range protos {
-			if !slices.Contains(baseFrameworks, o.conf.Name) {
+			if !slices.Contains(baseFrameworks, binaryName) {
 				if _, found := slices.BinarySearch(o.baseFWs["protocols"], proto.Name); found {
 					continue // skip Foundation protocols
 				}
 			}
 			if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
-				var props []string
-				var setters []string
-				for _, prop := range proto.InstanceProperties {
-					props = append(props, prop.Name)
-					setters = append(setters, "set"+strings.ToUpper(prop.Name[:1])+prop.Name[1:]+":")
-				}
-				slices.Sort(props)
-				slices.Sort(setters)
-				// remove methods that are property getter/setter
-				proto.InstanceMethods = slices.DeleteFunc(proto.InstanceMethods, func(m objc.Method) bool {
-					return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
+				proto.ClassMethods = dedupeKeepLastByKey(proto.ClassMethods, func(method objc.Method) string { return method.Name })
+				proto.InstanceMethods = dedupeKeepLastByKey(proto.InstanceMethods, func(method objc.Method) string { return method.Name })
+				proto.ClassProperties = dedupeKeepLastByKey(proto.ClassProperties, func(prop objc.Property) string { return prop.Name })
+				proto.InstanceProperties = dedupeKeepLastByKey(proto.InstanceProperties, func(prop objc.Property) string { return prop.Name })
+				proto.OptionalClassMethods = dedupeKeepLastByKey(proto.OptionalClassMethods, func(method objc.Method) string { return method.Name })
+				proto.OptionalInstanceMethods = dedupeKeepLastByKey(proto.OptionalInstanceMethods, func(method objc.Method) string { return method.Name })
+				slices.SortStableFunc(proto.ClassMethods, func(a, b objc.Method) int {
+					return cmp.Compare(a.Name, b.Name)
 				})
-				proto.OptionalInstanceMethods = slices.DeleteFunc(proto.OptionalInstanceMethods, func(m objc.Method) bool {
-					return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
+				slices.SortStableFunc(proto.InstanceMethods, func(a, b objc.Method) int {
+					return cmp.Compare(a.Name, b.Name)
 				})
-				fname := filepath.Join(o.conf.Output, o.conf.Name, proto.Name+"-Protocol.h")
+				slices.SortStableFunc(proto.ClassProperties, func(a, b objc.Property) int {
+					return cmp.Compare(a.Name, b.Name)
+				})
+				slices.SortStableFunc(proto.InstanceProperties, func(a, b objc.Property) int {
+					return cmp.Compare(a.Name, b.Name)
+				})
+				slices.SortStableFunc(proto.OptionalClassMethods, func(a, b objc.Method) int {
+					return cmp.Compare(a.Name, b.Name)
+				})
+				slices.SortStableFunc(proto.OptionalInstanceMethods, func(a, b objc.Method) int {
+					return cmp.Compare(a.Name, b.Name)
+				})
+				fname := filepath.Join(frameworkDir, proto.Name+"-Protocol.h")
 				if err := writeHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   o.conf.IpswVersion,
@@ -561,9 +620,9 @@ func (o *ObjC) Headers() error {
 			return cmp.Compare(a.Name, b.Name)
 		})
 		for _, cat := range cats {
-			fname := filepath.Join(o.conf.Output, o.conf.Name, cat.Name+".h")
+			fname := filepath.Join(frameworkDir, cat.Name+".h")
 			if cat.Class != nil && cat.Class.Name != "" {
-				fname = filepath.Join(o.conf.Output, o.conf.Name, cat.Class.Name+"+"+cat.Name+".h")
+				fname = filepath.Join(frameworkDir, cat.Class.Name+"+"+cat.Name+".h")
 			}
 			var name string
 			if cat.Class != nil && cat.Class.Name != "" {
@@ -571,6 +630,22 @@ func (o *ObjC) Headers() error {
 			} else {
 				name = cat.Name
 			}
+			cat.ClassMethods = dedupeKeepLastByKey(cat.ClassMethods, func(method objc.Method) string { return method.Name })
+			cat.InstanceMethods = dedupeKeepLastByKey(cat.InstanceMethods, func(method objc.Method) string { return method.Name })
+			cat.Properties = dedupeKeepLastByKey(cat.Properties, func(prop objc.Property) string { return prop.Name })
+			cat.Protocols = dedupeKeepLastByKey(cat.Protocols, func(proto objc.Protocol) string { return proto.Name })
+			slices.SortStableFunc(cat.ClassMethods, func(a, b objc.Method) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			slices.SortStableFunc(cat.InstanceMethods, func(a, b objc.Method) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			slices.SortStableFunc(cat.Properties, func(a, b objc.Property) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
+			slices.SortStableFunc(cat.Protocols, func(a, b objc.Protocol) int {
+				return cmp.Compare(a.Name, b.Name)
+			})
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
@@ -587,18 +662,16 @@ func (o *ObjC) Headers() error {
 
 		/* generate umbrella header */
 		if len(headers) > 0 {
-			var umbrella string
-			if slices.Contains(headers, o.conf.Name+".h") {
-				umbrella = o.conf.Name + "-Umbrella"
-			} else {
-				umbrella = o.conf.Name
-			}
+			var umbrella = o.conf.Name + "-Umbrella"
+			slices.SortStableFunc(headers, func(a, b string) int {
+				return cmp.Compare(a, b)
+			})
 
 			for i, header := range headers {
 				headers[i] = "#import \"" + header + "\""
 			}
 
-			fname := filepath.Join(o.conf.Output, o.conf.Name, umbrella+".h")
+			fname := filepath.Join(frameworkDir, umbrella+".h")
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
@@ -844,7 +917,7 @@ func writeHeader(hdr *headerInfo) error {
 			"//\n"+
 			"//    - LC_BUILD_VERSION:  %s\n"+
 			"//    - LC_SOURCE_VERSION: %s\n"+
-			"//\n"+
+			"//\n\n"+
 			"#ifndef %s_h\n"+
 			"#define %s_h\n",
 		hdr.IpswVersion,
