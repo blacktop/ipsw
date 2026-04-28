@@ -145,6 +145,12 @@ type ObjC struct {
 	deps  []*macho.File
 
 	baseFWs map[string][]string
+
+	// flatOutput suppresses the DSC-aware <framework-relative-path> routing
+	// in Headers() and writes headers directly under o.conf.Output. Used by
+	// XCFramework() so the generated <Name>.framework/Headers/ layout
+	// matches what the modulemap expects.
+	flatOutput bool
 }
 
 // NewObjC returns a new MachO ObjC parser instance
@@ -474,7 +480,7 @@ func (o *ObjC) Headers() error {
 		}
 		if id := m.DylibID(); id != nil {
 			binaryName = filepath.Base(id.Name)
-			if o.cache != nil {
+			if o.cache != nil && !o.flatOutput {
 				if filepath.IsAbs(id.Name) {
 					frameworkRelPath = safeRelPath(id.Name)
 				} else {
@@ -483,11 +489,22 @@ func (o *ObjC) Headers() error {
 			} else {
 				frameworkRelPath = binaryName
 			}
-		} else if o.cache != nil {
+		} else if o.cache != nil && !o.flatOutput {
 			frameworkRelPath = safeRelPath(o.conf.Name)
 		}
+		// o.conf.Name is mutated below for downstream consumers (writeHeader name,
+		// umbrella filename); save/restore so iterations over o.deps don't carry
+		// the previous dylib's binaryName into the next frameworkRelPath
+		// derivation (which falls back to safeRelPath(o.conf.Name)).
+		originalConfName := o.conf.Name
 		o.conf.Name = binaryName
+		defer func() { o.conf.Name = originalConfName }()
 		frameworkDir := filepath.Join(o.conf.Output, frameworkRelPath)
+		if o.flatOutput {
+			// XCFramework() expects headers directly under o.conf.Output so the
+			// generated modulemap's umbrella reference resolves.
+			frameworkDir = o.conf.Output
+		}
 		var buildVersions []string
 		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
 			for _, bv := range bvers {
@@ -855,9 +872,13 @@ func (o *ObjC) XCFramework() error {
 	}
 
 	/* generate modulemap */
+	// Headers() emits the umbrella file as "<Name>-Umbrella.h" so the umbrella
+	// never collides with a class header that happens to share the framework's
+	// name (e.g. class "SpringBoard" inside SpringBoard.framework). Keep the
+	// modulemap's umbrella reference in sync with that naming.
 	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), fmt.Appendf(nil,
 		"module %s [system] {\n"+
-			"    header \"Headers/%s.h\"\n"+ // NOTE: this SHOULD be the umbrella header
+			"    umbrella header \"%s-Umbrella.h\"\n"+
 			"    export *\n"+
 			"}\n", o.conf.Name, o.conf.Name,
 	), 0o660); err != nil {
@@ -900,6 +921,10 @@ func (o *ObjC) XCFramework() error {
 	/* generate Headers */
 	o.conf.Headers = true
 	o.conf.Output = filepath.Join(fwfolder, "Headers")
+	// XCFramework's modulemap references "<Name>-Umbrella.h" relative to
+	// Headers/, so headers must be flat there (no DSC framework-relative
+	// subdirectory routing).
+	o.flatOutput = true
 	return o.Headers()
 }
 
