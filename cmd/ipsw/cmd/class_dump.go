@@ -244,7 +244,11 @@ var classDumpCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(img.Name), err)
 				}
 
-				conf.Name = filepath.Base(img.Name)
+				if viper.GetBool("class-dump.headers") {
+					conf.Name = img.Name
+				} else {
+					conf.Name = filepath.Base(img.Name)
+				}
 
 				o, err = mcmd.NewObjC(m, f, &conf)
 				if err != nil {

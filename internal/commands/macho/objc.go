@@ -438,9 +438,38 @@ func (o *ObjC) Headers() error {
 			return nil
 		}
 
-		if id := m.DylibID(); id != nil {
-			o.conf.Name = filepath.Base(id.Name)
+		binaryName := filepath.Base(o.conf.Name)
+		frameworkRelPath := binaryName
+		// safeRelPath sanitizes a candidate path for joining under o.conf.Output.
+		// Returns binaryName as a fallback if the input would escape the output
+		// directory (e.g. via ".." segments, absolute paths, or symlink-style
+		// constructs) or is otherwise non-local.
+		safeRelPath := func(p string) string {
+			cleaned := filepath.Clean(p)
+			if filepath.IsAbs(cleaned) {
+				cleaned = strings.TrimPrefix(cleaned, string(filepath.Separator))
+			}
+			if cleaned == "" || cleaned == "." || !filepath.IsLocal(cleaned) {
+				return binaryName
+			}
+			return cleaned
 		}
+		if id := m.DylibID(); id != nil {
+			binaryName = filepath.Base(id.Name)
+			if o.cache != nil {
+				if filepath.IsAbs(id.Name) {
+					frameworkRelPath = safeRelPath(id.Name)
+				} else {
+					frameworkRelPath = safeRelPath(o.conf.Name)
+				}
+			} else {
+				frameworkRelPath = binaryName
+			}
+		} else if o.cache != nil {
+			frameworkRelPath = safeRelPath(o.conf.Name)
+		}
+		o.conf.Name = binaryName
+		frameworkDir := filepath.Join(o.conf.Output, frameworkRelPath)
 		var buildVersions []string
 		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
 			for _, bv := range bvers {
@@ -485,7 +514,7 @@ func (o *ObjC) Headers() error {
 			class.InstanceMethods = slices.DeleteFunc(class.InstanceMethods, func(m objc.Method) bool {
 				return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
 			})
-			fname := filepath.Join(o.conf.Output, o.conf.Name, class.Name+".h")
+			fname := filepath.Join(frameworkDir, class.Name+".h")
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
@@ -512,7 +541,7 @@ func (o *ObjC) Headers() error {
 		})
 		seen := make(map[uint64]bool)
 		for _, proto := range protos {
-			if !slices.Contains(baseFrameworks, o.conf.Name) {
+			if !slices.Contains(baseFrameworks, binaryName) {
 				if _, found := slices.BinarySearch(o.baseFWs["protocols"], proto.Name); found {
 					continue // skip Foundation protocols
 				}
@@ -533,7 +562,7 @@ func (o *ObjC) Headers() error {
 				proto.OptionalInstanceMethods = slices.DeleteFunc(proto.OptionalInstanceMethods, func(m objc.Method) bool {
 					return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
 				})
-				fname := filepath.Join(o.conf.Output, o.conf.Name, proto.Name+"-Protocol.h")
+				fname := filepath.Join(frameworkDir, proto.Name+"-Protocol.h")
 				if err := writeHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   o.conf.IpswVersion,
@@ -561,9 +590,9 @@ func (o *ObjC) Headers() error {
 			return cmp.Compare(a.Name, b.Name)
 		})
 		for _, cat := range cats {
-			fname := filepath.Join(o.conf.Output, o.conf.Name, cat.Name+".h")
+			fname := filepath.Join(frameworkDir, cat.Name+".h")
 			if cat.Class != nil && cat.Class.Name != "" {
-				fname = filepath.Join(o.conf.Output, o.conf.Name, cat.Class.Name+"+"+cat.Name+".h")
+				fname = filepath.Join(frameworkDir, cat.Class.Name+"+"+cat.Name+".h")
 			}
 			var name string
 			if cat.Class != nil && cat.Class.Name != "" {
@@ -598,7 +627,7 @@ func (o *ObjC) Headers() error {
 				headers[i] = "#import \"" + header + "\""
 			}
 
-			fname := filepath.Join(o.conf.Output, o.conf.Name, umbrella+".h")
+			fname := filepath.Join(frameworkDir, umbrella+".h")
 			if err := writeHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   o.conf.IpswVersion,
