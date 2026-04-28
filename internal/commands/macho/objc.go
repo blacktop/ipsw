@@ -679,7 +679,10 @@ func (o *ObjC) Headers() error {
 
 		/* generate umbrella header */
 		if len(headers) > 0 {
-			var umbrella = o.conf.Name + "-Umbrella"
+			// Strip a trailing extension (e.g. ".dylib") so the umbrella file is
+			// named "<Stem>-Umbrella.h" rather than "<Foo>.dylib-Umbrella.h".
+			umbrellaBase := strings.TrimSuffix(o.conf.Name, filepath.Ext(o.conf.Name))
+			var umbrella = umbrellaBase + "-Umbrella"
 			slices.SortStableFunc(headers, func(a, b string) int {
 				return cmp.Compare(a, b)
 			})
@@ -872,15 +875,16 @@ func (o *ObjC) XCFramework() error {
 	}
 
 	/* generate modulemap */
-	// Headers() emits the umbrella file as "<Name>-Umbrella.h" so the umbrella
-	// never collides with a class header that happens to share the framework's
-	// name (e.g. class "SpringBoard" inside SpringBoard.framework). Keep the
-	// modulemap's umbrella reference in sync with that naming.
+	// Headers() emits the umbrella file as "<Stem>-Umbrella.h" (with any
+	// trailing ".dylib"-style extension stripped). Keep the module name and
+	// the umbrella reference in sync; modulemap identifiers also can't
+	// contain '.', so the stem is required there too.
+	umbrellaBase := strings.TrimSuffix(o.conf.Name, filepath.Ext(o.conf.Name))
 	if err := os.WriteFile(filepath.Join(fwfolder, "Modules", "module.modulemap"), fmt.Appendf(nil,
 		"module %s [system] {\n"+
 			"    umbrella header \"%s-Umbrella.h\"\n"+
 			"    export *\n"+
-			"}\n", o.conf.Name, o.conf.Name,
+			"}\n", umbrellaBase, umbrellaBase,
 	), 0o660); err != nil {
 		return fmt.Errorf("failed to write module.modulemap file: %v", err)
 	}
