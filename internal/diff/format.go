@@ -55,6 +55,9 @@ const diffMarkdownTemplate = `
 {{- if .Ents }}
 		- [🔑 Entitlements](#entitlements)
 {{- end }}
+{{- if .Sandbox }}
+		- [Sandbox Profiles](#sandbox-profiles)
+{{- end }}
 	- [DSC](#dsc)
 		- [WebKit](#webkit)
 		- [Dylibs](#dylibs)
@@ -159,6 +162,11 @@ const diffMarkdownTemplate = `
   {{ .Ents | noescape }}
 
 </details>
+{{ end -}}
+
+{{ if .Sandbox }}
+## Sandbox Profiles
+{{ .Sandbox | noescape }}
 {{ end -}}
 
 {{- if .Firmwares }}
@@ -312,6 +320,7 @@ type diffHTMLPageData struct {
 	KDKs      template.HTML
 	Machos    *htmlMachoDiff
 	Ents      template.HTML
+	Sandbox   template.HTML
 	Firmwares *htmlMachoDiff
 	IBoot     *htmlIBootDiff
 	Launchd   template.HTML
@@ -735,6 +744,7 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             </li>
             {{- end }}
             {{- if .Launchd }}<li><a href="#launchd">launchd Config</a></li>{{ end }}
+            {{- if .Sandbox }}<li><a href="#sandbox-profiles">Sandbox Profiles</a></li>{{ end }}
             <li><a href="#dsc">DSC</a>
               <ul>
                 {{- if .OldWebkit }}<li><a href="#webkit">WebKit</a></li>{{ end }}
@@ -860,6 +870,11 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
           {{- if .Launchd }}
           <h2 id="launchd">launchd Config</h2>
           {{ .Launchd }}
+          {{- end }}
+
+          {{- if .Sandbox }}
+          <h2 id="sandbox-profiles">Sandbox Profiles</h2>
+          {{ .Sandbox }}
           {{- end }}
 
           <h2 id="dsc">DSC</h2>
@@ -1261,6 +1276,7 @@ func (d *Diff) renderHTML() (string, error) {
 		Features:   convertPlistDiff(d.Features),
 		Files:      convertFileDiff(d.Files),
 		Ents:       renderMarkdownFragment(d.Ents),
+		Sandbox:    renderMarkdownFragment(d.Sandbox),
 		KDKs:       renderMarkdownFragment(d.KDKs),
 		Launchd:    renderMarkdownFragment(d.Launchd),
 	}

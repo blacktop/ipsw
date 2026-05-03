@@ -50,6 +50,7 @@ func init() {
 	diffCmd.Flags().Bool("low-memory", false, "Use disk caching to reduce RAM usage")
 	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
+	registerDiffSandboxFlags(diffCmd)
 	diffCmd.Flags().StringP("signatures", "s", "", "Path to symbolicator signatures folder")
 	diffCmd.MarkFlagDirname("signatures")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
@@ -140,6 +141,9 @@ var diffCmd = &cobra.Command{
 		if len(viper.GetStringSlice("diff.kdk")) > 0 && len(viper.GetStringSlice("diff.kdk")) != 2 {
 			return fmt.Errorf("you must specify two KDKs to diff; example: --kdk <KDK1> --kdk <KDK2>")
 		}
+		if err := diffSandboxPreflight(); err != nil {
+			return err
+		}
 
 		d := diff.New(&diff.Config{
 			Title:        viper.GetString("diff.title"),
@@ -150,6 +154,7 @@ var diffCmd = &cobra.Command{
 			Firmware:     viper.GetBool("diff.fw"),
 			Features:     viper.GetBool("diff.feat"),
 			Files:        viper.GetBool("diff.files"),
+			Sandbox:      diffSandboxEnabled(),
 			CStrings:     viper.GetBool("diff.strs"),
 			FuncStarts:   viper.GetBool("diff.starts"),
 			Entitlements: viper.GetBool("diff.ent"),

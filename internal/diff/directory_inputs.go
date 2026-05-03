@@ -70,6 +70,9 @@ func unsupportedFlagsForDirectoryMode(conf *Config) []string {
 	if conf.LowMemory {
 		unsupported = append(unsupported, "--low-memory")
 	}
+	if conf.Sandbox {
+		unsupported = append(unsupported, "--sandbox")
+	}
 	return unsupported
 }
 

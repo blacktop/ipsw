@@ -36,6 +36,7 @@ func TestUnsupportedFlagsForOTAMode(t *testing.T) {
 				Features:     true,
 				Entitlements: true,
 				Files:        true,
+				Sandbox:      true,
 				CStrings:     true,
 			},
 			expected: nil,
@@ -82,6 +83,11 @@ func TestUnsupportedFlagsForDirectoryMode(t *testing.T) {
 			name:     "low-memory blocked",
 			conf:     Config{LowMemory: true},
 			expected: []string{"--low-memory"},
+		},
+		{
+			name:     "sandbox blocked",
+			conf:     Config{Sandbox: true},
+			expected: []string{"--sandbox"},
 		},
 		{
 			name: "supported flags not blocked",

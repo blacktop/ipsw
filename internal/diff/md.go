@@ -219,6 +219,21 @@ func (d *Diff) Markdown() error {
 		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "Entitlements DIFF", "Entitlements.md"))
 	}
 
+	// SUB-SECTION: Sandbox
+	if len(d.Sandbox) > 0 {
+		out.WriteString("### Sandbox Profiles\n\n")
+		fname := filepath.Join(d.conf.Output, "Sandbox.md")
+		log.Debugf("Creating diff Sandbox Markdown: %s", fname)
+		f, err := os.Create(fname)
+		if err != nil {
+			return fmt.Errorf("failed to create diff Sandbox Markdown: %w", err)
+		}
+		fmt.Fprintf(f, "## Sandbox Profiles\n\n")
+		fmt.Fprintf(f, "%s", d.Sandbox)
+		f.Close()
+		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "Sandbox Profiles DIFF", "Sandbox.md"))
+	}
+
 	// SECTION: Firmware
 	if d.Firmwares != nil && (len(d.Firmwares.New) > 0 || len(d.Firmwares.Removed) > 0 || len(d.Firmwares.Updated) > 0) {
 		out.WriteString("## Firmware\n\n")

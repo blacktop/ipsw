@@ -77,6 +77,7 @@ type Config struct {
 	Firmware     bool
 	Features     bool
 	Files        bool
+	Sandbox      bool
 	CStrings     bool
 	FuncStarts   bool
 	Entitlements bool
@@ -137,6 +138,7 @@ type Diff struct {
 	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
 	IBoot     *IBootDiff      `json:"iboot,omitempty"`
 	Launchd   string          `json:"launchd,omitempty"`
+	Sandbox   string          `json:"sandbox,omitempty"`
 	Features  *PlistDiff      `json:"features,omitempty"`
 	Files     *FileDiff       `json:"files,omitempty"`
 	tmpDir    string          `json:"-"`
@@ -425,6 +427,14 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing KDKS")
 		if err := d.parseKDKs(); err != nil {
 			log.WithError(err).Error("failed to parse KDKs")
+		}
+	}
+
+	if d.conf.Sandbox && !directoryMode {
+		log.Info("Diffing Sandbox Profiles")
+		d.Sandbox, err = d.parseSandboxProfiles()
+		if err != nil {
+			log.WithError(err).Error("failed to diff sandbox profiles")
 		}
 	}
 
