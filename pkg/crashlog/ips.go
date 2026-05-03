@@ -329,6 +329,31 @@ type BinaryImage struct {
 	Slide  uint64 `json:"slide,omitempty"`
 }
 
+// FactorPackIDs accepts both the current string-list rollout encoding and the legacy object encoding.
+type FactorPackIDs []string
+
+func (ids *FactorPackIDs) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte("null")) {
+		*ids = nil
+		return nil
+	}
+
+	var values []string
+	arrayErr := json.Unmarshal(data, &values)
+	if arrayErr == nil {
+		*ids = values
+		return nil
+	}
+
+	var legacyObject struct{}
+	if err := json.Unmarshal(data, &legacyObject); err == nil {
+		*ids = nil
+		return nil
+	}
+
+	return arrayErr
+}
+
 func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
 	var raw []json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -696,10 +721,9 @@ type IPSPayload struct {
 	} `json:"legacyInfo"`
 	TrialInfo struct {
 		Rollouts []struct {
-			RolloutID     string `json:"rolloutId,omitempty"`
-			FactorPackIds struct {
-			} `json:"factorPackIds"`
-			DeploymentID int `json:"deploymentId,omitempty"`
+			RolloutID     string        `json:"rolloutId,omitempty"`
+			FactorPackIds FactorPackIDs `json:"factorPackIds"`
+			DeploymentID  int           `json:"deploymentId,omitempty"`
 		} `json:"rollouts,omitempty"`
 		Experiments []struct {
 			TreatmentID  string `json:"treatmentId,omitempty"`
