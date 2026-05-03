@@ -11,19 +11,22 @@ description: Parse DeviceTree
 Parse DeviceTree
 
 ```
-ipsw dtree <DeviceTree> [flags]
+ipsw dtree <IPSW/OTA/DeviceTree> [flags]
 ```
 
 ### Options
 
 ```
-  -f, --filter string   Filter DeviceTree to parse (if multiple i.e. macOS)
-  -h, --help            help for dtree
-      --insecure        do not verify ssl certs
-  -j, --json            Output to stdout as JSON
-      --proxy string    HTTP/HTTPS proxy
-  -r, --remote          Extract from URL
-  -s, --summary         Output summary only
+  -y, --confirm          Skip confirmation prompt for OTA downloads
+  -f, --filter string    Filter DeviceTree to parse (if multiple i.e. macOS)
+  -h, --help             help for dtree
+      --insecure         do not verify ssl certs
+  -j, --json             Output to stdout as JSON
+      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string   Base64 encoded AEA symmetric encryption key
+      --proxy string     HTTP/HTTPS proxy
+  -r, --remote           Extract from URL
+  -s, --summary          Output summary only
 ```
 
 ### Options inherited from parent commands
