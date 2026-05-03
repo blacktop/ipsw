@@ -22,6 +22,56 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 )
 
+// isEnosys checks whether the function at callAddr is an enosys stub
+// by reading its first instructions and matching against known patterns:
+//   - ARM64: [bti c;] mov w0, #0x4e; ret
+//   - x86_64: [endbr64;] push rbp; mov rbp, rsp; mov eax, 0x4e; pop rbp; ret
+func isEnosys(m *macho.File, callAddr uint64) bool {
+	switch m.FileTOC.FileHeader.CPU {
+	case types.CPUArm64:
+		return isEnosysARM64(m, callAddr)
+	case types.CPUAmd64:
+		return isEnosysX86(m, callAddr)
+	default:
+		return false
+	}
+}
+
+func isEnosysARM64(m *macho.File, addr uint64) bool {
+	const (
+		arm64BtiC = 0xD503245F // bti c
+		arm64Mov  = 0x528009C0 // mov w0, #0x4e
+		arm64Ret  = 0xD65F03C0 // ret
+	)
+	var buf [12]byte // up to 3 instructions: bti c + mov + ret
+	if _, err := m.ReadAtAddr(buf[:], addr); err != nil {
+		return false
+	}
+	i0 := binary.LittleEndian.Uint32(buf[0:4])
+	i1 := binary.LittleEndian.Uint32(buf[4:8])
+	i2 := binary.LittleEndian.Uint32(buf[8:12])
+	if i0 == arm64Mov && i1 == arm64Ret {
+		return true
+	}
+	return i0 == arm64BtiC && i1 == arm64Mov && i2 == arm64Ret
+}
+
+func isEnosysX86(m *macho.File, addr uint64) bool {
+	// push rbp; mov rbp, rsp; mov eax, 0x4e; pop rbp; ret
+	plain := [11]byte{0x55, 0x48, 0x89, 0xE5, 0xB8, 0x4E, 0x00, 0x00, 0x00, 0x5D, 0xC3}
+	// endbr64; push rbp; mov rbp, rsp; mov eax, 0x4e; pop rbp; ret
+	endbr64 := [4]byte{0xF3, 0x0F, 0x1E, 0xFA}
+
+	var buf [15]byte // endbr64 (4) + plain (11)
+	if _, err := m.ReadAtAddr(buf[:], addr); err != nil {
+		return false
+	}
+	if [11]byte(buf[0:11]) == plain {
+		return true
+	}
+	return [4]byte(buf[0:4]) == endbr64 && [11]byte(buf[4:15]) == plain
+}
+
 //go:embed data/syscall.gz
 var syscallData []byte
 
@@ -230,10 +280,7 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 				} else if sc.Call == sysnoAddr {
 					name = "nosys"
 				} else {
-					if sysents[idx].Munge == 0 &&
-						sysents[idx].ReturnType == RET_INT_T &&
-						sysents[idx].NArg == 0 &&
-						sysents[idx].ArgBytes == 0 {
+					if isEnosys(m, sysents[idx].Call) {
 						name = "enosys"
 					} else {
 						name = unknownTrap
@@ -255,11 +302,16 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 					}
 				}
 
+				var args []string
+				if err == nil && sysents[idx].NArg != 0 && name != "enosys" && name != "nosys" {
+					args = sc.Arguments
+				}
+
 				syscalls = append(syscalls, Sysent{
 					Number: idx,
 					Name:   name,
 					DBName: sc.Name,
-					Args:   sc.Arguments,
+					Args:   args,
 					New:    isNew,
 					Old:    sc.Old,
 					sysent: sysents[idx],
