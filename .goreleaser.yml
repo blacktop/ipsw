@@ -244,6 +244,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -266,6 +268,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -291,6 +295,8 @@ builds:
       # - "386"
       - amd64
       - arm64
+    tags:
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
