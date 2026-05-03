@@ -64,7 +64,7 @@
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^20.5.2",
     "autoprefixer": "^10.4.15",
-    "postcss": "^8.4.29",
+    "postcss": "^8.5.10",
     "tailwindcss": "^3.3.3",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.1.6"
