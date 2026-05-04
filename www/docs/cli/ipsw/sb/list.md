@@ -12,12 +12,14 @@ List sandbox profile names in a kernelcache
 
 ### Synopsis
 
-List all sandbox profile names found in a kernelcache or pre-extracted blob.
+List sandbox profile names found in a kernelcache or pre-extracted blob.
 
-Prints one profile name per line, suitable for scripting.
+For a single source type, prints one profile name per line, suitable for scripting.
+Use --type all to show a grouped inventory of which sandbox source types contain
+each profile.
 
 Examples:
-  # List all profiles in a kernelcache
+  # List collection profiles in a kernelcache
   ipsw sb list kernelcache.release.iPhone18,1
 
   # List profiles from a pre-extracted collection blob
@@ -25,6 +27,12 @@ Examples:
 
   # List protobox profiles
   ipsw sb list kernelcache.release.iPhone18,1 --type protobox
+
+  # List profiles with all source memberships
+  ipsw sb list kernelcache.release.iPhone18,1 --type all
+
+  # List profiles with all source memberships as JSON
+  ipsw sb list kernelcache.release.iPhone18,1 --type all --format json
 
 ```
 ipsw sb list [KERNELCACHE] [flags]
@@ -34,10 +42,11 @@ ipsw sb list [KERNELCACHE] [flags]
 
 ```
       --darwin-version string   Darwin version (required when operations list is provided without kernelcache)
+  -f, --format string           Output format: auto, names, table, or json (default "auto")
   -h, --help                    help for list
   -i, --input string            Input sandbox profile binary file
   -o, --operations string       Input operations list file (one operation per line)
-      --type string             Sandbox source type: collection, protobox, or profile (default "collection")
+      --type string             Sandbox source type: collection, protobox, profile, or all (default "collection")
 ```
 
 ### Options inherited from parent commands

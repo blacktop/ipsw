@@ -51,6 +51,7 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
       --low-memory           Use disk caching to reduce RAM usage
   -m, --markdown             Output diff as Markdown
   -o, --output string        Folder to save diff output
+      --sandbox              Diff compiled sandbox profiles
   -s, --signatures string    Path to symbolicator signatures folder
       --starts               Diff MachO function starts
       --strs                 Diff MachO cstrings
