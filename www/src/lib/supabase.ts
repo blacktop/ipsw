@@ -38,7 +38,7 @@ const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
 let supabase: ReturnType<typeof createClient> | null = null;
 
-if (isSupabaseConfigured) {
+if (typeof window !== 'undefined' && isSupabaseConfigured) {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
 }
 
