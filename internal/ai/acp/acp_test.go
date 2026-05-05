@@ -74,6 +74,90 @@ func TestACPChatReportsNonEndTurnStopReason(t *testing.T) {
 	}
 }
 
+func TestACPChatIncludesAgentStderrOnInitializeFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := newTestACP(t, ctx, "stderr-exit", "")
+	_, err := client.Chat()
+	if err == nil {
+		t.Fatal("Chat() error = nil, want initialize failure")
+	}
+	if !strings.Contains(err.Error(), "agent stderr:") {
+		t.Fatalf("Chat() error = %q, want agent stderr section", err)
+	}
+	if !strings.Contains(err.Error(), "test acp adapter failed before initialize") {
+		t.Fatalf("Chat() error = %q, want adapter stderr", err)
+	}
+}
+
+func TestACPSetModelResolvesDisplayNameToModelID(t *testing.T) {
+	client, err := New(context.Background(), &Config{Command: "test-agent"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if _, err := client.SetModels(map[string]string{"Default (recommended)": "default"}); err != nil {
+		t.Fatalf("SetModels() error = %v", err)
+	}
+
+	if err := client.SetModel("Default (recommended)"); err != nil {
+		t.Fatalf("SetModel() error = %v", err)
+	}
+	if client.conf.Model != "default" {
+		t.Fatalf("conf.Model = %q, want default", client.conf.Model)
+	}
+	if got := client.models["default"]; got != "default" {
+		t.Fatalf("models[default] = %q, want default", got)
+	}
+}
+
+func TestACPSetModelAllowsArbitraryModelID(t *testing.T) {
+	client, err := New(context.Background(), &Config{Command: "test-agent"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	if err := client.SetModel("custom-model"); err != nil {
+		t.Fatalf("SetModel() error = %v", err)
+	}
+	if client.conf.Model != "custom-model" {
+		t.Fatalf("conf.Model = %q, want custom-model", client.conf.Model)
+	}
+	if got := client.models["custom-model"]; got != "custom-model" {
+		t.Fatalf("models[custom-model] = %q, want custom-model", got)
+	}
+}
+
+func TestLockedTailBufferKeepsBoundedStderrTail(t *testing.T) {
+	buf := newLockedTailBuffer(5)
+	if _, err := buf.Write([]byte("hello")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if _, err := buf.Write([]byte(" world")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if got := buf.String(); got != "world" {
+		t.Fatalf("String() = %q, want world", got)
+	}
+}
+
+func TestACPStderrCaptureWaitsForCopyToFinish(t *testing.T) {
+	buf := newLockedTailBuffer(32)
+	capture := &acpStderrCapture{
+		tail: buf,
+		done: make(chan struct{}),
+	}
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		_, _ = buf.Write([]byte("delayed stderr"))
+		close(capture.done)
+	}()
+
+	if got := capture.String(); got != "delayed stderr" {
+		t.Fatalf("String() = %q, want delayed stderr", got)
+	}
+}
+
 func TestCollectingClientReadTextFileRestrictsCWD(t *testing.T) {
 	dir := t.TempDir()
 	inside := filepath.Join(dir, "inside.txt")
@@ -180,6 +264,10 @@ func TestACPAgentHelperProcess(t *testing.T) {
 	mode := os.Getenv(testACPAgentModeEnv)
 	if mode == "" {
 		return
+	}
+	if mode == "stderr-exit" {
+		_, _ = fmt.Fprintln(os.Stderr, "test acp adapter failed before initialize")
+		os.Exit(2)
 	}
 
 	agent := &testACPAgent{
