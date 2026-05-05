@@ -16,6 +16,15 @@ This script generates markdown docs from cli.
     exit
 fi
 
+require_sandbox() {
+    if [[ ! -d pkg/sandbox ]]; then
+        echo "ERROR: pkg/sandbox/ is closed-source and not present in public clones." >&2
+        echo "       CLI doc generation requires the sandbox command sources." >&2
+        echo "       Public users should use the committed docs instead of regenerating them." >&2
+        exit 1
+    fi
+}
+
 move_swagger() {
     if [[ -f api/swagger.json ]]; then
         cp api/swagger.json www/static/api/swagger.json
@@ -23,6 +32,7 @@ move_swagger() {
 }
 
 main() {
+    require_sandbox
     move_swagger
 
     SED="sed"

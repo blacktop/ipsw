@@ -35,22 +35,6 @@ cd ipsw
 make build
 ```
 
-## Build for all supported platforms using [goreleaser](https://goreleaser.com) and [zig](https://ziglang.org)
-
-Get *goreleaser* and *zig*
-
-```bash
-brew install goreleaser zig unicorn libusb
-```
-
-Build for all supported platforms
-
-```bash
-git clone https://github.com/blacktop/ipsw.git
-cd ipsw
-make snapshot
-```
-
 :::info offline
 
 ### To dev and build *WITHOUT* internet
