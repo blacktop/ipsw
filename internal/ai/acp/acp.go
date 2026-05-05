@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -113,29 +114,13 @@ func (c *ACP) fetchModelsViaACP() (map[string]string, error) {
 		}
 	}()
 
-	client := &collectingClient{}
-	conn := acp.NewClientSideConnection(client, stdin, stdout)
-
-	if _, err = conn.Initialize(ctx, acp.InitializeRequest{
-		ProtocolVersion: acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{
-			// NOTE: Some ACP agents (notably gemini --experimental-acp) validate that
-			// fs.readTextFile and fs.writeTextFile are present in the initialize payload.
-			// The SDK uses `omitempty` on these booleans, so `false` would be omitted and
-			// the agent rejects the request. We advertise support but still enforce a
-			// deny-by-default policy in the handler implementations.
-			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-			Terminal: false,
-		},
-	}); err != nil {
-		return nil, fmt.Errorf("acp: initialize failed: %w", err)
-	}
-
-	cwd, err := os.Getwd()
+	cwd, _, conn, err := newClientConnection(stdin, stdout)
 	if err != nil {
-		cwd = "/"
+		return nil, err
 	}
-
+	if err := initializeClient(ctx, conn); err != nil {
+		return nil, err
+	}
 	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{
 		Cwd:        cwd,
 		McpServers: []acp.McpServer{},
@@ -206,12 +191,16 @@ func (c *ACP) Verify() error {
 type collectingClient struct {
 	mu sync.Mutex
 	b  strings.Builder
+
+	cwd string
 }
 
 var _ acp.Client = (*collectingClient)(nil)
 
 func (c *collectingClient) RequestPermission(ctx context.Context, p acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	// Default to cancelling any tool permissions. The decompiler prompt should not require tools.
+	if id, ok := autoApprovedPermissionOption(p); ok {
+		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(id)}, nil
+	}
 	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
 }
 
@@ -233,8 +222,19 @@ func (c *collectingClient) String() string {
 	return c.b.String()
 }
 
-func (c *collectingClient) ReadTextFile(ctx context.Context, _ acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
-	return acp.ReadTextFileResponse{}, fmt.Errorf("acp client: readTextFile denied")
+func (c *collectingClient) ReadTextFile(ctx context.Context, req acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return acp.ReadTextFileResponse{}, err
+	}
+	path, err := c.resolveReadPath(req.Path)
+	if err != nil {
+		return acp.ReadTextFileResponse{}, err
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return acp.ReadTextFileResponse{}, fmt.Errorf("acp client: read %s: %w", req.Path, err)
+	}
+	return acp.ReadTextFileResponse{Content: readTextWindow(string(b), req.Line, req.Limit)}, nil
 }
 
 func (c *collectingClient) WriteTextFile(ctx context.Context, _ acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
@@ -259,6 +259,118 @@ func (c *collectingClient) TerminalOutput(ctx context.Context, _ acp.TerminalOut
 
 func (c *collectingClient) WaitForTerminalExit(ctx context.Context, _ acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
 	return acp.WaitForTerminalExitResponse{}, fmt.Errorf("acp client: terminal not supported")
+}
+
+func newClientConnection(stdin io.Writer, stdout io.Reader) (string, *collectingClient, *acp.ClientSideConnection, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("acp: failed to get current working directory: %w", err)
+	}
+	client := &collectingClient{cwd: cwd}
+	conn := acp.NewClientSideConnection(client, stdin, stdout)
+	return cwd, client, conn, nil
+}
+
+func initializeClient(ctx context.Context, conn *acp.ClientSideConnection) error {
+	_, err := conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion: acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{
+			// NOTE: Some ACP agents (notably gemini --experimental-acp) validate that
+			// fs.readTextFile and fs.writeTextFile are present in the initialize payload.
+			// The SDK uses `omitempty` on these booleans, so `false` would be omitted and
+			// the agent rejects the request. We support readTextFile within the
+			// session cwd and keep writeTextFile denied in the handler implementation.
+			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
+			Terminal: false,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("acp: initialize failed: %w", err)
+	}
+	return nil
+}
+
+func autoApprovedPermissionOption(req acp.RequestPermissionRequest) (acp.PermissionOptionId, bool) {
+	if req.ToolCall.Kind == nil {
+		return "", false
+	}
+	switch *req.ToolCall.Kind {
+	case acp.ToolKindRead, acp.ToolKindSearch, acp.ToolKindThink:
+	default:
+		return "", false
+	}
+	for _, opt := range req.Options {
+		if opt.Kind == acp.PermissionOptionKindAllowOnce {
+			return opt.OptionId, true
+		}
+	}
+	for _, opt := range req.Options {
+		if opt.Kind == acp.PermissionOptionKindAllowAlways {
+			return opt.OptionId, true
+		}
+	}
+	return "", false
+}
+
+func (c *collectingClient) resolveReadPath(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("acp client: readTextFile path must be absolute: %s", path)
+	}
+	root, err := filepath.Abs(c.cwd)
+	if err != nil {
+		return "", fmt.Errorf("acp client: resolve cwd %s: %w", c.cwd, err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("acp client: resolve cwd %s: %w", c.cwd, err)
+	}
+	target, err := filepath.EvalSymlinks(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("acp client: resolve read path %s: %w", path, err)
+	}
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return "", fmt.Errorf("acp client: resolve read path %s relative to %s: %w", path, root, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("acp client: readTextFile outside session cwd denied: %s", path)
+	}
+	return target, nil
+}
+
+func readTextWindow(content string, line, limit *int) string {
+	if line == nil && limit == nil {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	start := 0
+	if line != nil && *line > 1 {
+		start = *line - 1
+		if start > len(lines) {
+			start = len(lines)
+		}
+	}
+	end := len(lines)
+	if limit != nil {
+		if *limit <= 0 {
+			end = start
+		} else if start+*limit < end {
+			end = start + *limit
+		}
+	}
+	return strings.Join(lines[start:end], "\n")
+}
+
+func promptStopError(reason acp.StopReason, resp string) error {
+	resp = strings.TrimSpace(utils.Clean(resp))
+	if resp == "" {
+		return fmt.Errorf("acp: prompt stopped with %s", reason)
+	}
+	const maxStopReasonSnippet = 1024
+	if len(resp) > maxStopReasonSnippet {
+		resp = resp[:maxStopReasonSnippet] + "... (truncated)"
+	}
+	return fmt.Errorf("acp: prompt stopped with %s: %s", reason, resp)
 }
 
 func (c *ACP) Chat() (string, error) {
@@ -306,27 +418,12 @@ func (c *ACP) Chat() (string, error) {
 		}
 	}()
 
-	client := &collectingClient{}
-	conn := acp.NewClientSideConnection(client, stdin, stdout)
-
-	if _, err = conn.Initialize(ctx, acp.InitializeRequest{
-		ProtocolVersion: acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{
-			// NOTE: Some ACP agents (notably gemini --experimental-acp) validate that
-			// fs.readTextFile and fs.writeTextFile are present in the initialize payload.
-			// The SDK uses `omitempty` on these booleans, so `false` would be omitted and
-			// the agent rejects the request. We advertise support but still enforce a
-			// deny-by-default policy in the handler implementations.
-			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-			Terminal: false,
-		},
-	}); err != nil {
-		return "", fmt.Errorf("acp: initialize failed: %w", err)
-	}
-
-	cwd, err := os.Getwd()
+	cwd, client, conn, err := newClientConnection(stdin, stdout)
 	if err != nil {
-		cwd = "/"
+		return "", err
+	}
+	if err := initializeClient(ctx, conn); err != nil {
+		return "", err
 	}
 
 	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{
@@ -346,14 +443,18 @@ func (c *ACP) Chat() (string, error) {
 		}
 	}
 
-	if _, err = conn.Prompt(ctx, acp.PromptRequest{
+	promptResp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sess.SessionId,
 		Prompt:    []acp.ContentBlock{acp.TextBlock(c.conf.Prompt)},
-	}); err != nil {
+	})
+	if err != nil {
 		return "", fmt.Errorf("acp: prompt failed: %w", err)
 	}
 
 	resp := strings.TrimSpace(client.String())
+	if promptResp.StopReason != "" && promptResp.StopReason != acp.StopReasonEndTurn {
+		return "", promptStopError(promptResp.StopReason, resp)
+	}
 	if resp == "" {
 		return "", fmt.Errorf("no content returned from agent")
 	}
