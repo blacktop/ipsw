@@ -2,8 +2,10 @@
 # Make sure to check the documentation at http://goreleaser.com
 before:
   hooks:
-    # You may remove this if you don't use go modules.
-    - go mod tidy
+    # `go mod tidy` fails on public CI runners because internal/diff/sandbox.go
+    # (//go:build sandbox) imports the closed-source pkg/sandbox/. tidy evaluates
+    # all build tags. Use `go mod download` which only fetches what go.mod requires.
+    - go mod download
     # you may remove this if you don't need go generate
     - ./hack/make/completions
     - ./hack/make/manpages
