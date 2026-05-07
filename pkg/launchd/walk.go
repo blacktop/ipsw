@@ -16,6 +16,7 @@ import (
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/mount"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (
@@ -156,10 +157,12 @@ func WalkIPSW(path string, cfg *IPSWConfig) ([]Record, []SkippedVolume, error) {
 }
 
 func WalkVolume(root, volume string) ([]Record, error) {
+	volumeRoot := utils.MountedFilesystemRoot(root)
+
 	var candidates []plistCandidate
 	seen := make(map[string]struct{})
 	addCandidate := func(kind, path string) {
-		rel := relativePlistPath(root, path)
+		rel := relativePlistPath(volumeRoot, path)
 		key := kind + "\x00" + rel
 		if _, ok := seen[key]; ok {
 			return
@@ -169,7 +172,7 @@ func WalkVolume(root, volume string) ([]Record, error) {
 	}
 
 	for _, spec := range launchdPlistDirs {
-		matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(spec.dir), "*.plist"))
+		matches, err := filepath.Glob(filepath.Join(volumeRoot, filepath.FromSlash(spec.dir), "*.plist"))
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +181,7 @@ func WalkVolume(root, volume string) ([]Record, error) {
 		}
 	}
 
-	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(volumeRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsPermission(err) {
 				return nil
@@ -188,7 +191,7 @@ func WalkVolume(root, volume string) ([]Record, error) {
 		if d.IsDir() || d.Name() != "Info.plist" {
 			return nil
 		}
-		rel := relativePlistPath(root, path)
+		rel := relativePlistPath(volumeRoot, path)
 		switch {
 		case isXPCInfoPlist(rel):
 			addCandidate(SourceKindXPCBundle, path)
@@ -209,7 +212,7 @@ func WalkVolume(root, volume string) ([]Record, error) {
 
 	records := make([]Record, 0, len(candidates))
 	for _, candidate := range candidates {
-		record, ok := recordFromFile(root, volume, candidate.kind, candidate.path)
+		record, ok := recordFromFile(volumeRoot, volume, candidate.kind, candidate.path)
 		if ok {
 			records = append(records, record)
 		}

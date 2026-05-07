@@ -126,6 +126,40 @@ func TestWalkVolumeXPCBundleLayouts(t *testing.T) {
 	}
 }
 
+func TestWalkVolumeAPFSFuseRootPrefix(t *testing.T) {
+	root := t.TempDir()
+	writePlist(t, root, "/root/System/Library/LaunchDaemons/com.apple.rooted.plist", map[string]any{
+		"Label":   "com.apple.rooted",
+		"Program": "/usr/libexec/rooted",
+	}, plist.XMLFormat)
+	writePlist(t, root, "/root/Applications/Foo.app/XPCServices/FooService.xpc/Info.plist", map[string]any{
+		"CFBundleIdentifier": "com.apple.FooService",
+		"CFBundleExecutable": "FooService",
+		"XPCService": map[string]any{
+			"ServiceType": "Application",
+		},
+	}, plist.XMLFormat)
+
+	records, err := WalkVolume(root, "FileSystem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected launchd and XPC records under apfs-fuse root, got %d", len(records))
+	}
+	if findRecord(records, "/System/Library/LaunchDaemons/com.apple.rooted.plist") == nil {
+		t.Fatalf("missing launchd daemon with normalized path: %#v", records)
+	}
+	if findRecord(records, "/Applications/Foo.app/XPCServices/FooService.xpc/Info.plist") == nil {
+		t.Fatalf("missing XPC bundle with normalized path: %#v", records)
+	}
+	for _, record := range records {
+		if strings.HasPrefix(record.PlistPath, "/root/") {
+			t.Fatalf("plist_path kept apfs-fuse root prefix: %#v", record)
+		}
+	}
+}
+
 func TestWalkVolumeAppXPCAndPlainApp(t *testing.T) {
 	root := t.TempDir()
 	writePlist(t, root, "/Applications/HasService.app/Info.plist", map[string]any{

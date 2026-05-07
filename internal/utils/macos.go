@@ -496,6 +496,26 @@ func Mount(image, mountPoint string) error {
 	return nil
 }
 
+// MountedFilesystemRoot returns the root directory of a mounted filesystem.
+// apfs-fuse exposes APFS volume contents below <mountPoint>/root; hdiutil and
+// hfsfuse expose the volume contents directly at <mountPoint>.
+func MountedFilesystemRoot(mountPoint string) string {
+	mountPoint = filepath.Clean(mountPoint)
+
+	rootPath := filepath.Join(mountPoint, "root")
+	rootInfo, err := os.Stat(rootPath)
+	if err != nil || !rootInfo.IsDir() {
+		return mountPoint
+	}
+
+	systemPath := filepath.Join(mountPoint, "System")
+	if _, err := os.Stat(systemPath); !os.IsNotExist(err) {
+		return mountPoint
+	}
+
+	return rootPath
+}
+
 // mountLinux mounts a DMG on Linux using the appropriate FUSE tool based on filesystem type
 func mountLinux(image, mountPoint string) error {
 	// First, try to detect the filesystem type

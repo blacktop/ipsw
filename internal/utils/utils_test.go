@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -43,6 +44,33 @@ func TestSanitizeArchivePath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMountedFilesystemRoot(t *testing.T) {
+	t.Run("apfs fuse root", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "root", "System"), 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := MountedFilesystemRoot(root), filepath.Join(root, "root"); got != want {
+			t.Fatalf("MountedFilesystemRoot() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("direct system wins", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "root", "System"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(root, "System"), 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := MountedFilesystemRoot(root), filepath.Clean(root); got != want {
+			t.Fatalf("MountedFilesystemRoot() = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestDifference(t *testing.T) {
