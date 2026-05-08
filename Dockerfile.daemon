@@ -32,9 +32,10 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && cd apfs-fuse \
     && git submodule init \
     && git submodule update \
+    && sed -i '/#include <memory>/a #include <cstdint>' ApfsLib/PList.h \
     && mkdir build \
     && cd build \
-    && cmake .. \
+    && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. \
     && make install \
     && echo "===> Clean up unnecessary files..." \
     && apt-get purge -y --auto-remove $buildDeps \
