@@ -12,6 +12,7 @@ overrides:
   copy-webpack-plugin>serialize-javascript: 7.0.5
   dompurify: 3.3.2
   estree-util-value-to-estree: 3.3.3
+  fast-xml-builder: 1.1.7
   glob: 10.5.0
   glob>minimatch: 9.0.7
   gray-matter>js-yaml: 3.14.2
@@ -3708,8 +3709,8 @@ packages:
   fast-uri@3.0.6:
     resolution: {integrity: sha512-Atfo14OibSv5wAp4VWNsFYE1AchQRTv9cBGWET4pZWHzYshFSS9NQI6I57rdKn9croWVMbYFbLhJ+yJvmZIIHw==}
 
-  fast-xml-builder@1.1.4:
-    resolution: {integrity: sha512-f2jhpN4Eccy0/Uz9csxh3Nu6q4ErKxf0XIsasomfOihuSUa3/xw6w8dnOtCDgEItQFJG8KyXPzQXzcODDrrbOg==}
+  fast-xml-builder@1.1.7:
+    resolution: {integrity: sha512-Yh7/7rQuMXICNr0oMYDR2yHP6oUvmQsTToFeOWj/kIDhAwQ+c4Ol/lbcwOmEM5OHYQmh6S6EQSQ1sljCKP36bQ==}
 
   fast-xml-parser@5.5.9:
     resolution: {integrity: sha512-jldvxr1MC6rtiZKgrFnDSvT8xuH+eJqxqOBThUVjYrxssYTo1avZLGql5l0a0BAERR01CadYzZ83kVEkbyDg+g==}
@@ -11287,13 +11288,13 @@ snapshots:
 
   fast-uri@3.0.6: {}
 
-  fast-xml-builder@1.1.4:
+  fast-xml-builder@1.1.7:
     dependencies:
       path-expression-matcher: 1.2.0
 
   fast-xml-parser@5.5.9:
     dependencies:
-      fast-xml-builder: 1.1.4
+      fast-xml-builder: 1.1.7
       path-expression-matcher: 1.2.0
       strnum: 2.2.2
 
