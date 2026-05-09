@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unsafe"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
@@ -986,11 +987,12 @@ func (f *File) GetDylibsImageArray() error {
 
 func (f *File) GetDylibsImageArrayIDs() ([]trie.Node, error) {
 
-	if f.Headers[f.UUID].DylibsTrieAddr == 0 {
-		return nil, fmt.Errorf("cache does not contain dylibs trie info")
+	dylibsTrieAddr, dylibsTrieSize, err := f.dylibsTrieInfo()
+	if err != nil {
+		return nil, err
 	}
 
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsTrieAddr)
+	uuid, off, err := f.GetOffset(dylibsTrieAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -999,7 +1001,7 @@ func (f *File) GetDylibsImageArrayIDs() ([]trie.Node, error) {
 
 	sr.Seek(int64(off), io.SeekStart)
 
-	dylibTrie := make([]byte, f.Headers[f.UUID].DylibsTrieSize)
+	dylibTrie := make([]byte, dylibsTrieSize)
 	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 		return nil, err
 	}
@@ -1010,11 +1012,12 @@ func (f *File) GetDylibsImageArrayIDs() ([]trie.Node, error) {
 // GetDylibIndex returns the index of a given dylib
 func (f *File) GetDylibIndex(path string) (uint64, error) {
 
-	if f.Headers[f.UUID].DylibsTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain dylibs trie info")
+	dylibsTrieAddr, dylibsTrieSize, err := f.dylibsTrieInfo()
+	if err != nil {
+		return 0, err
 	}
 
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsTrieAddr)
+	uuid, off, err := f.GetOffset(dylibsTrieAddr)
 	if err != nil {
 		return 0, err
 	}
@@ -1023,7 +1026,7 @@ func (f *File) GetDylibIndex(path string) (uint64, error) {
 
 	sr.Seek(int64(off), io.SeekStart)
 
-	dylibTrie := make([]byte, f.Headers[f.UUID].DylibsTrieSize)
+	dylibTrie := make([]byte, dylibsTrieSize)
 	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 		return 0, err
 	}
@@ -1039,6 +1042,25 @@ func (f *File) GetDylibIndex(path string) (uint64, error) {
 	}
 
 	return imageIndex, nil
+}
+
+func (f *File) dylibsTrieInfo() (uint64, uint64, error) {
+	header := f.Headers[f.UUID]
+	dylibsTrieFieldEnd := uint32(unsafe.Offsetof(CacheHeader{}.DylibsTrieSize) + unsafe.Sizeof(CacheHeader{}.DylibsTrieSize))
+	if header.MappingOffset < dylibsTrieFieldEnd {
+		return 0, 0, fmt.Errorf("cache does not contain dylibs trie info")
+	}
+
+	dylibsTrieAddr := header.DylibsTrieAddr
+	dylibsTrieSize := header.DylibsTrieSize
+	if dylibsTrieAddr == 0 || dylibsTrieSize == 0 {
+		return 0, 0, fmt.Errorf("cache does not contain dylibs trie info")
+	}
+	if f.size > 0 && dylibsTrieSize > uint64(f.size) {
+		return 0, 0, fmt.Errorf("dylibs trie size %#x exceeds cache size %#x", dylibsTrieSize, f.size)
+	}
+
+	return dylibsTrieAddr, dylibsTrieSize, nil
 }
 
 // GetDlopenOtherImageArray returns the other images array

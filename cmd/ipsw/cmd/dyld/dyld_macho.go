@@ -424,7 +424,10 @@ var MachoCmd = &cobra.Command{
 						}
 						for _, export := range exports {
 							if export.Flags.ReExport() {
-								export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
+								export.FoundInDylib, err = reexportLibraryName(m.ImportedLibraries(), export.Other)
+								if err != nil {
+									return err
+								}
 								reimg, err := f.Image(export.FoundInDylib)
 								if err != nil {
 									return err
@@ -614,4 +617,11 @@ var MachoCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func reexportLibraryName(importedLibraries []string, ordinal uint64) (string, error) {
+	if ordinal == 0 || ordinal > uint64(len(importedLibraries)) {
+		return "", fmt.Errorf("re-export ordinal %d outside imported library table with %d entries", ordinal, len(importedLibraries))
+	}
+	return importedLibraries[int(ordinal)-1], nil
 }

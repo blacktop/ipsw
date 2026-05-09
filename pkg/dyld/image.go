@@ -112,16 +112,17 @@ func (pg PatchableGotExport) GetGotLocations() any {
 type astate struct {
 	mu sync.Mutex
 
-	Deps     bool
-	Got      bool
-	Stubs    bool
-	Helpers  bool
-	Exports  bool
-	Privates bool
-	Starts   bool
-	ObjC     bool
-	Slide    bool
-	Swift    bool
+	Deps           bool
+	Got            bool
+	Stubs          bool
+	Helpers        bool
+	Exports        bool
+	ParsingExports bool
+	Privates       bool
+	Starts         bool
+	ObjC           bool
+	Slide          bool
+	Swift          bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -171,12 +172,28 @@ func (a *astate) IsStubsDone() bool {
 func (a *astate) SetExports(done bool) {
 	a.mu.Lock()
 	a.Exports = done
+	a.ParsingExports = false
 	a.mu.Unlock()
 }
 func (a *astate) IsExportsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Exports
+}
+func (a *astate) BeginExports() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.Exports || a.ParsingExports {
+		return false
+	}
+	a.ParsingExports = true
+	return true
+}
+func (a *astate) FinishExports(done bool) {
+	a.mu.Lock()
+	a.Exports = done
+	a.ParsingExports = false
+	a.mu.Unlock()
 }
 
 func (a *astate) SetPrivates(done bool) {
@@ -430,6 +447,35 @@ func (i *CacheImage) SlidePointer(addr uint64) uint64 {
 	return i.cache.SlideInfo.SlidePointer(addr)
 }
 
+func (i *CacheImage) relativeSelectorBase() (uint64, error) {
+	if !i.cache.IsDyld4 && i.Name == "/usr/lib/libobjc.A.dylib" {
+		return 0, nil
+	}
+
+	return i.cache.relativeSelectorBase()
+}
+
+func (f *File) relativeSelectorBase() (uint64, error) {
+	f.rsBaseOnce.Do(func() {
+		if _, err := f.Image("/usr/lib/libobjc.A.dylib"); err != nil {
+			return
+		}
+
+		opt, err := f.GetOptimizations()
+		if err != nil {
+			f.rsBaseErr = err
+			return
+		}
+
+		if opt.GetVersion() >= 16 {
+			f.rsBase = opt.RelativeMethodListsBaseAddress(f.objcOptRoAddr)
+			f.rsBase += f.Headers[f.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
+		}
+	})
+
+	return f.rsBase, f.rsBaseErr
+}
+
 // GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
 	if i.m != nil {
@@ -441,17 +487,9 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		return nil, err
 	}
 
-	var rsBase uint64
-	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		opt, err := i.cache.GetOptimizations()
-		if err != nil {
-			return nil, err
-		}
-
-		if opt.GetVersion() >= 16 {
-			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
-			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
-		}
+	rsBase, err := i.relativeSelectorBase()
+	if err != nil {
+		return nil, err
 	}
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
@@ -491,12 +529,8 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	}
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 	var rsBase uint64
-	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		opt, err := i.cache.GetOptimizations()
-		if err == nil && opt.GetVersion() >= 16 {
-			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
-			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart
-		}
+	if base, err := i.relativeSelectorBase(); err == nil {
+		rsBase = base
 	}
 	vma := types.VMAddrConverter{
 		Converter: func(addr uint64) uint64 {
@@ -1089,26 +1123,22 @@ func (i *CacheImage) GetLocalSymbolsAsMachoSymbols() []macho.Symbol {
 // ParsePublicSymbols parses and caches, with the option to dump, all the exports, symtab and dyld_info symbols in the image/dylib
 func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 
-	if !i.Analysis.State.IsExportsDone() {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	if i.Analysis.State.BeginExports() {
+		defer func() {
+			if !i.Analysis.State.IsExportsDone() {
+				i.Analysis.State.FinishExports(false)
+			}
+		}()
+
+		var w *tabwriter.Writer
+		if dump {
+			w = tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		}
 		// try to parse exports from the cache's export trie or the dylib's LC_DYLD_EXPORTS_TRIE
 		if syms, err := i.cache.GetExportTrieSymbols(i); err == nil {
 			for _, sym := range syms {
-				if sym.Flags.ReExport() {
-					m, err := i.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-					if len(sym.ReExport) > 0 {
-						reimg, err := i.cache.Image(sym.FoundInDylib)
-						if err != nil {
-							return err
-						}
-						if resym, err := reimg.GetPublicSymbol(sym.ReExport); err == nil {
-							sym.Address = resym.Address
-						}
-					}
+				if err := i.resolveReExport(&sym); err != nil {
+					return err
 				}
 				if dump {
 					fmt.Fprintf(w, "%s\n", sym)
@@ -1122,7 +1152,9 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 					})
 				}
 			}
-			w.Flush()
+			if dump {
+				w.Flush()
+			}
 		}
 		// try to parse the dylib's symbol table
 		m, err := i.GetMacho()
@@ -1150,7 +1182,9 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				})
 			}
 		}
-		w.Flush()
+		if dump {
+			w.Flush()
+		}
 		// try to parse LC_DYLD_INFO binds
 		if binds, err := m.GetBindInfo(); err == nil {
 			for _, bind := range binds {
@@ -1166,7 +1200,9 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 					})
 				}
 			}
-			w.Flush()
+			if dump {
+				w.Flush()
+			}
 		}
 		// try to parse LC_DYLD_INFO rebases TODO: this is slide info and not sym info
 		// if rebases, err := m.GetRebaseInfo(); err == nil {
@@ -1177,21 +1213,8 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 		// try to parse LC_DYLD_INFO exports TODO: is this redundant???
 		if exports, err := m.GetExports(); err == nil {
 			for _, export := range exports {
-				if export.Flags.ReExport() {
-					m, err := i.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-					export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
-					if len(export.ReExport) > 0 {
-						reimg, err := i.cache.Image(export.FoundInDylib)
-						if err != nil {
-							return err
-						}
-						if resym, err := reimg.GetPublicSymbol(export.ReExport); err == nil {
-							export.Address = resym.Address
-						}
-					}
+				if err := i.resolveReExport(&export); err != nil {
+					return err
 				}
 				if dump {
 					fmt.Fprintf(w, "%s\n", export)
@@ -1205,14 +1228,16 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 					})
 				}
 			}
-			w.Flush()
+			if dump {
+				w.Flush()
+			}
 		}
 
 		sort.Slice(i.PublicSymbols, func(j, k int) bool {
 			return i.PublicSymbols[j].Name < i.PublicSymbols[k].Name
 		})
 
-		i.Analysis.State.SetExports(true)
+		i.Analysis.State.FinishExports(true)
 	}
 
 	return nil
@@ -1220,7 +1245,18 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 
 // returns the public symbol matching the given name
 func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
-	i.ParsePublicSymbols(false)
+	if err := i.ParsePublicSymbols(false); err != nil {
+		return nil, err
+	}
+
+	if !i.Analysis.State.IsExportsDone() {
+		for _, sym := range i.PublicSymbols {
+			if sym.Name == name {
+				return sym, nil
+			}
+		}
+		return nil, fmt.Errorf("public symbols for image %s are still being parsed", filepath.Base(i.Name))
+	}
 
 	idx := sort.Search(len(i.PublicSymbols), func(idx int) bool { return i.PublicSymbols[idx].Name >= name })
 	if idx < len(i.PublicSymbols) && i.PublicSymbols[idx].Name == name {
@@ -1228,6 +1264,43 @@ func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
 	}
 
 	return nil, fmt.Errorf("public symbol %s not found in image %s", name, filepath.Base(i.Name))
+}
+
+func (i *CacheImage) resolveReExport(export *trie.TrieExport) error {
+	if !export.Flags.ReExport() {
+		return nil
+	}
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return err
+	}
+
+	export.FoundInDylib, err = reexportLibraryName(m.ImportedLibraries(), export.Other)
+	if err != nil {
+		return err
+	}
+
+	if len(export.ReExport) == 0 {
+		return nil
+	}
+
+	reimg, err := i.cache.Image(export.FoundInDylib)
+	if err != nil {
+		return err
+	}
+	if resym, err := reimg.GetPublicSymbol(export.ReExport); err == nil {
+		export.Address = resym.Address
+	}
+
+	return nil
+}
+
+func reexportLibraryName(importedLibraries []string, ordinal uint64) (string, error) {
+	if ordinal == 0 || ordinal > uint64(len(importedLibraries)) {
+		return "", fmt.Errorf("re-export ordinal %d outside imported library table with %d entries", ordinal, len(importedLibraries))
+	}
+	return importedLibraries[int(ordinal)-1], nil
 }
 
 // GetExport returns the trie export symbol matching the given name

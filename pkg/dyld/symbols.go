@@ -166,12 +166,130 @@ func (f *File) GetExportTrieSymbols(i *CacheImage) ([]trie.TrieExport, error) {
 		return nil, fmt.Errorf("failed to read export trie data: %v", err)
 	}
 
-	syms, err := trie.ParseTrieExports(bytes.NewReader(exportTrie), i.LoadAddress)
+	syms, err := parseTrieExports(exportTrie, i.LoadAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
 	}
 
 	return syms, nil
+}
+
+type exportTrieNode struct {
+	Offset uint64
+	Name   []byte
+}
+
+func parseTrieExports(data []byte, loadAddress uint64) ([]trie.TrieExport, error) {
+	r := bytes.NewReader(data)
+	nodes, err := parseExportTrieNodes(r, uint64(len(data)), 0, nil, make(map[uint64]bool))
+	if err != nil {
+		return nil, err
+	}
+
+	exports := make([]trie.TrieExport, 0, len(nodes))
+	for _, node := range nodes {
+		if _, err := r.Seek(int64(node.Offset), io.SeekStart); err != nil {
+			return nil, fmt.Errorf("could not seek to trie node: %v", err)
+		}
+		export, err := trie.ReadExport(r, string(node.Name), loadAddress)
+		if err != nil {
+			return nil, fmt.Errorf("could not read trie export metadata: %v", err)
+		}
+		exports = append(exports, *export)
+	}
+
+	return exports, nil
+}
+
+func parseExportTrieNodes(r *bytes.Reader, size, pos uint64, prefix []byte, visiting map[uint64]bool) ([]exportTrieNode, error) {
+	if pos >= size {
+		return nil, fmt.Errorf("trie node offset %#x exceeds trie size %#x", pos, size)
+	}
+	if visiting[pos] {
+		return nil, fmt.Errorf("export trie contains a cycle at offset %#x", pos)
+	}
+	visiting[pos] = true
+	defer delete(visiting, pos)
+
+	if _, err := r.Seek(int64(pos), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("could not seek to trie node: %v", err)
+	}
+
+	terminalSize, err := trie.ReadUleb128(r)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse ULEB128 terminalSize value: %v", err)
+	}
+
+	terminalStart, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("could not get current offset: %v", err)
+	}
+	terminalStartOffset := uint64(terminalStart)
+	if terminalStartOffset >= size || terminalSize > size-terminalStartOffset-1 {
+		return nil, fmt.Errorf("export trie terminal at offset %#x exceeds trie size %#x", pos, size)
+	}
+	terminalEnd := terminalStartOffset + terminalSize
+
+	var output []exportTrieNode
+	if terminalSize != 0 {
+		output = append(output, exportTrieNode{
+			Offset: uint64(terminalStart),
+			Name:   append([]byte{}, prefix...),
+		})
+	}
+
+	if _, err := r.Seek(int64(terminalEnd), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("could not seek to trie children: %v", err)
+	}
+
+	childrenRemaining, err := r.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("could not read childrenRemaining value: %v", err)
+	}
+
+	for range childrenRemaining {
+		edge, err := readTrieEdge(r)
+		if err != nil {
+			return nil, err
+		}
+
+		childNodeOffset, err := trie.ReadUleb128(r)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse ULEB128 childNodeOffset value: %v", err)
+		}
+
+		curr, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, fmt.Errorf("could not get current offset: %v", err)
+		}
+
+		nextPrefix := append(append([]byte{}, prefix...), edge...)
+		nodes, err := parseExportTrieNodes(r, size, childNodeOffset, nextPrefix, visiting)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse trie child at offset %#x: %v", childNodeOffset, err)
+		}
+		output = append(output, nodes...)
+
+		if _, err := r.Seek(curr, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("could not restore trie reader offset: %v", err)
+		}
+	}
+
+	return output, nil
+}
+
+func readTrieEdge(r *bytes.Reader) ([]byte, error) {
+	edge := make([]byte, 0, 32)
+	for {
+		c, err := r.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("could not read trie edge: %v", err)
+		}
+		if c == 0 {
+			return edge, nil
+		}
+		edge = append(edge, c)
+	}
 }
 
 // ParsePublicSymbols prints out all the exported symbols

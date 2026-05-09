@@ -33,12 +33,15 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/ipsw/internal/profile"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
 )
+
+var dyldExtractProfileFlags profile.ProfilingFlags
 
 func rebaseMachO(dsc *dyld.File, machoPath string) error {
 	f, err := os.OpenFile(machoPath, os.O_RDWR, 0755)
@@ -100,6 +103,7 @@ func init() {
 	dyldExtractCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
 	dyldExtractCmd.MarkFlagDirname("output")
+	profile.AddFlags(dyldExtractCmd, &dyldExtractProfileFlags)
 	viper.BindPFlag("dyld.extract.all", dyldExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.extract.force", dyldExtractCmd.Flags().Lookup("force"))
 	viper.BindPFlag("dyld.extract.slide", dyldExtractCmd.Flags().Lookup("slide"))
@@ -141,6 +145,19 @@ var dyldExtractCmd = &cobra.Command{
 		} else if !dumpALL && len(args) < 2 {
 			return fmt.Errorf("must specify at least one DYLIB to extract")
 		}
+
+		prof := profile.New(dyldExtractProfileFlags.ToConfig())
+		if err := prof.Start(); err != nil {
+			return fmt.Errorf("failed to start profiling: %v", err)
+		}
+		defer func() {
+			if err := prof.Stop(); err != nil {
+				log.Errorf("failed to stop profiling: %v", err)
+			}
+			if dyldExtractProfileFlags.IsEnabled() {
+				prof.PrintStats()
+			}
+		}()
 
 		dscPath := filepath.Clean(args[0])
 

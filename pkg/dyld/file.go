@@ -96,6 +96,9 @@ type File struct {
 	objcOpt         Optimization
 	objcOptOnce     sync.Once
 	objcOptErr      error
+	rsBaseOnce      sync.Once
+	rsBase          uint64
+	rsBaseErr       error
 	islandStubs     map[uint64]uint64
 	prewarmData     *PrewarmingHeader
 	size            int64

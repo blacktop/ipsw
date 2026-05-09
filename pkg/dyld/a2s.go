@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"sync"
 )
 
 var a2sMagic = [4]byte{'A', '2', 'S', 2}
@@ -33,9 +32,8 @@ type A2STable struct {
 	strBase    int    // offset of string table in data
 	strTabSize int    // size of string table in bytes
 
-	// build mode
-	mu sync.Mutex
-	m  map[uint64]string
+	// build mode; cache construction mutates this on one goroutine before Save/Load.
+	m map[uint64]string
 }
 
 // NewA2STable creates a new table in build mode with the given capacity hint.
@@ -48,9 +46,7 @@ func NewA2STable(sizeHint int) *A2STable {
 // Get looks up a symbol by address.
 func (t *A2STable) Get(addr uint64) (string, bool) {
 	if t.m != nil {
-		t.mu.Lock()
 		s, ok := t.m[addr]
-		t.mu.Unlock()
 		return s, ok
 	}
 	if t.data == nil {
@@ -103,12 +99,10 @@ func (t *A2STable) GetValue(addr uint64) string {
 
 // Set adds or updates a symbol mapping. Only valid in build mode.
 func (t *A2STable) Set(addr uint64, name string) {
-	t.mu.Lock()
 	if t.m == nil {
 		t.m = make(map[uint64]string)
 	}
 	t.m[addr] = name
-	t.mu.Unlock()
 }
 
 // Has returns true if addr exists in the table.
