@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -436,10 +437,8 @@ func TestKernelSymbolMapCandidatesIncludeAncestorOutputDirs(t *testing.T) {
 	}
 	path := filepath.Join(root, "extract", "23E254__iPhone18,1", "kernelcache.release.iPhone18,1")
 	candidates := kernelSymbolMapCandidates(path)
-	for _, got := range candidates {
-		if got == want {
-			return
-		}
+	if slices.Contains(candidates, want) {
+		return
 	}
 	t.Fatalf("candidate %q not found in %#v", want, candidates)
 }
