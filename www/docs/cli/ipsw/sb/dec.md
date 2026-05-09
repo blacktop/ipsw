@@ -50,6 +50,7 @@ ipsw sb dec [KERNELCACHE] [PROFILE] [flags]
   -f, --format string           Output format: sbpl, sbasm, or json (default "sbpl")
       --full-graph              Disable normalized-output node limit (may be slow)
   -h, --help                    help for dec
+      --inline                  Inline parent-profile chain into a single SBPL document (SBPL only; requires PROFILE)
   -i, --input string            Input sandbox profile binary file
   -o, --operations string       Input operations list file (one operation per line)
   -O, --output string           Output path for plain compileable SBPL
