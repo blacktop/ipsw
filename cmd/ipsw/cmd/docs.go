@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -45,7 +46,7 @@ description: %s
 
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender func(string, string) string, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
+		if !isMarkdownCommand(c) {
 			continue
 		}
 		if err := GenMarkdownTreeCustom(c, dir, filePrepender, linkHandler); err != nil {
@@ -56,7 +57,7 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender func(st
 	basename := strings.ReplaceAll(cmd.CommandPath(), " ", "/")
 
 	var filename string
-	if cmd.HasSubCommands() {
+	if hasMarkdownSubCommands(cmd) {
 		filename = filepath.Join(dir, basename, cmd.Name()+".md")
 	} else {
 		filename = filepath.Join(dir, basename+".md")
@@ -77,6 +78,14 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender func(st
 		return err
 	}
 	return nil
+}
+
+func isMarkdownCommand(cmd *cobra.Command) bool {
+	return cmd.IsAvailableCommand() && !cmd.IsAdditionalHelpTopicCommand()
+}
+
+func hasMarkdownSubCommands(cmd *cobra.Command) bool {
+	return slices.ContainsFunc(cmd.Commands(), isMarkdownCommand)
 }
 
 func init() {
