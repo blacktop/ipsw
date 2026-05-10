@@ -55,7 +55,7 @@ func readAllPlists(inpath string) error {
 			return nil
 		}
 		if !info.IsDir() {
-			settings := make(map[string]any)
+			var settings any
 			data, err := os.ReadFile(path)
 			if err != nil {
 				if errors.Is(err, os.ErrPermission) {
@@ -148,7 +148,7 @@ var plistCmd = &cobra.Command{
 						}
 						log.Infof("event: %s", event.String())
 
-						settings := make(map[string]any)
+						var settings any
 						data, err := os.ReadFile(event.Name)
 						if err != nil {
 							log.Fatal(err.Error())
@@ -234,7 +234,7 @@ var plistCmd = &cobra.Command{
 			}
 		}
 
-		var out map[string]any
+		var out any
 		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&out); err != nil {
 			return fmt.Errorf("failed to decode plist: %v", err)
 		}
