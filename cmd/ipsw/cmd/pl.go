@@ -234,7 +234,7 @@ var plistCmd = &cobra.Command{
 			}
 		}
 
-		var out map[string]any
+		var out any
 		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&out); err != nil {
 			return fmt.Errorf("failed to decode plist: %v", err)
 		}
