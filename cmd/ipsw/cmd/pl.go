@@ -43,7 +43,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cache map[string]string
+var cache = map[string]string{}
 
 func readAllPlists(inpath string) error {
 	return filepath.Walk(inpath, func(path string, info os.FileInfo, err error) error {
@@ -88,8 +88,6 @@ func init() {
 		"com.apple.universalaccess.plist"}, "Exclude files/directories from watching")
 	viper.BindPFlag("plist.watch", plistCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("plist.exclude", plistCmd.Flags().Lookup("exclude"))
-
-	cache = make(map[string]string)
 }
 
 // plistCmd represents the pl command
