@@ -28,8 +28,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/xref"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -153,6 +153,8 @@ var XrefCmd = &cobra.Command{
 
 		log.Info("Searching for xrefs (use -V for more progess output)")
 
+		targetAddrs := xref.NewTargetSet(unslidAddr)
+		var scanner xref.Scanner
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
 
@@ -184,17 +186,12 @@ var XrefCmd = &cobra.Command{
 					return err
 				}
 
-				engine := dyld.NewDyldDisass(f, &disass.Config{
-					Data:         data,
-					StartAddress: fn.StartAddr,
-					Quiet:        true,
+				result, ok := scanner.ScanFirstFunction(data, fn.StartAddr, xref.Options{
+					Targets: targetAddrs,
+					Mode:    xref.ModeReferences,
 				})
-
-				if err := engine.Triage(); err != nil {
-					return fmt.Errorf("first pass triage failed: %v", err)
-				}
-
-				if ok, loc := engine.Contains(unslidAddr); ok {
+				if ok {
+					loc := result.Address
 					if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {

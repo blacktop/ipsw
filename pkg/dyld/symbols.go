@@ -506,6 +506,26 @@ func (f *File) GetStubIslands() (map[uint64]string, error) {
 	return stubs, nil
 }
 
+// GetStubIslandTargets returns target function addresses keyed by stub-island
+// entry point. Unlike GetStubIslands, this does not require an address-to-symbol
+// cache to have been built first.
+func (f *File) GetStubIslandTargets() (map[uint64]uint64, error) {
+	stubs := make(map[uint64]uint64)
+	if len(f.islandStubs) == 0 {
+		if err := f.ParseStubIslands(); err != nil {
+			return nil, fmt.Errorf("failed to parse stub islands: %v", err)
+		}
+	}
+	for stub, target := range f.islandStubs {
+		if _, _, err := f.GetOffset(target); err == nil {
+			stubs[stub] = target
+		} else {
+			stubs[stub] = f.SlideInfo.SlidePointer(target)
+		}
+	}
+	return stubs, nil
+}
+
 // OpenOrCreateA2SCache returns an address to symbol map if the cache file exists otherwise it will create a NEW one
 func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {

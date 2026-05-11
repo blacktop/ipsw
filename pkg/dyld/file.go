@@ -785,6 +785,30 @@ func (f *File) ParseStubIslands() error {
 	return nil
 }
 
+// GetStubIslandPointerSlots returns pointer slots keyed by stub-island entry point.
+func (f *File) GetStubIslandPointerSlots() (map[uint64]uint64, error) {
+	slots := make(map[uint64]uint64)
+	for _, sc := range f.SubCacheInfo {
+		for _, mapping := range f.MappingsWithSlideInfo[sc.UUID] {
+			if !mapping.Flags.IsTextStubs() {
+				continue
+			}
+			dat := make([]byte, f.Headers[sc.UUID].CodeSignatureOffset-0x4000)
+			if _, err := f.r[sc.UUID].ReadAt(dat, 0x4000); err != nil {
+				return nil, fmt.Errorf("GetStubIslandPointerSlots: failed to read stub island data: %v", err)
+			}
+			stubs, err := disass.ParseStubsASM(dat, mapping.Address+0x4000, func(u uint64) (uint64, error) {
+				return u, nil
+			})
+			if err != nil {
+				return nil, fmt.Errorf("GetStubIslandPointerSlots: failed to parse stub island assembly: %v", err)
+			}
+			maps.Copy(slots, stubs)
+		}
+	}
+	return slots, nil
+}
+
 func (f *File) ParsePrewarmData() error {
 	if f.Headers[f.UUID].MappingOffset <= uint32(unsafe.Offsetof(CacheHeader{}.PrewarmingDataOffset)) {
 		return fmt.Errorf("prewarm data not supported in this DSC format")
