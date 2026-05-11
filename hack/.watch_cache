@@ -236,17 +236,8 @@
     }
   },
   "latest_ipsw": {
-    "fcs_keys": {
-      "beta": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    },
-    "url": "https://updates.cdn-apple.com/2026SpringFCS/fullrestores/122-60269/F123C921-03F7-44FA-BF63-CD9F2D1F9BEF/iPhone17,1_26.4.2_23E261_Restore.ipsw"
+    "ios_url": "https://updates.cdn-apple.com/2026SpringFCS/fullrestores/122-75601/BB8D0F8A-1430-4123-8782-563C2005AF64/iPhone17,1_26.5_23F77_Restore.ipsw",
+    "macos_url": "",
+    "url": "https://updates.cdn-apple.com/2026SpringFCS/fullrestores/122-75601/BB8D0F8A-1430-4123-8782-563C2005AF64/iPhone17,1_26.5_23F77_Restore.ipsw"
   }
 }
