@@ -2,9 +2,11 @@ package xrefs
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +17,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/blacktop/ipsw/pkg/symbols"
+	"github.com/blacktop/ipsw/pkg/xref"
 )
 
 var ErrNoTargetSymbols = errors.New("no entitlement-check target symbols found")
@@ -65,14 +68,19 @@ func ScanKernelcache(path string, stderr io.Writer) ([]Record, int, error) {
 
 	targets := collectMachOTargets(SourceKernelcache, m)
 	mergeTargets(targets, symbolicatedTargets)
-	if len(targets) == 0 {
+	discoveredTargets, virtualSlots, virtualCallers := discoverKernelTargets(m, []kernelScanImage{{name: "com.apple.kernel", m: m}}, stderr)
+	mergeTargets(targets, discoveredTargets)
+	if len(targets) == 0 && len(virtualSlots) == 0 {
 		progress(stderr, "kernelcache: no entitlement-check target symbols found\n")
 		return nil, 0, nil
 	}
-	progress(stderr, "kernelcache: found %d target addresses\n", len(targets))
+	progress(stderr, "kernelcache: found %d target addresses and %d virtual target slots\n", len(targets), len(virtualSlots))
 
 	ranges := kernelImageRanges(m)
 	mem := machoMemory{m: m}
+	targetAddrs := targetSetFromSpecs(targets)
+	hints := hintsForTargets(targets, virtualSlots)
+	var scanner xref.Scanner
 	var records []Record
 	for _, fn := range sortedFunctions(m.GetFunctions()) {
 		data, err := m.GetFunctionData(fn)
@@ -87,59 +95,66 @@ func ScanKernelcache(path string, stderr io.Writer) ([]Record, int, error) {
 			data:         data,
 			start:        fn.StartAddr,
 			targets:      targets,
+			targetAddrs:  targetAddrs,
+			virtualSlots: virtualSlots,
 			mem:          mem,
+			allowVirtual: virtualCallers.Has(fn.StartAddr),
+			scanner:      &scanner,
+			targetHints:  hints,
 		})...)
 	}
 	SortRecords(records)
-	return records, len(targets), nil
+	return records, len(targets) + len(virtualSlots), nil
 }
 
 func scanKernelFileset(root *macho.File, symbolicatedTargets map[uint64][]targetSpec, stderr io.Writer) ([]Record, int, error) {
 	globalTargets := make(map[uint64][]targetSpec)
 	entries := root.FileSets()
-	for _, entry := range entries {
-		m, err := root.GetFileSetFileByName(entry.EntryID)
-		if err != nil {
-			progress(stderr, "kernelcache: failed to parse fileset entry %s: %v\n", entry.EntryID, err)
-			continue
-		}
-		mergeTargets(globalTargets, collectMachOTargets(SourceKernelcache, m))
+	images := kernelFilesetScanImages(root, entries, stderr)
+	for _, image := range images {
+		mergeTargets(globalTargets, collectMachOTargets(SourceKernelcache, image.m))
 	}
 	mergeTargets(globalTargets, symbolicatedTargets)
-	if len(globalTargets) == 0 {
+	discoveredTargets, virtualSlots, virtualCallers := discoverKernelTargets(root, images, stderr)
+	mergeTargets(globalTargets, discoveredTargets)
+	if len(globalTargets) == 0 && len(virtualSlots) == 0 {
 		progress(stderr, "kernelcache: no entitlement-check target symbols found\n")
 		return nil, 0, nil
 	}
-	progress(stderr, "kernelcache: found %d fileset target addresses\n", len(globalTargets))
+	progress(stderr, "kernelcache: found %d fileset target addresses and %d virtual target slots\n", len(globalTargets), len(virtualSlots))
 
+	targetAddrs := targetSetFromSpecs(globalTargets)
+	hints := hintsForTargets(globalTargets, virtualSlots)
 	var records []Record
-	for _, entry := range entries {
-		m, err := root.GetFileSetFileByName(entry.EntryID)
-		if err != nil {
-			progress(stderr, "kernelcache: failed to parse fileset entry %s: %v\n", entry.EntryID, err)
-			continue
-		}
+	for _, image := range images {
+		m := image.m
 		targets := cloneTargets(globalTargets)
 		mem := machoMemory{m: m}
+		var scanner xref.Scanner
 		for _, fn := range sortedFunctions(m.GetFunctions()) {
 			data, err := m.GetFunctionData(fn)
 			if err != nil {
-				progress(stderr, "kernelcache: failed to read %s function %#x: %v\n", entry.EntryID, fn.StartAddr, err)
+				progress(stderr, "kernelcache: failed to read %s function %#x: %v\n", image.name, fn.StartAddr, err)
 				continue
 			}
 			records = append(records, scanFunction(functionScan{
 				source:       SourceKernelcache,
-				image:        entry.EntryID,
+				image:        image.name,
 				callerSymbol: functionSymbol(m, fn.StartAddr),
 				data:         data,
 				start:        fn.StartAddr,
 				targets:      targets,
+				targetAddrs:  targetAddrs,
+				virtualSlots: virtualSlots,
 				mem:          mem,
+				allowVirtual: virtualCallers.Has(fn.StartAddr),
+				scanner:      &scanner,
+				targetHints:  hints,
 			})...)
 		}
 	}
 	SortRecords(records)
-	return records, len(globalTargets), nil
+	return records, len(globalTargets) + len(virtualSlots), nil
 }
 
 func collectKernelSymbolicatedTargets(m *macho.File, path string, stderr io.Writer) map[uint64][]targetSpec {
@@ -218,12 +233,20 @@ func ScanDSC(path string, stderr io.Writer) ([]Record, int, error) {
 		progress(stderr, "dsc: no entitlement-check target symbols found\n")
 		return nil, 0, nil
 	}
-	progress(stderr, "dsc: found %d global target addresses\n", len(globalTargets))
 	if _, err := f.GetAllObjCSelectors(false); err != nil {
 		progress(stderr, "dsc: failed to load Objective-C selector table: %v\n", err)
 	}
+	patchTargets := map[string]map[uint64][]targetSpec{}
+	patchTargetSlots := map[uint64][]targetSpec{}
+	if err := f.ParsePatchInfo(); err != nil {
+		progress(stderr, "dsc: failed to parse patch info: %v\n", err)
+	} else {
+		patchTargets, patchTargetSlots = collectDSCPatchTargets(f)
+	}
+	addDSCStubIslandTargets(f, globalTargets, patchTargetSlots, stderr)
+	progress(stderr, "dsc: found %d global target addresses\n", len(globalTargets))
 
-	mem := dyldMemory{f: f}
+	mem := dyldMemory{f: f, boundPointers: make(map[uint64]uint64)}
 	var records []Record
 	for _, img := range f.Images {
 		m, err := img.GetMacho()
@@ -234,21 +257,32 @@ func ScanDSC(path string, stderr io.Writer) ([]Record, int, error) {
 		}
 		targets := cloneTargets(directTargets[img.Name])
 		includeObjCSelectors := selectorImages[img.Name]
+		bindTargets := collectDSCBoundTargets(m)
+		mergeTargets(bindTargets, patchTargets[img.Name])
+		addDSCBoundPointerTargets(targets, bindTargets, mem.boundPointers)
+		addDSCBindStubTargets(img, m, targets, bindTargets, stderr)
 		addDSCResolvedStubTargets(img, targets, globalTargets, includeObjCSelectors, stderr)
-		addDSCResolvedGOTTargets(img, targets, globalTargets, includeObjCSelectors, stderr)
+		gotTargetsAdded := addDSCResolvedGOTTargets(img, targets, globalTargets, includeObjCSelectors, stderr)
 		addDSCObjCStubTargets(f, img, targets)
-		if len(targets) > 0 || includeObjCSelectors {
-			addFilteredGlobalTargets(targets, globalTargets, includeObjCSelectors)
-		}
+		addFilteredGlobalTargets(targets, globalTargets, includeObjCSelectors)
 		if len(targets) == 0 {
 			img.Free()
 			continue
 		}
+		skipIndirect := skipIndirectDSCScan(bindTargets, gotTargetsAdded)
+		targetAddrs := targetSetFromSpecs(targets)
+		hints := hintsForTargets(targets, nil)
+		reader := newDyldFunctionReader(f, img, m)
+		funcs := sortedFunctions(m.GetFunctions())
+		var scanner xref.Scanner
 		progress(stderr, "dsc: scanning %s (%d target refs)\n", img.Name, len(targets))
-		for _, fn := range sortedFunctions(m.GetFunctions()) {
-			data, err := readDyldFunction(f, fn)
+		for _, fn := range funcs {
+			data, err := reader.read(fn)
 			if err != nil {
 				progress(stderr, "dsc: failed to read %s function %#x: %v\n", img.Name, fn.StartAddr, err)
+				continue
+			}
+			if skipIndirect && !xref.MayContainDirectCallTarget(data, fn.StartAddr, targetAddrs) {
 				continue
 			}
 			records = append(records, scanFunction(functionScan{
@@ -258,13 +292,35 @@ func ScanDSC(path string, stderr io.Writer) ([]Record, int, error) {
 				data:         data,
 				start:        fn.StartAddr,
 				targets:      targets,
+				targetAddrs:  targetAddrs,
 				mem:          mem,
+				skipIndirect: skipIndirect,
+				scanner:      &scanner,
+				targetHints:  hints,
+			})...)
+		}
+		for _, window := range reader.directTargetWindows(targetAddrs, funcs) {
+			records = append(records, scanFunction(functionScan{
+				source:       SourceDSC,
+				image:        img.Name,
+				data:         window.data,
+				start:        window.start,
+				targets:      targets,
+				targetAddrs:  targetAddrs,
+				mem:          mem,
+				skipIndirect: true,
+				scanner:      &scanner,
+				targetHints:  hints,
 			})...)
 		}
 		img.Free()
 	}
 	SortRecords(records)
 	return records, len(globalTargets), nil
+}
+
+func skipIndirectDSCScan(bindTargets map[uint64][]targetSpec, gotTargetsAdded bool) bool {
+	return len(bindTargets) == 0 && !gotTargetsAdded
 }
 
 func openKernelcache(path string) (*macho.File, func(), error) {
@@ -316,7 +372,81 @@ func collectMachOTargets(source Source, m *macho.File) map[uint64][]targetSpec {
 			add(sym.Address, sym.Name)
 		}
 	}
+	if exports, err := m.DyldExports(); err == nil {
+		for _, sym := range exports {
+			add(sym.Address, sym.Name)
+		}
+	}
 	return targets
+}
+
+func collectDSCPatchTargets(f *dyld.File) (map[string]map[uint64][]targetSpec, map[uint64][]targetSpec) {
+	targets := make(map[string]map[uint64][]targetSpec)
+	slotTargets := make(map[uint64][]targetSpec)
+	add := func(imageIndex int, addr uint64, target targetSpec) {
+		if addr == 0 {
+			return
+		}
+		addTarget(slotTargets, addr, target)
+		if imageIndex < 0 || imageIndex >= len(f.Images) {
+			return
+		}
+		imageTargets := targets[f.Images[imageIndex].Name]
+		if imageTargets == nil {
+			imageTargets = make(map[uint64][]targetSpec)
+			targets[f.Images[imageIndex].Name] = imageTargets
+		}
+		addTarget(imageTargets, addr, target)
+	}
+
+	for _, image := range f.Images {
+		for _, patch := range image.PatchableExports {
+			target, ok := matchTarget(SourceDSC, patch.GetName())
+			if !ok {
+				continue
+			}
+			clientIndex := int(patch.GetClientIndex())
+			if clientIndex < 0 || clientIndex >= len(f.Images) {
+				continue
+			}
+			clientBase := f.Images[clientIndex].LoadAddress
+			switch locs := patch.GetPatchLocations().(type) {
+			case []dyld.CachePatchableLocationV2:
+				for _, loc := range locs {
+					add(clientIndex, clientBase+uint64(loc.DylibOffsetOfUse), target)
+				}
+			case []dyld.CachePatchableLocationV4:
+				for _, loc := range locs {
+					add(clientIndex, clientBase+uint64(loc.DylibOffsetOfUse), target)
+				}
+			}
+		}
+	}
+
+	for imageIndex, image := range f.Images {
+		for _, patch := range image.PatchableGOTs {
+			target, ok := matchTarget(SourceDSC, patch.GetName())
+			if !ok {
+				continue
+			}
+			switch locs := patch.GetGotLocations().(type) {
+			case []dyld.CachePatchableLocationV3:
+				for _, loc := range locs {
+					if _, addr, err := f.GetCacheVMAddress(loc.CacheOffsetOfUse); err == nil {
+						add(imageIndex, addr, target)
+					}
+				}
+			case []dyld.CachePatchableLocationV4Got:
+				for _, loc := range locs {
+					if _, addr, err := f.GetCacheVMAddress(loc.CacheOffsetOfUse); err == nil {
+						add(imageIndex, addr, target)
+					}
+				}
+			}
+		}
+	}
+
+	return targets, slotTargets
 }
 
 func collectDSCTargetIndex(f *dyld.File, stderr io.Writer) (map[uint64][]targetSpec, map[string]map[uint64][]targetSpec, map[string]bool) {
@@ -357,6 +487,34 @@ func addDSCExportTrieTargets(f *dyld.File, img *dyld.CacheImage, targets map[uin
 	}
 }
 
+func addDSCStubIslandTargets(f *dyld.File, globalTargets map[uint64][]targetSpec, patchTargetSlots map[uint64][]targetSpec, stderr io.Writer) {
+	stubs, err := f.GetStubIslandTargets()
+	if err != nil {
+		progress(stderr, "dsc: failed to parse stub islands: %v\n", err)
+		return
+	}
+	stubTargets := make(map[uint64][]targetSpec)
+	for stub, targetAddr := range stubs {
+		for _, target := range globalTargets[targetAddr] {
+			addTarget(stubTargets, stub, target)
+		}
+	}
+	slots, err := f.GetStubIslandPointerSlots()
+	if err != nil {
+		progress(stderr, "dsc: failed to parse stub-island slots: %v\n", err)
+	} else {
+		for stub, slot := range slots {
+			for _, target := range patchTargetSlots[slot] {
+				addTarget(stubTargets, stub, target)
+			}
+		}
+	}
+	mergeTargets(globalTargets, stubTargets)
+	if len(stubTargets) > 0 {
+		progress(stderr, "dsc: resolved %d entitlement-check stub-island targets\n", len(stubTargets))
+	}
+}
+
 func addDSCResolvedStubTargets(img *dyld.CacheImage, targets, globalTargets map[uint64][]targetSpec, includeObjCSelectors bool, stderr io.Writer) {
 	if err := img.ParseStubs(); err != nil {
 		progress(stderr, "dsc: failed to parse %s stubs: %v\n", img.Name, err)
@@ -367,14 +525,96 @@ func addDSCResolvedStubTargets(img *dyld.CacheImage, targets, globalTargets map[
 	}
 }
 
-func addDSCResolvedGOTTargets(img *dyld.CacheImage, targets, globalTargets map[uint64][]targetSpec, includeObjCSelectors bool, stderr io.Writer) {
-	if err := img.ParseGOT(); err != nil {
-		progress(stderr, "dsc: failed to parse %s GOT: %v\n", img.Name, err)
+func collectDSCBoundTargets(m *macho.File) map[uint64][]targetSpec {
+	targets := make(map[uint64][]targetSpec)
+	add := func(addr uint64, name string) {
+		if addr == 0 || name == "" {
+			return
+		}
+		if target, ok := matchTarget(SourceDSC, name); ok {
+			addTarget(targets, addr, target)
+		}
+	}
+
+	if binds, err := m.GetBindInfo(); err == nil {
+		for _, bind := range binds {
+			add(bind.Start+bind.SegOffset, bind.Name)
+		}
+	}
+	if !m.HasDyldChainedFixups() {
+		return targets
+	}
+	dcf, err := m.DyldChainedFixups()
+	if err != nil {
+		return targets
+	}
+	if _, err := dcf.Parse(); err != nil {
+		return targets
+	}
+	for _, start := range dcf.Starts {
+		for _, bind := range start.Binds() {
+			slot, err := m.GetVMAddress(bind.Offset())
+			if err != nil {
+				continue
+			}
+			add(slot, bind.Name())
+		}
+	}
+	return targets
+}
+
+func addDSCBoundPointerTargets(targets, bindTargets map[uint64][]targetSpec, boundPointers map[uint64]uint64) {
+	for slot, specs := range bindTargets {
+		boundPointers[slot] = slot
+		for _, spec := range specs {
+			addTarget(targets, slot, spec)
+		}
+	}
+}
+
+func addDSCBindStubTargets(img *dyld.CacheImage, m *macho.File, targets, bindTargets map[uint64][]targetSpec, stderr io.Writer) {
+	if len(bindTargets) == 0 {
 		return
 	}
-	for _, targetAddr := range img.Analysis.GotPointers {
-		addResolvedAddressTarget(targets, globalTargets, targetAddr, targetAddr, includeObjCSelectors)
+	stubSlots, err := parseDSCStubPointerSlots(img, m)
+	if err != nil {
+		progress(stderr, "dsc: failed to parse %s stub slots: %v\n", img.Name, err)
+		return
 	}
+	for stub, slot := range stubSlots {
+		for _, target := range bindTargets[slot] {
+			addTarget(targets, stub, target)
+		}
+	}
+}
+
+func parseDSCStubPointerSlots(img *dyld.CacheImage, m *macho.File) (map[uint64]uint64, error) {
+	slots := make(map[uint64]uint64)
+	for _, sec := range m.Sections {
+		if !sec.Flags.IsSymbolStubs() {
+			continue
+		}
+		data := make([]byte, sec.Size)
+		if _, err := img.ReadAtAddr(data, sec.Addr); err != nil {
+			return nil, err
+		}
+		maps.Copy(slots, xref.StubPointerSlotsFromInstructions(xref.Decode(data, sec.Addr)))
+	}
+	return slots, nil
+}
+
+func addDSCResolvedGOTTargets(img *dyld.CacheImage, targets, globalTargets map[uint64][]targetSpec, includeObjCSelectors bool, stderr io.Writer) bool {
+	if err := img.ParseGOT(); err != nil {
+		progress(stderr, "dsc: failed to parse %s GOT: %v\n", img.Name, err)
+		return false
+	}
+	added := false
+	for _, targetAddr := range img.Analysis.GotPointers {
+		if addResolvedAddressTarget(targets, globalTargets, targetAddr, targetAddr, includeObjCSelectors) {
+			added = true
+		}
+	}
+	return added
 }
 
 func addDSCObjCStubTargets(f *dyld.File, img *dyld.CacheImage, targets map[uint64][]targetSpec) {
@@ -442,6 +682,82 @@ func readDyldFunction(f *dyld.File, fn mtypes.Function) ([]byte, error) {
 	return f.ReadBytesForUUID(uuid, int64(off), fn.EndAddr-fn.StartAddr)
 }
 
+type dyldTextSection struct {
+	start uint64
+	end   uint64
+	data  []byte
+}
+
+type dyldDirectWindow struct {
+	start uint64
+	data  []byte
+}
+
+type dyldFunctionReader struct {
+	f        *dyld.File
+	sections []dyldTextSection
+}
+
+func newDyldFunctionReader(f *dyld.File, img *dyld.CacheImage, m *macho.File) dyldFunctionReader {
+	reader := dyldFunctionReader{f: f}
+	for _, sec := range m.Sections {
+		if sec.Name != "__text" || (sec.Seg != "__TEXT" && sec.Seg != "__TEXT_EXEC") || sec.Size == 0 {
+			continue
+		}
+		data := make([]byte, sec.Size)
+		if _, err := img.ReadAtAddr(data, sec.Addr); err != nil {
+			continue
+		}
+		reader.sections = append(reader.sections, dyldTextSection{
+			start: sec.Addr,
+			end:   sec.Addr + sec.Size,
+			data:  data,
+		})
+	}
+	return reader
+}
+
+func (r dyldFunctionReader) read(fn mtypes.Function) ([]byte, error) {
+	for _, sec := range r.sections {
+		if fn.StartAddr < sec.start || fn.EndAddr > sec.end {
+			continue
+		}
+		start := fn.StartAddr - sec.start
+		end := fn.EndAddr - sec.start
+		return sec.data[start:end], nil
+	}
+	return readDyldFunction(r.f, fn)
+}
+
+func (r dyldFunctionReader) directTargetWindows(targetAddrs xref.TargetSet, funcs []mtypes.Function) []dyldDirectWindow {
+	var windows []dyldDirectWindow
+	for _, sec := range r.sections {
+		fnIdx := sort.Search(len(funcs), func(i int) bool {
+			return funcs[i].EndAddr > sec.start
+		})
+		for off := 0; off+4 <= len(sec.data); off += 4 {
+			addr := sec.start + uint64(off)
+			for fnIdx < len(funcs) && funcs[fnIdx].EndAddr <= addr {
+				fnIdx++
+			}
+			if fnIdx < len(funcs) && funcs[fnIdx].StartAddr <= addr && addr < funcs[fnIdx].EndAddr {
+				continue
+			}
+			raw := binary.LittleEndian.Uint32(sec.data[off : off+4])
+			target, ok := xref.DirectBranchTarget(raw, addr)
+			if !ok || !targetAddrs.Has(target) {
+				continue
+			}
+			startOff := off - min(off, xref.DefaultMaxInstructions*4)
+			windows = append(windows, dyldDirectWindow{
+				start: sec.start + uint64(startOff),
+				data:  sec.data[startOff : off+4],
+			})
+		}
+	}
+	return windows
+}
+
 func sortedFunctions(funcs []mtypes.Function) []mtypes.Function {
 	out := append([]mtypes.Function(nil), funcs...)
 	sort.Slice(out, func(i, j int) bool {
@@ -503,10 +819,14 @@ func (m machoMemory) ReadCString(addr uint64) (string, error) {
 }
 
 type dyldMemory struct {
-	f *dyld.File
+	f             *dyld.File
+	boundPointers map[uint64]uint64
 }
 
 func (m dyldMemory) ReadPointer(addr uint64) (uint64, error) {
+	if ptr := m.boundPointers[addr]; ptr != 0 {
+		return ptr, nil
+	}
 	ptr, err := m.f.ReadPointerAtAddress(addr)
 	if err != nil {
 		return 0, err

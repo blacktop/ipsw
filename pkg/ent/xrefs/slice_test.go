@@ -72,6 +72,13 @@ func TestKernelIOUserClientTargetsSplitBySignature(t *testing.T) {
 			wantKey:   1,
 		},
 		{
+			name:      "singular mangled",
+			symbol:    "__ZN12IOUserClient21copyClientEntitlementEP4taskPKc",
+			wantOK:    true,
+			wantCanon: "IOUserClient::copyClientEntitlement",
+			wantKey:   1,
+		},
+		{
 			name:      "vnode",
 			symbol:    "IOUserClient::copyClientEntitlementVnode(vnode*, task_t, char const*)",
 			wantOK:    true,
@@ -400,6 +407,173 @@ func TestScanFunctionExpandsLiteralCFArrayKeysWithSlidPointers(t *testing.T) {
 	}
 }
 
+func TestScanFunctionExpandsStackBuiltCFArrayKeys(t *testing.T) {
+	base := uint64(0x100000000)
+	arrayStub := uint64(0x100010000)
+	claimStub := uint64(0x100011000)
+	targetAddr := uint64(0x100012000)
+	slotOne := uint64(0x100002000)
+	slotTwo := uint64(0x100002008)
+	slotThree := uint64(0x100002010)
+	cfOne := uint64(0x100003000)
+	cfTwo := uint64(0x100003100)
+	cfThree := uint64(0x100003200)
+	strOne := uint64(0x100004000)
+	strTwo := uint64(0x100004100)
+	strThree := uint64(0x100004200)
+	data := words(
+		encADRP(8, base, slotOne),
+		encADDImm(8, 8, slotOne&0xfff),
+		encLDRUnsigned(8, 8, 0),
+		encADRP(9, base+12, slotTwo),
+		encADDImm(9, 9, slotTwo&0xfff),
+		encLDRUnsigned(9, 9, 0),
+		encSTP(8, 9, 31, 0x10),
+		encADRP(10, base+28, slotThree),
+		encADDImm(10, 10, slotThree&0xfff),
+		encLDRUnsigned(10, 10, 0),
+		encSTRUnsigned(10, 31, 0x20),
+		encADDImm(2, 31, 0x10),
+		encMOVZ(3, 3),
+		encBL(base+52, arrayStub),
+		encBL(base+56, claimStub),
+		encMOVReg(19, 0),
+		encMOVReg(1, 19),
+		encBL(base+68, targetAddr),
+	)
+
+	records := scanFunction(functionScan{
+		source: SourceDSC,
+		image:  "/System/Library/PrivateFrameworks/FileProvider.framework/FileProvider",
+		data:   data,
+		start:  base,
+		targets: map[uint64][]targetSpec{
+			targetAddr: {{Source: SourceDSC, Canonical: "SecTaskCopyValuesForEntitlements", KeyReg: 1, ValueReg: -1, KeyArray: true}},
+		},
+		mem: mockMemory{
+			ptrs: map[uint64]uint64{
+				slotOne:      cfOne,
+				slotTwo:      cfTwo,
+				slotThree:    cfThree,
+				cfOne + 16:   strOne,
+				cfTwo + 16:   strTwo,
+				cfThree + 16: strThree,
+			},
+			strs: map[uint64]string{
+				strOne:   "com.apple.private.fileprovider.read",
+				strTwo:   "com.apple.private.fileprovider.write",
+				strThree: "com.apple.private.fileprovider.enumerate",
+			},
+		},
+	})
+
+	if len(records) != 3 {
+		t.Fatalf("records=%d, want 3: %#v", len(records), records)
+	}
+	want := []string{
+		"com.apple.private.fileprovider.read",
+		"com.apple.private.fileprovider.write",
+		"com.apple.private.fileprovider.enumerate",
+	}
+	for idx, key := range want {
+		if !records[idx].Resolved || records[idx].Key != key {
+			t.Fatalf("record[%d]=%#v, want key %q", idx, records[idx], key)
+		}
+	}
+}
+
+func TestScanFunctionResolvesVirtualSlotEntitlementCall(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encLDRUnsigned(8, 0, 0),
+		encLDRUnsigned(8, 8, 0x28),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.IOUserClientTest",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		virtualSlots: map[int][]targetSpec{
+			5: {{Source: SourceKernelcache, Canonical: "IOUserClient::copyClientEntitlement", KeyReg: 2, ValueReg: -1, Discovery: "vtable_slot", VirtualSlot: 5}},
+		},
+		mem:          mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+		allowVirtual: true,
+	})
+
+	if len(records) != 1 {
+		t.Fatalf("records=%d, want 1", len(records))
+	}
+	if records[0].CheckFn != "IOUserClient::copyClientEntitlement" || records[0].Key != "com.apple.private.iokit.test" {
+		t.Fatalf("unexpected record: %#v", records[0])
+	}
+	if records[0].Extra["target_discovery"] != "vtable_slot" {
+		t.Fatalf("missing discovery provenance: %#v", records[0])
+	}
+}
+
+func TestScanFunctionSkipsVirtualSlotWhenCallerIsNotScoped(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encLDRUnsigned(8, 0, 0),
+		encLDRUnsigned(8, 8, 0x28),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.Unrelated",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		virtualSlots: map[int][]targetSpec{
+			5: {{Source: SourceKernelcache, Canonical: "IOUserClient::copyClientEntitlement", KeyReg: 2, ValueReg: -1, Discovery: "vtable_slot", VirtualSlot: 5}},
+		},
+		mem: mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+	})
+
+	if len(records) != 0 {
+		t.Fatalf("records=%d, want 0: %#v", len(records), records)
+	}
+}
+
+func TestScanFunctionSkipsVirtualSlotWhenReceiverIsNotSelf(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encLDRUnsigned(8, 19, 0),
+		encLDRUnsigned(8, 8, 0x28),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.IOUserClientTest",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		virtualSlots: map[int][]targetSpec{
+			5: {{Source: SourceKernelcache, Canonical: "IOUserClient::copyClientEntitlement", KeyReg: 2, ValueReg: -1, Discovery: "vtable_slot", VirtualSlot: 5}},
+		},
+		mem:          mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+		allowVirtual: true,
+	})
+
+	if len(records) != 0 {
+		t.Fatalf("records=%d, want 0: %#v", len(records), records)
+	}
+}
+
 func TestAddResolvedAddressTargetFiltersSelectorTargets(t *testing.T) {
 	global := map[uint64][]targetSpec{
 		0x1000: {
@@ -425,6 +599,18 @@ func TestAddResolvedAddressTargetFiltersSelectorTargets(t *testing.T) {
 	}
 }
 
+func TestSkipIndirectDSCScanKeepsGOTOnlyTargets(t *testing.T) {
+	if skipIndirectDSCScan(nil, true) {
+		t.Fatal("GOT-resolved targets require indirect BLR scanning")
+	}
+	if skipIndirectDSCScan(map[uint64][]targetSpec{0x1000: {{Canonical: "SecTaskCopyValueForEntitlement"}}}, false) {
+		t.Fatal("bind targets require indirect BLR scanning")
+	}
+	if !skipIndirectDSCScan(nil, false) {
+		t.Fatal("images without indirect target sources should keep the direct-branch prefilter")
+	}
+}
+
 func TestKernelSymbolMapCandidatesIncludeAncestorOutputDirs(t *testing.T) {
 	root := t.TempDir()
 	outputDir := filepath.Join(root, "ipsw-symbolicator")
@@ -447,7 +633,7 @@ func TestWriteJSONLDeterministicOrderingAndKeys(t *testing.T) {
 	records := []Record{
 		{Source: "kernelcache", Image: "b", Callsite: "0x2", CheckFn: "B", Extra: map[string]string{}},
 		{Source: "dsc", Image: "z", Callsite: "0x9", CheckFn: "A", Extra: map[string]string{"slice_notes": "param"}},
-		{Source: "dsc", Image: "a", Callsite: "0x1", CheckFn: "A", Extra: map[string]string{}},
+		{Source: "dsc", Image: "a", Callsite: "0x1", CheckFn: "A", Extra: map[string]string{"target_discovery": "cstring_convergence"}},
 	}
 	var buf bytes.Buffer
 	if err := WriteJSONL(&buf, records); err != nil {
@@ -460,7 +646,9 @@ func TestWriteJSONLDeterministicOrderingAndKeys(t *testing.T) {
 	if !strings.Contains(lines[0], `"source":"dsc"`) || !strings.Contains(lines[0], `"image":"a"`) {
 		t.Fatalf("records not sorted: %s", buf.String())
 	}
-	if !strings.HasPrefix(lines[0], `{"callsite":`) || !strings.Contains(lines[1], `"extra":{"slice_notes":"param"},"image":`) {
+	if !strings.HasPrefix(lines[0], `{"callsite":`) ||
+		!strings.Contains(lines[0], `"extra":{"target_discovery":"cstring_convergence"},"image":`) ||
+		!strings.Contains(lines[1], `"extra":{"slice_notes":"param"},"image":`) {
 		t.Fatalf("keys not deterministically ordered: %s", buf.String())
 	}
 }
@@ -493,6 +681,22 @@ func encADDReg(rd, rn, rm int) uint32 {
 
 func encLDRUnsigned(rt, rn int, imm uint64) uint32 {
 	return 0xf9400000 | (uint32((imm/8)&0xfff) << 10) | (uint32(rn) << 5) | uint32(rt)
+}
+
+func encSTRUnsigned(rt, rn int, imm uint64) uint32 {
+	return 0xf9000000 | (uint32((imm/8)&0xfff) << 10) | (uint32(rn) << 5) | uint32(rt)
+}
+
+func encSTP(rt, rt2, rn int, imm uint64) uint32 {
+	return 0xa9000000 | (uint32((imm/8)&0x7f) << 15) | (uint32(rt2) << 10) | (uint32(rn) << 5) | uint32(rt)
+}
+
+func encMOVZ(rd int, imm uint64) uint32 {
+	return 0xd2800000 | (uint32(imm&0xffff) << 5) | uint32(rd)
+}
+
+func encMOVReg(rd, rn int) uint32 {
+	return 0xaa0003e0 | (uint32(rn) << 16) | uint32(rd)
 }
 
 func encBL(pc, target uint64) uint32 {

@@ -11,9 +11,10 @@ import (
 
 // VtableEntry is a decoded function pointer from a recovered C++ vtable.
 type VtableEntry struct {
-	Index   int
-	Address uint64
-	Symbol  string
+	Index       int
+	SlotAddress uint64
+	Address     uint64
+	Symbol      string
 }
 
 // FunctionBody is the bounded analysis input for a recovered function.
@@ -64,9 +65,10 @@ func (s *Scanner) VtableEntries(class Class, max int) []VtableEntry {
 			break
 		}
 		out = append(out, VtableEntry{
-			Index:   idx,
-			Address: ptr,
-			Symbol:  s.SymbolName(ptr),
+			Index:       idx,
+			SlotAddress: addr,
+			Address:     ptr,
+			Symbol:      s.SymbolName(ptr),
 		})
 	}
 	return out
@@ -87,10 +89,19 @@ func (s *Scanner) VtableEntry(class Class, index int) (VtableEntry, bool) {
 		return VtableEntry{}, false
 	}
 	return VtableEntry{
-		Index:   index,
-		Address: ptr,
-		Symbol:  s.SymbolName(ptr),
+		Index:       index,
+		SlotAddress: addr,
+		Address:     ptr,
+		Symbol:      s.SymbolName(ptr),
 	}, true
+}
+
+// VtableSlotAddress returns the VM address of class' vtable slot.
+func (s *Scanner) VtableSlotAddress(class Class, index int) (uint64, bool) {
+	if index < 0 || class.VtableAddr == 0 {
+		return 0, false
+	}
+	return class.VtableAddr + uint64(index*8), true
 }
 
 // FunctionBodyAt returns function bounds, owner, and bytes for addr.

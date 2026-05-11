@@ -89,8 +89,20 @@ func appendExtra(dst []byte, extra map[string]string) []byte {
 	if len(extra) == 0 {
 		return append(dst, "{}"...)
 	}
-	dst = append(dst, `{"slice_notes":`...)
-	dst = strconv.AppendQuote(dst, extra["slice_notes"])
+	keys := make([]string, 0, len(extra))
+	for key := range extra {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	dst = append(dst, '{')
+	for idx, key := range keys {
+		if idx > 0 {
+			dst = append(dst, ',')
+		}
+		dst = strconv.AppendQuote(dst, key)
+		dst = append(dst, ':')
+		dst = strconv.AppendQuote(dst, extra[key])
+	}
 	dst = append(dst, '}')
 	return dst
 }
