@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/alecthomas/chroma/v2 v2.24.1
-	github.com/anthropics/anthropic-sdk-go v1.41.0
+	github.com/anthropics/anthropic-sdk-go v1.42.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
@@ -56,7 +56,6 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.13.0
-	github.com/klauspost/compress v1.18.6
 	github.com/mattn/go-isatty v0.0.22
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
@@ -230,7 +229,7 @@ require (
 	github.com/soniakeys/quant v1.0.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cobra-cli v1.3.0 // indirect
-	github.com/standard-webhooks/standard-webhooks/libraries v0.0.0-20260427160145-3afa6683f8b2 // indirect
+	github.com/standard-webhooks/standard-webhooks/libraries v0.0.0-20260508151727-1282bb917829 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
