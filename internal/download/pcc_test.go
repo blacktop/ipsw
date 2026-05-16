@@ -20,7 +20,7 @@ func TestCollectPCCReleasesPagesThroughLogLeaves(t *testing.T) {
 	releaseLeaf := newTestLogLeaf(t, 4, pcc.ATLogDataType_RELEASE, true, true)
 
 	var gotRanges [][2]uint64
-	releases, err := collectPCCReleases(5, 2, nil, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+	releases, err := collectPCCReleases(0, 5, 2, nil, func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
 		gotRanges = append(gotRanges, [2]uint64{startIndex, endIndex})
 		if startIndex == 4 {
 			return []*pcc.LogLeavesResponse_Leaf{releaseLeaf}, nil
@@ -125,9 +125,9 @@ func TestUniquePCCReleasesKeepsLatestIndexPerHash(t *testing.T) {
 	t.Parallel()
 
 	releases := []*PCCRelease{
-		{Index: 10, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseHash: []byte{0xaa}}},
-		{Index: 12, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseHash: []byte{0xbb}}},
-		{Index: 15, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseHash: []byte{0xaa}}},
+		{Index: 10, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xaa}}},
+		{Index: 12, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xbb}}},
+		{Index: 15, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xaa}}},
 	}
 
 	unique := UniquePCCReleases(releases)
@@ -137,13 +137,120 @@ func TestUniquePCCReleasesKeepsLatestIndexPerHash(t *testing.T) {
 
 	found := map[string]uint64{}
 	for _, release := range unique {
-		found[pccReleaseHashString(release)] = release.Index
+		found[release.ReleaseID()] = release.Index
 	}
 	if found["aa"] != 15 {
 		t.Fatalf("expected latest index for hash aa to be 15, got %d", found["aa"])
 	}
 	if found["bb"] != 12 {
 		t.Fatalf("expected latest index for hash bb to be 12, got %d", found["bb"])
+	}
+}
+
+func TestPCCReleaseIDFallsBackToATLeafHash(t *testing.T) {
+	t.Parallel()
+
+	release := &PCCRelease{ATLeaf: &ATLeaf{Hash: []byte{0xde, 0xad}}}
+
+	if got := release.ReleaseID(); got != "dead" {
+		t.Fatalf("unexpected release ID: got %q want %q", got, "dead")
+	}
+}
+
+func TestPCCReleaseCreationTimeHandlesMissingTimestamp(t *testing.T) {
+	t.Parallel()
+
+	release := &PCCRelease{}
+
+	if got := release.ReleaseCreationTime(); !got.IsZero() {
+		t.Fatalf("unexpected release creation time: got %s want zero", got)
+	}
+}
+
+func TestCloudOSInfoUsesReleaseMetadataFallbackFields(t *testing.T) {
+	t.Parallel()
+
+	release := &PCCRelease{ReleaseMetadata: pcc.ReleaseMetadata{
+		DarwinInit:   &structpb.Struct{},
+		Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
+		BuildVersion: "5F123",
+	}}
+
+	build, train, app := release.CloudOSInfo()
+	if build != "5F123" {
+		t.Fatalf("unexpected build: got %q want %q", build, "5F123")
+	}
+	if train != "" {
+		t.Fatalf("unexpected train: got %q want empty", train)
+	}
+	if app != "TIE Proxy" {
+		t.Fatalf("unexpected app: got %q want %q", app, "TIE Proxy")
+	}
+}
+
+func TestCloudOSInfoPrefersDarwinInitOverReleaseMetadataFallbackFields(t *testing.T) {
+	t.Parallel()
+
+	darwinInit, err := structpb.NewStruct(map[string]any{
+		"preferences": []any{
+			map[string]any{
+				"application_id": "com.apple.cloudos.cloudOSInfo",
+				"key":            "cloudOSBuildVersion",
+				"value":          "5E290",
+			},
+			map[string]any{
+				"application_id": "com.apple.cloudos.cloudOSInfo",
+				"key":            "cloudOSApplicationName",
+				"value":          "TIE",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create DarwinInit struct: %v", err)
+	}
+
+	release := &PCCRelease{ReleaseMetadata: pcc.ReleaseMetadata{
+		DarwinInit:   darwinInit,
+		Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
+		BuildVersion: "5F123",
+	}}
+
+	build, _, app := release.CloudOSInfo()
+	if build != "5E290" {
+		t.Fatalf("unexpected build: got %q want %q", build, "5E290")
+	}
+	if app != "TIE" {
+		t.Fatalf("unexpected app: got %q want %q", app, "TIE")
+	}
+}
+
+func TestAssetExtUsesReleaseMetadataFileType(t *testing.T) {
+	t.Parallel()
+
+	rawAsset := mustMarshalProto(t, &pcc.ReleaseMetadata_Asset{
+		Type:     pcc.ReleaseMetadata_ASSET_TYPE_MODEL,
+		FileType: pcc.ReleaseMetadata_FILE_TYPE_DISKIMAGE,
+	})
+
+	var asset pcc.ReleaseMetadata_Asset
+	if err := proto.Unmarshal(rawAsset, &asset); err != nil {
+		t.Fatalf("failed to unmarshal asset: %v", err)
+	}
+
+	if got := assetExt(&asset); got != ".dmg" {
+		t.Fatalf("unexpected extension: got %q want %q", got, ".dmg")
+	}
+}
+
+func TestAssetExtFallsBackToAssetType(t *testing.T) {
+	t.Parallel()
+
+	asset := &pcc.ReleaseMetadata_Asset{
+		Type: pcc.ReleaseMetadata_ASSET_TYPE_MODEL,
+	}
+
+	if got := assetExt(asset); got != ".aar" {
+		t.Fatalf("unexpected extension: got %q want %q", got, ".aar")
 	}
 }
 
@@ -162,9 +269,9 @@ func newTestLogLeaf(t *testing.T, index uint64, typ pcc.ATLogDataType, includeMe
 
 	if includeMetadata {
 		leaf.Metadata = mustMarshalProto(t, &pcc.ReleaseMetadata{
-			SchemaVersion: pcc.ReleaseMetadata_V1,
-			Timestamp:     timestamppb.New(time.Unix(1_700_000_000, 0)),
-			ReleaseHash:   bytes.Repeat([]byte{0xa5}, 32),
+			SchemaVersion:   pcc.ReleaseMetadata_SCHEMA_VERSION_V1,
+			ReleaseCreation: timestamppb.New(time.Unix(1_700_000_000, 0)),
+			ReleaseDigest:   bytes.Repeat([]byte{0xa5}, 32),
 			Assets: []*pcc.ReleaseMetadata_Asset{{
 				Type:    pcc.ReleaseMetadata_ASSET_TYPE_OS,
 				Url:     "https://example.test/pcc.ipsw",
