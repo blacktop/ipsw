@@ -746,7 +746,7 @@ func file_KtClientApi_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_KtClientApi_proto_rawDesc), len(file_KtClientApi_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   8,

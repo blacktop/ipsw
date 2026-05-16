@@ -283,8 +283,8 @@ type pccLogCache struct {
 type pccCachedRelease struct {
 	Index         uint64          `json:"index"`
 	ATLeaf        ATLeaf          `json:"leaf"`
-	MetadataBytes []byte          `json:"metadata_pb"`     // proto.Marshal(ReleaseMetadata)
-	TicketBytes   []byte          `json:"ticket_asn1"`     // asn1 raw (Ticket.Raw)
+	MetadataBytes []byte          `json:"metadata_pb"`       // proto.Marshal(ReleaseMetadata)
+	TicketBytes   []byte          `json:"ticket_asn1"`       // asn1 raw (Ticket.Raw)
 	Version       *PCCVersion     `json:"version,omitempty"` // resolved BuildManifest.plist version
 	VPhone        *VPhoneFirmware `json:"vphone,omitempty"`  // resolved vphone600 presence
 }

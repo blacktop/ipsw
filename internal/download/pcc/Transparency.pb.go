@@ -1689,7 +1689,7 @@ func file_Transparency_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeFor[x]().PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_Transparency_proto_rawDesc), len(file_Transparency_proto_rawDesc)),
 			NumEnums:      8,
 			NumMessages:   16,
