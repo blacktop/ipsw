@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -46,6 +47,35 @@ type dscFunc struct {
 	Size  uint64 `json:"size,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Image string `json:"image,omitempty"`
+}
+
+type dscFuncImageResolver interface {
+	GetImageContainingTextAddr(uint64) (*dyld.CacheImage, error)
+	GetImageContainingVMAddr(uint64) (*dyld.CacheImage, error)
+	Image(string) (*dyld.CacheImage, error)
+}
+
+func resolveDscFuncImage(f dscFuncImageResolver, fn dscFunc) (*dyld.CacheImage, error) {
+	if fn.Start != 0 {
+		if image, err := f.GetImageContainingTextAddr(fn.Start); err == nil && image != nil {
+			return image, nil
+		}
+		if image, err := f.GetImageContainingVMAddr(fn.Start); err == nil && image != nil {
+			return image, nil
+		}
+	}
+	if fn.Image == "" {
+		return nil, fmt.Errorf("failed to resolve image for function %#x", fn.Start)
+	}
+
+	image, err := f.Image(fn.Image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find image %s for function %#x: %w", fn.Image, fn.Start, err)
+	}
+	if image == nil {
+		return nil, fmt.Errorf("failed to find image %s for function %#x", fn.Image, fn.Start)
+	}
+	return image, nil
 }
 
 func getDSCs(path string) []string {
