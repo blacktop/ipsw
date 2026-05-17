@@ -184,7 +184,7 @@ var AddrToFuncCmd = &cobra.Command{
 							End:   fn.EndAddr,
 							Size:  fn.EndAddr - fn.StartAddr,
 							Name:  fn.Name,
-							Image: filepath.Base(img.Name),
+							Image: img.Name,
 						})
 					}
 				}
@@ -234,7 +234,7 @@ var AddrToFuncCmd = &cobra.Command{
 						End:   fn.EndAddr,
 						Size:  fn.EndAddr - fn.StartAddr,
 						Name:  fn.Name,
-						Image: filepath.Base(image.Name),
+						Image: image.Name,
 					}); err != nil {
 						return err
 					}

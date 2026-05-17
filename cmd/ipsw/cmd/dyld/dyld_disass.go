@@ -338,6 +338,11 @@ var DisassCmd = &cobra.Command{
 				}
 
 				for _, fn := range funcs {
+					funcImage, err := resolveDscFuncImage(f, fn)
+					if err != nil {
+						return err
+					}
+
 					uuid, off, err := f.GetOffset(fn.Start)
 					if err != nil {
 						return err
@@ -349,7 +354,7 @@ var DisassCmd = &cobra.Command{
 					}
 
 					engine := dyld.NewDyldDisass(f, &disass.Config{
-						Image:        fn.Image,
+						Image:        funcImage.Name,
 						Data:         data,
 						StartAddress: fn.Start,
 						Middle:       0,
@@ -363,10 +368,7 @@ var DisassCmd = &cobra.Command{
 						//***********************
 						//* First pass ANALYSIS *
 						//***********************
-						image, err = f.Image(fn.Image)
-						if err != nil {
-							return err
-						}
+						image = funcImage
 						if err := image.Analyze(); err != nil {
 							if !viper.GetBool("dyld.disass.force") {
 								return fmt.Errorf("failed to analyze image %s: %v (use --force to continue anyway)", filepath.Base(image.Name), err)
