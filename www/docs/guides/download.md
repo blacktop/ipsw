@@ -723,8 +723,8 @@ Get info about a PCC release
 ```bash
  ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴
 20872) b90e8f8813347a55cb9988aa264c73120099c179ce9992b9cc972836c2893c9a
-Type:   RELEASE
-Schema: V1
+Log Type: RELEASE
+Schema: SCHEMA_VERSION_V1
 Assets
     [OS]
         Variant: Darwin Cloud Customer Erase Install (IPSW)
