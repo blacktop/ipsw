@@ -55,6 +55,7 @@ func init() {
 	// Command-specific flags
 	downloadPccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
 	downloadPccCmd.Flags().String("version", "", "Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached")
+	downloadPccCmd.Flags().String("os-build", "", "Filter by OS ProductBuildVersion prefix (e.g. 23E5207q); resolved via partial-zip, cached")
 	downloadPccCmd.Flags().String("build", "", "Filter by cloudOS build version prefix (e.g. 5E, 5E290)")
 	downloadPccCmd.Flags().String("train", "", "Filter by cloudOS build train substring (e.g. LuckE)")
 	downloadPccCmd.Flags().String("app", "", "Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')")
@@ -70,6 +71,7 @@ func init() {
 	// Bind command-specific flags
 	viper.BindPFlag("download.pcc.info", downloadPccCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.pcc.version", downloadPccCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.pcc.os-build", downloadPccCmd.Flags().Lookup("os-build"))
 	viper.BindPFlag("download.pcc.build", downloadPccCmd.Flags().Lookup("build"))
 	viper.BindPFlag("download.pcc.train", downloadPccCmd.Flags().Lookup("train"))
 	viper.BindPFlag("download.pcc.app", downloadPccCmd.Flags().Lookup("app"))
@@ -95,6 +97,9 @@ var downloadPccCmd = &cobra.Command{
 		# Filter by cloudOS build prefix and pick interactively
 		❯ ipsw download pcc --build 5E --app TIE
 
+		# Filter by OS BuildManifest ProductBuildVersion prefix
+		❯ ipsw download pcc --os-build 23E5207q --info
+
 		# Download PCC VM files interactively
 		❯ ipsw download pcc
 
@@ -111,6 +116,7 @@ var downloadPccCmd = &cobra.Command{
 		// resumeAll := viper.GetBool("download.pcc.resume-all")
 		// restartAll := viper.GetBool("download.pcc.restart-all")
 		versionFilter := viper.GetString("download.pcc.version")
+		osBuildFilter := viper.GetString("download.pcc.os-build")
 		buildFilter := viper.GetString("download.pcc.build")
 		trainFilter := viper.GetString("download.pcc.train")
 		appFilter := viper.GetString("download.pcc.app")
@@ -178,17 +184,24 @@ var downloadPccCmd = &cobra.Command{
 			releases = filtered
 		}
 
-		// Version filter requires network on first use; runs after the cheap
-		// metadata filters so we resolve as few URLs as possible. Resolution
-		// attaches PCCVersion to each release in-place and persists to the
-		// unified pcc_log.json cache.
-		if versionFilter != "" {
+		// OS version/build filters require network on first use; run after
+		// the cheap metadata filters so we resolve as few URLs as possible.
+		// Resolution attaches PCCVersion to each release in-place and
+		// persists to the unified pcc_log.json cache.
+		if versionFilter != "" || osBuildFilter != "" {
 			download.ResolvePCCVersions(releases, pccVersionFetcher(proxy, insecure))
 			filtered := releases[:0]
 			for _, r := range releases {
-				if r.Version != nil && strings.HasPrefix(r.Version.Version, versionFilter) {
-					filtered = append(filtered, r)
+				if r.Version == nil {
+					continue
 				}
+				if versionFilter != "" && !strings.HasPrefix(r.Version.Version, versionFilter) {
+					continue
+				}
+				if osBuildFilter != "" && !strings.HasPrefix(r.Version.Build, osBuildFilter) {
+					continue
+				}
+				filtered = append(filtered, r)
 			}
 			releases = filtered
 		}
@@ -205,6 +218,9 @@ var downloadPccCmd = &cobra.Command{
 
 		if viper.GetBool("download.pcc.info") {
 			log.Infof("Found %d PCC Releases", len(releases))
+			// Warm BuildManifest ProductVersion/ProductBuildVersion so the
+			// cloudOS agent build line can include the OS build next to it.
+			download.ResolvePCCVersions(releases, pccVersionFetcher(proxy, insecure))
 			// Resolve any releases whose VPhone hasn't been populated yet from
 			// the cache; new entries since the last run pay the partial-zip
 			// cost once and persist the result.
@@ -214,10 +230,10 @@ var downloadPccCmd = &cobra.Command{
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 				fmt.Println(release)
 				if release.Version != nil {
-					utils.Indent(log.WithFields(log.Fields{"version": release.Version.Version, "build": release.Version.Build}).Info, 1)("OS IPSW")
+					utils.Indent(log.WithFields(pccVersionFields(*release.Version)).Info, 1)("OS IPSW")
 				} else if len(releases) == 1 {
 					if v, err := pccVersionFetcher(proxy, insecure)(release.OSAssetURL()); err == nil {
-						utils.Indent(log.WithFields(log.Fields{"version": v.Version, "build": v.Build}).Info, 1)("OS IPSW")
+						utils.Indent(log.WithFields(pccVersionFields(v)).Info, 1)("OS IPSW")
 					}
 				}
 				printVPhoneBanner(release.VRE(), release.VPhone)
@@ -360,6 +376,14 @@ func printVPhoneBanner(vre download.VRESignals, v *download.VPhoneFirmware) {
 	} else {
 		utils.Indent(log.WithFields(fields).Info, 2)(msg)
 	}
+}
+
+func pccVersionFields(v download.PCCVersion) log.Fields {
+	fields := log.Fields{"version": v.Version, "build": v.Build}
+	if channel := v.Channel(); channel != "" {
+		fields["channel"] = channel
+	}
+	return fields
 }
 
 // pccVersionFetcher returns a closure that partial-zips an OS asset to read

@@ -247,10 +247,42 @@ func (r *PCCRelease) OSAssetDigest() string {
 	return path.Base(url)
 }
 
-// PCCVersion is the ProductVersion/Build pair from an OS asset's BuildManifest.
+// PCCVersion is the ProductVersion/ProductBuildVersion pair from an OS asset's BuildManifest.
 type PCCVersion struct {
 	Version string `json:"v"`
 	Build   string `json:"b"`
+}
+
+func (v PCCVersion) BuildLabel() string {
+	if v.Build == "" {
+		return ""
+	}
+	if channel := v.Channel(); channel != "" {
+		return fmt.Sprintf("%s [%s]", v.Build, channel)
+	}
+	return v.Build
+}
+
+func (v PCCVersion) Channel() string {
+	if hasAppleBetaBuildSuffix(v.Build) {
+		return "beta"
+	}
+	return ""
+}
+
+func hasAppleBetaBuildSuffix(build string) bool {
+	if build == "" {
+		return false
+	}
+	last := build[len(build)-1]
+	return last >= 'a' && last <= 'z'
+}
+
+func samePCCVersion(a, b *PCCVersion) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Version == b.Version && a.Build == b.Build
 }
 
 // VPhoneFirmware records whether an OS asset IPSW carries vphone600 firmware.
@@ -375,7 +407,7 @@ func persistReleaseResolutions(releases []*PCCRelease) {
 		if !ok {
 			continue
 		}
-		if r.Version != nil && cr.Version == nil {
+		if r.Version != nil && !samePCCVersion(cr.Version, r.Version) {
 			cr.Version = r.Version
 			changed = true
 		}
@@ -396,16 +428,20 @@ func persistReleaseResolutions(releases []*PCCRelease) {
 func resolveOSAssetField[T any](
 	releases []*PCCRelease,
 	label string,
-	get func(*PCCRelease) *T, // returns current value (nil = unresolved)
+	get func(*PCCRelease) *T, // returns current value (nil or !keep = unresolved)
 	set func(*PCCRelease, *T), // writes value back to release
 	fetch func(url string) (T, error),
 	keep func(T) bool,
 ) {
+	isResolved := func(v *T) bool {
+		return v != nil && (keep == nil || keep(*v))
+	}
+
 	// Skip the per-digest map allocation on warm runs where every release
 	// already has a value loaded from cache.
 	allResolved := true
 	for _, r := range releases {
-		if r.OSAssetDigest() != "" && get(r) == nil {
+		if r.OSAssetDigest() != "" && !isResolved(get(r)) {
 			allResolved = false
 			break
 		}
@@ -429,14 +465,14 @@ func resolveOSAssetField[T any](
 		// from cache), copy it across to siblings without fetching.
 		var have *T
 		for _, r := range rs {
-			if v := get(r); v != nil {
+			if v := get(r); isResolved(v) {
 				have = v
 				break
 			}
 		}
 		if have != nil {
 			for _, r := range rs {
-				if get(r) == nil {
+				if !isResolved(get(r)) {
 					set(r, have)
 					backfilled = true
 				}
@@ -491,15 +527,15 @@ func resolveOSAssetField[T any](
 }
 
 // ResolvePCCVersions partial-zips each release's OS asset to read
-// BuildManifest.plist's ProductVersion. Results are attached to each
-// release's Version field and persisted in pcc_log.json so subsequent runs
-// skip the fetch.
+// BuildManifest.plist's ProductVersion and ProductBuildVersion. Results are
+// attached to each release's Version field and persisted in pcc_log.json so
+// subsequent runs skip the fetch.
 func ResolvePCCVersions(releases []*PCCRelease, fetch func(url string) (PCCVersion, error)) {
 	resolveOSAssetField(releases, "versions",
 		func(r *PCCRelease) *PCCVersion { return r.Version },
 		func(r *PCCRelease, v *PCCVersion) { r.Version = v },
 		fetch,
-		func(v PCCVersion) bool { return v.Version != "" })
+		func(v PCCVersion) bool { return v.Version != "" && v.Build != "" })
 }
 
 // ResolveVPhoneFirmware partial-zips each release's OS asset and checks
@@ -518,6 +554,11 @@ func (r *PCCRelease) String() string {
 	out.WriteString(fmt.Sprintf("%d) %s\n", r.Index, colorHash(r.ReleaseID())))
 	if build, train, app := r.CloudOSInfo(); build != "" {
 		out.WriteString(fmt.Sprintf(colorField("Build")+":  %s", colorName(build)))
+		if r.Version != nil {
+			if osBuild := r.Version.BuildLabel(); osBuild != "" {
+				out.WriteString(fmt.Sprintf(" / %s", colorName(osBuild)))
+			}
+		}
 		if train != "" {
 			out.WriteString(fmt.Sprintf(" (%s)", train))
 		}
@@ -526,7 +567,7 @@ func (r *PCCRelease) String() string {
 		}
 		out.WriteString("\n")
 	}
-	out.WriteString(fmt.Sprintf(colorField("Type")+":   %s\n", pcc.ATLogDataType(r.Type).String()))
+	out.WriteString(fmt.Sprintf(colorField("Log Type")+": %s\n", pcc.ATLogDataType(r.Type).String()))
 	out.WriteString(fmt.Sprintf(colorField("Schema")+": %s\n", string(r.SchemaVersion.String())))
 	out.WriteString(colorField("Assets\n"))
 	for _, asset := range r.GetAssets() {

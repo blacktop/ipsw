@@ -5,10 +5,12 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download/pcc"
+	"github.com/fatih/color"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -221,6 +223,79 @@ func TestCloudOSInfoPrefersDarwinInitOverReleaseMetadataFallbackFields(t *testin
 	}
 	if app != "TIE" {
 		t.Fatalf("unexpected app: got %q want %q", app, "TIE")
+	}
+}
+
+func TestPCCReleaseStringPrintsOSBuildNextToCloudOSBuild(t *testing.T) {
+	oldNoColor := color.NoColor
+	color.NoColor = true
+	defer func() { color.NoColor = oldNoColor }()
+
+	release, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 4, pcc.ATLogDataType_RELEASE, true, true))
+	if err != nil {
+		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
+	}
+	release.Version = &PCCVersion{Version: "26.4", Build: "23E5207q"}
+	release.ReleaseMetadata.BuildVersion = "5F88.1"
+
+	out := release.String()
+	if !strings.Contains(out, "Build:  5F88.1 / 23E5207q [beta]") {
+		t.Fatalf("expected OS build next to cloudOS build, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Log Type: RELEASE") {
+		t.Fatalf("expected PCC log type label, got:\n%s", out)
+	}
+}
+
+func TestPCCVersionBuildLabelMarksBetaBuildSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   PCCVersion
+		want string
+	}{
+		{name: "beta", in: PCCVersion{Build: "23E5207q"}, want: "23E5207q [beta]"},
+		{name: "release", in: PCCVersion{Build: "23E246"}, want: "23E246"},
+		{name: "empty", in: PCCVersion{}, want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.in.BuildLabel(); got != tt.want {
+				t.Fatalf("BuildLabel() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolvePCCVersionsRefetchesCachedVersionWithoutBuild(t *testing.T) {
+	t.Parallel()
+
+	release := &PCCRelease{
+		Version: &PCCVersion{Version: "26.4"},
+		ReleaseMetadata: pcc.ReleaseMetadata{
+			Assets: []*pcc.ReleaseMetadata_Asset{{
+				Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
+				Url:  "https://example.test/os-digest",
+			}},
+		},
+	}
+
+	var calls int
+	ResolvePCCVersions([]*PCCRelease{release}, func(url string) (PCCVersion, error) {
+		calls++
+		if url != "https://example.test/os-digest" {
+			t.Fatalf("unexpected URL: got %q", url)
+		}
+		return PCCVersion{Version: "26.4", Build: "23E5207q"}, nil
+	})
+
+	if calls != 1 {
+		t.Fatalf("expected one fetch for incomplete cached version, got %d", calls)
+	}
+	if release.Version == nil || release.Version.Build != "23E5207q" {
+		t.Fatalf("expected OS build to be resolved, got %#v", release.Version)
 	}
 }
 
