@@ -30,7 +30,7 @@ ipsw sb query path-read <TARGET> [KERNELCACHE] [flags]
   -i, --input string            Input sandbox profile binary file
       --no-color                disable colorize output
   -o, --operations string       Input operations list file (one operation per line)
-  -O, --output string           Output format: table or json (default "table")
+  -O, --output string           Output format: pretty, table, or json (default "pretty")
       --profile                 Build graph from a compiled sandbox profile instead of the builtin collection
   -V, --verbose                 verbose output
 ```

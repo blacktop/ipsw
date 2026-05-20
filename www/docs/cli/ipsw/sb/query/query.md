@@ -52,11 +52,17 @@ ipsw sb query [flags]
 # Which profiles can post a notification?
 ❯ ipsw sb query notification com.apple.mobile.keybagd.lock_status --graph graph.json
 
-# JSON output for scripting
+# Default output is multi-line and readable. Results include explicit
+# allow/deny decisions and inherited rules. JSON output records inherited
+# rules in .inherited_from. To answer "which profiles can do X" filter to allows:
 ❯ ipsw sb query iokit-open IOSurfaceRootUserClient --graph graph.json -O json \
     | jq -r '.matches[] | select(.decision=="allow") | .profile' | sort -u
 
-# Show guard conditions per profile
+# Compact summary table output. Full guards are omitted from the table;
+# use default pretty output or JSON when you need the full SBPL guard.
+❯ ipsw sb query path-write /var/mobile/foo --graph graph.json -O table
+
+# Script guard conditions per profile
 ❯ ipsw sb query path-write /var/mobile/foo --graph graph.json -O json \
     | jq -r '.matches[] | "\(.profile): \(.guard_string)"'
 
@@ -72,7 +78,7 @@ ipsw sb query [flags]
   -h, --help                    help for query
   -i, --input string            Input sandbox profile binary file
   -o, --operations string       Input operations list file (one operation per line)
-  -O, --output string           Output format: table or json (default "table")
+  -O, --output string           Output format: pretty, table, or json (default "pretty")
       --profile                 Build graph from a compiled sandbox profile instead of the builtin collection
 ```
 
