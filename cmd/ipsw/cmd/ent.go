@@ -234,7 +234,7 @@ var entCmd = &cobra.Command{
 			return ent.CreateSQLiteDatabase(sqliteDB, ipsws, inputs)
 		}
 
-		color.NoColor = viper.GetBool("no-color") || fileOnly
+		color.NoColor = fileOnly || shouldDisableColorForStdout()
 
 		if showStats {
 			if pgHost != "" {

@@ -46,6 +46,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 var (
@@ -66,8 +67,27 @@ var rootCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		color.NoColor = shouldDisableColorForStdout()
 	},
+}
+
+func shouldDisableColorForStdout() bool {
+	return shouldDisableColor(
+		viper.GetBool("no-color"),
+		viper.GetBool("color"),
+		term.IsTerminal(int(os.Stdout.Fd())),
+	)
+}
+
+func shouldDisableColor(noColor, forceColor, stdoutIsTerminal bool) bool {
+	switch {
+	case noColor:
+		return true
+	case forceColor:
+		return false
+	default:
+		return !stdoutIsTerminal
+	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
