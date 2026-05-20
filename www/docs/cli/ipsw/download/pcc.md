@@ -29,6 +29,9 @@ ipsw download pcc [INDEX] [flags]
 # Filter by cloudOS build prefix and pick interactively
 ❯ ipsw download pcc --build 5E --app TIE
 
+# Filter by OS BuildManifest ProductBuildVersion prefix
+❯ ipsw download pcc --os-build 23E5207q --info
+
 # Download PCC VM files interactively
 ❯ ipsw download pcc
 
@@ -40,18 +43,19 @@ ipsw download pcc [INDEX] [flags]
 ### Options
 
 ```
-      --app string       Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')
-      --build string     Filter by cloudOS build version prefix (e.g. 5E, 5E290)
-  -h, --help             help for pcc
-  -i, --info             Show PCC Release info
-      --insecure         do not verify ssl certs
-  -o, --output string    Output directory to save files to
-      --proxy string     HTTP/HTTPS proxy
-      --restart-all      always restart resumable IPSWs
-      --resume-all       always resume resumable IPSWs
-      --skip-all         always skip resumable IPSWs
-      --train string     Filter by cloudOS build train substring (e.g. LuckE)
-      --version string   Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached
+      --app string        Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')
+      --build string      Filter by cloudOS build version prefix (e.g. 5E, 5E290)
+  -h, --help              help for pcc
+  -i, --info              Show PCC Release info
+      --insecure          do not verify ssl certs
+      --os-build string   Filter by OS ProductBuildVersion prefix (e.g. 23E5207q); resolved via partial-zip, cached
+  -o, --output string     Output directory to save files to
+      --proxy string      HTTP/HTTPS proxy
+      --restart-all       always restart resumable IPSWs
+      --resume-all        always resume resumable IPSWs
+      --skip-all          always skip resumable IPSWs
+      --train string      Filter by cloudOS build train substring (e.g. LuckE)
+      --version string    Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached
 ```
 
 ### Options inherited from parent commands
