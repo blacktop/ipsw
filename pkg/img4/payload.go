@@ -122,6 +122,12 @@ const (
 	IM4P_SYSTEM_VOLUME_METADATA     = "msys" // System Volume Canonical Metadata (Compressed gzip file)
 	IM4P_X86_SYSTEM_VOLUME_METADATA = "xsys" // x86 System Volume Canonical Metadata (Compressed gzip file)
 
+	// Cryptex Components
+	IM4P_CRYPTEX_INFO        = "ginf" // Cryptex Info.plist metadata
+	IM4P_CRYPTEX_DISK_IMAGE  = "gdmg" // Cryptex disk image
+	IM4P_CRYPTEX_SEAL        = "gtgv" // Cryptex APFS root hash tree seal
+	IM4P_CRYPTEX_TRUST_CACHE = "gtcd" // Cryptex trust cache cdhash list
+
 	// Special/Testing Components
 	IM4P_AP_TICKET        = "SCAB" // On devices that don't use IMG4
 	IM4P_OS_RAMDISK       = "osrd" // OSRamdisk
