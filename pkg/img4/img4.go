@@ -143,9 +143,13 @@ var ComponentFourCCs = map[string]string{
 	"Cryptex1,AppTrustCache":            "trca",
 	"Cryptex1,AppOS":                    "caos",
 	"Cryptex1,AppVolume":                "casy",
+	"Cryptex1,DiskImage":                "gdmg",
+	"Cryptex1,Info":                     "ginf",
+	"Cryptex1,Seal":                     "gtgv",
 	"Cryptex1,SystemOS":                 "csos",
 	"Cryptex1,SystemTrustCache":         "trcs",
 	"Cryptex1,SystemVolume":             "cssy",
+	"Cryptex1,TrustCache":               "gtcd",
 	"Ap,RestoreDCP2":                    "rdc2",
 }
 
