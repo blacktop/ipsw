@@ -40,6 +40,8 @@ func init() {
 	entCmd.Flags().StringArray("ipsw", []string{}, "IPSWs to process")
 	entCmd.Flags().StringArray("input", []string{}, "Folders of MachOs to analyze")
 	entCmd.MarkFlagDirname("input")
+	entCmd.Flags().Bool("fs", false, "Search IPSW filesystem Mach-Os directly instead of a database")
+	entCmd.Flags().String("pem-db", "", "AEA PEM DB JSON file path")
 
 	// Database flags
 	entCmd.Flags().String("sqlite", "", "Path to SQLite database")
@@ -58,11 +60,14 @@ func init() {
 	entCmd.Flags().StringP("value", "v", "", "Search for entitlement value pattern")
 	entCmd.Flags().StringP("file", "f", "", "Search for file path pattern")
 	entCmd.Flags().String("version", "", "Filter by iOS version")
+	entCmd.Flags().StringSlice("has", nil, "Require entitlement key(s); comma-separated values are supported")
+	entCmd.Flags().StringSlice("without", nil, "Exclude entitlement key(s); comma-separated values are supported")
 
 	// Output flags
 	entCmd.Flags().Bool("file-only", false, "Only output file paths")
 	entCmd.Flags().Bool("stats", false, "Show database statistics")
 	entCmd.Flags().Int("limit", 100, "Limit number of results")
+	entCmd.Flags().String("format", "text", "Output format for --fs: text, tsv, jsonl")
 
 	// Replacement flags
 	entCmd.Flags().Bool("replace", false, "Replace older builds of the same iOS version with newer builds")
@@ -72,6 +77,8 @@ func init() {
 	// Viper bindings
 	viper.BindPFlag("ent.ipsw", entCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
+	viper.BindPFlag("ent.fs", entCmd.Flags().Lookup("fs"))
+	viper.BindPFlag("ent.pem-db", entCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("ent.sqlite", entCmd.Flags().Lookup("sqlite"))
 	viper.BindPFlag("ent.pg-host", entCmd.Flags().Lookup("pg-host"))
 	viper.BindPFlag("ent.pg-port", entCmd.Flags().Lookup("pg-port"))
@@ -84,9 +91,12 @@ func init() {
 	viper.BindPFlag("ent.value", entCmd.Flags().Lookup("value"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
 	viper.BindPFlag("ent.version", entCmd.Flags().Lookup("version"))
+	viper.BindPFlag("ent.has", entCmd.Flags().Lookup("has"))
+	viper.BindPFlag("ent.without", entCmd.Flags().Lookup("without"))
 	viper.BindPFlag("ent.file-only", entCmd.Flags().Lookup("file-only"))
 	viper.BindPFlag("ent.stats", entCmd.Flags().Lookup("stats"))
 	viper.BindPFlag("ent.limit", entCmd.Flags().Lookup("limit"))
+	viper.BindPFlag("ent.format", entCmd.Flags().Lookup("format"))
 	viper.BindPFlag("ent.replace", entCmd.Flags().Lookup("replace"))
 	viper.BindPFlag("ent.replace-strategy", entCmd.Flags().Lookup("replace-strategy"))
 	viper.BindPFlag("ent.dry-run", entCmd.Flags().Lookup("dry-run"))
@@ -95,7 +105,7 @@ func init() {
 
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
-	Use:   "ent",
+	Use:   "ent [IPSW]",
 	Short: "Manage and search entitlements database",
 	Example: heredoc.Doc(`
 		# Create SQLite database from IPSW
@@ -124,14 +134,18 @@ var entCmd = &cobra.Command{
 
 		# Search PostgreSQL database (Supabase)
 		❯ ipsw ent --pg-host db.xyz.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --key sandbox
+
+		# Search IPSW filesystem Mach-Os directly
+		❯ ipsw ent iPhone16,1_18.2_22C150_Restore.ipsw --fs --has com.apple.developer.hardened-process --without com.apple.security.hardened-process.checked-allocations.soft-mode --file-only
 		
 		# Replace older iOS builds with newer ones
 		❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace
 		
 		# Preview what would be replaced
 		❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_26.0_22G87_Restore.ipsw --replace --dry-run`),
-	Args:          cobra.NoArgs,
+	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
+	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -155,13 +169,53 @@ var entCmd = &cobra.Command{
 		fileOnly := viper.GetBool("ent.file-only")
 		showStats := viper.GetBool("ent.stats")
 		limit := viper.GetInt("ent.limit")
+		format := viper.GetString("ent.format")
 		replace := viper.GetBool("ent.replace")
 		replaceStrategy := viper.GetString("ent.replace-strategy")
 		dryRun := viper.GetBool("ent.dry-run")
+		fsMode := viper.GetBool("ent.fs")
+		hasKeys := viper.GetStringSlice("ent.has")
+		withoutKeys := viper.GetStringSlice("ent.without")
+		pemDB := viper.GetString("ent.pem-db")
 
-		// Validate required flags
-		if sqliteDB == "" && pgHost == "" {
-			return fmt.Errorf("either --sqlite (SQLite) or --pg-host (PostgreSQL) is required")
+		if len(args) > 0 {
+			if !fsMode {
+				return fmt.Errorf("positional IPSW input is only supported with --fs")
+			}
+			if len(ipsws) > 0 || len(inputs) > 0 {
+				return fmt.Errorf("positional IPSW cannot be combined with --ipsw or --input")
+			}
+			ipsws = []string{args[0]}
+		}
+
+		if fsMode {
+			if len(ipsws) > 0 && len(inputs) > 0 {
+				return fmt.Errorf("--ipsw and --input are mutually exclusive")
+			}
+			if sqliteDB != "" || pgHost != "" {
+				return fmt.Errorf("--fs cannot be combined with database flags")
+			}
+			if showStats || replace || dryRun {
+				return fmt.Errorf("--fs cannot be combined with --stats, --replace, or --dry-run")
+			}
+			if versionFilter != "" {
+				return fmt.Errorf("--version only applies to database searches")
+			}
+			if len(ipsws) == 0 && len(inputs) == 0 {
+				return fmt.Errorf("--fs requires an IPSW argument, --ipsw, or --input")
+			}
+			color.NoColor = viper.GetBool("no-color") || fileOnly || format == "jsonl" || format == "tsv"
+			return ent.SearchFilesystemEntitlements(ipsws, inputs, ent.FilesystemQuery{
+				PemDB:        pemDB,
+				KeyPattern:   keyPattern,
+				ValuePattern: valuePattern,
+				FilePattern:  filePattern,
+				Has:          hasKeys,
+				Without:      withoutKeys,
+				FileOnly:     fileOnly,
+				Limit:        limit,
+				Format:       format,
+			})
 		}
 
 		// Validate mutually exclusive flags (works for CLI, ENV, and config values)
@@ -171,6 +225,18 @@ var entCmd = &cobra.Command{
 
 		if len(ipsws) > 0 && len(inputs) > 0 {
 			return fmt.Errorf("--ipsw and --input are mutually exclusive")
+		}
+
+		if len(hasKeys) > 0 || len(withoutKeys) > 0 {
+			return fmt.Errorf("--has and --without require --fs")
+		}
+		if format != "" && format != "text" {
+			return fmt.Errorf("--format only applies to --fs")
+		}
+
+		// Validate required flags
+		if sqliteDB == "" && pgHost == "" {
+			return fmt.Errorf("either --sqlite (SQLite) or --pg-host (PostgreSQL) is required")
 		}
 
 		// Count search/operation flags
