@@ -16,20 +16,26 @@ import (
 var (
 	ErrNoObjCProtocols     = errors.New("no Objective-C protocol metadata found")
 	ErrNoResolvedInterface = errors.New("no resolved NSXPCInterface interfaceWithProtocol callsites found")
+	ErrNoScopedImages      = errors.New("no DSC images matched NSXPC scan scope")
 )
 
 type Config struct {
-	DSC    string
-	Stderr io.Writer
+	DSC             string
+	Stderr          io.Writer
+	DylibPatterns   []string
+	ServicePatterns []string
 }
 
 type scanner struct {
-	f             *dyld.File
-	stderr        io.Writer
-	classNames    map[uint64]string
-	protocols     map[string]objc.Protocol
-	globalTargets map[uint64][]targetSpec
-	directTargets map[string]map[uint64][]targetSpec
+	f               *dyld.File
+	stderr          io.Writer
+	classNames      map[uint64]string
+	protocols       map[string]objc.Protocol
+	globalTargets   map[uint64][]targetSpec
+	directTargets   map[string]map[uint64][]targetSpec
+	dylibPatterns   []string
+	servicePatterns []string
+	scopedImages    map[string]struct{}
 }
 
 type imageMeta struct {
@@ -50,18 +56,25 @@ func Scan(conf Config) ([]Record, error) {
 	}
 
 	s := &scanner{
-		f:             f,
-		stderr:        conf.Stderr,
-		classNames:    make(map[uint64]string),
-		protocols:     make(map[string]objc.Protocol),
-		globalTargets: make(map[uint64][]targetSpec),
-		directTargets: make(map[string]map[uint64][]targetSpec),
+		f:               f,
+		stderr:          conf.Stderr,
+		classNames:      make(map[uint64]string),
+		protocols:       make(map[string]objc.Protocol),
+		globalTargets:   make(map[uint64][]targetSpec),
+		directTargets:   make(map[string]map[uint64][]targetSpec),
+		dylibPatterns:   normalizeGlobPatterns(conf.DylibPatterns),
+		servicePatterns: normalizeGlobPatterns(conf.ServicePatterns),
 	}
 	if _, err := f.GetAllObjCSelectors(false); err != nil {
 		progress(conf.Stderr, "dsc: failed to load Objective-C selector table: %v\n", err)
 	}
 	if _, err := f.GetAllObjCProtocols(false); err != nil {
 		progress(conf.Stderr, "dsc: failed to load Objective-C protocol table: %v\n", err)
+	}
+
+	s.collectScopedImages()
+	if s.hasScope() && len(s.scopedImages) == 0 {
+		return nil, ErrNoScopedImages
 	}
 
 	s.collectIndexes()
@@ -177,6 +190,9 @@ func (s *scanner) collectRuntimeStubs() {
 }
 
 func (s *scanner) scanImage(img *dyld.CacheImage) ([]Record, error) {
+	if !s.imageInScope(img.Name) {
+		return nil, nil
+	}
 	m, err := img.GetMacho()
 	if err != nil {
 		return nil, err
