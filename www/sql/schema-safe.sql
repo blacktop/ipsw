@@ -165,6 +165,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Keep administrative helpers off the public Data API/RPC surface.
+REVOKE EXECUTE ON FUNCTION refresh_search_view() FROM PUBLIC, anon, authenticated;
+
 -- Enable Row Level Security for all tables
 ALTER TABLE ipsws ENABLE ROW LEVEL SECURITY;
 ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
@@ -173,6 +176,19 @@ ALTER TABLE entitlement_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entitlement_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paths ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entitlements ENABLE ROW LEVEL SECURITY;
+
+-- Browser roles are read-only. Writes are reserved for direct DB credentials used by automation.
+REVOKE ALL ON TABLE ipsws, devices, ipsw_devices, entitlement_keys, entitlement_values, paths, entitlements, entitlements_search FROM anon, authenticated;
+REVOKE ALL ON SEQUENCE entitlement_keys_id_seq, entitlement_values_id_seq, paths_id_seq, entitlements_id_seq FROM anon, authenticated;
+GRANT SELECT ON TABLE ipsws, devices, ipsw_devices, entitlement_keys, entitlement_values, paths, entitlements, entitlements_search TO anon, authenticated;
+
+-- Prevent future public-schema objects from becoming browser-writable by default.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE USAGE, SELECT, UPDATE ON SEQUENCES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 
 -- Drop existing policies if they exist and recreate them
 DO $$
@@ -185,19 +201,23 @@ BEGIN
     DROP POLICY IF EXISTS "Allow public read access" ON entitlement_values;
     DROP POLICY IF EXISTS "Allow public read access" ON paths;
     DROP POLICY IF EXISTS "Allow public read access" ON entitlements;
+    DROP POLICY IF EXISTS "Allow anonymous read access on ipsws" ON ipsws;
+    DROP POLICY IF EXISTS "Allow anonymous read access on devices" ON devices;
+    DROP POLICY IF EXISTS "Allow anonymous read access on ipsw_devices" ON ipsw_devices;
+    DROP POLICY IF EXISTS "Allow anonymous read access on entitlement_keys" ON entitlement_keys;
+    DROP POLICY IF EXISTS "Allow anonymous read access on entitlement_values" ON entitlement_values;
+    DROP POLICY IF EXISTS "Allow anonymous read access on paths" ON paths;
+    DROP POLICY IF EXISTS "Allow anonymous read access on entitlements" ON entitlements;
 END $$;
 
 -- Create policies for public read-only access (safe for community service)
-CREATE POLICY "Allow public read access" ON ipsws FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON devices FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON ipsw_devices FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON entitlement_keys FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON entitlement_values FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON paths FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON entitlements FOR SELECT USING (true);
-
--- Grant access to materialized view
-GRANT SELECT ON entitlements_search TO anon, authenticated;
+CREATE POLICY "Allow public read access" ON ipsws FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON devices FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON ipsw_devices FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON entitlement_keys FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON entitlement_values FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON paths FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Allow public read access" ON entitlements FOR SELECT TO anon, authenticated USING (true);
 
 -- Analyze all tables for optimal query planning
 ANALYZE ipsws;
