@@ -37,7 +37,11 @@ func init() {
 	rootCmd.AddCommand(nsxpcCmd)
 
 	nsxpcCmd.Flags().String("format", "jsonl", "Output format (only jsonl is supported)")
+	nsxpcCmd.Flags().StringSlice("dylib", nil, "Only scan DSC images matching glob(s); comma-separated values are supported")
+	nsxpcCmd.Flags().StringSlice("service", nil, "Only scan DSC images referencing NSXPC service glob(s); combines with --dylib as an intersection")
 	viper.BindPFlag("nsxpc.format", nsxpcCmd.Flags().Lookup("format"))
+	viper.BindPFlag("nsxpc.dylib", nsxpcCmd.Flags().Lookup("dylib"))
+	viper.BindPFlag("nsxpc.service", nsxpcCmd.Flags().Lookup("service"))
 }
 
 var nsxpcCmd = &cobra.Command{
@@ -56,8 +60,10 @@ var nsxpcCmd = &cobra.Command{
 			return fmt.Errorf("unsupported --format %q (only \"jsonl\" is supported)", viper.GetString("nsxpc.format"))
 		}
 		records, err := nsxpc.Scan(nsxpc.Config{
-			DSC:    expandPath(args[0]),
-			Stderr: os.Stderr,
+			DSC:             expandPath(args[0]),
+			Stderr:          os.Stderr,
+			DylibPatterns:   viper.GetStringSlice("nsxpc.dylib"),
+			ServicePatterns: viper.GetStringSlice("nsxpc.service"),
 		})
 		if err != nil {
 			switch {
@@ -65,6 +71,8 @@ var nsxpcCmd = &cobra.Command{
 				return fmt.Errorf("DSC has no __objc_protolist protocol metadata")
 			case errors.Is(err, nsxpc.ErrNoResolvedInterface):
 				return fmt.Errorf("no resolved NSXPCInterface interfaceWithProtocol: callsites found")
+			case errors.Is(err, nsxpc.ErrNoScopedImages):
+				return fmt.Errorf("no DSC images matched --dylib/--service scope")
 			default:
 				return err
 			}
