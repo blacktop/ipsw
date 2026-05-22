@@ -56,7 +56,6 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.13.0
-	github.com/klauspost/compress v1.18.6
 	github.com/mattn/go-isatty v0.0.22
 	github.com/mattn/go-mastodon v0.0.11
 	github.com/mitchellh/mapstructure v1.5.0
@@ -80,7 +79,7 @@ require (
 	golang.org/x/net v0.54.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	golang.org/x/term v0.43.0
 	google.golang.org/genai v1.57.0
 	google.golang.org/protobuf v1.36.11
