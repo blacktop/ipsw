@@ -545,21 +545,4 @@ export class EntitlementsService {
     return stats;
   }
 
-  /**
-   * Refresh materialized view (call this periodically, not per-query)
-   */
-  static async refreshSearchView(): Promise<void> {
-    if (!isSupabaseConfigured || !supabase) {
-      throw new Error('Supabase is not configured.');
-    }
-
-    const { error } = await supabase.rpc('refresh_search_view');
-
-    if (error) {
-      throw new Error(`Failed to refresh search view: ${error.message}`);
-    }
-
-    // Clear cache when view is refreshed
-    searchCache.clear();
-  }
 }

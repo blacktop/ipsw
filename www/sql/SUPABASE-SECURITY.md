@@ -26,14 +26,44 @@ You can verify RLS is enabled by running:
 SELECT tablename, rowsecurity 
 FROM pg_tables 
 WHERE schemaname = 'public' 
-AND tablename IN ('ipsws', 'devices', 'entitlement_unique_keys', 
-                  'entitlement_unique_values', 'entitlement_unique_paths', 
-                  'entitlement_keys');
+AND tablename IN ('ipsws', 'devices', 'ipsw_devices',
+                  'entitlement_keys', 'entitlement_values',
+                  'paths', 'entitlements');
 ```
 
 All tables should show `rowsecurity = true`.
 
-### 3. Test Read-Only Access
+### 3. Use a Dedicated Writer for Automation
+
+The website should only use the public anon key. GitHub Actions should use a dedicated PostgreSQL login role stored in repository secrets, not the `postgres` owner password and never a browser-exposed key.
+
+Create a writer role with a generated password and grant it only the permissions needed by `ipsw ent --replace`:
+
+```sql
+CREATE ROLE entitlements_writer WITH LOGIN PASSWORD '<generated-long-password>';
+
+GRANT USAGE ON SCHEMA public TO entitlements_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  ipsws,
+  devices,
+  ipsw_devices,
+  entitlement_keys,
+  entitlement_values,
+  paths,
+  entitlements
+TO entitlements_writer;
+
+GRANT USAGE, SELECT, UPDATE ON SEQUENCE
+  entitlement_keys_id_seq,
+  entitlement_values_id_seq,
+  paths_id_seq,
+  entitlements_id_seq
+TO entitlements_writer;
+```
+
+Set `.github/workflows/update-entitlements-db.yml` secrets so `SUPABASE_USER=entitlements_writer` and `SUPABASE_PASSWORD` is that generated password. Keep `SUPABASE_HOST` pointed at the project database host and keep SSL required.
+
+### 4. Test Read-Only Access
 
 Test that the anon key can only read data:
 
@@ -68,12 +98,12 @@ const { error: deleteError } = await supabase
 ## How RLS Policies Work
 
 1. **When RLS is enabled**: All access is denied by default
-2. **Policies grant specific permissions**: We only create SELECT policies for the anon role
+2. **Policies grant specific permissions**: We only create SELECT policies for the browser roles
 3. **No policy = Access denied**: Since we don't create INSERT/UPDATE/DELETE policies, those operations are automatically denied
 
-## Service Role Key for Writing
+## Writer Credentials for Automation
 
-The service role key (used by your backend/GitHub Actions) bypasses RLS and can perform all operations. This key must be kept secret and only used server-side.
+The GitHub Actions writer credentials are direct PostgreSQL credentials and must be kept secret. Prefer a dedicated role such as `entitlements_writer` over the project owner password. Service role or secret API keys bypass RLS and must never be shipped to the website.
 
 ## Important Security Notes
 
@@ -81,6 +111,7 @@ The service role key (used by your backend/GitHub Actions) bypasses RLS and can 
 2. **RLS policies are your security layer** - They control what operations are allowed
 3. **Always test your policies** - Verify that write operations fail with the anon key
 4. **Monitor usage** - Check Supabase logs for any unexpected write attempts
+5. **Do not expose writer credentials** - Keep PostgreSQL passwords, service role keys, and secret keys in GitHub Actions or backend-only secret stores
 
 ## Checking Current Policies
 
@@ -113,7 +144,7 @@ DROP POLICY IF EXISTS "policy_name" ON table_name;
 ## Summary
 
 With these RLS policies in place:
-- ✅ Anonymous users can READ all entitlement data
-- ❌ Anonymous users CANNOT write, update, or delete any data
-- ✅ Your service role key can still perform all operations
+- ✅ Browser clients can READ all entitlement data
+- ❌ Browser clients CANNOT write, update, or delete any data
+- ✅ Your GitHub Actions writer role can still update the entitlement tables
 - ✅ The anon key is safe to include in client-side code
