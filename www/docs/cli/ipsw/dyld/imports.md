@@ -11,13 +11,15 @@ description: List all dylibs that load a given dylib
 List all dylibs that load a given dylib
 
 ```
-ipsw dyld imports <DSC> <DYLIB> [flags]
+ipsw dyld imports <DSC> [DYLIB] [flags]
 ```
 
 ### Options
 
 ```
+      --filter string   Regex filter for printed import/importer rows
   -h, --help            help for imports
+      --image string    List imported bind symbols for this image instead of reverse importers
   -i, --ipsw string     Path to IPSW to scan for MachO files that import dylib
       --pem-db string   AEA pem DB JSON file
 ```
