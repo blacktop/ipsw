@@ -523,7 +523,7 @@ var downloadIpswCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remoteKernel || remoteDSC || len(remotePattern) > 0 {
+			if remoteKernel || remoteDSC || len(remotePattern) > 0 || fcsKeys || fcsKeysJson {
 				for _, ipsw := range ipsws {
 					log.WithFields(log.Fields{
 						"device":  ipsw.Identifier,
@@ -547,48 +547,52 @@ var downloadIpswCmd = &cobra.Command{
 						Output:       output,
 					}
 
-					// REMOTE KERNEL MODE
-					if remoteKernel {
-						log.Info("Extracting remote kernelcache")
-						if out, err := extractRemoteKernelcache(config, ipsw, urlDevices, proxy, insecure, decrypt); err != nil {
-							return err
-						} else {
+					if err := func() error {
+						defer config.Close()
+
+						// REMOTE KERNEL MODE
+						if remoteKernel {
+							log.Info("Extracting remote kernelcache")
+							out, err := extractRemoteKernelcache(config, ipsw, urlDevices, proxy, insecure, decrypt)
+							if err != nil {
+								return err
+							}
 							for fn := range out {
 								utils.Indent(log.Info, 2)("Created " + fn)
 							}
 						}
-					}
-					// REMOTE DSC MODE
-					if remoteDSC {
-						log.Info("Extracting remote dyld_shared_cache(s)")
-						if out, err := extract.DSC(config); err != nil {
-							return err
-						} else {
+						// REMOTE DSC MODE
+						if remoteDSC {
+							log.Info("Extracting remote dyld_shared_cache(s)")
+							out, err := extract.DSC(config)
+							if err != nil {
+								return err
+							}
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + f)
 							}
 						}
-					}
-					// REMOTE AEA1 DMG fcs-key MODE
-					if fcsKeys || fcsKeysJson {
-						if fcsKeysJson {
-							config.JSON = true
-						}
-						log.Info("Extracting remote AEA1 DMG fcs-keys")
-						if out, err := extract.FcsKeys(config); err != nil {
-							return err
-						} else {
+						// REMOTE AEA1 DMG fcs-key MODE
+						if fcsKeys || fcsKeysJson {
+							if fcsKeysJson {
+								config.JSON = true
+							}
+							log.Info("Extracting remote AEA1 DMG fcs-keys")
+							out, err := extract.FcsKeys(config)
+							if err != nil {
+								return err
+							}
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + f)
 							}
 						}
-					}
-					// PATTERN MATCHING MODE
-					if len(remotePattern) > 0 {
-						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if out, err := extract.Search(config); err != nil {
-							return err
-						} else {
+						// PATTERN MATCHING MODE
+						if len(remotePattern) > 0 {
+							log.Infof("Downloading files matching pattern %#v", remotePattern)
+							out, err := extract.Search(config)
+							if err != nil {
+								return err
+							}
 							cwd, _ := os.Getwd()
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + strings.TrimPrefix(f, cwd))
@@ -604,6 +608,9 @@ var downloadIpswCmd = &cobra.Command{
 								}
 							}
 						}
+						return nil
+					}(); err != nil {
+						return err
 					}
 				}
 			} else { // NORMAL MODE
