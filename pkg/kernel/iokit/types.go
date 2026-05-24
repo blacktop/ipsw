@@ -9,10 +9,11 @@ const (
 	KindMethod        = "iokit_method"
 	KindServiceClient = "iokit_service_client"
 
-	DispatchExternalMethod     = "IOExternalMethodDispatch"
-	DispatchExternalMethod2022 = "IOExternalMethodDispatch2022"
-	DispatchSwitch             = "switch"
-	DispatchUnknown            = "unknown"
+	DispatchExternalMethod       = "IOExternalMethodDispatch"
+	DispatchExternalMethod2022   = "IOExternalMethodDispatch2022"
+	DispatchExternalMethodLegacy = "IOExternalMethod"
+	DispatchSwitch               = "switch"
+	DispatchUnknown              = "unknown"
 
 	SourceNewUserClient    = "newUserClient"
 	SourceIOKitPersonality = "IOKitPersonality"
@@ -23,6 +24,7 @@ var ErrNoIOUserClients = errors.New("no IOUserClient subclasses discovered")
 type Config struct {
 	Kernelcache             string
 	Stderr                  io.Writer
+	ClassFilter             string
 	MaxFunctionInstructions int
 	MaxVtableSlots          int
 }

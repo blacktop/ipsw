@@ -55,3 +55,32 @@ func TestWebKitIPCRecordMatches(t *testing.T) {
 		t.Fatal("expected receiver filter to reject record")
 	}
 }
+
+func TestWebKitIPCHandlerInfoParsesArgTypes(t *testing.T) {
+	t.Parallel()
+
+	symbol := "void IPC::handleMessage<Messages::GPUConnectionToWebProcess::CreateRenderingBackend, WebKit::GPUConnectionToWebProcess, void (WebKit::GPUConnectionToWebProcess::*)(WebKit::SharedMemory::Handle&&, WTF::Vector<unsigned char>&&)>(IPC::Connection&, IPC::Decoder&, WebKit::GPUConnectionToWebProcess*, void (WebKit::GPUConnectionToWebProcess::*)(WebKit::SharedMemory::Handle&&, WTF::Vector<unsigned char>&&))"
+	handler, args, workQueue, ok := webKitIPCHandlerInfo(symbol)
+	if !ok {
+		t.Fatal("expected handler info")
+	}
+	if handler != "WebKit::GPUConnectionToWebProcess" {
+		t.Fatalf("handler=%q", handler)
+	}
+	if workQueue {
+		t.Fatal("did not expect workqueue receiver")
+	}
+	if len(args) != 2 || args[0] != "WebKit::SharedMemory::Handle&&" || args[1] != "WTF::Vector<unsigned char>&&" {
+		t.Fatalf("args=%#v", args)
+	}
+}
+
+func TestWebKitIPCHandlerInfoDetectsWorkQueue(t *testing.T) {
+	t.Parallel()
+
+	symbol := "void IPC::handleMessage<Messages::Foo::Bar, IPC::WorkQueueMessageReceiver, void (IPC::WorkQueueMessageReceiver::*)()>()"
+	_, _, workQueue, ok := webKitIPCHandlerInfo(symbol)
+	if !ok || !workQueue {
+		t.Fatalf("ok=%v workQueue=%v", ok, workQueue)
+	}
+}

@@ -38,6 +38,9 @@ type WebKitIPCRecord struct {
 	Source        string   `json:"source"`
 	Symbol        string   `json:"symbol,omitempty"`
 	Symbols       []string `json:"symbols,omitempty"`
+	HandlerClass  string   `json:"handler_class,omitempty"`
+	ArgTypes      []string `json:"arg_types,omitempty"`
+	WorkQueue     bool     `json:"work_queue,omitempty"`
 }
 
 // WebKitIPCMessages dumps WebKit.framework IPC message-name strings from the shipping DSC image.
@@ -47,7 +50,7 @@ func WebKitIPCMessages(f *File, config WebKitIPCConfig) ([]WebKitIPCRecord, erro
 		imageName = defaultWebKitImage
 	}
 
-	image, err := webKitIPCImage(f, imageName)
+	image, err := cacheImageByName(f, imageName)
 	if err != nil {
 		return nil, fmt.Errorf("image not in DSC: %w", err)
 	}
@@ -157,6 +160,15 @@ func addWebKitIPCSymbol(records map[string]WebKitIPCRecord, symbol string, addr 
 			}
 		}
 		record.Symbols = appendUniqueString(record.Symbols, demangled)
+		if handlerClass, argTypes, workQueue, ok := webKitIPCHandlerInfo(demangled); ok {
+			if record.HandlerClass == "" {
+				record.HandlerClass = handlerClass
+			}
+			for _, argType := range argTypes {
+				record.ArgTypes = appendUniqueString(record.ArgTypes, argType)
+			}
+			record.WorkQueue = record.WorkQueue || workQueue
+		}
 		if shouldReplaceWebKitIPCSymbol(record.SymbolAddress, addr) || record.Symbol == "" {
 			record.SymbolAddress = addr
 			record.Symbol = demangled
@@ -214,6 +226,7 @@ func webKitIPCRecordsFromMap(recordsByName map[string]WebKitIPCRecord, config We
 			continue
 		}
 		sort.Strings(record.Symbols)
+		sort.Strings(record.ArgTypes)
 		records = append(records, record)
 	}
 	sort.Slice(records, func(i, j int) bool {
@@ -232,7 +245,130 @@ func appendUniqueString(values []string, value string) []string {
 	return append(values, value)
 }
 
-func webKitIPCImage(f *File, name string) (*CacheImage, error) {
+func webKitIPCHandlerInfo(symbol string) (string, []string, bool, bool) {
+	if !strings.Contains(symbol, "IPC::handleMessage") {
+		return "", nil, false, false
+	}
+	templateArgs, ok := templateArgumentsAfter(symbol, "IPC::handleMessage")
+	if !ok {
+		return "", nil, strings.Contains(symbol, "WorkQueueMessageReceiver"), false
+	}
+	parts := splitTopLevel(templateArgs, ',')
+	if len(parts) < 2 {
+		return "", nil, strings.Contains(symbol, "WorkQueueMessageReceiver"), false
+	}
+	handlerClass := strings.TrimSpace(parts[1])
+	argTypes := memberFunctionPointerArgTypes(parts)
+	workQueue := strings.Contains(symbol, "WorkQueueMessageReceiver") || strings.Contains(handlerClass, "WorkQueueMessageReceiver")
+	return handlerClass, argTypes, workQueue, handlerClass != "" || len(argTypes) > 0 || workQueue
+}
+
+func templateArgumentsAfter(symbol, name string) (string, bool) {
+	idx := strings.Index(symbol, name)
+	if idx < 0 {
+		return "", false
+	}
+	start := strings.Index(symbol[idx:], "<")
+	if start < 0 {
+		return "", false
+	}
+	start += idx
+	depth := 0
+	for pos := start; pos < len(symbol); pos++ {
+		switch symbol[pos] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+			if depth == 0 {
+				return symbol[start+1 : pos], true
+			}
+		}
+	}
+	return "", false
+}
+
+func memberFunctionPointerArgTypes(parts []string) []string {
+	for _, part := range parts {
+		idx := strings.Index(part, "::*)(")
+		if idx < 0 {
+			continue
+		}
+		start := idx + len("::*)(")
+		end := matchingParenIndex(part, start-1)
+		if end <= start {
+			continue
+		}
+		args := strings.TrimSpace(part[start:end])
+		if args == "" || args == "void" {
+			return nil
+		}
+		return trimStrings(splitTopLevel(args, ','))
+	}
+	return nil
+}
+
+func matchingParenIndex(value string, open int) int {
+	if open < 0 || open >= len(value) || value[open] != '(' {
+		return -1
+	}
+	depth := 0
+	for idx := open; idx < len(value); idx++ {
+		switch value[idx] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return idx
+			}
+		}
+	}
+	return -1
+}
+
+func splitTopLevel(value string, sep byte) []string {
+	var out []string
+	start := 0
+	angleDepth := 0
+	parenDepth := 0
+	for idx := 0; idx < len(value); idx++ {
+		switch value[idx] {
+		case '<':
+			angleDepth++
+		case '>':
+			if angleDepth > 0 {
+				angleDepth--
+			}
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case sep:
+			if angleDepth == 0 && parenDepth == 0 {
+				out = append(out, strings.TrimSpace(value[start:idx]))
+				start = idx + 1
+			}
+		}
+	}
+	out = append(out, strings.TrimSpace(value[start:]))
+	return out
+}
+
+func trimStrings(values []string) []string {
+	out := values[:0]
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func cacheImageByName(f *File, name string) (*CacheImage, error) {
 	if idx, err := f.GetDylibIndex(name); err == nil {
 		return f.Images[idx], nil
 	}

@@ -39,9 +39,15 @@ func init() {
 	KernelcacheCmd.AddCommand(kernelIOKitMethodsCmd)
 
 	kernelIOKitMethodsCmd.Flags().String("format", "jsonl", "Output format (only jsonl is supported)")
+	kernelIOKitMethodsCmd.Flags().Bool("jsonl", false, "Emit JSONL output (compatibility alias for --format jsonl)")
+	kernelIOKitMethodsCmd.Flags().String("class", "", "Regex filter for IOUserClient or IOService class names")
+	kernelIOKitMethodsCmd.Flags().Int("max-fn-insns", 0, "Maximum function instructions to decode for IOKit method analysis (0 uses defaults)")
 	kernelIOKitMethodsCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("kernel.iokit-methods.format", kernelIOKitMethodsCmd.Flags().Lookup("format"))
+	viper.BindPFlag("kernel.iokit-methods.jsonl", kernelIOKitMethodsCmd.Flags().Lookup("jsonl"))
+	viper.BindPFlag("kernel.iokit-methods.class", kernelIOKitMethodsCmd.Flags().Lookup("class"))
+	viper.BindPFlag("kernel.iokit-methods.max-fn-insns", kernelIOKitMethodsCmd.Flags().Lookup("max-fn-insns"))
 	viper.BindPFlag("kernel.iokit-methods.arch", kernelIOKitMethodsCmd.Flags().Lookup("arch"))
 }
 
@@ -57,8 +63,16 @@ var kernelIOKitMethodsCmd = &cobra.Command{
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		format := strings.ToLower(strings.TrimSpace(viper.GetString("kernel.iokit-methods.format")))
+		if viper.GetBool("kernel.iokit-methods.jsonl") {
+			format = "jsonl"
+		}
 		if format != "jsonl" {
 			return fmt.Errorf("unsupported --format %q (only \"jsonl\" is supported)", format)
+		}
+
+		maxFnInsns := viper.GetInt("kernel.iokit-methods.max-fn-insns")
+		if maxFnInsns < 0 {
+			return fmt.Errorf("--max-fn-insns must be >= 0")
 		}
 
 		kernelPath := filepath.Clean(args[0])
@@ -69,8 +83,10 @@ var kernelIOKitMethodsCmd = &cobra.Command{
 		defer m.Close()
 
 		records, err := iokit.Scan(m.File, iokit.Config{
-			Kernelcache: kernelPath,
-			Stderr:      os.Stderr,
+			Kernelcache:             kernelPath,
+			Stderr:                  os.Stderr,
+			ClassFilter:             viper.GetString("kernel.iokit-methods.class"),
+			MaxFunctionInstructions: maxFnInsns,
 		})
 		if err != nil {
 			if errors.Is(err, iokit.ErrNoIOUserClients) {

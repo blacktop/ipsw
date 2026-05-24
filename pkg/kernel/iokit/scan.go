@@ -5,6 +5,7 @@ import (
 	"io"
 	"maps"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -17,24 +18,26 @@ import (
 )
 
 const (
-	defaultMaxFunctionInstructions = 320
-	defaultMaxVtableSlots          = 240
+	defaultMaxFunctionInstructions       = 320
+	defaultSwitchMaxFunctionInstructions = 2048
+	defaultMaxVtableSlots                = 240
 )
 
 type analyzer struct {
-	root       *macho.File
-	scanner    *cpp.Scanner
-	classes    []cpp.Class
-	infos      []*classInfo
-	byName     map[string][]*classInfo
-	symbolMap  map[uint64]string
-	symCache   map[uint64]string
-	methods    map[methodCacheKey]methodAnalysis
-	ucRefs     map[uint64][]string
-	stderr     io.Writer
-	maxInst    int
-	maxSlots   int
-	userClient map[string]struct{}
+	root          *macho.File
+	scanner       *cpp.Scanner
+	classes       []cpp.Class
+	infos         []*classInfo
+	byName        map[string][]*classInfo
+	symbolMap     map[uint64]string
+	symCache      map[uint64]string
+	methods       map[methodCacheKey]methodAnalysis
+	ucRefs        map[uint64][]string
+	stderr        io.Writer
+	maxInst       int
+	maxSwitchInst int
+	maxSlots      int
+	userClient    map[string]struct{}
 }
 
 type classInfo struct {
@@ -49,11 +52,13 @@ func Scan(root *macho.File, conf Config) ([]Record, error) {
 	if root == nil {
 		return nil, fmt.Errorf("nil kernelcache")
 	}
-	if conf.MaxFunctionInstructions == 0 {
-		conf.MaxFunctionInstructions = defaultMaxFunctionInstructions
-	}
+	maxInst, maxSwitchInst := normalizeMaxInstructionCaps(conf.MaxFunctionInstructions)
 	if conf.MaxVtableSlots == 0 {
 		conf.MaxVtableSlots = defaultMaxVtableSlots
+	}
+	classFilter, err := compileClassFilter(conf.ClassFilter)
+	if err != nil {
+		return nil, err
 	}
 
 	scanner := cpp.NewScanner(root, cpp.Config{})
@@ -62,7 +67,7 @@ func Scan(root *macho.File, conf Config) ([]Record, error) {
 		return nil, fmt.Errorf("cpp scan: %w", err)
 	}
 
-	a := newAnalyzer(root, scanner, classes, conf)
+	a := newAnalyzer(root, scanner, classes, conf, maxInst, maxSwitchInst)
 	userClients := a.userClientClasses()
 	if len(userClients) == 0 {
 		return nil, ErrNoIOUserClients
@@ -75,24 +80,33 @@ func Scan(root *macho.File, conf Config) ([]Record, error) {
 	}
 	records = append(records, a.serviceClientRecords()...)
 	records = dedupeRecords(records)
+	records = filterRecordsByClass(records, classFilter)
 	SortRecords(records)
 	return records, nil
 }
 
-func newAnalyzer(root *macho.File, scanner *cpp.Scanner, classes []cpp.Class, conf Config) *analyzer {
+func normalizeMaxInstructionCaps(requestedMaxInst int) (int, int) {
+	if requestedMaxInst <= 0 {
+		return defaultMaxFunctionInstructions, defaultSwitchMaxFunctionInstructions
+	}
+	return requestedMaxInst, requestedMaxInst
+}
+
+func newAnalyzer(root *macho.File, scanner *cpp.Scanner, classes []cpp.Class, conf Config, maxInst, maxSwitchInst int) *analyzer {
 	a := &analyzer{
-		root:       root,
-		scanner:    scanner,
-		classes:    classes,
-		byName:     make(map[string][]*classInfo),
-		symbolMap:  loadKernelSymbolMap(conf.Kernelcache, conf.Stderr),
-		symCache:   make(map[uint64]string),
-		methods:    make(map[methodCacheKey]methodAnalysis),
-		ucRefs:     make(map[uint64][]string),
-		stderr:     conf.Stderr,
-		maxInst:    conf.MaxFunctionInstructions,
-		maxSlots:   conf.MaxVtableSlots,
-		userClient: make(map[string]struct{}),
+		root:          root,
+		scanner:       scanner,
+		classes:       classes,
+		byName:        make(map[string][]*classInfo),
+		symbolMap:     loadKernelSymbolMap(conf.Kernelcache, conf.Stderr),
+		symCache:      make(map[uint64]string),
+		methods:       make(map[methodCacheKey]methodAnalysis),
+		ucRefs:        make(map[uint64][]string),
+		stderr:        conf.Stderr,
+		maxInst:       maxInst,
+		maxSwitchInst: maxSwitchInst,
+		maxSlots:      conf.MaxVtableSlots,
+		userClient:    make(map[string]struct{}),
 	}
 	a.buildClassInfos()
 	return a
@@ -166,6 +180,7 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	legacySlots := a.legacyMethodSlots(userClients)
 	records := make([]Record, 0, len(userClients))
 	for _, info := range userClients {
 		slot, ok := slots[info.family]
@@ -189,6 +204,12 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 		case DispatchSwitch:
 			records = append(records, a.switchRecords(info, analysis)...)
 		default:
+			if recs, ok, err := a.legacyMethodRecordsForInfo(info, legacySlots); err != nil {
+				return nil, err
+			} else if ok {
+				records = append(records, recs...)
+				continue
+			}
 			note := analysis.note
 			if note == "" {
 				note = "indirect"
@@ -243,6 +264,65 @@ func (a *analyzer) externalMethodSlots(userClients []*classInfo) (map[string]int
 		out[family] = slot
 	}
 	return out, nil
+}
+
+func (a *analyzer) legacyMethodSlots(userClients []*classInfo) map[string]int {
+	symbolSlots := make(map[string]map[int]int)
+	for _, info := range userClients {
+		for _, entry := range a.scanner.VtableEntries(info.Class, a.maxSlots) {
+			if isNamedMethod(a.symbolName(entry.Address), "getTargetAndMethodForIndex") {
+				addSlot(symbolSlots, info.family, entry.Index)
+			}
+		}
+	}
+	out := make(map[string]int)
+	for family, slots := range symbolSlots {
+		if slot, err := chooseSlot(family, slots, "legacy"); err == nil {
+			out[family] = slot
+		}
+	}
+
+	patternSlots := make(map[string]map[int]int)
+	for _, info := range userClients {
+		if _, ok := out[info.family]; ok {
+			continue
+		}
+		for _, entry := range a.scanner.VtableEntries(info.Class, a.maxSlots) {
+			analysis := a.analyzeLegacyExternalMethod(entry.Address)
+			if analysis.kind == DispatchExternalMethodLegacy {
+				addSlot(patternSlots, info.family, entry.Index)
+			}
+		}
+	}
+	for family, slots := range patternSlots {
+		if _, ok := out[family]; ok {
+			continue
+		}
+		if slot, err := chooseSlot(family, slots, "legacy pattern"); err == nil {
+			out[family] = slot
+		}
+	}
+	return out
+}
+
+func (a *analyzer) legacyMethodRecordsForInfo(info *classInfo, legacySlots map[string]int) ([]Record, bool, error) {
+	slot, ok := legacySlots[info.family]
+	if !ok {
+		return nil, false, nil
+	}
+	entry, ok := a.scanner.VtableEntry(info.Class, slot)
+	if !ok || entry.Address == 0 {
+		return nil, false, nil
+	}
+	analysis := a.analyzeLegacyExternalMethod(entry.Address)
+	if analysis.kind != DispatchExternalMethodLegacy {
+		return nil, false, nil
+	}
+	records, err := a.legacyDispatchRecords(info, analysis)
+	if err != nil {
+		return nil, false, err
+	}
+	return records, true, nil
 }
 
 func addSlot(slots map[string]map[int]int, family string, slot int) {
@@ -308,34 +388,39 @@ func (a *analyzer) unknownMethodRecord(info *classInfo, methodAddr uint64, note 
 }
 
 func (a *analyzer) symbolName(addr uint64) string {
-	if addr == 0 {
+	if a == nil || addr == 0 {
 		return ""
 	}
-	if cached, ok := a.symCache[addr]; ok {
-		return cached
+	if a.symCache != nil {
+		if cached, ok := a.symCache[addr]; ok {
+			return cached
+		}
 	}
 	if name := a.symbolMap[addr]; name != "" {
-		name = symbols.DemangleSymbolName(name)
-		a.symCache[addr] = name
-		return name
+		return a.cacheSymbolName(addr, symbols.DemangleSymbolName(name))
+	}
+	if a.scanner == nil {
+		return ""
 	}
 	if name := a.scanner.SymbolName(addr); name != "" {
-		a.symCache[addr] = name
-		return name
+		return a.cacheSymbolName(addr, name)
 	}
 	if body, err := a.scanner.FunctionBodyAt(addr); err == nil && body.Function.StartAddr != addr {
 		if name := a.symbolMap[body.Function.StartAddr]; name != "" {
-			name = symbols.DemangleSymbolName(name)
-			a.symCache[addr] = name
-			return name
+			return a.cacheSymbolName(addr, symbols.DemangleSymbolName(name))
 		}
 		if name := a.scanner.SymbolName(body.Function.StartAddr); name != "" {
-			a.symCache[addr] = name
-			return name
+			return a.cacheSymbolName(addr, name)
 		}
 	}
-	a.symCache[addr] = ""
-	return ""
+	return a.cacheSymbolName(addr, "")
+}
+
+func (a *analyzer) cacheSymbolName(addr uint64, name string) string {
+	if a != nil && a.symCache != nil {
+		a.symCache[addr] = name
+	}
+	return name
 }
 
 func loadKernelSymbolMap(path string, stderr io.Writer) map[uint64]string {
@@ -423,6 +508,40 @@ func dedupeRecords(records []Record) []Record {
 		last = key
 	}
 	return out
+}
+
+func compileClassFilter(pattern string) (*regexp.Regexp, error) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid class filter %q: %w", pattern, err)
+	}
+	return re, nil
+}
+
+func filterRecordsByClass(records []Record, classFilter *regexp.Regexp) []Record {
+	if classFilter == nil || len(records) == 0 {
+		return records
+	}
+	out := records[:0]
+	for _, rec := range records {
+		if recordMatchesClassFilter(rec, classFilter) {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
+func recordMatchesClassFilter(rec Record, classFilter *regexp.Regexp) bool {
+	if classFilter == nil {
+		return true
+	}
+	return classFilter.MatchString(rec.Class) ||
+		classFilter.MatchString(rec.ServiceClass) ||
+		classFilter.MatchString(rec.UserClientClass)
 }
 
 func recordKey(r Record) string {
