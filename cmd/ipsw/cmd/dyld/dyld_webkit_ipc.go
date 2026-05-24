@@ -101,17 +101,20 @@ func printWebKitIPC(records []dyld.WebKitIPCRecord, format string) error {
 
 func printWebKitIPCTSV(records []dyld.WebKitIPCRecord) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "addr\treceiver\tmessage\tname\tsection\tsource\tsymbol")
+	fmt.Fprintln(w, "addr\treceiver\tmessage\tname\thandler\targ-types\tworkqueue\tsection\tsource\tsymbol")
 	for _, record := range records {
 		addr := ""
 		if record.Address != 0 {
 			addr = fmt.Sprintf("%#x", record.Address)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%t\t%s\t%s\t%s\n",
 			addr,
 			record.Receiver,
 			record.Message,
 			record.Name,
+			record.HandlerClass,
+			strings.Join(record.ArgTypes, "; "),
+			record.WorkQueue,
 			record.Section,
 			record.Source,
 			webKitIPCSymbolField(record),

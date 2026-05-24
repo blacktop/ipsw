@@ -448,11 +448,15 @@ func (i *CacheImage) SlidePointer(addr uint64) uint64 {
 }
 
 func (i *CacheImage) relativeSelectorBase() (uint64, error) {
-	if !i.cache.IsDyld4 && i.Name == "/usr/lib/libobjc.A.dylib" {
+	return i.cache.relativeSelectorBase()
+}
+
+func (i *CacheImage) partialRelativeSelectorBase() (uint64, error) {
+	if i.Name == "/usr/lib/libobjc.A.dylib" {
 		return 0, nil
 	}
 
-	return i.cache.relativeSelectorBase()
+	return i.relativeSelectorBase()
 }
 
 func (f *File) relativeSelectorBase() (uint64, error) {
@@ -467,13 +471,18 @@ func (f *File) relativeSelectorBase() (uint64, error) {
 			return
 		}
 
-		if opt.GetVersion() >= 16 {
-			f.rsBase = opt.RelativeMethodListsBaseAddress(f.objcOptRoAddr)
-			f.rsBase += f.Headers[f.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
-		}
+		f.rsBase = f.relativeSelectorBaseForOptimization(opt)
 	})
 
 	return f.rsBase, f.rsBaseErr
+}
+
+func (f *File) relativeSelectorBaseForOptimization(opt Optimization) uint64 {
+	base := opt.RelativeMethodListsBaseAddress(f.objcOptRoAddr)
+	if _, ok := opt.(*ObjCOptimizationHeader); ok {
+		base += f.Headers[f.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
+	}
+	return base
 }
 
 // GetMacho parses dyld image as a MachO (slow)
@@ -529,7 +538,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	}
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 	var rsBase uint64
-	if base, err := i.relativeSelectorBase(); err == nil {
+	if base, err := i.partialRelativeSelectorBase(); err == nil {
 		rsBase = base
 	}
 	vma := types.VMAddrConverter{

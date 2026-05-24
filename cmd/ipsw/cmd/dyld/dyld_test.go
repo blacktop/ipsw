@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	dyldpkg "github.com/blacktop/ipsw/pkg/dyld"
@@ -47,5 +48,25 @@ func TestResolveDscFuncImagePrefersStartAddress(t *testing.T) {
 	}
 	if resolver.nameCalls != 0 {
 		t.Fatalf("expected start-address resolution to avoid basename lookup, called Image %d times", resolver.nameCalls)
+	}
+}
+
+func TestFilterImportRowsUsesRegex(t *testing.T) {
+	t.Parallel()
+
+	filter, err := compileImportsFilter(`xmlXPath|xmlSchema`)
+	if err != nil {
+		t.Fatalf("compileImportsFilter failed: %v", err)
+	}
+	rows := []string{
+		"_objc_msgSend",
+		"_xmlXPathNewContext",
+		"_xmlSchemaFreeValidCtxt",
+	}
+
+	got := filterImportRows(rows, filter)
+	want := []string{"_xmlXPathNewContext", "_xmlSchemaFreeValidCtxt"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("filterImportRows=%#v, want %#v", got, want)
 	}
 }

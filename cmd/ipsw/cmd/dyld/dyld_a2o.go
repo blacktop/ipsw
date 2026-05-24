@@ -39,8 +39,10 @@ func init() {
 	DyldCmd.AddCommand(AddrToOffsetCmd)
 	AddrToOffsetCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
 	AddrToOffsetCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	AddrToOffsetCmd.Flags().Bool("image-rel", false, "Return offset relative to the containing image __TEXT load address")
 	viper.BindPFlag("dyld.a2o.dec", AddrToOffsetCmd.Flags().Lookup("dec"))
 	viper.BindPFlag("dyld.a2o.hex", AddrToOffsetCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("dyld.a2o.image-rel", AddrToOffsetCmd.Flags().Lookup("image-rel"))
 }
 
 // AddrToOffsetCmd represents the a2o command
@@ -59,6 +61,7 @@ var AddrToOffsetCmd = &cobra.Command{
 
 		inDec := viper.GetBool("dyld.a2o.dec")
 		inHex := viper.GetBool("dyld.a2o.hex")
+		imageRelative := viper.GetBool("dyld.a2o.image-rel")
 
 		if inDec && inHex {
 			return fmt.Errorf("you can only use --dec OR --hex")
@@ -99,6 +102,26 @@ var AddrToOffsetCmd = &cobra.Command{
 			utils.Indent(log.Warn, 2)("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
 		} else if f.IsDyld4 {
 			utils.Indent(log.Warn, 2)("dyld4 cache detected (will search for offset in each subcache)")
+		}
+
+		if imageRelative {
+			image, err := f.GetImageContainingVMAddr(addr)
+			if err != nil {
+				return fmt.Errorf("failed to find image containing %#x: %w", addr, err)
+			}
+			rel := addr - image.LoadAddress
+			if inDec {
+				fmt.Printf("%d\n", rel)
+			} else if inHex {
+				fmt.Printf("%#x\n", rel)
+			} else {
+				log.WithFields(log.Fields{
+					"hex":   fmt.Sprintf("%#x", rel),
+					"dec":   fmt.Sprintf("%d", rel),
+					"image": image.Name,
+				}).Info("Image Offset")
+			}
+			return nil
 		}
 
 		off, err := dsc.ConvertAddressToOffset(f, addr)

@@ -13,6 +13,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/blacktop/ipsw/pkg/symbols"
 )
 
 type DyldDisass struct {
@@ -389,16 +390,87 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
 func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
 	if symName, ok := d.f.AddressToSymbol.Get(addr); ok {
-		if d.cfg.Demangle {
-			if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
-				symName, _ = swift.DemangleSimple(symName)
-				return symName, true
-			}
-			return demangle.Do(symName, false, false), true
-		}
-		return symName, true
+		return symbols.FormatSymbol(symName, d.cfg.Demangle), true
+	}
+	if symName, ok := d.resolveStubSymbol(addr); ok {
+		return symbols.FormatSymbol(symName, d.cfg.Demangle), true
 	}
 	return "", false
+}
+
+func (d DyldDisass) resolveStubSymbol(addr uint64) (string, bool) {
+	if d.f == nil {
+		return "", false
+	}
+	if image, err := d.f.GetImageContainingTextAddr(addr); err == nil {
+		if _, targetName, err := image.ResolveStubAtAddr(addr); err == nil && targetName != "" {
+			symName := jumpSymbolName(targetName)
+			d.f.AddressToSymbol.Set(addr, symName)
+			return symName, true
+		}
+	}
+	target, ok := d.stubIslandTarget(addr)
+	if !ok {
+		return "", false
+	}
+	if targetName, ok := d.resolveTargetSymbolName(target); ok {
+		symName := jumpSymbolName(targetName)
+		d.f.AddressToSymbol.Set(addr, symName)
+		return symName, true
+	}
+	symName := fmt.Sprintf("%s%x", symbols.PrefixStubFallback, target)
+	d.f.AddressToSymbol.Set(addr, symName)
+	return symName, true
+}
+
+func (d DyldDisass) stubIslandTarget(addr uint64) (uint64, bool) {
+	if len(d.f.islandStubs) == 0 {
+		if err := d.f.ParseStubIslands(); err != nil {
+			return 0, false
+		}
+	}
+	target, ok := d.f.islandStubs[addr]
+	if !ok {
+		return 0, false
+	}
+	if _, _, err := d.f.GetOffset(target); err == nil || d.f.SlideInfo == nil {
+		return target, true
+	}
+	return d.f.SlideInfo.SlidePointer(target), true
+}
+
+func (d DyldDisass) resolveTargetSymbolName(target uint64) (string, bool) {
+	if symName, ok := d.f.AddressToSymbol.Get(target); ok && symName != "" {
+		return symName, true
+	}
+	image, err := d.f.GetImageContainingTextAddr(target)
+	if err != nil {
+		return "", false
+	}
+	m, err := image.GetMacho()
+	if err != nil {
+		return "", false
+	}
+	defer m.Close()
+	if syms, err := m.FindAddressSymbols(target); err == nil {
+		for _, sym := range syms {
+			if sym.Name != "" && sym.Name != "<redacted>" {
+				return sym.Name, true
+			}
+		}
+	}
+	if name, err := image.FindLocalSymbolAtAddr(target); err == nil && name != "" {
+		return name, true
+	}
+	return "", false
+}
+
+func jumpSymbolName(name string) string {
+	name = strings.TrimPrefix(name, symbols.PrefixStubHelper)
+	if strings.HasPrefix(name, symbols.PrefixJump) {
+		return name
+	}
+	return symbols.PrefixJump + name
 }
 
 func (d DyldDisass) FindSwiftString(addr uint64) (string, bool) {

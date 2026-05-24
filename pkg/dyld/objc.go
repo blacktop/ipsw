@@ -204,6 +204,7 @@ func (f *File) getOptimizationsOld() (Optimization, error) {
 	}
 
 	if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
+		f.objcOptRoAddr = s.Addr
 		uuid, off, err := f.GetOffset(s.Addr)
 		if err != nil {
 			return nil, err

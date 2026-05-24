@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/apex/log"
@@ -41,16 +42,20 @@ func init() {
 	DyldCmd.AddCommand(dyldImportsCmd)
 	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
 	dyldImportsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	dyldImportsCmd.Flags().String("image", "", "List imported bind symbols for this image instead of reverse importers")
+	dyldImportsCmd.Flags().String("filter", "", "Regex filter for printed import/importer rows")
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
 	viper.BindPFlag("dyld.imports.ipsw", dyldImportsCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("dyld.imports.pem-db", dyldImportsCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("dyld.imports.image", dyldImportsCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.imports.filter", dyldImportsCmd.Flags().Lookup("filter"))
 }
 
 // dyldImportsCmd represents the imports command
 var dyldImportsCmd = &cobra.Command{
-	Use:     "imports <DSC> <DYLIB>",
+	Use:     "imports <DSC> [DYLIB]",
 	Aliases: []string{"imp"},
 	Short:   "List all dylibs that load a given dylib",
 	Args:    cobra.MaximumNArgs(2),
@@ -66,18 +71,27 @@ var dyldImportsCmd = &cobra.Command{
 		// flags
 		ipswPath := viper.GetString("dyld.imports.ipsw")
 		pemDB := viper.GetString("dyld.imports.pem-db")
+		imageName := viper.GetString("dyld.imports.image")
+		rowFilter, err := compileImportsFilter(viper.GetString("dyld.imports.filter"))
+		if err != nil {
+			return err
+		}
 		// validate args
-		if ipswPath != "" && len(args) != 1 {
+		if imageName != "" && ipswPath != "" {
+			return errors.New("--image cannot be used with --ipsw")
+		} else if imageName != "" && len(args) != 1 {
+			return errors.New("you must specify a DSC when using --image")
+		} else if ipswPath != "" && len(args) != 1 {
 			return errors.New("you must specify a DYLIB to search for")
-		} else if ipswPath == "" && len(args) != 2 {
-			return errors.New("you must specify a DSC and a DYLIB to search for")
+		} else if ipswPath == "" && imageName == "" && len(args) != 2 {
+			return errors.New("you must specify a DSC and a DYLIB to search for, or use --image with a DSC")
 		}
 
 		if ipswPath != "" {
 			found := false
 			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), pemDB, func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
-					if strings.EqualFold(imp, args[0]) {
+					if strings.EqualFold(imp, args[0]) && importFilterMatch(rowFilter, path) {
 						fmt.Printf("%s\n", path)
 						found = true
 					}
@@ -116,6 +130,26 @@ var dyldImportsCmd = &cobra.Command{
 			}
 			defer f.Close()
 
+			if imageName != "" {
+				image, err := f.Image(imageName)
+				if err != nil {
+					return fmt.Errorf("image not in %s: %v", dscPath, err)
+				}
+				imports, err := dyld.ImportedSymbolNamesForImage(image)
+				if err != nil {
+					return fmt.Errorf("failed to get imported symbols for image %s: %w", image.Name, err)
+				}
+				imports = filterImportRows(imports, rowFilter)
+				if len(imports) == 0 {
+					log.Warnf("No imports found for %s matching filter", filepath.Base(image.Name))
+					return nil
+				}
+				for _, imp := range imports {
+					fmt.Println(imp)
+				}
+				return nil
+			}
+
 			image, err := f.Image(args[1])
 			if err != nil {
 				return fmt.Errorf("image not in %s: %v", dscPath, err)
@@ -129,6 +163,9 @@ var dyldImportsCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to get dylibs that import %s: %v", image.Name, err)
 			}
+
+			importedBy.DSC = filterImportRows(importedBy.DSC, rowFilter)
+			importedBy.Apps = filterImportRows(importedBy.Apps, rowFilter)
 
 			if len(importedBy.DSC) > 0 {
 				fmt.Println("\nIn DSC (Dylibs)")
@@ -149,4 +186,33 @@ var dyldImportsCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func compileImportsFilter(pattern string) (*regexp.Regexp, error) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, nil
+	}
+	filter, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --filter regex %q: %w", pattern, err)
+	}
+	return filter, nil
+}
+
+func filterImportRows(rows []string, filter *regexp.Regexp) []string {
+	if filter == nil || len(rows) == 0 {
+		return rows
+	}
+	out := rows[:0]
+	for _, row := range rows {
+		if importFilterMatch(filter, row) {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func importFilterMatch(filter *regexp.Regexp, row string) bool {
+	return filter == nil || filter.MatchString(row)
 }
