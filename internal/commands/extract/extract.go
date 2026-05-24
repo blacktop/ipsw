@@ -38,6 +38,10 @@ import (
 
 var ErrNoDecryptionKey = errors.New("no decryption key found")
 
+// Remote firmware extraction reads multi-GB ZIP members; larger blocks avoid
+// thousands of tiny HTTP range requests from ranger's 128 KiB default.
+const remoteFirmwareZipBlockSize = 8 * 1024 * 1024
+
 type remoteKernelcacheMember struct {
 	file    *zip.File
 	devices []string
@@ -249,8 +253,9 @@ func getFolder(c *Config) (*info.Info, string, error) {
 
 func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 	zr, err := download.NewRemoteZipReader(c.URL, &download.RemoteConfig{
-		Proxy:    c.Proxy,
-		Insecure: c.Insecure,
+		Proxy:     c.Proxy,
+		Insecure:  c.Insecure,
+		BlockSize: remoteFirmwareZipBlockSize,
 	})
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("unable to download remote zip: %v", err)
