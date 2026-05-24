@@ -201,6 +201,7 @@ var extractCmd = &cobra.Command{
 		} else {
 			config.IPSW = args[0]
 		}
+		defer config.Close()
 
 		if typ, err := extract.FirmwareType(config); err == nil {
 			if typ == "OTA" {

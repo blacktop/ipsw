@@ -519,44 +519,56 @@ var downloadOtaCmd = &cobra.Command{
 						Output:       destPath,
 					}
 
-					// check if AEA encryption
-					isAEA, err := extract.IsAEA(config)
+					stop, err := func() (bool, error) {
+						defer config.Close()
+
+						// check if AEA encryption
+						isAEA, err := extract.IsAEA(config)
+						if err != nil {
+							return false, err
+						}
+						if isAEA {
+							log.Warn("This OTA is AEA encrypted and is NOT supported for remote extraction (yet 🤞)")
+							return true, nil
+						}
+
+						if remoteKernel {
+							log.Info("Extracting remote kernelcache")
+							out, err := extract.Kernelcache(config)
+							if err != nil {
+								return false, fmt.Errorf("failed to extract kernelcache: %v", err)
+							}
+							for fn := range out {
+								utils.Indent(log.Info, 2)("Created " + fn)
+							}
+						}
+						if len(remotePattern) > 0 {
+							log.Infof("Downloading files matching pattern %#v", remotePattern)
+							out, err := extract.Search(config)
+							if err != nil {
+								return false, err
+							}
+							for _, f := range out {
+								utils.Indent(log.Info, 2)("Created " + f)
+							}
+						}
+						if remoteDyld {
+							log.Info("Extracting dyld_shared_cache")
+							out, err := extract.DSC(config)
+							if err != nil {
+								return false, err
+							}
+							for _, f := range out {
+								utils.Indent(log.Info, 2)("Created " + f)
+							}
+						}
+						return false, nil
+					}()
 					if err != nil {
 						return err
-					} else if isAEA {
-						log.Warn("This OTA is AEA encrypted and is NOT supported for remote extraction (yet 🤞)")
+					}
+					if stop {
 						return nil
-					}
-
-					if remoteKernel {
-						log.Info("Extracting remote kernelcache")
-						out, err := extract.Kernelcache(config)
-						if err != nil {
-							return fmt.Errorf("failed to extract kernelcache: %v", err)
-						}
-						for fn := range out {
-							utils.Indent(log.Info, 2)("Created " + fn)
-						}
-					}
-					if len(remotePattern) > 0 {
-						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						out, err := extract.Search(config)
-						if err != nil {
-							return err
-						}
-						for _, f := range out {
-							utils.Indent(log.Info, 2)("Created " + f)
-						}
-					}
-					if remoteDyld {
-						log.Info("Extracting dyld_shared_cache")
-						out, err := extract.DSC(config)
-						if err != nil {
-							return err
-						}
-						for _, f := range out {
-							utils.Indent(log.Info, 2)("Created " + f)
-						}
 					}
 				}
 			} else {

@@ -6,10 +6,13 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -187,6 +190,54 @@ func TestRemoteKernelcacheWithKeysPassesThroughUnencrypted(t *testing.T) {
 		t.Fatalf("kernelcache mismatch: got %d bytes with prefix %x, want %d bytes with prefix %x",
 			len(got), got[:8], len(plaintext), plaintext[:8])
 	}
+}
+
+func TestRemoteZipReaderCacheResetsWhenURLChanges(t *testing.T) {
+	first := newRemoteZipServer(t, "first.txt")
+	second := newRemoteZipServer(t, "second.txt")
+
+	c := &Config{URL: first.URL}
+	zr, err := c.remoteZipReader(download.DefaultRemoteZipBlockSize)
+	if err != nil {
+		t.Fatalf("remoteZipReader(first) error = %v", err)
+	}
+	if got, want := zr.File[0].Name, "first.txt"; got != want {
+		t.Fatalf("first reader member = %q, want %q", got, want)
+	}
+
+	c.URL = second.URL
+	zr, err = c.remoteZipReader(download.DefaultRemoteZipBlockSize)
+	if err != nil {
+		t.Fatalf("remoteZipReader(second) error = %v", err)
+	}
+	if got, want := zr.File[0].Name, "second.txt"; got != want {
+		t.Fatalf("second reader member = %q, want %q", got, want)
+	}
+}
+
+func newRemoteZipServer(t *testing.T, name string) *httptest.Server {
+	t.Helper()
+
+	var zipData bytes.Buffer
+	zw := zip.NewWriter(&zipData)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatalf("Create(%s) error = %v", name, err)
+	}
+	if _, err := w.Write([]byte(name)); err != nil {
+		t.Fatalf("Write(%s) error = %v", name, err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	data := append([]byte(nil), zipData.Bytes()...)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+name+`"`)
+		http.ServeContent(w, r, "payload.zip", time.Unix(0, 0), bytes.NewReader(data))
+	}))
+	t.Cleanup(server.Close)
+	return server
 }
 
 func newKernelZipReader(t *testing.T, payloadData []byte, names ...string) *zip.Reader {

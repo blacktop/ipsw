@@ -434,55 +434,62 @@ var downloadAppledbCmd = &cobra.Command{
 						Output:       output,
 					}
 
-					// REMOTE KERNEL MODE
-					if kernel {
-						log.Info("Extracting remote kernelcache")
-						if out, err := extract.Kernelcache(config); err != nil {
-							return err
-						} else {
+					if err := func() error {
+						defer config.Close()
+
+						// REMOTE KERNEL MODE
+						if kernel {
+							log.Info("Extracting remote kernelcache")
+							out, err := extract.Kernelcache(config)
+							if err != nil {
+								return err
+							}
 							for fn := range out {
 								utils.Indent(log.Info, 2)("Created " + fn)
 							}
 						}
-					}
-					// PATTERN MATCHING MODE
-					if len(pattern) > 0 {
-						log.Infof("Downloading files matching pattern %#v", pattern)
-						if out, err := extract.Search(config); err != nil {
-							return err
-						} else {
+						// PATTERN MATCHING MODE
+						if len(pattern) > 0 {
+							log.Infof("Downloading files matching pattern %#v", pattern)
+							out, err := extract.Search(config)
+							if err != nil {
+								return err
+							}
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + f)
 							}
 						}
-					}
-					// REMOTE DSC MODE
-					if dyld {
-						if fwType != "ota" {
-							return fmt.Errorf("dyld_shared_cache(s) can only be extracted from OTA files (for now)")
-						}
-						log.Info("Extracting remote dyld_shared_cache(s)")
-						if out, err := extract.DSC(config); err != nil {
-							return err
-						} else {
+						// REMOTE DSC MODE
+						if dyld {
+							if fwType != "ota" {
+								return fmt.Errorf("dyld_shared_cache(s) can only be extracted from OTA files (for now)")
+							}
+							log.Info("Extracting remote dyld_shared_cache(s)")
+							out, err := extract.DSC(config)
+							if err != nil {
+								return err
+							}
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + f)
 							}
 						}
-					}
-					// REMOTE AEA1 DMG fcs-key MODE
-					if fcsKeys || fcsKeysJson {
-						if fcsKeysJson {
-							config.JSON = true
-						}
-						log.Info("Extracting remote AEA1 DMG fcs-keys")
-						if out, err := extract.FcsKeys(config); err != nil {
-							return err
-						} else {
+						// REMOTE AEA1 DMG fcs-key MODE
+						if fcsKeys || fcsKeysJson {
+							if fcsKeysJson {
+								config.JSON = true
+							}
+							log.Info("Extracting remote AEA1 DMG fcs-keys")
+							out, err := extract.FcsKeys(config)
+							if err != nil {
+								return err
+							}
 							for _, f := range out {
 								utils.Indent(log.Info, 2)("Created " + f)
 							}
 						}
+						return nil
+					}(); err != nil {
+						return err
 					}
 				}
 			} else { // NORMAL MODE

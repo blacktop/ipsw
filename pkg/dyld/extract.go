@@ -228,23 +228,49 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 	return ExtractFromDMG(i, dmgPath, destPath, pemDB, arches, driverkit, all)
 }
 
-// ExtractFromRemoteCryptex extracts the dyld_shared_cache from the cryptex-system file in the given zip.Reader.
-// It creates a temp file for the cryptex-system file, patches it, and extracts the dyld_shared_cache from the decrypted file.
-// The extracted dyld_shared_cache is saved to the given destPath.
-// The function returns a slice of artifacts extracted from the dyld_shared_cache and an error if any.
-func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
-	re := regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
-	if len(arches) > 0 {
-		var parts []string
-		for _, arch := range arches {
-			if arch == "arm64" || arch == "arm64e" {
-				parts = append(parts, "arm64e?")
-			} else {
-				parts = append(parts, "x86_64h?")
-			}
-		}
-		re = regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(parts, "|")))
+// RemoteCryptexPattern returns the ZIP member matcher used for remote OTA
+// cryptex-system images.
+func RemoteCryptexPattern(arches []string) *regexp.Regexp {
+	if len(arches) == 0 {
+		return regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
 	}
+	parts := remoteCryptexArchPatterns(arches)
+	if len(parts) == 0 {
+		return regexp.MustCompile(`a^`)
+	}
+	return regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(parts, "|")))
+}
+
+func remoteCryptexArchPatterns(arches []string) []string {
+	parts := make([]string, 0, len(arches))
+	for _, arch := range arches {
+		switch arch {
+		case "arm64", "arm64e", "x86_64", "x86_64h":
+			parts = append(parts, regexp.QuoteMeta(arch))
+		case "aot":
+			parts = append(parts, "x86_64h?")
+		}
+	}
+	return parts
+}
+
+// RemoteCryptexFiles returns remote OTA cryptex-system members matching arches.
+func RemoteCryptexFiles(files []*zip.File, arches []string) []*zip.File {
+	re := RemoteCryptexPattern(arches)
+	matches := make([]*zip.File, 0)
+	for _, file := range files {
+		if file.FileInfo().IsDir() || !re.MatchString(file.Name) {
+			continue
+		}
+		matches = append(matches, file)
+	}
+	return matches
+}
+
+// ExtractFromRemoteCryptex extracts the dyld_shared_cache from the
+// cryptex-system file in the given zip.Reader.
+func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+	re := RemoteCryptexPattern(arches)
 	for _, zf := range zr.File {
 		if re.MatchString(zf.Name) {
 			rc, err := zf.Open()

@@ -938,6 +938,9 @@ changelog:
     - title: "Security updates"
       regexp: '^.*?sec(\(.+\))??!?:.+$'
       order: 150
+    - title: "Performance improvements"
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 175
     - title: "Bug fixes"
       regexp: '^.*?(fix|refactor)(\(.+\))??!?:.+$'
       order: 200
@@ -953,6 +956,7 @@ changelog:
     include:
       - "^feat.*"
       - "^fix.*"
+      - "^perf.*"
       - "^chore.*"
       - "^sec.*"
       - "^(doc|docs).*"

@@ -302,19 +302,26 @@ var downloadWikiCmd = &cobra.Command{
 								Output:       destPath,
 							}
 
-							// REMOTE KERNEL MODE
-							if kernel {
-								log.Info("Extracting remote kernelcache")
-								if _, err := extract.Kernelcache(config); err != nil {
-									return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+							if err := func() error {
+								defer config.Close()
+
+								// REMOTE KERNEL MODE
+								if kernel {
+									log.Info("Extracting remote kernelcache")
+									if _, err := extract.Kernelcache(config); err != nil {
+										return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+									}
 								}
-							}
-							// PATTERN MATCHING MODE
-							if len(pattern) > 0 {
-								log.Infof("Downloading files matching pattern %#v", pattern)
-								if _, err := extract.Search(config); err != nil {
-									return err
+								// PATTERN MATCHING MODE
+								if len(pattern) > 0 {
+									log.Infof("Downloading files matching pattern %#v", pattern)
+									if _, err := extract.Search(config); err != nil {
+										return err
+									}
 								}
+								return nil
+							}(); err != nil {
+								return err
 							}
 						}
 					} else { // NORMAL MODE
@@ -536,27 +543,34 @@ var downloadWikiCmd = &cobra.Command{
 								Output:       destPath,
 							}
 
-							// REMOTE KERNEL MODE
-							if kernel {
-								log.Info("Extracting remote kernelcache")
-								if out, err := extract.Kernelcache(config); err != nil {
-									return err
-								} else {
+							if err := func() error {
+								defer config.Close()
+
+								// REMOTE KERNEL MODE
+								if kernel {
+									log.Info("Extracting remote kernelcache")
+									out, err := extract.Kernelcache(config)
+									if err != nil {
+										return err
+									}
 									for fn := range out {
 										utils.Indent(log.Info, 2)("Created " + fn)
 									}
 								}
-							}
-							// PATTERN MATCHING MODE
-							if len(pattern) > 0 {
-								log.Infof("Downloading files matching pattern %#v", pattern)
-								if out, err := extract.Search(config); err != nil {
-									return err
-								} else {
+								// PATTERN MATCHING MODE
+								if len(pattern) > 0 {
+									log.Infof("Downloading files matching pattern %#v", pattern)
+									out, err := extract.Search(config)
+									if err != nil {
+										return err
+									}
 									for _, f := range out {
 										utils.Indent(log.Info, 2)("Created " + f)
 									}
 								}
+								return nil
+							}(); err != nil {
+								return err
 							}
 						}
 					} else { // NORMAL MODE
