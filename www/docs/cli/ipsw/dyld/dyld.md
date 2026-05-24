@@ -49,6 +49,7 @@ ipsw dyld [flags]
 * [ipsw dyld prewarm](/docs/cli/ipsw/dyld/prewarm)	 - Dump DSC prewarming data
 * [ipsw dyld search](/docs/cli/ipsw/dyld/search)	 - Find Dylib files for given search criteria
 * [ipsw dyld slide](/docs/cli/ipsw/dyld/slide)	 - Dump slide info
+* [ipsw dyld softlinks](/docs/cli/ipsw/dyld/softlinks)	 - Enumerate SOFT_LINK globals in a DSC image
 * [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Split DSC into dylibs using Xcode's dsc_extractor (macOS only)
 * [ipsw dyld str](/docs/cli/ipsw/dyld/str)	 - Search dyld_shared_cache for string
 * [ipsw dyld stubs](/docs/cli/ipsw/dyld/stubs)	 - Dump Stub Islands

@@ -17,9 +17,10 @@ ipsw dyld a2o <DSC> <ADDR> [flags]
 ### Options
 
 ```
-  -d, --dec    Return address in decimal
-  -h, --help   help for a2o
-  -x, --hex    Return address in hexadecimal
+  -d, --dec         Return address in decimal
+  -h, --help        help for a2o
+  -x, --hex         Return address in hexadecimal
+      --image-rel   Return offset relative to the containing image __TEXT load address
 ```
 
 ### Options inherited from parent commands
