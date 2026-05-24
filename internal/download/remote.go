@@ -15,6 +15,9 @@ import (
 type RemoteConfig struct {
 	Proxy    string
 	Insecure bool
+	// BlockSize controls the ranger HTTP range request block size. If unset,
+	// ranger's default block size is used.
+	BlockSize int
 }
 
 // NewRemoteZipReader returns a new remote zip file reader
@@ -37,6 +40,9 @@ func NewRemoteZipReader(zipURL string, config *RemoteConfig) (*zip.Reader, error
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ranger reader")
+	}
+	if config.BlockSize > 0 {
+		reader.BlockSize = config.BlockSize
 	}
 
 	length, err := reader.Length()
