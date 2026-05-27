@@ -43,6 +43,7 @@ func init() {
 	diffCmd.Flags().Bool("launchd", false, "Diff launchd configs")
 	diffCmd.Flags().Bool("fw", false, "Diff other firmwares")
 	diffCmd.Flags().Bool("feat", false, "Diff feature flags")
+	diffCmd.Flags().Bool("loc", false, "Diff localized string resources (.strings, .stringsdict, .loctable)")
 	diffCmd.Flags().Bool("files", false, "Diff files")
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
 	diffCmd.Flags().Bool("starts", false, "Diff MachO function starts")
@@ -69,6 +70,7 @@ func init() {
 	viper.BindPFlag("diff.launchd", diffCmd.Flags().Lookup("launchd"))
 	viper.BindPFlag("diff.fw", diffCmd.Flags().Lookup("fw"))
 	viper.BindPFlag("diff.feat", diffCmd.Flags().Lookup("feat"))
+	viper.BindPFlag("diff.loc", diffCmd.Flags().Lookup("loc"))
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
 	viper.BindPFlag("diff.starts", diffCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("diff.ent", diffCmd.Flags().Lookup("ent"))
@@ -146,27 +148,28 @@ var diffCmd = &cobra.Command{
 		}
 
 		d := diff.New(&diff.Config{
-			Title:        viper.GetString("diff.title"),
-			IpswOld:      filepath.Clean(args[0]),
-			IpswNew:      filepath.Clean(args[1]),
-			KDKs:         viper.GetStringSlice("diff.kdk"),
-			LaunchD:      viper.GetBool("diff.launchd"),
-			Firmware:     viper.GetBool("diff.fw"),
-			Features:     viper.GetBool("diff.feat"),
-			Files:        viper.GetBool("diff.files"),
-			Sandbox:      diffSandboxEnabled(),
-			CStrings:     viper.GetBool("diff.strs"),
-			FuncStarts:   viper.GetBool("diff.starts"),
-			Entitlements: viper.GetBool("diff.ent"),
-			AllowList:    viper.GetStringSlice("diff.allow-list"),
-			BlockList:    viper.GetStringSlice("diff.block-list"),
-			Signatures:   viper.GetString("diff.signatures"),
-			Output:       viper.GetString("diff.output"),
-			Verbose:      Verbose,
-			LowMemory:    viper.GetBool("diff.low-memory"),
-			AEAKeyDB:     viper.GetString("diff.key-db"),
-			AEAKeyVal:    viper.GetString("diff.key-val"),
-			AEAInsecure:  viper.GetBool("diff.insecure"),
+			Title:         viper.GetString("diff.title"),
+			IpswOld:       filepath.Clean(args[0]),
+			IpswNew:       filepath.Clean(args[1]),
+			KDKs:          viper.GetStringSlice("diff.kdk"),
+			LaunchD:       viper.GetBool("diff.launchd"),
+			Firmware:      viper.GetBool("diff.fw"),
+			Features:      viper.GetBool("diff.feat"),
+			Localizations: viper.GetBool("diff.localizations"),
+			Files:         viper.GetBool("diff.files"),
+			Sandbox:       diffSandboxEnabled(),
+			CStrings:      viper.GetBool("diff.strs"),
+			FuncStarts:    viper.GetBool("diff.starts"),
+			Entitlements:  viper.GetBool("diff.ent"),
+			AllowList:     viper.GetStringSlice("diff.allow-list"),
+			BlockList:     viper.GetStringSlice("diff.block-list"),
+			Signatures:    viper.GetString("diff.signatures"),
+			Output:        viper.GetString("diff.output"),
+			Verbose:       Verbose,
+			LowMemory:     viper.GetBool("diff.low-memory"),
+			AEAKeyDB:      viper.GetString("diff.key-db"),
+			AEAKeyVal:     viper.GetString("diff.key-val"),
+			AEAInsecure:   viper.GetBool("diff.insecure"),
 		})
 		if err := d.Diff(); err != nil {
 			return err

@@ -203,6 +203,39 @@ const diffMarkdownTemplate = `
 {{ .Launchd | noescape }}
 {{ end }}
 
+{{ if .Localizations }}
+## Localizations
+{{ if .Localizations.New }}
+### 🆕 NEW
+{{ range $key, $value := .Localizations.New }}
+#### {{ $key | locbase }}
+> {{ $key | code }}
+~~~text
+{{ $value }}
+~~~
+{{ end }}
+{{ end -}}
+{{- if .Localizations.Removed }}
+### ❌ Removed
+{{ range .Localizations.Removed }}
+- {{ . | code }}
+{{ end }}
+{{ end -}}
+{{- if .Localizations.Updated }}
+### ⬆️ Updated
+<details>
+  <summary><i>View Updated</i></summary>
+
+{{ range $key, $value := .Localizations.Updated }}
+#### {{ $key | locbase }}
+> {{ $key | code }}
+{{ $value | noescape }}
+{{ end }}
+
+</details>
+{{ end -}}
+{{ end }}
+
 ## DSC
 
 {{ if .Old.Webkit }}
@@ -250,6 +283,9 @@ var diffMDTmpl = template.Must(template.New("diff").
 		},
 		"base": func(value string) template.HTML {
 			return template.HTML(fmt.Sprintf("`%s`", filepath.Base(value)))
+		},
+		"locbase": func(value string) template.HTML {
+			return template.HTML(fmt.Sprintf("`%s`", localizationDisplayName(value)))
 		},
 		"code": func(value string) template.HTML {
 			return template.HTML(fmt.Sprintf("`%s`", value))
@@ -316,16 +352,17 @@ type diffHTMLPageData struct {
 	NewKernelXNU     string
 	NewKernelDate    string
 
-	Kexts     *htmlMachoDiff
-	KDKs      template.HTML
-	Machos    *htmlMachoDiff
-	Ents      template.HTML
-	Sandbox   template.HTML
-	Firmwares *htmlMachoDiff
-	IBoot     *htmlIBootDiff
-	Launchd   template.HTML
-	Features  *htmlPlistDiff
-	Files     *htmlFileDiff
+	Kexts         *htmlMachoDiff
+	KDKs          template.HTML
+	Machos        *htmlMachoDiff
+	Ents          template.HTML
+	Sandbox       template.HTML
+	Firmwares     *htmlMachoDiff
+	IBoot         *htmlIBootDiff
+	Launchd       template.HTML
+	Features      *htmlPlistDiff
+	Files         *htmlFileDiff
+	Localizations *htmlPlistDiff
 
 	OldWebkit string
 	NewWebkit string
@@ -767,6 +804,15 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
               </ul>
             </li>
             {{- end }}
+            {{- if .Localizations }}
+            <li><a href="#localizations">Localizations</a>
+              <ul>
+                {{- if .Localizations.New }}<li><a href="#localizations-new">New ({{ len .Localizations.New }})</a></li>{{ end }}
+                {{- if .Localizations.Removed }}<li><a href="#localizations-removed">Removed ({{ len .Localizations.Removed }})</a></li>{{ end }}
+                {{- if .Localizations.Updated }}<li><a href="#localizations-updated">Updated ({{ len .Localizations.Updated }})</a></li>{{ end }}
+              </ul>
+            </li>
+            {{- end }}
             {{- if .Features }}
             <li><a href="#feature-flags">Feature Flags</a>
               <ul>
@@ -914,6 +960,40 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             <ul>{{ range .Items }}<li><code>{{ . }}</code></li>{{ end }}</ul>
           </div>
           {{- end }}
+          {{- end }}
+          {{- end }}
+
+          {{- if .Localizations }}
+          <h2 id="localizations">Localizations</h2>
+          {{- if .Localizations.New }}
+          <h3 id="localizations-new">New</h3>
+          <details>
+            <summary>View New ({{ len .Localizations.New }})</summary>
+            {{- range .Localizations.New }}
+            <div class="diff-entry">
+              <h4>{{ .Name }}</h4>
+              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+              {{ .Content }}
+            </div>
+            {{- end }}
+          </details>
+          {{- end }}
+          {{- if .Localizations.Removed }}
+          <h3 id="localizations-removed">Removed</h3>
+          <ul>{{ range .Localizations.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
+          {{- end }}
+          {{- if .Localizations.Updated }}
+          <h3 id="localizations-updated">Updated</h3>
+          <details>
+            <summary>View Updated ({{ len .Localizations.Updated }})</summary>
+            {{- range .Localizations.Updated }}
+            <div class="diff-entry">
+              <h4>{{ .Name }}</h4>
+              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+              {{ .Content }}
+            </div>
+            {{- end }}
+          </details>
           {{- end }}
           {{- end }}
 
@@ -1197,6 +1277,14 @@ func convertIBootDiff(ib *IBootDiff) *htmlIBootDiff {
 }
 
 func convertPlistDiff(pd *PlistDiff) *htmlPlistDiff {
+	return convertPlistDiffWithName(pd, filepath.Base)
+}
+
+func convertLocalizationDiff(pd *PlistDiff) *htmlPlistDiff {
+	return convertPlistDiffWithName(pd, localizationDisplayName)
+}
+
+func convertPlistDiffWithName(pd *PlistDiff, nameForPath func(string) string) *htmlPlistDiff {
 	if pd == nil {
 		return nil
 	}
@@ -1207,7 +1295,7 @@ func convertPlistDiff(pd *PlistDiff) *htmlPlistDiff {
 
 	for _, k := range slices.Sorted(maps.Keys(pd.New)) {
 		out.New = append(out.New, htmlPlistEntry{
-			Name:    filepath.Base(k),
+			Name:    nameForPath(k),
 			Path:    k,
 			Content: renderCodeBlock(pd.New[k]),
 		})
@@ -1215,7 +1303,7 @@ func convertPlistDiff(pd *PlistDiff) *htmlPlistDiff {
 
 	for _, k := range slices.Sorted(maps.Keys(pd.Updated)) {
 		out.Updated = append(out.Updated, htmlPlistEntry{
-			Name:    filepath.Base(k),
+			Name:    nameForPath(k),
 			Path:    k,
 			Content: renderMarkdownFragment(pd.Updated[k]),
 		})
@@ -1259,26 +1347,27 @@ func (d *Diff) renderHTML() (string, error) {
 	var htmlBuf bytes.Buffer
 
 	data := diffHTMLPageData{
-		Title:      d.Title,
-		OldInput:   filepath.Base(d.Old.IPSWPath),
-		NewInput:   filepath.Base(d.New.IPSWPath),
-		OldVersion: d.Old.Version,
-		OldBuild:   d.Old.Build,
-		NewVersion: d.New.Version,
-		NewBuild:   d.New.Build,
-		OldWebkit:  d.Old.Webkit,
-		NewWebkit:  d.New.Webkit,
-		Kexts:      convertMachoDiff(d.Kexts),
-		Machos:     convertMachoDiff(d.Machos),
-		Dylibs:     convertMachoDiff(d.Dylibs),
-		Firmwares:  convertMachoDiff(d.Firmwares),
-		IBoot:      convertIBootDiff(d.IBoot),
-		Features:   convertPlistDiff(d.Features),
-		Files:      convertFileDiff(d.Files),
-		Ents:       renderMarkdownFragment(d.Ents),
-		Sandbox:    renderMarkdownFragment(d.Sandbox),
-		KDKs:       renderMarkdownFragment(d.KDKs),
-		Launchd:    renderMarkdownFragment(d.Launchd),
+		Title:         d.Title,
+		OldInput:      filepath.Base(d.Old.IPSWPath),
+		NewInput:      filepath.Base(d.New.IPSWPath),
+		OldVersion:    d.Old.Version,
+		OldBuild:      d.Old.Build,
+		NewVersion:    d.New.Version,
+		NewBuild:      d.New.Build,
+		OldWebkit:     d.Old.Webkit,
+		NewWebkit:     d.New.Webkit,
+		Kexts:         convertMachoDiff(d.Kexts),
+		Machos:        convertMachoDiff(d.Machos),
+		Dylibs:        convertMachoDiff(d.Dylibs),
+		Firmwares:     convertMachoDiff(d.Firmwares),
+		IBoot:         convertIBootDiff(d.IBoot),
+		Features:      convertPlistDiff(d.Features),
+		Files:         convertFileDiff(d.Files),
+		Localizations: convertLocalizationDiff(d.Localizations),
+		Ents:          renderMarkdownFragment(d.Ents),
+		Sandbox:       renderMarkdownFragment(d.Sandbox),
+		KDKs:          renderMarkdownFragment(d.KDKs),
+		Launchd:       renderMarkdownFragment(d.Launchd),
 	}
 
 	if d.Old.Kernel.Version != nil {
