@@ -148,15 +148,23 @@ func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
 			"/System/Library/FeatureFlags/Changed.plist": "```diff\n- old\n+ new\n```",
 		},
 	}
+	d.Localizations = &PlistDiff{
+		Updated: map[string]string{
+			"FileSystem/System/Library/PrivateFrameworks/CommunicationsFilter.framework/CommunicationsFilter.loctable": "```diff\n+en.BLOCKLIST_LIMIT_ALERT_TITLE = \"Blocked Contacts Limit Reached\"\n```",
+		},
+	}
 	rendered := mustRenderHTML(t, d)
 
 	for _, needle := range []string{
 		`id="iboot"`,
 		`id="files"`,
 		`id="feature-flags"`,
+		`id="localizations"`,
+		`<h4>CommunicationsFilter</h4>`,
 		`new-symbol`,
 		`System/Library/NewFile`,
 		`Changed.plist`,
+		`BLOCKLIST_LIMIT_ALERT_TITLE`,
 	} {
 		if !strings.Contains(rendered, needle) {
 			t.Fatalf("rendered HTML missing %q", needle)

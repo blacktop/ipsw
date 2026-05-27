@@ -69,28 +69,29 @@ type IBootDiff struct {
 }
 
 type Config struct {
-	Title        string
-	IpswOld      string
-	IpswNew      string
-	KDKs         []string
-	LaunchD      bool
-	Firmware     bool
-	Features     bool
-	Files        bool
-	Sandbox      bool
-	CStrings     bool
-	FuncStarts   bool
-	Entitlements bool
-	AllowList    []string
-	BlockList    []string
-	PemDB        string
-	Signatures   string
-	Output       string
-	Verbose      bool
-	LowMemory    bool
-	AEAKeyDB     string
-	AEAKeyVal    string
-	AEAInsecure  bool
+	Title         string
+	IpswOld       string
+	IpswNew       string
+	KDKs          []string
+	LaunchD       bool
+	Firmware      bool
+	Features      bool
+	Files         bool
+	Localizations bool
+	Sandbox       bool
+	CStrings      bool
+	FuncStarts    bool
+	Entitlements  bool
+	AllowList     []string
+	BlockList     []string
+	PemDB         string
+	Signatures    string
+	Output        string
+	Verbose       bool
+	LowMemory     bool
+	AEAKeyDB      string
+	AEAKeyVal     string
+	AEAInsecure   bool
 }
 
 // Context is the context for the diff
@@ -130,19 +131,20 @@ type Diff struct {
 	Old Context `json:"-"`
 	New Context `json:"-"`
 
-	Kexts     *mcmd.MachoDiff `json:"kexts,omitempty"`
-	KDKs      string          `json:"kdks,omitempty"`
-	Ents      string          `json:"ents,omitempty"`
-	Dylibs    *mcmd.MachoDiff `json:"dylibs,omitempty"`
-	Machos    *mcmd.MachoDiff `json:"machos,omitempty"`
-	Firmwares *mcmd.MachoDiff `json:"firmwares,omitempty"`
-	IBoot     *IBootDiff      `json:"iboot,omitempty"`
-	Launchd   string          `json:"launchd,omitempty"`
-	Sandbox   string          `json:"sandbox,omitempty"`
-	Features  *PlistDiff      `json:"features,omitempty"`
-	Files     *FileDiff       `json:"files,omitempty"`
-	tmpDir    string          `json:"-"`
-	conf      *Config
+	Kexts         *mcmd.MachoDiff `json:"kexts,omitempty"`
+	KDKs          string          `json:"kdks,omitempty"`
+	Ents          string          `json:"ents,omitempty"`
+	Dylibs        *mcmd.MachoDiff `json:"dylibs,omitempty"`
+	Machos        *mcmd.MachoDiff `json:"machos,omitempty"`
+	Firmwares     *mcmd.MachoDiff `json:"firmwares,omitempty"`
+	IBoot         *IBootDiff      `json:"iboot,omitempty"`
+	Launchd       string          `json:"launchd,omitempty"`
+	Sandbox       string          `json:"sandbox,omitempty"`
+	Features      *PlistDiff      `json:"features,omitempty"`
+	Files         *FileDiff       `json:"files,omitempty"`
+	Localizations *PlistDiff      `json:"localizations,omitempty"`
+	tmpDir        string          `json:"-"`
+	conf          *Config
 }
 
 // New news the diff
@@ -479,6 +481,13 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing Feature Flags")
 		if err := d.parseFeatureFlags(); err != nil {
 			log.WithError(err).Error("failed to parse feature flags")
+		}
+	}
+
+	if d.conf.Localizations {
+		log.Info("Diffing Localizations")
+		if err := d.parseLocalizations(); err != nil {
+			log.WithError(err).Error("failed to parse localizations")
 		}
 	}
 

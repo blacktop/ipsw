@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"hash/fnv"
 	"maps"
 	"os"
 	"path/filepath"
@@ -503,6 +504,79 @@ func (d *Diff) Markdown() error {
 		}
 	}
 
+	// SUB-SECTION: Localizations
+	if d.Localizations != nil && (len(d.Localizations.New) > 0 || len(d.Localizations.Removed) > 0 || len(d.Localizations.Updated) > 0) {
+		out.WriteString("## Localizations\n\n")
+		if len(d.Localizations.New) > 0 {
+			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Localizations.New)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View New</i></summary>\n\n")
+			keys := slices.Collect(maps.Keys(d.Localizations.New))
+			slices.Sort(keys)
+			if len(d.Localizations.New) < 20 {
+				for _, k := range keys {
+					out.WriteString(fmt.Sprintf("#### %s\n\n", localizationDisplayName(k)))
+					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
+					out.WriteString(fmt.Sprintf("```text\n%s\n```\n", d.Localizations.New[k]))
+				}
+			} else {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "LOCALIZATIONS"), 0o750); err != nil {
+					return err
+				}
+				for _, k := range keys {
+					relName, err := writeLocalizationMarkdownFile(d.conf.Output, k, fmt.Sprintf("```text\n%s\n```\n", d.Localizations.New[k]))
+					if err != nil {
+						return err
+					}
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("LOCALIZATIONS", relName)))
+				}
+			}
+			out.WriteString("\n</details>\n\n")
+		}
+		if len(d.Localizations.Removed) > 0 {
+			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Localizations.Removed)))
+			if len(d.Localizations.Removed) > 30 {
+				out.WriteString("<details>\n" +
+					"  <summary><i>View Removed</i></summary>\n\n")
+			}
+			for _, k := range d.Localizations.Removed {
+				out.WriteString(fmt.Sprintf("- `%s`\n", k))
+			}
+			if len(d.Localizations.Removed) > 30 {
+				out.WriteString("\n</details>\n")
+			}
+			out.WriteString("\n")
+		}
+		if len(d.Localizations.Updated) > 0 {
+			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Localizations.Updated)))
+			out.WriteString("<details>\n" +
+				"  <summary><i>View Updated</i></summary>\n\n")
+
+			keys := slices.Collect(maps.Keys(d.Localizations.Updated))
+			slices.Sort(keys)
+
+			if len(d.Localizations.Updated) < 15 {
+				for _, k := range keys {
+					out.WriteString(fmt.Sprintf("#### %s\n\n", localizationDisplayName(k)))
+					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
+					out.WriteString(fmt.Sprintf("%s\n", d.Localizations.Updated[k]))
+				}
+			} else {
+				if err := os.MkdirAll(filepath.Join(d.conf.Output, "LOCALIZATIONS"), 0o750); err != nil {
+					return err
+				}
+				for _, k := range keys {
+					relName, err := writeLocalizationMarkdownFile(d.conf.Output, k, d.Localizations.Updated[k])
+					if err != nil {
+						return err
+					}
+					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("LOCALIZATIONS", relName)))
+				}
+			}
+			out.WriteString("\n</details>\n\n")
+		}
+	}
+
 	// SUB-SECTION: Feature Flags
 	if d.Features != nil && (len(d.Features.New) > 0 || len(d.Features.Removed) > 0 || len(d.Features.Updated) > 0) {
 		out.WriteString("## Feature Flags\n\n")
@@ -606,4 +680,30 @@ func (d *Diff) Markdown() error {
 	fname := filepath.Join(d.conf.Output, "README.md")
 	log.Infof("Creating diff file Markdown README: %s", fname)
 	return os.WriteFile(fname, []byte(out.String()), 0o644)
+}
+
+func localizationMarkdownFilename(path string) string {
+	base := strings.ReplaceAll(localizationDisplayName(path), " ", "_")
+	if base == "" || base == "." {
+		base = "localization"
+	}
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(filepath.ToSlash(path)))
+	return fmt.Sprintf("%08x_%s.md", hash.Sum32(), base)
+}
+
+func writeLocalizationMarkdownFile(output, path, content string) (string, error) {
+	relName := localizationMarkdownFilename(path)
+	fname := filepath.Join(output, "LOCALIZATIONS", relName)
+	log.Debugf("Creating diff localization Markdown file: %s", fname)
+
+	var out strings.Builder
+	fmt.Fprintf(&out, "## %s\n\n", localizationDisplayName(path))
+	fmt.Fprintf(&out, "> `%s`\n\n", path)
+	out.WriteString(content)
+
+	if err := os.WriteFile(fname, []byte(out.String()), 0o644); err != nil {
+		return "", fmt.Errorf("failed to create diff file: %w", err)
+	}
+	return relName, nil
 }
