@@ -155,7 +155,7 @@ var diffCmd = &cobra.Command{
 			LaunchD:       viper.GetBool("diff.launchd"),
 			Firmware:      viper.GetBool("diff.fw"),
 			Features:      viper.GetBool("diff.feat"),
-			Localizations: viper.GetBool("diff.localizations"),
+			Localizations: viper.GetBool("diff.loc"),
 			Files:         viper.GetBool("diff.files"),
 			Sandbox:       diffSandboxEnabled(),
 			CStrings:      viper.GetBool("diff.strs"),
