@@ -82,6 +82,18 @@ func (sm SymbolMap) Copy(m map[uint64]string) {
 	maps.Copy(sm, m)
 }
 
+// Nearest returns the symbol whose address is the greatest key less than or
+// equal to addr, along with that base address. ok is false when no symbol sits
+// at or below addr. Callers can compute the offset as addr-base.
+func (sm SymbolMap) Nearest(addr uint64) (base uint64, symbol string, ok bool) {
+	for a, s := range sm {
+		if a <= addr && (!ok || a > base) {
+			base, symbol, ok = a, s, true
+		}
+	}
+	return base, symbol, ok
+}
+
 func resolveTextSection(m *macho.File) (*types.Section, error) {
 	for _, segment := range []string{"__TEXT_EXEC", "__TEXT"} {
 		text := m.Section(segment, "__text")
