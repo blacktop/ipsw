@@ -30,10 +30,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/invopop/jsonschema"
@@ -52,7 +54,7 @@ func init() {
 	kernelSymbolicateCmd.Flags().Bool("schema", false, "Generate JSON schema")
 	kernelSymbolicateCmd.Flags().MarkHidden("schema")
 	kernelSymbolicateCmd.Flags().StringP("signatures", "s", "", "Path to signatures folder")
-	kernelSymbolicateCmd.Flags().Uint64P("lookup", "l", 0, "Lookup a symbol by address")
+	kernelSymbolicateCmd.Flags().Uint64P("lookup", "l", 0, "Lookup the nearest symbol for an address (input may be a kernelcache or a symbols JSON map)")
 	kernelSymbolicateCmd.Flags().StringP("output", "o", "", "Folder to write files to")
 	kernelSymbolicateCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	kernelSymbolicateCmd.MarkFlagDirname("output")
@@ -69,9 +71,16 @@ func init() {
 
 // kernelSymbolicateCmd represents the symbolicate command
 var kernelSymbolicateCmd = &cobra.Command{
-	Use:           "symbolicate",
-	Aliases:       []string{"sym"},
-	Short:         "Symbolicate kernelcache",
+	Use:     "symbolicate",
+	Aliases: []string{"sym"},
+	Short:   "Symbolicate kernelcache",
+	Example: heredoc.Doc(`
+		# Symbolicate a kernelcache using signatures and write the map to JSON
+		❯ ipsw kernel symbolicate --signatures /path/to/sigs --json kernelcache.release.iPhone18,1
+		# Look up the nearest symbol for an address directly from a kernelcache
+		❯ ipsw kernel symbolicate --signatures /path/to/sigs --lookup 0xfffffe000aecb258 kernelcache.release.iPhone18,1
+		# Look up the nearest symbol using a previously generated symbol map
+		❯ ipsw kernel symbolicate --lookup 0xfffffe000aecb258 kernelcache.release.iPhone18,1.symbols.json`),
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -97,40 +106,28 @@ var kernelSymbolicateCmd = &cobra.Command{
 			return nil
 		}
 
-		if viper.GetUint64("kernel.symbolicate.lookup") != 0 {
+		sigDir := viper.GetString("kernel.symbolicate.signatures")
+
+		if addr := viper.GetUint64("kernel.symbolicate.lookup"); addr != 0 {
 			log.Info("Looking up symbol")
-			smap := signature.NewSymbolMap()
-			if err := smap.LoadJSON(args[0]); err != nil {
-				return fmt.Errorf("failed to load symbol map: %v", err)
+			smap, err := loadOrBuildSymbolMap(args[0], selectedArch, sigDir, quiet)
+			if err != nil {
+				return err
 			}
-			addr := viper.GetUint64("kernel.symbolicate.lookup")
 			if sym, ok := smap[addr]; ok {
 				fmt.Printf("%#x %s\n", addr, sym)
 				return nil
 			}
-			return fmt.Errorf("symbol not found at address %#x", addr)
-		}
-
-		var sigs []signature.Symbolicator
-		if sigDir := viper.GetString("kernel.symbolicate.signatures"); sigDir != "" {
-			log.Info("Parsing Signatures")
-			sigs, err = signature.Parse(sigDir)
-			if err != nil {
-				return fmt.Errorf("failed to parse signatures: %v", err)
+			if base, sym, ok := smap.Nearest(addr); ok {
+				fmt.Printf("%#x %s+%#x\n", addr, sym, addr-base)
+				return nil
 			}
+			return fmt.Errorf("no symbol found at or below address %#x", addr)
 		}
 
-		smap := signature.NewSymbolMap()
-		m, err := mcmd.OpenMachO(args[0], selectedArch)
+		smap, err := buildSymbolMapFromKernelcache(args[0], selectedArch, sigDir, quiet)
 		if err != nil {
-			return fmt.Errorf("failed to open kernelcache: %v", err)
-		}
-		defer m.Close()
-
-		// symbolicate kernelcache
-		log.WithField("kernelcache", filepath.Base(args[0])).Info("Symbolicating...")
-		if err := smap.SymbolicateMachO(m.File, filepath.Base(args[0]), sigs, quiet); err != nil {
-			return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+			return err
 		}
 
 		// test the accuracy of the symbolication on the source KDK material
@@ -201,6 +198,47 @@ var kernelSymbolicateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// loadOrBuildSymbolMap returns a SymbolMap for path. When path is a kernelcache
+// Mach-O it is symbolicated in-memory (using the optional signatures); otherwise
+// path is loaded as a map[uint64]string JSON file (e.g. a prior --json run).
+func loadOrBuildSymbolMap(path, arch, sigDir string, quiet bool) (signature.SymbolMap, error) {
+	if ok, _ := magic.IsMachO(path); ok {
+		return buildSymbolMapFromKernelcache(path, arch, sigDir, quiet)
+	}
+	smap := signature.NewSymbolMap()
+	if err := smap.LoadJSON(path); err != nil {
+		return nil, fmt.Errorf("%q is neither a kernelcache Mach-O nor a valid symbol-map JSON file: %w", path, err)
+	}
+	return smap, nil
+}
+
+// buildSymbolMapFromKernelcache opens a kernelcache and symbolicates it,
+// applying signatures from sigDir when provided.
+func buildSymbolMapFromKernelcache(path, arch, sigDir string, quiet bool) (signature.SymbolMap, error) {
+	var sigs []signature.Symbolicator
+	if sigDir != "" {
+		log.Info("Parsing Signatures")
+		var err error
+		sigs, err = signature.Parse(sigDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse signatures: %v", err)
+		}
+	}
+
+	m, err := mcmd.OpenMachO(path, arch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open kernelcache: %v", err)
+	}
+	defer m.Close()
+
+	smap := signature.NewSymbolMap()
+	log.WithField("kernelcache", filepath.Base(path)).Info("Symbolicating...")
+	if err := smap.SymbolicateMachO(m.File, filepath.Base(path), sigs, quiet); err != nil {
+		return nil, fmt.Errorf("failed to symbolicate kernelcache: %v", err)
+	}
+	return smap, nil
 }
 
 var kernelSymbolSuffixRE = regexp.MustCompile(`\.\d+$`)
