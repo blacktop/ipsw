@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/signature"
 	"github.com/fatih/color"
@@ -1086,7 +1087,48 @@ func (i *Ips) panicFrameAddr(frame PanicFrame) (addr, slide uint64, wasSlid bool
 	return addr, slide, wasSlid
 }
 
-func (i *Ips) Symbolicate210(ipswPath string) (err error) {
+// openDSCs opens the dyld_shared_caches used for userspace symbolication. With
+// an IPSW it mounts and opens the IPSW's caches; otherwise it opens the supplied
+// paths (e.g. an Xcode DeviceSupport dump). The returned func releases the
+// caches (and unmounts the IPSW when applicable).
+func (i *Ips) openDSCs(ipswPath string, dscPaths []string) ([]*dyld.File, func(), error) {
+	if ipswPath != "" {
+		ctx, fs, err := dsc.OpenFromIPSW(ipswPath, i.Config.PemDB, false, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open DSC from IPSW: %w", err)
+		}
+		return fs, func() {
+			for _, f := range fs {
+				f.Close()
+			}
+			ctx.Unmount()
+		}, nil
+	}
+
+	var fs []*dyld.File
+	for _, p := range dscPaths {
+		f, err := dyld.Open(p)
+		if err != nil {
+			for _, opened := range fs {
+				opened.Close()
+			}
+			return nil, nil, fmt.Errorf("failed to open DeviceSupport DSC %s: %w", p, err)
+		}
+		fs = append(fs, f)
+	}
+	return fs, func() {
+		for _, f := range fs {
+			f.Close()
+		}
+	}, nil
+}
+
+// Symbolicate210 symbolicates a 210/288 panic crashlog. When ipswPath is set,
+// it extracts the matching kernelcache and opens the IPSW's DSC for full
+// kernel + userspace symbolication. When ipswPath is empty and dscPaths are
+// supplied (e.g. an Xcode DeviceSupport dump), only userspace frames backed by
+// those dyld_shared_caches are symbolicated; kernel frames are left raw.
+func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string) (err error) {
 
 	i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
 	if err != nil {
@@ -1138,7 +1180,7 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 
 	/* SYMBOLICATE KERNELCACHE */
 	var kc *macho.File
-	{
+	if ipswPath != "" {
 		// If crashlog has no device identifier, prompt user to select from available devices
 		device := i.Payload.Product
 		log.WithField("device", device).Debug("Looking for kernelcache matching crashlog device")
@@ -1396,75 +1438,77 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	}
 
 	/* SYMBOLICATE FILESYSTEM MACHOS */
-	if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
-		if total == 0 {
-			return ErrDone // break
-		}
-		for idx, img := range i.Payload.BinaryImages {
-			if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
-				i.Payload.BinaryImages[idx].Path = path
-				i.Payload.BinaryImages[idx].Name = path
-				// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
-				i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
-				// Read peek bytes for panicked thread user frames from this binary (--peek flag)
-				if i.Config.Peek && i.Payload.panic210 != nil {
-					panicPID := i.Payload.panic210.PanickedTask.PID
-					panicTID := i.Payload.panic210.PanickedThread.TID
-					if proc, ok := i.Payload.ProcessByPid[panicPID]; ok {
-						if thread, ok := proc.ThreadByID[panicTID]; ok {
-							for frameIdx := range thread.UserFrames {
-								frame := &i.Payload.ProcessByPid[panicPID].ThreadByID[panicTID].UserFrames[frameIdx]
-								if frame.ImageIndex == uint64(idx) {
-									// Compute the VM address relative to MachO base (not runtime base)
-									// frame.ImageOffset is raw offset within image
-									// m.GetBaseAddress() is MachO's preferred load address
-									vmAddr := m.GetBaseAddress() + frame.ImageOffset
-									// Get function boundaries for boundary checking
-									var funcStart, funcEnd uint64
-									if fn, err := m.GetFunctionForVMAddr(vmAddr); err == nil {
-										funcStart = fn.StartAddr
-										funcEnd = fn.EndAddr
-									}
-									if peekBytes, startAddr, frameIdx := readPeekBytes(m, vmAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
-										frame.PeekBytes = peekBytes
-										// Store the runtime (slid) address for display
-										slide := i.Payload.BinaryImages[idx].Slide
-										slidAddr := startAddr + slide
-										frame.PeekAddr = slidAddr
-										frame.PeekFrameIdx = frameIdx
-										// Extract symbols for branch targets in peek bytes
-										// Use slid address so keys match what formatPeekDisassembly will look up
-										frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, slide, m)
+	if ipswPath != "" {
+		if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
+			if total == 0 {
+				return ErrDone // break
+			}
+			for idx, img := range i.Payload.BinaryImages {
+				if m.UUID() != nil && strings.EqualFold(img.UUID, m.UUID().UUID.String()) {
+					i.Payload.BinaryImages[idx].Path = path
+					i.Payload.BinaryImages[idx].Name = path
+					// i.Payload.BinaryImages[idx].Name = filepath.Base(path)
+					i.Payload.BinaryImages[idx].Slide = i.Payload.BinaryImages[idx].Base - m.GetBaseAddress()
+					// Read peek bytes for panicked thread user frames from this binary (--peek flag)
+					if i.Config.Peek && i.Payload.panic210 != nil {
+						panicPID := i.Payload.panic210.PanickedTask.PID
+						panicTID := i.Payload.panic210.PanickedThread.TID
+						if proc, ok := i.Payload.ProcessByPid[panicPID]; ok {
+							if thread, ok := proc.ThreadByID[panicTID]; ok {
+								for frameIdx := range thread.UserFrames {
+									frame := &i.Payload.ProcessByPid[panicPID].ThreadByID[panicTID].UserFrames[frameIdx]
+									if frame.ImageIndex == uint64(idx) {
+										// Compute the VM address relative to MachO base (not runtime base)
+										// frame.ImageOffset is raw offset within image
+										// m.GetBaseAddress() is MachO's preferred load address
+										vmAddr := m.GetBaseAddress() + frame.ImageOffset
+										// Get function boundaries for boundary checking
+										var funcStart, funcEnd uint64
+										if fn, err := m.GetFunctionForVMAddr(vmAddr); err == nil {
+											funcStart = fn.StartAddr
+											funcEnd = fn.EndAddr
+										}
+										if peekBytes, startAddr, frameIdx := readPeekBytes(m, vmAddr, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
+											frame.PeekBytes = peekBytes
+											// Store the runtime (slid) address for display
+											slide := i.Payload.BinaryImages[idx].Slide
+											slidAddr := startAddr + slide
+											frame.PeekAddr = slidAddr
+											frame.PeekFrameIdx = frameIdx
+											// Extract symbols for branch targets in peek bytes
+											// Use slid address so keys match what formatPeekDisassembly will look up
+											frame.PeekSymbols = extractPeekSymbols(peekBytes, slidAddr, slide, m)
+										}
 									}
 								}
 							}
 						}
 					}
-				}
-				for _, fn := range m.GetFunctions() {
-					if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
-						for _, sym := range syms {
-							fn.Name = sym.Name
+					for _, fn := range m.GetFunctions() {
+						if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+							for _, sym := range syms {
+								fn.Name = sym.Name
+							}
+							fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+							fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+							machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+							uuidFuncMap[strings.ToUpper(img.UUID)] = append(uuidFuncMap[strings.ToUpper(img.UUID)], fn)
+						} else {
+							fn.StartAddr += i.Payload.BinaryImages[idx].Slide
+							fn.EndAddr += i.Payload.BinaryImages[idx].Slide
+							fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
+							machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
+							uuidFuncMap[strings.ToUpper(img.UUID)] = append(uuidFuncMap[strings.ToUpper(img.UUID)], fn)
 						}
-						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
-						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
-						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
-						uuidFuncMap[strings.ToUpper(img.UUID)] = append(uuidFuncMap[strings.ToUpper(img.UUID)], fn)
-					} else {
-						fn.StartAddr += i.Payload.BinaryImages[idx].Slide
-						fn.EndAddr += i.Payload.BinaryImages[idx].Slide
-						fn.Name = fmt.Sprintf("func_%x", fn.StartAddr)
-						machoFuncMap[i.Payload.BinaryImages[idx].Name] = append(machoFuncMap[i.Payload.BinaryImages[idx].Name], fn)
-						uuidFuncMap[strings.ToUpper(img.UUID)] = append(uuidFuncMap[strings.ToUpper(img.UUID)], fn)
 					}
+					total--
 				}
-				total--
 			}
-		}
-		return nil
-	}); err != nil {
-		if !errors.Is(err, ErrDone) {
-			return fmt.Errorf("failed to symbolicate: %w", err)
+			return nil
+		}); err != nil {
+			if !errors.Is(err, ErrDone) {
+				return fmt.Errorf("failed to symbolicate: %w", err)
+			}
 		}
 	}
 
@@ -1475,16 +1519,11 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 	// 	}
 	// }
 
-	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, i.Config.PemDB, false, true)
+	fs, closeDSCs, err := i.openDSCs(ipswPath, dscPaths)
 	if err != nil {
-		return fmt.Errorf("failed to open DSC from IPSW: %w", err)
+		return err
 	}
-	defer func() {
-		for _, f := range fs {
-			f.Close()
-		}
-		ctx.Unmount()
-	}()
+	defer closeDSCs()
 
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
@@ -1573,60 +1612,62 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}
 			}
 			/* KernelFrames */
-			for idx, frame := range thread.KernelFrames {
-				i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
-				if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
-					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
-				}
-				if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
-					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
-				} else {
-					if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName, "image_") {
-						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (maybe a kext)"
+			if kc != nil {
+				for idx, frame := range thread.KernelFrames {
+					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
+					if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
 					}
-				}
-				if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
-					continue // skip absolute
-				} else if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
-					found := false
-					for _, fn := range funcs {
-						if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset &&
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset < fn.EndAddr {
-							found = true
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
-							if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-fn.StartAddr != 0 {
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - fn.StartAddr
-							}
-							break
+					if len(i.Payload.BinaryImages[frame.ImageIndex].Name) > 0 {
+						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName = i.Payload.BinaryImages[frame.ImageIndex].Name
+					} else {
+						if strings.HasPrefix(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName, "image_") {
+							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (maybe a kext)"
 						}
 					}
-					if !found {
-						// if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "??" {
-						// 	i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (??? maybe kext?)"
-						// }
-						if seg := kc.FindSegmentForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); seg != nil {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = seg.Name
-							if sec := kc.FindSectionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); sec != nil {
-								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol += "." + sec.Name
+					if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "absolute" {
+						continue // skip absolute
+					} else if funcs, ok := machoFuncMap[i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName]; ok {
+						found := false
+						for _, fn := range funcs {
+							if fn.StartAddr <= i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset &&
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset < fn.EndAddr {
+								found = true
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = demangleSym(i.Config.Demangle, fn.Name)
+								if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset-fn.StartAddr != 0 {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].SymbolLocation = i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset - fn.StartAddr
+								}
+								break
 							}
-						} else {
-							i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = "???"
-							log.WithFields(log.Fields{
-								"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
-								"thread": tid,
-								"frame":  idx,
-								"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
-							}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
 						}
+						if !found {
+							// if i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName == "??" {
+							// 	i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName += " (??? maybe kext?)"
+							// }
+							if seg := kc.FindSegmentForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); seg != nil {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = seg.Name
+								if sec := kc.FindSectionForVMAddr(i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset); sec != nil {
+									i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol += "." + sec.Name
+								}
+							} else {
+								i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Symbol = "???"
+								log.WithFields(log.Fields{
+									"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+									"thread": tid,
+									"frame":  idx,
+									"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+								}).Debugf("failed to find function for process offset %#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset)
+							}
+						}
+					} else {
+						log.WithFields(log.Fields{
+							"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
+							"thread": tid,
+							"frame":  idx,
+							"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
+							"offset": fmt.Sprintf("%#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset),
+						}).Errorf("unexpected image")
 					}
-				} else {
-					log.WithFields(log.Fields{
-						"proc":   fmt.Sprintf("%s [%d]", proc.Name, pid),
-						"thread": tid,
-						"frame":  idx,
-						"img":    i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageName,
-						"offset": fmt.Sprintf("%#x", i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset),
-					}).Errorf("unexpected image")
 				}
 			}
 
@@ -1643,25 +1684,27 @@ func (i *Ips) Symbolicate210(ipswPath string) (err error) {
 				}()
 
 				// Read peek bytes for kernel frames from kernelcache
-				for idx := range i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames {
-					frame := &i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx]
-					if frame.ImageName == "absolute" {
-						continue
-					}
-					if frame.ImageOffset > 0 {
-						// Get function boundaries for boundary checking
-						var funcStart, funcEnd uint64
-						if fn, err := kc.GetFunctionForVMAddr(frame.ImageOffset); err == nil {
-							funcStart = fn.StartAddr
-							funcEnd = fn.EndAddr
+				if kc != nil {
+					for idx := range i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames {
+						frame := &i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx]
+						if frame.ImageName == "absolute" {
+							continue
 						}
-						// Use the runtime (slid) address for reading; kc segments are already in slid VM space.
-						if peekBytes, startAddr, frameIdx := readPeekBytes(kc, frame.ImageOffset, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
-							frame.PeekBytes = peekBytes
-							frame.PeekAddr = startAddr
-							frame.PeekFrameIdx = frameIdx
-							// Extract symbols for branch targets in peek bytes (kernel has no slide)
-							frame.PeekSymbols = extractPeekSymbols(peekBytes, startAddr, 0, kc)
+						if frame.ImageOffset > 0 {
+							// Get function boundaries for boundary checking
+							var funcStart, funcEnd uint64
+							if fn, err := kc.GetFunctionForVMAddr(frame.ImageOffset); err == nil {
+								funcStart = fn.StartAddr
+								funcEnd = fn.EndAddr
+							}
+							// Use the runtime (slid) address for reading; kc segments are already in slid VM space.
+							if peekBytes, startAddr, frameIdx := readPeekBytes(kc, frame.ImageOffset, i.Config.PeekCount, funcStart, funcEnd); peekBytes != nil {
+								frame.PeekBytes = peekBytes
+								frame.PeekAddr = startAddr
+								frame.PeekFrameIdx = frameIdx
+								// Extract symbols for branch targets in peek bytes (kernel has no slide)
+								frame.PeekSymbols = extractPeekSymbols(peekBytes, startAddr, 0, kc)
+							}
 						}
 					}
 				}
