@@ -34,6 +34,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/xcode"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -90,6 +91,11 @@ var symbolicateCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 	# Symbolicate a panic crashlog (BugType=210) with an IPSW
 	❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
+
+	# Symbolicate without an IPSW/DSC; falls back to the matching Xcode DeviceSupport DSC
+	❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips
+	  # Uses ~/Library/Developer/Xcode/<Platform> DeviceSupport/<device> (<build>)/Symbols
+	  # (userspace frames only for panics; kernel frames still need an IPSW)
 
 	# Show disassembly around panic frames with --peek (default 5 instructions)
 	❯ ipsw symbolicate panic.ips firmware.ipsw --peek
@@ -223,7 +229,13 @@ var symbolicateCmd = &cobra.Command{
 					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
 						return err
 					}
+				} else if ds, err := xcode.FindDeviceSupportDSCs(ips.Payload.Product, ips.Header.Version(), ips.Header.Build()); err == nil {
+					log.WithField("dsc", ds.DSCs[0]).Infof("Using Xcode DeviceSupport DSC for %s (userspace frames only; kernel frames need an IPSW)", filepath.Base(ds.Dir))
+					if err := ips.Symbolicate210("", ds.DSCs); err != nil {
+						return err
+					}
 				} else {
+					log.WithError(err).Debug("no Xcode DeviceSupport DSC found")
 					log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 				}
 			} else {
@@ -252,7 +264,7 @@ var symbolicateCmd = &cobra.Command{
 							i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
 						)
 					}
-					if err := ips.Symbolicate210(filepath.Clean(args[1])); err != nil {
+					if err := ips.Symbolicate210(filepath.Clean(args[1]), nil); err != nil {
 						return err
 					}
 				}
@@ -265,9 +277,17 @@ var symbolicateCmd = &cobra.Command{
 			}
 			defer crashLog.Close()
 
+			dscPath := ""
 			if len(args) > 1 {
-				dscPath := filepath.Clean(args[1])
+				dscPath = filepath.Clean(args[1])
+			} else if ds, err := xcode.FindDeviceSupportDSCs(crashLog.HardwareModel, crashLog.OSVersion, crashLog.OSBuild); err == nil {
+				dscPath = ds.DSCs[0]
+				log.WithField("dsc", dscPath).Infof("Using Xcode DeviceSupport DSC for %s", filepath.Base(ds.Dir))
+			} else {
+				log.WithError(err).Debug("no Xcode DeviceSupport DSC found")
+			}
 
+			if dscPath != "" {
 				fileInfo, err := os.Lstat(dscPath)
 				if err != nil {
 					return fmt.Errorf("file %s does not exist", dscPath)
