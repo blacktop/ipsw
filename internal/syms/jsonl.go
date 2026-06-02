@@ -132,6 +132,9 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 // server backed by this output returns byte-identical results to ipswd.
 func ScanJSONL(cfg *JSONLConfig, w io.Writer) error {
 	bw := bufio.NewWriter(w)
+	// Flush buffered lines on every return path, including early errors, so an
+	// aborted scan still writes the records it already produced.
+	defer bw.Flush()
 	em := newJSONLEmitter(bw)
 
 	sha1, err := utils.Sha1(cfg.IPSW)
@@ -141,6 +144,9 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) error {
 	inf, err := info.Parse(cfg.IPSW)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW info: %w", err)
+	}
+	if inf.Plists == nil || inf.Plists.BuildManifest == nil {
+		return fmt.Errorf("missing BuildManifest in %s (not a valid IPSW?)", cfg.IPSW)
 	}
 	if err := em.emit(&ipswLine{
 		Type:     "ipsw",

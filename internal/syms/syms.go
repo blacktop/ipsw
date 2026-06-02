@@ -472,9 +472,11 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to get IPSW from database: %w", err)
 	}
-	// Kernels and DSCs are rebuilt from scratch on rescan.
+	// The kernel, DSC, and file system graphs are rebuilt from scratch on
+	// rescan; clear them so a re-scan replaces rather than duplicates entries.
 	ipsw.Kernels = nil
 	ipsw.DSCs = nil
+	ipsw.FileSystem = nil
 	acc := newDBAccumulator(ipsw)
 	/* KERNEL */
 	if err := scanKernels(ipswPath, sigsDir, acc.visit); err != nil {
