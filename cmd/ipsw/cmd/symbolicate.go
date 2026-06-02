@@ -34,6 +34,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/internal/xcode"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -229,13 +230,22 @@ var symbolicateCmd = &cobra.Command{
 					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
 						return err
 					}
-				} else if ds, err := xcode.FindDeviceSupportDSCs(ips.Payload.Product, ips.Header.Version(), ips.Header.Build()); err == nil {
-					log.WithField("dsc", ds.DSCs[0]).Infof("Using Xcode DeviceSupport DSC for %s (userspace frames only; kernel frames need an IPSW)", filepath.Base(ds.Dir))
-					if err := ips.Symbolicate210("", ds.DSCs); err != nil {
-						return err
+				} else if ds, err := xcode.FindDeviceSupport(ips.Payload.Product, ips.Header.Version(), ips.Header.Build()); err == nil {
+					if len(ds.DSCs) > 0 {
+						log.Infof("Using Xcode DeviceSupport DSC for %s", filepath.Base(ds.Dir))
+						utils.Indent(log.Warn, 2)("userspace frames only (kernel frames need an IPSW)")
+						if err := ips.Symbolicate210("", ds.DSCs, ""); err != nil {
+							return err
+						}
+					} else {
+						log.Infof("Using Xcode DeviceSupport dylibs for %s", filepath.Base(ds.Dir))
+						utils.Indent(log.Warn, 2)("no DSC; userspace frames only (kernel frames need an IPSW)")
+						if err := ips.Symbolicate210("", nil, ds.Symbols); err != nil {
+							return err
+						}
 					}
 				} else {
-					log.WithError(err).Debug("no Xcode DeviceSupport DSC found")
+					log.WithError(err).Debug("no Xcode DeviceSupport dump found")
 					log.Warnf("please supply %s %s IPSW for symbolication", ips.Payload.Product, ips.Header.OsVersion)
 				}
 			} else {
@@ -264,7 +274,7 @@ var symbolicateCmd = &cobra.Command{
 							i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
 						)
 					}
-					if err := ips.Symbolicate210(filepath.Clean(args[1]), nil); err != nil {
+					if err := ips.Symbolicate210(filepath.Clean(args[1]), nil, ""); err != nil {
 						return err
 					}
 				}
@@ -280,11 +290,16 @@ var symbolicateCmd = &cobra.Command{
 			dscPath := ""
 			if len(args) > 1 {
 				dscPath = filepath.Clean(args[1])
-			} else if ds, err := xcode.FindDeviceSupportDSCs(crashLog.HardwareModel, crashLog.OSVersion, crashLog.OSBuild); err == nil {
-				dscPath = ds.DSCs[0]
-				log.WithField("dsc", dscPath).Infof("Using Xcode DeviceSupport DSC for %s", filepath.Base(ds.Dir))
+			} else if ds, err := xcode.FindDeviceSupport(crashLog.HardwareModel, crashLog.OSVersion, crashLog.OSBuild); err == nil {
+				if len(ds.DSCs) > 0 {
+					dscPath = ds.DSCs[0]
+					log.Infof("Using Xcode DeviceSupport DSC for %s", filepath.Base(ds.Dir))
+					utils.Indent(log.Info, 2)("dsc=" + dscPath)
+				} else {
+					log.Warnf("Xcode DeviceSupport dump for %s has no dyld_shared_cache; loose-dylib symbolication for old-style (109) crashes is not yet supported", filepath.Base(ds.Dir))
+				}
 			} else {
-				log.WithError(err).Debug("no Xcode DeviceSupport DSC found")
+				log.WithError(err).Debug("no Xcode DeviceSupport dump found")
 			}
 
 			if dscPath != "" {
