@@ -56,8 +56,9 @@ func init() {
 
 // symbolsCmd represents the symbols command
 var symbolsCmd = &cobra.Command{
-	Use:   "symbols <IPSW>",
-	Short: "Emit IPSW symbols as JSONL",
+	Use:     "symbols <IPSW>",
+	Aliases: []string{"syms"},
+	Short:   "Emit IPSW symbols as JSONL",
 	Long: `Emit every symbol in an IPSW as newline-delimited JSON (JSONL).
 
 The stream is emitted in this order: one "ipsw" line, then for each image an
@@ -70,6 +71,7 @@ database stores them, so a server backed by this output returns byte-identical
 results to the daemon.`,
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

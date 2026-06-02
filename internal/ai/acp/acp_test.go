@@ -292,6 +292,10 @@ func (a *testACPAgent) Authenticate(ctx context.Context, _ acpsdk.AuthenticateRe
 	return acpsdk.AuthenticateResponse{}, nil
 }
 
+func (a *testACPAgent) Logout(ctx context.Context, _ acpsdk.LogoutRequest) (acpsdk.LogoutResponse, error) {
+	return acpsdk.LogoutResponse{}, nil
+}
+
 func (a *testACPAgent) Initialize(ctx context.Context, _ acpsdk.InitializeRequest) (acpsdk.InitializeResponse, error) {
 	return acpsdk.InitializeResponse{
 		ProtocolVersion:   acpsdk.ProtocolVersionNumber,
@@ -312,15 +316,22 @@ func (a *testACPAgent) ListSessions(ctx context.Context, _ acpsdk.ListSessionsRe
 }
 
 func (a *testACPAgent) NewSession(ctx context.Context, _ acpsdk.NewSessionRequest) (acpsdk.NewSessionResponse, error) {
+	modelCategory := acpsdk.SessionConfigOptionCategoryModel
+	options := acpsdk.SessionConfigSelectOptionsUngrouped{{
+		Name:  "Test Model",
+		Value: acpsdk.SessionConfigValueId("test-model"),
+	}}
 	return acpsdk.NewSessionResponse{
 		SessionId: acpsdk.SessionId("test-session"),
-		Models: &acpsdk.SessionModelState{
-			CurrentModelId: acpsdk.ModelId("test-model"),
-			AvailableModels: []acpsdk.ModelInfo{{
-				Name:    "Test Model",
-				ModelId: acpsdk.ModelId("test-model"),
-			}},
-		},
+		ConfigOptions: []acpsdk.SessionConfigOption{{
+			Select: &acpsdk.SessionConfigOptionSelect{
+				Category:     &modelCategory,
+				Id:           acpsdk.SessionConfigId("model"),
+				Name:         "Model",
+				CurrentValue: acpsdk.SessionConfigValueId("test-model"),
+				Options:      acpsdk.SessionConfigSelectOptions{Ungrouped: &options},
+			},
+		}},
 	}, nil
 }
 
