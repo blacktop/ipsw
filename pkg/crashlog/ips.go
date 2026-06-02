@@ -1123,12 +1123,25 @@ func (i *Ips) openDSCs(ipswPath string, dscPaths []string) ([]*dyld.File, func()
 	}, nil
 }
 
+// hasSharedCacheImage reports whether any binary image is the shared cache,
+// i.e. whether there are userspace frames a DSC/loose-dylib source could resolve.
+func (i *Ips) hasSharedCacheImage() bool {
+	for _, img := range i.Payload.BinaryImages {
+		if img.Name == "dyld_shared_cache" {
+			return true
+		}
+	}
+	return false
+}
+
 // Symbolicate210 symbolicates a 210/288 panic crashlog. When ipswPath is set,
 // it extracts the matching kernelcache and opens the IPSW's DSC for full
-// kernel + userspace symbolication. When ipswPath is empty and dscPaths are
-// supplied (e.g. an Xcode DeviceSupport dump), only userspace frames backed by
-// those dyld_shared_caches are symbolicated; kernel frames are left raw.
-func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string) (err error) {
+// kernel + userspace symbolication. When ipswPath is empty, only userspace
+// frames are symbolicated (kernel frames are left raw) using, in order of
+// preference: the dyld_shared_caches at dscPaths, or — when those are absent —
+// the loose extracted dylibs under looseDir (a modern Xcode DeviceSupport
+// "Symbols" dump, which no longer ships the cache itself).
+func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string) (err error) {
 
 	i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
 	if err != nil {
@@ -1525,6 +1538,19 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string) (err error) {
 	}
 	defer closeDSCs()
 
+	// When no dyld_shared_cache is available, fall back to the loose extracted
+	// dylibs from an Xcode DeviceSupport dump for userspace symbolication. Only
+	// build the (expensive) index if the crash actually has shared-cache frames.
+	var lc *looseCache
+	if len(fs) == 0 && looseDir != "" && i.hasSharedCacheImage() {
+		if lc, err = newLooseCache(looseDir); err != nil {
+			log.WithError(err).Warn("failed to index DeviceSupport dylibs")
+			lc = nil
+		} else {
+			defer lc.Close()
+		}
+	}
+
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
 			for idx, frame := range thread.UserFrames {
@@ -1566,6 +1592,20 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string) (err error) {
 									}
 								} else {
 									i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Symbol = fmt.Sprintf("func_%x", fn.StartAddr)
+								}
+							}
+						}
+					}
+					if lc != nil {
+						uf := &i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx]
+						if name, sym, symStart, ok := lc.symbolicate(uf.ImageOffset); ok {
+							if name != "" {
+								uf.ImageName = name
+							}
+							if sym != "" {
+								uf.Symbol = demangleSym(i.Config.Demangle, sym)
+								if uf.ImageOffset-symStart != 0 {
+									uf.SymbolLocation = uf.ImageOffset - symStart
 								}
 							}
 						}

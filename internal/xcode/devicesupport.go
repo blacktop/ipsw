@@ -18,7 +18,8 @@ const (
 
 // deviceSupportCacheGlobs are the locations of the main dyld_shared_cache file
 // inside a DeviceSupport "Symbols" dump, relative to the dump root. The layouts
-// mirror the on-device filesystem.
+// mirror the on-device filesystem. Modern Xcode no longer ships the cache here
+// (only the extracted dylibs), so a dump may match none of these.
 var deviceSupportCacheGlobs = []string{
 	filepath.Join(deviceSupportCryptexCacheDir, "dyld_shared_cache_*"),
 	filepath.Join(deviceSupportSystemCacheDir, "dyld_shared_cache_*"),
@@ -27,29 +28,30 @@ var deviceSupportCacheGlobs = []string{
 
 // DeviceSupport describes a matched Xcode DeviceSupport symbol dump.
 type DeviceSupport struct {
-	Dir  string   // the matched "<Platform> DeviceSupport/<device dir>" directory
-	DSCs []string // main (non-subcache) dyld_shared_cache files found inside it
+	Dir     string   // the matched "<Platform> DeviceSupport/<device dir>" directory
+	Symbols string   // the symbol-dump root inside Dir (loose dylibs under System/, usr/)
+	DSCs    []string // main dyld_shared_cache files found inside it (empty on modern dumps)
 }
 
-// FindDeviceSupportDSCs locates the dyld_shared_cache files in the Xcode
-// DeviceSupport dump matching the given device build (and, when available,
-// product and version). Xcode populates these dumps automatically when a
-// device is connected, e.g.:
+// FindDeviceSupport locates the Xcode DeviceSupport symbol dump matching the
+// given device build (and, when available, product and version). Xcode
+// populates these dumps automatically when a device is connected, e.g.:
 //
-//	~/Library/Developer/Xcode/iOS DeviceSupport/iPhone12,1 26.5 (23F77)/Symbols
+//	~/Library/Developer/Xcode/iOS DeviceSupport/iPhone12,1 26.4.2 (23E261)/Symbols
 //
-// product and version are used to disambiguate when multiple dumps share a
-// build; build is required because it uniquely identifies a firmware. On
-// success the returned DeviceSupport always has at least one DSC.
-func FindDeviceSupportDSCs(product, version, build string) (*DeviceSupport, error) {
+// On success the dump always has either a dyld_shared_cache (DSCs) or a loose
+// dylib tree (Symbols/System or Symbols/usr); modern Xcode ships only the
+// latter. product and version disambiguate when multiple dumps share a build;
+// build is required because it uniquely identifies a firmware.
+func FindDeviceSupport(product, version, build string) (*DeviceSupport, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve home directory: %w", err)
 	}
-	return findDeviceSupportDSCs(filepath.Join(home, "Library", "Developer", "Xcode"), product, version, build)
+	return findDeviceSupport(filepath.Join(home, "Library", "Developer", "Xcode"), product, version, build)
 }
 
-func findDeviceSupportDSCs(xcodeDir, product, version, build string) (*DeviceSupport, error) {
+func findDeviceSupport(xcodeDir, product, version, build string) (*DeviceSupport, error) {
 	if build == "" {
 		return nil, fmt.Errorf("crashlog has no build identifier; cannot locate an Xcode DeviceSupport dump")
 	}
@@ -79,15 +81,26 @@ func findDeviceSupportDSCs(xcodeDir, product, version, build string) (*DeviceSup
 	candidates = preferContaining(candidates, product)
 	candidates = preferContaining(candidates, version)
 
+	// Prefer a dump with a real dyld_shared_cache over a loose-dylib-only dump,
+	// regardless of scan order; fall back to the first loose-only dump.
+	var looseOnly *DeviceSupport
 	for _, dir := range candidates {
-		for _, root := range []string{filepath.Join(dir, "Symbols"), dir} {
-			if dscs := findMainCaches(root); len(dscs) > 0 {
-				return &DeviceSupport{Dir: dir, DSCs: dscs}, nil
-			}
+		symbols := dir
+		if st, err := os.Stat(filepath.Join(dir, "Symbols")); err == nil && st.IsDir() {
+			symbols = filepath.Join(dir, "Symbols")
+		}
+		if dscs := findMainCaches(symbols); len(dscs) > 0 {
+			return &DeviceSupport{Dir: dir, Symbols: symbols, DSCs: dscs}, nil
+		}
+		if looseOnly == nil && hasLooseDylibs(symbols) {
+			looseOnly = &DeviceSupport{Dir: dir, Symbols: symbols}
 		}
 	}
+	if looseOnly != nil {
+		return looseOnly, nil
+	}
 
-	return nil, fmt.Errorf("found Xcode DeviceSupport dump for build %s but no dyld_shared_cache inside %s", build, strings.Join(candidates, ", "))
+	return nil, fmt.Errorf("found Xcode DeviceSupport dump for build %s but it has no dyld_shared_cache or extracted dylibs (%s)", build, strings.Join(candidates, ", "))
 }
 
 // preferContaining keeps only the dirs whose base name contains want; if none
@@ -126,4 +139,15 @@ func findMainCaches(root string) []string {
 	}
 	slices.Sort(mains)
 	return slices.Compact(mains)
+}
+
+// hasLooseDylibs reports whether root contains an extracted on-device file tree
+// (the System or usr directories hold the split dylibs/frameworks).
+func hasLooseDylibs(root string) bool {
+	for _, sub := range []string{"System", "usr"} {
+		if st, err := os.Stat(filepath.Join(root, sub)); err == nil && st.IsDir() {
+			return true
+		}
+	}
+	return false
 }
