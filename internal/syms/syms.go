@@ -10,12 +10,13 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/db"
 	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/signature"
@@ -25,6 +26,16 @@ const (
 	highestBitMask uint64 = ^uint64(1 << 63)
 	isKernelMask   uint64 = 1 << 62
 )
+
+// scanConfig selects which sources of an IPSW a scan walks.
+type scanConfig struct {
+	IPSW       string
+	PemDB      string
+	SigsDir    string
+	Kernel     bool
+	DSC        bool
+	FileSystem bool
+}
 
 // scanImage is a single Mach-O image surfaced while scanning an IPSW, paired
 // with the extra metadata the streaming JSONL emitter needs but the persisted
@@ -296,86 +307,100 @@ func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
 	return nil
 }
 
-// scanDSCs opens every dyld_shared_cache in the IPSW and visits a "dsc"
-// container (carrying shared_region_start) followed by each of its dylib images.
-func scanDSCs(ipswPath, pemDB string, visit scanVisitor) error {
-	ctx, fs, err := dsc.OpenFromIPSW(ipswPath, pemDB, false, true)
+// scanDSCsInMount finds every dyld_shared_cache in an already-mounted volume and
+// visits a "dsc" container (carrying shared_region_start) followed by each of its
+// dylib images. The mount is provided by the caller so the volume is mounted once
+// and shared with the file-system Mach-O walk.
+func scanDSCsInMount(mountPoint string, visit scanVisitor) error {
+	dscPaths, err := dyld.GetDscPathsInMount(mountPoint, false, true)
 	if err != nil {
-		return fmt.Errorf("failed to open DSC from IPSW: %w", err)
+		return fmt.Errorf("failed to find DSCs in %s: %w", mountPoint, err)
 	}
-	defer func() {
-		for _, f := range fs {
-			f.Close()
+	for _, dscPath := range dscPaths {
+		if len(filepath.Ext(dscPath)) != 0 {
+			continue // skip subcaches/.symbols; dyld.Open pulls them in
 		}
-		ctx.Unmount()
-	}()
-
-	for _, f := range fs {
-		if err := visit(&scanImage{
-			Kind:              "dsc",
-			DSCUUID:           f.UUID.String(),
-			SharedRegionStart: f.Headers[f.UUID].SharedRegionStart,
-		}); err != nil {
+		f, err := dyld.Open(dscPath)
+		if err != nil {
+			return fmt.Errorf("failed to open DSC %s: %w", dscPath, err)
+		}
+		if err := scanDSC(f, visit); err != nil {
+			f.Close()
 			return err
 		}
+		f.Close()
+	}
+	return nil
+}
 
-		for idx, img := range f.Images {
-			log.WithFields(log.Fields{
-				"index": idx,
-				"name":  img.Name,
-			}).Debug("Parsing DSC Image")
-			img.ParsePublicSymbols(false)
-			img.ParseLocalSymbols(false)
-			m, err := img.GetMacho()
-			if err != nil {
-				return fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
-			}
-			defer m.Close()
-			dylib := &model.Macho{
-				UUID: m.UUID().String(),
-				Path: model.Path{Path: img.Name},
-			}
-			if text := m.Segment("__TEXT"); text != nil {
-				dylib.TextStart = text.Addr
-				dylib.TextEnd = text.Addr + text.Filesz
-			}
-			for _, fn := range m.GetFunctions() {
-				var msym *model.Symbol
-				if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
-					msym = &model.Symbol{
-						Name:  model.Name{Name: sym},
-						Start: fn.StartAddr,
-						End:   fn.EndAddr,
-					}
-				} else {
-					msym = &model.Symbol{
-						Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
-						Start: fn.StartAddr,
-						End:   fn.EndAddr,
-					}
+func scanDSC(f *dyld.File, visit scanVisitor) error {
+	if err := visit(&scanImage{
+		Kind:              "dsc",
+		DSCUUID:           f.UUID.String(),
+		SharedRegionStart: f.Headers[f.UUID].SharedRegionStart,
+	}); err != nil {
+		return err
+	}
+
+	for idx, img := range f.Images {
+		log.WithFields(log.Fields{
+			"index": idx,
+			"name":  img.Name,
+		}).Debug("Parsing DSC Image")
+		img.ParsePublicSymbols(false)
+		img.ParseLocalSymbols(false)
+		m, err := img.GetMacho()
+		if err != nil {
+			return fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
+		}
+		dylib := &model.Macho{
+			UUID: m.UUID().String(),
+			Path: model.Path{Path: img.Name},
+		}
+		if text := m.Segment("__TEXT"); text != nil {
+			dylib.TextStart = text.Addr
+			dylib.TextEnd = text.Addr + text.Filesz
+		}
+		for _, fn := range m.GetFunctions() {
+			var msym *model.Symbol
+			if sym, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
+				msym = &model.Symbol{
+					Name:  model.Name{Name: sym},
+					Start: fn.StartAddr,
+					End:   fn.EndAddr,
 				}
-				dylib.Symbols = append(dylib.Symbols, msym)
+			} else {
+				msym = &model.Symbol{
+					Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+					Start: fn.StartAddr,
+					End:   fn.EndAddr,
+				}
 			}
-			if err := visit(&scanImage{
-				Macho:   dylib,
-				Kind:    "dylib",
-				CPU:     machoArch(m),
-				Arch:    machoArch(m),
-				DSCUUID: f.UUID.String(),
-			}); err != nil {
-				return err
-			}
+			dylib.Symbols = append(dylib.Symbols, msym)
+		}
+		if err := visit(&scanImage{
+			Macho:   dylib,
+			Kind:    "dylib",
+			CPU:     machoArch(m),
+			Arch:    machoArch(m),
+			DSCUUID: f.UUID.String(),
+		}); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// scanFileSystem walks every Mach-O in the IPSW file system and visits it as a
-// "macho" image.
-func scanFileSystem(ipswPath, pemDB string, visit scanVisitor) error {
-	return search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
+// scanMachosInMount walks every Mach-O in an already-mounted volume and visits
+// it as a "macho" image. The path is reported relative to the mount point so it
+// matches the path the daemon database stores.
+func scanMachosInMount(mountPoint string, visit scanVisitor) error {
+	return search.ForEachMacho(mountPoint, func(path string, m *macho.File) error {
 		if m.UUID() == nil {
 			return nil
+		}
+		if _, rest, ok := strings.Cut(path, mountPoint); ok {
+			path = rest
 		}
 		mm := &model.Macho{
 			UUID: m.UUID().String(),
@@ -414,6 +439,68 @@ func scanFileSystem(ipswPath, pemDB string, visit scanVisitor) error {
 	})
 }
 
+// scanIPSW walks the requested sources of an IPSW and emits each image to visit.
+//
+// The kernelcache comes from the IPSW zip (no mount). The DSC parse and the
+// file-system Mach-O walk both live on the SystemOS volume, so it is mounted
+// once via a mount.Session and reused; the remaining OS volumes are mounted once
+// each. Each distinct volume is therefore extracted/decrypted/mounted a single
+// time per scan.
+func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
+	if cfg.Kernel {
+		if err := scanKernels(cfg.IPSW, cfg.SigsDir, visit); err != nil {
+			return fmt.Errorf("failed to scan kernels: %w", err)
+		}
+	}
+	if !cfg.DSC && !cfg.FileSystem {
+		return nil
+	}
+
+	session := mount.NewSession(cfg.IPSW, &mount.Config{PemDB: cfg.PemDB})
+	defer func() {
+		if err := session.Close(); err != nil {
+			log.WithError(err).Debug("failed to unmount IPSW DMGs")
+		}
+	}()
+
+	walked := make(map[string]bool)
+	walk := func(mountPoint string) error {
+		if walked[mountPoint] {
+			return nil // a volume aliased to one already walked (e.g. sys==fs)
+		}
+		walked[mountPoint] = true
+		return scanMachosInMount(mountPoint, visit)
+	}
+
+	// The SystemOS volume hosts both the DSC and most framework Mach-Os; mount
+	// it once and run both passes against it.
+	sysMount, err := session.Root("sys")
+	if err != nil {
+		return fmt.Errorf("failed to mount SystemOS: %w", err)
+	}
+	if cfg.DSC {
+		if err := scanDSCsInMount(sysMount, visit); err != nil {
+			return fmt.Errorf("failed to scan DSCs: %w", err)
+		}
+	}
+	if cfg.FileSystem {
+		if err := walk(sysMount); err != nil {
+			return fmt.Errorf("failed to scan SystemOS machos: %w", err)
+		}
+		for _, typ := range []string{"fs", "app", "exc"} {
+			mountPoint, err := session.Root(typ)
+			if err != nil {
+				log.WithError(err).Debugf("skipping %s volume", typ)
+				continue
+			}
+			if err := walk(mountPoint); err != nil {
+				return fmt.Errorf("failed to scan %s machos: %w", typ, err)
+			}
+		}
+	}
+	return nil
+}
+
 // Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
 func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	/* IPSW */
@@ -444,17 +531,15 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	}
 
 	acc := newDBAccumulator(ipsw)
-	/* KERNEL */
-	if err := scanKernels(ipswPath, sigsDir, acc.visit); err != nil {
-		return fmt.Errorf("failed to scan kernels: %w", err)
-	}
-	/* DSC */
-	if err := scanDSCs(ipswPath, pemDB, acc.visit); err != nil {
-		return fmt.Errorf("failed to scan DSCs: %w", err)
-	}
-	/* FileSystem */
-	if err := scanFileSystem(ipswPath, pemDB, acc.visit); err != nil {
-		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
+	if err := scanIPSW(&scanConfig{
+		IPSW:       ipswPath,
+		PemDB:      pemDB,
+		SigsDir:    sigsDir,
+		Kernel:     true,
+		DSC:        true,
+		FileSystem: true,
+	}, acc.visit); err != nil {
+		return err
 	}
 
 	log.Debug("Saving IPSW with FileSystem")
@@ -478,17 +563,15 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	ipsw.DSCs = nil
 	ipsw.FileSystem = nil
 	acc := newDBAccumulator(ipsw)
-	/* KERNEL */
-	if err := scanKernels(ipswPath, sigsDir, acc.visit); err != nil {
-		return fmt.Errorf("failed to scan kernels: %w", err)
-	}
-	/* DSC */
-	if err := scanDSCs(ipswPath, pemDB, acc.visit); err != nil {
-		return fmt.Errorf("failed to scan DSCs: %w", err)
-	}
-	/* FileSystem */
-	if err := scanFileSystem(ipswPath, pemDB, acc.visit); err != nil {
-		return fmt.Errorf("failed to search for machos in IPSW: %w", err)
+	if err := scanIPSW(&scanConfig{
+		IPSW:       ipswPath,
+		PemDB:      pemDB,
+		SigsDir:    sigsDir,
+		Kernel:     true,
+		DSC:        true,
+		FileSystem: true,
+	}, acc.visit); err != nil {
+		return err
 	}
 
 	log.Debug("Saving IPSW with FileSystem")

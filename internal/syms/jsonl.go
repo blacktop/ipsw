@@ -160,20 +160,15 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) error {
 		return err
 	}
 
-	if cfg.Kernel {
-		if err := scanKernels(cfg.IPSW, cfg.SigsDir, em.image); err != nil {
-			return fmt.Errorf("failed to scan kernels: %w", err)
-		}
-	}
-	if cfg.DSC {
-		if err := scanDSCs(cfg.IPSW, cfg.PemDB, em.image); err != nil {
-			return fmt.Errorf("failed to scan DSCs: %w", err)
-		}
-	}
-	if cfg.FileSystem {
-		if err := scanFileSystem(cfg.IPSW, cfg.PemDB, em.image); err != nil {
-			return fmt.Errorf("failed to scan file system machos: %w", err)
-		}
+	if err := scanIPSW(&scanConfig{
+		IPSW:       cfg.IPSW,
+		PemDB:      cfg.PemDB,
+		SigsDir:    cfg.SigsDir,
+		Kernel:     cfg.Kernel,
+		DSC:        cfg.DSC,
+		FileSystem: cfg.FileSystem,
+	}, em.image); err != nil {
+		return err
 	}
 
 	return bw.Flush()
