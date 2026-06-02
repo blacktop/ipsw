@@ -48,6 +48,7 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
       --key-db string        Path to AEA keys JSON database (for OTA diffs)
       --key-val string       Base64 encoded AEA symmetric encryption key (for OTA diffs)
       --launchd              Diff launchd configs
+      --loc                  Diff localized string resources (.strings, .stringsdict, .loctable)
       --low-memory           Use disk caching to reduce RAM usage
   -m, --markdown             Output diff as Markdown
   -o, --output string        Folder to save diff output

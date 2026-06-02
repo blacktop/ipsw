@@ -53,6 +53,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
 * [ipsw swift-dump](/docs/cli/ipsw/swift-dump)	 - 🚧 Swift class-dump a dylib from a DSC or MachO
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
+* [ipsw symbols](/docs/cli/ipsw/symbols)	 - Emit IPSW symbols as JSONL
 * [ipsw version](/docs/cli/ipsw/version)	 - Print the version number of ipsw
 * [ipsw watch](/docs/cli/ipsw/watch)	 - Watch Github Commits
 
