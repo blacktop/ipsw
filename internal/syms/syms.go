@@ -319,6 +319,11 @@ func scanDSCsInMount(mountPoint string, visit scanVisitor) error {
 	if err != nil {
 		return fmt.Errorf("failed to find DSCs in %s: %w", mountPoint, err)
 	}
+	if len(dscPaths) == 0 {
+		// DSC scanning was requested but the volume has none; surface it rather
+		// than silently emitting zero dylib symbols.
+		log.Warnf("no dyld_shared_cache found in %s", mountPoint)
+	}
 	for _, dscPath := range dscPaths {
 		if len(filepath.Ext(dscPath)) != 0 {
 			continue // skip subcaches/.symbols; dyld.Open pulls them in
