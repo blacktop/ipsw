@@ -62,8 +62,8 @@ func (c *ACP) Models() (map[string]string, error) {
 		return c.models, nil
 	}
 
-	// Attempt to query supported models via ACP. The protocol exposes this via the
-	// (unstable) SessionModelState returned from `session/new`.
+	// Attempt to query supported models via ACP. The protocol exposes these as a
+	// "model"-category session config option returned from `session/new`.
 	models, err := c.fetchModelsViaACP()
 	if err == nil && len(models) > 0 {
 		c.models = models
@@ -128,15 +128,16 @@ func (c *ACP) fetchModelsViaACP() (map[string]string, error) {
 	}
 
 	models := make(map[string]string)
-	if sess.Models == nil {
+	sel := modelConfigOption(sess.ConfigOptions)
+	if sel == nil {
 		return models, nil
 	}
-	for _, mi := range sess.Models.AvailableModels {
-		id := strings.TrimSpace(string(mi.ModelId))
+	for _, opt := range selectOptionValues(sel) {
+		id := strings.TrimSpace(string(opt.Value))
 		if id == "" {
 			continue
 		}
-		key := strings.TrimSpace(mi.Name)
+		key := strings.TrimSpace(opt.Name)
 		if key == "" {
 			key = id
 		}
@@ -147,6 +148,38 @@ func (c *ACP) fetchModelsViaACP() (map[string]string, error) {
 	}
 
 	return models, nil
+}
+
+// modelConfigOption returns the model-selection config option the agent
+// advertised in its session configuration, or nil if none is exposed. The ACP
+// protocol surfaces model choices as a "select" session config option tagged
+// with the "model" category.
+func modelConfigOption(opts []acp.SessionConfigOption) *acp.SessionConfigOptionSelect {
+	for i := range opts {
+		sel := opts[i].Select
+		if sel == nil || sel.Category == nil {
+			continue
+		}
+		if *sel.Category == acp.SessionConfigOptionCategoryModel {
+			return sel
+		}
+	}
+	return nil
+}
+
+// selectOptionValues flattens a select config option's grouped and ungrouped
+// values into a single slice.
+func selectOptionValues(sel *acp.SessionConfigOptionSelect) []acp.SessionConfigSelectOption {
+	var out []acp.SessionConfigSelectOption
+	if sel.Options.Ungrouped != nil {
+		out = append(out, (*sel.Options.Ungrouped)...)
+	}
+	if sel.Options.Grouped != nil {
+		for _, group := range *sel.Options.Grouped {
+			out = append(out, group.Options...)
+		}
+	}
+	return out
 }
 
 func (c *ACP) SetModel(model string) error {
@@ -503,15 +536,21 @@ func (c *ACP) Chat() (string, error) {
 		return "", stderrCapture.wrap(fmt.Errorf("acp: newSession failed: %w", err))
 	}
 
-	// Best-effort: attempt to set model if the agent supports it (UNSTABLE ACP API).
+	// Best-effort: attempt to set the model if the agent advertises a model
+	// configuration option (ACP session config option, category "model").
 	if m := strings.TrimSpace(c.conf.Model); m != "" && m != "default" {
-		setModelReq := acp.UnstableSetSessionModelRequest{
-			SessionId: sess.SessionId,
-			ModelId:   acp.UnstableModelId(m),
-		}
-		if _, setErr := clientConn.conn.UnstableSetSessionModel(ctx, setModelReq); setErr != nil {
-			if c.conf.Verbose {
-				log.Debugf("acp: UnstableSetSessionModel failed (ignored): %v", setErr)
+		if sel := modelConfigOption(sess.ConfigOptions); sel != nil {
+			setModelReq := acp.SetSessionConfigOptionRequest{
+				ValueId: &acp.SetSessionConfigOptionValueId{
+					ConfigId:  sel.Id,
+					SessionId: sess.SessionId,
+					Value:     acp.SessionConfigValueId(m),
+				},
+			}
+			if _, setErr := clientConn.conn.SetSessionConfigOption(ctx, setModelReq); setErr != nil {
+				if c.conf.Verbose {
+					log.Debugf("acp: SetSessionConfigOption(model) failed (ignored): %v", setErr)
+				}
 			}
 		}
 	}

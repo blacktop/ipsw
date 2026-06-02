@@ -33,7 +33,7 @@ ipsw symbols <IPSW> [flags]
       --dyld                Include dyld_shared_cache dylib symbols
       --filesystem          Include file system Mach-O symbols
   -h, --help                help for symbols
-      --json                Emit symbols as JSONL (one JSON object per line)
+      --json                Emit symbols as JSONL (one JSON object per line) (default true)
       --kernel              Include kernelcache/KEXT symbols
   -o, --output string       Output file path ("-" or unset for stdout)
       --pem-db string       AEA pem DB JSON file
