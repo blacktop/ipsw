@@ -20,6 +20,11 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 # Symbolicate a panic crashlog (BugType=210) with an IPSW
 ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
 
+# Symbolicate without an IPSW/DSC; falls back to the matching Xcode DeviceSupport DSC
+❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips
+  # Uses ~/Library/Developer/Xcode/<Platform> DeviceSupport/<device> (<build>)/Symbols
+  # (userspace frames only for panics; kernel frames still need an IPSW)
+
 # Show disassembly around panic frames with --peek (default 5 instructions)
 ❯ ipsw symbolicate panic.ips firmware.ipsw --peek
 
