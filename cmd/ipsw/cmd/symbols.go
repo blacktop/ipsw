@@ -35,7 +35,7 @@ import (
 func init() {
 	rootCmd.AddCommand(symbolsCmd)
 
-	symbolsCmd.Flags().Bool("json", false, "Emit symbols as JSONL (one JSON object per line)")
+	symbolsCmd.Flags().Bool("json", true, "Emit symbols as JSONL (one JSON object per line)")
 	symbolsCmd.Flags().Bool("dyld", false, "Include dyld_shared_cache dylib symbols")
 	symbolsCmd.Flags().Bool("kernel", false, "Include kernelcache/KEXT symbols")
 	symbolsCmd.Flags().Bool("filesystem", false, "Include file system Mach-O symbols")
@@ -73,10 +73,6 @@ results to the daemon.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
-		}
-
-		if !viper.GetBool("symbols.json") {
-			return fmt.Errorf("only JSONL output is supported; pass --json")
 		}
 
 		// Default to all sources when none are explicitly selected.

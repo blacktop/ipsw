@@ -190,10 +190,10 @@ func TestDBAccumulatorMatchesGraph(t *testing.T) {
 		{Kind: "dsc", DSCUUID: "DSC1", SharedRegionStart: 0x1800},
 		{Kind: "dylib", DSCUUID: "DSC1", Macho: &model.Macho{UUID: "D1", Symbols: []*model.Symbol{{Start: 1, End: 2}}}},
 		// Fileset kernel: container (no symbols) then a kext.
-		{Kind: "kernel", KernelVersion: "v1", Macho: &model.Macho{UUID: "KC1"}},
+		{Kind: "kernel", IsFileset: true, KernelVersion: "v1", Macho: &model.Macho{UUID: "KC1"}},
 		{Kind: "kext", KernelUUID: "KC1", Macho: &model.Macho{UUID: "KX1", Symbols: []*model.Symbol{{Start: 3, End: 4}}}},
-		// Non-fileset kernel: container is also the only kext.
-		{Kind: "kernel", KernelVersion: "v2", Macho: &model.Macho{UUID: "KC2", Symbols: []*model.Symbol{{Start: 5, End: 6}}}},
+		// Non-fileset kernel: container is also the only kext, even when symbol-less.
+		{Kind: "kernel", KernelVersion: "v2", Macho: &model.Macho{UUID: "KC2"}},
 		{Kind: "macho", Macho: &model.Macho{UUID: "FS1", Symbols: []*model.Symbol{{Start: 7, End: 8}}}},
 	}
 	for _, img := range visit {
@@ -223,6 +223,84 @@ func TestDBAccumulatorMatchesGraph(t *testing.T) {
 	}
 	if len(ipsw.FileSystem) != 1 || ipsw.FileSystem[0].UUID != "FS1" {
 		t.Fatalf("unexpected file system: %+v", ipsw.FileSystem)
+	}
+}
+
+func TestRescanTargetDoesNotShareScannedGraph(t *testing.T) {
+	existing := &model.Ipsw{
+		ID:      "id",
+		Name:    "restore.ipsw",
+		Version: "26.0",
+		BuildID: "23A1",
+		Devices: []*model.Device{
+			{Name: "iPhone18,1"},
+		},
+		Kernels:    []*model.Kernelcache{{UUID: "old-kernel"}},
+		DSCs:       []*model.DyldSharedCache{{UUID: "old-dsc"}},
+		FileSystem: []*model.Macho{{UUID: "old-fs"}},
+	}
+
+	replacement := rescanTarget(existing)
+	if replacement.ID != existing.ID ||
+		replacement.Name != existing.Name ||
+		replacement.Version != existing.Version ||
+		replacement.BuildID != existing.BuildID {
+		t.Fatalf("replacement metadata = %+v, want %+v", replacement, existing)
+	}
+	if len(replacement.Devices) != 1 || replacement.Devices[0].Name != "iPhone18,1" {
+		t.Fatalf("replacement devices = %+v, want existing devices copied", replacement.Devices)
+	}
+	if len(replacement.Kernels) != 0 || len(replacement.DSCs) != 0 || len(replacement.FileSystem) != 0 {
+		t.Fatalf("replacement scan graph should start empty: %+v", replacement)
+	}
+
+	replacement.Kernels = append(replacement.Kernels, &model.Kernelcache{UUID: "new-kernel"})
+	if len(existing.Kernels) != 1 || existing.Kernels[0].UUID != "old-kernel" {
+		t.Fatalf("existing kernels mutated: %+v", existing.Kernels)
+	}
+}
+
+func TestOptionalVolumePresentDistinguishesAbsentFromInvalid(t *testing.T) {
+	present, err := optionalVolumePresent(testVolumeInfo(
+		map[string]string{"Cryptex1,AppOS": "app.dmg"},
+	), "app")
+	if err != nil || !present {
+		t.Fatalf("present app volume = %t, err=%v; want present with no error", present, err)
+	}
+
+	present, err = optionalVolumePresent(testVolumeInfo(map[string]string{}), "app")
+	if err != nil || present {
+		t.Fatalf("absent app volume = %t, err=%v; want absent with no error", present, err)
+	}
+
+	present, err = optionalVolumePresent(testVolumeInfo(
+		map[string]string{"Cryptex1,AppOS": "app1.dmg"},
+		map[string]string{"Cryptex1,AppOS": "app2.dmg"},
+	), "app")
+	if err == nil || present || !strings.Contains(err.Error(), "multiple AppOS DMGs") {
+		t.Fatalf("invalid app volume = %t, err=%v; want propagated invalid-manifest error", present, err)
+	}
+}
+
+func testVolumeInfo(manifests ...map[string]string) *info.Info {
+	buildIdentities := make([]plist.BuildIdentity, 0, len(manifests))
+	for _, manifest := range manifests {
+		buildIdentity := plist.BuildIdentity{
+			Manifest: make(map[string]plist.IdentityManifest, len(manifest)),
+		}
+		for key, path := range manifest {
+			buildIdentity.Manifest[key] = plist.IdentityManifest{
+				Info: map[string]any{"Path": path},
+			}
+		}
+		buildIdentities = append(buildIdentities, buildIdentity)
+	}
+	return &info.Info{
+		Plists: &plist.Plists{
+			BuildManifest: &plist.BuildManifest{
+				BuildIdentities: buildIdentities,
+			},
+		},
 	}
 }
 

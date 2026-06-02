@@ -1,6 +1,7 @@
 package syms
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +51,7 @@ type scanImage struct {
 	Arch              string       // lowercase arch slice, e.g. "arm64e"
 	DSCUUID           string       // parent DSC UUID ("dsc" + "dylib")
 	SharedRegionStart uint64       // parent DSC shared region start ("dsc")
+	IsFileset         bool         // kernel image is a fileset container, not a loadable kernel Mach-O
 	KernelUUID        string       // parent kernelcache UUID ("kext")
 	KernelVersion     string       // kernelcache version ("kernel")
 }
@@ -96,7 +98,7 @@ func (a *dbAccumulator) visit(img *scanImage) error {
 			a.ipsw.Kernels = append(a.ipsw.Kernels, kc)
 		}
 		// A non-fileset kernel is both the cache container and its only kext.
-		if len(img.Macho.Symbols) > 0 {
+		if !img.IsFileset {
 			kc.Kexts = append(kc.Kexts, img.Macho)
 		}
 	case "kext":
@@ -258,6 +260,7 @@ func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
 				Kind:          "kernel",
 				CPU:           arch,
 				Arch:          arch,
+				IsFileset:     true,
 				KernelVersion: kv.String(),
 			}); err != nil {
 				return err
@@ -439,6 +442,41 @@ func scanMachosInMount(mountPoint string, visit scanVisitor) error {
 	})
 }
 
+func optionalVolumePresent(inf *info.Info, typ string) (bool, error) {
+	var err error
+	switch typ {
+	case "fs":
+		_, err = inf.GetFileSystemOsDmg()
+	case "app":
+		_, err = inf.GetAppOsDmg()
+	case "exc":
+		_, err = inf.GetExclaveOSDmg()
+	default:
+		return false, fmt.Errorf("unknown optional volume type: %s", typ)
+	}
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, info.ErrorCryptexNotFound) {
+		return false, nil
+	}
+	return false, err
+}
+
+func rescanTarget(existing *model.Ipsw) *model.Ipsw {
+	return &model.Ipsw{
+		ID:        existing.ID,
+		Name:      existing.Name,
+		Version:   existing.Version,
+		BuildID:   existing.BuildID,
+		Platform:  existing.Platform,
+		Devices:   slices.Clone(existing.Devices),
+		CreatedAt: existing.CreatedAt,
+		UpdatedAt: existing.UpdatedAt,
+		DeletedAt: existing.DeletedAt,
+	}
+}
+
 // scanIPSW walks the requested sources of an IPSW and emits each image to visit.
 //
 // The kernelcache comes from the IPSW zip (no mount). The DSC parse and the
@@ -454,6 +492,15 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 	}
 	if !cfg.DSC && !cfg.FileSystem {
 		return nil
+	}
+
+	var inf *info.Info
+	if cfg.FileSystem {
+		var err error
+		inf, err = info.Parse(cfg.IPSW)
+		if err != nil {
+			return fmt.Errorf("failed to parse IPSW info: %w", err)
+		}
 	}
 
 	session := mount.NewSession(cfg.IPSW, &mount.Config{PemDB: cfg.PemDB})
@@ -488,10 +535,17 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 			return fmt.Errorf("failed to scan SystemOS machos: %w", err)
 		}
 		for _, typ := range []string{"fs", "app", "exc"} {
+			present, err := optionalVolumePresent(inf, typ)
+			if err != nil {
+				return fmt.Errorf("failed to inspect %s volume: %w", typ, err)
+			}
+			if !present {
+				log.Debugf("skipping absent %s volume", typ)
+				continue
+			}
 			mountPoint, err := session.Root(typ)
 			if err != nil {
-				log.WithError(err).Debugf("skipping %s volume", typ)
-				continue
+				return fmt.Errorf("failed to mount %s volume: %w", typ, err)
 			}
 			if err := walk(mountPoint); err != nil {
 				return fmt.Errorf("failed to scan %s machos: %w", typ, err)
@@ -558,10 +612,9 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 		return fmt.Errorf("failed to get IPSW from database: %w", err)
 	}
 	// The kernel, DSC, and file system graphs are rebuilt from scratch on
-	// rescan; clear them so a re-scan replaces rather than duplicates entries.
-	ipsw.Kernels = nil
-	ipsw.DSCs = nil
-	ipsw.FileSystem = nil
+	// rescan. Build the replacement graph separately so an in-memory database
+	// keeps the old graph intact if scanning fails before Save.
+	ipsw = rescanTarget(ipsw)
 	acc := newDBAccumulator(ipsw)
 	if err := scanIPSW(&scanConfig{
 		IPSW:       ipswPath,
