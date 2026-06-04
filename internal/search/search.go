@@ -359,7 +359,7 @@ func resolveSymlinkInRoot(root, path string) (string, error) {
 		return "", err
 	}
 	current := path
-	for depth := 0; depth < 32; depth++ {
+	for range 32 {
 		info, err := os.Lstat(current)
 		if err != nil {
 			return "", err
