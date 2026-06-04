@@ -122,7 +122,7 @@ func TestTopLevelCacheLifecycleTwoHitsNoParse(t *testing.T) {
 	}
 
 	// Two consecutive warm reruns must both hit and never Parse again.
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := d.runTopLevelTasks(context.Background(), []TopLevelTask{task}); err != nil {
 			t.Fatalf("warm run %d error = %v", i, err)
 		}
