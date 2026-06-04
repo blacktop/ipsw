@@ -34,29 +34,32 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
 ### Options
 
 ```
-      --allow-list strings   Filter MachO sections to diff (e.g. __TEXT.__text)
-      --block-list strings   Remove MachO sections to diff (e.g. __TEXT.__info_plist)
-      --ent                  Diff MachO entitlements
-      --feat                 Diff feature flags
-      --files                Diff files
-      --fw                   Diff other firmwares
-  -h, --help                 help for diff
-      --html                 Output diff as HTML
-      --insecure             Allow insecure connections when fetching AEA keys
-      --json                 Output diff as JSON
-  -k, --kdk stringArray      Path to KDKs to diff
-      --key-db string        Path to AEA keys JSON database (for OTA diffs)
-      --key-val string       Base64 encoded AEA symmetric encryption key (for OTA diffs)
-      --launchd              Diff launchd configs
-      --loc                  Diff localized string resources (.strings, .stringsdict, .loctable)
-      --low-memory           Use disk caching to reduce RAM usage
-  -m, --markdown             Output diff as Markdown
-  -o, --output string        Folder to save diff output
-      --sandbox              Diff compiled sandbox profiles
-  -s, --signatures string    Path to symbolicator signatures folder
-      --starts               Diff MachO function starts
-      --strs                 Diff MachO cstrings
-  -t, --title string         Title of the diff
+      --allow-list strings      Filter MachO sections to diff (e.g. __TEXT.__text)
+      --block-list strings      Remove MachO sections to diff (e.g. __TEXT.__info_plist)
+      --cache-dir string        Override default cache directory (default: $XDG_CACHE_HOME/ipsw/diffs or ~/Library/Caches/ipsw/diffs)
+      --cache-max-size string   LRU eviction threshold for the cache directory (e.g. 5GiB, 500MB) (default "5GiB")
+      --clean                   Delete the cached DB for this IPSW pair before running
+      --ent                     Diff MachO entitlements
+      --feat                    Diff feature flags
+      --files                   Diff files
+      --fw                      Diff other firmwares
+  -h, --help                    help for diff
+      --html                    Output diff as HTML
+      --insecure                Allow insecure connections when fetching AEA keys
+      --json                    Output diff as JSON
+  -k, --kdk stringArray         Path to KDKs to diff
+      --key-db string           Path to AEA keys JSON database (for OTA diffs)
+      --key-val string          Base64 encoded AEA symmetric encryption key (for OTA diffs)
+      --launchd                 Diff launchd configs
+      --loc                     Diff localized string resources (.strings, .stringsdict, .loctable)
+  -m, --markdown                Output diff as Markdown
+      --no-cache                Disable persistent cache; use a temp SQLite DB cleaned on exit
+  -o, --output string           Folder to save diff output
+      --sandbox                 Diff compiled sandbox profiles
+  -s, --signatures string       Path to symbolicator signatures folder
+      --starts                  Diff MachO function starts
+      --strs                    Diff MachO cstrings
+  -t, --title string            Title of the diff
 ```
 
 ### Options inherited from parent commands

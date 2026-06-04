@@ -155,60 +155,9 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 		}()
 	}
 
-	// walkFilesStreaming walks the mount and streams file paths to the callback.
-	// Re-walking per handler avoids caching millions of paths in RAM.
-	walkFilesStreaming := func(handle func(string) error) error {
-		visited := make(map[string]bool)
-		return filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				if os.IsPermission(err) {
-					log.Debugf("skipping path due to permission denied: %s", path)
-					return nil
-				}
-				log.Debugf("failed to walk mount %s: %v", path, err)
-				return nil
-			}
-			if info.Mode()&os.ModeSymlink != 0 {
-				if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-					info, err = os.Stat(linkPath)
-					if err != nil {
-						return nil
-					}
-					if info.IsDir() && !visited[linkPath] {
-						visited[linkPath] = true
-						return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
-							if subErr != nil {
-								log.WithError(subErr).Debug("failed to walk symlinked path")
-								return nil
-							}
-							if subInfo == nil || subInfo.IsDir() {
-								return nil
-							}
-							if visited[subPath] {
-								return nil
-							}
-							visited[subPath] = true
-							return handle(subPath)
-						})
-					}
-				}
-			} else {
-				if info == nil || info.IsDir() {
-					return nil
-				}
-				if visited[path] {
-					return nil
-				}
-				visited[path] = true
-				return handle(path)
-			}
-			return nil
-		})
-	}
-
 	// Run handlers with a re-walk per handler (avoids huge in-memory file list)
 	for i, handler := range handlers {
-		if err := walkFilesStreaming(func(file string) error {
+		if err := walkFilesInMount(mountPoint, func(file string) error {
 			return handler(mountPoint, file)
 		}); err != nil {
 			return fmt.Errorf("failed to walk files in dir %s: %w", mountPoint, err)
@@ -287,51 +236,8 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 	}
 
 	// Stream file paths directly to handler to avoid huge in-memory file list
-	visited := make(map[string]bool)
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsPermission(err) {
-				log.Debugf("skipping path due to permission denied: %s", path)
-				return nil
-			}
-			log.Debugf("failed to walk mount %s: %v", path, err)
-			return nil
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-				info, err = os.Stat(linkPath)
-				if err != nil {
-					return nil
-				}
-				if info.IsDir() && !visited[linkPath] {
-					visited[linkPath] = true
-					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
-						if subErr != nil {
-							log.WithError(subErr).Debug("failed to walk symlinked path")
-							return nil
-						}
-						if subInfo == nil || subInfo.IsDir() {
-							return nil
-						}
-						if visited[subPath] {
-							return nil
-						}
-						visited[subPath] = true
-						return handler(mountPoint, subPath)
-					})
-				}
-			}
-		} else {
-			if info == nil || info.IsDir() {
-				return nil
-			}
-			if visited[path] {
-				return nil
-			}
-			visited[path] = true
-			return handler(mountPoint, path)
-		}
-		return nil
+	if err := walkFilesInMount(mountPoint, func(path string) error {
+		return handler(mountPoint, path)
 	}); err != nil {
 		return fmt.Errorf("failed to walk files in dir %s: %w", mountPoint, err)
 	}
@@ -339,34 +245,280 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 	return nil
 }
 
+// WalkFilesInRoot streams every regular file under root to handle. Symlinked
+// files are skipped; symlinked directories are followed and deduped by resolved
+// path. Absolute symlink targets are resolved inside root, never against the
+// host filesystem.
+func WalkFilesInRoot(root string, handle func(path string) error) error {
+	return WalkFilesInRootFrom(root, root, handle)
+}
+
+// WalkFilesInRootFrom is like WalkFilesInRoot, but starts walking at start while
+// still resolving absolute symlinks relative to root.
+func WalkFilesInRootFrom(root, start string, handle func(path string) error) error {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	startAbs, err := filepath.Abs(start)
+	if err != nil {
+		return err
+	}
+	if !pathInRoot(rootAbs, startAbs) {
+		return fmt.Errorf("walk start %s escapes root %s", startAbs, rootAbs)
+	}
+
+	visitedFiles := make(map[string]bool)
+	visitedDirs := make(map[string]bool)
+
+	visitFile := func(path string, info os.FileInfo) error {
+		if info == nil || info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+		visitKey := absOrSelf(path)
+		if !pathInRoot(rootAbs, visitKey) {
+			return nil
+		}
+		if visitedFiles[visitKey] {
+			return nil
+		}
+		visitedFiles[visitKey] = true
+		return handle(path)
+	}
+
+	var walkDir func(string) error
+	walkDir = func(dir string) error {
+		return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				if os.IsPermission(err) {
+					log.Debugf("skipping path due to permission denied: %s", path)
+					return nil
+				}
+				log.Debugf("failed to walk root %s from %s: %v", root, dir, err)
+				return nil
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				linkPath, err := resolveSymlinkInRoot(root, path)
+				if err != nil {
+					return nil
+				}
+				info, err := os.Stat(linkPath)
+				if err != nil {
+					return nil
+				}
+				if info.IsDir() {
+					linkKey := absOrSelf(linkPath)
+					if visitedDirs[linkKey] {
+						return nil
+					}
+					return walkDir(linkPath)
+				}
+				return nil
+			}
+
+			if info.IsDir() {
+				dirKey := absOrSelf(path)
+				if visitedDirs[dirKey] {
+					return filepath.SkipDir
+				}
+				visitedDirs[dirKey] = true
+				return nil
+			}
+			return visitFile(path, info)
+		})
+	}
+	return walkDir(start)
+}
+
+func absOrSelf(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	return abs
+}
+
+// FirmwareMemberKey scopes a firmware Mach-O key by its containing IM4P member
+// so duplicate payload names from different firmware bundles do not collide.
+func FirmwareMemberKey(member, name string) string {
+	if name == "" {
+		return filepath.ToSlash(filepath.Clean(member))
+	}
+	return filepath.ToSlash(filepath.Join(member, name))
+}
+
+// walkFilesInMount is the shared mounted-root walker behind scanDmg,
+// scanDmgMulti, and the ForEach*InMount helpers.
+func walkFilesInMount(mountPoint string, handle func(path string) error) error {
+	return WalkFilesInRoot(mountPoint, handle)
+}
+
+func resolveSymlinkInRoot(root, path string) (string, error) {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	current := path
+	for depth := 0; depth < 32; depth++ {
+		info, err := os.Lstat(current)
+		if err != nil {
+			return "", err
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			if !pathInRoot(rootAbs, current) {
+				return "", fmt.Errorf("symlink target %s escapes root %s", current, rootAbs)
+			}
+			return current, nil
+		}
+		target, err := os.Readlink(current)
+		if err != nil {
+			return "", err
+		}
+		if filepath.IsAbs(target) {
+			current = filepath.Join(rootAbs, strings.TrimPrefix(filepath.Clean(target), string(filepath.Separator)))
+		} else {
+			current = filepath.Join(filepath.Dir(current), target)
+		}
+		current = filepath.Clean(current)
+		if !pathInRoot(rootAbs, current) {
+			return "", fmt.Errorf("symlink target %s escapes root %s", current, rootAbs)
+		}
+	}
+	return "", fmt.Errorf("symlink chain too deep at %s", path)
+}
+
+func pathInRoot(root, path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, absPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// handleMachoInMount opens machoPath as a Mach-O (last arch of a FAT), trims the
+// mount-point prefix off the key, and calls handler. Shared by the *InIPSW and
+// *InMount macho walkers so they produce identical keys.
+func handleMachoInMount(mountPoint, machoPath string, handler func(string, *macho.File) error) error {
+	if ok, _ := magic.IsMachO(machoPath); !ok {
+		return nil
+	}
+	var m *macho.File
+	// UNIVERSAL MACHO
+	if fat, err := macho.OpenFat(machoPath); err == nil {
+		defer fat.Close()
+		m = fat.Arches[len(fat.Arches)-1].File
+	} else { // SINGLE MACHO
+		if errors.Is(err, macho.ErrNotFat) {
+			m, err = macho.Open(machoPath)
+			if err != nil {
+				return nil
+			}
+			defer m.Close()
+		} else { // NOT a macho file
+			return nil
+		}
+	}
+	if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
+		machoPath = rest
+	}
+	if err := handler(machoPath, m); err != nil {
+		return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
+	}
+	return nil
+}
+
+// handlePlistInMount reads a .plist under directory, keyed relative to directory.
+// Shared by ForEachPlistInIPSW and ForEachPlistInMount.
+func handlePlistInMount(mountPoint, directory, plistPath string, handler func(string, string) error) error {
+	if directory != "" && !strings.Contains(plistPath, directory) {
+		return nil
+	}
+	if !strings.HasSuffix(plistPath, ".plist") {
+		return nil
+	}
+	data, err := os.ReadFile(plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plist %s: %v", plistPath, err)
+	}
+	if _, rest, ok := strings.Cut(plistPath, mountPoint); ok {
+		plistPath = rest
+	}
+	plistPath, err = filepath.Rel(directory, plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to get relative path for %s: %v", plistPath, err)
+	}
+	if err := handler(plistPath, string(data)); err != nil {
+		return fmt.Errorf("failed to handle plist %s: %v", plistPath, err)
+	}
+	return nil
+}
+
+// handleFileInMount emits (dmg, mount-relative path) for a file under directory.
+// Shared by ForEachFileInIPSW and ForEachFileInMount.
+func handleFileInMount(mountPoint, directory, dmg, filePath string, handler func(string, string) error) error {
+	if directory != "" && !strings.Contains(filePath, directory) {
+		return nil
+	}
+	if _, rest, ok := strings.Cut(filePath, mountPoint); ok {
+		filePath = rest
+	}
+	if err := handler(dmg, filePath); err != nil {
+		return fmt.Errorf("failed to handle file %s: %w", filePath, err)
+	}
+	return nil
+}
+
+// ForEachMachoInMount walks an already-mounted root and calls handler for each
+// Mach-O. The IPSW-key-preserving twin of the per-volume ForEachMachoInIPSW pass.
+func ForEachMachoInMount(mountPoint string, handler func(string, *macho.File) error) error {
+	return walkFilesInMount(mountPoint, func(path string) error {
+		return handleMachoInMount(mountPoint, path, handler)
+	})
+}
+
+// ForEachPlistInMount walks an already-mounted root for .plists under directory.
+func ForEachPlistInMount(mountPoint, directory string, handler func(string, string) error) error {
+	return walkFilesInMount(mountPoint, func(path string) error {
+		return handlePlistInMount(mountPoint, directory, path, handler)
+	})
+}
+
+// ForEachFileInMount walks an already-mounted root, emitting (dmgLabel, path).
+func ForEachFileInMount(mountPoint, dmgLabel, directory string, handler func(string, string) error) error {
+	return walkFilesInMount(mountPoint, func(path string) error {
+		return handleFileInMount(mountPoint, directory, dmgLabel, path, handler)
+	})
+}
+
+// ForEachFileInZip walks the IPSW zip itself (not its mounted DMGs), emitting
+// (dmgLabel, f.Name) for each non-directory file that isn't a DMG/cryptex.
+// It matches the whole-zip pass in ForEachFileInIPSW.
+func ForEachFileInZip(ipswPath, dmgLabel, directory string, handler func(string, string) error) error {
+	zr, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to open IPSW: %v", err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		// skip DMGs/cryptexes (always a different name, e.g. 090-43228-337.dmg.aea)
+		if reDmgAeaFile.MatchString(f.Name) {
+			continue
+		}
+		if err := handleFileInMount("", directory, dmgLabel, f.Name, handler); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
 func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
 	scanMacho := func(mountPoint, machoPath string) error {
-		if ok, _ := magic.IsMachO(machoPath); ok {
-			var m *macho.File
-			// UNIVERSAL MACHO
-			if fat, err := macho.OpenFat(machoPath); err == nil {
-				defer fat.Close()
-				m = fat.Arches[len(fat.Arches)-1].File
-			} else { // SINGLE MACHO
-				if errors.Is(err, macho.ErrNotFat) {
-					m, err = macho.Open(machoPath)
-					if err != nil {
-						return nil
-					}
-					defer m.Close()
-				} else { // NOT a macho file
-					return nil
-				}
-			}
-			if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
-				machoPath = rest
-			}
-			if err := handler(machoPath, m); err != nil {
-				return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
-			}
-		}
-		return nil
+		return handleMachoInMount(mountPoint, machoPath, handler)
 	}
 
 	i, err := info.Parse(ipswPath)
@@ -404,9 +556,6 @@ func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.
 
 // ForEachMacho walks the folder and calls the handler for each macho file found
 func ForEachMacho(folder string, handler func(string, *macho.File) error) error {
-	// Stream file paths directly instead of collecting them into memory
-	visited := make(map[string]bool)
-
 	handleMacho := func(file string) error {
 		if ok, _ := magic.IsMachO(file); !ok {
 			return nil
@@ -429,51 +578,7 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 		return handler(file, m)
 	}
 
-	return filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsPermission(err) {
-				log.Debugf("skipping path due to permission denied: %s", path)
-				return nil
-			}
-			log.Debugf("failed to walk folder %s: %v", path, err)
-			return nil
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			if linkPath, err := filepath.EvalSymlinks(path); err == nil {
-				info, err = os.Stat(linkPath)
-				if err != nil {
-					return nil
-				}
-				if info.IsDir() && !visited[linkPath] {
-					visited[linkPath] = true
-					return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
-						if subErr != nil {
-							log.WithError(subErr).Debug("failed to walk symlinked path")
-							return nil
-						}
-						if subInfo == nil || subInfo.IsDir() {
-							return nil
-						}
-						if visited[subPath] {
-							return nil
-						}
-						visited[subPath] = true
-						return handleMacho(subPath)
-					})
-				}
-			}
-		} else {
-			if info == nil || info.IsDir() {
-				return nil
-			}
-			if visited[path] {
-				return nil
-			}
-			visited[path] = true
-			return handleMacho(path)
-		}
-		return nil
-	})
+	return WalkFilesInRoot(folder, handleMacho)
 }
 
 // ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p firmware macho file found
@@ -484,22 +589,20 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 	}
 	defer os.RemoveAll(tmpDIR)
 
-	im4ps, err := utils.Unzip(ipswPath, tmpDIR, func(f *zip.File) bool {
-		return filepath.Ext(f.Name) == ".im4p"
-	})
+	im4ps, err := extractIM4PsInIPSW(ipswPath, tmpDIR)
 	if err != nil {
 		return fmt.Errorf("failed to unzip im4p: %v", err)
 	}
 
 	for _, im4pFile := range im4ps {
-		if reArmFwIm4p.MatchString(im4pFile) {
-			im4p, err := img4.OpenPayload(im4pFile)
+		if reArmFwIm4p.MatchString(im4pFile.path) {
+			im4p, err := img4.OpenPayload(im4pFile.path)
 			if err != nil {
-				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile.name, err)
 			}
 			im4pData, err := im4p.GetData()
 			if err != nil {
-				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile.name, err)
 			}
 			ftab, err := ftab.Parse(bytes.NewReader(im4pData))
 			if err != nil {
@@ -511,55 +614,115 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 					return fmt.Errorf("failed to read ftab entry: %v", err)
 				}
 				if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
-					name := "agx_" + filepath.Base(string(entry.Tag[:]))
+					name := FirmwareMemberKey(im4pFile.name, "agx_"+filepath.Base(string(entry.Tag[:])))
 					if err := handler(name, m); err != nil {
 						return fmt.Errorf("failed to handle macho %s: %w", name, err)
 					}
 				}
 			}
 			ftab.Close()
-		} else if reExclaveBundleIm4p.MatchString(im4pFile) {
-			im4p, err := img4.OpenPayload(im4pFile)
+		} else if reExclaveBundleIm4p.MatchString(im4pFile.path) {
+			im4p, err := img4.OpenPayload(im4pFile.path)
 			if err != nil {
-				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile.name, err)
 			}
 			data, err := im4p.GetData()
 			if err != nil {
-				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile.name, err)
 			}
-			out, err := fwcmd.ExtractExclaveCores(data, os.TempDir())
+			im4pName := im4pFile.name
+			outDir := filepath.Join(tmpDIR, "exclave", filepath.FromSlash(im4pName))
+			out, err := fwcmd.ExtractExclaveCores(data, outDir)
 			if err != nil {
 				return fmt.Errorf("failed to split exclave apps FW: %v", err)
 			}
 			for _, f := range out {
 				if m, err := macho.Open(f); err == nil {
-					if err := handler("exclave_"+filepath.Base(f), m); err != nil {
+					name := FirmwareMemberKey(im4pName, "exclave_"+filepath.Base(f))
+					if err := handler(name, m); err != nil {
 						return fmt.Errorf("failed to handle macho %s: %w", f, err)
 					}
 					m.Close()
 				}
 			}
 		} else {
-			im4p, err := img4.OpenPayload(im4pFile)
+			im4p, err := img4.OpenPayload(im4pFile.path)
 			if err != nil {
-				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to open im4p file %s: %v", im4pFile.name, err)
 			}
 			data, err := im4p.GetData()
 			if err != nil {
-				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile, err)
+				return fmt.Errorf("failed to get data from im4p file %s: %v", im4pFile.name, err)
 			}
 			if m, err := macho.NewFile(bytes.NewReader(data)); err == nil {
-				if err := handler(filepath.Base(im4pFile), m); err != nil {
-					return fmt.Errorf("failed to handle macho %s: %w", im4pFile, err)
+				name := FirmwareMemberKey(im4pFile.name, "")
+				if err := handler(name, m); err != nil {
+					return fmt.Errorf("failed to handle macho %s: %w", name, err)
 				}
 				m.Close()
 			} else {
-				log.Debugf("failed to parse %s data as macho: %v", im4pFile, err)
+				log.Debugf("failed to parse %s data as macho: %v", im4pFile.name, err)
 			}
 		}
 	}
 
 	return nil
+}
+
+type im4pExtraction struct {
+	name string
+	path string
+}
+
+func extractIM4PsInIPSW(ipswPath, dest string) ([]im4pExtraction, error) {
+	r, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	if err := os.MkdirAll(dest, 0o750); err != nil {
+		return nil, err
+	}
+
+	var out []im4pExtraction
+	for _, f := range r.File {
+		if filepath.Ext(f.Name) != ".im4p" || f.FileInfo().IsDir() {
+			continue
+		}
+		name := filepath.ToSlash(filepath.Clean(f.Name))
+		path, err := utils.SanitizeArchivePath(dest, filepath.FromSlash(name))
+		if err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			return nil, err
+		}
+		if err := extractZipMember(f, path); err != nil {
+			return nil, err
+		}
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Extracted %s from %s", path, filepath.Base(ipswPath)))
+		out = append(out, im4pExtraction{name: name, path: path})
+	}
+	return out, nil
+}
+
+func extractZipMember(f *zip.File, path string) error {
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	of, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(of, rc); err != nil {
+		_ = of.Close()
+		return err
+	}
+	return of.Close()
 }
 
 func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, string) error) error {
@@ -569,40 +732,7 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 	}
 
 	scanPlist := func(mountPoint, plistPath string) error {
-		// filter to only scan a specific directory (if provided)
-		if directory != "" && !strings.Contains(plistPath, directory) {
-			return nil
-		}
-		if strings.HasSuffix(plistPath, ".plist") {
-			// settings := make(map[string]interface{})
-			data, err := os.ReadFile(plistPath)
-			if err != nil {
-				return fmt.Errorf("failed to read plist %s: %v", plistPath, err)
-			}
-			// TODO: add support for binary plists
-			// pdata, err := plist.MarshalIndent(data, plist.XMLFormat, "  ")
-			// if err != nil {
-			// 	return fmt.Errorf("failed to marshal plist %s: %v", plistPath, err)
-			// }
-			// if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&settings); err != nil {
-			// 	return fmt.Errorf("failed to decode plist %s: %v", plistPath, err)
-			// }
-			// jdata, err := json.MarshalIndent(settings, "", "  ")
-			// if err != nil {
-			// 	return fmt.Errorf("failed to marshal plist %s: %v", plistPath, err)
-			// }
-			if _, rest, ok := strings.Cut(plistPath, mountPoint); ok {
-				plistPath = rest
-			}
-			plistPath, err = filepath.Rel(directory, plistPath)
-			if err != nil {
-				return fmt.Errorf("failed to get relative path for %s: %v", plistPath, err)
-			}
-			if err := handler(plistPath, string(data)); err != nil {
-				return fmt.Errorf("failed to handle plist %s: %v", plistPath, err)
-			}
-		}
-		return nil
+		return handlePlistInMount(mountPoint, directory, plistPath, handler)
 	}
 
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
@@ -641,17 +771,7 @@ func ForEachFileInIPSW(ipswPath, directory, pemDB string, handler func(string, s
 
 	var dmg string
 	scanFile := func(mountPoint, filePath string) error {
-		// filter to only scan a specific directory (if provided)
-		if directory != "" && !strings.Contains(filePath, directory) {
-			return nil
-		}
-		if _, rest, ok := strings.Cut(filePath, mountPoint); ok {
-			filePath = rest
-		}
-		if err := handler(dmg, filePath); err != nil {
-			return fmt.Errorf("failed to handle file %s: %w", filePath, err)
-		}
-		return nil
+		return handleFileInMount(mountPoint, directory, dmg, filePath, handler)
 	}
 
 	// scan the IPSW as a zip file

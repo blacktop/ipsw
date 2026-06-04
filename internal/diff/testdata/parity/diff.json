@@ -1,0 +1,195 @@
+{
+  "dylibs": {
+    "new": [
+      "/usr/lib/DYLIBS_new.dylib"
+    ],
+    "removed": [
+      "/usr/lib/DYLIBS_removed.dylib"
+    ],
+    "updated": {
+      "/usr/lib/DYLIBS_updated.dylib": "```diff\n- DYLIBS old\n+ DYLIBS new\n```"
+    }
+  },
+  "ents": {
+    "AppOS": "```diff\n- ENTS AppOS old\n+ ENTS AppOS new\n```",
+    "SystemOS": "```diff\n- ENTS SystemOS old\n+ ENTS SystemOS new\n```",
+    "filesystem": "```diff\n- ENTS filesystem old\n+ ENTS filesystem new\n```"
+  },
+  "features": {
+    "AppOS": {
+      "new": {
+        "/FeatureFlags_AppOS_new.plist": "\u003cplist\u003eFEATURES AppOS new\u003c/plist\u003e"
+      },
+      "removed": [
+        "/FeatureFlags_AppOS_removed.plist"
+      ],
+      "changed": {
+        "/FeatureFlags_AppOS_updated.plist": "```diff\n- FEATURES AppOS old\n+ FEATURES AppOS new\n```\n"
+      }
+    },
+    "SystemOS": {
+      "new": {
+        "/FeatureFlags_SystemOS_new.plist": "\u003cplist\u003eFEATURES SystemOS new\u003c/plist\u003e"
+      },
+      "removed": [
+        "/FeatureFlags_SystemOS_removed.plist"
+      ],
+      "changed": {
+        "/FeatureFlags_SystemOS_updated.plist": "```diff\n- FEATURES SystemOS old\n+ FEATURES SystemOS new\n```\n"
+      }
+    },
+    "filesystem": {
+      "new": {
+        "/FeatureFlags_filesystem_new.plist": "\u003cplist\u003eFEATURES filesystem new\u003c/plist\u003e"
+      },
+      "removed": [
+        "/FeatureFlags_filesystem_removed.plist"
+      ],
+      "changed": {
+        "/FeatureFlags_filesystem_updated.plist": "```diff\n- FEATURES filesystem old\n+ FEATURES filesystem new\n```\n"
+      }
+    }
+  },
+  "files": {
+    "new": {
+      "AppOS": [
+        "/FILES_AppOS_new"
+      ],
+      "IPSW": [
+        "/FILES_IPSW_new"
+      ],
+      "SystemOS": [
+        "/FILES_SystemOS_new"
+      ],
+      "filesystem": [
+        "/FILES_filesystem_new"
+      ]
+    },
+    "removed": {
+      "AppOS": [
+        "/FILES_AppOS_removed"
+      ],
+      "IPSW": [
+        "/FILES_IPSW_removed"
+      ],
+      "SystemOS": [
+        "/FILES_SystemOS_removed"
+      ],
+      "filesystem": [
+        "/FILES_filesystem_removed"
+      ]
+    }
+  },
+  "firmwares": {
+    "new": [
+      "FIRMWARE_new.im4p"
+    ],
+    "removed": [
+      "FIRMWARE_removed.im4p"
+    ],
+    "updated": {
+      "FIRMWARE_updated.im4p": "```diff\n- FIRMWARE old\n+ FIRMWARE new\n```"
+    }
+  },
+  "iboot": {
+    "versions": [
+      "iBoot-IBOOT_old",
+      "iBoot-IBOOT_new"
+    ],
+    "new": {
+      "iBoot.IBOOT.section": [
+        "IBOOT new string one of sufficient length"
+      ]
+    },
+    "removed": {
+      "iBoot.IBOOT.section": [
+        "IBOOT removed string one of sufficient length"
+      ]
+    }
+  },
+  "kdks": "```diff\n- KDK old struct\n+ KDK new struct\n```",
+  "kexts": {
+    "new": [
+      "com.apple.KEXT.NewKext"
+    ],
+    "removed": [
+      "com.apple.KEXT.RemovedKext"
+    ],
+    "updated": {
+      "/System/Library/Extensions/AppleKEXT.kext/AppleKEXT": "```diff\n- KEXT old line\n+ KEXT new line\n```"
+    }
+  },
+  "launchd": "```diff\n- LAUNCHD old\n+ LAUNCHD new\n```",
+  "localizations": {
+    "AppOS": {
+      "new": {
+        "/Localizations_AppOS_new.lproj/Localizable.strings": "LOC AppOS new content"
+      },
+      "removed": [
+        "/Localizations_AppOS_removed.lproj/Localizable.strings"
+      ],
+      "changed": {
+        "/Localizations_AppOS_updated.lproj/Localizable.strings": "```diff\n- LOC AppOS old\n+ LOC AppOS new\n```\n"
+      }
+    },
+    "SystemOS": {
+      "new": {
+        "/Localizations_SystemOS_new.lproj/Localizable.strings": "LOC SystemOS new content"
+      },
+      "removed": [
+        "/Localizations_SystemOS_removed.lproj/Localizable.strings"
+      ],
+      "changed": {
+        "/Localizations_SystemOS_updated.lproj/Localizable.strings": "```diff\n- LOC SystemOS old\n+ LOC SystemOS new\n```\n"
+      }
+    },
+    "filesystem": {
+      "new": {
+        "/Localizations_filesystem_new.lproj/Localizable.strings": "LOC filesystem new content"
+      },
+      "removed": [
+        "/Localizations_filesystem_removed.lproj/Localizable.strings"
+      ],
+      "changed": {
+        "/Localizations_filesystem_updated.lproj/Localizable.strings": "```diff\n- LOC filesystem old\n+ LOC filesystem new\n```\n"
+      }
+    }
+  },
+  "machos": {
+    "AppOS": {
+      "new": [
+        "/System/Library/MACHO_AppOS_new"
+      ],
+      "removed": [
+        "/System/Library/MACHO_AppOS_removed"
+      ],
+      "updated": {
+        "/System/Library/MACHO_AppOS_updated": "```diff\n- MACHO AppOS old\n+ MACHO AppOS new\n```"
+      }
+    },
+    "SystemOS": {
+      "new": [
+        "/System/Library/MACHO_SystemOS_new"
+      ],
+      "removed": [
+        "/System/Library/MACHO_SystemOS_removed"
+      ],
+      "updated": {
+        "/System/Library/MACHO_SystemOS_updated": "```diff\n- MACHO SystemOS old\n+ MACHO SystemOS new\n```"
+      }
+    },
+    "filesystem": {
+      "new": [
+        "/usr/bin/MACHO_filesystem_new"
+      ],
+      "removed": [
+        "/usr/bin/MACHO_filesystem_removed"
+      ],
+      "updated": {
+        "/usr/bin/MACHO_filesystem_updated": "```diff\n- MACHO filesystem old\n+ MACHO filesystem new\n```"
+      }
+    }
+  },
+  "sandbox": "```diff\n- SANDBOX old profile\n+ SANDBOX new profile\n```",
+  "title": "26.5_22F76__vs__26.5.1_22F84"
+}

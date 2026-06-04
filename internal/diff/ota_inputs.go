@@ -20,6 +20,7 @@ import (
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ftab"
 	"github.com/blacktop/ipsw/pkg/iboot"
@@ -268,11 +269,7 @@ func validateOTAScope(inf *info.Info) error {
 // fully supported when diffing OTA files. These flags will be
 // skipped gracefully with a warning rather than hard-erroring.
 func unsupportedFlagsForOTAMode(conf *Config) []string {
-	var unsupported []string
-	if conf.LowMemory {
-		unsupported = append(unsupported, "--low-memory")
-	}
-	return unsupported
+	return nil
 }
 
 // isMacOSOTA checks whether the OTA targets macOS. Nil-safe for
@@ -915,7 +912,7 @@ func forEachOTAFirmware(
 				if err != nil {
 					continue
 				}
-				name := "agx_" + filepath.Base(string(entry.Tag[:]))
+				name := search.FirmwareMemberKey(f.Name(), "agx_"+filepath.Base(string(entry.Tag[:])))
 				if err := handler(name, m); err != nil {
 					m.Close()
 					ft.Close()
@@ -930,7 +927,8 @@ func forEachOTAFirmware(
 			if err != nil {
 				return fmt.Errorf("failed to create temp directory for exclave cores: %w", err)
 			}
-			out, err := fwcmd.ExtractExclaveCores(payload, tmpDir)
+			outDir := filepath.Join(tmpDir, "exclave", filepath.FromSlash(f.Name()))
+			out, err := fwcmd.ExtractExclaveCores(payload, outDir)
 			if err != nil {
 				_ = os.RemoveAll(tmpDir)
 				return fmt.Errorf("failed to split exclave apps FW: %w", err)
@@ -940,7 +938,7 @@ func forEachOTAFirmware(
 				if err != nil {
 					continue
 				}
-				name := "exclave_" + filepath.Base(path)
+				name := search.FirmwareMemberKey(f.Name(), "exclave_"+filepath.Base(path))
 				if err := handler(name, m); err != nil {
 					m.Close()
 					_ = os.RemoveAll(tmpDir)
@@ -958,7 +956,7 @@ func forEachOTAFirmware(
 				// Not a MachO (e.g. raw firmware blob) — skip.
 				continue
 			}
-			name := filepath.Base(f.Name())
+			name := search.FirmwareMemberKey(f.Name(), "")
 			if err := handler(name, m); err != nil {
 				m.Close()
 				return fmt.Errorf(
@@ -974,54 +972,36 @@ func forEachOTAFirmware(
 
 // collectFeatureFlagsFromMounts walks mounted volumes for
 // /System/Library/FeatureFlags plists and collects their content.
-func collectFeatureFlagsFromMounts(
-	mounts map[string]mount, out map[string]string,
-) error {
-	featureFlagsDir := filepath.Join(
-		"System", "Library", "FeatureFlags",
-	)
-	for _, name := range sortedMountNames(mounts) {
-		mnt := mounts[name]
-		ffDir := filepath.Join(mnt.MountPath, featureFlagsDir)
-		if _, err := os.Stat(ffDir); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf(
-				"failed to stat FeatureFlags in %s: %w",
-				name, err,
-			)
-		}
-		if err := filepath.Walk(ffDir, func(
-			path string, fi os.FileInfo, err error,
-		) error {
-			if err != nil {
-				if os.IsPermission(err) {
-					return nil
-				}
-				return nil
-			}
-			if fi.IsDir() || !strings.HasSuffix(path, ".plist") {
-				return nil
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf(
-					"failed to read plist %s: %w", path, err,
-				)
-			}
-			rel, err := filepath.Rel(ffDir, path)
-			if err != nil {
-				rel = filepath.Base(path)
-			}
-			out[rel] = string(data)
+// collectFeatureFlagsFromMount walks System/Library/FeatureFlags under a
+// single mount root, populating out with mount-relative plist content.
+// The volume label is only used in error messages for context.
+func collectFeatureFlagsFromMount(mountPath, volumeLabel string, out map[string]string) error {
+	ffDir := filepath.Join(mountPath, "System", "Library", "FeatureFlags")
+	if _, err := os.Stat(ffDir); err != nil {
+		if os.IsNotExist(err) {
 			return nil
-		}); err != nil {
-			return fmt.Errorf(
-				"failed to walk FeatureFlags in %s: %w",
-				name, err,
-			)
 		}
+		return fmt.Errorf("failed to stat FeatureFlags in %s: %w", volumeLabel, err)
+	}
+	if err := search.WalkFilesInRootFrom(mountPath, ffDir, func(path string) error {
+		if !strings.HasSuffix(path, ".plist") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read plist %s: %w", path, err)
+		}
+		rel, err := filepath.Rel(ffDir, path)
+		if err != nil {
+			return nil
+		}
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil
+		}
+		out[rel] = string(data)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk FeatureFlags in %s: %w", volumeLabel, err)
 	}
 	return nil
 }
@@ -1040,16 +1020,7 @@ func launchdConfigFromRoots(roots []string) (string, error) {
 			}
 			return "", fmt.Errorf("failed to stat launchd search root %s: %w", root, err)
 		}
-		if err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
-			if err != nil {
-				if os.IsPermission(err) {
-					return nil
-				}
-				return nil
-			}
-			if fi.IsDir() {
-				return nil
-			}
+		if err := walkFolderFiles(root, func(_ string, path string) error {
 			if filepath.Base(path) == "launchd" {
 				candidates = append(candidates, path)
 			}

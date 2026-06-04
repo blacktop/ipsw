@@ -23,18 +23,49 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/diff"
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+// defaultDiffCacheMaxSize is the default LRU eviction threshold for the
+// persistent diff cache. 5 GiB matches the migration plan; users can tune
+// via --cache-max-size.
+const defaultDiffCacheMaxSize = "5GiB"
+
+// buildDiffCacheConfig resolves the four --cache-* flags into a
+// diff.CacheConfig. --cache-max-size accepts any size string humanize.ParseBytes
+// supports (e.g. "5GiB", "500MB", "1073741824"); empty means use the default.
+func buildDiffCacheConfig() (diff.CacheConfig, error) {
+	cfg := diff.CacheConfig{
+		Dir:     viper.GetString("diff.cache-dir"),
+		NoCache: viper.GetBool("diff.no-cache"),
+		Clean:   viper.GetBool("diff.clean"),
+	}
+	raw := strings.TrimSpace(viper.GetString("diff.cache-max-size"))
+	if raw == "" {
+		raw = defaultDiffCacheMaxSize
+	}
+	parsed, err := humanize.ParseBytes(raw)
+	if err != nil {
+		return diff.CacheConfig{}, fmt.Errorf("invalid --cache-max-size %q: %w", raw, err)
+	}
+	if parsed > math.MaxInt64 {
+		return diff.CacheConfig{}, fmt.Errorf("--cache-max-size %q exceeds int64 range", raw)
+	}
+	cfg.MaxBytes = int64(parsed)
+	return cfg, nil
+}
+
 func init() {
 	rootCmd.AddCommand(diffCmd)
-	// diffCmd.Flags().StringP("in", "i", "", "Path to IPSW .idiff file")
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
 	diffCmd.Flags().BoolP("markdown", "m", false, "Output diff as Markdown")
 	diffCmd.Flags().Bool("json", false, "Output diff as JSON")
@@ -48,7 +79,6 @@ func init() {
 	diffCmd.Flags().Bool("strs", false, "Diff MachO cstrings")
 	diffCmd.Flags().Bool("starts", false, "Diff MachO function starts")
 	diffCmd.Flags().Bool("ent", false, "Diff MachO entitlements")
-	diffCmd.Flags().Bool("low-memory", false, "Use disk caching to reduce RAM usage")
 	diffCmd.Flags().StringSlice("allow-list", []string{}, "Filter MachO sections to diff (e.g. __TEXT.__text)")
 	diffCmd.Flags().StringSlice("block-list", []string{}, "Remove MachO sections to diff (e.g. __TEXT.__info_plist)")
 	registerDiffSandboxFlags(diffCmd)
@@ -60,8 +90,16 @@ func init() {
 	diffCmd.MarkFlagFilename("key-db", "json")
 	diffCmd.Flags().String("key-val", "", "Base64 encoded AEA symmetric encryption key (for OTA diffs)")
 	diffCmd.Flags().Bool("insecure", false, "Allow insecure connections when fetching AEA keys")
+	diffCmd.Flags().Bool("clean", false, "Delete the cached DB for this IPSW pair before running")
+	diffCmd.Flags().String("cache-dir", "", "Override default cache directory (default: $XDG_CACHE_HOME/ipsw/diffs or ~/Library/Caches/ipsw/diffs)")
+	diffCmd.MarkFlagDirname("cache-dir")
+	diffCmd.Flags().Bool("no-cache", false, "Disable persistent cache; use a temp SQLite DB cleaned on exit")
+	diffCmd.Flags().String("cache-max-size", defaultDiffCacheMaxSize, "LRU eviction threshold for the cache directory (e.g. 5GiB, 500MB)")
 	diffCmd.MarkFlagsMutuallyExclusive("markdown", "json", "html")
-	// viper.BindPFlag("diff.in", diffCmd.Flags().Lookup("in"))
+	diffCmd.MarkFlagsMutuallyExclusive("no-cache", "cache-dir")
+	// --clean wipes the persistent DB before opening it; --no-cache never
+	// opens one, so the combination would silently ignore --clean.
+	diffCmd.MarkFlagsMutuallyExclusive("no-cache", "clean")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
 	viper.BindPFlag("diff.markdown", diffCmd.Flags().Lookup("markdown"))
 	viper.BindPFlag("diff.json", diffCmd.Flags().Lookup("json"))
@@ -74,7 +112,6 @@ func init() {
 	viper.BindPFlag("diff.strs", diffCmd.Flags().Lookup("strs"))
 	viper.BindPFlag("diff.starts", diffCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("diff.ent", diffCmd.Flags().Lookup("ent"))
-	viper.BindPFlag("diff.low-memory", diffCmd.Flags().Lookup("low-memory"))
 	viper.BindPFlag("diff.files", diffCmd.Flags().Lookup("files"))
 	viper.BindPFlag("diff.allow-list", diffCmd.Flags().Lookup("allow-list"))
 	viper.BindPFlag("diff.block-list", diffCmd.Flags().Lookup("block-list"))
@@ -83,6 +120,10 @@ func init() {
 	viper.BindPFlag("diff.key-db", diffCmd.Flags().Lookup("key-db"))
 	viper.BindPFlag("diff.key-val", diffCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("diff.insecure", diffCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("diff.clean", diffCmd.Flags().Lookup("clean"))
+	viper.BindPFlag("diff.cache-dir", diffCmd.Flags().Lookup("cache-dir"))
+	viper.BindPFlag("diff.no-cache", diffCmd.Flags().Lookup("no-cache"))
+	viper.BindPFlag("diff.cache-max-size", diffCmd.Flags().Lookup("cache-max-size"))
 }
 
 func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) error {
@@ -104,8 +145,12 @@ func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) err
 			return fmt.Errorf("failed to output HTML diff: %s", err)
 		}
 	case hasOutput:
-		if err := d.Save(); err != nil {
-			return fmt.Errorf("failed to save diff: %w", err)
+		// --output with no format flag: still produce a file (scripts rely
+		// on -o creating output). Markdown is the canonical file format now
+		// that the .idiff persistence format is gone.
+		log.Infof("No format flag given with --output; defaulting to Markdown")
+		if err := d.Markdown(); err != nil {
+			return fmt.Errorf("failed to save Markdown diff: %s", err)
 		}
 	default:
 		fmt.Println(d.String())
@@ -147,6 +192,11 @@ var diffCmd = &cobra.Command{
 			return err
 		}
 
+		cacheCfg, err := buildDiffCacheConfig()
+		if err != nil {
+			return err
+		}
+
 		d := diff.New(&diff.Config{
 			Title:         viper.GetString("diff.title"),
 			IpswOld:       filepath.Clean(args[0]),
@@ -166,10 +216,10 @@ var diffCmd = &cobra.Command{
 			Signatures:    viper.GetString("diff.signatures"),
 			Output:        viper.GetString("diff.output"),
 			Verbose:       Verbose,
-			LowMemory:     viper.GetBool("diff.low-memory"),
 			AEAKeyDB:      viper.GetString("diff.key-db"),
 			AEAKeyVal:     viper.GetString("diff.key-val"),
 			AEAInsecure:   viper.GetBool("diff.insecure"),
+			Cache:         cacheCfg,
 		})
 		if err := d.Diff(); err != nil {
 			return err

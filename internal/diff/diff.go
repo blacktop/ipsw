@@ -3,17 +3,14 @@ package diff
 
 import (
 	"archive/zip"
-	"encoding/gob"
-	"errors"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
 
 	"github.com/apex/log"
@@ -21,12 +18,11 @@ import (
 	dcmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
-	"github.com/blacktop/ipsw/internal/commands/extract"
 	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/search"
+	mountcmd "github.com/blacktop/ipsw/internal/commands/mount"
+	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/iboot"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -88,10 +84,30 @@ type Config struct {
 	Signatures    string
 	Output        string
 	Verbose       bool
-	LowMemory     bool
 	AEAKeyDB      string
 	AEAKeyVal     string
 	AEAInsecure   bool
+	// Cache holds the persistent-cache lifecycle options used in IPSW
+	// mode. A zero value disables persistent caching and falls back to
+	// the per-orchestrator MemoryStore that the directory/OTA paths use.
+	Cache CacheConfig
+}
+
+// CacheConfig mirrors the CLI flags that govern the SQLite-backed diff
+// cache. It is consumed by [Diff.Diff] after parsing IPSW Info structs;
+// non-IPSW input modes ignore it.
+type CacheConfig struct {
+	// Dir overrides the default cache directory. Empty means use
+	// os.UserCacheDir() + "/ipsw/diffs/".
+	Dir string
+	// NoCache disables persistent storage; a temp SQLite DB is used and
+	// removed on exit.
+	NoCache bool
+	// Clean deletes any existing cache DB for this pair before opening.
+	Clean bool
+	// MaxBytes is the LRU eviction threshold applied to the cache
+	// directory after the run finishes. Zero disables eviction.
+	MaxBytes int64
 }
 
 // Context is the context for the diff
@@ -113,11 +129,9 @@ type Context struct {
 	KDK             string
 	PemDB           string
 
-	// otaFile is unexported to avoid gob serialization issues
-	// in Diff.Save(). Nil unless InputMode == inputModeOTA.
+	// otaFile is the parsed OTA archive. Nil unless InputMode == inputModeOTA.
 	otaFile *otapkg.AA
 	// payloadRoot is the extracted OTA payload filesystem root.
-	// Unexported so gob ignores it in Diff.Save().
 	payloadRoot  string
 	payloadReady bool
 
@@ -131,21 +145,34 @@ type Diff struct {
 	Old Context `json:"-"`
 	New Context `json:"-"`
 
-	Kexts         *mcmd.MachoDiff `json:"kexts,omitempty"`
-	KDKs          string          `json:"kdks,omitempty"`
-	Ents          string          `json:"ents,omitempty"`
-	Dylibs        *mcmd.MachoDiff `json:"dylibs,omitempty"`
-	Machos        *mcmd.MachoDiff `json:"machos,omitempty"`
-	Firmwares     *mcmd.MachoDiff `json:"firmwares,omitempty"`
-	IBoot         *IBootDiff      `json:"iboot,omitempty"`
-	Launchd       string          `json:"launchd,omitempty"`
-	Sandbox       string          `json:"sandbox,omitempty"`
-	Features      *PlistDiff      `json:"features,omitempty"`
-	Files         *FileDiff       `json:"files,omitempty"`
-	Localizations *PlistDiff      `json:"localizations,omitempty"`
-	tmpDir        string          `json:"-"`
+	Kexts         *mcmd.MachoDiff            `json:"kexts,omitempty"`
+	KDKs          string                     `json:"kdks,omitempty"`
+	Ents          map[string]string          `json:"ents,omitempty"`
+	Dylibs        *mcmd.MachoDiff            `json:"dylibs,omitempty"`
+	Machos        map[string]*mcmd.MachoDiff `json:"machos,omitempty"`
+	Firmwares     *mcmd.MachoDiff            `json:"firmwares,omitempty"`
+	IBoot         *IBootDiff                 `json:"iboot,omitempty"`
+	Launchd       string                     `json:"launchd,omitempty"`
+	Sandbox       string                     `json:"sandbox,omitempty"`
+	Features      map[string]*PlistDiff      `json:"features,omitempty"`
+	Files         *FileDiff                  `json:"files,omitempty"`
+	Localizations map[string]*PlistDiff      `json:"localizations,omitempty"`
+	tmpDir        string                     `json:"-"`
 	conf          *Config
+	oldSession    *mountcmd.Session // IPSW mode only: mounts each OS volume once
+	newSession    *mountcmd.Session // IPSW mode only: mounts each OS volume once
+	sameKernel    bool              // IPSW mode only: BuildManifest digests match
+	sameVolumes   map[string]bool   // IPSW mode only: dmg type -> BuildManifest digests match
+	// store is the cache backend used by orchestrators; nil means each
+	// orchestrator allocates its own ephemeral MemoryStore. The CLI sets
+	// this via SetStore so a single SQLiteStore spans every task in a run.
+	store storage.Store
 }
+
+// SetStore installs a shared cache backend used by the volume-major and
+// top-level orchestrators. Passing nil restores the default behavior of
+// allocating a per-run MemoryStore for each orchestrator call.
+func (d *Diff) SetStore(s storage.Store) { d.store = s }
 
 // New news the diff
 func New(conf *Config) *Diff {
@@ -218,30 +245,8 @@ func (d *Diff) TitleToFilename() string {
 	return filename
 }
 
-// Save saves the diff
-func (d *Diff) Save() error {
-	if err := os.MkdirAll(d.conf.Output, 0755); err != nil {
-		return err
-	}
-
-	idiff, err := os.Create(filepath.Join(d.conf.Output, d.TitleToFilename()+".idiff"))
-	if err != nil {
-		return err
-	}
-	defer idiff.Close()
-
-	d.Old.Info = nil
-	d.New.Info = nil
-
-	gob.Register([]any{})
-	gob.Register(map[string]any{})
-
-	log.Infof("Saving pickled IPSW diff: %s", idiff.Name())
-	if err := gob.NewEncoder(idiff).Encode(&d); err != nil {
-		return fmt.Errorf("failed to encode diff: %v", err)
-	}
-
-	return nil
+func ipswSessionExtractDir(tmpDir, side string) string {
+	return filepath.Join(tmpDir, "ipsw-session", side)
 }
 
 func (d *Diff) getInfo() (err error) {
@@ -387,6 +392,14 @@ func (d *Diff) Diff() (err error) {
 	if err := d.getInfo(); err != nil {
 		return err
 	}
+	d.indexIdenticalIPSWArtifacts()
+
+	// Install the persistent diff cache for IPSW mode. Directory and
+	// OTA inputs lack BuildManifest digests so they fall back to the
+	// per-orchestrator MemoryStore that acquireStore allocates.
+	if cleanup := d.openCacheStore(); cleanup != nil {
+		defer cleanup()
+	}
 
 	// Close OTA handles when done (after all extractions).
 	if d.Old.otaFile != nil {
@@ -416,89 +429,122 @@ func (d *Diff) Diff() (err error) {
 		}
 	}
 
-	if directoryMode {
-		log.Debug("Skipping KERNELCACHES for directory inputs")
-	} else {
-		log.Info("Diffing KERNELCACHES")
-		if err := d.parseKernelcache(); err != nil {
-			log.WithError(err).Error("failed to parse kernelcaches")
+	// Top-level kernel-derived tasks run in source order before mount
+	// sessions exist: parseKernelcache populates d.Kexts and Kernel.Path
+	// (which the sandbox task consumes); parseKDKs runs against the
+	// per-side KDK paths; parseSandboxProfiles is gated on sameKernel.
+	{
+		var pre []TopLevelTask
+		if directoryMode {
+			log.Debug("Skipping KERNELCACHES for directory inputs")
+		} else if d.sameKernel {
+			log.Info("Skipping KERNELCACHES (BuildManifest digest unchanged)")
+		} else {
+			log.Info("Diffing KERNELCACHES")
+			pre = append(pre, newKextsTask(d))
 		}
-	}
-
-	if d.Old.KDK != "" && d.New.KDK != "" {
-		log.Info("Diffing KDKS")
-		if err := d.parseKDKs(); err != nil {
-			log.WithError(err).Error("failed to parse KDKs")
+		if d.Old.KDK != "" && d.New.KDK != "" {
+			log.Info("Diffing KDKS")
+			pre = append(pre, newKDKsTask(d))
+		}
+		if err := d.runTopLevelTasks(context.Background(), pre); err != nil {
+			log.WithError(err).Error("failed to run pre-mount top-level tasks")
 		}
 	}
 
 	if d.conf.Sandbox && !directoryMode {
-		log.Info("Diffing Sandbox Profiles")
-		d.Sandbox, err = d.parseSandboxProfiles()
-		if err != nil {
-			log.WithError(err).Error("failed to diff sandbox profiles")
+		if d.sameKernel {
+			utils.Indent(log.Warn, 2)("Skipping Sandbox Profiles (kernelcache unchanged)")
+		} else {
+			log.Info("Diffing Sandbox Profiles")
+			if err := d.runTopLevelTasks(context.Background(), []TopLevelTask{newSandboxTask(d)}); err != nil {
+				log.WithError(err).Error("failed to diff sandbox profiles")
+			}
 		}
 	}
 
-	log.Info("Diffing DYLD_SHARED_CACHES")
-	if !directoryMode {
+	if !directoryMode && !otaMode {
+		// IPSW mode: mount each OS volume once per side via a session, shared by
+		// the DSC parse and every later feature. defer Close() here so it
+		// dominates every session.Root() call across the feature passes.
+		// Keep old/new extracted DMGs isolated; IPSWs often reuse the same DMG
+		// filenames across builds, and DmgInIPSW treats an existing extraction as
+		// a cache hit.
+		d.oldSession = mountcmd.NewSession(d.Old.IPSWPath, &mountcmd.Config{
+			PemDB:      d.conf.PemDB,
+			ExtractDir: ipswSessionExtractDir(d.tmpDir, "old"),
+		})
+		d.newSession = mountcmd.NewSession(d.New.IPSWPath, &mountcmd.Config{
+			PemDB:      d.conf.PemDB,
+			ExtractDir: ipswSessionExtractDir(d.tmpDir, "new"),
+		})
+		defer d.oldSession.Close()
+		defer d.newSession.Close()
+		// IPSW mode no longer pre-mounts "sys" here. The volume-major
+		// orchestrator (runIPSWVolumeJobsForMode) lazily mounts each volume
+		// when its phase runs and releases it before moving on.
+	} else if otaMode {
 		if err := d.mountSystemOsDMGs(); err != nil {
 			return fmt.Errorf("failed to mount DMGs: %v", err)
 		}
 		defer d.unmountSystemOsDMGs()
 	}
 
-	if err := d.parseDSC(); err != nil {
-		log.WithError(err).Error("failed to parse DSCs")
-	}
-
-	log.Info("Diffing MachOs")
-	if err := d.parseMachos(); err != nil {
-		log.WithError(err).Error("failed to parse MachOs")
-	}
-
-	if d.conf.LaunchD && !directoryMode {
-		log.Info("Diffing launchd PLIST")
-		if err := d.parseLaunchdPlists(); err != nil {
-			log.WithError(err).Error("failed to parse launchd plists")
+	if directoryMode || otaMode {
+		// Legacy feature-major paths for non-IPSW input modes.
+		if otaMode || !d.dscVolumeUnchanged() {
+			log.Info("Diffing DYLD_SHARED_CACHES")
+			if err := d.parseDSC(); err != nil {
+				log.WithError(err).Error("failed to parse DSCs")
+			}
 		}
-	}
-
-	if d.conf.Firmware {
-		log.Info("Diffing Firmware")
-		if err := d.parseFirmwares(); err != nil {
-			log.WithError(err).Error("failed to parse firmwares")
+		log.Info("Diffing MachOs")
+		if err := d.parseMachos(); err != nil {
+			log.WithError(err).Error("failed to parse MachOs")
 		}
-		if !directoryMode {
-			log.Info("Diffing iBoot")
-			if err := d.parseIBoot(); err != nil {
-				log.WithError(err).Error("failed to parse iBoot")
+		if d.conf.LaunchD && otaMode {
+			log.Info("Diffing launchd PLIST")
+			if err := d.parseLaunchdPlists(); err != nil {
+				log.WithError(err).Error("failed to parse launchd plists")
 			}
 		}
 	}
+	// IPSW mode: DSC, MachOs, launchd, features, localizations, entitlements,
+	// and files are all dispatched by the volume-major orchestrator below.
 
-	if d.conf.Features {
+	if d.conf.Firmware {
+		var fw []TopLevelTask
+		log.Info("Diffing Firmware")
+		fw = append(fw, newFirmwaresTask(d))
+		if !directoryMode {
+			log.Info("Diffing iBoot")
+			fw = append(fw, newIBootTask(d))
+		}
+		if err := d.runTopLevelTasks(context.Background(), fw); err != nil {
+			log.WithError(err).Error("failed to run firmware top-level tasks")
+		}
+	}
+
+	// IPSW-mode Feature Flags is handled by featuresJob via the volume-major
+	// orchestrator (see runIPSWVolumeJobsForMode). OTA and Directory modes
+	// still run the legacy parseFeatureFlags here.
+	if d.conf.Features && (directoryMode || otaMode) {
 		log.Info("Diffing Feature Flags")
 		if err := d.parseFeatureFlags(); err != nil {
 			log.WithError(err).Error("failed to parse feature flags")
 		}
 	}
 
-	if d.conf.Localizations {
+	// IPSW-mode Localizations handled by locsJob via the orchestrator.
+	if d.conf.Localizations && (directoryMode || otaMode) {
 		log.Info("Diffing Localizations")
 		if err := d.parseLocalizations(); err != nil {
 			log.WithError(err).Error("failed to parse localizations")
 		}
 	}
 
-	if d.conf.Files {
-		log.Info("Diffing Files")
-		if err := d.parseFiles(); err != nil {
-			log.WithError(err).Error("failed to parse files")
-		}
-	}
-
-	if d.conf.Entitlements {
+	// IPSW-mode Entitlements handled by entsJob via the orchestrator.
+	if d.conf.Entitlements && (directoryMode || otaMode) {
 		log.Info("Diffing ENTITLEMENTS")
 		d.Ents, err = d.parseEntitlements()
 		if err != nil {
@@ -506,69 +552,100 @@ func (d *Diff) Diff() (err error) {
 		}
 	}
 
+	if err := d.runIPSWVolumeJobsForMode(directoryMode, otaMode); err != nil {
+		log.WithError(err).Error("failed to run volume-major jobs")
+	}
+
 	return nil
 }
 
-func mountDMG(ctx *Context) (err error) {
-	ctx.SystemOsDmgPath, err = ctx.Info.GetSystemOsDmg()
-	if err != nil {
-		if errors.Is(err, info.ErrorCryptexNotFound) {
-			utils.Indent(log.Warn, 2)("failed to get SystemOS DMG; trying filesystem DMG")
-			ctx.SystemOsDmgPath, err = ctx.Info.GetFileSystemOsDmg()
-			if err != nil {
-				return fmt.Errorf("failed to get filesystem DMG: %v", err)
+// runIPSWVolumeJobsForMode dispatches the per-flag jobs that have been
+// migrated to the volume-major orchestrator. OTA and Directory modes fall
+// back to the legacy feature-major parser for Files; the other parsers
+// (DSC, launchd) are handled outside this function for those modes.
+//
+// IPSW mode builds a job list from d.conf.* flags and runs the orchestrator.
+// As more parsers are ported, additional entries get appended here.
+func (d *Diff) runIPSWVolumeJobsForMode(directoryMode, otaMode bool) error {
+	if directoryMode || otaMode {
+		if d.conf.Files {
+			log.Info("Diffing Files")
+			if err := d.parseFiles(); err != nil {
+				log.WithError(err).Error("failed to parse files")
 			}
-		} else {
-			return fmt.Errorf("failed to get SystemOS DMG: %v", err)
 		}
+		return nil
 	}
-	if _, err := os.Stat(ctx.SystemOsDmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ctx.IPSWPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), ctx.SystemOsDmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", ctx.SystemOsDmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", ctx.SystemOsDmgPath)
-		}
+
+	var jobs []Task
+
+	// DSC always runs in IPSW mode (the existing behavior); the per-volume
+	// skip in the orchestrator handles the "sys unchanged" case.
+	if !d.dscVolumeUnchanged() {
+		log.Info("Diffing DYLD_SHARED_CACHES")
+		jobs = append(jobs, newDSCJob(d))
 	} else {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", ctx.SystemOsDmgPath))
+		log.Info("Skipping DYLD_SHARED_CACHES (SystemOS DMG unchanged)")
 	}
-	if filepath.Ext(ctx.SystemOsDmgPath) == ".aea" {
-		aeaPath := ctx.SystemOsDmgPath
-		ctx.SystemOsDmgPath, err = aea.Decrypt(&aea.DecryptConfig{
-			Input:    aeaPath,
-			Output:   filepath.Dir(aeaPath),
-			PemDB:    ctx.PemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
-		}
-		// Verify the decrypted file exists before proceeding
-		if _, err := os.Stat(ctx.SystemOsDmgPath); err != nil {
-			return fmt.Errorf("decrypted DMG file not found: %v", err)
-		}
-		// Remove the original .aea file to avoid leaving it around
-		if err := os.Remove(aeaPath); err != nil {
-			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to remove original .aea file: %v", err))
+
+	if d.conf.LaunchD {
+		if d.ipswVolumeUnchanged("fs") {
+			log.Info("Skipping launchd PLIST (FileSystem DMG unchanged)")
+		} else {
+			log.Info("Diffing launchd PLIST")
+			jobs = append(jobs, newLaunchdJob(d))
 		}
 	}
-	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ctx.SystemOsDmgPath))
-	ctx.MountPath, ctx.IsMounted, err = utils.MountDMG(ctx.SystemOsDmgPath, "")
-	if err != nil {
-		if !errors.Is(err, utils.ErrMountResourceBusy) {
-			return fmt.Errorf("failed to mount DMG: %v", err)
+
+	if d.conf.Features {
+		if d.allIPSWOSVolumesUnchanged() {
+			log.Info("Skipping Feature Flags (OS DMGs unchanged)")
+		} else {
+			log.Info("Diffing Feature Flags")
+			jobs = append(jobs, newFeaturesJob(d))
 		}
 	}
-	if ctx.IsMounted {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ctx.SystemOsDmgPath))
+
+	if d.conf.Localizations {
+		if d.allIPSWOSVolumesUnchanged() {
+			log.Info("Skipping Localizations (OS DMGs unchanged)")
+		} else {
+			log.Info("Diffing Localizations")
+			jobs = append(jobs, newLocalizationsJob(d))
+		}
 	}
-	return nil
+
+	if d.conf.Entitlements {
+		if d.allIPSWOSVolumesUnchanged() {
+			log.Info("Skipping ENTITLEMENTS (OS DMGs unchanged)")
+		} else {
+			log.Info("Diffing ENTITLEMENTS")
+			jobs = append(jobs, newEntitlementsJob(d))
+		}
+	}
+
+	// MachOs always runs in IPSW mode (the existing behavior); the per-volume
+	// skip in the orchestrator handles the "all OS DMGs unchanged" case.
+	if d.allIPSWOSVolumesUnchanged() {
+		log.Info("Skipping MachOs (OS DMGs unchanged)")
+	} else {
+		log.Info("Diffing MachOs")
+		jobs = append(jobs, newMachosJob(d))
+	}
+
+	if d.conf.Files {
+		log.Info("Diffing Files")
+		jobs = append(jobs, newFilesJob(d))
+	}
+
+	if len(jobs) == 0 {
+		return nil
+	}
+	return d.runIPSWVolumePhases(jobs)
 }
 
+// mountSystemOsDMGs mounts the OS volumes for OTA and directory inputs. IPSW
+// mode instead mounts each volume once via a per-side mount.Session in Diff().
 func (d *Diff) mountSystemOsDMGs() (err error) {
 	switch d.Old.InputMode {
 	case inputModeDirectory:
@@ -593,15 +670,7 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 		}
 		return nil
 	default:
-		log.Info("Mounting 'Old' SystemOS DMG")
-		if err := mountDMG(&d.Old); err != nil {
-			return err
-		}
-		log.Info("Mounting 'New' SystemOS DMG")
-		if err := mountDMG(&d.New); err != nil {
-			return err
-		}
-		return nil
+		return fmt.Errorf("mountSystemOsDMGs: IPSW mode mounts via mount.Session, not this path")
 	}
 }
 
@@ -616,22 +685,7 @@ func (d *Diff) unmountSystemOsDMGs() error {
 		unmountOTACryptexes("New", &d.New)
 		return nil
 	}
-	utils.Indent(log.Info, 2)("Unmounting 'Old' SystemOS DMG")
-	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.Old.MountPath, true)
-	}); err != nil {
-		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'Old' SystemOS DMG: %v", err))
-	}
-	utils.Indent(log.Info, 2)("Unmounting 'New' SystemOS DMG")
-	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(d.New.MountPath, true)
-	}); err != nil {
-		utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount 'New' SystemOS DMG: %v", err))
-	}
-	utils.Indent(log.Info, 2)("Deleting 'Old' SystemOS DMG")
-	os.Remove(d.Old.SystemOsDmgPath)
-	utils.Indent(log.Info, 2)("Deleting 'New' SystemOS DMG")
-	os.Remove(d.New.SystemOsDmgPath)
+	// IPSW mode unmounts via mount.Session.Close.
 	return nil
 }
 
@@ -690,6 +744,19 @@ func (d *Diff) extractKernelcaches() error {
 	return nil
 }
 
+// ensureKernelcachePaths populates d.Old.Kernel.Path / d.New.Kernel.Path when
+// they are empty. extractKernelcaches sets them as a side effect of the kexts
+// task's Parse, but a warm cache hit on kexts SKIPS that Parse, so a sibling
+// task that runs fresh (e.g. a partial-hit sandbox task) would otherwise find an
+// empty path. Extraction treats an existing extraction as a cache hit, so this is
+// idempotent and cheap; it is a no-op once either prior extraction has run.
+func (d *Diff) ensureKernelcachePaths() error {
+	if d.Old.Kernel.Path != "" && d.New.Kernel.Path != "" {
+		return nil
+	}
+	return d.extractKernelcaches()
+}
+
 func (d *Diff) parseKernelcache() error {
 	if err := d.extractKernelcaches(); err != nil {
 		return err
@@ -714,6 +781,26 @@ func (d *Diff) parseKernelcache() error {
 		return fmt.Errorf("failed to get kernelcache version: %v", err)
 	}
 	defer m2.Close()
+
+	sameKernel, err := filesSHA256Equal(d.Old.Kernel.Path, d.New.Kernel.Path)
+	if err != nil {
+		return fmt.Errorf("failed to compare extracted kernelcaches: %w", err)
+	}
+	if sameKernel {
+		d.sameKernel = true
+		utils.Indent(log.Warn, 2)("Skipping kernelcache symbolication and KEXT diff (extracted kernelcache unchanged)")
+		return nil
+	}
+
+	// Wrapper bytes (UUID, build-root strings, embedded plist digests) often
+	// differ across rebuilds of an otherwise-identical kernel. If every
+	// functional segment (code, constants, mutable data, symbols) matches,
+	// the kernel is functionally unchanged regardless of those differences.
+	if kernelKeySegmentsEqual(m1, m2) {
+		d.sameKernel = true
+		utils.Indent(log.Warn, 2)("Skipping kernelcache symbolication and KEXT diff (functional segments unchanged; only UUID/build metadata differs)")
+		return nil
+	}
 
 	var smap map[string]signature.SymbolMap
 	if d.conf.Signatures != "" {
@@ -778,85 +865,40 @@ func (d *Diff) parseKernelcache() error {
 }
 
 func (d *Diff) parseKDKs() (err error) {
-	if !strings.Contains(d.Old.KDK, ".dSYM/Contents/Resources/DWARF") {
-		d.Old.KDK = filepath.Join(d.Old.KDK+".dSYM/Contents/Resources/DWARF", filepath.Base(d.Old.KDK))
-	}
-	if !strings.Contains(d.New.KDK, ".dSYM/Contents/Resources/DWARF") {
-		d.New.KDK = filepath.Join(d.New.KDK+".dSYM/Contents/Resources/DWARF", filepath.Base(d.New.KDK))
-	}
+	d.Old.KDK = kdkDwarfPath(d.Old.KDK)
+	d.New.KDK = kdkDwarfPath(d.New.KDK)
 	d.KDKs, err = dwarf.DiffStructures(d.Old.KDK, d.New.KDK, &dwarf.Config{
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
 	})
-	d.Old.KDK, _, _ = strings.Cut(strings.TrimPrefix(d.Old.KDK, "/Library/Developer/KDKs/"), ".dSYM/Contents/Resources/DWARF")
-	d.New.KDK, _, _ = strings.Cut(strings.TrimPrefix(d.New.KDK, "/Library/Developer/KDKs/"), ".dSYM/Contents/Resources/DWARF")
+	d.Old.KDK = kdkDisplayPath(d.Old.KDK)
+	d.New.KDK = kdkDisplayPath(d.New.KDK)
 	return
 }
 
 func (d *Diff) parseDSC() error {
-	/* OLD DSC */
-	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false, false)
-	if err != nil {
-		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
-	}
-	if len(oldDSCes) == 0 {
-		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
-	}
-	if d.Old.IsMacOS {
-		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
-		for _, match := range oldDSCes {
-			if r.MatchString(match) {
-				filtered = append(filtered, match)
-			}
-		}
-		if len(filtered) == 0 && d.Old.InputMode != inputModeOTA {
-			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
-		}
-		if len(filtered) > 0 {
-			oldDSCes = filtered
-		}
-	}
+	return d.diffDSCBetweenRoots(d.Old.MountPath, d.New.MountPath)
+}
 
-	dscOLD, err := dyld.Open(oldDSCes[0])
+// diffDSCBetweenRoots is the shared DSC diff implementation used by both
+// the legacy parseDSC (OTA / Directory mode, which sets Context.MountPath
+// via their own mount setup) and the volume-major dscJob (IPSW mode, which
+// receives roots from the orchestrator's "sys" phase).
+func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
+	dscOLD, err := openDSCFromMount(oldRoot, d.Old.IsMacOS, d.Old.InputMode, "Old")
 	if err != nil {
-		return fmt.Errorf("failed to open DSC: %v", err)
+		return err
 	}
 	defer dscOLD.Close()
 
-	/* NEW DSC */
-
-	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false, false)
+	dscNEW, err := openDSCFromMount(newRoot, d.New.IsMacOS, d.New.InputMode, "New")
 	if err != nil {
-		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
-	}
-	if len(newDSCes) == 0 {
-		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
-	}
-	if d.New.IsMacOS {
-		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
-		for _, match := range newDSCes {
-			if r.MatchString(match) {
-				filtered = append(filtered, match)
-			}
-		}
-		if len(filtered) == 0 && d.New.InputMode != inputModeOTA {
-			return fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
-		}
-		if len(filtered) > 0 {
-			newDSCes = filtered
-		}
-	}
-
-	dscNEW, err := dyld.Open(newDSCes[0])
-	if err != nil {
-		return fmt.Errorf("failed to open DSC: %v", err)
+		return err
 	}
 	defer dscNEW.Close()
 
-	/* DIFF WEBKIT*/
+	/* DIFF WEBKIT */
 
 	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
 	if err != nil {
@@ -868,16 +910,7 @@ func (d *Diff) parseDSC() error {
 		log.WithError(err).Error("failed to get WebKit version from 'new' DSC")
 	}
 
-	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  d.conf.AllowList,
-		BlockList:  d.conf.BlockList,
-		CStrings:   d.conf.CStrings,
-		FuncStarts: d.conf.FuncStarts,
-		Verbose:    d.conf.Verbose,
-	})
+	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, d.dscDiffConfig())
 	if err != nil {
 		return err
 	}
@@ -885,20 +918,36 @@ func (d *Diff) parseDSC() error {
 	return nil
 }
 
-func scanEntitlementsFromMounts(mounts map[string]mount, label string) (map[string]string, error) {
-	db := make(map[string]string)
-	for _, name := range sortedMountNames(mounts) {
-		mnt := mounts[name]
-		partial, err := ent.GetDatabase(&ent.Config{
-			Folder:            mnt.MountPath,
-			LaunchConstraints: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan entitlements in %s %s: %w", label, name, err)
-		}
-		maps.Copy(db, partial)
+// openDSCFromMount finds the dyld_shared_cache under mountRoot (filtered to
+// arm64e for macOS IPSWs when applicable) and opens the first match.
+func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side string) (*dyld.File, error) {
+	dscs, err := dyld.GetDscPathsInMount(mountRoot, false, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DSC paths in %s: %v", mountRoot, err)
 	}
-	return db, nil
+	if len(dscs) == 0 {
+		return nil, fmt.Errorf("no DSCs found in '%s' IPSW mount %s", side, mountRoot)
+	}
+	if isMacOS {
+		var filtered []string
+		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		for _, match := range dscs {
+			if r.MatchString(match) {
+				filtered = append(filtered, match)
+			}
+		}
+		if len(filtered) == 0 && mode != inputModeOTA {
+			return nil, fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+		}
+		if len(filtered) > 0 {
+			dscs = filtered
+		}
+	}
+	dsc, err := dyld.Open(dscs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to open DSC: %v", err)
+	}
+	return dsc, nil
 }
 
 func (d *Diff) ensureOTAPayloadFilesystems() error {
@@ -911,58 +960,70 @@ func (d *Diff) ensureOTAPayloadFilesystems() error {
 	return nil
 }
 
-func (d *Diff) parseEntitlements() (string, error) {
-	if d.Old.InputMode == inputModeOTA {
+// parseEntitlements handles OTA and Directory input modes. IPSW mode is
+// handled by entsJob via the volume-major orchestrator.
+func (d *Diff) parseEntitlements() (map[string]string, error) {
+	var oldMounts, newMounts map[string]mount
+	switch d.Old.InputMode {
+	case inputModeOTA:
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
-			return "", err
+			return nil, err
 		}
-		oldDB, err := scanEntitlementsFromMounts(otaDiffMounts(&d.Old), "old")
-		if err != nil {
-			return "", err
-		}
-		newDB, err := scanEntitlementsFromMounts(otaDiffMounts(&d.New), "new")
-		if err != nil {
-			return "", err
-		}
-		return ent.DiffDatabases(oldDB, newDB, &ent.Config{
-			Markdown: true,
-			Color:    false,
-			DiffTool: "git",
-		})
-	}
-	if d.Old.InputMode == inputModeDirectory {
-		oldDB, err := scanEntitlementsFromMounts(d.Old.Mount, "old")
-		if err != nil {
-			return "", err
-		}
-		newDB, err := scanEntitlementsFromMounts(d.New.Mount, "new")
-		if err != nil {
-			return "", err
-		}
-		return ent.DiffDatabases(oldDB, newDB, &ent.Config{
-			Markdown: true,
-			Color:    false,
-			DiffTool: "git",
-		})
-	}
-	oldDB, err := ent.GetDatabase(&ent.Config{
-		IPSW:              d.Old.IPSWPath,
-		PemDB:             d.conf.PemDB,
-		LaunchConstraints: true,
-	})
-	if err != nil {
-		return "", err
+		oldMounts = otaDiffMounts(&d.Old)
+		newMounts = otaDiffMounts(&d.New)
+	case inputModeDirectory:
+		oldMounts = d.Old.Mount
+		newMounts = d.New.Mount
+	default:
+		return nil, fmt.Errorf("diff: parseEntitlements: IPSW mode uses entsJob via the volume-major orchestrator")
 	}
 
-	newDB, err := ent.GetDatabase(&ent.Config{
-		IPSW:              d.New.IPSWPath,
-		PemDB:             d.conf.PemDB,
-		LaunchConstraints: true,
-	})
-	if err != nil {
-		return "", err
+	names := unionMountNames(oldMounts, newMounts)
+	out := make(map[string]string)
+	for _, name := range names {
+		oldDB := make(map[string]string)
+		if mnt, ok := oldMounts[name]; ok {
+			ents, err := ent.GetDatabase(&ent.Config{
+				Folder:            mnt.MountPath,
+				LaunchConstraints: true,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan entitlements in old %s: %w", name, err)
+			}
+			maps.Copy(oldDB, ents)
+		}
+		newDB := make(map[string]string)
+		if mnt, ok := newMounts[name]; ok {
+			ents, err := ent.GetDatabase(&ent.Config{
+				Folder:            mnt.MountPath,
+				LaunchConstraints: true,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan entitlements in new %s: %w", name, err)
+			}
+			maps.Copy(newDB, ents)
+		}
+		rendered, err := renderEntitlementsDiff(oldDB, newDB)
+		if err != nil {
+			return nil, err
+		}
+		if entitlementsDiffHasContent(rendered) {
+			out[name] = rendered
+		}
 	}
+	return out, nil
+}
 
+// entitlementsDiffHasContent reports whether the rendered diff string
+// contains actual diff data (as opposed to the "no differences" marker).
+func entitlementsDiffHasContent(s string) bool {
+	return s != "" && s != "- No differences found\n"
+}
+
+// renderEntitlementsDiff renders the markdown diff between two
+// path-keyed entitlement databases. Shared by parseEntitlements
+// (OTA/Directory) and entsJob (IPSW).
+func renderEntitlementsDiff(oldDB, newDB map[string]string) (string, error) {
 	return ent.DiffDatabases(oldDB, newDB, &ent.Config{
 		Markdown: true,
 		Color:    false,
@@ -970,17 +1031,10 @@ func (d *Diff) parseEntitlements() (string, error) {
 	})
 }
 
+// parseMachos handles OTA and Directory input modes. IPSW mode is handled
+// by machosJob via the volume-major orchestrator.
 func (d *Diff) parseMachos() (err error) {
-	conf := &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  d.conf.AllowList,
-		BlockList:  d.conf.BlockList,
-		CStrings:   d.conf.CStrings,
-		FuncStarts: d.conf.FuncStarts,
-		Verbose:    d.conf.Verbose,
-	}
+	conf := d.machoDiffConfig()
 	if d.Old.InputMode == inputModeOTA {
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
 			return err
@@ -992,11 +1046,37 @@ func (d *Diff) parseMachos() (err error) {
 		d.Machos, err = diffMachosInMounts(d.Old.Mount, d.New.Mount, conf)
 		return
 	}
-	conf.LowMemory = d.conf.LowMemory
-	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, conf)
-	return
+	return fmt.Errorf("diff: parseMachos: IPSW mode uses machosJob via the volume-major orchestrator")
 }
 
+// machoDiffConfig builds the mcmd.DiffConfig used by all macho diff paths.
+// Shared by parseMachos (OTA/Directory) and machosJob (IPSW).
+func (d *Diff) machoDiffConfig() *mcmd.DiffConfig {
+	return &mcmd.DiffConfig{
+		Markdown:   true,
+		Color:      false,
+		DiffTool:   "git",
+		AllowList:  d.conf.AllowList,
+		BlockList:  d.conf.BlockList,
+		CStrings:   d.conf.CStrings,
+		FuncStarts: d.conf.FuncStarts,
+		Verbose:    d.conf.Verbose,
+	}
+}
+
+// dscDiffConfig builds the mcmd.DiffConfig used for dyld_shared_cache image
+// diffs. Cache-image load-command bytes are noisy across point releases even
+// when the image's rendered sections are unchanged, so DSC reports rely on the
+// section/function/string/symbol legs and suppress load-command comparison.
+func (d *Diff) dscDiffConfig() *mcmd.DiffConfig {
+	conf := d.machoDiffConfig()
+	conf.IgnoreLoadCommands = true
+	return conf
+}
+
+// parseLaunchdPlists handles the OTA path (Directory mode is not supported
+// for launchd). IPSW mode is handled by launchdJob via the volume-major
+// orchestrator.
 func (d *Diff) parseLaunchdPlists() error {
 	if d.Old.InputMode == inputModeOTA {
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
@@ -1010,29 +1090,18 @@ func (d *Diff) parseLaunchdPlists() error {
 		if err != nil {
 			return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
 		}
-		out, err := utils.GitDiff(
-			oldConfig+"\n",
-			newConfig+"\n",
-			&utils.GitDiffConfig{Color: false, Tool: "git"})
-		if err != nil {
-			return err
-		}
-		if len(out) > 0 {
-			d.Launchd = "```diff\n" + out + "\n```"
-		}
-		return nil
+		return d.applyLaunchdGitDiff(oldConfig, newConfig)
 	}
 	if d.Old.InputMode != inputModeIPSW {
 		return fmt.Errorf("diff: parseLaunchdPlists: launchd diff is only supported for IPSW and OTA payload inputs")
 	}
-	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath, d.conf.PemDB)
-	if err != nil {
-		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
-	}
-	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath, d.conf.PemDB)
-	if err != nil {
-		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
-	}
+	return fmt.Errorf("diff: parseLaunchdPlists: IPSW mode uses launchdJob via the volume-major orchestrator")
+}
+
+// applyLaunchdGitDiff renders the git diff of the two extracted launchd
+// __TEXT.__config strings into d.Launchd. Shared by parseLaunchdPlists
+// (OTA) and launchdJob (IPSW).
+func (d *Diff) applyLaunchdGitDiff(oldConfig, newConfig string) error {
 	out, err := utils.GitDiff(
 		oldConfig+"\n",
 		newConfig+"\n",
@@ -1043,7 +1112,6 @@ func (d *Diff) parseLaunchdPlists() error {
 	if len(out) > 0 {
 		d.Launchd = "```diff\n" + out + "\n```"
 	}
-
 	return nil
 }
 
@@ -1057,7 +1125,6 @@ func (d *Diff) parseFirmwares() (err error) {
 		CStrings:   d.conf.CStrings,
 		FuncStarts: d.conf.FuncStarts,
 		Verbose:    d.conf.Verbose,
-		LowMemory:  d.conf.LowMemory,
 	}
 	if d.Old.InputMode == inputModeOTA {
 		d.Firmwares, err = diffFirmwaresFromOTA(&d.Old, &d.New, conf)
@@ -1161,102 +1228,147 @@ func (d *Diff) parseIBoot() (err error) {
 	return nil
 }
 
-func (d *Diff) parseFeatureFlags() (err error) {
-	d.Features = &PlistDiff{
-		New:     make(map[string]string),
-		Updated: make(map[string]string),
-	}
-	conf := &mcmd.DiffConfig{
-		Markdown: true,
-		Color:    false,
-		DiffTool: "git",
-	}
-
-	oldPlists := make(map[string]string)
-	newPlists := make(map[string]string)
-	if d.Old.InputMode == inputModeOTA {
+// parseFeatureFlags handles OTA and Directory input modes. IPSW mode is
+// handled by featuresJob via the volume-major orchestrator.
+func (d *Diff) parseFeatureFlags() error {
+	var oldMounts, newMounts map[string]mount
+	switch d.Old.InputMode {
+	case inputModeOTA:
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
 			return err
 		}
-		if err := collectFeatureFlagsFromMounts(otaDiffMounts(&d.Old), oldPlists); err != nil {
-			return err
-		}
-		if err := collectFeatureFlagsFromMounts(otaDiffMounts(&d.New), newPlists); err != nil {
-			return err
-		}
-	} else if d.Old.InputMode == inputModeDirectory {
-		if err := collectFeatureFlagsFromMounts(d.Old.Mount, oldPlists); err != nil {
-			return err
-		}
-		if err := collectFeatureFlagsFromMounts(d.New.Mount, newPlists); err != nil {
-			return err
-		}
-	} else {
-		if err := search.ForEachPlistInIPSW(d.Old.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
-			oldPlists[path] = content
-			return nil
-		}); err != nil {
-			return err
-		}
-		if err := search.ForEachPlistInIPSW(d.New.IPSWPath, "/System/Library/FeatureFlags", d.conf.PemDB, func(path string, content string) error {
-			newPlists[path] = content
-			return nil
-		}); err != nil {
-			return err
-		}
+		oldMounts = otaDiffMounts(&d.Old)
+		newMounts = otaDiffMounts(&d.New)
+	case inputModeDirectory:
+		oldMounts = d.Old.Mount
+		newMounts = d.New.Mount
+	default:
+		return fmt.Errorf("diff: parseFeatureFlags: IPSW mode uses featuresJob via the volume-major orchestrator")
 	}
 
-	var prevFiles []string
+	prevByVolume := make(map[string]map[string]string)
+	nextByVolume := make(map[string]map[string]string)
+	volumes, err := collectFeatureFlagsByVolume(oldMounts, prevByVolume, newMounts, nextByVolume)
+	if err != nil {
+		return err
+	}
+	out, err := buildPlistDiffByVolume(volumes, prevByVolume, nextByVolume)
+	if err != nil {
+		return err
+	}
+	d.Features = out
+	return nil
+}
+
+// collectFeatureFlagsByVolume walks System/Library/FeatureFlags under every
+// mount on both sides, populating per-volume plist maps. Returns the union
+// of volume names in sorted order so callers can build a deterministic
+// output.
+func collectFeatureFlagsByVolume(oldMounts map[string]mount, prev map[string]map[string]string, newMounts map[string]mount, next map[string]map[string]string) ([]string, error) {
+	names := unionMountNames(oldMounts, newMounts)
+	for _, name := range names {
+		if mnt, ok := oldMounts[name]; ok {
+			prev[name] = make(map[string]string)
+			if err := collectFeatureFlagsFromMount(mnt.MountPath, name, prev[name]); err != nil {
+				return nil, err
+			}
+		}
+		if mnt, ok := newMounts[name]; ok {
+			next[name] = make(map[string]string)
+			if err := collectFeatureFlagsFromMount(mnt.MountPath, name, next[name]); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return names, nil
+}
+
+// trackVolumeOnce appends label to volumes if not already present.
+func trackVolumeOnce(volumes *[]string, label string) {
+	if slices.Contains(*volumes, label) {
+		return
+	}
+	*volumes = append(*volumes, label)
+}
+
+func removeVolume(volumes *[]string, label string) {
+	out := (*volumes)[:0]
+	for _, v := range *volumes {
+		if v != label {
+			out = append(out, v)
+		}
+	}
+	*volumes = out
+}
+
+// buildPlistDiffByVolume builds the per-volume PlistDiff map. Empty
+// per-volume diffs are omitted. Shared by featuresJob and locsJob.
+func buildPlistDiffByVolume(volumes []string, prev, next map[string]map[string]string) (map[string]*PlistDiff, error) {
+	out := make(map[string]*PlistDiff, len(volumes))
+	for _, vol := range volumes {
+		diff, err := buildPlistDiff(prev[vol], next[vol])
+		if err != nil {
+			return nil, err
+		}
+		if plistDiffHasContent(diff) {
+			out[vol] = diff
+		}
+	}
+	return out, nil
+}
+
+func plistDiffHasContent(d *PlistDiff) bool {
+	return d != nil && (len(d.New) > 0 || len(d.Removed) > 0 || len(d.Updated) > 0)
+}
+
+// buildPlistDiff computes a PlistDiff from path-keyed old/new plist content
+// maps. Shared by feature-flag and localization paths.
+func buildPlistDiff(oldPlists, newPlists map[string]string) (*PlistDiff, error) {
+	diff := &PlistDiff{
+		New:     make(map[string]string),
+		Updated: make(map[string]string),
+	}
+
+	prevFiles := make([]string, 0, len(oldPlists))
 	for f := range oldPlists {
 		prevFiles = append(prevFiles, f)
 	}
 	slices.Sort(prevFiles)
 
-	var nextFiles []string
+	nextFiles := make([]string, 0, len(newPlists))
 	for f := range newPlists {
 		nextFiles = append(nextFiles, f)
 	}
 	slices.Sort(nextFiles)
 
-	/* DIFF IPSW */
 	newFiles := utils.Difference(nextFiles, prevFiles)
-	d.Features.Removed = utils.Difference(prevFiles, nextFiles)
+	diff.Removed = utils.Difference(prevFiles, nextFiles)
 
 	for _, f2 := range nextFiles {
-		if slices.Contains(newFiles, f2) {
-			d.Features.New[f2] = newPlists[f2]
-		}
 		dat2 := newPlists[f2]
-		if dat1, ok := oldPlists[f2]; ok {
-			if strings.EqualFold(dat2, dat1) {
-				continue
-			}
-			var out string
-			if conf.Markdown {
-				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return err
-				}
-			} else {
-				out, err = utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
-				if err != nil {
-					return err
-				}
-			}
-			if len(out) == 0 { // no diff
-				continue
-			}
-			if conf.Markdown {
-				d.Features.Updated[f2] = "```diff\n" + out + "\n```\n"
-			} else {
-				d.Features.Updated[f2] = out
-			}
+		if slices.Contains(newFiles, f2) {
+			diff.New[f2] = dat2
+			continue
 		}
+		dat1, ok := oldPlists[f2]
+		if !ok || strings.EqualFold(dat2, dat1) {
+			continue
+		}
+		out, err := utils.GitDiff(dat1+"\n", dat2+"\n", &utils.GitDiffConfig{Color: false, Tool: "git"})
+		if err != nil {
+			return nil, err
+		}
+		if len(out) == 0 {
+			continue
+		}
+		diff.Updated[f2] = "```diff\n" + out + "\n```\n"
 	}
 
-	return nil
+	return diff, nil
 }
 
+// parseFiles diffs file paths for OTA and Directory input modes. IPSW mode
+// is handled by filesJob via the volume-major orchestrator.
 func (d *Diff) parseFiles() error {
 	if d.Old.InputMode == inputModeOTA {
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
@@ -1271,39 +1383,64 @@ func (d *Diff) parseFiles() error {
 		d.Files, err = diffFilesInMounts(d.Old.Mount, d.New.Mount)
 		return err
 	}
-	d.Files = &FileDiff{
-		New:     make(map[string][]string),
-		Removed: make(map[string][]string),
-	}
+	return fmt.Errorf("diff: parseFiles: IPSW mode uses filesJob via the volume-major orchestrator")
+}
 
-	/* PREVIOUS IPSW */
-
-	prev := make(map[string][]string)
-
-	if err := search.ForEachFileInIPSW(d.Old.IPSWPath, "", d.conf.PemDB, func(dmg, path string) error {
-		prev[dmg] = append(prev[dmg], path)
+// openCacheStore initializes the persistent cache store for IPSW-mode runs
+// and installs it on d via SetStore. Non-IPSW input modes are returned a nil
+// cleanup so the per-orchestrator MemoryStore path stays in effect; failures
+// to open the persistent store are logged and fall back to a temp-backed
+// SQLiteStore via storage.OpenCacheStore.
+func (d *Diff) openCacheStore() func() {
+	if d.conf == nil {
 		return nil
-	}); err != nil {
-		return err
 	}
-
-	/* NEXT IPSW */
-
-	next := make(map[string][]string)
-
-	if err := search.ForEachFileInIPSW(d.New.IPSWPath, "", d.conf.PemDB, func(dmg, path string) error {
-		next[dmg] = append(next[dmg], path)
+	if d.Old.InputMode != inputModeIPSW || d.New.InputMode != inputModeIPSW {
 		return nil
-	}); err != nil {
-		return err
 	}
-
-	for dmg := range prev {
-		d.Files.New[dmg] = utils.Difference(next[dmg], prev[dmg])
-		d.Files.Removed[dmg] = utils.Difference(prev[dmg], next[dmg])
-		sort.Strings(d.Files.New[dmg])
-		sort.Strings(d.Files.Removed[dmg])
+	opts := storage.CacheOptions{
+		OldInfo:  d.Old.Info,
+		NewInfo:  d.New.Info,
+		Dir:      d.conf.Cache.Dir,
+		NoCache:  d.conf.Cache.NoCache,
+		Clean:    d.conf.Cache.Clean,
+		MaxBytes: d.conf.Cache.MaxBytes,
 	}
+	store, cleanup, err := storage.OpenCacheStore(opts)
+	if err != nil {
+		log.WithError(err).Warn("failed to open diff cache; falling back to in-memory store")
+		return nil
+	}
+	if d.conf.Cache.NoCache {
+		log.Debug("using temporary diff cache (--no-cache)")
+	} else if path, ok := persistentCachePath(d.Old.Info, d.New.Info, d.conf.Cache.Dir); ok {
+		log.Infof("using diff cache at %s", path)
+	} else {
+		log.Debug("using temporary diff cache (identity unavailable)")
+	}
+	d.SetStore(store)
+	return func() {
+		cleanup()
+		d.SetStore(nil)
+	}
+}
 
-	return nil
+// persistentCachePath returns the path OpenCacheStore would resolve for the
+// (old, new) pair given the override directory, so callers can log the
+// concrete path. ok=false when either Info lacks a BuildManifest and the
+// cache must therefore fall back to a temp-backed store.
+func persistentCachePath(oldInfo, newInfo *info.Info, dir string) (string, bool) {
+	oldID, err := storage.IPSWCacheIdentity(oldInfo)
+	if err != nil {
+		return "", false
+	}
+	newID, err := storage.IPSWCacheIdentity(newInfo)
+	if err != nil {
+		return "", false
+	}
+	path, err := storage.ResolveCachePath(oldID, newID, dir)
+	if err != nil {
+		return "", false
+	}
+	return path, true
 }

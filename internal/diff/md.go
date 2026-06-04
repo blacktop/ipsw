@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/apex/log"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"golang.org/x/exp/rand"
 )
 
@@ -57,300 +57,62 @@ func (d *Diff) Markdown() error {
 		)
 	}
 
-	// SUB-SECTION: Kexts
-	if d.Kexts != nil && (len(d.Kexts.New) > 0 || len(d.Kexts.Removed) > 0 || len(d.Kexts.Updated) > 0) {
-		out.WriteString("### Kexts\n\n")
-		if len(d.Kexts.New) > 0 {
-			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.Kexts.New)))
-			slices.Sort(d.Kexts.New)
-			for _, k := range d.Kexts.New {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Kexts.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.Kexts.Removed)))
-			slices.Sort(d.Kexts.Removed)
-			for _, k := range d.Kexts.Removed {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			out.WriteString("\n")
-		}
-
-		if len(d.Kexts.Updated) > 0 {
-			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Kexts.Updated)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Updated</i></summary>\n\n")
-
-			keys := slices.Collect(maps.Keys(d.Kexts.Updated))
-			slices.Sort(keys)
-
-			if len(d.Kexts.Updated) < 10 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", d.Kexts.Updated[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "KEXTS"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "KEXTS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
-					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "KEXTS", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
-					}
-					log.Debugf("Creating diff kext Markdown file: %s", fname)
-					f, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create diff file: %w", err)
-					}
-					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, "%s", d.Kexts.Updated[k])
-					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("KEXTS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SUB-SECTION: Kexts — owned by kextsTask (body in tasks_kexts.go).
+	if kt := newKextsTask(d); !kt.Empty() {
+		if err := kt.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SUB-SECTION: KDKs
-	if len(d.KDKs) > 0 {
-		out.WriteString("### KDKs\n\n")
-		fname := filepath.Join(d.conf.Output, "KDK.md")
-		log.Debugf("Creating diff KDK Markdown: %s", fname)
-		f, err := os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("failed to create diff KDK Markdown: %w", err)
-		}
-		fmt.Fprintf(f, "## KDKs\n\n"+
-			"- `%s`\n"+
-			"- `%s`\n\n",
-			d.Old.KDK, d.New.KDK,
-		)
-		fmt.Fprintf(f, "%s", d.KDKs)
-		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "KDK DIFF", "KDK.md"))
-	}
-
-	// SECTION: MachO
-	if d.Machos != nil && (len(d.Machos.New) > 0 || len(d.Machos.Removed) > 0 || len(d.Machos.Updated) > 0) {
-		out.WriteString("## MachO\n\n")
-		if len(d.Machos.New) > 0 {
-			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Machos.New)))
-			slices.Sort(d.Machos.New)
-			if len(d.Machos.New) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View NEW</i></summary>\n\n")
-			}
-			for _, k := range d.Machos.New {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Machos.New) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Machos.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Machos.Removed)))
-			slices.Sort(d.Machos.Removed)
-			if len(d.Machos.Removed) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View Removed</i></summary>\n\n")
-			}
-			for _, k := range d.Machos.Removed {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Machos.Removed) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Machos.Updated) > 0 {
-			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Machos.Updated)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Updated</i></summary>\n\n")
-
-			keys := slices.Collect(maps.Keys(d.Machos.Updated))
-			slices.Sort(keys)
-
-			if len(d.Machos.Updated) < 20 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", d.Machos.Updated[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "MACHOS"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
-					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "MACHOS", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
-					}
-					log.Debugf("Creating diff macho Markdown file: %s", fname)
-					f, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create diff file: %w", err)
-					}
-					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, "%s", d.Machos.Updated[k])
-					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SUB-SECTION: KDKs — owned by kdksTask (body in tasks_kdks.go).
+	if kt := newKDKsTask(d); !kt.Empty() {
+		if err := kt.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SUB-SECTION: Entitlements
-	if len(d.Ents) > 0 && d.Ents != "- No differences found\n" {
-		out.WriteString("### 🔑 Entitlements\n\n")
-		fname := filepath.Join(d.conf.Output, "Entitlements.md")
-		log.Debugf("Creating diff Entitlements Markdown: %s", fname)
-		f, err := os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("failed to create diff Entitlements Markdown: %w", err)
-		}
-		fmt.Fprintf(f, "## 🔑 Entitlements\n\n")
-		fmt.Fprintf(f, "%s", d.Ents)
-		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "Entitlements DIFF", "Entitlements.md"))
-	}
-
-	// SUB-SECTION: Sandbox
-	if len(d.Sandbox) > 0 {
-		out.WriteString("### Sandbox Profiles\n\n")
-		fname := filepath.Join(d.conf.Output, "Sandbox.md")
-		log.Debugf("Creating diff Sandbox Markdown: %s", fname)
-		f, err := os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("failed to create diff Sandbox Markdown: %w", err)
-		}
-		fmt.Fprintf(f, "## Sandbox Profiles\n\n")
-		fmt.Fprintf(f, "%s", d.Sandbox)
-		f.Close()
-		out.WriteString(fmt.Sprintf("- [%s](%s)\n\n", "Sandbox Profiles DIFF", "Sandbox.md"))
-	}
-
-	// SECTION: Firmware
-	if d.Firmwares != nil && (len(d.Firmwares.New) > 0 || len(d.Firmwares.Removed) > 0 || len(d.Firmwares.Updated) > 0) {
-		out.WriteString("## Firmware\n\n")
-		if len(d.Firmwares.New) > 0 {
-			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Firmwares.New)))
-			slices.Sort(d.Firmwares.New)
-			if len(d.Firmwares.New) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View NEW</i></summary>\n\n")
-			}
-			for _, k := range d.Firmwares.New {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Firmwares.New) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Firmwares.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Firmwares.Removed)))
-			slices.Sort(d.Firmwares.Removed)
-			if len(d.Firmwares.Removed) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View Removed</i></summary>\n\n")
-			}
-			for _, k := range d.Firmwares.Removed {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Firmwares.Removed) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Firmwares.Updated) > 0 {
-			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Firmwares.Updated)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Updated</i></summary>\n\n")
-
-			keys := slices.Collect(maps.Keys(d.Firmwares.Updated))
-			slices.Sort(keys)
-
-			if len(d.Firmwares.Updated) < 10 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", d.Firmwares.Updated[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FIRMWARE"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "FIRMWARE", filepath.Base(k)+".md")
-					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "FIRMWARE", fmt.Sprintf("%s.%d.md", filepath.Base(k), rand.Intn(20)))
-					}
-					log.Debugf("Creating diff firmware Markdown file: %s", fname)
-					f, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create diff file: %w", err)
-					}
-					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, "%s", d.Firmwares.Updated[k])
-					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FIRMWARE", filepath.Base(k)+".md")))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SECTION: MachO (per-volume sub-grouping; empty volumes are hidden).
+	// Owned by machosJob — body lives in machosRenderer.Markdown.
+	if mr := newMachosRenderer(d.Machos); !mr.Empty() {
+		if err := mr.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SECTION: iBoot
-	if d.IBoot != nil {
-		if len(d.IBoot.Versions) >= 2 {
-			out.WriteString(
-				fmt.Sprintf(
-					"### iBoot\n\n"+
-						"| iOS | Version |\n"+
-						"| :-- | :------ |\n"+
-						"| %s *(%s)* | %s |\n"+
-						"| %s *(%s)* | %s |\n\n",
-					d.Old.Version, d.Old.Build, d.IBoot.Versions[0],
-					d.New.Version, d.New.Build, d.IBoot.Versions[1],
-				),
-			)
-		}
-		if len(d.IBoot.New) > 0 {
-			out.WriteString(fmt.Sprintf("#### 🆕 NEW (%d)\n\n", len(d.IBoot.New)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View NEW</i></summary>\n\n")
-			for k, v := range d.IBoot.New {
-				out.WriteString(fmt.Sprintf("##### `%s`\n", k))
-				for _, str := range v {
-					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
-		}
-		if len(d.IBoot.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("#### ❌ Removed (%d)\n\n", len(d.IBoot.Removed)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Removed</i></summary>\n\n")
-			for k, v := range d.IBoot.Removed {
-				out.WriteString(fmt.Sprintf("##### `%s`\n", k))
-				for _, str := range v {
-					out.WriteString(fmt.Sprintf("  - `%s`\n", str))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SUB-SECTION: Entitlements (per-volume sub-grouping). The per-volume
+	// rendered diff strings are written into a single Entitlements.md file
+	// with per-volume sub-headings; the README links to that file.
+	// Owned by entsJob — body lives in entsRenderer.Markdown.
+	if er := newEntsRenderer(d.Ents); !er.Empty() {
+		if err := er.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SECTION: Launchd
-	if len(d.Launchd) > 0 {
-		out.WriteString("### launchd Config\n\n<details>\n  <summary><i>View Updated</i></summary>\n\n" + d.Launchd + "\n\n</details>\n\n")
+	// SUB-SECTION: Sandbox — owned by sandboxTask (body in tasks_sandbox.go).
+	if st := newSandboxTask(d); !st.Empty() {
+		if err := st.Markdown(&out, d.conf.Output); err != nil {
+			return err
+		}
+	}
+
+	// SECTION: Firmware — owned by firmwaresTask (body in tasks_firmwares.go).
+	if ft := newFirmwaresTask(d); !ft.Empty() {
+		if err := ft.Markdown(&out, d.conf.Output); err != nil {
+			return err
+		}
+	}
+
+	// SECTION: iBoot — owned by ibootTask (body in tasks_iboot.go).
+	if err := newIBootTask(d).Markdown(&out, d.conf.Output); err != nil {
+		return err
+	}
+
+	// SECTION: Launchd — owned by launchdJob (body in launchdRenderer.Markdown).
+	if lr := newLaunchdRenderer(d.Launchd); !lr.Empty() {
+		if err := lr.Markdown(&out, d.conf.Output); err != nil {
+			return err
+		}
 	}
 
 	// SECTION: DSC
@@ -446,228 +208,26 @@ func (d *Diff) Markdown() error {
 		}
 	}
 
-	// SUB-SECTION: Feature Flags
-	if d.Files != nil {
-		types := []string{"IPSW", "filesystem", "SystemOS", "AppOS", "ExclaveOS"}
-		hasNewFiles := false
-		hasRemovedFiles := false
-		for _, t := range types {
-			if len(d.Files.New[t]) > 0 {
-				hasNewFiles = true
-			}
-			if len(d.Files.Removed[t]) > 0 {
-				hasRemovedFiles = true
-			}
-		}
-		if hasNewFiles || hasRemovedFiles {
-			out.WriteString("## Files\n\n")
-		}
-		if hasNewFiles {
-			if len(d.Files.New) > 0 {
-				out.WriteString("### 🆕 New\n\n")
-				for _, t := range types {
-					if len(d.Files.New[t]) > 0 {
-						out.WriteString(fmt.Sprintf("#### %s (%d)\n\n", t, len(d.Files.New[t])))
-						if len(d.Files.New[t]) > 10 {
-							out.WriteString("<details>\n" +
-								"  <summary><i>View Files</i></summary>\n\n")
-						}
-						for _, k := range d.Files.New[t] {
-							out.WriteString(fmt.Sprintf("- `%s`\n", k))
-						}
-						if len(d.Files.New[t]) > 10 {
-							out.WriteString("\n</details>\n")
-						}
-						out.WriteString("\n")
-					}
-				}
-			}
-		}
-		if hasRemovedFiles {
-			out.WriteString("### ❌ Removed\n\n")
-			for _, t := range types {
-				if len(d.Files.Removed[t]) > 0 {
-					out.WriteString(fmt.Sprintf("#### %s (%d)\n\n", t, len(d.Files.Removed[t])))
-					if len(d.Files.Removed[t]) > 10 {
-						out.WriteString("<details>\n" +
-							"  <summary><i>View Files</i></summary>\n\n")
-					}
-					for _, k := range d.Files.Removed[t] {
-						out.WriteString(fmt.Sprintf("- `%s`\n", k))
-					}
-					if len(d.Files.Removed[t]) > 10 {
-						out.WriteString("\n</details>\n")
-					}
-					out.WriteString("\n")
-				}
-			}
+	// SECTION: Files — owned by filesJob (body in filesRenderer.Markdown).
+	if fr := newFilesRenderer(d.Files); !fr.Empty() {
+		if err := fr.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SUB-SECTION: Localizations
-	if d.Localizations != nil && (len(d.Localizations.New) > 0 || len(d.Localizations.Removed) > 0 || len(d.Localizations.Updated) > 0) {
-		out.WriteString("## Localizations\n\n")
-		if len(d.Localizations.New) > 0 {
-			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Localizations.New)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View New</i></summary>\n\n")
-			keys := slices.Collect(maps.Keys(d.Localizations.New))
-			slices.Sort(keys)
-			if len(d.Localizations.New) < 20 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", localizationDisplayName(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("```text\n%s\n```\n", d.Localizations.New[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "LOCALIZATIONS"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					relName, err := writeLocalizationMarkdownFile(d.conf.Output, k, fmt.Sprintf("```text\n%s\n```\n", d.Localizations.New[k]))
-					if err != nil {
-						return err
-					}
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("LOCALIZATIONS", relName)))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
-		}
-		if len(d.Localizations.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Localizations.Removed)))
-			if len(d.Localizations.Removed) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View Removed</i></summary>\n\n")
-			}
-			for _, k := range d.Localizations.Removed {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Localizations.Removed) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Localizations.Updated) > 0 {
-			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Localizations.Updated)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Updated</i></summary>\n\n")
-
-			keys := slices.Collect(maps.Keys(d.Localizations.Updated))
-			slices.Sort(keys)
-
-			if len(d.Localizations.Updated) < 15 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", localizationDisplayName(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", d.Localizations.Updated[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "LOCALIZATIONS"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					relName, err := writeLocalizationMarkdownFile(d.conf.Output, k, d.Localizations.Updated[k])
-					if err != nil {
-						return err
-					}
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("LOCALIZATIONS", relName)))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SECTION: Localizations (per-volume sub-grouping) — owned by locsJob
+	// (body in locsRenderer.Markdown).
+	if lr := newLocsRenderer(d.Localizations); !lr.Empty() {
+		if err := lr.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
-	// SUB-SECTION: Feature Flags
-	if d.Features != nil && (len(d.Features.New) > 0 || len(d.Features.Removed) > 0 || len(d.Features.Updated) > 0) {
-		out.WriteString("## Feature Flags\n\n")
-		if len(d.Features.New) > 0 {
-			out.WriteString(fmt.Sprintf("### 🆕 NEW (%d)\n\n", len(d.Features.New)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View New</i></summary>\n\n")
-			if len(d.Features.New) < 20 {
-				for k, v := range d.Features.New {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("```xml\n%s\n```\n", v))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
-					return err
-				}
-				keys := make([]string, 0, len(d.Features.New))
-				for k := range d.Features.New {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
-					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
-					}
-					log.Debugf("Creating diff feature Markdown file: %s", fname)
-					f, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create diff file: %w", err)
-					}
-					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprint(f, d.Features.New[k])
-					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
-		}
-		if len(d.Features.Removed) > 0 {
-			out.WriteString(fmt.Sprintf("### ❌ Removed (%d)\n\n", len(d.Features.Removed)))
-			if len(d.Features.Removed) > 30 {
-				out.WriteString("<details>\n" +
-					"  <summary><i>View Removed</i></summary>\n\n")
-			}
-			for _, k := range d.Features.Removed {
-				out.WriteString(fmt.Sprintf("- `%s`\n", k))
-			}
-			if len(d.Features.Removed) > 30 {
-				out.WriteString("\n</details>\n")
-			}
-			out.WriteString("\n")
-		}
-		if len(d.Features.Updated) > 0 {
-			out.WriteString(fmt.Sprintf("### ⬆️ Updated (%d)\n\n", len(d.Features.Updated)))
-			out.WriteString("<details>\n" +
-				"  <summary><i>View Updated</i></summary>\n\n")
-
-			keys := slices.Collect(maps.Keys(d.Features.Updated))
-			slices.Sort(keys)
-
-			if len(d.Features.Updated) < 15 {
-				for _, k := range keys {
-					out.WriteString(fmt.Sprintf("#### %s\n\n", filepath.Base(k)))
-					out.WriteString(fmt.Sprintf(">  `%s`\n\n", k))
-					out.WriteString(fmt.Sprintf("%s\n", d.Features.Updated[k]))
-				}
-			} else {
-				if err := os.MkdirAll(filepath.Join(d.conf.Output, "FEATURES"), 0o750); err != nil {
-					return err
-				}
-				for _, k := range keys {
-					fname := filepath.Join(d.conf.Output, "FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
-					if _, err := os.Stat(fname); os.IsExist(err) {
-						fname = filepath.Join(d.conf.Output, "FEATURES", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
-					}
-					log.Debugf("Creating diff feature Markdown file: %s", fname)
-					f, err := os.Create(fname)
-					if err != nil {
-						return fmt.Errorf("failed to create diff file: %w", err)
-					}
-					fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-					fmt.Fprintf(f, "> `%s`\n\n", k)
-					fmt.Fprintf(f, "%s", d.Features.Updated[k])
-					f.Close()
-					out.WriteString(fmt.Sprintf("- [%s](%s)\n", k, filepath.Join("FEATURES", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")))
-				}
-			}
-			out.WriteString("\n</details>\n\n")
+	// SECTION: Feature Flags (per-volume sub-grouping) — owned by featuresJob
+	// (body in featuresRenderer.Markdown).
+	if fr := newFeaturesRenderer(d.Features); !fr.Empty() {
+		if err := fr.Markdown(&out, d.conf.Output); err != nil {
+			return err
 		}
 	}
 
@@ -682,23 +242,248 @@ func (d *Diff) Markdown() error {
 	return os.WriteFile(fname, []byte(out.String()), 0o644)
 }
 
-func localizationMarkdownFilename(path string) string {
-	base := strings.ReplaceAll(localizationDisplayName(path), " ", "_")
+// sortedVolumeKeys returns the keys of m in volumeOutputOrder; unknown
+// volumes sort alphabetically after. Used by every per-volume diff section.
+func sortedVolumeKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return sortVolumeNames(keys)
+}
+
+func hasEntitlementsContent(m map[string]string) bool {
+	for _, rendered := range m {
+		if entitlementsDiffHasContent(rendered) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPlistVolumeContent(m map[string]*PlistDiff) bool {
+	for _, d := range m {
+		if plistDiffHasContent(d) {
+			return true
+		}
+	}
+	return false
+}
+
+// plistVolumeRenderer is the per-volume config that distinguishes
+// renderPlistVolume's two callers (Localizations vs FeatureFlags).
+type plistVolumeRenderer struct {
+	subDir      string              // "LOCALIZATIONS" or "FEATURES"
+	fenceLang   string              // "text" or "xml" (for the New sub-section)
+	displayName func(string) string // path → header label
+}
+
+// renderPlistVolume emits the New/Removed/Updated sub-sections for a single
+// plist-style volume (localizations or feature flags). headingPrefix is the
+// markdown heading level (e.g. "####" when the per-volume heading is "###").
+// Overflow entries spill into per-file markdown under r.subDir, with FNV-hashed
+// filenames so basename collisions stay deterministic.
+func renderPlistVolume(out *strings.Builder, diff *PlistDiff, outputDir, headingPrefix string, r plistVolumeRenderer) error {
+	entryPrefix := headingPrefix + "#"
+	if len(diff.New) > 0 {
+		fmt.Fprintf(out, "%s 🆕 NEW (%d)\n\n", headingPrefix, len(diff.New))
+		out.WriteString("<details>\n  <summary><i>View New</i></summary>\n\n")
+		keys := slices.Collect(maps.Keys(diff.New))
+		slices.Sort(keys)
+		if len(diff.New) < 20 {
+			for _, k := range keys {
+				fmt.Fprintf(out, "%s %s\n\n", entryPrefix, r.displayName(k))
+				fmt.Fprintf(out, ">  `%s`\n\n", k)
+				fmt.Fprintf(out, "```%s\n%s\n```\n", r.fenceLang, diff.New[k])
+			}
+		} else {
+			if err := os.MkdirAll(filepath.Join(outputDir, r.subDir), 0o750); err != nil {
+				return err
+			}
+			for _, k := range keys {
+				body := fmt.Sprintf("```%s\n%s\n```\n", r.fenceLang, diff.New[k])
+				relName, err := writePlistMarkdownFile(outputDir, r.subDir, k, r.displayName, body)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(r.subDir, relName))
+			}
+		}
+		out.WriteString("\n</details>\n\n")
+	}
+	if len(diff.Removed) > 0 {
+		fmt.Fprintf(out, "%s ❌ Removed (%d)\n\n", headingPrefix, len(diff.Removed))
+		if len(diff.Removed) > 30 {
+			out.WriteString("<details>\n  <summary><i>View Removed</i></summary>\n\n")
+		}
+		for _, k := range diff.Removed {
+			fmt.Fprintf(out, "- `%s`\n", k)
+		}
+		if len(diff.Removed) > 30 {
+			out.WriteString("\n</details>\n")
+		}
+		out.WriteString("\n")
+	}
+	if len(diff.Updated) > 0 {
+		fmt.Fprintf(out, "%s ⬆️ Updated (%d)\n\n", headingPrefix, len(diff.Updated))
+		out.WriteString("<details>\n  <summary><i>View Updated</i></summary>\n\n")
+		keys := slices.Collect(maps.Keys(diff.Updated))
+		slices.Sort(keys)
+		if len(diff.Updated) < 15 {
+			for _, k := range keys {
+				fmt.Fprintf(out, "%s %s\n\n", entryPrefix, r.displayName(k))
+				fmt.Fprintf(out, ">  `%s`\n\n", k)
+				fmt.Fprintf(out, "%s\n", diff.Updated[k])
+			}
+		} else {
+			if err := os.MkdirAll(filepath.Join(outputDir, r.subDir), 0o750); err != nil {
+				return err
+			}
+			for _, k := range keys {
+				relName, err := writePlistMarkdownFile(outputDir, r.subDir, k, r.displayName, diff.Updated[k])
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(r.subDir, relName))
+			}
+		}
+		out.WriteString("\n</details>\n\n")
+	}
+	return nil
+}
+
+var (
+	localizationsRenderer = plistVolumeRenderer{subDir: "LOCALIZATIONS", fenceLang: "text", displayName: localizationDisplayName}
+	featureFlagsRenderer  = plistVolumeRenderer{subDir: "FEATURES", fenceLang: "xml", displayName: filepath.Base}
+)
+
+// volumeOutputOrder is the deterministic order per-volume diff sections
+// render in. Unknown volume names sort alphabetically after these.
+var volumeOutputOrder = []string{"IPSW", "filesystem", "SystemOS", "AppOS", "ExclaveOS"}
+
+func sortVolumeNames(names []string) []string {
+	order := make(map[string]int, len(volumeOutputOrder))
+	for i, name := range volumeOutputOrder {
+		order[name] = i
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		ia, oka := order[a]
+		ib, okb := order[b]
+		switch {
+		case oka && okb:
+			return ia - ib
+		case oka:
+			return -1
+		case okb:
+			return 1
+		default:
+			return strings.Compare(a, b)
+		}
+	})
+	return names
+}
+
+func hasMachoDiffVolumeContent(m map[string]*mcmd.MachoDiff) bool {
+	for _, d := range m {
+		if machoDiffHasContent(d) {
+			return true
+		}
+	}
+	return false
+}
+
+func renderMachoDiffSection(out *strings.Builder, diff *mcmd.MachoDiff, outputDir, headingPrefix string) error {
+	if len(diff.New) > 0 {
+		fmt.Fprintf(out, "%s 🆕 NEW (%d)\n\n", headingPrefix, len(diff.New))
+		slices.Sort(diff.New)
+		if len(diff.New) > 30 {
+			out.WriteString("<details>\n  <summary><i>View NEW</i></summary>\n\n")
+		}
+		for _, k := range diff.New {
+			fmt.Fprintf(out, "- `%s`\n", k)
+		}
+		if len(diff.New) > 30 {
+			out.WriteString("\n</details>\n")
+		}
+		out.WriteString("\n")
+	}
+	if len(diff.Removed) > 0 {
+		fmt.Fprintf(out, "%s ❌ Removed (%d)\n\n", headingPrefix, len(diff.Removed))
+		slices.Sort(diff.Removed)
+		if len(diff.Removed) > 30 {
+			out.WriteString("<details>\n  <summary><i>View Removed</i></summary>\n\n")
+		}
+		for _, k := range diff.Removed {
+			fmt.Fprintf(out, "- `%s`\n", k)
+		}
+		if len(diff.Removed) > 30 {
+			out.WriteString("\n</details>\n")
+		}
+		out.WriteString("\n")
+	}
+	if len(diff.Updated) > 0 {
+		fmt.Fprintf(out, "%s ⬆️ Updated (%d)\n\n", headingPrefix, len(diff.Updated))
+		out.WriteString("<details>\n  <summary><i>View Updated</i></summary>\n\n")
+
+		keys := slices.Collect(maps.Keys(diff.Updated))
+		slices.Sort(keys)
+
+		entryPrefix := headingPrefix + "#"
+		if len(diff.Updated) < 20 {
+			for _, k := range keys {
+				fmt.Fprintf(out, "%s %s\n\n", entryPrefix, filepath.Base(k))
+				fmt.Fprintf(out, ">  `%s`\n\n", k)
+				fmt.Fprintf(out, "%s\n", diff.Updated[k])
+			}
+		} else {
+			if err := os.MkdirAll(filepath.Join(outputDir, "MACHOS"), 0o750); err != nil {
+				return err
+			}
+			for _, k := range keys {
+				fname := filepath.Join(outputDir, "MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
+				if _, err := os.Stat(fname); os.IsExist(err) {
+					fname = filepath.Join(outputDir, "MACHOS", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
+				}
+				log.Debugf("Creating diff macho Markdown file: %s", fname)
+				f, err := os.Create(fname)
+				if err != nil {
+					return fmt.Errorf("failed to create diff file: %w", err)
+				}
+				fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
+				fmt.Fprintf(f, "> `%s`\n\n", k)
+				fmt.Fprintf(f, "%s", diff.Updated[k])
+				f.Close()
+				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join("MACHOS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md"))
+			}
+		}
+		out.WriteString("\n</details>\n\n")
+	}
+	return nil
+}
+
+// plistMarkdownFilename derives the per-entry markdown filename from a path
+// and a displayName resolver. FNV-hashing the path keeps filenames
+// deterministic even when multiple keys share a basename.
+func plistMarkdownFilename(path string, displayName func(string) string) string {
+	base := strings.ReplaceAll(displayName(path), " ", "_")
 	if base == "" || base == "." {
-		base = "localization"
+		base = "entry"
 	}
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(filepath.ToSlash(path)))
 	return fmt.Sprintf("%08x_%s.md", hash.Sum32(), base)
 }
 
-func writeLocalizationMarkdownFile(output, path, content string) (string, error) {
-	relName := localizationMarkdownFilename(path)
-	fname := filepath.Join(output, "LOCALIZATIONS", relName)
-	log.Debugf("Creating diff localization Markdown file: %s", fname)
+// writePlistMarkdownFile writes a single per-key markdown file under
+// outputDir/subDir/ and returns the basename so the caller can link to it
+// from the README.
+func writePlistMarkdownFile(output, subDir, path string, displayName func(string) string, content string) (string, error) {
+	relName := plistMarkdownFilename(path, displayName)
+	fname := filepath.Join(output, subDir, relName)
+	log.Debugf("Creating diff %s Markdown file: %s", strings.ToLower(subDir), fname)
 
 	var out strings.Builder
-	fmt.Fprintf(&out, "## %s\n\n", localizationDisplayName(path))
+	fmt.Fprintf(&out, "## %s\n\n", displayName(path))
 	fmt.Fprintf(&out, "> `%s`\n\n", path)
 	out.WriteString(content)
 

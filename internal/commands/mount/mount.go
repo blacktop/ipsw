@@ -28,6 +28,11 @@ type Config struct {
 	Keys       any    // Either string (DMG key) or download.WikiFWKeys (auto-lookup)
 	MountPoint string // Custom mount point
 	Ident      string // BuildManifest identity selector (used for rdisk)
+	// ExtractDir is where DMGs are extracted/decrypted (default: os.TempDir()).
+	// Callers that also mount the same volumes via internal/search.scanDmg (which
+	// extracts to the cwd) set this to the cwd so both share one backing file and
+	// the same volume is never attached twice.
+	ExtractDir string
 }
 
 // Context is the mount context
@@ -127,10 +132,14 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
 	}
 
-	extractedDMG := filepath.Join(os.TempDir(), dmgPath)
+	extractDir := cfg.ExtractDir
+	if extractDir == "" {
+		extractDir = os.TempDir()
+	}
+	extractedDMG := filepath.Join(extractDir, dmgPath)
 
 	if _, err := os.Stat(extractedDMG); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, os.TempDir(), func(f *zip.File) bool {
+		dmgs, err := utils.Unzip(ipswPath, extractDir, func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
 		if err != nil {

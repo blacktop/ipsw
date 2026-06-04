@@ -40,17 +40,8 @@ const diffMarkdownTemplate = `
 			- [⬆️ Updated ({{ len .Kexts.Updated }})](#️-updated)
 {{- end }}
 {{- end }}
-	- [Machos](#machos)
 {{- if .Machos }}
-{{- if .Machos.New }}
-		- [🆕 NEW ({{ len .Machos.New }})](#-new-1)
-{{- end }}
-{{- if .Machos.Removed }}
-		- [❌ Removed ({{ len .Machos.Removed }})](#-removed-1)
-{{- end }}
-{{- if .Machos.Updated }}
-		- [⬆️ Updated ({{ len .Machos.Updated }})](#️-updated-1)
-{{- end }}
+	- [Machos](#machos)
 {{- end }}
 {{- if .Ents }}
 		- [🔑 Entitlements](#entitlements)
@@ -128,40 +119,46 @@ const diffMarkdownTemplate = `
 
 {{- if .Machos }}
 ## MachOs
-{{ if .Machos.New }}
-### 🆕 NEW
-{{ range .Machos.New }}
+{{- range machoVolumes .Machos }}
+### {{ .Name }}
+{{ if .Diff.New }}
+#### 🆕 NEW
+{{ range .Diff.New }}
 - {{ . | code }}
 {{ end }}
 {{ end -}}
-{{- if .Machos.Removed }}
-### ❌ Removed
-{{ range .Machos.Removed }}
+{{- if .Diff.Removed }}
+#### ❌ Removed
+{{ range .Diff.Removed }}
 - {{ . | code }}
 {{ end }}
 {{ end -}}
-{{- if .Machos.Updated }}
-### ⬆️ Updated
+{{- if .Diff.Updated }}
+#### ⬆️ Updated
 <details>
   <summary><i>View Updated</i></summary>
 
-{{ range $key, $value := .Machos.Updated }}
-#### {{ $key | base }}
+{{ range $key, $value := .Diff.Updated }}
+##### {{ $key | base }}
 > {{ $key | code }}
 {{ $value | noescape }}
 {{ end }}
 
 </details>
 {{ end -}}
-{{ end -}}
+{{- end }}
+{{- end }}
 {{ if .Ents }}
 ### 🔑 Entitlements
+{{- range entsVolumes .Ents }}
+#### {{ .Name }}
 <details>
   <summary><i>View Entitlements</i></summary>
 
-  {{ .Ents | noescape }}
+  {{ .Content | noescape }}
 
 </details>
+{{- end }}
 {{ end -}}
 
 {{ if .Sandbox }}
@@ -205,36 +202,39 @@ const diffMarkdownTemplate = `
 
 {{ if .Localizations }}
 ## Localizations
-{{ if .Localizations.New }}
-### 🆕 NEW
-{{ range $key, $value := .Localizations.New }}
-#### {{ $key | locbase }}
+{{- range plistVolumes .Localizations }}
+### {{ .Name }}
+{{ if .Diff.New }}
+#### 🆕 NEW
+{{ range $key, $value := .Diff.New }}
+##### {{ $key | locbase }}
 > {{ $key | code }}
 ~~~text
 {{ $value }}
 ~~~
 {{ end }}
 {{ end -}}
-{{- if .Localizations.Removed }}
-### ❌ Removed
-{{ range .Localizations.Removed }}
+{{- if .Diff.Removed }}
+#### ❌ Removed
+{{ range .Diff.Removed }}
 - {{ . | code }}
 {{ end }}
 {{ end -}}
-{{- if .Localizations.Updated }}
-### ⬆️ Updated
+{{- if .Diff.Updated }}
+#### ⬆️ Updated
 <details>
   <summary><i>View Updated</i></summary>
 
-{{ range $key, $value := .Localizations.Updated }}
-#### {{ $key | locbase }}
+{{ range $key, $value := .Diff.Updated }}
+##### {{ $key | locbase }}
 > {{ $key | code }}
 {{ $value | noescape }}
 {{ end }}
 
 </details>
 {{ end -}}
-{{ end }}
+{{- end }}
+{{- end }}
 
 ## DSC
 
@@ -293,10 +293,84 @@ var diffMDTmpl = template.Must(template.New("diff").
 		"slug": func(value string) string {
 			return utils.Slugify(value)
 		},
+		"machoVolumes": templateMachoVolumes,
+		"plistVolumes": templatePlistVolumes,
+		"entsVolumes":  templateEntsVolumes,
 	}).
 	Parse(diffMarkdownTemplate))
 
-var diffHTMLTmpl = template.Must(template.New("diff-html-page").Funcs(template.FuncMap{
+// templateMachoVolumes returns the sorted-and-filtered per-volume MachOs
+// entries for use inside Markdown/HTML templates. It mirrors the slice that
+// the HTML page renderer pre-builds (convertMachoVolumeDiff) so both
+// renderers walk the same ordered structure.
+func templateMachoVolumes(m map[string]*mcmd.MachoDiff) []templateMachoVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]templateMachoVolume, 0, len(m))
+	for _, vol := range sortedVolumeKeys(m) {
+		md := m[vol]
+		if !machoDiffHasContent(md) {
+			continue
+		}
+		out = append(out, templateMachoVolume{Name: vol, Diff: md})
+	}
+	return out
+}
+
+type templateMachoVolume struct {
+	Name string
+	Diff *mcmd.MachoDiff
+}
+
+func templatePlistVolumes(m map[string]*PlistDiff) []templatePlistVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]templatePlistVolume, 0, len(m))
+	for _, vol := range sortedVolumeKeys(m) {
+		pd := m[vol]
+		if !plistDiffHasContent(pd) {
+			continue
+		}
+		out = append(out, templatePlistVolume{Name: vol, Diff: pd})
+	}
+	return out
+}
+
+type templatePlistVolume struct {
+	Name string
+	Diff *PlistDiff
+}
+
+func templateEntsVolumes(m map[string]string) []templateEntsVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	keys = sortVolumeNames(keys)
+	out := make([]templateEntsVolume, 0, len(keys))
+	for _, vol := range keys {
+		rendered := m[vol]
+		if !entitlementsDiffHasContent(rendered) {
+			continue
+		}
+		out = append(out, templateEntsVolume{Name: vol, Content: rendered})
+	}
+	return out
+}
+
+type templateEntsVolume struct {
+	Name    string
+	Content string
+}
+
+// htmlTaskFuncs is the FuncMap shared between the outer page template and
+// the per-task sub-templates that render in-scope sections.
+var htmlTaskFuncs = template.FuncMap{
 	"dict": func(pairs ...any) map[string]any {
 		m := make(map[string]any, len(pairs)/2)
 		for i := 0; i < len(pairs)-1; i += 2 {
@@ -304,7 +378,103 @@ var diffHTMLTmpl = template.Must(template.New("diff-html-page").Funcs(template.F
 		}
 		return m
 	},
-}).Parse(diffHTMLPageTemplate))
+	"slug": utils.Slugify,
+}
+
+var diffHTMLTmpl = template.Must(template.New("diff-html-page").
+	Funcs(htmlTaskFuncs).
+	Parse(diffHTMLPageTemplate))
+
+// htmlTaskPartials defines the shared sub-templates that per-task HTML
+// renderers compose into. machoDiffSection and plistDiffSection are the
+// same blocks the outer page template uses, factored so per-task templates
+// can produce byte-identical output without duplicating their bodies.
+const htmlTaskPartials = `
+{{ define "machoDiffSection" }}
+{{- if .Diff.New }}
+<h4 id="{{ .Prefix }}-new">New</h4>
+<ul>{{ range .Diff.New }}<li><code>{{ . }}</code></li>{{ end }}</ul>
+{{- end }}
+{{- if .Diff.Removed }}
+<h4 id="{{ .Prefix }}-removed">Removed</h4>
+<ul>{{ range .Diff.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
+{{- end }}
+{{- if .Diff.Updated }}
+<h4 id="{{ .Prefix }}-updated">Updated</h4>
+<details>
+  <summary>View Updated ({{ len .Diff.Updated }})</summary>
+  {{- range .Diff.Updated }}
+  <div class="diff-entry">
+    <h5>{{ .Name }}</h5>
+    <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+    <pre><code>{{ .Diff }}</code></pre>
+  </div>
+  {{- end }}
+</details>
+{{- end }}
+{{ end }}
+
+{{ define "plistDiffSection" }}
+{{- if .Diff.New }}
+<h4 id="{{ .Prefix }}-new">New</h4>
+<details>
+  <summary>View New ({{ len .Diff.New }})</summary>
+  {{- range .Diff.New }}
+  <div class="diff-entry">
+    <h5>{{ .Name }}</h5>
+    <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+    {{ .Content }}
+  </div>
+  {{- end }}
+</details>
+{{- end }}
+{{- if .Diff.Removed }}
+<h4 id="{{ .Prefix }}-removed">Removed</h4>
+<ul>{{ range .Diff.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
+{{- end }}
+{{- if .Diff.Updated }}
+<h4 id="{{ .Prefix }}-updated">Updated</h4>
+<details>
+  <summary>View Updated ({{ len .Diff.Updated }})</summary>
+  {{- range .Diff.Updated }}
+  <div class="diff-entry">
+    <h5>{{ .Name }}</h5>
+    <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+    {{ .Content }}
+  </div>
+  {{- end }}
+</details>
+{{- end }}
+{{ end }}
+`
+
+// newHTMLTaskTemplate parses body in a new template that also has the
+// shared partials registered, so per-task renderers can call
+// {{ template "machoDiffSection" ... }} and {{ template "plistDiffSection" ... }}.
+func newHTMLTaskTemplate(name, body string) (*template.Template, error) {
+	tmpl := template.New(name).Funcs(htmlTaskFuncs)
+	if _, err := tmpl.Parse(htmlTaskPartials); err != nil {
+		return nil, err
+	}
+	if _, err := tmpl.Parse(body); err != nil {
+		return nil, err
+	}
+	return tmpl, nil
+}
+
+// executeHTMLTaskTemplate renders body (after composing it with the shared
+// partials) against data and returns the result as template.HTML.
+func executeHTMLTaskTemplate(name, body string, data any) (template.HTML, error) {
+	tmpl, err := newHTMLTaskTemplate(name, body)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return template.HTML(buf.String()), nil
+}
 
 func (d *Diff) String() string {
 	var buf bytes.Buffer
@@ -316,7 +486,11 @@ func (d *Diff) String() string {
 
 // ToJSON saves the diff as a JSON file
 func (d *Diff) ToJSON() error {
-	dat, err := json.MarshalIndent(d, "", "  ")
+	report, err := buildReport(d)
+	if err != nil {
+		return err
+	}
+	dat, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -352,27 +526,65 @@ type diffHTMLPageData struct {
 	NewKernelXNU     string
 	NewKernelDate    string
 
+	// TOC-only converted views: every in-scope task (mount-based or
+	// top-level) keeps its sidebar TOC entry while the section bodies
+	// themselves render via the per-task HTML fragments below. KDKs and
+	// Sandbox are kept as plain template.HTML / string so the TOC's
+	// `{{- if .KDKs }}` / `{{- if .Sandbox }}` truthiness checks keep
+	// working without re-marshalling task fragments.
 	Kexts         *htmlMachoDiff
 	KDKs          template.HTML
-	Machos        *htmlMachoDiff
-	Ents          template.HTML
 	Sandbox       template.HTML
 	Firmwares     *htmlMachoDiff
 	IBoot         *htmlIBootDiff
-	Launchd       template.HTML
-	Features      *htmlPlistDiff
+	Machos        []htmlMachoVolume
+	Ents          []htmlEntsVolume
+	Features      []htmlPlistVolume
 	Files         *htmlFileDiff
-	Localizations *htmlPlistDiff
+	Localizations []htmlPlistVolume
+
+	// Per-task body fragments for both the mount-based (kexts/kdks/...)
+	// and top-level (kexts/kdks/firmwares/iboot/sandbox) sections. Each
+	// is produced by calling the owning task's HTML() method; if Empty()
+	// is true the section emits no heading or body.
+	KextsFragment         htmlSectionFragment
+	KDKsFragment          htmlSectionFragment
+	MachosFragment        htmlSectionFragment
+	EntsFragment          htmlSectionFragment
+	FirmwaresFragment     htmlSectionFragment
+	IBootFragment         htmlSectionFragment
+	LaunchdFragment       htmlSectionFragment
+	SandboxFragment       htmlSectionFragment
+	FilesFragment         htmlSectionFragment
+	LocalizationsFragment htmlSectionFragment
+	FeaturesFragment      htmlSectionFragment
 
 	OldWebkit string
 	NewWebkit string
 	Dylibs    *htmlMachoDiff
 }
 
+// htmlSectionFragment is the outer-template view of a per-task HTML fragment.
+// renderHTML builds one of these per in-scope task by combining the task's
+// HTMLFragment (Heading + Body) with the section's stable anchor ID.
+type htmlSectionFragment struct {
+	Anchor  string
+	Heading string
+	Body    template.HTML
+	Empty   bool
+}
+
 type htmlMachoDiff struct {
 	New     []string
 	Removed []string
 	Updated []htmlUpdatedEntry
+}
+
+// htmlMachoVolume groups a single volume's MachoDiff for per-volume HTML
+// rendering. Used by the d.Machos shape (cross-DMG).
+type htmlMachoVolume struct {
+	Name string
+	Diff *htmlMachoDiff
 }
 
 type htmlUpdatedEntry struct {
@@ -402,6 +614,43 @@ type htmlPlistDiff struct {
 	New     []htmlPlistEntry
 	Removed []string
 	Updated []htmlPlistEntry
+}
+
+// htmlPlistVolume groups a single volume's PlistDiff for per-volume HTML
+// rendering (used by d.Features and d.Localizations).
+type htmlPlistVolume struct {
+	Name string
+	Diff *htmlPlistDiff
+}
+
+// htmlEntsVolume groups a single volume's rendered entitlements diff for
+// per-volume HTML rendering.
+type htmlEntsVolume struct {
+	Name    string
+	Content template.HTML
+}
+
+func convertEntitlementsDiff(m map[string]string) []htmlEntsVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	keys = sortVolumeNames(keys)
+	out := make([]htmlEntsVolume, 0, len(keys))
+	for _, vol := range keys {
+		rendered := m[vol]
+		if !entitlementsDiffHasContent(rendered) {
+			continue
+		}
+		out = append(out, htmlEntsVolume{
+			Name:    vol,
+			Content: renderMarkdownFragment(rendered),
+		})
+	}
+	return out
 }
 
 type htmlFileDiff struct {
@@ -756,9 +1005,9 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             {{- if .Machos }}
             <li><a href="#machos">MachOs</a>
               <ul>
-                {{- if .Machos.New }}<li><a href="#machos-new">New ({{ len .Machos.New }})</a></li>{{ end }}
-                {{- if .Machos.Removed }}<li><a href="#machos-removed">Removed ({{ len .Machos.Removed }})</a></li>{{ end }}
-                {{- if .Machos.Updated }}<li><a href="#machos-updated">Updated ({{ len .Machos.Updated }})</a></li>{{ end }}
+                {{- range .Machos }}
+                <li><a href="#machos-{{ .Name | slug }}">{{ .Name }}</a></li>
+                {{- end }}
               </ul>
             </li>
             {{- end }}
@@ -780,7 +1029,7 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
               </ul>
             </li>
             {{- end }}
-            {{- if .Launchd }}<li><a href="#launchd">launchd Config</a></li>{{ end }}
+            {{- if not .LaunchdFragment.Empty }}<li><a href="#launchd">launchd Config</a></li>{{ end }}
             {{- if .Sandbox }}<li><a href="#sandbox-profiles">Sandbox Profiles</a></li>{{ end }}
             <li><a href="#dsc">DSC</a>
               <ul>
@@ -807,18 +1056,18 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             {{- if .Localizations }}
             <li><a href="#localizations">Localizations</a>
               <ul>
-                {{- if .Localizations.New }}<li><a href="#localizations-new">New ({{ len .Localizations.New }})</a></li>{{ end }}
-                {{- if .Localizations.Removed }}<li><a href="#localizations-removed">Removed ({{ len .Localizations.Removed }})</a></li>{{ end }}
-                {{- if .Localizations.Updated }}<li><a href="#localizations-updated">Updated ({{ len .Localizations.Updated }})</a></li>{{ end }}
+                {{- range .Localizations }}
+                <li><a href="#localizations-{{ .Name | slug }}">{{ .Name }}</a></li>
+                {{- end }}
               </ul>
             </li>
             {{- end }}
             {{- if .Features }}
             <li><a href="#feature-flags">Feature Flags</a>
               <ul>
-                {{- if .Features.New }}<li><a href="#features-new">New ({{ len .Features.New }})</a></li>{{ end }}
-                {{- if .Features.Removed }}<li><a href="#features-removed">Removed ({{ len .Features.Removed }})</a></li>{{ end }}
-                {{- if .Features.Updated }}<li><a href="#features-updated">Updated ({{ len .Features.Updated }})</a></li>{{ end }}
+                {{- range .Features }}
+                <li><a href="#features-{{ .Name | slug }}">{{ .Name }}</a></li>
+                {{- end }}
               </ul>
             </li>
             {{- end }}
@@ -847,81 +1096,26 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
           </table>
           {{- end }}
 
-          {{- if .Kexts }}
-          <h3 id="kexts">Kexts</h3>
-          {{- template "machoDiffSection" dict "Prefix" "kexts" "Diff" .Kexts }}
+          {{- if not .KextsFragment.Empty }}{{ .KextsFragment.Body }}{{- end }}
+
+          {{- if not .KDKsFragment.Empty }}{{ .KDKsFragment.Body }}{{- end }}
+
+          {{- if not .MachosFragment.Empty }}
+          <h2 id="{{ .MachosFragment.Anchor }}">{{ .MachosFragment.Heading }}</h2>{{ .MachosFragment.Body }}
+          {{- end }}
+          {{- if not .EntsFragment.Empty }}
+          <h2 id="{{ .EntsFragment.Anchor }}">{{ .EntsFragment.Heading }}</h2>{{ .EntsFragment.Body }}
           {{- end }}
 
-          {{- if .KDKs }}
-          <h2 id="kdks">KDKs</h2>
-          {{ .KDKs }}
+          {{- if not .FirmwaresFragment.Empty }}{{ .FirmwaresFragment.Body }}{{- end }}
+
+          {{- if not .IBootFragment.Empty }}{{ .IBootFragment.Body }}{{- end }}
+
+          {{- if not .LaunchdFragment.Empty }}
+          <h2 id="{{ .LaunchdFragment.Anchor }}">{{ .LaunchdFragment.Heading }}</h2>{{ .LaunchdFragment.Body }}
           {{- end }}
 
-          {{- if .Machos }}
-          <h2 id="machos">MachOs</h2>
-          {{- template "machoDiffSection" dict "Prefix" "machos" "Diff" .Machos }}
-          {{- end }}
-
-          {{- if .Ents }}
-          <h3 id="entitlements">Entitlements</h3>
-          <details>
-            <summary>View Entitlements</summary>
-            {{ .Ents }}
-          </details>
-          {{- end }}
-
-          {{- if .Firmwares }}
-          <h2 id="firmwares">Firmwares</h2>
-          {{- template "machoDiffSection" dict "Prefix" "fw" "Diff" .Firmwares }}
-          {{- end }}
-
-          {{- if .IBoot }}
-          <h2 id="iboot">iBoot</h2>
-          {{- if ge (len .IBoot.Versions) 2 }}
-          <table>
-            <caption>iBoot version comparison across the old and new inputs.</caption>
-            <thead><tr><th>iOS</th><th>Version</th></tr></thead>
-            <tbody>
-              <tr><td>{{ .OldVersion }} <em>({{ .OldBuild }})</em></td><td>{{ index .IBoot.Versions 0 }}</td></tr>
-              <tr><td>{{ .NewVersion }} <em>({{ .NewBuild }})</em></td><td>{{ index .IBoot.Versions 1 }}</td></tr>
-            </tbody>
-          </table>
-          {{- end }}
-          {{- if .IBoot.New }}
-          <h3 id="iboot-new">New</h3>
-          <details>
-            <summary>View New ({{ len .IBoot.New }})</summary>
-            {{- range .IBoot.New }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <ul>{{ range .Items }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
-          {{- if .IBoot.Removed }}
-          <h3 id="iboot-removed">Removed</h3>
-          <details>
-            <summary>View Removed ({{ len .IBoot.Removed }})</summary>
-            {{- range .IBoot.Removed }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <ul>{{ range .Items }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
-          {{- end }}
-
-          {{- if .Launchd }}
-          <h2 id="launchd">launchd Config</h2>
-          {{ .Launchd }}
-          {{- end }}
-
-          {{- if .Sandbox }}
-          <h2 id="sandbox-profiles">Sandbox Profiles</h2>
-          {{ .Sandbox }}
-          {{- end }}
+          {{- if not .SandboxFragment.Empty }}{{ .SandboxFragment.Body }}{{- end }}
 
           <h2 id="dsc">DSC</h2>
           {{- if .OldWebkit }}
@@ -941,94 +1135,14 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
           {{- template "machoDiffSection" dict "Prefix" "dylibs" "Diff" .Dylibs }}
           {{- end }}
 
-          {{- if .Files }}
-          <h2 id="files">Files</h2>
-          {{- if .Files.New }}
-          <h3 id="files-new">New</h3>
-          {{- range .Files.New }}
-          <div class="diff-entry">
-            <h4>{{ .Name }} ({{ len .Items }})</h4>
-            <ul>{{ range .Items }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-          </div>
+          {{- if not .FilesFragment.Empty }}
+          <h2 id="{{ .FilesFragment.Anchor }}">{{ .FilesFragment.Heading }}</h2>{{ .FilesFragment.Body }}
           {{- end }}
+          {{- if not .LocalizationsFragment.Empty }}
+          <h2 id="{{ .LocalizationsFragment.Anchor }}">{{ .LocalizationsFragment.Heading }}</h2>{{ .LocalizationsFragment.Body }}
           {{- end }}
-          {{- if .Files.Removed }}
-          <h3 id="files-removed">Removed</h3>
-          {{- range .Files.Removed }}
-          <div class="diff-entry">
-            <h4>{{ .Name }} ({{ len .Items }})</h4>
-            <ul>{{ range .Items }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-          </div>
-          {{- end }}
-          {{- end }}
-          {{- end }}
-
-          {{- if .Localizations }}
-          <h2 id="localizations">Localizations</h2>
-          {{- if .Localizations.New }}
-          <h3 id="localizations-new">New</h3>
-          <details>
-            <summary>View New ({{ len .Localizations.New }})</summary>
-            {{- range .Localizations.New }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-              {{ .Content }}
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
-          {{- if .Localizations.Removed }}
-          <h3 id="localizations-removed">Removed</h3>
-          <ul>{{ range .Localizations.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-          {{- end }}
-          {{- if .Localizations.Updated }}
-          <h3 id="localizations-updated">Updated</h3>
-          <details>
-            <summary>View Updated ({{ len .Localizations.Updated }})</summary>
-            {{- range .Localizations.Updated }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-              {{ .Content }}
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
-          {{- end }}
-
-          {{- if .Features }}
-          <h2 id="feature-flags">Feature Flags</h2>
-          {{- if .Features.New }}
-          <h3 id="features-new">New</h3>
-          <details>
-            <summary>View New ({{ len .Features.New }})</summary>
-            {{- range .Features.New }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-              {{ .Content }}
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
-          {{- if .Features.Removed }}
-          <h3 id="features-removed">Removed</h3>
-          <ul>{{ range .Features.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
-          {{- end }}
-          {{- if .Features.Updated }}
-          <h3 id="features-updated">Updated</h3>
-          <details>
-            <summary>View Updated ({{ len .Features.Updated }})</summary>
-            {{- range .Features.Updated }}
-            <div class="diff-entry">
-              <h4>{{ .Name }}</h4>
-              <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-              {{ .Content }}
-            </div>
-            {{- end }}
-          </details>
-          {{- end }}
+          {{- if not .FeaturesFragment.Empty }}
+          <h2 id="{{ .FeaturesFragment.Anchor }}">{{ .FeaturesFragment.Heading }}</h2>{{ .FeaturesFragment.Body }}
           {{- end }}
 
         </article>
@@ -1073,6 +1187,39 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
     <h5>{{ .Name }}</h5>
     <div class="diff-entry-path"><code>{{ .Path }}</code></div>
     <pre><code>{{ .Diff }}</code></pre>
+  </div>
+  {{- end }}
+</details>
+{{- end }}
+{{ end }}
+
+{{ define "plistDiffSection" }}
+{{- if .Diff.New }}
+<h4 id="{{ .Prefix }}-new">New</h4>
+<details>
+  <summary>View New ({{ len .Diff.New }})</summary>
+  {{- range .Diff.New }}
+  <div class="diff-entry">
+    <h5>{{ .Name }}</h5>
+    <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+    {{ .Content }}
+  </div>
+  {{- end }}
+</details>
+{{- end }}
+{{- if .Diff.Removed }}
+<h4 id="{{ .Prefix }}-removed">Removed</h4>
+<ul>{{ range .Diff.Removed }}<li><code>{{ . }}</code></li>{{ end }}</ul>
+{{- end }}
+{{- if .Diff.Updated }}
+<h4 id="{{ .Prefix }}-updated">Updated</h4>
+<details>
+  <summary>View Updated ({{ len .Diff.Updated }})</summary>
+  {{- range .Diff.Updated }}
+  <div class="diff-entry">
+    <h5>{{ .Name }}</h5>
+    <div class="diff-entry-path"><code>{{ .Path }}</code></div>
+    {{ .Content }}
   </div>
   {{- end }}
 </details>
@@ -1247,6 +1394,49 @@ func convertMachoDiff(md *mcmd.MachoDiff) *htmlMachoDiff {
 	return h
 }
 
+// convertPlistVolumeDiff turns a per-volume PlistDiff map into an ordered
+// slice the HTML template iterates. Empty volumes are omitted. nameForPath
+// chooses the display name used for entry headings.
+func convertPlistVolumeDiff(m map[string]*PlistDiff, nameForPath func(string) string) []htmlPlistVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]htmlPlistVolume, 0, len(m))
+	for _, vol := range sortedVolumeKeys(m) {
+		pd := m[vol]
+		if !plistDiffHasContent(pd) {
+			continue
+		}
+		out = append(out, htmlPlistVolume{
+			Name: vol,
+			Diff: convertPlistDiffWithName(pd, nameForPath),
+		})
+	}
+	return out
+}
+
+// convertMachoVolumeDiff turns the per-volume d.Machos map into an ordered
+// slice the HTML template iterates. Empty volumes are omitted; volumes are
+// emitted in canonical order (filesystem, SystemOS, AppOS, ExclaveOS) with
+// any others trailing alphabetically.
+func convertMachoVolumeDiff(m map[string]*mcmd.MachoDiff) []htmlMachoVolume {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]htmlMachoVolume, 0, len(m))
+	for _, vol := range sortedVolumeKeys(m) {
+		md := m[vol]
+		if !machoDiffHasContent(md) {
+			continue
+		}
+		out = append(out, htmlMachoVolume{
+			Name: vol,
+			Diff: convertMachoDiff(md),
+		})
+	}
+	return out
+}
+
 func sortedNamedLists(m map[string][]string) []htmlNamedList {
 	var out []htmlNamedList
 	for _, k := range slices.Sorted(maps.Keys(m)) {
@@ -1274,14 +1464,6 @@ func convertIBootDiff(ib *IBootDiff) *htmlIBootDiff {
 	}
 
 	return out
-}
-
-func convertPlistDiff(pd *PlistDiff) *htmlPlistDiff {
-	return convertPlistDiffWithName(pd, filepath.Base)
-}
-
-func convertLocalizationDiff(pd *PlistDiff) *htmlPlistDiff {
-	return convertPlistDiffWithName(pd, localizationDisplayName)
 }
 
 func convertPlistDiffWithName(pd *PlistDiff, nameForPath func(string) string) *htmlPlistDiff {
@@ -1343,31 +1525,150 @@ func convertFileDiff(fd *FileDiff) *htmlFileDiff {
 	return out
 }
 
+// htmlSectionAnchors maps each in-scope renderer's JSONKey() to the stable
+// section anchor ID the outer template embeds in <h2 id="...">. These IDs
+// must not change without coordinating with downstream link consumers.
+//
+// Top-level task fragments (kexts, kdks, firmwares, iboot, sandbox)
+// embed their own `<hN id="...">` heading inside Body, so they do not
+// participate in the outer-template anchor wrapping handled by this
+// map; they still appear here as documentation of the canonical
+// section ID each fragment owns.
+var htmlSectionAnchors = map[string]string{
+	"kexts":         "kexts",
+	"kdks":          "kdks",
+	"machos":        "machos",
+	"ents":          "entitlements",
+	"firmwares":     "firmwares",
+	"iboot":         "iboot",
+	"launchd":       "launchd",
+	"sandbox":       "sandbox-profiles",
+	"files":         "files",
+	"localizations": "localizations",
+	"features":      "feature-flags",
+}
+
+// buildHTMLSectionFragment calls r.HTML(), then wraps the result in the
+// outer-template view that the page renderer expects. Empty tasks produce
+// a fragment with Empty=true so the outer template renders nothing.
+func buildHTMLSectionFragment(r interface {
+	JSONKey() string
+	Empty() bool
+	HTML() (HTMLFragment, error)
+}) (htmlSectionFragment, error) {
+	anchor, ok := htmlSectionAnchors[r.JSONKey()]
+	if !ok {
+		return htmlSectionFragment{}, fmt.Errorf("no html anchor registered for task %q", r.JSONKey())
+	}
+	if r.Empty() {
+		return htmlSectionFragment{Anchor: anchor, Empty: true}, nil
+	}
+	frag, err := r.HTML()
+	if err != nil {
+		return htmlSectionFragment{}, err
+	}
+	return htmlSectionFragment{
+		Anchor:  anchor,
+		Heading: frag.Heading,
+		Body:    frag.Body,
+	}, nil
+}
+
 func (d *Diff) renderHTML() (string, error) {
 	var htmlBuf bytes.Buffer
 
+	// Top-level tasks (kexts/kdks/firmwares/iboot/sandbox) and mount-based
+	// renderers (machos/ents/launchd/files/localizations/features) all
+	// expose HTML()/Empty(); build one HTML fragment per task in source order.
+	kexts := newKextsTask(d)
+	kdks := newKDKsTask(d)
+	machos := newMachosRenderer(d.Machos)
+	ents := newEntsRenderer(d.Ents)
+	firmwares := newFirmwaresTask(d)
+	iboot := newIBootTask(d)
+	launchd := newLaunchdRenderer(d.Launchd)
+	sandbox := newSandboxTask(d)
+	files := newFilesRenderer(d.Files)
+	locs := newLocsRenderer(d.Localizations)
+	features := newFeaturesRenderer(d.Features)
+
+	kextsFrag, err := buildHTMLSectionFragment(kexts)
+	if err != nil {
+		return "", err
+	}
+	kdksFrag, err := buildHTMLSectionFragment(kdks)
+	if err != nil {
+		return "", err
+	}
+	machosFrag, err := buildHTMLSectionFragment(machos)
+	if err != nil {
+		return "", err
+	}
+	entsFrag, err := buildHTMLSectionFragment(ents)
+	if err != nil {
+		return "", err
+	}
+	firmwaresFrag, err := buildHTMLSectionFragment(firmwares)
+	if err != nil {
+		return "", err
+	}
+	ibootFrag, err := buildHTMLSectionFragment(iboot)
+	if err != nil {
+		return "", err
+	}
+	launchdFrag, err := buildHTMLSectionFragment(launchd)
+	if err != nil {
+		return "", err
+	}
+	sandboxFrag, err := buildHTMLSectionFragment(sandbox)
+	if err != nil {
+		return "", err
+	}
+	filesFrag, err := buildHTMLSectionFragment(files)
+	if err != nil {
+		return "", err
+	}
+	locsFrag, err := buildHTMLSectionFragment(locs)
+	if err != nil {
+		return "", err
+	}
+	featuresFrag, err := buildHTMLSectionFragment(features)
+	if err != nil {
+		return "", err
+	}
+
 	data := diffHTMLPageData{
-		Title:         d.Title,
-		OldInput:      filepath.Base(d.Old.IPSWPath),
-		NewInput:      filepath.Base(d.New.IPSWPath),
-		OldVersion:    d.Old.Version,
-		OldBuild:      d.Old.Build,
-		NewVersion:    d.New.Version,
-		NewBuild:      d.New.Build,
-		OldWebkit:     d.Old.Webkit,
-		NewWebkit:     d.New.Webkit,
-		Kexts:         convertMachoDiff(d.Kexts),
-		Machos:        convertMachoDiff(d.Machos),
-		Dylibs:        convertMachoDiff(d.Dylibs),
-		Firmwares:     convertMachoDiff(d.Firmwares),
-		IBoot:         convertIBootDiff(d.IBoot),
-		Features:      convertPlistDiff(d.Features),
-		Files:         convertFileDiff(d.Files),
-		Localizations: convertLocalizationDiff(d.Localizations),
-		Ents:          renderMarkdownFragment(d.Ents),
-		Sandbox:       renderMarkdownFragment(d.Sandbox),
-		KDKs:          renderMarkdownFragment(d.KDKs),
-		Launchd:       renderMarkdownFragment(d.Launchd),
+		Title:                 d.Title,
+		OldInput:              filepath.Base(d.Old.IPSWPath),
+		NewInput:              filepath.Base(d.New.IPSWPath),
+		OldVersion:            d.Old.Version,
+		OldBuild:              d.Old.Build,
+		NewVersion:            d.New.Version,
+		NewBuild:              d.New.Build,
+		OldWebkit:             d.Old.Webkit,
+		NewWebkit:             d.New.Webkit,
+		Kexts:                 convertMachoDiff(d.Kexts),
+		Machos:                convertMachoVolumeDiff(d.Machos),
+		Dylibs:                convertMachoDiff(d.Dylibs),
+		Firmwares:             convertMachoDiff(d.Firmwares),
+		IBoot:                 convertIBootDiff(d.IBoot),
+		Features:              convertPlistVolumeDiff(d.Features, filepath.Base),
+		Files:                 convertFileDiff(d.Files),
+		Localizations:         convertPlistVolumeDiff(d.Localizations, localizationDisplayName),
+		Ents:                  convertEntitlementsDiff(d.Ents),
+		KDKs:                  renderMarkdownFragment(d.KDKs),
+		Sandbox:               renderMarkdownFragment(d.Sandbox),
+		KextsFragment:         kextsFrag,
+		KDKsFragment:          kdksFrag,
+		MachosFragment:        machosFrag,
+		EntsFragment:          entsFrag,
+		FirmwaresFragment:     firmwaresFrag,
+		IBootFragment:         ibootFrag,
+		LaunchdFragment:       launchdFrag,
+		SandboxFragment:       sandboxFrag,
+		FilesFragment:         filesFrag,
+		LocalizationsFragment: locsFrag,
+		FeaturesFragment:      featuresFrag,
 	}
 
 	if d.Old.Kernel.Version != nil {

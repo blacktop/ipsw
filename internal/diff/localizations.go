@@ -11,7 +11,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
@@ -34,79 +33,76 @@ var localizationOwnerExtensions = [...]string{
 	".fs",
 }
 
+// parseLocalizations handles OTA and Directory input modes. IPSW mode is
+// handled by locsJob via the volume-major orchestrator.
 func (d *Diff) parseLocalizations() error {
-	d.Localizations = &PlistDiff{
-		New:     make(map[string]string),
-		Updated: make(map[string]string),
-	}
-
-	oldResources := make(map[string]string)
-	newResources := make(map[string]string)
-
+	var oldMounts, newMounts map[string]mount
 	switch d.Old.InputMode {
 	case inputModeOTA:
 		if err := d.ensureOTAPayloadFilesystems(); err != nil {
 			return err
 		}
-		if err := collectLocalizedResourcesFromMounts(otaDiffMounts(&d.Old), oldResources); err != nil {
-			return err
-		}
-		if err := collectLocalizedResourcesFromMounts(otaDiffMounts(&d.New), newResources); err != nil {
-			return err
-		}
+		oldMounts = otaDiffMounts(&d.Old)
+		newMounts = otaDiffMounts(&d.New)
 	case inputModeDirectory:
-		if err := collectLocalizedResourcesFromMounts(d.Old.Mount, oldResources); err != nil {
-			return err
-		}
-		if err := collectLocalizedResourcesFromMounts(d.New.Mount, newResources); err != nil {
-			return err
-		}
+		oldMounts = d.Old.Mount
+		newMounts = d.New.Mount
 	default:
-		if err := collectLocalizedResourcesFromIPSW(d.Old.IPSWPath, d.conf.PemDB, oldResources); err != nil {
-			return err
+		return fmt.Errorf("diff: parseLocalizations: IPSW mode uses locsJob via the volume-major orchestrator")
+	}
+
+	prevByVolume := make(map[string]map[string]string)
+	nextByVolume := make(map[string]map[string]string)
+	names := unionMountNames(oldMounts, newMounts)
+	for _, name := range names {
+		if mnt, ok := oldMounts[name]; ok {
+			prevByVolume[name] = make(map[string]string)
+			if err := collectLocalizedResourcesFromMount(mnt.MountPath, name, prevByVolume[name]); err != nil {
+				return err
+			}
 		}
-		if err := collectLocalizedResourcesFromIPSW(d.New.IPSWPath, d.conf.PemDB, newResources); err != nil {
-			return err
+		if mnt, ok := newMounts[name]; ok {
+			nextByVolume[name] = make(map[string]string)
+			if err := collectLocalizedResourcesFromMount(mnt.MountPath, name, nextByVolume[name]); err != nil {
+				return err
+			}
 		}
 	}
 
-	if err := diffLocalizedResources(d.Localizations, oldResources, newResources); err != nil {
-		return err
-	}
-	if len(d.Localizations.New) == 0 && len(d.Localizations.Removed) == 0 && len(d.Localizations.Updated) == 0 {
-		d.Localizations = nil
-	}
-	return nil
-}
-
-func collectLocalizedResourcesFromIPSW(ipswPath, pemDB string, out map[string]string) error {
-	dmgs, err := search.ListDMGs(ipswPath)
+	out, err := assembleLocalizationDiffByVolume(names, prevByVolume, nextByVolume)
 	if err != nil {
 		return err
 	}
-
-	for _, dmg := range dmgs {
-		name := dmg.Name
-		if err := search.ScanDmgWithMultipleHandlers(ipswPath, dmg.Path, name, pemDB, func(mountPoint, path string) error {
-			return collectLocalizedResourceFile(out, name, mountPoint, path)
-		}); err != nil {
-			return fmt.Errorf("failed to scan %s localizations: %w", name, err)
-		}
-	}
-
+	d.Localizations = out
 	return nil
 }
 
-func collectLocalizedResourcesFromMounts(mounts map[string]mount, out map[string]string) error {
-	for _, name := range sortedMountNames(mounts) {
-		mnt := mounts[name]
-		if err := walkFolderFiles(mnt.MountPath, func(_ string, absPath string) error {
-			return collectLocalizedResourceFile(out, name, mnt.MountPath, absPath)
-		}); err != nil {
-			return fmt.Errorf("failed to walk %s localizations: %w", name, err)
+// assembleLocalizationDiffByVolume produces the per-volume PlistDiff map
+// for localizations. Empty per-volume diffs are omitted. Shared by
+// parseLocalizations (OTA/Directory) and locsJob (IPSW).
+func assembleLocalizationDiffByVolume(volumes []string, prev, next map[string]map[string]string) (map[string]*PlistDiff, error) {
+	out := make(map[string]*PlistDiff)
+	for _, vol := range volumes {
+		diff := &PlistDiff{
+			New:     make(map[string]string),
+			Updated: make(map[string]string),
+		}
+		if err := diffLocalizedResources(diff, prev[vol], next[vol]); err != nil {
+			return nil, err
+		}
+		if plistDiffHasContent(diff) {
+			out[vol] = diff
 		}
 	}
-	return nil
+	return out, nil
+}
+
+// collectLocalizedResourcesFromMount walks a single mount root for
+// localization resources, populating out keyed by the resource path.
+func collectLocalizedResourcesFromMount(mountPath, volumeLabel string, out map[string]string) error {
+	return walkFolderFiles(mountPath, func(_ string, absPath string) error {
+		return collectLocalizedResourceFile(out, volumeLabel, mountPath, absPath)
+	})
 }
 
 func collectLocalizedResourceFile(out map[string]string, mountName, mountPoint, absPath string) error {

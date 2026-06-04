@@ -67,9 +67,6 @@ func unsupportedFlagsForDirectoryMode(conf *Config) []string {
 	if conf.LaunchD {
 		unsupported = append(unsupported, "--launchd")
 	}
-	if conf.LowMemory {
-		unsupported = append(unsupported, "--low-memory")
-	}
 	if conf.Sandbox {
 		unsupported = append(unsupported, "--sandbox")
 	}
@@ -223,97 +220,72 @@ func relativeToRoot(root, path string) string {
 }
 
 func walkFolderFiles(root string, fn func(relPath, absPath string) error) error {
-	visited := make(map[string]bool)
-
-	handle := func(absPath string) error {
+	return search.WalkFilesInRoot(root, func(absPath string) error {
 		return fn(relativeToRoot(root, absPath), absPath)
-	}
-
-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsPermission(err) {
-				log.Debugf("skipping path due to permission denied: %s", path)
-				return nil
-			}
-			log.Debugf("failed to walk folder %s: %v", path, err)
-			return nil
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			linkPath, err := filepath.EvalSymlinks(path)
-			if err != nil {
-				return nil
-			}
-			linkInfo, err := os.Stat(linkPath)
-			if err != nil {
-				return nil
-			}
-			if linkInfo.IsDir() && !visited[linkPath] {
-				visited[linkPath] = true
-				return filepath.Walk(linkPath, func(subPath string, subInfo os.FileInfo, subErr error) error {
-					if subErr != nil {
-						log.WithError(subErr).Debug("failed to walk symlinked path")
-						return nil
-					}
-					if subInfo == nil || subInfo.IsDir() {
-						return nil
-					}
-					if visited[subPath] {
-						return nil
-					}
-					visited[subPath] = true
-					return handle(subPath)
-				})
-			}
-			// filepath.Walk does not follow symlinks. Only symlinked
-			// directories need manual recursion (above); symlinked
-			// files are visited as regular entries by Walk.
-			return nil
-		}
-		if info == nil || info.IsDir() {
-			return nil
-		}
-		if visited[path] {
-			return nil
-		}
-		visited[path] = true
-		return handle(path)
 	})
 }
 
-func diffMachosInMounts(oldMounts, newMounts map[string]mount, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
-	diff := &mcmd.MachoDiff{
-		Updated: make(map[string]string),
-	}
+// diffMachosInMounts diffs Mach-Os per volume between the old and new mount
+// sets. Each volume's contents are diffed independently, producing a per-
+// volume map matching the IPSW machosJob output shape so renderers and JSON
+// consumers see the same structure across input modes.
+func diffMachosInMounts(oldMounts, newMounts map[string]mount, conf *mcmd.DiffConfig) (map[string]*mcmd.MachoDiff, error) {
+	out := make(map[string]*mcmd.MachoDiff)
 
-	prev := make(map[string]*mcmd.DiffInfo)
-	for _, name := range sortedMountNames(oldMounts) {
-		mnt := oldMounts[name]
-		if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
-			key := filepath.ToSlash(filepath.Join(name, relativeToRoot(mnt.MountPath, path)))
-			prev[key] = mcmd.GenerateDiffInfo(m, conf)
-			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to parse machos in old %s mount: %w", name, err)
+	names := unionMountNames(oldMounts, newMounts)
+	for _, name := range names {
+		prev := make(map[string]*mcmd.DiffInfo)
+		if mnt, ok := oldMounts[name]; ok {
+			if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
+				key := filepath.ToSlash(relativeToRoot(mnt.MountPath, path))
+				prev[key] = mcmd.GenerateDiffInfo(m, conf)
+				return nil
+			}); err != nil {
+				return nil, fmt.Errorf("failed to parse machos in old %s mount: %w", name, err)
+			}
+		}
+
+		next := make(map[string]*mcmd.DiffInfo)
+		if mnt, ok := newMounts[name]; ok {
+			if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
+				key := filepath.ToSlash(relativeToRoot(mnt.MountPath, path))
+				next[key] = mcmd.GenerateDiffInfo(m, conf)
+				return nil
+			}); err != nil {
+				return nil, fmt.Errorf("failed to parse machos in new %s mount: %w", name, err)
+			}
+		}
+
+		if len(prev) == 0 && len(next) == 0 {
+			continue
+		}
+		diff := &mcmd.MachoDiff{Updated: make(map[string]string)}
+		if err := diff.Generate(prev, next, conf); err != nil {
+			return nil, fmt.Errorf("failed to generate %s machos diff: %w", name, err)
+		}
+		if machoDiffHasContent(diff) {
+			out[name] = diff
 		}
 	}
 
-	next := make(map[string]*mcmd.DiffInfo)
-	for _, name := range sortedMountNames(newMounts) {
-		mnt := newMounts[name]
-		if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
-			key := filepath.ToSlash(filepath.Join(name, relativeToRoot(mnt.MountPath, path)))
-			next[key] = mcmd.GenerateDiffInfo(m, conf)
-			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to parse machos in new %s mount: %w", name, err)
-		}
-	}
+	return out, nil
+}
 
-	if err := diff.Generate(prev, next, conf); err != nil {
-		return nil, err
+// unionMountNames returns the sorted union of two mount maps' keys.
+func unionMountNames(a, b map[string]mount) []string {
+	seen := make(map[string]struct{}, len(a)+len(b))
+	for name := range a {
+		seen[name] = struct{}{}
 	}
-
-	return diff, nil
+	for name := range b {
+		seen[name] = struct{}{}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func diffFilesInMounts(oldMounts, newMounts map[string]mount) (*FileDiff, error) {

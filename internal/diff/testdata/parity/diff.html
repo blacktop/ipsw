@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>26.5_22F76__vs__26.5.1_22F84</title>
+  <style>
+    :root {
+      --radius: 18px;
+      --background: oklch(0.985 0.004 247.858);
+      --foreground: oklch(0.205 0.01 257.417);
+      --card: oklch(0.999 0 0);
+      --card-foreground: oklch(0.205 0.01 257.417);
+      --muted: oklch(0.968 0.006 247.896);
+      --muted-foreground: oklch(0.473 0.013 255.508);
+      --primary: oklch(0.598 0.112 221.723);
+      --primary-foreground: oklch(0.985 0 0);
+      --accent: oklch(0.929 0.03 214.91);
+      --accent-foreground: oklch(0.278 0.033 256.848);
+      --border: oklch(0.923 0.01 252.096);
+      --shadow-soft: 0 24px 60px -32px oklch(0.188 0.012 257.417 / 0.28);
+      --shadow-panel: 0 18px 40px -28px oklch(0.188 0.012 257.417 / 0.22);
+      --code-bg: oklch(0.25 0.014 253.1);
+      --code-fg: oklch(0.96 0.004 247.858);
+      --diff-add: oklch(0.30 0.10 145);
+      --diff-add-bg: oklch(0.96 0.03 145);
+      --diff-del: oklch(0.38 0.10 25);
+      --diff-del-bg: oklch(0.96 0.03 25);
+      --diff-mod: oklch(0.40 0.10 75);
+      --diff-mod-bg: oklch(0.96 0.03 75);
+      --hero-wash: radial-gradient(circle at top left, oklch(0.96 0.04 215 / 0.9), transparent 38%),
+        radial-gradient(circle at top right, oklch(0.92 0.025 250 / 0.75), transparent 34%),
+        linear-gradient(135deg, oklch(0.995 0.002 247.858), oklch(0.975 0.01 247.896));
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: oklch(0.14 0.012 257.417);
+        --foreground: oklch(0.96 0.004 247.858);
+        --card: oklch(0.19 0.014 255.508);
+        --card-foreground: oklch(0.96 0.004 247.858);
+        --muted: oklch(0.24 0.012 255.508);
+        --muted-foreground: oklch(0.7 0.013 255.508);
+        --primary: oklch(0.72 0.104 221.723);
+        --primary-foreground: oklch(0.205 0.01 257.417);
+        --accent: oklch(0.28 0.02 224.12);
+        --accent-foreground: oklch(0.96 0.004 247.858);
+        --border: oklch(0.30 0.012 255.508);
+        --shadow-soft: 0 30px 80px -40px oklch(0.02 0 0 / 0.65);
+        --shadow-panel: 0 22px 46px -32px oklch(0.02 0 0 / 0.56);
+        --code-bg: oklch(0.15 0.01 255.508);
+        --code-fg: oklch(0.92 0.004 247.858);
+        --diff-add: oklch(0.72 0.16 145);
+        --diff-add-bg: oklch(0.22 0.04 145);
+        --diff-del: oklch(0.72 0.16 25);
+        --diff-del-bg: oklch(0.22 0.04 25);
+        --diff-mod: oklch(0.76 0.12 75);
+        --diff-mod-bg: oklch(0.22 0.03 75);
+        --hero-wash: radial-gradient(circle at top left, oklch(0.26 0.036 215 / 0.55), transparent 38%),
+          radial-gradient(circle at top right, oklch(0.22 0.02 250 / 0.5), transparent 34%),
+          linear-gradient(135deg, oklch(0.18 0.012 257.417), oklch(0.15 0.012 255.508));
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--foreground);
+      background:
+        radial-gradient(circle at top, oklch(0.9 0.02 215 / 0.18), transparent 30%),
+        linear-gradient(180deg, color-mix(in oklab, var(--background) 92%, white 8%), var(--background));
+      font-family: "Avenir Next", "Aptos", "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(to right, color-mix(in oklab, var(--border) 40%, transparent) 1px, transparent 1px),
+        linear-gradient(to bottom, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 75%);
+      opacity: 0.28;
+    }
+
+    a { color: color-mix(in oklab, var(--primary) 82%, var(--foreground) 18%); text-decoration: none; }
+    a:hover { color: var(--primary); }
+    code, pre, kbd { font-family: "IBM Plex Mono", "SFMono-Regular", "SF Mono", Consolas, monospace; }
+
+    .report-shell { position: relative; max-width: 1500px; margin: 0 auto; padding: 28px 22px 72px; }
+
+    .panel {
+      background: color-mix(in oklab, var(--card) 94%, transparent 6%);
+      color: var(--card-foreground);
+      border: 1px solid color-mix(in oklab, var(--border) 90%, transparent 10%);
+      border-radius: calc(var(--radius) + 2px);
+      box-shadow: var(--shadow-panel);
+      backdrop-filter: blur(16px);
+    }
+
+    .report-hero { position: relative; overflow: hidden; margin-bottom: 24px; padding: 28px; background: var(--hero-wash); }
+
+    .report-hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -35% auto;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in oklab, var(--primary) 32%, transparent 68%) 0%, transparent 72%);
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .hero-topline {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 16px; padding: 8px 12px;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--card) 80%, transparent 20%);
+      border: 1px solid color-mix(in oklab, var(--border) 80%, transparent 20%);
+      color: var(--muted-foreground);
+      font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+    }
+
+    .hero-grid {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+      gap: 18px; align-items: start;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      font-size: clamp(2.2rem, 4vw, 4rem);
+      line-height: 1.02; letter-spacing: -0.04em;
+      text-wrap: balance;
+    }
+
+    .hero-subtitle { max-width: 62ch; margin: 14px 0 4px; color: var(--muted-foreground); font-size: 1rem; }
+
+    .hero-meta { display: grid; gap: 12px; }
+    .meta-card {
+      padding: 16px 18px; border-radius: calc(var(--radius) - 4px);
+      background: color-mix(in oklab, var(--card) 82%, transparent 18%);
+      border: 1px solid color-mix(in oklab, var(--border) 76%, transparent 24%);
+      box-shadow: var(--shadow-soft);
+    }
+    .meta-label { display: block; margin-bottom: 6px; color: var(--muted-foreground); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    .meta-value { display: block; font-size: 1rem; font-weight: 700; word-break: break-word; }
+    .meta-note { display: block; margin-top: 6px; color: var(--muted-foreground); font-size: 0.92rem; }
+
+    .report-layout { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px; align-items: start; }
+    .report-layout.no-sidebar { grid-template-columns: minmax(0, 1fr); }
+
+    .report-sidebar { position: sticky; top: 22px; padding: 18px; }
+    .sidebar-title { margin: 0 0 14px; font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); }
+
+    .toc ul { list-style: none; margin: 0; padding: 0; }
+    .toc ul ul { margin-top: 6px; margin-left: 10px; padding-left: 10px; border-left: 1px solid color-mix(in oklab, var(--border) 82%, transparent 18%); }
+    .toc li { margin: 2px 0; }
+    .toc a {
+      display: block; padding: 8px 10px; border-radius: 12px;
+      color: var(--muted-foreground); font-size: 0.92rem; line-height: 1.35;
+      transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+    .toc a:hover { background: color-mix(in oklab, var(--accent) 70%, transparent 30%); color: var(--foreground); transform: translateX(2px); }
+
+    .report-main { min-width: 0; padding: 30px 32px; }
+
+    .rc h2, .rc h3, .rc h4, .rc h5 { scroll-margin-top: 28px; }
+    .rc h2 {
+      margin: 2.5rem 0 1rem; padding-top: 1.4rem;
+      border-top: 1px solid color-mix(in oklab, var(--border) 88%, transparent 12%);
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      font-size: clamp(1.55rem, 2vw, 2rem); line-height: 1.15; letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+    .rc h2:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+    .rc h3, .rc h4, .rc h5 {
+      margin: 1.6rem 0 0.7rem; font-size: 0.82rem; font-weight: 800;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-foreground);
+    }
+    .rc p, .rc li, .rc blockquote, .rc summary { font-size: 0.98rem; }
+    .rc p { max-width: 74ch; }
+    .rc ul, .rc ol { padding-left: 1.35rem; }
+    .rc li + li { margin-top: 0.28rem; }
+    .rc li::marker { color: color-mix(in oklab, var(--primary) 75%, var(--foreground) 25%); }
+
+    .rc table {
+      width: 100%; display: block; overflow-x: auto;
+      margin: 1.2rem 0 1.6rem; border-collapse: separate; border-spacing: 0;
+      border: 1px solid color-mix(in oklab, var(--border) 88%, transparent 12%);
+      border-radius: calc(var(--radius) - 6px);
+      background: color-mix(in oklab, var(--card) 92%, transparent 8%);
+    }
+    .rc thead th {
+      background: color-mix(in oklab, var(--muted) 84%, transparent 16%);
+      color: var(--foreground); font-size: 0.82rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .rc caption {
+      caption-side: bottom;
+      padding: 12px 14px 0;
+      color: var(--muted-foreground);
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .rc th, .rc td { padding: 12px 14px; border-bottom: 1px solid color-mix(in oklab, var(--border) 82%, transparent 18%); text-align: left; white-space: nowrap; }
+    .rc tr:last-child td { border-bottom: 0; }
+    .rc tbody tr:nth-child(even) { background: color-mix(in oklab, var(--muted) 48%, transparent 52%); }
+
+    .rc blockquote {
+      margin: 1.1rem 0; padding: 0.9rem 1rem;
+      border-left: 3px solid color-mix(in oklab, var(--primary) 68%, transparent 32%);
+      border-radius: 0 14px 14px 0;
+      background: color-mix(in oklab, var(--accent) 52%, transparent 48%);
+      color: var(--foreground);
+    }
+
+    .rc code {
+      padding: 0.18rem 0.44rem; border-radius: 0.55rem;
+      background: color-mix(in oklab, var(--muted) 72%, transparent 28%);
+      color: var(--foreground); font-size: 0.88em;
+    }
+
+    .rc pre {
+      overflow-x: auto; margin: 1rem 0 1.4rem; padding: 16px 18px;
+      border: 1px solid color-mix(in oklab, var(--border) 60%, transparent 40%);
+      border-radius: calc(var(--radius) - 4px);
+      background: linear-gradient(180deg, color-mix(in oklab, var(--code-bg) 88%, black 12%), var(--code-bg));
+      color: var(--code-fg);
+      box-shadow: inset 0 1px 0 color-mix(in oklab, white 8%, transparent 92%);
+    }
+    .rc pre code { padding: 0; background: transparent; color: inherit; border-radius: 0; font-size: 0.9rem; }
+
+    .rc .diff-add { color: var(--diff-add); background: var(--diff-add-bg); display: inline-block; width: 100%; padding: 0 4px; margin: 0 -4px; border-radius: 3px; }
+    .rc .diff-del { color: var(--diff-del); background: var(--diff-del-bg); display: inline-block; width: 100%; padding: 0 4px; margin: 0 -4px; border-radius: 3px; }
+    .rc .diff-mod { color: var(--diff-mod); background: var(--diff-mod-bg); display: inline-block; width: 100%; padding: 0 4px; margin: 0 -4px; border-radius: 3px; }
+
+    .rc details {
+      margin: 1.1rem 0 1.5rem; padding: 0.45rem 1rem 1rem;
+      border: 1px solid color-mix(in oklab, var(--border) 85%, transparent 15%);
+      border-radius: calc(var(--radius) - 4px);
+      background: color-mix(in oklab, var(--card) 90%, transparent 10%);
+    }
+    .rc details[open] { box-shadow: var(--shadow-soft); }
+    .rc summary {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      cursor: pointer; list-style: none; font-weight: 700; color: var(--foreground); padding: 0.6rem 0;
+      transition: color 150ms ease;
+    }
+    .rc summary:hover { color: var(--primary); }
+    .rc summary::-webkit-details-marker { display: none; }
+    .rc summary::after {
+      content: "+"; display: inline-flex; align-items: center; justify-content: center;
+      width: 1.6rem; height: 1.6rem; border-radius: 999px;
+      background: color-mix(in oklab, var(--accent) 72%, transparent 28%);
+      color: var(--accent-foreground); font-size: 1rem; font-weight: 700; flex-shrink: 0;
+      transition: transform 200ms ease, background-color 150ms ease;
+    }
+    .rc summary:hover::after { background: color-mix(in oklab, var(--primary) 30%, var(--accent) 70%); }
+    .rc details[open] summary::after { content: "\2212"; transform: rotate(180deg); }
+
+    .rc .diff-entry { margin: 1.5rem 0; padding-top: 1rem; border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent 40%); }
+    .rc .diff-entry:first-child { border-top: 0; padding-top: 0; margin-top: 0.5rem; }
+    .rc .diff-entry-path {
+      display: block; margin: 0.3rem 0 0.6rem; padding: 0.5rem 0.8rem;
+      border-left: 3px solid color-mix(in oklab, var(--primary) 68%, transparent 32%);
+      border-radius: 0 10px 10px 0;
+      background: color-mix(in oklab, var(--accent) 40%, transparent 60%);
+      color: var(--muted-foreground); font-size: 0.85rem;
+    }
+    .rc .diff-entry-path code { background: transparent; padding: 0; font-size: 0.82rem; }
+
+    .rc hr { margin: 2rem 0; border: 0; border-top: 1px solid color-mix(in oklab, var(--border) 88%, transparent 12%); }
+
+    a:focus-visible, summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+    .toc a.active { background: color-mix(in oklab, var(--primary) 15%, transparent 85%); color: var(--foreground); font-weight: 600; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
+
+    @media (max-width: 1100px) {
+      .hero-grid, .report-layout, .report-layout.no-sidebar { grid-template-columns: minmax(0, 1fr); }
+      .report-sidebar { position: static; }
+      .report-main { padding: 24px 22px; }
+    }
+
+    @media (max-width: 700px) {
+      .report-shell { padding: 18px 14px 40px; }
+      .report-hero { padding: 22px 18px; }
+      .hero-title { font-size: 2rem; }
+      .report-main { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="report-shell">
+    <header class="report-hero panel">
+      <div class="hero-topline">
+        <span>ipsw</span>
+        <span>Diff Report</span>
+      </div>
+      <div class="hero-grid">
+        <section>
+          <h1 class="hero-title">26.5_22F76__vs__26.5.1_22F84</h1>
+        </section>
+        <section class="hero-meta">
+          <div class="meta-card">
+            <span class="meta-label">Old Input</span>
+            <span class="meta-value">iPhone18,1_26.5_22F76_Restore.ipsw</span><span class="meta-note">26.5 &middot; 22F76</span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">New Input</span>
+            <span class="meta-value">iPhone18,1_26.5.1_22F84_Restore.ipsw</span><span class="meta-note">26.5.1 &middot; 22F84</span>
+          </div>
+        </section>
+      </div>
+    </header>
+    <div class="report-layout">
+      <aside class="report-sidebar panel">
+        <h2 class="sidebar-title">Contents</h2>
+        <nav class="toc">
+          <ul>
+            <li><a href="#inputs">Inputs</a></li>
+            <li><a href="#kernel">Kernel</a>
+            </li>
+            <li><a href="#kexts">Kexts</a>
+              <ul><li><a href="#kexts-new">New (1)</a></li><li><a href="#kexts-removed">Removed (1)</a></li><li><a href="#kexts-updated">Updated (1)</a></li>
+              </ul>
+            </li>
+            <li><a href="#machos">MachOs</a>
+              <ul>
+                <li><a href="#machos-filesystem">filesystem</a></li>
+                <li><a href="#machos-systemos">SystemOS</a></li>
+                <li><a href="#machos-appos">AppOS</a></li>
+              </ul>
+            </li><li><a href="#entitlements">Entitlements</a></li>
+            <li><a href="#firmwares">Firmwares</a>
+              <ul><li><a href="#fw-new">New (1)</a></li><li><a href="#fw-removed">Removed (1)</a></li><li><a href="#fw-updated">Updated (1)</a></li>
+              </ul>
+            </li>
+            <li><a href="#iboot">iBoot</a>
+              <ul><li><a href="#iboot-new">New (1)</a></li><li><a href="#iboot-removed">Removed (1)</a></li>
+              </ul>
+            </li><li><a href="#launchd">launchd Config</a></li><li><a href="#sandbox-profiles">Sandbox Profiles</a></li>
+            <li><a href="#dsc">DSC</a>
+              <ul><li><a href="#webkit">WebKit</a></li>
+                <li><a href="#dylibs">Dylibs</a>
+                  <ul><li><a href="#dylibs-new">New (1)</a></li><li><a href="#dylibs-removed">Removed (1)</a></li><li><a href="#dylibs-updated">Updated (1)</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li><a href="#files">Files</a>
+              <ul><li><a href="#files-new">New (4)</a></li><li><a href="#files-removed">Removed (4)</a></li>
+              </ul>
+            </li>
+            <li><a href="#localizations">Localizations</a>
+              <ul>
+                <li><a href="#localizations-filesystem">filesystem</a></li>
+                <li><a href="#localizations-systemos">SystemOS</a></li>
+                <li><a href="#localizations-appos">AppOS</a></li>
+              </ul>
+            </li>
+            <li><a href="#feature-flags">Feature Flags</a>
+              <ul>
+                <li><a href="#features-filesystem">filesystem</a></li>
+                <li><a href="#features-systemos">SystemOS</a></li>
+                <li><a href="#features-appos">AppOS</a></li>
+              </ul>
+            </li>
+          </ul>
+        </nav>
+      </aside>
+      <main class="report-main panel">
+        <article class="rc">
+
+          <h2 id="inputs">Inputs</h2>
+          <ul>
+            <li><code>iPhone18,1_26.5_22F76_Restore.ipsw</code></li>
+            <li><code>iPhone18,1_26.5.1_22F84_Restore.ipsw</code></li>
+          </ul>
+
+          <h2 id="kernel">Kernel</h2>
+          <h3 id="kexts">Kexts</h3>
+<h4 id="kexts-new">New</h4>
+<ul><li><code>com.apple.KEXT.NewKext</code></li></ul>
+<h4 id="kexts-removed">Removed</h4>
+<ul><li><code>com.apple.KEXT.RemovedKext</code></li></ul>
+<h4 id="kexts-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>AppleKEXT</h5>
+    <div class="diff-entry-path"><code>/System/Library/Extensions/AppleKEXT.kext/AppleKEXT</code></div>
+    <pre><code><span class="diff-del">- KEXT old line</span>
+<span class="diff-add">+ KEXT new line</span></code></pre>
+  </div>
+</details>
+
+          <h2 id="kdks">KDKs</h2>
+          <pre><code><span class="diff-del">- KDK old struct</span>
+<span class="diff-add">+ KDK new struct</span></code></pre>
+          <h2 id="machos">MachOs</h2>
+          <h3 id="machos-filesystem">filesystem</h3>
+<h4 id="machos-filesystem-new">New</h4>
+<ul><li><code>/usr/bin/MACHO_filesystem_new</code></li></ul>
+<h4 id="machos-filesystem-removed">Removed</h4>
+<ul><li><code>/usr/bin/MACHO_filesystem_removed</code></li></ul>
+<h4 id="machos-filesystem-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>MACHO_filesystem_updated</h5>
+    <div class="diff-entry-path"><code>/usr/bin/MACHO_filesystem_updated</code></div>
+    <pre><code><span class="diff-del">- MACHO filesystem old</span>
+<span class="diff-add">+ MACHO filesystem new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="machos-systemos">SystemOS</h3>
+<h4 id="machos-systemos-new">New</h4>
+<ul><li><code>/System/Library/MACHO_SystemOS_new</code></li></ul>
+<h4 id="machos-systemos-removed">Removed</h4>
+<ul><li><code>/System/Library/MACHO_SystemOS_removed</code></li></ul>
+<h4 id="machos-systemos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>MACHO_SystemOS_updated</h5>
+    <div class="diff-entry-path"><code>/System/Library/MACHO_SystemOS_updated</code></div>
+    <pre><code><span class="diff-del">- MACHO SystemOS old</span>
+<span class="diff-add">+ MACHO SystemOS new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="machos-appos">AppOS</h3>
+<h4 id="machos-appos-new">New</h4>
+<ul><li><code>/System/Library/MACHO_AppOS_new</code></li></ul>
+<h4 id="machos-appos-removed">Removed</h4>
+<ul><li><code>/System/Library/MACHO_AppOS_removed</code></li></ul>
+<h4 id="machos-appos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>MACHO_AppOS_updated</h5>
+    <div class="diff-entry-path"><code>/System/Library/MACHO_AppOS_updated</code></div>
+    <pre><code><span class="diff-del">- MACHO AppOS old</span>
+<span class="diff-add">+ MACHO AppOS new</span></code></pre>
+  </div>
+</details>
+
+          <h2 id="entitlements">Entitlements</h2>
+          <h3 id="entitlements-filesystem">filesystem</h3>
+          <details>
+            <summary>View Entitlements</summary>
+            <pre><code><span class="diff-del">- ENTS filesystem old</span>
+<span class="diff-add">+ ENTS filesystem new</span></code></pre>
+          </details>
+          <h3 id="entitlements-systemos">SystemOS</h3>
+          <details>
+            <summary>View Entitlements</summary>
+            <pre><code><span class="diff-del">- ENTS SystemOS old</span>
+<span class="diff-add">+ ENTS SystemOS new</span></code></pre>
+          </details>
+          <h3 id="entitlements-appos">AppOS</h3>
+          <details>
+            <summary>View Entitlements</summary>
+            <pre><code><span class="diff-del">- ENTS AppOS old</span>
+<span class="diff-add">+ ENTS AppOS new</span></code></pre>
+          </details>
+          <h2 id="firmwares">Firmwares</h2>
+<h4 id="fw-new">New</h4>
+<ul><li><code>FIRMWARE_new.im4p</code></li></ul>
+<h4 id="fw-removed">Removed</h4>
+<ul><li><code>FIRMWARE_removed.im4p</code></li></ul>
+<h4 id="fw-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>FIRMWARE_updated.im4p</h5>
+    <div class="diff-entry-path"><code>FIRMWARE_updated.im4p</code></div>
+    <pre><code><span class="diff-del">- FIRMWARE old</span>
+<span class="diff-add">+ FIRMWARE new</span></code></pre>
+  </div>
+</details>
+
+          <h2 id="iboot">iBoot</h2>
+          <table>
+            <caption>iBoot version comparison across the old and new inputs.</caption>
+            <thead><tr><th>iOS</th><th>Version</th></tr></thead>
+            <tbody>
+              <tr><td>26.5 <em>(22F76)</em></td><td>iBoot-IBOOT_old</td></tr>
+              <tr><td>26.5.1 <em>(22F84)</em></td><td>iBoot-IBOOT_new</td></tr>
+            </tbody>
+          </table>
+          <h3 id="iboot-new">New</h3>
+          <details>
+            <summary>View New (1)</summary>
+            <div class="diff-entry">
+              <h4>iBoot.IBOOT.section</h4>
+              <ul><li><code>IBOOT new string one of sufficient length</code></li></ul>
+            </div>
+          </details>
+          <h3 id="iboot-removed">Removed</h3>
+          <details>
+            <summary>View Removed (1)</summary>
+            <div class="diff-entry">
+              <h4>iBoot.IBOOT.section</h4>
+              <ul><li><code>IBOOT removed string one of sufficient length</code></li></ul>
+            </div>
+          </details>
+          <h2 id="launchd">launchd Config</h2>
+          <pre><code><span class="diff-del">- LAUNCHD old</span>
+<span class="diff-add">+ LAUNCHD new</span></code></pre>
+          <h2 id="sandbox-profiles">Sandbox Profiles</h2>
+          <pre><code><span class="diff-del">- SANDBOX old profile</span>
+<span class="diff-add">+ SANDBOX new profile</span></code></pre>
+
+          <h2 id="dsc">DSC</h2>
+          <h3 id="webkit">WebKit</h3>
+          <table>
+            <caption>WebKit version comparison across the old and new inputs.</caption>
+            <thead><tr><th>iOS</th><th>Version</th></tr></thead>
+            <tbody>
+              <tr><td>26.5 <em>(22F76)</em></td><td>Webkit-26.5</td></tr>
+              <tr><td>26.5.1 <em>(22F84)</em></td><td>Webkit-26.5.1</td></tr>
+            </tbody>
+          </table>
+          <h3 id="dylibs">Dylibs</h3>
+<h4 id="dylibs-new">New</h4>
+<ul><li><code>/usr/lib/DYLIBS_new.dylib</code></li></ul>
+<h4 id="dylibs-removed">Removed</h4>
+<ul><li><code>/usr/lib/DYLIBS_removed.dylib</code></li></ul>
+<h4 id="dylibs-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>DYLIBS_updated.dylib</h5>
+    <div class="diff-entry-path"><code>/usr/lib/DYLIBS_updated.dylib</code></div>
+    <pre><code><span class="diff-del">- DYLIBS old</span>
+<span class="diff-add">+ DYLIBS new</span></code></pre>
+  </div>
+</details>
+
+          <h2 id="files">Files</h2>
+          <h3 id="files-new">New</h3>
+          <div class="diff-entry">
+            <h4>IPSW (1)</h4>
+            <ul><li><code>/FILES_IPSW_new</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>filesystem (1)</h4>
+            <ul><li><code>/FILES_filesystem_new</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>SystemOS (1)</h4>
+            <ul><li><code>/FILES_SystemOS_new</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>AppOS (1)</h4>
+            <ul><li><code>/FILES_AppOS_new</code></li></ul>
+          </div>
+          <h3 id="files-removed">Removed</h3>
+          <div class="diff-entry">
+            <h4>IPSW (1)</h4>
+            <ul><li><code>/FILES_IPSW_removed</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>filesystem (1)</h4>
+            <ul><li><code>/FILES_filesystem_removed</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>SystemOS (1)</h4>
+            <ul><li><code>/FILES_SystemOS_removed</code></li></ul>
+          </div>
+          <div class="diff-entry">
+            <h4>AppOS (1)</h4>
+            <ul><li><code>/FILES_AppOS_removed</code></li></ul>
+          </div>
+          <h2 id="localizations">Localizations</h2>
+          <h3 id="localizations-filesystem">filesystem</h3>
+<h4 id="localizations-filesystem-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_filesystem_new.lproj/Localizable.strings</code></div>
+    <pre><code>LOC filesystem new content</code></pre>
+  </div>
+</details>
+<h4 id="localizations-filesystem-removed">Removed</h4>
+<ul><li><code>/Localizations_filesystem_removed.lproj/Localizable.strings</code></li></ul>
+<h4 id="localizations-filesystem-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_filesystem_updated.lproj/Localizable.strings</code></div>
+    <pre><code><span class="diff-del">- LOC filesystem old</span>
+<span class="diff-add">+ LOC filesystem new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="localizations-systemos">SystemOS</h3>
+<h4 id="localizations-systemos-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_SystemOS_new.lproj/Localizable.strings</code></div>
+    <pre><code>LOC SystemOS new content</code></pre>
+  </div>
+</details>
+<h4 id="localizations-systemos-removed">Removed</h4>
+<ul><li><code>/Localizations_SystemOS_removed.lproj/Localizable.strings</code></li></ul>
+<h4 id="localizations-systemos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_SystemOS_updated.lproj/Localizable.strings</code></div>
+    <pre><code><span class="diff-del">- LOC SystemOS old</span>
+<span class="diff-add">+ LOC SystemOS new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="localizations-appos">AppOS</h3>
+<h4 id="localizations-appos-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_AppOS_new.lproj/Localizable.strings</code></div>
+    <pre><code>LOC AppOS new content</code></pre>
+  </div>
+</details>
+<h4 id="localizations-appos-removed">Removed</h4>
+<ul><li><code>/Localizations_AppOS_removed.lproj/Localizable.strings</code></li></ul>
+<h4 id="localizations-appos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>Localizable</h5>
+    <div class="diff-entry-path"><code>/Localizations_AppOS_updated.lproj/Localizable.strings</code></div>
+    <pre><code><span class="diff-del">- LOC AppOS old</span>
+<span class="diff-add">+ LOC AppOS new</span></code></pre>
+  </div>
+</details>
+
+          <h2 id="feature-flags">Feature Flags</h2>
+          <h3 id="features-filesystem">filesystem</h3>
+<h4 id="features-filesystem-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_filesystem_new.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_filesystem_new.plist</code></div>
+    <pre><code>&lt;plist&gt;FEATURES filesystem new&lt;/plist&gt;</code></pre>
+  </div>
+</details>
+<h4 id="features-filesystem-removed">Removed</h4>
+<ul><li><code>/FeatureFlags_filesystem_removed.plist</code></li></ul>
+<h4 id="features-filesystem-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_filesystem_updated.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_filesystem_updated.plist</code></div>
+    <pre><code><span class="diff-del">- FEATURES filesystem old</span>
+<span class="diff-add">+ FEATURES filesystem new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="features-systemos">SystemOS</h3>
+<h4 id="features-systemos-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_SystemOS_new.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_SystemOS_new.plist</code></div>
+    <pre><code>&lt;plist&gt;FEATURES SystemOS new&lt;/plist&gt;</code></pre>
+  </div>
+</details>
+<h4 id="features-systemos-removed">Removed</h4>
+<ul><li><code>/FeatureFlags_SystemOS_removed.plist</code></li></ul>
+<h4 id="features-systemos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_SystemOS_updated.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_SystemOS_updated.plist</code></div>
+    <pre><code><span class="diff-del">- FEATURES SystemOS old</span>
+<span class="diff-add">+ FEATURES SystemOS new</span></code></pre>
+  </div>
+</details>
+
+          <h3 id="features-appos">AppOS</h3>
+<h4 id="features-appos-new">New</h4>
+<details>
+  <summary>View New (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_AppOS_new.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_AppOS_new.plist</code></div>
+    <pre><code>&lt;plist&gt;FEATURES AppOS new&lt;/plist&gt;</code></pre>
+  </div>
+</details>
+<h4 id="features-appos-removed">Removed</h4>
+<ul><li><code>/FeatureFlags_AppOS_removed.plist</code></li></ul>
+<h4 id="features-appos-updated">Updated</h4>
+<details>
+  <summary>View Updated (1)</summary>
+  <div class="diff-entry">
+    <h5>FeatureFlags_AppOS_updated.plist</h5>
+    <div class="diff-entry-path"><code>/FeatureFlags_AppOS_updated.plist</code></div>
+    <pre><code><span class="diff-del">- FEATURES AppOS old</span>
+<span class="diff-add">+ FEATURES AppOS new</span></code></pre>
+  </div>
+</details>
+
+
+        </article>
+      </main>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var links=document.querySelectorAll('.toc a[href^="#"]');
+    if(!links.length)return;
+    var ids=[];links.forEach(function(a){ids.push(a.getAttribute('href').slice(1));});
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(a){a.classList.remove('active');});
+          var match=document.querySelector('.toc a[href="#'+e.target.id+'"]');
+          if(match)match.classList.add('active');
+        }
+      });
+    },{rootMargin:'-20% 0px -60% 0px'});
+    ids.forEach(function(id){var el=document.getElementById(id);if(el)io.observe(el);});
+  })();
+  </script>
+</body>
+</html>
+
+
+
+
