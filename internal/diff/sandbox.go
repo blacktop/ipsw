@@ -81,7 +81,7 @@ func collectSandboxProfileDocuments(ctx *Context) (sandboxProfileDocuments, erro
 }
 
 func renderSandboxSourceProfiles(kernel *macho.File, fixups map[uint64]uint64, source string) (map[string]string, error) {
-	conf := &sandbox.Config{Kernel: kernel}
+	conf := &sandbox.Config{Kernel: kernel, Quiet: true}
 	if fixups != nil {
 		conf.Fixups = fixups
 	}
