@@ -40,7 +40,7 @@ type mteScanModel struct {
 	results []mteResult
 	done    bool
 	err     error
-	mu      sync.Mutex
+	mu      *sync.Mutex
 }
 
 type dmgStartMsg struct{ name string }
@@ -233,7 +233,7 @@ func RunMTEScanIPSW(ipswPath, pemDB string) error {
 	log.SetLevel(log.WarnLevel)
 	defer log.SetLevel(oldLevel)
 
-	model := mteScanModel{dmgs: []dmgProgress{}, results: []mteResult{}}
+	model := mteScanModel{dmgs: []dmgProgress{}, results: []mteResult{}, mu: &sync.Mutex{}}
 	p := tea.NewProgram(model)
 
 	go func() {

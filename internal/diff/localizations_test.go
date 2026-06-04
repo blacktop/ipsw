@@ -37,17 +37,17 @@ func TestDiffLocalizedResourcesReportsUpdatedLoctableKeys(t *testing.T) {
 }
 
 func TestLocalizationMarkdownFilenameUsesFullPath(t *testing.T) {
-	first := localizationMarkdownFilename("FileSystem/Applications/Phone.app/en.lproj/Localizable.strings")
-	second := localizationMarkdownFilename("FileSystem/System/Library/Frameworks/Test.framework/en.lproj/Localizable.strings")
+	first := plistMarkdownFilename("FileSystem/Applications/Phone.app/en.lproj/Localizable.strings", localizationDisplayName)
+	second := plistMarkdownFilename("FileSystem/System/Library/Frameworks/Test.framework/en.lproj/Localizable.strings", localizationDisplayName)
 
 	if first == second {
 		t.Fatalf("localizationMarkdownFilename collided for same basename: %q", first)
 	}
 	if !strings.HasSuffix(first, "_Phone.md") {
-		t.Fatalf("localizationMarkdownFilename(%q) should use containing bundle name", first)
+		t.Fatalf("plistMarkdownFilename(%q) should use containing bundle name", first)
 	}
 	if !strings.HasSuffix(second, "_Test.md") {
-		t.Fatalf("localizationMarkdownFilename(%q) should use containing bundle name", second)
+		t.Fatalf("plistMarkdownFilename(%q) should use containing bundle name", second)
 	}
 }
 
@@ -94,9 +94,11 @@ func TestMarkdownUsesLocalizationDisplayName(t *testing.T) {
 		IpswNew: "new.ipsw",
 		Output:  output,
 	})
-	d.Localizations = &PlistDiff{
-		New: map[string]string{
-			path: `en.KEY = "value"`,
+	d.Localizations = map[string]*PlistDiff{
+		"SystemOS": {
+			New: map[string]string{
+				path: `en.KEY = "value"`,
+			},
 		},
 	}
 
@@ -109,10 +111,10 @@ func TestMarkdownUsesLocalizationDisplayName(t *testing.T) {
 		t.Fatalf("failed to read Markdown output: %v", err)
 	}
 	rendered := string(readme)
-	if !strings.Contains(rendered, "#### ActionKit") {
+	if !strings.Contains(rendered, "##### ActionKit") {
 		t.Fatalf("rendered Markdown should use localization owner name:\n%s", rendered)
 	}
-	if strings.Contains(rendered, "#### Localizable.loctable") {
+	if strings.Contains(rendered, "##### Localizable.loctable") {
 		t.Fatalf("rendered Markdown should not use generic localization resource basename:\n%s", rendered)
 	}
 }
@@ -128,11 +130,12 @@ func TestMarkdownNewLocalizationOverflowFilesAreFenced(t *testing.T) {
 
 	// >= 20 new resources forces the overflow path that writes per-resource
 	// Markdown files instead of inlining the content.
-	d.Localizations = &PlistDiff{New: make(map[string]string)}
+	volumeDiff := &PlistDiff{New: make(map[string]string)}
 	for i := range 25 {
 		path := fmt.Sprintf("FileSystem/System/Library/PrivateFrameworks/Frame%02d.framework/Localizable.loctable", i)
-		d.Localizations.New[path] = fmt.Sprintf("en.KEY_A = \"value %d\"\nen.KEY_B = \"other %d\"", i, i)
+		volumeDiff.New[path] = fmt.Sprintf("en.KEY_A = \"value %d\"\nen.KEY_B = \"other %d\"", i, i)
 	}
+	d.Localizations = map[string]*PlistDiff{"SystemOS": volumeDiff}
 
 	if err := d.Markdown(); err != nil {
 		t.Fatalf("Markdown returned error: %v", err)

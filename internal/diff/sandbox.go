@@ -21,6 +21,14 @@ const (
 )
 
 func (d *Diff) parseSandboxProfiles() (string, error) {
+	// The sandbox diff reads only the kernelcache. extractKernelcaches sets
+	// Kernel.Path as a side effect of the kexts task's Parse, but a warm cache
+	// hit on kexts skips that Parse, leaving the path empty on a partial hit
+	// (kexts hydrated, sandbox missed). Ensure the path here so a fresh sandbox
+	// parse is self-sufficient regardless of the kexts cache state.
+	if err := d.ensureKernelcachePaths(); err != nil {
+		return "", fmt.Errorf("failed to resolve kernelcache paths for sandbox diff: %w", err)
+	}
 	oldDocs, err := collectSandboxProfileDocuments(&d.Old)
 	if err != nil {
 		return "", fmt.Errorf("old sandbox profiles: %w", err)

@@ -1,16 +1,27 @@
 package diff
 
 import (
-	"encoding/gob"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func writeDiffTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
+}
 
 func TestUnsupportedFlagsForOTAMode(t *testing.T) {
 	tests := []struct {
@@ -22,11 +33,6 @@ func TestUnsupportedFlagsForOTAMode(t *testing.T) {
 			name:     "no flags",
 			conf:     Config{},
 			expected: nil,
-		},
-		{
-			name:     "low-memory blocked",
-			conf:     Config{LowMemory: true},
-			expected: []string{"--low-memory"},
 		},
 		{
 			name: "now-supported flags not blocked",
@@ -78,11 +84,6 @@ func TestUnsupportedFlagsForDirectoryMode(t *testing.T) {
 			name:     "launchd blocked",
 			conf:     Config{LaunchD: true},
 			expected: []string{"--launchd"},
-		},
-		{
-			name:     "low-memory blocked",
-			conf:     Config{LowMemory: true},
-			expected: []string{"--low-memory"},
 		},
 		{
 			name:     "sandbox blocked",
@@ -326,18 +327,18 @@ func TestCollectFeatureFlagsFromMountsSkipsMissingMountDirs(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	mounts := map[string]mount{
-		"AppOS": {
-			MountPath: filepath.Join(tmpDir, "app-missing"),
-		},
-		"SystemOS": {
-			MountPath: systemRoot,
-		},
+	// Test the single-mount helper directly: a missing FeatureFlags dir
+	// should be skipped without erroring, and a present one should be walked.
+	out := make(map[string]string)
+	if err := collectFeatureFlagsFromMount(filepath.Join(tmpDir, "app-missing"), "AppOS", out); err != nil {
+		t.Fatalf("collectFeatureFlagsFromMount(missing) error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("missing-mount walk populated %v, want empty", out)
 	}
 
-	out := make(map[string]string)
-	if err := collectFeatureFlagsFromMounts(mounts, out); err != nil {
-		t.Fatalf("collectFeatureFlagsFromMounts() error = %v", err)
+	if err := collectFeatureFlagsFromMount(systemRoot, "SystemOS", out); err != nil {
+		t.Fatalf("collectFeatureFlagsFromMount(present) error = %v", err)
 	}
 
 	got, ok := out[filepath.Join("Domain", "SoftwareUpdate.plist")]
@@ -346,6 +347,51 @@ func TestCollectFeatureFlagsFromMountsSkipsMissingMountDirs(t *testing.T) {
 	}
 	if got != wantContent {
 		t.Fatalf("FeatureFlags content = %q, want %q", got, wantContent)
+	}
+}
+
+func TestWalkFolderFilesConfinesSymlinkDirsToRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeDiffTestFile(t, filepath.Join(root, "plain.txt"), "plain")
+	writeDiffTestFile(t, filepath.Join(root, "real", "inside.txt"), "inside")
+	writeDiffTestFile(t, filepath.Join(outside, "outside.txt"), "outside")
+
+	if err := os.Symlink(outside, filepath.Join(root, "outside-link")); err != nil {
+		t.Fatalf("symlink outside dir: %v", err)
+	}
+	if err := os.Symlink("/real", filepath.Join(root, "abs-real-link")); err != nil {
+		t.Fatalf("symlink absolute in-root dir: %v", err)
+	}
+
+	var got []string
+	if err := walkFolderFiles(root, func(relPath, _ string) error {
+		got = append(got, filepath.ToSlash(relPath))
+		return nil
+	}); err != nil {
+		t.Fatalf("walkFolderFiles() error = %v", err)
+	}
+	slices.Sort(got)
+	want := []string{"plain.txt", "real/inside.txt"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("walkFolderFiles() = %v, want %v", got, want)
+	}
+}
+
+func TestOTAFirmwareMemberKeySourceQualifiesDuplicateBasenames(t *testing.T) {
+	restore := search.FirmwareMemberKey(
+		"AssetData/Firmware/image4/exclavecore_bundle.t8150.RELEASE.restore.im4p",
+		"exclave_sharedcache",
+	)
+	release := search.FirmwareMemberKey(
+		"AssetData/Firmware/image4/exclavecore_bundle.t8150.RELEASE.im4p",
+		"exclave_sharedcache",
+	)
+	if restore == release {
+		t.Fatalf("duplicate firmware basename keys collapsed: %q", restore)
+	}
+	if !strings.Contains(restore, "RELEASE.restore.im4p/exclave_sharedcache") {
+		t.Fatalf("restore key %q does not retain containing member path", restore)
 	}
 }
 
@@ -415,39 +461,6 @@ func TestDetectInputMode(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestSaveRoundtripWithOTAMode(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	d := &Diff{
-		Title: "OTA Test",
-		Old: Context{
-			InputMode: inputModeOTA,
-			Version:   "18.4",
-			Build:     "22E5230e",
-			// otaFile is nil (already closed) — gob must not panic.
-		},
-		New: Context{
-			InputMode: inputModeOTA,
-			Version:   "18.4",
-			Build:     "22E5246b",
-		},
-		conf: &Config{Output: tmpDir},
-	}
-
-	gob.Register([]any{})
-	gob.Register(map[string]any{})
-
-	if err := d.Save(); err != nil {
-		t.Fatalf("Save() with OTA mode failed: %v", err)
-	}
-
-	// Verify the file was created.
-	outPath := filepath.Join(tmpDir, d.TitleToFilename()+".idiff")
-	if _, err := os.Stat(outPath); err != nil {
-		t.Fatalf("expected .idiff file at %s: %v", outPath, err)
 	}
 }
 

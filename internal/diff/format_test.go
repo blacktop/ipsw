@@ -139,18 +139,22 @@ func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
 			"IPSW": {"Firmware/old.im4p"},
 		},
 	}
-	d.Features = &PlistDiff{
-		New: map[string]string{
-			"/System/Library/FeatureFlags/Test.plist": "<plist><dict><key>Enabled</key><true/></dict></plist>",
-		},
-		Removed: []string{"/System/Library/FeatureFlags/Old.plist"},
-		Updated: map[string]string{
-			"/System/Library/FeatureFlags/Changed.plist": "```diff\n- old\n+ new\n```",
+	d.Features = map[string]*PlistDiff{
+		"SystemOS": {
+			New: map[string]string{
+				"/System/Library/FeatureFlags/Test.plist": "<plist><dict><key>Enabled</key><true/></dict></plist>",
+			},
+			Removed: []string{"/System/Library/FeatureFlags/Old.plist"},
+			Updated: map[string]string{
+				"/System/Library/FeatureFlags/Changed.plist": "```diff\n- old\n+ new\n```",
+			},
 		},
 	}
-	d.Localizations = &PlistDiff{
-		Updated: map[string]string{
-			"FileSystem/System/Library/PrivateFrameworks/CommunicationsFilter.framework/CommunicationsFilter.loctable": "```diff\n+en.BLOCKLIST_LIMIT_ALERT_TITLE = \"Blocked Contacts Limit Reached\"\n```",
+	d.Localizations = map[string]*PlistDiff{
+		"SystemOS": {
+			Updated: map[string]string{
+				"FileSystem/System/Library/PrivateFrameworks/CommunicationsFilter.framework/CommunicationsFilter.loctable": "```diff\n+en.BLOCKLIST_LIMIT_ALERT_TITLE = \"Blocked Contacts Limit Reached\"\n```",
+			},
 		},
 	}
 	rendered := mustRenderHTML(t, d)
@@ -160,7 +164,7 @@ func TestRenderHTMLIncludesIBootFilesAndFeatureFlags(t *testing.T) {
 		`id="files"`,
 		`id="feature-flags"`,
 		`id="localizations"`,
-		`<h4>CommunicationsFilter</h4>`,
+		`<h5>CommunicationsFilter</h5>`,
 		`new-symbol`,
 		`System/Library/NewFile`,
 		`Changed.plist`,

@@ -111,6 +111,12 @@ func createGoDiff(src, dst string, conf *GitDiffConfig) (string, error) {
 	return dmp.DiffPrettyText(diffs), nil
 }
 
+// createGitDiffPatch renders a unified diff by shelling out to the host git
+// binary. The output bytes (hunk boundaries, context-line algorithm) depend on
+// the installed git version. The diff cache (internal/diff) does not fold the
+// git version into its cache scope, so a cache built on one host may render
+// differently than a fresh run on a host with a different git; the cache is
+// therefore host-bound by default. See machosJob.OptionsHash for details.
 func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 	tmpSrc, err := os.CreateTemp("", "src")
 	if err != nil {

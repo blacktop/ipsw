@@ -21,6 +21,7 @@ import (
 	"github.com/blacktop/go-macho"
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -58,8 +59,9 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 
 	// create or load entitlement database
 	if _, err := os.Stat(conf.Database); os.IsNotExist(err) {
-		utils.Indent(log.Info, 2)("Generating entitlement database file...")
 		if len(conf.IPSW) > 0 {
+			utils.Indent(log.Info, 2)("Generating entitlement database file...")
+
 			i, err := info.Parse(conf.IPSW)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse IPSW: %v", err)
@@ -101,19 +103,8 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 
 		if len(conf.Folder) > 0 {
 			var files []string
-			if err := filepath.Walk(conf.Folder, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					// Skip paths with permission errors gracefully
-					if os.IsPermission(err) {
-						log.Debugf("skipping path due to permission denied: %s", path)
-						return nil
-					}
-					log.Debugf("failed to walk mount %s: %v", conf.Folder, err)
-					return nil
-				}
-				if !info.IsDir() {
-					files = append(files, path)
-				}
+			if err := search.WalkFilesInRoot(conf.Folder, func(path string) error {
+				files = append(files, path)
 				return nil
 			}); err != nil {
 				return nil, fmt.Errorf("failed to walk files in dir %s: %v", conf.Folder, err)
@@ -469,22 +460,11 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 func mountedEntitlementFiles(mountPoint string) ([]mountedEntitlementFile, error) {
 	root := utils.MountedFilesystemRoot(mountPoint)
 	var files []mountedEntitlementFile
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			// Skip paths with permission errors gracefully
-			if os.IsPermission(err) {
-				log.Debugf("skipping path due to permission denied: %s", path)
-				return nil
-			}
-			log.Debugf("failed to walk mount %s: %v", root, err)
-			return nil
-		}
-		if !info.IsDir() {
-			files = append(files, mountedEntitlementFile{
-				Path:   path,
-				DBPath: strings.TrimPrefix(path, root),
-			})
-		}
+	if err := search.WalkFilesInRoot(root, func(path string) error {
+		files = append(files, mountedEntitlementFile{
+			Path:   path,
+			DBPath: strings.TrimPrefix(path, root),
+		})
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to walk files in dir %s: %v", root, err)

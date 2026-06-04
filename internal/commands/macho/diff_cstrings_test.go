@@ -3,6 +3,8 @@ package macho
 import (
 	"strings"
 	"testing"
+
+	"github.com/blacktop/go-macho/types"
 )
 
 func baseDiffInfo() *DiffInfo {
@@ -13,6 +15,132 @@ func baseDiffInfo() *DiffInfo {
 		Sections:  []section{{Name: "__TEXT.__text", Size: 0x1000}},
 		Functions: 1,
 		Symbols:   []string{"_foo"},
+	}
+}
+
+func TestDiffInfoEqualUsesLoadCmdHash(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.LoadCmdHash = strings.Repeat("a", 64)
+	newInfo.LoadCmdHash = strings.Repeat("b", 64)
+
+	if newInfo.Equal(*oldInfo) {
+		t.Fatal("expected differing LoadCmdHash to make diff info unequal")
+	}
+}
+
+func TestDiffInfoStringOmitsLoadCmdHash(t *testing.T) {
+	info := baseDiffInfo()
+	info.LoadCmdHash = strings.Repeat("a", 64)
+
+	if got := info.String(); strings.Contains(got, "load_commands") || strings.Contains(got, info.LoadCmdHash) {
+		t.Fatalf("DiffInfo.String rendered LoadCmdHash:\n%s", got)
+	}
+}
+
+func TestFormatUpdatedDiffOmitsLoadCommandOnlyChanges(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.LoadCmdHash = strings.Repeat("a", 64)
+	newInfo.LoadCmdHash = strings.Repeat("b", 64)
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if out != "" {
+		t.Fatalf("expected no rendered diff for a load-command-only change, got:\n%s", out)
+	}
+}
+
+func TestDiffInfoEqualSkipsLoadCmdHashWhenMissingOnEitherSide(t *testing.T) {
+	// Backward compatibility: if one side has no LoadCmdHash (e.g. older
+	// cached DiffInfo, or a binary where loadCommandsHash returned ""),
+	// Equal should not flip on the LoadCmdHash leg.
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.LoadCmdHash = ""
+	newInfo.LoadCmdHash = strings.Repeat("a", 64)
+	if !newInfo.Equal(*oldInfo) {
+		t.Fatal("expected Equal to ignore LoadCmdHash when one side is missing")
+	}
+}
+
+func TestGenerateDiffInfoCanIgnoreLoadCommands(t *testing.T) {
+	m := openSelfT(t)
+	withLoadCommands := GenerateDiffInfo(m, &DiffConfig{})
+	if withLoadCommands.LoadCmdHash == "" {
+		t.Skip("test binary did not produce a load-command hash")
+	}
+
+	withoutLoadCommands := GenerateDiffInfo(m, &DiffConfig{IgnoreLoadCommands: true})
+	if withoutLoadCommands.LoadCmdHash != "" {
+		t.Fatalf("LoadCmdHash = %q, want empty when IgnoreLoadCommands is set", withoutLoadCommands.LoadCmdHash)
+	}
+}
+
+func TestDiffInfoEqualUsesSectionHash(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
+	newInfo.Sections[0].Hash = strings.Repeat("b", 64)
+
+	if newInfo.Equal(*oldInfo) {
+		t.Fatal("expected section hash changes to make diff info unequal")
+	}
+}
+
+func TestFormatUpdatedDiffReportsSameSizeSectionHashChanges(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldHash := strings.Repeat("a", 64)
+	newHash := strings.Repeat("b", 64)
+	oldInfo.Sections[0].Hash = oldHash
+	newInfo.Sections[0].Hash = newHash
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+
+	if !strings.Contains(out, "sha256:") {
+		t.Fatalf("expected section hash label in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, oldHash) {
+		t.Fatalf("expected old section hash in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, newHash) {
+		t.Fatalf("expected new section hash in output, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffReportsSameSizeFunctionHashChanges(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldSectionHash := strings.Repeat("a", 64)
+	newSectionHash := strings.Repeat("b", 64)
+	oldFunctionHash := strings.Repeat("c", 64)
+	newFunctionHash := strings.Repeat("d", 64)
+	fn := types.Function{StartAddr: 0x1000, EndAddr: 0x1020}
+	oldInfo.Sections[0].Hash = oldSectionHash
+	newInfo.Sections[0].Hash = newSectionHash
+	oldInfo.Starts = []types.Function{fn}
+	newInfo.Starts = []types.Function{fn}
+	oldInfo.SymbolMap = map[uint64]string{fn.StartAddr: "_foo"}
+	newInfo.SymbolMap = map[uint64]string{fn.StartAddr: "_foo"}
+	oldInfo.FunctionHashes = map[uint64]string{fn.StartAddr: oldFunctionHash}
+	newInfo.FunctionHashes = map[uint64]string{fn.StartAddr: newFunctionHash}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{
+		DiffTool:   "go",
+		FuncStarts: true,
+	})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+
+	if !strings.Contains(out, "~ _foo : sha256 "+oldFunctionHash+" -> "+newFunctionHash) {
+		t.Fatalf("expected same-size function hash change in output, got:\n%s", out)
 	}
 }
 

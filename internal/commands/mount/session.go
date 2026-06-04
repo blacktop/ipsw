@@ -62,6 +62,48 @@ func (s *Session) Root(typ string) (string, error) {
 	return ctx.MountPoint, nil
 }
 
+// Release unmounts the DMG backing typ and removes it from the session cache.
+// Any cached type aliases that resolved to the same mount point are evicted too,
+// so a later Root call for any of them will mount again. DMGs that were already
+// mounted before the session acquired them (AlreadyMounted) are only evicted.
+func (s *Session) Release(typ string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ctx, ok := s.mounts[typ]
+	if !ok {
+		return nil
+	}
+
+	return s.releaseMountPointLocked(ctx.MountPoint)
+}
+
+func (s *Session) releaseMountPointLocked(mountPoint string) error {
+	var aliases []string
+	var owner *Context
+	for typ, ctx := range s.mounts {
+		if ctx.MountPoint != mountPoint {
+			continue
+		}
+		aliases = append(aliases, typ)
+		if owner == nil && !ctx.AlreadyMounted {
+			owner = ctx
+		}
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	if owner != nil {
+		if err := s.unmount(owner); err != nil {
+			return err
+		}
+	}
+	for _, typ := range aliases {
+		delete(s.mounts, typ)
+	}
+	return nil
+}
+
 // Close unmounts every DMG this session mounted and removes the extracted
 // backing files. DMGs that were already mounted before the session acquired
 // them (AlreadyMounted) are left in place, and DMGs that resolved to the same
