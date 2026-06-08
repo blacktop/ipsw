@@ -135,7 +135,20 @@ func (o ObjcOptT) GetClassOffset() int32 {
 	}
 }
 
+const (
+	// objcOptHeaderV1Size is Version(4) + Flags(4) + 6×uint64 offsets(48).
+	objcOptHeaderV1Size = 56
+	// objcOptHeaderV2Size adds relativeMethodSelectorBufferSize(8) + relativeMethodTypesBufferSize(8).
+	objcOptHeaderV2Size = 72
+	// objcOptHeaderMaxVersion is the newest ObjCOptimizationHeader version this code models.
+	objcOptHeaderMaxVersion = 2
+	// objcOptHeaderMaxDump caps the raw-bytes buffer so a corrupt (file-controlled)
+	// ObjcOptsSize can't drive a huge allocation. The real header is ~56-72 bytes.
+	objcOptHeaderMaxDump = 0x1000
+)
+
 // ObjCOptimizationHeader is the NEW LargeSharedCache objc optimization header
+// (dyld ObjCOptimizationHeader in common/DyldSharedCache.h).
 type ObjCOptimizationHeader struct {
 	Version                                 uint32
 	Flags                                   optFlags
@@ -145,18 +158,17 @@ type ObjCOptimizationHeader struct {
 	ClassHashTableCacheOffset               uint64
 	ProtocolHashTableCacheOffset            uint64
 	RelativeMethodSelectorBaseAddressOffset uint64
-	// v2 fields (iOS/macOS 26.4+)
-	// TODO: validate field names when Apple releases 26.4 dyld sources
-	SelectorStringsSize uint64 // byte size of relative method selector strings pool
-	Reserved            uint64
+	// Added in version 2
+	RelativeMethodSelectorBufferSize uint64 // byte size of the relative method selector strings buffer
+	RelativeMethodTypesBufferSize    uint64 // byte size of the relative method types buffer (starts at end of the selectors buffer)
 }
 
 func (o *ObjCOptimizationHeader) GetVersion() uint32 {
-	// Known header versions (1, 2) use stringHashV16 layout.
-	if o.Version <= 2 {
-		return 16
-	}
-	return o.Version
+	// The header version tracks the ObjCOptimizationHeader layout, not the
+	// on-disk selector/class/protocol hash table format, which is always the
+	// v16 layout. Report 16 so the hash tables still parse correctly when the
+	// header version is bumped (e.g. iOS 27 introduced v4).
+	return 16
 }
 func (o *ObjCOptimizationHeader) GetFlags() optFlags {
 	return o.Flags
@@ -235,61 +247,113 @@ func (f *File) GetOptimizations() (Optimization, error) {
 }
 
 func (f *File) getOptimizations() (Optimization, error) {
-	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].ObjcOptsSize)) { // check for NEW objc optimizations
-		const (
-			objcOptHeaderV1Size = 56 // Version(4) + Flags(4) + 6×uint64(48)
-			objcOptHeaderV2Size = 72 // v1 + SelectorStringsSize(8) + Reserved(8)
-		)
-		if f.Headers[f.UUID].ObjcOptsOffset > 0 && f.Headers[f.UUID].ObjcOptsSize >= objcOptHeaderV1Size {
-			uuid, off, err := f.GetOffset(f.Headers[f.UUID].SharedRegionStart + f.Headers[f.UUID].ObjcOptsOffset)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get offset for NEW objc optimization header at addr %#x: %v",
-					f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].ObjcOptsOffset, err)
-			}
+	hdr := f.Headers[f.UUID]
+	// NEW objc optimizations live in the dyld_cache_header itself: the cache must
+	// be new enough to carry the objcOpts fields (MappingOffset guard) and
+	// actually have a header present (objcOptsOffset/objcOptsSize).
+	if hdr.MappingOffset > uint32(unsafe.Offsetof(hdr.ObjcOptsSize)) &&
+		hdr.ObjcOptsOffset > 0 && hdr.ObjcOptsSize >= objcOptHeaderV1Size {
+		return f.parseObjCOptimizationHeader()
+	}
+	// OLD objc optimizations: objc_opt_t inside libobjc's __TEXT.__objc_opt_ro.
+	return f.getOptimizationsOld()
+}
 
-			sr := io.NewSectionReader(f.r[uuid], int64(off), int64(f.Headers[f.UUID].ObjcOptsSize))
-			var o ObjCOptimizationHeader
-			var readErr error
-			read := func(field any) {
-				if readErr != nil {
-					return
-				}
-				readErr = binary.Read(sr, f.ByteOrder, field)
-			}
-			read(&o.Version)
-			read(&o.Flags)
-			read(&o.HeaderInfoRoCacheOffset)
-			read(&o.HeaderInfoRwCacheOffset)
-			read(&o.SelectorHashTableCacheOffset)
-			read(&o.ClassHashTableCacheOffset)
-			read(&o.ProtocolHashTableCacheOffset)
-			read(&o.RelativeMethodSelectorBaseAddressOffset)
-			if readErr != nil {
-				return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", readErr)
-			}
-			if o.Version >= 2 {
-				read(&o.SelectorStringsSize)
-				read(&o.Reserved)
-				if readErr != nil {
-					return nil, fmt.Errorf("failed to read v2 objc optimization header fields: %v", readErr)
-				}
-			}
-			// Warn on unrecognized versions or unexpected sizes
-			if o.Version > 2 {
-				log.Warnf("objc optimization header version %d is newer than supported (max 2); parsing may be incomplete", o.Version)
-			}
-			if o.Version == 1 && f.Headers[f.UUID].ObjcOptsSize != objcOptHeaderV1Size {
-				log.Warnf("objc optimization header v1 expected %d bytes, got %d", objcOptHeaderV1Size, f.Headers[f.UUID].ObjcOptsSize)
-			}
-			if o.Version == 2 && f.Headers[f.UUID].ObjcOptsSize != objcOptHeaderV2Size {
-				log.Warnf("objc optimization header v2 expected %d bytes, got %d", objcOptHeaderV2Size, f.Headers[f.UUID].ObjcOptsSize)
-			}
+// parseObjCOptimizationHeader reads the NEW LargeSharedCache ObjC optimization
+// header. The layout grows by version (v1: 56 bytes, v2: 72 bytes); newer
+// versions may reorganize fields past the stable offset prefix, so the full
+// region is dumped (see logObjCOptimizationHeader) to make any new layout visible.
+func (f *File) parseObjCOptimizationHeader() (*ObjCOptimizationHeader, error) {
+	hdr := f.Headers[f.UUID]
+	addr := hdr.SharedRegionStart + hdr.ObjcOptsOffset
+	uuid, off, err := f.GetOffset(addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offset for NEW objc optimization header at addr %#x: %v", addr, err)
+	}
 
-			return &o, nil
+	// ObjcOptsSize comes from the (untrusted) cache header; cap the buffer we
+	// allocate for the raw dump so a corrupt size can't trigger a huge alloc.
+	dumpSize := min(hdr.ObjcOptsSize, objcOptHeaderMaxDump)
+	data := make([]byte, dumpSize)
+	if _, err := f.r[uuid].ReadAt(data, int64(off)); err != nil {
+		return nil, fmt.Errorf("failed to read NEW objc optimization header (%d bytes) at %#x: %v", dumpSize, addr, err)
+	}
+
+	r := bytes.NewReader(data)
+	var o ObjCOptimizationHeader
+	var readErr error
+	read := func(field any) {
+		if readErr != nil {
+			return
+		}
+		readErr = binary.Read(r, f.ByteOrder, field)
+	}
+	read(&o.Version)
+	read(&o.Flags)
+	read(&o.HeaderInfoRoCacheOffset)
+	read(&o.HeaderInfoRwCacheOffset)
+	read(&o.SelectorHashTableCacheOffset)
+	read(&o.ClassHashTableCacheOffset)
+	read(&o.ProtocolHashTableCacheOffset)
+	read(&o.RelativeMethodSelectorBaseAddressOffset)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", readErr)
+	}
+	// Only v2's post-prefix layout is known. v4 (iOS 27) reorganized everything
+	// after RelativeMethodSelectorBaseAddressOffset, so don't assign these fields
+	// for other versions — logObjCOptimizationHeader dumps the rest as raw slots.
+	if o.Version == 2 {
+		read(&o.RelativeMethodSelectorBufferSize)
+		read(&o.RelativeMethodTypesBufferSize)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read v2 objc optimization header fields: %v", readErr)
 		}
 	}
-	// check for OLD objc optimizations
-	return f.getOptimizationsOld()
+
+	f.logObjCOptimizationHeader(&o, data, hdr.ObjcOptsSize, addr)
+
+	return &o, nil
+}
+
+// logObjCOptimizationHeader emits a debug dump of the parsed ObjC optimization
+// header (enable with -V). Only the stable offset prefix is consumed for
+// class/selector/protocol/method resolution, so in-cache dylib objc parsing is
+// unaffected by newer header versions; bytes past the version's known layout are
+// dumped as raw u64 slots (and hexdumped) so a new layout (e.g. iOS 27's v4) can
+// be reverse-engineered. All debug-level: a newer-but-handled header is not a
+// user-facing problem.
+func (f *File) logObjCOptimizationHeader(o *ObjCOptimizationHeader, data []byte, size, addr uint64) {
+	knownSize := uint64(objcOptHeaderV1Size)
+	if o.Version == 2 {
+		knownSize = objcOptHeaderV2Size
+	}
+
+	cache := f.Name()
+	if cache == "" {
+		cache = "<in-memory cache>"
+	}
+
+	log.Debugf("dyld objc optimization header @ %#x (v%d, flags=%#x, %d bytes) in %s:", addr, o.Version, uint32(o.Flags), size, cache)
+	log.Debugf("  header_info_ro    offset: %#x", o.HeaderInfoRoCacheOffset)
+	log.Debugf("  header_info_rw    offset: %#x", o.HeaderInfoRwCacheOffset)
+	log.Debugf("  selector  hash    offset: %#x", o.SelectorHashTableCacheOffset)
+	log.Debugf("  class     hash    offset: %#x", o.ClassHashTableCacheOffset)
+	log.Debugf("  protocol  hash    offset: %#x", o.ProtocolHashTableCacheOffset)
+	log.Debugf("  rel method sel base off : %#x", o.RelativeMethodSelectorBaseAddressOffset)
+	if o.Version == 2 {
+		log.Debugf("  rel method sel buf size : %#x", o.RelativeMethodSelectorBufferSize)
+		log.Debugf("  rel method types buf sz : %#x", o.RelativeMethodTypesBufferSize)
+	}
+	for slot := knownSize; slot+8 <= uint64(len(data)); slot += 8 {
+		log.Debugf("  +%#03x (unknown u64)     : %#x", slot, f.ByteOrder.Uint64(data[slot:slot+8]))
+	}
+	log.Debugf("objc optimization header raw bytes:\n%s", utils.HexDump(data, addr))
+
+	if o.Version > objcOptHeaderMaxVersion {
+		log.Debugf("objc optimization header version %d is newer than supported (max %d); only the stable offset prefix is parsed [%s]", o.Version, objcOptHeaderMaxVersion, cache)
+	} else if size != knownSize {
+		log.Debugf("objc optimization header v%d expected %d bytes, got %d [%s]", o.Version, knownSize, size, cache)
+	}
 }
 
 // GetAllHeaderRO dumps the header_ro from the optimized string hash
