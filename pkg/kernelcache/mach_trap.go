@@ -44,25 +44,50 @@ type MachTrap struct {
 	machTrapT
 }
 
-// MachSyscall is the mach tral object
+// MachSyscall is the mach trap object
 type MachSyscall struct {
-	Arguments []string `json:"arguments"`
-	Name      string   `json:"name"`
-	Number    int      `json:"number"`
+	Arguments syscallArguments `json:"arguments"`
+	Name      string           `json:"name"`
+	Number    int              `json:"number"`
 }
 
 // BsdSyscall is the bsd syscall object
 type BsdSyscall struct {
-	Arguments []string `json:"arguments"`
-	Name      string   `json:"name"`
-	Number    int      `json:"number"`
-	Old       bool     `json:"old,omitempty"`
+	Arguments syscallArguments `json:"arguments"`
+	Name      string           `json:"name"`
+	Number    int              `json:"number"`
+	Old       bool             `json:"old,omitempty"`
 }
 
 // SyscallsData is the struct that holds the syscall data
 type SyscallsData struct {
 	MachSyscalls []MachSyscall `json:"mach_syscalls"`
 	BsdSyscalls  []BsdSyscall  `json:"bsd_syscalls"`
+}
+
+// syscallArguments accepts Apple's syscalls.json shape, where old BSD syscalls
+// encode empty arguments as `{}` instead of `[]`.
+type syscallArguments []string
+
+func (a *syscallArguments) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(trimmed, &obj); err != nil {
+			return err
+		}
+		if len(obj) != 0 {
+			return fmt.Errorf("unexpected syscall arguments object: %s", string(trimmed))
+		}
+		*a = nil
+		return nil
+	}
+	var args []string
+	if err := json.Unmarshal(trimmed, &args); err != nil {
+		return err
+	}
+	*a = args
+	return nil
 }
 
 // GetMachSyscallByNumber returns the mach trap for the given number
