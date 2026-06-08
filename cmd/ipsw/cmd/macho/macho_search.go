@@ -23,6 +23,7 @@ package macho
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -130,18 +131,31 @@ var machoSearchCmd = &cobra.Command{
 			return errors.New("you must specify a search criteria via one of the flags")
 		}
 
+		input := filepath.Clean(args[0])
+		pemDB := viper.GetString("macho.search.pem-db")
+
 		if searchMTE {
-			return mcmd.RunMTEScanIPSW(filepath.Clean(args[0]), viper.GetString("macho.search.pem-db"))
+			return mcmd.RunMTEScanIPSW(input, pemDB)
 		}
 
-		if err := search.ForEachMachoInIPSW(filepath.Clean(args[0]), viper.GetString("macho.search.pem-db"), func(path string, m *macho.File) error {
+		scanMachos := func(handler func(string, *macho.File) error) error {
+			if info, err := os.Stat(input); err == nil && info.IsDir() {
+				return search.ForEachMachoInMount(input, handler)
+			}
+			return search.ForEachMachoInIPSW(input, pemDB, handler)
+		}
+
+		if err := scanMachos(func(path string, m *macho.File) error {
 			if loadCmdReStr != "" {
 				re, err := regexp.Compile(loadCmdReStr)
 				if err != nil {
 					return fmt.Errorf("invalid regex '%s': %w", loadCmdReStr, err)
 				}
 				for _, lc := range m.Loads {
-					if re.MatchString(lc.Command().String()) {
+					cmd := lc.Command()
+					if re.MatchString(cmd.String()) ||
+						re.MatchString(fmt.Sprintf("%d", uint32(cmd))) ||
+						re.MatchString(fmt.Sprintf("0x%x", uint32(cmd))) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("load"), lc.Command())
 						fmt.Printf("\t%s\n", lc)
 						break
@@ -511,7 +525,7 @@ var machoSearchCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			return fmt.Errorf("failed to scan files in IPSW: %v", err)
+			return fmt.Errorf("failed to scan Mach-Os: %v", err)
 		}
 
 		return nil
