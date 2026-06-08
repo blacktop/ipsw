@@ -931,7 +931,11 @@ func forEachOTAFirmware(
 			out, err := fwcmd.ExtractExclaveCores(payload, outDir)
 			if err != nil {
 				_ = os.RemoveAll(tmpDir)
-				return fmt.Errorf("failed to split exclave apps FW: %w", err)
+				if errors.Is(err, fwcmd.ErrUnsupportedExclaveAppBundleType) {
+					log.WithError(err).Warnf("skipping unsupported exclave apps FW %s", f.Name())
+					continue
+				}
+				return fmt.Errorf("failed to split exclave apps FW %s: %w", f.Name(), err)
 			}
 			for _, path := range out {
 				m, err := macho.Open(path)

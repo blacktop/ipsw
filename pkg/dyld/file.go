@@ -102,12 +102,19 @@ type File struct {
 	islandStubs     map[uint64]uint64
 	prewarmData     *PrewarmingHeader
 	size            int64
+	path            string // on-disk path of the main cache file (set by Open)
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
 
 	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
 	sortedImages []*CacheImage
+}
+
+// Name returns the on-disk path of the main cache file, or "" if the File was
+// created without one (e.g. via NewFile).
+func (f *File) Name() string {
+	return f.path
 }
 
 // FormatError is returned by some operations if the data does
@@ -163,6 +170,7 @@ func Open(name string) (*File, error) {
 	}
 
 	ff.size = size
+	ff.path = name
 
 	if ff.IsDyld4 {
 
