@@ -11,7 +11,7 @@ description: Find Mach-O files for given search criteria
 Find Mach-O files for given search criteria
 
 ```
-ipsw macho search <IPSW> [flags]
+ipsw macho search <IPSW|FOLDER> [flags]
 ```
 
 ### Options
