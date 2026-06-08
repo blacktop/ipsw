@@ -25,7 +25,7 @@ type Header struct {
 	_        uint32  // padding ?
 	Magic    [4]byte // "BUND"
 	_        uint16  // padding ?
-	Type     uint16  // 3 (AOP/DCP), 4 (ExclaveCore)
+	Type     uint16  // 3 (legacy Exclave), 4 (range-table bundle)
 }
 
 type Bundle struct {
@@ -44,28 +44,35 @@ func (b Bundle) String() string {
 	s.WriteString(fmt.Sprintf("  Type: %d\n", b.Type))
 	switch b.Type {
 	case 3:
-		s.WriteString("  Config:\n")
-		s.WriteString(fmt.Sprintf("    Unk1: %d\n", b.Config.Unk1))
-		s.WriteString(fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2))
-		s.WriteString("    Assets:\n")
-		for i, h := range b.Config.Assets {
-			s.WriteString(fmt.Sprintf("      %3s) %-20s\n", fmt.Sprintf("%d", i+1), h))
-		}
-		s.WriteString("    TOC:\n")
-		for _, t := range b.Config.TOC {
-			s.WriteString(fmt.Sprintf("      %s\n", t))
-		}
-		s.WriteString("Compartments:\n")
-		for _, f := range b.Files {
-			s.WriteString(fmt.Sprintf("%s\n", f))
-		}
+		b.writeConfig(&s)
 	case 4:
 		s.WriteString("  Ranges:\n")
 		for i, f := range b.TypeHeader.(Type4).Ranges {
 			s.WriteString(fmt.Sprintf("    %3s) %s\n", fmt.Sprintf("%d", i+1), f))
 		}
+		if len(b.Files) > 0 {
+			b.writeConfig(&s)
+		}
 	}
 	return s.String()
+}
+
+func (b Bundle) writeConfig(s *strings.Builder) {
+	s.WriteString("  Config:\n")
+	s.WriteString(fmt.Sprintf("    Unk1: %d\n", b.Config.Unk1))
+	s.WriteString(fmt.Sprintf("    Unk2: %d\n", b.Config.Unk2))
+	s.WriteString("    Assets:\n")
+	for i, h := range b.Config.Assets {
+		s.WriteString(fmt.Sprintf("      %3s) %-20s\n", fmt.Sprintf("%d", i+1), h))
+	}
+	s.WriteString("    TOC:\n")
+	for _, t := range b.Config.TOC {
+		s.WriteString(fmt.Sprintf("      %s\n", t))
+	}
+	s.WriteString("Compartments:\n")
+	for _, f := range b.Files {
+		s.WriteString(fmt.Sprintf("%s\n", f))
+	}
 }
 
 type Segment struct {
@@ -210,16 +217,20 @@ type Type4 struct {
 	Unk13      uint64         // 8020000h ?
 	Unk14      uint64         // 6 ?
 	Unk15      uint64         // 8003E80h ?
-	_          [36]uint64     // padding ?
-	Unk17      uint64         // 0xa == 10 ?
+	_          [32]uint64     // padding ?
+	ConfigOff  uint64         // offset from urst range to ASN.1 config
+	ConfigPad  uint64         // padded config allocation size
+	ConfigSz   uint64         // ASN.1 config size
 	_          uint64         // padding ?
+	Unk17      uint64         // 0xa == 10 ?
+	ConfigOff2 uint64         // offset from urst range to ASN.1 config
 	Unk18      uint64         // 16000h ?
 	Unk19      uint64         // 1582Ch ?
 	_          uint64         // padding ?
 	Unk20      uint64         // 0xa == 10 ?
 	_          uint64         // padding ?
 	Unk21      uint64         // F000h ?
-	Ranges     [0xD]typ4Range // FIXME: this should be read AFTER the Type4 header is read
+	Ranges     [0xD]typ4Range // type 4 file table ranges
 }
 
 type typ4Range struct {
@@ -230,11 +241,26 @@ type typ4Range struct {
 }
 
 func (t4 typ4Range) String() string {
-	slices.Reverse(t4.Name[:])
+	name := t4.NameString()
 	if t4.Size == 0 {
-		return fmt.Sprintf("typ=%d sz=%-10s off=0x%08x-0x%08x %s", t4.Type, fmt.Sprintf("%d", t4.Size), t4.Offset, t4.Offset+t4.Size, t4.Name)
+		return fmt.Sprintf("typ=%d sz=%-10s off=0x%08x-0x%08x %s", t4.Type, fmt.Sprintf("%d", t4.Size), t4.Offset, t4.Offset+t4.Size, name)
 	}
-	return fmt.Sprintf("typ=%d sz=0x%08x off=0x%08x-0x%08x %s", t4.Type, t4.Size, t4.Offset, t4.Offset+t4.Size, t4.Name)
+	return fmt.Sprintf("typ=%d sz=0x%08x off=0x%08x-0x%08x %s", t4.Type, t4.Size, t4.Offset, t4.Offset+t4.Size, name)
+}
+
+func (t4 typ4Range) NameString() string {
+	name := t4.Name
+	slices.Reverse(name[:])
+	return strings.TrimRight(string(name[:]), "\x00")
+}
+
+func (t4 Type4) rangeByName(name string) (typ4Range, bool) {
+	for _, rng := range t4.Ranges {
+		if rng.NameString() == name {
+			return rng, true
+		}
+	}
+	return typ4Range{}, false
 }
 
 type Config struct {
@@ -427,7 +453,6 @@ func (b *Bundle) ParseFiles() error {
 func (b *Bundle) DumpFiles(output string) error {
 	if b.Type == 4 {
 		for _, rng := range b.TypeHeader.(Type4).Ranges {
-			slices.Reverse(rng.Name[:])
 			if rng.Size > 0 {
 				if _, err := b.r.Seek(int64(rng.Offset), io.SeekStart); err != nil {
 					return fmt.Errorf("failed to seek to bundle config data: %v", err)
@@ -436,7 +461,7 @@ func (b *Bundle) DumpFiles(output string) error {
 				if _, err := b.r.Read(data); err != nil {
 					return fmt.Errorf("failed to read bundle data: %v", err)
 				}
-				fname := filepath.Join(output, string(rng.Name[:])+".bin")
+				fname := filepath.Join(output, rng.NameString()+".bin")
 				log.WithField("name", fname).Info("Creating")
 				if err := os.WriteFile(fname, data, 0o644); err != nil {
 					return fmt.Errorf("failed to write bundle data to file: %v", err)
@@ -446,6 +471,46 @@ func (b *Bundle) DumpFiles(output string) error {
 	} else {
 		return fmt.Errorf("unsupported bundle type: %d", b.Type)
 	}
+	return nil
+}
+
+func (b *Bundle) parseType4Config(t4 Type4) error {
+	if t4.ConfigSz == 0 {
+		return nil
+	}
+
+	urst, ok := t4.rangeByName("urst")
+	if !ok {
+		return nil
+	}
+	if t4.ConfigOff > urst.Size || t4.ConfigSz > urst.Size-t4.ConfigOff {
+		return fmt.Errorf("type 4 bundle config range out of bounds: urst=0x%x config_off=0x%x config_sz=0x%x", urst.Size, t4.ConfigOff, t4.ConfigSz)
+	}
+	if t4.ConfigPad != 0 && t4.ConfigSz > t4.ConfigPad {
+		return fmt.Errorf("type 4 bundle config size exceeds padded allocation: config_sz=0x%x config_pad=0x%x", t4.ConfigSz, t4.ConfigPad)
+	}
+
+	configOffset := urst.Offset + t4.ConfigOff
+	if _, err := b.r.Seek(int64(configOffset), io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to type 4 bundle config data: %v", err)
+	}
+
+	fdata := make([]byte, t4.ConfigSz)
+	if _, err := io.ReadFull(b.r, fdata); err != nil {
+		return fmt.Errorf("failed to read type 4 bundle config data: %v", err)
+	}
+	if fdata[0] != 0x30 {
+		return nil
+	}
+
+	if _, err := asn1.Unmarshal(fdata, &b.Config); err != nil {
+		return fmt.Errorf("failed to ASN.1 parse type 4 bundle config: %v", err)
+	}
+
+	if err := b.ParseFiles(); err != nil {
+		return fmt.Errorf("failed to parse type 4 bundle files: %v", err)
+	}
+
 	return nil
 }
 
@@ -486,7 +551,7 @@ func Parse(r io.ReadSeeker) (*Bundle, error) {
 	}
 
 	switch bn.Type {
-	case 3: // ExclaveCore
+	case 3: // legacy ASN.1-footer Exclave bundle
 		var t3 Type3
 		if err := binary.Read(r, binary.LittleEndian, &t3); err != nil {
 			return nil, fmt.Errorf("failed to read bundle type 3: %v", err)
@@ -509,18 +574,20 @@ func Parse(r io.ReadSeeker) (*Bundle, error) {
 		if err := bn.ParseFiles(); err != nil {
 			return nil, fmt.Errorf("failed to parse bundle files: %v", err)
 		}
-	case 4: // AOP/DCP
+	case 4: // range-table bundle, including the new ExclaveCore layout
 		var t4 Type4
 		if err := binary.Read(r, binary.LittleEndian, &t4); err != nil {
 			return nil, fmt.Errorf("failed to read bundle type 4: %v", err)
 		}
 		bn.TypeHeader = t4
+		if err := bn.parseType4Config(t4); err != nil {
+			return nil, err
+		}
 		for _, rng := range t4.Ranges {
-			slices.Reverse(rng.Name[:])
-			switch string(rng.Name[:]) {
+			switch rng.NameString() {
 			// case "uedt":
 			// 	// parse device tree/config
-			// 	log.WithField("name", string(rng.Name[:])).Debug("Device Tree")
+			// 	log.WithField("name", rng.NameString()).Debug("Device Tree")
 			// 	if _, err := r.Seek(int64(rng.Offset), io.SeekStart); err != nil {
 			// 		return nil, fmt.Errorf("failed to seek to bundle config data: %v", err)
 			// 	}
@@ -535,7 +602,7 @@ func Parse(r io.ReadSeeker) (*Bundle, error) {
 			// 	}
 			// 	log.Debug(dt.String())
 			default:
-				log.WithField("name", string(rng.Name[:])).Debug("unsupported")
+				log.WithField("name", rng.NameString()).Debug("unsupported")
 			}
 		}
 	default:

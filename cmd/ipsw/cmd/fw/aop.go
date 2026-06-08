@@ -193,6 +193,7 @@ var aopCmd = &cobra.Command{
 			defer bn.Close()
 			if showInfo {
 				fmt.Println(bn)
+				return nil
 			} else {
 				if bn.Type == 4 {
 					return bn.DumpFiles(output)

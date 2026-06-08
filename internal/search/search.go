@@ -581,8 +581,14 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error) error 
 	return WalkFilesInRoot(folder, handleMacho)
 }
 
-// ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p firmware macho file found
-func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
+// ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p
+// firmware Mach-O file found. skippedUnsupportedExclave is called for Exclave
+// app bundles that parse as a known but unsupported bundle type.
+func ForEachIm4pInIPSW(
+	ipswPath string,
+	handler func(string, *macho.File) error,
+	skippedUnsupportedExclave func(string),
+) error {
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_im4p")
 	if err != nil {
 		return fmt.Errorf("failed to create temporary directory to store im4ps: %v", err)
@@ -634,7 +640,14 @@ func ForEachIm4pInIPSW(ipswPath string, handler func(string, *macho.File) error)
 			outDir := filepath.Join(tmpDIR, "exclave", filepath.FromSlash(im4pName))
 			out, err := fwcmd.ExtractExclaveCores(data, outDir)
 			if err != nil {
-				return fmt.Errorf("failed to split exclave apps FW: %v", err)
+				if errors.Is(err, fwcmd.ErrUnsupportedExclaveAppBundleType) {
+					if skippedUnsupportedExclave != nil {
+						skippedUnsupportedExclave(im4pName)
+					}
+					log.WithError(err).Warnf("skipping unsupported exclave apps FW %s", im4pName)
+					continue
+				}
+				return fmt.Errorf("failed to split exclave apps FW %s: %w", im4pName, err)
 			}
 			for _, f := range out {
 				if m, err := macho.Open(f); err == nil {
