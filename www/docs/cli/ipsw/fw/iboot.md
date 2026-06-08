@@ -11,7 +11,7 @@ description: Dump iBoot files
 Dump iBoot files
 
 ```
-ipsw fw iboot <IPSW|URL|IM4P> [flags]
+ipsw fw iboot <IPSW|URL|IM4P|PAYLOAD> [flags]
 ```
 
 ### Options
