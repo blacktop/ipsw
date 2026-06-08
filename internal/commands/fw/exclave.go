@@ -3,6 +3,7 @@ package fw
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/bundle"
 )
 
+// ErrUnsupportedExclaveAppBundleType means the bundle parsed, but it is not an
+// Exclave app-bundle layout ExtractExclaveCores can reconstruct into Mach-Os.
+var ErrUnsupportedExclaveAppBundleType = errors.New("unsupported exclave app bundle type")
+
 // ShowExclaveCores prints information about the Exclave cores in the bundle.
 func ShowExclaveCores(data []byte) {
 	bn, err := bundle.Parse(bytes.NewReader(data))
@@ -20,8 +25,8 @@ func ShowExclaveCores(data []byte) {
 		fmt.Printf("failed to open bundle: %v\n", err)
 		return
 	}
-	if bn.Type != 3 {
-		fmt.Printf("bundle is not an exclave bundle\n")
+	if !isSupportedExclaveBundle(bn) {
+		fmt.Printf("%v: %d\n", ErrUnsupportedExclaveAppBundleType, bn.Type)
 		return
 	}
 	fmt.Println(bn)
@@ -39,8 +44,8 @@ func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 	}
 	defer bn.Close()
 
-	if bn.Type != 3 {
-		return nil, fmt.Errorf("bundle is not an exclave bundle")
+	if !isSupportedExclaveBundle(bn) {
+		return nil, fmt.Errorf("%w: %d", ErrUnsupportedExclaveAppBundleType, bn.Type)
 	}
 
 	r := bytes.NewReader(data)
@@ -57,11 +62,17 @@ func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 		}
 		defer of.Close()
 
+		var kernelHeaderOffset uint64
 		if idx == 0 { // SYSTEM/kernel
-			if _, err := r.Seek(int64(bn.Config.Assets[idx].Offset), io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek to offset %d: %v", bn.Config.Assets[idx].Offset, err)
+			if len(bn.Config.Assets) <= idx {
+				return nil, fmt.Errorf("failed to find Mach-O header asset for %s", fname)
 			}
-			mHdrData := make([]byte, bn.Config.Assets[idx].Size)
+			headerAsset := bn.Config.Assets[idx]
+			kernelHeaderOffset = uint64(headerAsset.Offset)
+			if _, err := r.Seek(int64(headerAsset.Offset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d: %v", headerAsset.Offset, err)
+			}
+			mHdrData := make([]byte, headerAsset.Size)
 			if err := binary.Read(r, binary.LittleEndian, &mHdrData); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
@@ -99,19 +110,23 @@ func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 		}
 		// write data to correct offsets
 		for _, sec := range bf.Sections {
-			if _, err := r.Seek(int64(sec.Offset), io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek to offset %d in file %s: %v", sec.Offset, fname, err)
+			seg := m.Segment("__" + sec.Name)
+			if seg == nil { // lookup segment in MachO header
+				return nil, fmt.Errorf("failed to find segment %s for %s", sec.Name, fname)
+			}
+			sectionOffset := sec.Offset
+			if bn.Type == 4 && idx == 0 && sec.Name == "TEXT" && sec.Offset == 0 {
+				sectionOffset = kernelHeaderOffset + seg.Offset
+			}
+			if _, err := r.Seek(int64(sectionOffset), io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek to offset %d in file %s: %v", sectionOffset, fname, err)
 			}
 			data := make([]byte, sec.Size)
 			if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
 				return nil, fmt.Errorf("failed to read data from file %s: %v", fname, err)
 			}
-			if s := m.Segment("__" + sec.Name); s == nil { // lookup segment in MachO header
-				return nil, fmt.Errorf("failed to find segment %s for %s", sec.Name, fname)
-			} else {
-				if _, err := of.WriteAt(data, int64(s.Offset)); err != nil {
-					return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
-				}
+			if _, err := of.WriteAt(data, int64(seg.Offset)); err != nil {
+				return nil, fmt.Errorf("failed to write data to file %s: %v", fname, err)
 			}
 		}
 		m.Close()
@@ -119,7 +134,11 @@ func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 		outfiles = append(outfiles, fname)
 
 		/* ASSET file */
-		if entry := bn.Config.TOC[idx].GetEntry(); entry != nil && idx > 0 {
+		if idx > 0 && idx < len(bn.Config.TOC) {
+			entry := bn.Config.TOC[idx].GetEntry()
+			if entry == nil {
+				continue
+			}
 			for _, asset := range bn.Config.Assets {
 				if entry.Type == asset.Type {
 					aname := fname + "." + string(entry.Name.Bytes)
@@ -151,4 +170,11 @@ func ExtractExclaveCores(data []byte, output string) ([]string, error) {
 	}
 
 	return outfiles, nil
+}
+
+func isSupportedExclaveBundle(bn *bundle.Bundle) bool {
+	if bn.Type == 3 {
+		return true
+	}
+	return bn.Type == 4 && len(bn.Files) > 0
 }
