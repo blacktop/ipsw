@@ -59,7 +59,7 @@ func init() {
 
 // ibootCmd represents the iboot command
 var ibootCmd = &cobra.Command{
-	Use:           "iboot <IPSW|URL|IM4P>",
+	Use:           "iboot <IPSW|URL|IM4P|PAYLOAD>",
 	Aliases:       []string{"ib"},
 	Short:         "Dump iBoot files",
 	Args:          cobra.ExactArgs(1),
@@ -89,8 +89,8 @@ var ibootCmd = &cobra.Command{
 			}
 		}
 
-		dowork := func(im4p *img4.Payload, outputDir string) error {
-			iboot, err := iboot.Parse(im4p.Data)
+		dowork := func(data []byte, outputDir string) error {
+			iboot, err := iboot.Parse(data)
 			if err != nil {
 				return fmt.Errorf("failed to parse iboot data: %v", err)
 			}
@@ -128,7 +128,7 @@ var ibootCmd = &cobra.Command{
 			} else {
 				fname := filepath.Join(outputDir, fmt.Sprintf("%s_%s.bin", iboot.Version, iboot.Release))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
-				if err := os.WriteFile(fname, im4p.Data, 0o755); err != nil {
+				if err := os.WriteFile(fname, data, 0o755); err != nil {
 					return fmt.Errorf("failed to write file: %v", err)
 				}
 				for _, name := range names {
@@ -173,7 +173,7 @@ var ibootCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to open im4p: %v", err)
 				}
-				if err := dowork(im4p, filepath.Dir(f)); err != nil {
+				if err := dowork(im4p.Data, filepath.Dir(f)); err != nil {
 					return err
 				}
 				os.Remove(f) // cleanup the extracted im4p file
@@ -183,9 +183,13 @@ var ibootCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return dowork(im4p, output)
+			return dowork(im4p.Data, output)
 		} else {
-			return fmt.Errorf("unsupported file type: %s", infile)
+			data, err := os.ReadFile(infile)
+			if err != nil {
+				return fmt.Errorf("failed to read raw iboot payload: %v", err)
+			}
+			return dowork(data, output)
 		}
 
 		return nil
