@@ -95,7 +95,7 @@ func init() {
 
 // machoSearchCmd represents the search command
 var machoSearchCmd = &cobra.Command{
-	Use:           "search <IPSW>",
+	Use:           "search <IPSW|FOLDER>",
 	Aliases:       []string{"sr"},
 	Short:         "Find Mach-O files for given search criteria",
 	Args:          cobra.ExactArgs(1),
