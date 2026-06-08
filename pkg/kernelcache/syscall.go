@@ -241,6 +241,26 @@ func getSyscallData() (*SyscallData, error) {
 	return &sdata, nil
 }
 
+func maxBsdSyscallCount(syscalls []BsdSyscall) int {
+	if len(syscalls) == 0 {
+		return 0
+	}
+	maxNumber := 0
+	for _, sc := range syscalls {
+		if sc.Number > maxNumber {
+			maxNumber = sc.Number
+		}
+	}
+	return maxNumber + 1
+}
+
+func shouldStopSysentScan(idx, maxSyscall int, sc sysent) bool {
+	if sc.ReturnType > RET_UINT64_T || sc.ReturnType < RET_NONE {
+		return true
+	}
+	return idx >= maxSyscall && sc.Call == 0
+}
+
 // GetSyscallTable returns a map of system call table as array of sysent structs
 func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 	var syscalls []Sysent
@@ -258,7 +278,7 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 		return tableAddr, nil, fmt.Errorf("failed to get embedded syscall JSON data: %v", err)
 	}
 
-	maxSyscall = len(sdata.BsdSyscalls)
+	maxSyscall = maxBsdSyscallCount(sdata.BsdSyscalls)
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
@@ -292,7 +312,7 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 			// fixup syscall table call/munge addresses
 			for idx, sc := range sysents {
 				isNew := false
-				if sc.ReturnType > RET_UINT64_T || sc.ReturnType < RET_NONE {
+				if shouldStopSysentScan(idx, maxSyscall, sc) {
 					break
 				}
 				sysents[idx].Call = m.SlidePointer(sc.Call)
@@ -329,7 +349,7 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 
 				var args []string
 				if err == nil && sysents[idx].NArg != 0 && name != "enosys" && name != "nosys" {
-					args = sc.Arguments
+					args = []string(sc.Arguments)
 				}
 
 				syscalls = append(syscalls, Sysent{
