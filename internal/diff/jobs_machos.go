@@ -453,7 +453,7 @@ func (r *machosRenderer) Markdown(out *strings.Builder, outputDir string) error 
 			continue
 		}
 		fmt.Fprintf(out, "### %s\n\n", vol)
-		if err := renderMachoDiffSection(out, diff, outputDir, "####"); err != nil {
+		if err := renderMachoDiffSection(out, diff, outputDir, "####", vol); err != nil {
 			return err
 		}
 	}

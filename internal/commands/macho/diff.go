@@ -912,16 +912,23 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 	defer os.RemoveAll(cacheDir)
 
 	prevKeys := make(map[string]bool) // value==true => already matched
+	oldSkippedExclaveMembers := make(map[string]struct{})
 	if err := search.ForEachIm4pInIPSW(oldIPSW, func(path string, m *macho.File) error {
 		prevKeys[path] = false
 		return WriteCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
+	}, func(member string) {
+		oldSkippedExclaveMembers[member] = struct{}{}
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse firmwares in 'Old' IPSW: %v", err)
 	}
 
+	newSkippedExclaveMembers := make(map[string]struct{})
 	if err := search.ForEachIm4pInIPSW(newIPSW, func(path string, m *macho.File) error {
 		matched, ok := prevKeys[path]
 		if !ok {
+			if generatedExclaveKeyFromSkippedBundle(path, oldSkippedExclaveMembers) {
+				return nil
+			}
 			diff.New = append(diff.New, path)
 			return nil
 		}
@@ -950,12 +957,17 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 		}
 		prevKeys[path] = true
 		return nil
+	}, func(member string) {
+		newSkippedExclaveMembers[member] = struct{}{}
 	}); err != nil {
 		return nil, fmt.Errorf("failed to parse firmwares in 'New' IPSW: %v", err)
 	}
 
 	for path, matched := range prevKeys {
 		if !matched {
+			if generatedExclaveKeyFromSkippedBundle(path, newSkippedExclaveMembers) {
+				continue
+			}
 			diff.Removed = append(diff.Removed, path)
 		}
 	}
@@ -963,4 +975,13 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 	sort.Strings(diff.Removed)
 
 	return diff, nil
+}
+
+func generatedExclaveKeyFromSkippedBundle(path string, skippedMembers map[string]struct{}) bool {
+	for member := range skippedMembers {
+		if strings.HasPrefix(path, search.FirmwareMemberKey(member, "exclave_")) {
+			return true
+		}
+	}
+	return false
 }
