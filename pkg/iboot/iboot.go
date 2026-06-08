@@ -18,15 +18,30 @@ import (
 
 const MinStringLength = 2
 
+const (
+	legacyCopyrightOffset  = int64(0x200)
+	releaseOffsetDelta     = int64(0x40)
+	versionOffsetDelta     = int64(0x80)
+	baseAddressOffsetDelta = int64(0x100)
+)
+
 var (
-	lzfseStart = []byte{0x62, 0x76, 0x78, 0x32} // bvx2
-	lzfseEnd   = []byte{0x62, 0x76, 0x78, 0x24} // bvx$
-	prologs    = [][]byte{
+	lzfseStart       = []byte{0x62, 0x76, 0x78, 0x32} // bvx2
+	lzfseEnd         = []byte{0x62, 0x76, 0x78, 0x24} // bvx$
+	metadataPrefixes = []string{"iBoot", "SecureROM", "AVPBooter"}
+	prologs          = [][]byte{
 		{0x7F, 0x23, 0x03, 0xD5}, // PACIBSP
 		{0xBD, 0xA9},             //
 		{0xBF, 0xA9},             //
 	}
 )
+
+type metadata struct {
+	offset    int64
+	copyright string
+	release   string
+	version   string
+}
 
 type IBoot struct {
 	Version     string
@@ -50,49 +65,32 @@ func Parse(data []byte) (*IBoot, error) {
 		return nil, fmt.Errorf("data too short to be iboot")
 	}
 	// check for lzfse
-	if bytes.Contains(data[:4], []byte("bvx2")) {
+	if bytes.Equal(data[:4], lzfseStart) {
 		data = lzfse.DecodeBuffer(data)
 	}
 	r := bytes.NewReader(data)
 
-	var err error
-	if _, err := r.Seek(0x200, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("failed to seek to copyright: %v", err)
-	}
-	iboot.Copyright, err = utils.ReadCString(r)
+	meta, err := findMetadata(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read copyright: %v", err)
+		return nil, err
 	}
-	if !strings.HasPrefix(iboot.Copyright, "iBoot") &&
-		!strings.HasPrefix(iboot.Copyright, "SecureROM") &&
-		!strings.HasPrefix(iboot.Copyright, "AVPBooter") {
-		return nil, fmt.Errorf("iBoot potentially encrypted")
-	}
-	if _, err := r.Seek(0x240, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("failed to seek to release string: %v", err)
-	}
-	iboot.Release, err = utils.ReadCString(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read release string: %v", err)
-	}
-	if _, err := r.Seek(0x280, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("failed to seek to version string: %v", err)
-	}
-	iboot.Version, err = utils.ReadCString(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read version string: %v", err)
-	}
+	iboot.Copyright = meta.copyright
+	iboot.Release = meta.release
+	iboot.Version = meta.version
 
-	if _, err := r.Seek(0x300, io.SeekStart); err != nil {
+	baseAddressOffset := meta.offset + baseAddressOffsetDelta
+	if _, err := r.Seek(baseAddressOffset, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("failed to seek to base address: %v", err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &iboot.BaseAddress); err != nil {
 		return nil, fmt.Errorf("failed to read base address: %v", err)
 	}
 	if iboot.BaseAddress == 0 {
-		iboot.BaseAddress, err = getBaseAddress(r)
+		baseAddress, err := getBaseAddress(r)
 		if err != nil {
 			log.WithError(err).Debug("failed to get iBoot base address")
+		} else {
+			iboot.BaseAddress = baseAddress
 		}
 	}
 
@@ -147,6 +145,74 @@ func Parse(data []byte) (*IBoot, error) {
 	}
 
 	return iboot, nil
+}
+
+func findMetadata(data []byte) (*metadata, error) {
+	if meta, ok := readMetadataAt(data, legacyCopyrightOffset, false); ok {
+		return meta, nil
+	}
+
+	for _, prefix := range metadataPrefixes {
+		searchFrom := 0
+		for searchFrom < len(data) {
+			idx := bytes.Index(data[searchFrom:], []byte(prefix))
+			if idx < 0 {
+				break
+			}
+			offset := searchFrom + idx
+			if meta, ok := readMetadataAt(data, int64(offset), true); ok {
+				return meta, nil
+			}
+			searchFrom = offset + len(prefix)
+		}
+	}
+
+	return nil, fmt.Errorf("iBoot potentially encrypted")
+}
+
+func readMetadataAt(data []byte, offset int64, requireCompleteMetadata bool) (*metadata, bool) {
+	copyright, err := readCStringAt(data, offset)
+	if err != nil || !isIBootMetadataString(copyright, requireCompleteMetadata) {
+		return nil, false
+	}
+	release, err := readCStringAt(data, offset+releaseOffsetDelta)
+	if err != nil || (requireCompleteMetadata && release == "") {
+		return nil, false
+	}
+	version, err := readCStringAt(data, offset+versionOffsetDelta)
+	if err != nil || (requireCompleteMetadata && version == "") {
+		return nil, false
+	}
+
+	return &metadata{
+		offset:    offset,
+		copyright: copyright,
+		release:   release,
+		version:   version,
+	}, true
+}
+
+func readCStringAt(data []byte, offset int64) (string, error) {
+	if offset < 0 || offset >= int64(len(data)) {
+		return "", fmt.Errorf("offset %#x is outside data", offset)
+	}
+	return utils.ReadCString(bytes.NewReader(data[offset:]))
+}
+
+func isIBootMetadataString(s string, requireCompleteMetadata bool) bool {
+	if !hasKnownMetadataPrefix(s) {
+		return false
+	}
+	return !requireCompleteMetadata || strings.Contains(s, "Copyright") || strings.Contains(s, "Apple")
+}
+
+func hasKnownMetadataPrefix(s string) bool {
+	for _, prefix := range metadataPrefixes {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func getBaseAddress(r *bytes.Reader) (uint64, error) {
