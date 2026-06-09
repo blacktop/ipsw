@@ -1087,6 +1087,57 @@ func (i *Ips) panicFrameAddr(frame PanicFrame) (addr, slide uint64, wasSlid bool
 	return addr, slide, wasSlid
 }
 
+// crashFrameAddr computes the display address and image name for a 309/"Crash"
+// report frame.
+//
+// The raw address is the slid runtime address recorded in the crash:
+// UsedImages[ImageIndex].Base + ImageOffset. Frames whose image lives inside the
+// dyld_shared_cache (base within [sharedCache.base, sharedCache.base+size)) are
+// rebased for static analysis when --dsc-slide N is set:
+//
+//	N + (runtime - sharedCache.base)
+//
+// i.e. the cache is treated as if loaded at base N (e.g. the base your static
+// disassembler loaded the DSC at). Pass 0x180000000 for canonical macOS arm64
+// cache vmaddrs. Detection is by address range, not UsedImages.Source: real 309
+// reports tag cache-resident dylibs with source "P", so the source string is
+// unreliable here. --unslide still relies on the frame's recorded slide (absent
+// in 309 reports, so it is a no-op there). Returns the display address, the image
+// name, and a human-readable note describing any remap.
+func (i *Ips) crashFrameAddr(f Frame) (addr uint64, name, slideInfo string) {
+	if f.ImageIndex >= uint64(len(i.Payload.UsedImages)) {
+		return f.ImageOffset, fmt.Sprintf("image_%d", f.ImageIndex), ""
+	}
+	img := i.Payload.UsedImages[f.ImageIndex]
+	name = img.Name
+	addr = img.Base + f.ImageOffset
+
+	sc := i.Payload.SharedCache
+	isDSC := sc.Size > 0 && img.Base >= sc.Base && img.Base < sc.Base+sc.Size
+
+	switch {
+	case isDSC && i.Config.DSCSlide != 0:
+		addr = i.Config.DSCSlide + (addr - sc.Base)
+		slideInfo = fmt.Sprintf(" (dsc-slide %#x)", i.Config.DSCSlide)
+	case i.Config.Unslid && f.Slide != 0 && addr >= f.Slide:
+		addr -= f.Slide
+		slideInfo = fmt.Sprintf(" (unslid %#x)", f.Slide)
+	}
+	return addr, name, slideInfo
+}
+
+// fmtSymbolLocation renders a frame's symbol offset as " + N" (or " + 0xN" with
+// --hex), or "" when there is no offset.
+func (i *Ips) fmtSymbolLocation(loc uint64) string {
+	if loc == 0 {
+		return ""
+	}
+	if i.Config.Hex {
+		return fmt.Sprintf(" + %#x", loc)
+	}
+	return fmt.Sprintf(" + %d", loc)
+}
+
 // openDSCs opens the dyld_shared_caches used for userspace symbolication. With
 // an IPSW it mounts and opens the IPSW's caches; otherwise it opens the supplied
 // paths (e.g. an Xcode DeviceSupport dump). The returned func releases the
@@ -2191,13 +2242,7 @@ func (i *Ips) String() string {
 						if slideVal > 0 {
 							slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
 						}
-						symloc := ""
-						if f.SymbolLocation > 0 {
-							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
-							if i.Config.Hex {
-								symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
-							}
-						}
+						symloc := i.fmtSymbolLocation(f.SymbolLocation)
 						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
 						// Add peek disassembly for panicked thread frames
 						if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
@@ -2227,13 +2272,7 @@ func (i *Ips) String() string {
 						if slideVal > 0 {
 							slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
 						}
-						symloc := ""
-						if f.SymbolLocation > 0 {
-							symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
-							if i.Config.Hex {
-								symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
-							}
-						}
+						symloc := i.fmtSymbolLocation(f.SymbolLocation)
 						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
 						// Add peek disassembly for panicked thread frames
 						if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
@@ -2323,20 +2362,9 @@ func (i *Ips) String() string {
 				buf := bytes.NewBufferString("")
 				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 				for idx, f := range t.Frames {
-					addr := i.Payload.UsedImages[f.ImageIndex].Base + f.ImageOffset
-					slideInfo := ""
-					if i.Config.Unslid && f.Slide != 0 && addr >= f.Slide {
-						addr -= f.Slide
-						slideInfo = fmt.Sprintf(" (unslid %#x)", f.Slide)
-					}
-					symloc := ""
-					if f.SymbolLocation > 0 {
-						symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
-						if i.Config.Hex {
-							symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
-						}
-					}
-					fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+					addr, name, slideInfo := i.crashFrameAddr(f)
+					symloc := i.fmtSymbolLocation(f.SymbolLocation)
+					fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
 				}
 				w.Flush()
 				out += buf.String()
@@ -2406,20 +2434,9 @@ func (i *Ips) String() string {
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 			for idx, f := range i.Payload.LastExceptionBacktrace {
-				addr := i.Payload.UsedImages[f.ImageIndex].Base + f.ImageOffset
-				slideInfo := ""
-				if i.Config.Unslid && f.Slide != 0 && addr >= f.Slide {
-					addr -= f.Slide
-					slideInfo = fmt.Sprintf(" (unslid %#x)", f.Slide)
-				}
-				symloc := ""
-				if f.SymbolLocation > 0 {
-					symloc = fmt.Sprintf(" + %d", f.SymbolLocation)
-					if i.Config.Hex {
-						symloc = fmt.Sprintf(" + %#x", f.SymbolLocation)
-					}
-				}
-				fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(i.Payload.UsedImages[f.ImageIndex].Name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+				addr, name, slideInfo := i.crashFrameAddr(f)
+				symloc := i.fmtSymbolLocation(f.SymbolLocation)
+				fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
 			}
 			w.Flush()
 			out += buf.String() + "\n"

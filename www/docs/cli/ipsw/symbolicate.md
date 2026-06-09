@@ -42,9 +42,10 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
   # Useful when reproducing a crash with a different KASLR slide
   # Shows runtime addresses you can use with lldb breakpoints
 
-# Apply custom slide to dyld_shared_cache frames for lldb live debugging
-❯ ipsw symbolicate panic.ips firmware.ipsw --dsc-slide 0x1a000000
-  # For debugging user-space crashes where DSC was loaded at a different address
+# Rebase dyld_shared_cache frames onto a static base (e.g. to match Binary Ninja/IDA)
+❯ ipsw symbolicate crash.ips --dsc-slide 0x180000000
+  # Cache frames display as base + offset-into-cache so they line up with your disassembler
+  # (uses the report's sharedCache.base to compute the offset; pass 0 for raw cache offsets)
 
 # Combine both slides for full runtime address mapping
 ❯ ipsw symbolicate panic.ips firmware.ipsw --kc-slide 0x14f74000 --dsc-slide 0x1a000000
@@ -67,7 +68,7 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 ```
   -a, --all                 Show all threads in crashlog
   -d, --demangle            Demangle symbol names
-      --dsc-slide string    Apply custom slide to dyld_shared_cache frames for live debugging (hex, e.g. 0x1a000000)
+      --dsc-slide string    Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)
   -x, --extra string        Path to folder with extra files for symbolication
       --force               Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)
   -h, --help                help for symbolicate
