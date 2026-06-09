@@ -14,6 +14,8 @@ const (
 	LZFSE_IBOOT Algorithm = 0x891
 	LZBITMAP    Algorithm = 0x702
 	BROTLI      Algorithm = 0xB02
+	LZRAVEN     Algorithm = 0xD05 // buffer API only, available starting macOS 27.0, iOS 27.0
+	LZMESH      Algorithm = 0xE05 // buffer API only, available starting macOS 27.0, iOS 27.0
 )
 
 func (a Algorithm) String() string {
@@ -34,6 +36,10 @@ func (a Algorithm) String() string {
 		return "lzbitmap"
 	case BROTLI:
 		return "brotli"
+	case LZRAVEN:
+		return "lzraven"
+	case LZMESH:
+		return "lzmesh"
 	default:
 		return fmt.Sprintf("unknown(%d)", a)
 	}
@@ -57,6 +63,10 @@ func Lookup(name string) (Algorithm, error) {
 		return LZBITMAP, nil
 	case "brotli":
 		return BROTLI, nil
+	case "lzraven":
+		return LZRAVEN, nil
+	case "lzmesh":
+		return LZMESH, nil
 	default:
 		return 0, fmt.Errorf("unknown compression algorithm: %s", name)
 	}
@@ -72,6 +82,8 @@ func Algorithms() []string {
 		LZFSE_IBOOT.String(),
 		LZBITMAP.String(),
 		BROTLI.String(),
+		LZRAVEN.String(),
+		LZMESH.String(),
 	}
 }
 
