@@ -14,6 +14,21 @@ ObjC class-dump a dylib from a DSC or MachO
 ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ```
 
+### Examples
+
+```bash
+# Class-dump a dylib from a DSC
+❯ ipsw class-dump <DSC> /System/Library/Frameworks/Foundation.framework/Foundation
+# Class-dump a standalone MachO binary
+❯ ipsw class-dump <MACHO>
+# Dump a single class (regex) with RE addresses
+❯ ipsw class-dump <DSC> <DYLIB> --class 'NSString' --re
+# Write ObjC headers to a folder
+❯ ipsw class-dump <DSC> <DYLIB> --headers --output /tmp/headers
+# Structurally diff a dylib's ObjC between two DSC versions (added/removed/changed)
+❯ ipsw class-dump <NEW_DSC> <DYLIB> --diff <OLD_DSC> --color
+```
+
 ### Options
 
 ```
@@ -23,6 +38,7 @@ ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
   -c, --class string    Dump class (regex)
       --demangle        Demangle symbol names (same as verbose)
       --deps            Dump imported private frameworks as well
+      --diff string     Structurally diff ObjC against another DSC/MachO (same DYLIB)
       --headers         Dump ObjC headers
   -h, --help            help for class-dump
   -o, --output string   Folder to write headers to
