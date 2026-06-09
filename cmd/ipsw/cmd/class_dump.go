@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -74,7 +76,9 @@ func init() {
 	classDumpCmd.Flags().Bool("refs", false, "Dump ObjC references too")
 	classDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
 	classDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
-	classDumpCmd.MarkFlagsMutuallyExclusive("headers", "xcfw", "spm")
+	classDumpCmd.Flags().String("diff", "", "Structurally diff ObjC against another DSC/MachO (same DYLIB)")
+	classDumpCmd.MarkFlagFilename("diff")
+	classDumpCmd.MarkFlagsMutuallyExclusive("diff", "headers", "xcfw", "spm")
 
 	viper.BindPFlag("class-dump.all", classDumpCmd.Flags().Lookup("all"))
 	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
@@ -91,6 +95,95 @@ func init() {
 	viper.BindPFlag("class-dump.refs", classDumpCmd.Flags().Lookup("refs"))
 	viper.BindPFlag("class-dump.re", classDumpCmd.Flags().Lookup("re"))
 	viper.BindPFlag("class-dump.arch", classDumpCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("class-dump.diff", classDumpCmd.Flags().Lookup("diff"))
+}
+
+// openObjCForDiff opens path (an in-cache DYLIB selected from a DSC, or a MachO)
+// and returns an ObjC parser plus a closer for the underlying file(s).
+func openObjCForDiff(path, dylib, arch string, conf *mcmd.ObjcConfig) (*mcmd.ObjC, func(), error) {
+	if ok, _ := magic.IsMachO(path); ok {
+		mr, err := mcmd.OpenMachO(path, arch)
+		if err != nil {
+			return nil, nil, err
+		}
+		o, err := mcmd.NewObjC(mr.File, nil, conf)
+		if err != nil {
+			mr.Close()
+			return nil, nil, err
+		}
+		return o, func() { mr.Close() }, nil
+	}
+	if dylib == "" {
+		return nil, nil, fmt.Errorf("must provide an in-cache DYLIB to diff")
+	}
+	f, err := dyld.Open(filepath.Clean(path))
+	if err != nil {
+		return nil, nil, err
+	}
+	img, err := f.Image(dylib)
+	if err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("failed to find dylib '%s' in DSC '%s': %v", dylib, filepath.Base(path), err)
+	}
+	m, err := img.GetMacho()
+	if err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(img.Name), err)
+	}
+	o, err := mcmd.NewObjC(m, f, conf)
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	return o, func() { f.Close() }, nil
+}
+
+// runClassDumpDiff compares the ObjC of args[0] (the newer build) against
+// oldPath, using the same DYLIB (args[1]) for both when the inputs are DSCs.
+func runClassDumpDiff(args []string, oldPath string, conf *mcmd.ObjcConfig) error {
+	if viper.GetBool("class-dump.all") {
+		return fmt.Errorf("--diff cannot be combined with --all (diff one DYLIB at a time)")
+	}
+	if viper.GetString("class-dump.class") != "" || viper.GetString("class-dump.proto") != "" || viper.GetString("class-dump.cat") != "" {
+		return fmt.Errorf("--diff cannot be combined with --class/--proto/--cat (it diffs the whole dylib)")
+	}
+	dylib := ""
+	if len(args) > 1 {
+		dylib = args[1]
+	}
+	arch := viper.GetString("class-dump.arch")
+
+	// conf.Name is set later in RunE for the normal dump paths; populate it here
+	// so the diff header reports the dylib/MachO being compared.
+	if dylib != "" {
+		conf.Name = filepath.Base(dylib)
+	} else {
+		conf.Name = filepath.Base(args[0])
+	}
+
+	newObjc, closeNew, err := openObjCForDiff(args[0], dylib, arch, conf)
+	if err != nil {
+		return fmt.Errorf("failed to load new target '%s': %w", filepath.Base(args[0]), err)
+	}
+	defer closeNew()
+
+	oldObjc, closeOld, err := openObjCForDiff(oldPath, dylib, arch, conf)
+	if err != nil {
+		return fmt.Errorf("failed to load --diff target '%s': %w", filepath.Base(oldPath), err)
+	}
+	defer closeOld()
+
+	out, err := newObjc.Diff(oldObjc)
+	if err != nil {
+		return err
+	}
+	if conf.Color {
+		// Syntax-highlight the ```diff body for the terminal (same approach as
+		// internal/utils/git.go); without --color the raw fenced markdown prints.
+		return quick.Highlight(os.Stdout, out, "diff", "terminal256", conf.Theme)
+	}
+	fmt.Print(out)
+	return nil
 }
 
 // classDumpCmd represents the classDump command
@@ -99,7 +192,18 @@ var classDumpCmd = &cobra.Command{
 	Use:     "class-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"cd"},
 	Short:   "ObjC class-dump a dylib from a DSC or MachO",
-	Args:    cobra.MinimumNArgs(1),
+	Example: heredoc.Doc(`
+		# Class-dump a dylib from a DSC
+		❯ ipsw class-dump <DSC> /System/Library/Frameworks/Foundation.framework/Foundation
+		# Class-dump a standalone MachO binary
+		❯ ipsw class-dump <MACHO>
+		# Dump a single class (regex) with RE addresses
+		❯ ipsw class-dump <DSC> <DYLIB> --class 'NSString' --re
+		# Write ObjC headers to a folder
+		❯ ipsw class-dump <DSC> <DYLIB> --headers --output /tmp/headers
+		# Structurally diff a dylib's ObjC between two DSC versions (added/removed/changed)
+		❯ ipsw class-dump <NEW_DSC> <DYLIB> --diff <OLD_DSC> --color`),
+	Args: cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
 			return getImages(args[0]), cobra.ShellCompDirectiveNoFileComp
@@ -161,6 +265,10 @@ var classDumpCmd = &cobra.Command{
 			Color:       viper.GetBool("color") && !viper.GetBool("no-color"),
 			Theme:       viper.GetString("class-dump.theme"),
 			Output:      viper.GetString("class-dump.output"),
+		}
+
+		if oldPath := viper.GetString("class-dump.diff"); oldPath != "" {
+			return runClassDumpDiff(args, oldPath, &conf)
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
