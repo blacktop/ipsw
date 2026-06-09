@@ -15,21 +15,9 @@
 
 - `com.apple.KEXT.RemovedKext`
 
-### ⬆️ Updated (1)
+#### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-#### AppleKEXT
-
->  `/System/Library/Extensions/AppleKEXT.kext/AppleKEXT`
-
-```diff
-- KEXT old line
-+ KEXT new line
-```
-
-</details>
+- [/System/Library/Extensions/AppleKEXT.kext/AppleKEXT](KEXTS/System/Library/Extensions/AppleKEXT.kext/AppleKEXT.md)
 
 ### KDKs
 
@@ -49,19 +37,7 @@
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### MACHO_filesystem_updated
-
->  `/usr/bin/MACHO_filesystem_updated`
-
-```diff
-- MACHO filesystem old
-+ MACHO filesystem new
-```
-
-</details>
+- [/usr/bin/MACHO_filesystem_updated](MACHOS/filesystem/usr/bin/MACHO_filesystem_updated.md)
 
 ### SystemOS
 
@@ -75,19 +51,7 @@
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### MACHO_SystemOS_updated
-
->  `/System/Library/MACHO_SystemOS_updated`
-
-```diff
-- MACHO SystemOS old
-+ MACHO SystemOS new
-```
-
-</details>
+- [/System/Library/MACHO_SystemOS_updated](MACHOS/SystemOS/System/Library/MACHO_SystemOS_updated.md)
 
 ### AppOS
 
@@ -101,19 +65,7 @@
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### MACHO_AppOS_updated
-
->  `/System/Library/MACHO_AppOS_updated`
-
-```diff
-- MACHO AppOS old
-+ MACHO AppOS new
-```
-
-</details>
+- [/System/Library/MACHO_AppOS_updated](MACHOS/AppOS/System/Library/MACHO_AppOS_updated.md)
 
 ### 🔑 Entitlements
 
@@ -135,19 +87,7 @@
 
 ### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-#### FIRMWARE_updated.im4p
-
->  `FIRMWARE_updated.im4p`
-
-```diff
-- FIRMWARE old
-+ FIRMWARE new
-```
-
-</details>
+- [FIRMWARE_updated.im4p](FIRMWARE/FIRMWARE_updated.im4p.md)
 
 ### iBoot
 
@@ -158,23 +98,11 @@
 
 #### 🆕 NEW (1)
 
-<details>
-  <summary><i>View NEW</i></summary>
-
-##### `iBoot.IBOOT.section`
-  - `IBOOT new string one of sufficient length`
-
-</details>
+- [iBoot.IBOOT.section](IBOOT/NEW/iBoot.IBOOT.section.md)
 
 #### ❌ Removed (1)
 
-<details>
-  <summary><i>View Removed</i></summary>
-
-##### `iBoot.IBOOT.section`
-  - `IBOOT removed string one of sufficient length`
-
-</details>
+- [iBoot.IBOOT.section](IBOOT/Removed/iBoot.IBOOT.section.md)
 
 ### launchd Config
 
@@ -209,19 +137,7 @@
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-#### DYLIBS_updated.dylib
-
->  `/usr/lib/DYLIBS_updated.dylib`
-
-```diff
-- DYLIBS old
-+ DYLIBS new
-```
-
-</details>
+- [/usr/lib/DYLIBS_updated.dylib](DYLIBS/usr/lib/DYLIBS_updated.dylib.md)
 
 ## Files
 
@@ -286,20 +202,7 @@ LOC filesystem new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### Localizable
-
->  `/Localizations_filesystem_updated.lproj/Localizable.strings`
-
-```diff
-- LOC filesystem old
-+ LOC filesystem new
-```
-
-
-</details>
+- [/Localizations_filesystem_updated.lproj/Localizable.strings](LOCALIZATIONS/filesystem/Localizations_filesystem_updated.lproj/Localizable.strings.md)
 
 ### SystemOS
 
@@ -324,20 +227,7 @@ LOC SystemOS new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### Localizable
-
->  `/Localizations_SystemOS_updated.lproj/Localizable.strings`
-
-```diff
-- LOC SystemOS old
-+ LOC SystemOS new
-```
-
-
-</details>
+- [/Localizations_SystemOS_updated.lproj/Localizable.strings](LOCALIZATIONS/SystemOS/Localizations_SystemOS_updated.lproj/Localizable.strings.md)
 
 ### AppOS
 
@@ -362,20 +252,7 @@ LOC AppOS new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### Localizable
-
->  `/Localizations_AppOS_updated.lproj/Localizable.strings`
-
-```diff
-- LOC AppOS old
-+ LOC AppOS new
-```
-
-
-</details>
+- [/Localizations_AppOS_updated.lproj/Localizable.strings](LOCALIZATIONS/AppOS/Localizations_AppOS_updated.lproj/Localizable.strings.md)
 
 ## Feature Flags
 
@@ -402,20 +279,7 @@ LOC AppOS new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### FeatureFlags_filesystem_updated.plist
-
->  `/FeatureFlags_filesystem_updated.plist`
-
-```diff
-- FEATURES filesystem old
-+ FEATURES filesystem new
-```
-
-
-</details>
+- [/FeatureFlags_filesystem_updated.plist](FEATURES/filesystem/FeatureFlags_filesystem_updated.plist.md)
 
 ### SystemOS
 
@@ -440,20 +304,7 @@ LOC AppOS new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### FeatureFlags_SystemOS_updated.plist
-
->  `/FeatureFlags_SystemOS_updated.plist`
-
-```diff
-- FEATURES SystemOS old
-+ FEATURES SystemOS new
-```
-
-
-</details>
+- [/FeatureFlags_SystemOS_updated.plist](FEATURES/SystemOS/FeatureFlags_SystemOS_updated.plist.md)
 
 ### AppOS
 
@@ -478,19 +329,6 @@ LOC AppOS new content
 
 #### ⬆️ Updated (1)
 
-<details>
-  <summary><i>View Updated</i></summary>
-
-##### FeatureFlags_AppOS_updated.plist
-
->  `/FeatureFlags_AppOS_updated.plist`
-
-```diff
-- FEATURES AppOS old
-+ FEATURES AppOS new
-```
-
-
-</details>
+- [/FeatureFlags_AppOS_updated.plist](FEATURES/AppOS/FeatureFlags_AppOS_updated.plist.md)
 
 ## EOF

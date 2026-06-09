@@ -121,9 +121,10 @@ func (t *ibootTask) persistTo(scope storage.Scope, store storage.Store) error {
 	return nil
 }
 
-// Markdown emits the iBoot section. The byte sequence must remain
-// identical to the prior inlined body in md.go.
-func (t *ibootTask) Markdown(w *strings.Builder, _ string) error {
+// Markdown emits the iBoot section. New/Removed render as a list of changed
+// bins, each linking to a side-car markdown doc under IBOOT/ that holds that
+// bin's changed strings, under the shared plain/collapsed/spill rule.
+func (t *ibootTask) Markdown(w *strings.Builder, outputDir string) error {
 	if t.d.IBoot == nil {
 		return nil
 	}
@@ -138,31 +139,10 @@ func (t *ibootTask) Markdown(w *strings.Builder, _ string) error {
 			t.d.New.Version, t.d.New.Build, t.d.IBoot.Versions[1],
 		)
 	}
-	if len(t.d.IBoot.New) > 0 {
-		fmt.Fprintf(w, "#### 🆕 NEW (%d)\n\n", len(t.d.IBoot.New))
-		w.WriteString("<details>\n" +
-			"  <summary><i>View NEW</i></summary>\n\n")
-		for k, v := range t.d.IBoot.New {
-			fmt.Fprintf(w, "##### `%s`\n", k)
-			for _, str := range v {
-				fmt.Fprintf(w, "  - `%s`\n", str)
-			}
-		}
-		w.WriteString("\n</details>\n\n")
+	if err := renderBinStringList(w, listSection{headingPrefix: "####", title: "🆕 NEW", tag: "NEW", subDir: "IBOOT", label: "iBoot", groupDir: "NEW"}, t.d.IBoot.New, outputDir); err != nil {
+		return err
 	}
-	if len(t.d.IBoot.Removed) > 0 {
-		fmt.Fprintf(w, "#### ❌ Removed (%d)\n\n", len(t.d.IBoot.Removed))
-		w.WriteString("<details>\n" +
-			"  <summary><i>View Removed</i></summary>\n\n")
-		for k, v := range t.d.IBoot.Removed {
-			fmt.Fprintf(w, "##### `%s`\n", k)
-			for _, str := range v {
-				fmt.Fprintf(w, "  - `%s`\n", str)
-			}
-		}
-		w.WriteString("\n</details>\n\n")
-	}
-	return nil
+	return renderBinStringList(w, listSection{headingPrefix: "####", title: "❌ Removed", tag: "Removed", subDir: "IBOOT", label: "iBoot", groupDir: "Removed"}, t.d.IBoot.Removed, outputDir)
 }
 
 // ibootHTMLTemplate renders the iBoot HTML body the outer page template

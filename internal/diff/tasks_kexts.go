@@ -7,18 +7,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	iofs "io/fs"
-	"maps"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
-	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"golang.org/x/exp/rand"
 )
 
 // kextsTask owns the kernelcache parse plus the per-renderer emission for
@@ -295,60 +290,7 @@ func (t *kextsTask) Markdown(w *strings.Builder, outputDir string) error {
 		return nil
 	}
 	w.WriteString("### Kexts\n\n")
-	if len(t.d.Kexts.New) > 0 {
-		fmt.Fprintf(w, "#### 🆕 NEW (%d)\n\n", len(t.d.Kexts.New))
-		slices.Sort(t.d.Kexts.New)
-		for _, k := range t.d.Kexts.New {
-			fmt.Fprintf(w, "- `%s`\n", k)
-		}
-		w.WriteString("\n")
-	}
-	if len(t.d.Kexts.Removed) > 0 {
-		fmt.Fprintf(w, "#### ❌ Removed (%d)\n\n", len(t.d.Kexts.Removed))
-		slices.Sort(t.d.Kexts.Removed)
-		for _, k := range t.d.Kexts.Removed {
-			fmt.Fprintf(w, "- `%s`\n", k)
-		}
-		w.WriteString("\n")
-	}
-	if len(t.d.Kexts.Updated) > 0 {
-		fmt.Fprintf(w, "### ⬆️ Updated (%d)\n\n", len(t.d.Kexts.Updated))
-		w.WriteString("<details>\n" +
-			"  <summary><i>View Updated</i></summary>\n\n")
-
-		keys := slices.Collect(maps.Keys(t.d.Kexts.Updated))
-		slices.Sort(keys)
-
-		if len(t.d.Kexts.Updated) < 10 {
-			for _, k := range keys {
-				fmt.Fprintf(w, "#### %s\n\n", filepath.Base(k))
-				fmt.Fprintf(w, ">  `%s`\n\n", k)
-				fmt.Fprintf(w, "%s\n", t.d.Kexts.Updated[k])
-			}
-		} else {
-			if err := os.MkdirAll(filepath.Join(outputDir, "KEXTS"), 0o750); err != nil {
-				return err
-			}
-			for _, k := range keys {
-				fname := filepath.Join(outputDir, "KEXTS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md")
-				if _, err := os.Stat(fname); os.IsExist(err) {
-					fname = filepath.Join(outputDir, "KEXTS", fmt.Sprintf("%s.%d.md", strings.ReplaceAll(filepath.Base(k), " ", "_"), rand.Intn(20)))
-				}
-				log.Debugf("Creating diff kext Markdown file: %s", fname)
-				f, err := os.Create(fname)
-				if err != nil {
-					return fmt.Errorf("failed to create diff file: %w", err)
-				}
-				fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-				fmt.Fprintf(f, "> `%s`\n\n", k)
-				fmt.Fprintf(f, "%s", t.d.Kexts.Updated[k])
-				f.Close()
-				fmt.Fprintf(w, "- [%s](%s)\n", k, filepath.Join("KEXTS", strings.ReplaceAll(filepath.Base(k), " ", "_")+".md"))
-			}
-		}
-		w.WriteString("\n</details>\n\n")
-	}
-	return nil
+	return renderMachoDiff(w, listSection{headingPrefix: "####", subDir: "KEXTS", label: "Kexts"}, t.d.Kexts, outputDir)
 }
 
 // kextsHTMLTemplate renders the kexts HTML body the outer page template
