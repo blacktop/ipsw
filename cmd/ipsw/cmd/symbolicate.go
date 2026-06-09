@@ -51,7 +51,7 @@ func init() {
 	symbolicateCmd.Flags().StringP("proc", "p", "", "Filter crashlog by process name")
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide user-space addresses for static analysis (kernel frames are always unslid)")
 	symbolicateCmd.Flags().String("kc-slide", "", "Apply custom KASLR slide to kernelcache frames for live debugging (hex, e.g. 0x14f74000)")
-	symbolicateCmd.Flags().String("dsc-slide", "", "Apply custom slide to dyld_shared_cache frames for live debugging (hex, e.g. 0x1a000000)")
+	symbolicateCmd.Flags().String("dsc-slide", "", "Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)")
 	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.Flags().Bool("hex", false, "Display function offsets in hexadecimal")
 	symbolicateCmd.Flags().Bool("peek", false, "Show disassembly instructions around each panicked frame")
@@ -115,9 +115,10 @@ var symbolicateCmd = &cobra.Command{
 	  # Useful when reproducing a crash with a different KASLR slide
 	  # Shows runtime addresses you can use with lldb breakpoints
 
-	# Apply custom slide to dyld_shared_cache frames for lldb live debugging
-	❯ ipsw symbolicate panic.ips firmware.ipsw --dsc-slide 0x1a000000
-	  # For debugging user-space crashes where DSC was loaded at a different address
+	# Rebase dyld_shared_cache frames onto a static base (e.g. to match Binary Ninja/IDA)
+	❯ ipsw symbolicate crash.ips --dsc-slide 0x180000000
+	  # Cache frames display as base + offset-into-cache so they line up with your disassembler
+	  # (uses the report's sharedCache.base to compute the offset; pass 0 for raw cache offsets)
 
 	# Combine both slides for full runtime address mapping
 	❯ ipsw symbolicate panic.ips firmware.ipsw --kc-slide 0x14f74000 --dsc-slide 0x1a000000
