@@ -201,7 +201,7 @@ func (r *locsRenderer) Markdown(out *strings.Builder, outputDir string) error {
 			continue
 		}
 		fmt.Fprintf(out, "### %s\n\n", vol)
-		if err := renderPlistVolume(out, diff, outputDir, "####", localizationsRenderer); err != nil {
+		if err := renderPlistVolume(out, diff, outputDir, "####", vol, localizationsRenderer); err != nil {
 			return err
 		}
 	}

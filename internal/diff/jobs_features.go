@@ -202,7 +202,7 @@ func (r *featuresRenderer) Markdown(out *strings.Builder, outputDir string) erro
 			continue
 		}
 		fmt.Fprintf(out, "### %s\n\n", vol)
-		if err := renderPlistVolume(out, diff, outputDir, "####", featureFlagsRenderer); err != nil {
+		if err := renderPlistVolume(out, diff, outputDir, "####", vol, featureFlagsRenderer); err != nil {
 			return err
 		}
 	}

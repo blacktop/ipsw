@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,18 +37,49 @@ func TestDiffLocalizedResourcesReportsUpdatedLoctableKeys(t *testing.T) {
 	}
 }
 
-func TestLocalizationMarkdownFilenameUsesFullPath(t *testing.T) {
-	first := plistMarkdownFilename("FileSystem/Applications/Phone.app/en.lproj/Localizable.strings", localizationDisplayName)
-	second := plistMarkdownFilename("FileSystem/System/Library/Frameworks/Test.framework/en.lproj/Localizable.strings", localizationDisplayName)
+func TestSideCarRelNamesMirrorsPathUnderVolumeFolder(t *testing.T) {
+	keys := []string{
+		"FileSystem/Applications/Phone.app/en.lproj/Localizable.strings",
+		"FileSystem/System/Library/Frameworks/Test.framework/en.lproj/Localizable.strings",
+	}
+	rel := sideCarRelNames(keys, "SystemOS")
 
-	if first == second {
-		t.Fatalf("localizationMarkdownFilename collided for same basename: %q", first)
+	// The real path is mirrored under the volume folder — no hash, can't collide.
+	if got, want := rel[keys[0]], filepath.Join("SystemOS", keys[0]+".md"); got != want {
+		t.Errorf("rel[%q] = %q, want %q", keys[0], got, want)
 	}
-	if !strings.HasSuffix(first, "_Phone.md") {
-		t.Fatalf("plistMarkdownFilename(%q) should use containing bundle name", first)
+	if got, want := rel[keys[1]], filepath.Join("SystemOS", keys[1]+".md"); got != want {
+		t.Errorf("rel[%q] = %q, want %q", keys[1], got, want)
 	}
-	if !strings.HasSuffix(second, "_Test.md") {
-		t.Fatalf("plistMarkdownFilename(%q) should use containing bundle name", second)
+}
+
+func TestSideCarRelNamesHashesOnlyOnSanitizeCollision(t *testing.T) {
+	// Distinct real paths never collide, even with the same bundle/basename.
+	keys := []string{
+		"FileSystem/A/ActionKit.framework/Localizable.loctable",
+		"FileSystem/B/ActionKit.framework/Localizable.loctable",
+	}
+	rel := sideCarRelNames(keys, "")
+	if rel[keys[0]] == rel[keys[1]] {
+		t.Fatalf("distinct paths must not collide: %q", rel[keys[0]])
+	}
+	for _, k := range keys {
+		if want := k + ".md"; rel[k] != want {
+			t.Errorf("distinct path should stay clean (no hash): rel[%q] = %q, want %q", k, rel[k], want)
+		}
+	}
+
+	// Two keys that only differ by a sanitized character DO collide → hash fallback.
+	clash := []string{"dir a/Localizable.loctable", "dir_a/Localizable.loctable"}
+	rc := sideCarRelNames(clash, "")
+	if rc[clash[0]] == rc[clash[1]] {
+		t.Fatalf("sanitization-colliding keys must get distinct names: %q", rc[clash[0]])
+	}
+
+	// A key already prefixed with its volume doesn't become volume/volume/... .
+	vp := sideCarRelNames([]string{"SystemOS/usr/lib/foo.dylib"}, "SystemOS")
+	if got, want := vp["SystemOS/usr/lib/foo.dylib"], filepath.Join("SystemOS", "usr/lib/foo.dylib.md"); got != want {
+		t.Errorf("redundant volume prefix not stripped: got %q, want %q", got, want)
 	}
 }
 
@@ -141,16 +173,20 @@ func TestMarkdownNewLocalizationOverflowFilesAreFenced(t *testing.T) {
 		t.Fatalf("Markdown returned error: %v", err)
 	}
 
-	locDir := filepath.Join(output, d.TitleToFilename(), "LOCALIZATIONS")
-	entries, err := os.ReadDir(locDir)
-	if err != nil {
-		t.Fatalf("failed to read LOCALIZATIONS dir: %v", err)
+	// Per-resource files mirror the real path under the volume subfolder; find
+	// one recursively and confirm its content is fenced.
+	volDir := filepath.Join(output, d.TitleToFilename(), "LOCALIZATIONS", "SystemOS")
+	var sample string
+	_ = filepath.WalkDir(volDir, func(p string, dent fs.DirEntry, err error) error {
+		if err == nil && sample == "" && !dent.IsDir() && strings.HasSuffix(dent.Name(), ".md") {
+			sample = p
+		}
+		return nil
+	})
+	if sample == "" {
+		t.Fatalf("expected overflow localization files under %s", volDir)
 	}
-	if len(entries) == 0 {
-		t.Fatalf("expected overflow localization files in %s", locDir)
-	}
-
-	body, err := os.ReadFile(filepath.Join(locDir, entries[0].Name()))
+	body, err := os.ReadFile(sample)
 	if err != nil {
 		t.Fatalf("failed to read overflow file: %v", err)
 	}

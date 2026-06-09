@@ -138,19 +138,8 @@ func (d *Diff) Markdown() error {
 	// SUB-SECTION: Dylibs
 	if d.Dylibs != nil && (len(d.Dylibs.New) > 0 || len(d.Dylibs.Removed) > 0 || len(d.Dylibs.Updated) > 0) {
 		out.WriteString("### Dylibs\n\n")
-		if err := renderNameList(&out, nameListSection{headingPrefix: "####", title: "🆕 NEW", tag: "NEW", subDir: "DYLIBS", label: "Dylibs"}, d.Dylibs.New, d.conf.Output); err != nil {
+		if err := renderMachoDiff(&out, listSection{headingPrefix: "####", subDir: "DYLIBS", label: "Dylibs"}, d.Dylibs, d.conf.Output); err != nil {
 			return err
-		}
-		if err := renderNameList(&out, nameListSection{headingPrefix: "####", title: "❌ Removed", tag: "Removed", subDir: "DYLIBS", label: "Dylibs"}, d.Dylibs.Removed, d.conf.Output); err != nil {
-			return err
-		}
-		if len(d.Dylibs.Updated) > 0 {
-			fmt.Fprintf(&out, "#### ⬆️ Updated (%d)\n\n", len(d.Dylibs.Updated))
-			out.WriteString("<details>\n  <summary><i>View Updated</i></summary>\n\n")
-			if err := renderUpdatedEntries(&out, d.Dylibs.Updated, d.conf.Output, "DYLIBS", "####"); err != nil {
-				return err
-			}
-			out.WriteString("\n</details>\n\n")
 		}
 	}
 
@@ -229,71 +218,36 @@ type plistVolumeRenderer struct {
 // markdown heading level (e.g. "####" when the per-volume heading is "###").
 // Overflow entries spill into per-file markdown under r.subDir, with FNV-hashed
 // filenames so basename collisions stay deterministic.
-func renderPlistVolume(out *strings.Builder, diff *PlistDiff, outputDir, headingPrefix string, r plistVolumeRenderer) error {
+func renderPlistVolume(out *strings.Builder, diff *PlistDiff, outputDir, headingPrefix, volLabel string, r plistVolumeRenderer) error {
 	entryPrefix := headingPrefix + "#"
 	if len(diff.New) > 0 {
 		fmt.Fprintf(out, "%s 🆕 NEW (%d)\n\n", headingPrefix, len(diff.New))
 		out.WriteString("<details>\n  <summary><i>View New</i></summary>\n\n")
 		keys := slices.Collect(maps.Keys(diff.New))
 		slices.Sort(keys)
-		if len(diff.New) < 20 {
+		if len(diff.New) < plistNewInlineMax {
 			for _, k := range keys {
 				fmt.Fprintf(out, "%s %s\n\n", entryPrefix, r.displayName(k))
 				fmt.Fprintf(out, ">  `%s`\n\n", k)
 				fmt.Fprintf(out, "```%s\n%s\n```\n", r.fenceLang, diff.New[k])
 			}
 		} else {
-			if err := ensureSubDir(outputDir, r.subDir); err != nil {
-				return err
-			}
+			rel := sideCarRelNames(keys, volLabel)
 			for _, k := range keys {
-				body := fmt.Sprintf("```%s\n%s\n```\n", r.fenceLang, diff.New[k])
-				relName, err := writePlistMarkdownFile(outputDir, r.subDir, k, r.displayName, body)
-				if err != nil {
+				body := plistDocBody(r.displayName(k), k, fmt.Sprintf("```%s\n%s\n```\n", r.fenceLang, diff.New[k]))
+				if _, err := writeSideCar(outputDir, r.subDir, rel[k], body); err != nil {
 					return err
 				}
-				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(r.subDir, relName))
+				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(r.subDir, rel[k]))
 			}
 		}
 		out.WriteString("\n</details>\n\n")
 	}
-	if len(diff.Removed) > 0 {
-		fmt.Fprintf(out, "%s ❌ Removed (%d)\n\n", headingPrefix, len(diff.Removed))
-		if len(diff.Removed) > 30 {
-			out.WriteString("<details>\n  <summary><i>View Removed</i></summary>\n\n")
-		}
-		for _, k := range diff.Removed {
-			fmt.Fprintf(out, "- `%s`\n", k)
-		}
-		if len(diff.Removed) > 30 {
-			out.WriteString("\n</details>\n")
-		}
-		out.WriteString("\n")
+	if err := renderNameList(out, listSection{headingPrefix: headingPrefix, title: "❌ Removed", tag: "Removed", subDir: r.subDir, label: volLabel}, diff.Removed, outputDir); err != nil {
+		return err
 	}
-	if len(diff.Updated) > 0 {
-		fmt.Fprintf(out, "%s ⬆️ Updated (%d)\n\n", headingPrefix, len(diff.Updated))
-		out.WriteString("<details>\n  <summary><i>View Updated</i></summary>\n\n")
-		keys := slices.Collect(maps.Keys(diff.Updated))
-		slices.Sort(keys)
-		if len(diff.Updated) < 15 {
-			for _, k := range keys {
-				fmt.Fprintf(out, "%s %s\n\n", entryPrefix, r.displayName(k))
-				fmt.Fprintf(out, ">  `%s`\n\n", k)
-				fmt.Fprintf(out, "%s\n", diff.Updated[k])
-			}
-		} else {
-			if err := ensureSubDir(outputDir, r.subDir); err != nil {
-				return err
-			}
-			for _, k := range keys {
-				relName, err := writePlistMarkdownFile(outputDir, r.subDir, k, r.displayName, diff.Updated[k])
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(r.subDir, relName))
-			}
-		}
-		out.WriteString("\n</details>\n\n")
+	if err := renderUpdatedEntries(out, listSection{headingPrefix: headingPrefix, title: "⬆️ Updated", tag: "Updated", subDir: r.subDir, label: volLabel, groupDir: volLabel}, diff.Updated, outputDir, r.displayName); err != nil {
+		return err
 	}
 	return nil
 }
@@ -338,172 +292,251 @@ func hasMachoDiffVolumeContent(m map[string]*mcmd.MachoDiff) bool {
 	return false
 }
 
-const (
-	// updatedInlineMaxFiles is the maximum number of "Updated" entries rendered
-	// inline in the README. Above it, every entry spills to a side-car markdown
-	// file linked from the README so the README stays small enough to render.
-	updatedInlineMaxFiles = 30
-	// updatedInlineMaxLines is the maximum number of lines a single "Updated"
-	// diff may contain before it spills to its own side-car file, even when the
-	// entry count is at or below updatedInlineMaxFiles. A handful of very large
-	// per-binary diffs (e.g. SystemOS) is enough to make the README
-	// unrenderable, so they are linked rather than inlined.
-	updatedInlineMaxLines = 100
-)
+// listCollapseThreshold is the entry count below which a NEW/Removed/Updated
+// list renders as a plain, always-visible bullet list. At or above it (but below
+// the section's spill threshold) the list renders inside a collapsed-by-default
+// <details> block.
+const listCollapseThreshold = 30
+
+// listSpillThreshold is the default entry count at or above which a list stops
+// rendering in the README and instead spills to a side-car markdown doc that the
+// README links to with a single line. It is high so ordinary sections keep their
+// full list in the README; only very large lists spill. A section can override
+// it via listSection.spillAt.
+const listSpillThreshold = 1000
+
+// filesSpillThreshold is the spill threshold for the `## Files` name lists.
+// Those are noisy file-path dumps that read better as their own linked doc, so
+// they spill much sooner than the default.
+const filesSpillThreshold = 30
+
+// plistNewInlineMax is the separate, lower spill threshold for a
+// localizations/feature-flags "New" section. Unlike the other sections it
+// inlines each new file's full content (not just a name or a link), so it
+// spills sooner than listSpillThreshold to keep that bulkier content out of the
+// README.
+const plistNewInlineMax = 20
 
 // nameListReplacer sanitizes a section label into a filename fragment. It is
 // package-level because strings.Replacer is immutable and goroutine-safe, so
 // there is no reason to rebuild it per call.
 var nameListReplacer = strings.NewReplacer(" ", "_", "/", "_")
 
-// ensureSubDir creates outputDir/subDir if it does not already exist. Callers
-// invoke it once before a spill loop so the per-entry writers do not each issue
-// a redundant mkdir syscall.
-func ensureSubDir(output, subDir string) error {
-	if err := os.MkdirAll(filepath.Join(output, subDir), 0o750); err != nil {
-		return fmt.Errorf("failed to create %s dir: %w", subDir, err)
-	}
-	return nil
+// listSection describes a NEW/Removed/Updated list sub-section.
+type listSection struct {
+	headingPrefix string // markdown heading level, e.g. "###" or "####"
+	title         string // heading title, e.g. "🆕 NEW" / "⬆️ Updated" / a volume name
+	tag           string // filename + summary tag, e.g. "NEW" / "Removed" / "Updated"
+	subDir        string // side-car directory, e.g. "MACHOS" / "FILES"
+	label         string // per-section disambiguator, e.g. "SystemOS" / "Dylibs"
+	groupDir      string // per-entry side-car subfolder under subDir (volume / NEW|Removed); "" = none
+	spillAt       int    // count at/above which the list spills to a side-car doc; 0 → listSpillThreshold
 }
 
-// renderUpdatedEntries emits the body of an "Updated" sub-section. Each entry
-// is rendered inline as an `entryPrefix base` heading followed by its diff,
-// unless the entry count exceeds updatedInlineMaxFiles or the individual diff
-// exceeds updatedInlineMaxLines, in which case that entry spills to a side-car
-// markdown file under outputDir/subDir and is linked from the README. The
-// caller owns the surrounding heading and <details> wrapper.
-func renderUpdatedEntries(out *strings.Builder, updated map[string]string, outputDir, subDir, entryPrefix string) error {
-	keys := slices.Collect(maps.Keys(updated))
-	slices.Sort(keys)
-	forceSidecar := len(updated) > updatedInlineMaxFiles
-	dirReady := false
+// sideCarPathReplacer sanitizes a mirrored path so it is a valid markdown link
+// target. Folder separators ("/") are preserved; only characters that break a
+// `[text](target)` link are replaced.
+var sideCarPathReplacer = strings.NewReplacer(" ", "_", "(", "_", ")", "_", "#", "_", "?", "_")
+
+// sideCarRelNames maps each key to its side-car path relative to the section
+// subDir, mirroring the key's real path under groupDir (e.g.
+// MACHOS/SystemOS/System/Library/Foo.md) so two distinct files can never
+// collide. A short hash suffix is appended only in the rare case two keys
+// sanitize to the same path.
+func sideCarRelNames(keys []string, groupDir string) map[string]string {
+	mirror := make(map[string]string, len(keys))
+	count := make(map[string]int, len(keys))
 	for _, k := range keys {
-		body := updated[k]
-		if forceSidecar || strings.Count(body, "\n") > updatedInlineMaxLines {
-			if !dirReady {
-				if err := ensureSubDir(outputDir, subDir); err != nil {
-					return err
-				}
-				dirReady = true
-			}
-			relName, err := writePlistMarkdownFile(outputDir, subDir, k, filepath.Base, body)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "- [%s](%s)\n", k, filepath.Join(subDir, relName))
-			continue
+		p := sideCarPathReplacer.Replace(strings.TrimPrefix(filepath.ToSlash(k), "/"))
+		// Drop a leading segment equal to groupDir so a key already prefixed with
+		// its volume doesn't become groupDir/groupDir/... .
+		if groupDir != "" {
+			p = strings.TrimPrefix(p, groupDir+"/")
 		}
-		fmt.Fprintf(out, "%s %s\n\n", entryPrefix, filepath.Base(k))
-		fmt.Fprintf(out, ">  `%s`\n\n", k)
-		fmt.Fprintf(out, "%s\n", body)
+		if p == "" {
+			p = "entry"
+		}
+		mirror[k] = p
+		count[p]++
 	}
-	return nil
+	out := make(map[string]string, len(keys))
+	for _, k := range keys {
+		p := mirror[k]
+		if count[p] > 1 {
+			h := fnv.New32a()
+			_, _ = h.Write([]byte(filepath.ToSlash(k)))
+			p = fmt.Sprintf("%s.%08x", p, h.Sum32())
+		}
+		out[k] = filepath.Join(groupDir, p+".md")
+	}
+	return out
 }
 
-// nameListSection describes a NEW/Removed name-list sub-section: the heading
-// level and title, the tag used in the side-car filename and link text, and
-// the side-car subDir plus a per-volume label that disambiguates the file.
-type nameListSection struct {
-	headingPrefix string // markdown heading level, e.g. "####"
-	title         string // heading title incl. emoji, e.g. "🆕 NEW"
-	tag           string // filename + link-text tag, e.g. "NEW" / "Removed"
-	subDir        string // side-car directory, e.g. "MACHOS" / "DYLIBS"
-	label         string // per-volume/section disambiguator, e.g. "SystemOS"
+// plistDocBody builds a side-car document body: an H2 display heading, the
+// source path as a quote, then the content.
+func plistDocBody(display, path, content string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## %s\n\n", display)
+	fmt.Fprintf(&b, "> `%s`\n\n", path)
+	b.WriteString(content)
+	return b.String()
 }
 
-// renderNameList emits a sorted bullet list of file paths under a
-// `headingPrefix title (N)` heading. When the list exceeds
-// updatedInlineMaxFiles, the whole list spills to a side-car markdown file
-// (outputDir/subDir/<label>.<tag>.md) and the README shows a single link plus
-// the count, so a volume with hundreds of new/removed files does not bloat the
-// README.
-func renderNameList(out *strings.Builder, sec nameListSection, names []string, outputDir string) error {
+// renderNameList renders a NEW/Removed name list under its own heading as
+// backtick bullets, applying the shared plain/collapsed/spill rule (see
+// emitListBody).
+func renderNameList(out *strings.Builder, sec listSection, names []string, outputDir string) error {
 	if len(names) == 0 {
 		return nil
 	}
 	slices.Sort(names)
 	fmt.Fprintf(out, "%s %s (%d)\n\n", sec.headingPrefix, sec.title, len(names))
-	if len(names) > updatedInlineMaxFiles {
-		relName, err := writeNameListFile(outputDir, sec, names)
+	return emitListBody(out, sec, len(names), outputDir, func(w *strings.Builder, _ string) {
+		for _, n := range names {
+			fmt.Fprintf(w, "- `%s`\n", n)
+		}
+	})
+}
+
+// linkEntry is one README list item: the link text plus the side-car basename
+// it points at (relative to the section's subDir).
+type linkEntry struct {
+	text    string
+	relName string
+}
+
+// renderLinkList emits the section heading plus a list of side-car links,
+// applying the shared plain/collapsed/spill rule via emitListBody. It is the
+// shared core of the "list of links to per-entry side-car docs" sections
+// (Updated diffs and iBoot bins).
+func renderLinkList(out *strings.Builder, sec listSection, entries []linkEntry, outputDir string) error {
+	fmt.Fprintf(out, "%s %s (%d)\n\n", sec.headingPrefix, sec.title, len(entries))
+	return emitListBody(out, sec, len(entries), outputDir, func(w *strings.Builder, linkBase string) {
+		for _, e := range entries {
+			fmt.Fprintf(w, "- [%s](%s)\n", e.text, filepath.Join(linkBase, e.relName))
+		}
+	})
+}
+
+// renderSideCarEntries writes one side-car doc per entry (path-mirrored under
+// sec.subDir/sec.groupDir, body from the body callback) and renders the README
+// list of links under the shared plain/collapsed/spill rule. It is the shared
+// core of every "one side-car doc per entry" section.
+func renderSideCarEntries[V any](out *strings.Builder, sec listSection, m map[string]V, outputDir string, body func(key string, val V) string) error {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := slices.Collect(maps.Keys(m))
+	slices.Sort(keys)
+	rel := sideCarRelNames(keys, sec.groupDir)
+	entries := make([]linkEntry, 0, len(keys))
+	for _, k := range keys {
+		if _, err := writeSideCar(outputDir, sec.subDir, rel[k], body(k, m[k])); err != nil {
+			return err
+		}
+		entries = append(entries, linkEntry{k, rel[k]})
+	}
+	return renderLinkList(out, sec, entries, outputDir)
+}
+
+// renderUpdatedEntries renders an "Updated" list: every entry's diff is written
+// to its own path-mirrored side-car (never inlined) and the README shows the
+// list of links under the shared plain/collapsed/spill rule.
+func renderUpdatedEntries(out *strings.Builder, sec listSection, updated map[string]string, outputDir string, displayName func(string) string) error {
+	return renderSideCarEntries(out, sec, updated, outputDir, func(k, diff string) string {
+		return plistDocBody(displayName(k), k, diff)
+	})
+}
+
+// renderBinStringList renders an iBoot-style section: each entry is a named bin
+// whose side-car holds its strings as a bullet list.
+func renderBinStringList(out *strings.Builder, sec listSection, bins map[string][]string, outputDir string) error {
+	return renderSideCarEntries(out, sec, bins, outputDir, func(bin string, strs []string) string {
+		var body strings.Builder
+		fmt.Fprintf(&body, "## %s\n\n", bin)
+		for _, s := range strs {
+			fmt.Fprintf(&body, "- `%s`\n", s)
+		}
+		return body.String()
+	})
+}
+
+// emitListBody writes a list body in one of three forms by entry count:
+//   - count >= spill threshold → the whole list spills to a side-car doc and the
+//     README shows a single "View N" link;
+//   - count < listCollapseThreshold → a plain, always-visible bullet list;
+//   - otherwise → the full list inside a collapsed-by-default <details>.
+//
+// The spill threshold is sec.spillAt, or listSpillThreshold when sec.spillAt is
+// zero. renderItems writes the bullet/link lines to the given builder, joining
+// any per-item link target with linkBase: sec.subDir for the README (the targets
+// live under it) and "" inside the side-car doc (which lives in sec.subDir
+// alongside the targets).
+func emitListBody(out *strings.Builder, sec listSection, count int, outputDir string, renderItems func(w *strings.Builder, linkBase string)) error {
+	spillAt := sec.spillAt
+	if spillAt == 0 {
+		spillAt = listSpillThreshold
+	}
+	if count >= spillAt {
+		var b strings.Builder
+		fmt.Fprintf(&b, "## %s — %s (%d)\n\n", sec.label, sec.tag, count)
+		renderItems(&b, "")
+		relName, err := writeListDoc(outputDir, sec, b.String())
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "- [View %d %s files](%s)\n\n", len(names), strings.ToLower(sec.tag), filepath.Join(sec.subDir, relName))
+		fmt.Fprintf(out, "- [View %d %s files](%s)\n\n", count, strings.ToLower(sec.tag), filepath.Join(sec.subDir, relName))
 		return nil
 	}
-	for _, k := range names {
-		fmt.Fprintf(out, "- `%s`\n", k)
+	if count < listCollapseThreshold {
+		renderItems(out, sec.subDir)
+		out.WriteString("\n")
+		return nil
 	}
-	out.WriteString("\n")
+	fmt.Fprintf(out, "<details>\n  <summary><i>View %s</i></summary>\n\n", sec.tag)
+	renderItems(out, sec.subDir)
+	out.WriteString("\n</details>\n\n")
 	return nil
 }
 
-// writeNameListFile writes the full name list to outputDir/subDir/<label>.<tag>.md
-// and returns the basename so renderNameList can link to it from the README.
-func writeNameListFile(output string, sec nameListSection, names []string) (string, error) {
-	if err := ensureSubDir(output, sec.subDir); err != nil {
-		return "", err
-	}
+// writeListDoc writes body to outputDir/sec.subDir/<label>.<tag>.md and returns
+// the basename so the caller can link to it from the README.
+func writeListDoc(output string, sec listSection, body string) (string, error) {
 	relName := fmt.Sprintf("%s.%s.md", nameListReplacer.Replace(sec.label), sec.tag)
-	fname := filepath.Join(output, sec.subDir, relName)
-	log.Debugf("Creating diff %s Markdown file: %s", strings.ToLower(sec.subDir), fname)
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "## %s — %s (%d)\n\n", sec.label, sec.tag, len(names))
-	for _, n := range names {
-		fmt.Fprintf(&b, "- `%s`\n", n)
-	}
-	if err := os.WriteFile(fname, []byte(b.String()), 0o644); err != nil {
-		return "", fmt.Errorf("failed to create diff file: %w", err)
-	}
-	return relName, nil
+	return writeSideCar(output, sec.subDir, relName, body)
 }
 
-func renderMachoDiffSection(out *strings.Builder, diff *mcmd.MachoDiff, outputDir, headingPrefix, label string) error {
-	if err := renderNameList(out, nameListSection{headingPrefix: headingPrefix, title: "🆕 NEW", tag: "NEW", subDir: "MACHOS", label: label}, diff.New, outputDir); err != nil {
+// renderMachoDiff renders the NEW/Removed/Updated triple for a MachoDiff-shaped
+// section. base carries the per-section fields (headingPrefix, subDir, label,
+// groupDir, spillAt); the title and tag for each of the three sub-sections are
+// filled in here. NEW/Removed are name lists; Updated diffs each get their own
+// path-mirrored side-car (named by basename).
+func renderMachoDiff(out *strings.Builder, base listSection, diff *mcmd.MachoDiff, outputDir string) error {
+	newSec := base
+	newSec.title, newSec.tag = "🆕 NEW", "NEW"
+	if err := renderNameList(out, newSec, diff.New, outputDir); err != nil {
 		return err
 	}
-	if err := renderNameList(out, nameListSection{headingPrefix: headingPrefix, title: "❌ Removed", tag: "Removed", subDir: "MACHOS", label: label}, diff.Removed, outputDir); err != nil {
+	rmSec := base
+	rmSec.title, rmSec.tag = "❌ Removed", "Removed"
+	if err := renderNameList(out, rmSec, diff.Removed, outputDir); err != nil {
 		return err
 	}
-	if len(diff.Updated) > 0 {
-		fmt.Fprintf(out, "%s ⬆️ Updated (%d)\n\n", headingPrefix, len(diff.Updated))
-		out.WriteString("<details>\n  <summary><i>View Updated</i></summary>\n\n")
-		if err := renderUpdatedEntries(out, diff.Updated, outputDir, "MACHOS", headingPrefix+"#"); err != nil {
-			return err
-		}
-		out.WriteString("\n</details>\n\n")
-	}
-	return nil
+	upSec := base
+	upSec.title, upSec.tag = "⬆️ Updated", "Updated"
+	return renderUpdatedEntries(out, upSec, diff.Updated, outputDir, filepath.Base)
 }
 
-// plistMarkdownFilename derives the per-entry markdown filename from a path
-// and a displayName resolver. FNV-hashing the path keeps filenames
-// deterministic even when multiple keys share a basename.
-func plistMarkdownFilename(path string, displayName func(string) string) string {
-	base := strings.ReplaceAll(displayName(path), " ", "_")
-	if base == "" || base == "." {
-		base = "entry"
-	}
-	hash := fnv.New32a()
-	_, _ = hash.Write([]byte(filepath.ToSlash(path)))
-	return fmt.Sprintf("%08x_%s.md", hash.Sum32(), base)
-}
-
-// writePlistMarkdownFile writes a single per-key markdown file under
-// outputDir/subDir/ and returns the basename so the caller can link to it
-// from the README.
-func writePlistMarkdownFile(output, subDir, path string, displayName func(string) string, content string) (string, error) {
-	relName := plistMarkdownFilename(path, displayName)
+// writeSideCar writes body verbatim to outputDir/subDir/relName, creating the
+// (possibly nested) parent directory, and returns relName. It is the shared
+// write tail for every per-section side-car doc.
+func writeSideCar(output, subDir, relName, body string) (string, error) {
 	fname := filepath.Join(output, subDir, relName)
+	if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+		return "", fmt.Errorf("failed to create side-car dir: %w", err)
+	}
 	log.Debugf("Creating diff %s Markdown file: %s", strings.ToLower(subDir), fname)
-
-	var out strings.Builder
-	fmt.Fprintf(&out, "## %s\n\n", displayName(path))
-	fmt.Fprintf(&out, "> `%s`\n\n", path)
-	out.WriteString(content)
-
-	if err := os.WriteFile(fname, []byte(out.String()), 0o644); err != nil {
+	if err := os.WriteFile(fname, []byte(body), 0o644); err != nil {
 		return "", fmt.Errorf("failed to create diff file: %w", err)
 	}
 	return relName, nil

@@ -6,16 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"maps"
-	"os"
-	"path/filepath"
-	"slices"
 	"strings"
 
-	"github.com/apex/log"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
-	"golang.org/x/exp/rand"
 )
 
 // firmwaresTask owns the firmware diff parse plus the per-renderer
@@ -181,74 +175,7 @@ func (t *firmwaresTask) Markdown(w *strings.Builder, outputDir string) error {
 		return nil
 	}
 	w.WriteString("## Firmware\n\n")
-	if len(t.d.Firmwares.New) > 0 {
-		fmt.Fprintf(w, "### 🆕 NEW (%d)\n\n", len(t.d.Firmwares.New))
-		slices.Sort(t.d.Firmwares.New)
-		if len(t.d.Firmwares.New) > 30 {
-			w.WriteString("<details>\n" +
-				"  <summary><i>View NEW</i></summary>\n\n")
-		}
-		for _, k := range t.d.Firmwares.New {
-			fmt.Fprintf(w, "- `%s`\n", k)
-		}
-		if len(t.d.Firmwares.New) > 30 {
-			w.WriteString("\n</details>\n")
-		}
-		w.WriteString("\n")
-	}
-	if len(t.d.Firmwares.Removed) > 0 {
-		fmt.Fprintf(w, "### ❌ Removed (%d)\n\n", len(t.d.Firmwares.Removed))
-		slices.Sort(t.d.Firmwares.Removed)
-		if len(t.d.Firmwares.Removed) > 30 {
-			w.WriteString("<details>\n" +
-				"  <summary><i>View Removed</i></summary>\n\n")
-		}
-		for _, k := range t.d.Firmwares.Removed {
-			fmt.Fprintf(w, "- `%s`\n", k)
-		}
-		if len(t.d.Firmwares.Removed) > 30 {
-			w.WriteString("\n</details>\n")
-		}
-		w.WriteString("\n")
-	}
-	if len(t.d.Firmwares.Updated) > 0 {
-		fmt.Fprintf(w, "### ⬆️ Updated (%d)\n\n", len(t.d.Firmwares.Updated))
-		w.WriteString("<details>\n" +
-			"  <summary><i>View Updated</i></summary>\n\n")
-
-		keys := slices.Collect(maps.Keys(t.d.Firmwares.Updated))
-		slices.Sort(keys)
-
-		if len(t.d.Firmwares.Updated) < 10 {
-			for _, k := range keys {
-				fmt.Fprintf(w, "#### %s\n\n", filepath.Base(k))
-				fmt.Fprintf(w, ">  `%s`\n\n", k)
-				fmt.Fprintf(w, "%s\n", t.d.Firmwares.Updated[k])
-			}
-		} else {
-			if err := os.MkdirAll(filepath.Join(outputDir, "FIRMWARE"), 0o750); err != nil {
-				return err
-			}
-			for _, k := range keys {
-				fname := filepath.Join(outputDir, "FIRMWARE", filepath.Base(k)+".md")
-				if _, err := os.Stat(fname); os.IsExist(err) {
-					fname = filepath.Join(outputDir, "FIRMWARE", fmt.Sprintf("%s.%d.md", filepath.Base(k), rand.Intn(20)))
-				}
-				log.Debugf("Creating diff firmware Markdown file: %s", fname)
-				f, err := os.Create(fname)
-				if err != nil {
-					return fmt.Errorf("failed to create diff file: %w", err)
-				}
-				fmt.Fprintf(f, "## %s\n\n", filepath.Base(k))
-				fmt.Fprintf(f, "> `%s`\n\n", k)
-				fmt.Fprintf(f, "%s", t.d.Firmwares.Updated[k])
-				f.Close()
-				fmt.Fprintf(w, "- [%s](%s)\n", k, filepath.Join("FIRMWARE", filepath.Base(k)+".md"))
-			}
-		}
-		w.WriteString("\n</details>\n\n")
-	}
-	return nil
+	return renderMachoDiff(w, listSection{headingPrefix: "###", subDir: "FIRMWARE", label: "Firmware"}, t.d.Firmwares, outputDir)
 }
 
 // firmwaresHTMLTemplate renders the firmwares HTML body the outer page

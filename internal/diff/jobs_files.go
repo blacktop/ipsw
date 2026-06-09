@@ -284,7 +284,7 @@ func (r *filesRenderer) Empty() bool {
 
 // Markdown emits the `## Files` section. The byte sequence must remain
 // identical to the prior inlined body in md.go.
-func (r *filesRenderer) Markdown(out *strings.Builder, _ string) error {
+func (r *filesRenderer) Markdown(out *strings.Builder, outputDir string) error {
 	if r.diff == nil {
 		return nil
 	}
@@ -302,42 +302,20 @@ func (r *filesRenderer) Markdown(out *strings.Builder, _ string) error {
 		out.WriteString("## Files\n\n")
 	}
 	if hasNewFiles {
-		if len(r.diff.New) > 0 {
-			out.WriteString("### 🆕 New\n\n")
-			for _, t := range filesRenderTypes {
-				if len(r.diff.New[t]) > 0 {
-					fmt.Fprintf(out, "#### %s (%d)\n\n", t, len(r.diff.New[t]))
-					if len(r.diff.New[t]) > 10 {
-						out.WriteString("<details>\n" +
-							"  <summary><i>View Files</i></summary>\n\n")
-					}
-					for _, k := range r.diff.New[t] {
-						fmt.Fprintf(out, "- `%s`\n", k)
-					}
-					if len(r.diff.New[t]) > 10 {
-						out.WriteString("\n</details>\n")
-					}
-					out.WriteString("\n")
-				}
+		out.WriteString("### 🆕 New\n\n")
+		for _, t := range filesRenderTypes {
+			sec := listSection{headingPrefix: "####", title: t, tag: "NEW", subDir: "FILES", label: t, spillAt: filesSpillThreshold}
+			if err := renderNameList(out, sec, r.diff.New[t], outputDir); err != nil {
+				return err
 			}
 		}
 	}
 	if hasRemovedFiles {
 		out.WriteString("### ❌ Removed\n\n")
 		for _, t := range filesRenderTypes {
-			if len(r.diff.Removed[t]) > 0 {
-				fmt.Fprintf(out, "#### %s (%d)\n\n", t, len(r.diff.Removed[t]))
-				if len(r.diff.Removed[t]) > 10 {
-					out.WriteString("<details>\n" +
-						"  <summary><i>View Files</i></summary>\n\n")
-				}
-				for _, k := range r.diff.Removed[t] {
-					fmt.Fprintf(out, "- `%s`\n", k)
-				}
-				if len(r.diff.Removed[t]) > 10 {
-					out.WriteString("\n</details>\n")
-				}
-				out.WriteString("\n")
+			sec := listSection{headingPrefix: "####", title: t, tag: "Removed", subDir: "FILES", label: t, spillAt: filesSpillThreshold}
+			if err := renderNameList(out, sec, r.diff.Removed[t], outputDir); err != nil {
+				return err
 			}
 		}
 	}
