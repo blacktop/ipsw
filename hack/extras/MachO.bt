@@ -359,6 +359,7 @@ typedef enum <uint> {
     LC_FUNCTION_VARIANTS        = 0x37,
     LC_FUNCTION_VARIANT_FIXUPS  = 0x38,
     LC_TARGET_TRIPLE            = 0x39,
+    LC_LAZY_LOAD_DYLIB_INFO     = 0x3A,
     LC_SEP_CACHE_SLIDE          = 0x1 | REQ_SEP,
     LC_SEP_UNKNOWN2             = 0x2 | REQ_SEP,
     LC_SEP_UNKNOWN3             = 0x3 | REQ_SEP,
@@ -484,7 +485,9 @@ string LoadCommandTypeRead(LoadCommandType &loadCommandType) {
             return "LC_FUNCTION_VARIANT_FIXUPS";
         case LC_TARGET_TRIPLE:
             return "LC_TARGET_TRIPLE";
-        case LC_SEP_CACHE_SLIDE:    
+        case LC_LAZY_LOAD_DYLIB_INFO:
+            return "LC_LAZY_LOAD_DYLIB_INFO";
+        case LC_SEP_CACHE_SLIDE:
             return "LC_SEP_CACHE_SLIDE";
         case LC_SEP_UNKNOWN2:
             return "LC_SEP_UNKNOWN2";
@@ -831,6 +834,7 @@ typedef struct {
     case LC_ATOM_INFO:
     case LC_FUNCTION_VARIANTS:
     case LC_FUNCTION_VARIANT_FIXUPS:
+    case LC_LAZY_LOAD_DYLIB_INFO:
         uint32 data_offset;
         uint32 data_size;
         break;
