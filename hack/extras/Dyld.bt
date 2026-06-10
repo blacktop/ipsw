@@ -173,6 +173,10 @@ typedef struct
     uint64    functionVariantInfoSize;// Size of all of the variant information pointed to via the dyld_cache_function_variant_info
     uint64    prewarmingDataOffset;   // file offset to dyld_prewarming_header
     uint64    prewarmingDataSize;     // byte size of prewarming data
+    /* NEW fields (macOS/iOS/etc 27.x beta 1) NOTE: not yet in Apple's published dyld_cache_format.h */
+    uint32    cacheCPUType;           // Mach-O CPU type of the cache
+    uint32    cacheCPUSubtype;        // Mach-O CPU subtype of the cache (may include capability bits)
+    uint64    cacheCPUReserved;       // reserved; observed zero (Apple's field name unknown)
 } dyld_cache_header;
 
 typedef struct

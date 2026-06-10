@@ -218,6 +218,7 @@ func (f *File) String(verbose bool) string {
 			"%s"+ // alt platform
 			"%s"+ // os version
 			"%s"+ // alt os version
+			"%s"+ // cache cpu
 			"%s"+ // format
 			"%s"+ // max slide
 			"%s"+ // image count
@@ -243,6 +244,7 @@ func (f *File) String(verbose bool) string {
 		f.getAltPlatform(f.UUID),
 		f.getOSVersion(f.UUID),
 		f.getAltOSVersion(f.UUID),
+		f.getCacheCPU(f.UUID),
 		f.getFormatVersion(f.UUID),
 		f.getMaxSlide(f.UUID),
 		f.getImageCount(f.UUID),
@@ -292,6 +294,18 @@ func (f *File) getAltPlatform(uuid types.UUID) string {
 	var output string
 	if f.IsDyld4 && f.Headers[uuid].AltPlatform > 0 {
 		output = fmt.Sprintf("Alt Platform   = %s\n", f.Headers[uuid].AltPlatform.String())
+	}
+	return output
+}
+
+func (f *File) getCacheCPU(uuid types.UUID) string {
+	var output string
+	if hdr := f.Headers[uuid]; hdr.HasCacheCPUFields() {
+		output = fmt.Sprintf("Cache CPU      = %s (type: %#08x, subtype: %#08x, reserved: %#x)\n",
+			hdr.CacheCPUString(),
+			uint32(hdr.CacheCPUType),
+			uint32(hdr.CacheCPUSubtype),
+			hdr.CacheCPUReserved)
 	}
 	return output
 }

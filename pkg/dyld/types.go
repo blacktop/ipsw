@@ -6,6 +6,7 @@ import (
 	"math/bits"
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
@@ -206,6 +207,26 @@ type CacheHeader struct {
 	FunctionVariantInfoSize       uint64         // Size of all of the variant information pointed to via the dyld_cache_function_variant_info
 	PrewarmingDataOffset          uint64         // file offset to dyld_prewarming_header
 	PrewarmingDataSize            uint64         // byte size of prewarming data
+	/* NEW fields (macOS/iOS/etc 27.x beta 1) NOTE: not yet in Apple's published dyld_cache_format.h */
+	CacheCPUType     types.CPU        // Mach-O CPU type of the cache
+	CacheCPUSubtype  types.CPUSubtype // Mach-O CPU subtype of the cache (may include capability bits)
+	CacheCPUReserved uint64           // reserved; observed zero (Apple's field name unknown)
+}
+
+// HasCacheCPUFields returns true if the cache header is new enough to contain the
+// cache CPU type/subtype fields (i.e. MappingOffset covers the header extension).
+func (dch CacheHeader) HasCacheCPUFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.CacheCPUReserved)+unsafe.Sizeof(dch.CacheCPUReserved))
+}
+
+// CacheCPUString returns the cache's Mach-O CPU type/subtype tuple formatted by
+// go-macho (e.g. "AARCH64, ARM64e caps: USR00"), masking subtype capability bits.
+func (dch CacheHeader) CacheCPUString() string {
+	cpu := fmt.Sprintf("%s, %s", dch.CacheCPUType, dch.CacheCPUSubtype.String(dch.CacheCPUType))
+	if caps := dch.CacheCPUSubtype.Capabilities(dch.CacheCPUType); len(caps) > 0 {
+		cpu += " caps: " + caps
+	}
+	return cpu
 }
 
 type CacheMappingInfo struct {
