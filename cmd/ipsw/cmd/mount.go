@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -56,7 +57,7 @@ func init() {
 
 // mountCmd represents the mount command
 var mountCmd = &cobra.Command{
-	Use:           "mount [fs|sys|app|exc|rdisk] IPSW",
+	Use:           fmt.Sprintf("mount [%s] IPSW", strings.Join(mount.DmgTypes, "|")),
 	Aliases:       []string{"mo", "mnt"},
 	Short:         "Mount DMG from IPSW",
 	SilenceErrors: true,
@@ -79,6 +80,9 @@ var mountCmd = &cobra.Command{
 
 		# Mount a RestoreRamDisk by identity (defaults to the first if not specified)
 		$ ipsw mount rdisk iPhone.ipsw --ident Erase
+
+		# Mount the RosettaOS cryptex DMG from a macOS IPSW (macOS 27+)
+		$ ipsw mount rosetta UniversalMac.ipsw
 
 		# Mount in background without blocking (detach mode)
 		$ ipsw mount fs iPhone.ipsw --detach

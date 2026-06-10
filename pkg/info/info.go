@@ -128,6 +128,9 @@ func (i *Info) String() string {
 		if fsDMG, err := i.GetAppOsDmg(); err == nil {
 			iStr.WriteString(fmt.Sprintf("AppOS          = %s\n", fsDMG))
 		}
+		if fsDMG, err := i.GetRosettaOsDmg(); err == nil {
+			iStr.WriteString(fmt.Sprintf("RosettaOS      = %s\n", fsDMG))
+		}
 		if fsDMG, err := i.GetExclaveOSDmg(); err == nil {
 			iStr.WriteString(fmt.Sprintf("ExclaveOS      = %s\n", fsDMG))
 		}
@@ -255,25 +258,36 @@ func (i *Info) ToJSON() InfoJSON {
 	}
 }
 
-// GetAppOsDmg returns the name of the AppOS dmg
-func (i *Info) GetAppOsDmg() (string, error) {
+// getCryptexDmg returns the DMG path declared under the given BuildManifest key (e.g. "Cryptex1,AppOS")
+func (i *Info) getCryptexDmg(key, name string) (string, error) {
+	if i.Plists == nil || i.Plists.BuildManifest == nil {
+		return "", fmt.Errorf("no BuildManifest.plist found")
+	}
 	var dmgs []string
-	if i.Plists != nil && i.Plists.BuildManifest != nil {
-		for _, bi := range i.Plists.BuildIdentities {
-			if appOS, ok := bi.Manifest["Cryptex1,AppOS"]; ok {
-				dmgs = append(dmgs, appOS.Info["Path"].(string))
-			}
-		}
-		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 0 {
-			return "", fmt.Errorf("no AppOS DMG found: %w", ErrorCryptexNotFound)
-		} else if len(dmgs) == 1 {
-			return dmgs[0], nil
-		} else {
-			return "", fmt.Errorf("multiple AppOS DMGs found")
+	for _, bi := range i.Plists.BuildIdentities {
+		if cryptex, ok := bi.Manifest[key]; ok {
+			dmgs = append(dmgs, cryptex.Info["Path"].(string))
 		}
 	}
-	return "", fmt.Errorf("no BuildManifest.plist found")
+	dmgs = utils.Unique(dmgs)
+	switch len(dmgs) {
+	case 0:
+		return "", fmt.Errorf("no %s DMG found: %w", name, ErrorCryptexNotFound)
+	case 1:
+		return dmgs[0], nil
+	default:
+		return "", fmt.Errorf("multiple %s DMGs found", name)
+	}
+}
+
+// GetAppOsDmg returns the name of the AppOS dmg
+func (i *Info) GetAppOsDmg() (string, error) {
+	return i.getCryptexDmg("Cryptex1,AppOS", "AppOS")
+}
+
+// GetRosettaOsDmg returns the name of the RosettaOS dmg (macOS 27+ cryptex)
+func (i *Info) GetRosettaOsDmg() (string, error) {
+	return i.getCryptexDmg("Cryptex1,RosettaOS", "RosettaOS")
 }
 
 // GetSystemOsDmg returns the name of the SystemOS dmg (the one with the dyld_shared_cache(s))
@@ -406,23 +420,7 @@ func (i *Info) GetRestoreRamDiskDmg(ident string) (string, error) {
 }
 
 func (i *Info) GetExclaveOSDmg() (string, error) {
-	var dmgs []string
-	if i.Plists != nil && i.Plists.BuildManifest != nil {
-		for _, bi := range i.Plists.BuildIdentities {
-			if appOS, ok := bi.Manifest["Ap,ExclaveOS"]; ok {
-				dmgs = append(dmgs, appOS.Info["Path"].(string))
-			}
-		}
-		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 0 {
-			return "", fmt.Errorf("no ExclaveOS DMG found: %w", ErrorCryptexNotFound)
-		} else if len(dmgs) == 1 {
-			return dmgs[0], nil
-		} else {
-			return "", fmt.Errorf("multiple ExclaveOS DMGs found")
-		}
-	}
-	return "", fmt.Errorf("no BuildManifest.plist found")
+	return i.getCryptexDmg("Ap,ExclaveOS", "ExclaveOS")
 }
 
 func (i *Info) IsMacOS() bool {

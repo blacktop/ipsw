@@ -1090,6 +1090,11 @@ func DMG(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to find RestoreRamDisk DMG in IPSW: %v", err)
 		}
+	case "rosetta":
+		dmgPath, err = i.GetRosettaOsDmg()
+		if err != nil {
+			return nil, fmt.Errorf("failed to find RosettaOS DMG in IPSW: %v", err)
+		}
 	default:
 		return nil, fmt.Errorf("unknown DMG type %q", c.DmgType)
 	}

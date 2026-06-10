@@ -3,9 +3,11 @@ package mount
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/mount"
@@ -37,7 +39,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//     Parameters:
 	//       + name: type
 	//         in: path
-	//         description: type of DMG to mount (app|sys|fs)
+	//         description: type of DMG to mount (app|sys|fs|exc|rdisk|rosetta)
 	//         required: true
 	//         type: string
 	//       + name: path
@@ -87,8 +89,8 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 		ident, _ := c.GetQuery("ident")
 
 		dmgType := c.Param("type")
-		if !slices.Contains([]string{"app", "sys", "fs", "exc", "rdisk"}, dmgType) {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, fs, exc, or rdisk"})
+		if !slices.Contains(mount.DmgTypes, dmgType) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid dmg type: must be one of: %s", strings.Join(mount.DmgTypes, ", "))})
 			return
 		}
 		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, &mount.Config{
