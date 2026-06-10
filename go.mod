@@ -14,7 +14,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/alecthomas/chroma/v2 v2.26.1
-	github.com/anthropics/anthropic-sdk-go v1.50.0
+	github.com/anthropics/anthropic-sdk-go v1.50.1
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
@@ -87,7 +87,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
-	software.sslmate.com/src/go-pkcs12 v0.7.1
+	software.sslmate.com/src/go-pkcs12 v0.7.2
 )
 
 require (
