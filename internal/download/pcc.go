@@ -332,8 +332,11 @@ func (cr *pccCachedRelease) toRelease() (*PCCRelease, error) {
 	if err := proto.Unmarshal(cr.MetadataBytes, &r.ReleaseMetadata); err != nil {
 		return nil, fmt.Errorf("unmarshal cached metadata: %w", err)
 	}
+	// A release kept despite an unparseable ticket (parsePCCReleaseLeaf) caches
+	// the raw ticket bytes verbatim; preserve them on reload rather than failing
+	// the whole cache load — the ticket is display-only.
 	if _, err := asn1.Unmarshal(cr.TicketBytes, &r.Ticket); err != nil {
-		return nil, fmt.Errorf("asn1 unmarshal cached ticket: %w", err)
+		r.Ticket = Ticket{Raw: asn1.RawContent(cr.TicketBytes)}
 	}
 	return r, nil
 }
@@ -346,15 +349,13 @@ func releaseToCached(r *PCCRelease) (*pccCachedRelease, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal metadata: %w", err)
 	}
-	ticketBytes := []byte(r.Ticket.Raw)
-	if len(ticketBytes) == 0 {
-		return nil, fmt.Errorf("release %d missing raw ticket bytes", r.Index)
-	}
+	// TicketBytes may be empty for a release kept despite a missing/unparseable
+	// ticket; that's fine — the ticket is display-only and toRelease tolerates it.
 	return &pccCachedRelease{
 		Index:         r.Index,
 		ATLeaf:        *r.ATLeaf,
 		MetadataBytes: metaBytes,
-		TicketBytes:   ticketBytes,
+		TicketBytes:   []byte(r.Ticket.Raw),
 		Version:       r.Version,
 		VPhone:        r.VPhone,
 	}, nil
@@ -806,11 +807,13 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 		return nil, nil
 	}
 
+	// A RELEASE leaf is only useful if it carries ReleaseMetadata — the assets,
+	// URLs, and darwinInit that drive --info and download all live there.
+	// Apple's append-only AT log also contains metadata-less RELEASE leaves
+	// (issue #1249 hit one), so skip them rather than abort the whole fetch.
 	if len(leaf.GetMetadata()) == 0 {
-		return nil, fmt.Errorf("release leaf missing metadata")
-	}
-	if len(leaf.GetRawData()) == 0 {
-		return nil, fmt.Errorf("release leaf missing raw ticket data")
+		log.WithFields(leafLogFields(leaf, atLeaf)).Warn("Skipping PCC release leaf with no metadata")
+		return nil, nil
 	}
 
 	release := &PCCRelease{
@@ -819,13 +822,32 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 	}
 
 	if err := proto.Unmarshal(leaf.GetMetadata(), &release.ReleaseMetadata); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal ReleaseMetadata: %v", err)
+		log.WithFields(leafLogFields(leaf, atLeaf)).Warnf("Skipping PCC release leaf with unparseable metadata: %v", err)
+		return nil, nil
 	}
+
+	// The ticket is auxiliary: download and --info asset listing read only
+	// ReleaseMetadata; the ticket adds AP/cryptex hashes to the display. Apple
+	// is evolving its format (security-pcc's Release.asn carries a SEQUENCE
+	// "..." extensibility marker, and a version-2 shape our parser doesn't
+	// model already exists), so when the ASN.1 won't decode we keep the raw
+	// bytes and the release stays downloadable and cacheable — only the ticket
+	// hashes are unavailable. Dropping it would silently hide a fetchable build.
 	if _, err := asn1.Unmarshal(leaf.GetRawData(), &release.Ticket); err != nil {
-		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
+		log.WithFields(leafLogFields(leaf, atLeaf)).Warnf("PCC release leaf has unparseable ticket; keeping release, ticket hashes unavailable: %v", err)
+		release.Ticket = Ticket{Raw: asn1.RawContent(leaf.GetRawData())}
 	}
 
 	return release, nil
+}
+
+// leafLogFields is the shared index+digest context for the warnings emitted
+// when a release leaf is skipped or has a degraded ticket.
+func leafLogFields(leaf *pcc.LogLeavesResponse_Leaf, atLeaf *ATLeaf) log.Fields {
+	return log.Fields{
+		"index":  leaf.GetIndex(),
+		"digest": hex.EncodeToString(atLeaf.Hash),
+	}
 }
 
 func collectPCCReleases(startIdx, endIdx, batchSize uint64, progress func(done, total uint64), fetchLeaves func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error)) ([]*PCCRelease, error) {
