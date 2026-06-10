@@ -966,14 +966,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, class.Name, "", classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		for _, method := range class.ClassMethods {
@@ -981,14 +975,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, class.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, class.Name, "", classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, class.Name, "", classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		imp.uniq(o.baseFWs)
@@ -1015,14 +1003,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Protocol instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, "", proto.Name, classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		for _, method := range proto.ClassMethods {
@@ -1030,14 +1012,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Protocol class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, "", proto.Name, classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		for _, method := range proto.OptionalInstanceMethods {
@@ -1045,14 +1021,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Protocol optional instance method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, "", proto.Name, classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		for _, method := range proto.OptionalClassMethods {
@@ -1060,14 +1030,8 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 				log.Warnf("Protocol optional class method %s in %s has empty type encoding (TypesVMAddr=%#x)", method.Name, proto.Name, method.TypesVMAddr)
 				continue
 			}
-			for i := 0; i < method.NumberOfArguments(); i++ {
-				typ := method.ArgumentType(i)
-				if err := o.fillImportsForType(typ, "", proto.Name, classNames, protoNames, &imp); err != nil {
-					return nil, err
-				}
-				if i == 0 {
-					i += 2
-				}
+			if err := o.fillImportsForMethod(method, "", proto.Name, classNames, protoNames, &imp); err != nil {
+				return nil, err
 			}
 		}
 		imp.uniq(o.baseFWs)
@@ -1118,6 +1082,31 @@ func (o *ObjC) scanBaseFrameworks() error {
 			}
 			slices.Sort(o.baseFWs["classes"])
 			slices.Sort(o.baseFWs["protocols"])
+		}
+	}
+	return nil
+}
+
+// fillImportsForMethod adds the imports required by a method's return type and
+// its real argument types. ArgumentType indexes the full method type encoding,
+// so entry 0 is the return type and entries 1 and 2 are the implicit self/_cmd
+// (which never need imports); the real arguments run from entry 3 through
+// NumberOfArguments() inclusive.
+func (o *ObjC) fillImportsForMethod(method objc.Method, className string, protoName string, classNames []string, protoNames []string, imp *Imports) error {
+	for i := 0; i <= method.NumberOfArguments(); i++ {
+		typ := method.ArgumentType(i)
+		// On a malformed/truncated encoding NumberOfArguments() (which counts via
+		// a different parser) can exceed the decodable argument count, so
+		// ArgumentType returns its out-of-range sentinel; stop before it is
+		// mistaken for a real type (e.g. "<error>" looks like a protocol).
+		if typ == "<error>" {
+			break
+		}
+		if err := o.fillImportsForType(typ, className, protoName, classNames, protoNames, imp); err != nil {
+			return err
+		}
+		if i == 0 {
+			i += 2 // skip self (@) and SEL (:)
 		}
 	}
 	return nil
@@ -1214,7 +1203,11 @@ func (o *ObjC) nonBuiltInType(typ string) string {
 		return ""
 	}
 
-	if strings.ContainsAny(typ, "()[]{}:;") {
+	// A real type name never contains these — aggregates ({}, <>) are handled by
+	// the callers above, so anything reaching here with structural punctuation
+	// (including a stray '=' from a truncated struct encoding) is a decode
+	// fragment, not an importable type.
+	if strings.ContainsAny(typ, "()[]{}:;=") {
 		return ""
 	}
 
