@@ -38,12 +38,25 @@ type Dylib struct {
 	LoadAddress uint64 `json:"load_address,omitempty"`
 }
 
+// CacheCPU is the Mach-O CPU type/subtype tuple from the dyld_shared_cache header
+// (only present in macOS/iOS/etc 27.x+ caches)
+// swagger:model
+type CacheCPU struct {
+	Type       uint32 `json:"type"`
+	Subtype    uint32 `json:"subtype"`
+	Reserved   uint64 `json:"reserved"`
+	CPU        string `json:"cpu,omitempty"`
+	SubCPU     string `json:"subcpu,omitempty"`
+	SubCPUCaps string `json:"subcpu_caps,omitempty"`
+}
+
 // Info is a struct that contains information about a dyld_shared_cache file
 // swagger:model
 type Info struct {
 	Magic              string                                      `json:"magic,omitempty"`
 	UUID               string                                      `json:"uuid,omitempty"`
 	Platform           string                                      `json:"platform,omitempty"`
+	CacheCPU           *CacheCPU                                   `json:"cache_cpu,omitempty"`
 	MaxSlide           int                                         `json:"max_slide,omitempty"`
 	SubCacheArrayCount int                                         `json:"num_sub_caches,omitempty"`
 	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
@@ -592,6 +605,17 @@ func GetInfo(f *dyld.File) (*Info, error) {
 		UUID:     f.UUID.String(),
 		Platform: f.Headers[f.UUID].Platform.String(),
 		MaxSlide: int(f.Headers[f.UUID].MaxSlide),
+	}
+
+	if hdr := f.Headers[f.UUID]; hdr.HasCacheCPUFields() {
+		info.CacheCPU = &CacheCPU{
+			Type:       uint32(hdr.CacheCPUType),
+			Subtype:    uint32(hdr.CacheCPUSubtype),
+			Reserved:   hdr.CacheCPUReserved,
+			CPU:        hdr.CacheCPUType.String(),
+			SubCPU:     hdr.CacheCPUSubtype.String(hdr.CacheCPUType),
+			SubCPUCaps: hdr.CacheCPUSubtype.Capabilities(hdr.CacheCPUType),
+		}
 	}
 
 	info.Mappings = make(map[string][]dyld.CacheMappingWithSlideInfo)
