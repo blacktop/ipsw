@@ -20,7 +20,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-var DmgTypes = []string{"app", "sys", "fs", "exc", "rdisk"}
+var DmgTypes = []string{"app", "sys", "fs", "exc", "rdisk", "rosetta"}
 
 // Config contains optional options for mounting a DMG from an IPSW
 type Config struct {
@@ -127,6 +127,11 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		dmgPath, err = i.GetRestoreRamDiskDmg(cfg.Ident)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get RestoreRamDisk DMG: %v", err)
+		}
+	case "rosetta":
+		dmgPath, err = i.GetRosettaOsDmg()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get RosettaOS DMG: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
