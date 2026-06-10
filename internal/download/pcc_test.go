@@ -45,15 +45,75 @@ func TestCollectPCCReleasesPagesThroughLogLeaves(t *testing.T) {
 	}
 }
 
-func TestParsePCCReleaseLeafRejectsMissingMetadata(t *testing.T) {
+func TestParsePCCReleaseLeafSkipsMetadataLessLeaf(t *testing.T) {
 	t.Parallel()
 
-	_, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 7, pcc.ATLogDataType_RELEASE, false, true))
-	if err == nil {
-		t.Fatal("expected missing metadata error")
+	// A RELEASE leaf with no ReleaseMetadata has nothing to download (issue
+	// #1249 hit one); skip it without failing the whole fetch. Presence of
+	// ticket raw data doesn't matter — metadata is what makes a leaf usable.
+	tests := []struct {
+		name           string
+		includeRawData bool
+	}{
+		{name: "no metadata, with ticket", includeRawData: true},
+		{name: "no metadata, no ticket", includeRawData: false},
 	}
-	if err.Error() != "release leaf missing metadata" {
-		t.Fatalf("unexpected error: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			release, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 7, pcc.ATLogDataType_RELEASE, false, tt.includeRawData))
+			if err != nil {
+				t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
+			}
+			if release != nil {
+				t.Fatalf("expected metadata-less release leaf to be skipped, got %+v", release)
+			}
+		})
+	}
+}
+
+func TestParsePCCReleaseLeafKeepsReleaseWithUnparseableTicket(t *testing.T) {
+	t.Parallel()
+
+	// A metadata-bearing RELEASE leaf whose ticket is a format we don't model
+	// (e.g. Apple's newer version-2 ticket) must be KEPT — its assets come from
+	// ReleaseMetadata and are downloadable; only the ticket hashes are lost.
+	v2Ticket := mustMarshalASN1(t, struct {
+		Version int
+		Variant asn1.RawValue
+	}{
+		Version: 2,
+		Variant: asn1.RawValue{Class: asn1.ClassContextSpecific, Tag: 2, IsCompound: true, Bytes: []byte{0x02, 0x01, 0x00}},
+	})
+	leaf := newTestLogLeaf(t, 11, pcc.ATLogDataType_RELEASE, true, false)
+	leaf.RawData = v2Ticket
+
+	release, err := parsePCCReleaseLeaf(leaf)
+	if err != nil {
+		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
+	}
+	if release == nil {
+		t.Fatal("expected metadata-bearing release to be kept despite unparseable ticket")
+	}
+	if release.OSAssetURL() == "" {
+		t.Fatal("expected kept release to expose its downloadable OS asset URL")
+	}
+	if !bytes.Equal([]byte(release.Ticket.Raw), v2Ticket) {
+		t.Fatalf("expected raw ticket bytes to be preserved, got %x", release.Ticket.Raw)
+	}
+
+	// The kept release must survive a cache round-trip without poisoning the
+	// cache (toRelease must not fail on the unparseable ticket).
+	cached, err := releaseToCached(release)
+	if err != nil {
+		t.Fatalf("releaseToCached failed for release with unparseable ticket: %v", err)
+	}
+	reloaded, err := cached.toRelease()
+	if err != nil {
+		t.Fatalf("toRelease failed for cached release with unparseable ticket: %v", err)
+	}
+	if !bytes.Equal([]byte(reloaded.Ticket.Raw), v2Ticket) {
+		t.Fatalf("expected raw ticket bytes preserved across cache round-trip, got %x", reloaded.Ticket.Raw)
 	}
 }
 
