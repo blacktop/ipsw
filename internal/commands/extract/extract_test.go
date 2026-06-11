@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -317,6 +318,81 @@ func makeUnencryptedKernelPayload(t *testing.T, plaintext []byte) []byte {
 		t.Fatalf("Marshal() error = %v", err)
 	}
 	return data
+}
+
+func TestRemoteDscExtractionStepsRouteRosettaArches(t *testing.T) {
+	i := testDscInfo(true, "27.0")
+	got, err := remoteDscExtractionSteps(i, []string{"arm64e", "x86_64"})
+	if err != nil {
+		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
+	}
+	want := []remoteDscExtractionStep{
+		{dmgPath: "system.dmg.aea", arches: []string{"arm64e"}},
+		{dmgPath: "rosetta.dmg", arches: []string{"x86_64"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
+	}
+}
+
+func TestRemoteDscExtractionStepsKeepX86InSystemWhenRosettaMissing(t *testing.T) {
+	i := testDscInfo(false)
+	got, err := remoteDscExtractionSteps(i, []string{"x86_64"})
+	if err != nil {
+		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
+	}
+	want := []remoteDscExtractionStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
+	}
+}
+
+func TestRemoteDscExtractionStepsIgnoreRosettaBeforeMacOS27(t *testing.T) {
+	i := testDscInfo(true, "26.5")
+	got, err := remoteDscExtractionSteps(i, []string{"x86_64"})
+	if err != nil {
+		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
+	}
+	want := []remoteDscExtractionStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
+	}
+}
+
+func TestRemoteDscExtractionStepsRequireRosettaForMacOS27(t *testing.T) {
+	i := testDscInfo(false, "27.0")
+	_, err := remoteDscExtractionSteps(i, []string{"x86_64"})
+	if err == nil {
+		t.Fatal("remoteDscExtractionSteps() error = nil, want error")
+	}
+}
+
+func testDscInfo(hasRosetta bool, version ...string) *info.Info {
+	manifest := map[string]plist.IdentityManifest{
+		"Cryptex1,SystemOS": {
+			Info: map[string]any{"Path": "system.dmg.aea"},
+		},
+	}
+	if hasRosetta {
+		manifest["Cryptex1,RosettaOS"] = plist.IdentityManifest{
+			Info: map[string]any{"Path": "rosetta.dmg"},
+		}
+	}
+	productVersion := "26.0"
+	if len(version) > 0 {
+		productVersion = version[0]
+	}
+	return &info.Info{
+		Plists: &plist.Plists{
+			BuildManifest: &plist.BuildManifest{
+				ProductVersion:        productVersion,
+				SupportedProductTypes: []string{"Mac17,1"},
+				BuildIdentities: []plist.BuildIdentity{
+					{Manifest: manifest},
+				},
+			},
+		},
+	}
 }
 
 func testKernelInfo(kernelPaths ...string) *info.Info {

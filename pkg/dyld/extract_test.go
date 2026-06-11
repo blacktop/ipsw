@@ -62,10 +62,104 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 	}
 }
 
+func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
+	tests := []struct {
+		name            string
+		arches          []string
+		hasRosettaOS    bool
+		requiresRosetta bool
+		want            []dscExtractionStep
+		wantErr         bool
+	}{
+		{
+			name:            "legacy x86 stays in system os when rosetta os is absent",
+			arches:          []string{"x86_64"},
+			hasRosettaOS:    false,
+			requiresRosetta: false,
+			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: []string{"x86_64"}}},
+		},
+		{
+			name:            "empty arches preserve existing system os behavior",
+			arches:          nil,
+			hasRosettaOS:    true,
+			requiresRosetta: true,
+			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: nil}},
+		},
+		{
+			name:            "rosetta os before it is required keeps legacy system os extraction",
+			arches:          []string{"x86_64"},
+			hasRosettaOS:    true,
+			requiresRosetta: false,
+			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: []string{"x86_64"}}},
+		},
+		{
+			name:            "x86_64 uses rosetta os when available",
+			arches:          []string{"x86_64"},
+			hasRosettaOS:    true,
+			requiresRosetta: true,
+			want:            []dscExtractionStep{{kind: rosettaOSDscDMG, arches: []string{"x86_64"}}},
+		},
+		{
+			name:            "mixed arches split system and rosetta os",
+			arches:          []string{"arm64e", "x86_64"},
+			hasRosettaOS:    true,
+			requiresRosetta: true,
+			want: []dscExtractionStep{
+				{kind: systemOSDscDMG, arches: []string{"arm64e"}},
+				{kind: rosettaOSDscDMG, arches: []string{"x86_64"}},
+			},
+		},
+		{
+			name:            "aot follows the rosetta os x86 cache family",
+			arches:          []string{"aot"},
+			hasRosettaOS:    true,
+			requiresRosetta: true,
+			want:            []dscExtractionStep{{kind: rosettaOSDscDMG, arches: []string{"aot"}}},
+		},
+		{
+			name:            "required rosetta os fails instead of falling back to system os",
+			arches:          []string{"x86_64"},
+			hasRosettaOS:    false,
+			requiresRosetta: true,
+			wantErr:         true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := dscExtractionPlan(test.arches, test.hasRosettaOS, test.requiresRosetta)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("dscExtractionPlan(%v, %v, %v) error = nil, want error", test.arches, test.hasRosettaOS, test.requiresRosetta)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("dscExtractionPlan(%v, %v, %v) error = %v", test.arches, test.hasRosettaOS, test.requiresRosetta, err)
+			}
+			if !equalDscExtractionSteps(got, test.want) {
+				t.Fatalf("dscExtractionPlan(%v, %v, %v) = %#v, want %#v", test.arches, test.hasRosettaOS, test.requiresRosetta, got, test.want)
+			}
+		})
+	}
+}
+
 func zipFileNames(files []*zip.File) []string {
 	names := make([]string, 0, len(files))
 	for _, file := range files {
 		names = append(names, file.Name)
 	}
 	return names
+}
+
+func equalDscExtractionSteps(a, b []dscExtractionStep) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for idx := range a {
+		if a[idx].kind != b[idx].kind || !slices.Equal(a[idx].arches, b[idx].arches) {
+			return false
+		}
+	}
+	return true
 }
