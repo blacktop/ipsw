@@ -84,17 +84,21 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 // dyld_shared_caches into the Cryptex1,RosettaOS DMG, so plans for those
 // IPSWs can span two DMGs.
 func DscExtractionPlan(i *info.Info, arches []string) ([]DscExtractionStep, error) {
-	hasRosettaOS := false
-	if i != nil {
-		if _, err := i.GetRosettaOsDmg(); err == nil {
-			hasRosettaOS = true
-		}
+	if !macOSX86DscRequiresRosetta(i) {
+		return dscExtractionPlan(arches, false, false)
 	}
-	requiresRosetta := macOSX86DscRequiresRosetta(i)
-	if requiresRosetta && !hasRosettaOS && len(arches) == 0 {
+	hasRosettaOS := false
+	if _, err := i.GetRosettaOsDmg(); err == nil {
+		hasRosettaOS = true
+	} else if !errors.Is(err, info.ErrorCryptexNotFound) {
+		// a truly absent cryptex is handled below; anything else (e.g.
+		// multiple RosettaOS DMGs) would otherwise masquerade as "absent"
+		return nil, fmt.Errorf("failed to determine RosettaOS DMG availability: %w", err)
+	}
+	if !hasRosettaOS && len(arches) == 0 {
 		log.Warn("macOS 27+ moves x86_64 dyld_shared_cache(s) to the RosettaOS cryptex, but BuildManifest has no Cryptex1,RosettaOS; extracting SystemOS caches only")
 	}
-	return dscExtractionPlan(arches, hasRosettaOS, requiresRosetta)
+	return dscExtractionPlan(arches, hasRosettaOS, true)
 }
 
 func dscExtractionPlan(arches []string, hasRosettaOS, requiresRosetta bool) ([]DscExtractionStep, error) {
@@ -338,6 +342,11 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		if err != nil {
 			return nil, err
 		}
+		if stepArtifacts == nil {
+			// nil artifacts with no error means the user interrupted the
+			// interactive cache selection; don't prompt for remaining DMGs
+			return artifacts, nil
+		}
 		artifacts = append(artifacts, stepArtifacts...)
 	}
 
@@ -352,7 +361,7 @@ func dmgPathForDscStep(i *info.Info, kind DscDMGKind) (string, error) {
 			return "", fmt.Errorf("failed to get RosettaOS DMG containing the x86_64 dyld_shared_cache(s): %v", err)
 		}
 		return dmgPath, nil
-	default:
+	case SystemOSDscDMG:
 		dmgPath, err := i.GetSystemOsDmg()
 		if err != nil {
 			dmgPath, err = i.GetFileSystemOsDmg()
@@ -361,6 +370,8 @@ func dmgPathForDscStep(i *info.Info, kind DscDMGKind) (string, error) {
 			}
 		}
 		return dmgPath, nil
+	default:
+		return "", fmt.Errorf("unsupported dyld_shared_cache DMG kind: %s", kind)
 	}
 }
 

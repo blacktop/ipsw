@@ -1009,6 +1009,11 @@ func DSC(c *Config) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
+			if stepOut == nil {
+				// nil output with no error means the user interrupted the
+				// interactive cache selection; don't prompt for remaining DMGs
+				return out, nil
+			}
 			out = append(out, stepOut...)
 		}
 		return out, nil
@@ -1017,14 +1022,18 @@ func DSC(c *Config) ([]string, error) {
 }
 
 func remoteDmgPathForDscStep(i *info.Info, kind dyld.DscDMGKind) (string, error) {
-	if kind == dyld.RosettaOSDscDMG {
+	switch kind {
+	case dyld.RosettaOSDscDMG:
 		dmgPath, err := i.GetRosettaOsDmg()
 		if err != nil {
 			return "", fmt.Errorf("failed to get RosettaOS DMG containing the x86_64 dyld_shared_cache(s) from remote zip metadata: %v", err)
 		}
 		return dmgPath, nil
+	case dyld.SystemOSDscDMG:
+		return remoteSystemDscDMG(i)
+	default:
+		return "", fmt.Errorf("unsupported dyld_shared_cache DMG kind: %s", kind)
 	}
-	return remoteSystemDscDMG(i)
 }
 
 func remoteSystemDscDMG(i *info.Info) (string, error) {

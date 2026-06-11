@@ -330,11 +330,12 @@ type resolvedDscStep struct {
 
 func TestRemoteDscPlanRouting(t *testing.T) {
 	tests := []struct {
-		name    string
-		info    *info.Info
-		arches  []string
-		want    []resolvedDscStep
-		wantErr bool
+		name        string
+		info        *info.Info
+		arches      []string
+		want        []resolvedDscStep
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:   "macOS 27 routes rosetta arches to rosetta dmg",
@@ -372,6 +373,13 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 			arches:  []string{"x86_64"},
 			wantErr: true,
 		},
+		{
+			name:        "macOS 27 with conflicting rosetta dmgs fails instead of treating rosetta as absent",
+			info:        testDscInfoWithConflictingRosetta(),
+			arches:      []string{"x86_64"},
+			wantErr:     true,
+			errContains: "failed to determine RosettaOS DMG availability",
+		},
 	}
 
 	for _, test := range tests {
@@ -380,6 +388,9 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 			if test.wantErr {
 				if err == nil {
 					t.Fatal("DscExtractionPlan() error = nil, want error")
+				}
+				if test.errContains != "" && !strings.Contains(err.Error(), test.errContains) {
+					t.Fatalf("DscExtractionPlan() error = %q, want it to contain %q", err, test.errContains)
 				}
 				return
 			}
@@ -427,6 +438,15 @@ func testDscInfo(hasRosetta bool, version ...string) *info.Info {
 			},
 		},
 	}
+}
+
+func testDscInfoWithConflictingRosetta() *info.Info {
+	i := testDscInfo(true, "27.0")
+	i.Plists.BuildManifest.BuildIdentities = append(i.Plists.BuildManifest.BuildIdentities,
+		plist.BuildIdentity{Manifest: map[string]plist.IdentityManifest{
+			"Cryptex1,RosettaOS": {Info: map[string]any{"Path": "rosetta-other.dmg"}},
+		}})
+	return i
 }
 
 func testKernelInfo(kernelPaths ...string) *info.Info {
