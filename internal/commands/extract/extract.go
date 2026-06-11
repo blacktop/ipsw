@@ -995,13 +995,17 @@ func DSC(c *Config) ([]string, error) {
 			}
 			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
-		steps, err := remoteDscExtractionSteps(i, c.Arches)
+		steps, err := dyld.DscExtractionPlan(i, c.Arches)
 		if err != nil {
 			return nil, err
 		}
 		var out []string
 		for _, step := range steps {
-			stepOut, err := extractRemoteDscDMG(c, i, zr, step.dmgPath, folder, step.arches)
+			dmgPath, err := remoteDmgPathForDscStep(i, step.Kind)
+			if err != nil {
+				return nil, err
+			}
+			stepOut, err := extractRemoteDscDMG(c, i, zr, dmgPath, folder, step.Arches)
 			if err != nil {
 				return nil, err
 			}
@@ -1012,73 +1016,15 @@ func DSC(c *Config) ([]string, error) {
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
 
-type remoteDscExtractionStep struct {
-	dmgPath string
-	arches  []string
-}
-
-func remoteDscExtractionSteps(i *info.Info, arches []string) ([]remoteDscExtractionStep, error) {
-	rosettaDMG, rosettaErr := i.GetRosettaOsDmg()
-	if len(arches) == 0 || !remoteX86DscRequiresRosetta(i) {
-		sysDMG, err := remoteSystemDscDMG(i)
+func remoteDmgPathForDscStep(i *info.Info, kind dyld.DscDMGKind) (string, error) {
+	if kind == dyld.RosettaOSDscDMG {
+		dmgPath, err := i.GetRosettaOsDmg()
 		if err != nil {
-			return nil, err
+			return "", fmt.Errorf("failed to get RosettaOS DMG containing the x86_64 dyld_shared_cache(s) from remote zip metadata: %v", err)
 		}
-		return []remoteDscExtractionStep{{dmgPath: sysDMG, arches: arches}}, nil
+		return dmgPath, nil
 	}
-
-	var systemArches []string
-	var rosettaArches []string
-	for _, arch := range arches {
-		if remoteDscArchUsesRosetta(arch) {
-			rosettaArches = append(rosettaArches, arch)
-		} else {
-			systemArches = append(systemArches, arch)
-		}
-	}
-
-	if len(rosettaArches) > 0 && rosettaErr != nil {
-		if remoteX86DscRequiresRosetta(i) {
-			return nil, fmt.Errorf("macOS 27+ x86_64 dyld_shared_cache requires Cryptex1,RosettaOS in BuildManifest")
-		}
-		sysDMG, err := remoteSystemDscDMG(i)
-		if err != nil {
-			return nil, err
-		}
-		return []remoteDscExtractionStep{{dmgPath: sysDMG, arches: arches}}, nil
-	}
-
-	steps := make([]remoteDscExtractionStep, 0, 2)
-	if len(systemArches) > 0 {
-		sysDMG, err := remoteSystemDscDMG(i)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, remoteDscExtractionStep{dmgPath: sysDMG, arches: systemArches})
-	}
-	if len(rosettaArches) > 0 {
-		steps = append(steps, remoteDscExtractionStep{dmgPath: rosettaDMG, arches: rosettaArches})
-	}
-	return steps, nil
-}
-
-func remoteDscArchUsesRosetta(arch string) bool {
-	switch arch {
-	case "x86_64", "x86_64h", "aot":
-		return true
-	default:
-		return false
-	}
-}
-
-func remoteX86DscRequiresRosetta(i *info.Info) bool {
-	if i == nil || i.Plists == nil || i.Plists.BuildManifest == nil {
-		return false
-	}
-	if !utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
-		return false
-	}
-	return utils.Compare(i.Plists.BuildManifest.ProductVersion, "27.0") >= 0
+	return remoteSystemDscDMG(i)
 }
 
 func remoteSystemDscDMG(i *info.Info) (string, error) {

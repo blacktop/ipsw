@@ -68,7 +68,7 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 		arches          []string
 		hasRosettaOS    bool
 		requiresRosetta bool
-		want            []dscExtractionStep
+		want            []DscExtractionStep
 		wantErr         bool
 	}{
 		{
@@ -76,37 +76,47 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 			arches:          []string{"x86_64"},
 			hasRosettaOS:    false,
 			requiresRosetta: false,
-			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: []string{"x86_64"}}},
+			want:            []DscExtractionStep{{Kind: SystemOSDscDMG, Arches: []string{"x86_64"}}},
 		},
 		{
-			name:            "empty arches preserve existing system os behavior",
+			name:            "empty arches cover both system and rosetta os",
 			arches:          nil,
 			hasRosettaOS:    true,
 			requiresRosetta: true,
-			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: nil}},
+			want: []DscExtractionStep{
+				{Kind: SystemOSDscDMG},
+				{Kind: RosettaOSDscDMG},
+			},
+		},
+		{
+			name:            "empty arches fall back to system os when rosetta os is absent",
+			arches:          nil,
+			hasRosettaOS:    false,
+			requiresRosetta: true,
+			want:            []DscExtractionStep{{Kind: SystemOSDscDMG}},
 		},
 		{
 			name:            "rosetta os before it is required keeps legacy system os extraction",
 			arches:          []string{"x86_64"},
 			hasRosettaOS:    true,
 			requiresRosetta: false,
-			want:            []dscExtractionStep{{kind: systemOSDscDMG, arches: []string{"x86_64"}}},
+			want:            []DscExtractionStep{{Kind: SystemOSDscDMG, Arches: []string{"x86_64"}}},
 		},
 		{
 			name:            "x86_64 uses rosetta os when available",
 			arches:          []string{"x86_64"},
 			hasRosettaOS:    true,
 			requiresRosetta: true,
-			want:            []dscExtractionStep{{kind: rosettaOSDscDMG, arches: []string{"x86_64"}}},
+			want:            []DscExtractionStep{{Kind: RosettaOSDscDMG, Arches: []string{"x86_64"}}},
 		},
 		{
 			name:            "mixed arches split system and rosetta os",
 			arches:          []string{"arm64e", "x86_64"},
 			hasRosettaOS:    true,
 			requiresRosetta: true,
-			want: []dscExtractionStep{
-				{kind: systemOSDscDMG, arches: []string{"arm64e"}},
-				{kind: rosettaOSDscDMG, arches: []string{"x86_64"}},
+			want: []DscExtractionStep{
+				{Kind: SystemOSDscDMG, Arches: []string{"arm64e"}},
+				{Kind: RosettaOSDscDMG, Arches: []string{"x86_64"}},
 			},
 		},
 		{
@@ -114,7 +124,7 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 			arches:          []string{"aot"},
 			hasRosettaOS:    true,
 			requiresRosetta: true,
-			want:            []dscExtractionStep{{kind: rosettaOSDscDMG, arches: []string{"aot"}}},
+			want:            []DscExtractionStep{{Kind: RosettaOSDscDMG, Arches: []string{"aot"}}},
 		},
 		{
 			name:            "required rosetta os fails instead of falling back to system os",
@@ -152,12 +162,12 @@ func zipFileNames(files []*zip.File) []string {
 	return names
 }
 
-func equalDscExtractionSteps(a, b []dscExtractionStep) bool {
+func equalDscExtractionSteps(a, b []DscExtractionStep) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for idx := range a {
-		if a[idx].kind != b[idx].kind || !slices.Equal(a[idx].arches, b[idx].arches) {
+		if a[idx].Kind != b[idx].Kind || !slices.Equal(a[idx].Arches, b[idx].Arches) {
 			return false
 		}
 	}

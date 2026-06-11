@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -320,50 +321,83 @@ func makeUnencryptedKernelPayload(t *testing.T, plaintext []byte) []byte {
 	return data
 }
 
-func TestRemoteDscExtractionStepsRouteRosettaArches(t *testing.T) {
-	i := testDscInfo(true, "27.0")
-	got, err := remoteDscExtractionSteps(i, []string{"arm64e", "x86_64"})
-	if err != nil {
-		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
-	}
-	want := []remoteDscExtractionStep{
-		{dmgPath: "system.dmg.aea", arches: []string{"arm64e"}},
-		{dmgPath: "rosetta.dmg", arches: []string{"x86_64"}},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
-	}
+// resolvedDscStep pairs a planned step's resolved remote DMG path with its
+// arches, mirroring what the remote DSC loop feeds extractRemoteDscDMG.
+type resolvedDscStep struct {
+	dmgPath string
+	arches  []string
 }
 
-func TestRemoteDscExtractionStepsKeepX86InSystemWhenRosettaMissing(t *testing.T) {
-	i := testDscInfo(false)
-	got, err := remoteDscExtractionSteps(i, []string{"x86_64"})
-	if err != nil {
-		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
+func TestRemoteDscPlanRouting(t *testing.T) {
+	tests := []struct {
+		name    string
+		info    *info.Info
+		arches  []string
+		want    []resolvedDscStep
+		wantErr bool
+	}{
+		{
+			name:   "macOS 27 routes rosetta arches to rosetta dmg",
+			info:   testDscInfo(true, "27.0"),
+			arches: []string{"arm64e", "x86_64"},
+			want: []resolvedDscStep{
+				{dmgPath: "system.dmg.aea", arches: []string{"arm64e"}},
+				{dmgPath: "rosetta.dmg", arches: []string{"x86_64"}},
+			},
+		},
+		{
+			name:   "macOS 27 default arches cover both dmgs",
+			info:   testDscInfo(true, "27.0"),
+			arches: nil,
+			want: []resolvedDscStep{
+				{dmgPath: "system.dmg.aea"},
+				{dmgPath: "rosetta.dmg"},
+			},
+		},
+		{
+			name:   "x86 stays in system os when rosetta is missing pre-27",
+			info:   testDscInfo(false),
+			arches: []string{"x86_64"},
+			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}},
+		},
+		{
+			name:   "rosetta dmg is ignored before macOS 27",
+			info:   testDscInfo(true, "26.5"),
+			arches: []string{"x86_64"},
+			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}},
+		},
+		{
+			name:    "macOS 27 x86 without rosetta dmg fails",
+			info:    testDscInfo(false, "27.0"),
+			arches:  []string{"x86_64"},
+			wantErr: true,
+		},
 	}
-	want := []remoteDscExtractionStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
-	}
-}
 
-func TestRemoteDscExtractionStepsIgnoreRosettaBeforeMacOS27(t *testing.T) {
-	i := testDscInfo(true, "26.5")
-	got, err := remoteDscExtractionSteps(i, []string{"x86_64"})
-	if err != nil {
-		t.Fatalf("remoteDscExtractionSteps() error = %v", err)
-	}
-	want := []remoteDscExtractionStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("remoteDscExtractionSteps() = %#v, want %#v", got, want)
-	}
-}
-
-func TestRemoteDscExtractionStepsRequireRosettaForMacOS27(t *testing.T) {
-	i := testDscInfo(false, "27.0")
-	_, err := remoteDscExtractionSteps(i, []string{"x86_64"})
-	if err == nil {
-		t.Fatal("remoteDscExtractionSteps() error = nil, want error")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			steps, err := dyld.DscExtractionPlan(test.info, test.arches)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("DscExtractionPlan() error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("DscExtractionPlan() error = %v", err)
+			}
+			got := make([]resolvedDscStep, 0, len(steps))
+			for _, step := range steps {
+				dmgPath, err := remoteDmgPathForDscStep(test.info, step.Kind)
+				if err != nil {
+					t.Fatalf("remoteDmgPathForDscStep(%q) error = %v", step.Kind, err)
+				}
+				got = append(got, resolvedDscStep{dmgPath: dmgPath, arches: step.Arches})
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("resolved steps = %#v, want %#v", got, test.want)
+			}
+		})
 	}
 }
 
