@@ -83,7 +83,7 @@ type Config struct {
 	// search the DMGs for files
 	DMGs bool `json:"dmgs,omitempty"`
 	// type of DMG to extract
-	// pattern: (app|sys|fs)
+	// pattern: (app|sys|fs|exc|rdisk|rosetta)
 	DmgType string `json:"dmg_type,omitempty"`
 	// flatten the extracted files paths (remove the folders)
 	Flatten bool `json:"flatten,omitempty"`
@@ -995,33 +995,122 @@ func DSC(c *Config) ([]string, error) {
 			}
 			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
-		sysDMG, err := i.GetSystemOsDmg()
-		if err != nil {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
-		}
-		if len(sysDMG) == 0 {
-			return nil, fmt.Errorf("only iOS16.x/macOS13.x+ supported: no SystemOS DMG found in remote zip metadata")
-		}
-		zr, err = tuneRemoteZipReader(c, zr, matchingZipFileName(zr.File, sysDMG))
+		steps, err := remoteDscExtractionSteps(i, c.Arches)
 		if err != nil {
 			return nil, err
 		}
-		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
+		var out []string
+		for _, step := range steps {
+			stepOut, err := extractRemoteDscDMG(c, i, zr, step.dmgPath, folder, step.arches)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, stepOut...)
 		}
-		defer os.RemoveAll(tmpDIR)
-		sysDMGRegex := exactZipNamePattern(sysDMG)
-		extracted, err := utils.SearchZip(zr.File, sysDMGRegex, tmpDIR, c.Flatten, true)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
-		}
-		if len(extracted) == 0 {
-			return nil, fmt.Errorf("failed to extract SystemOS DMG %s from remote IPSW", sysDMG)
-		}
-		return dyld.ExtractFromDMG(i, extracted[0], filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
+		return out, nil
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
+}
+
+type remoteDscExtractionStep struct {
+	dmgPath string
+	arches  []string
+}
+
+func remoteDscExtractionSteps(i *info.Info, arches []string) ([]remoteDscExtractionStep, error) {
+	rosettaDMG, rosettaErr := i.GetRosettaOsDmg()
+	if len(arches) == 0 || !remoteX86DscRequiresRosetta(i) {
+		sysDMG, err := remoteSystemDscDMG(i)
+		if err != nil {
+			return nil, err
+		}
+		return []remoteDscExtractionStep{{dmgPath: sysDMG, arches: arches}}, nil
+	}
+
+	var systemArches []string
+	var rosettaArches []string
+	for _, arch := range arches {
+		if remoteDscArchUsesRosetta(arch) {
+			rosettaArches = append(rosettaArches, arch)
+		} else {
+			systemArches = append(systemArches, arch)
+		}
+	}
+
+	if len(rosettaArches) > 0 && rosettaErr != nil {
+		if remoteX86DscRequiresRosetta(i) {
+			return nil, fmt.Errorf("macOS 27+ x86_64 dyld_shared_cache requires Cryptex1,RosettaOS in BuildManifest")
+		}
+		sysDMG, err := remoteSystemDscDMG(i)
+		if err != nil {
+			return nil, err
+		}
+		return []remoteDscExtractionStep{{dmgPath: sysDMG, arches: arches}}, nil
+	}
+
+	steps := make([]remoteDscExtractionStep, 0, 2)
+	if len(systemArches) > 0 {
+		sysDMG, err := remoteSystemDscDMG(i)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, remoteDscExtractionStep{dmgPath: sysDMG, arches: systemArches})
+	}
+	if len(rosettaArches) > 0 {
+		steps = append(steps, remoteDscExtractionStep{dmgPath: rosettaDMG, arches: rosettaArches})
+	}
+	return steps, nil
+}
+
+func remoteDscArchUsesRosetta(arch string) bool {
+	switch arch {
+	case "x86_64", "x86_64h", "aot":
+		return true
+	default:
+		return false
+	}
+}
+
+func remoteX86DscRequiresRosetta(i *info.Info) bool {
+	if i == nil || i.Plists == nil || i.Plists.BuildManifest == nil {
+		return false
+	}
+	if !utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
+		return false
+	}
+	return utils.Compare(i.Plists.BuildManifest.ProductVersion, "27.0") >= 0
+}
+
+func remoteSystemDscDMG(i *info.Info) (string, error) {
+	sysDMG, err := i.GetSystemOsDmg()
+	if err != nil {
+		return "", fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+	}
+	if len(sysDMG) == 0 {
+		return "", fmt.Errorf("only iOS16.x/macOS13.x+ supported: no SystemOS DMG found in remote zip metadata")
+	}
+	return sysDMG, nil
+}
+
+func extractRemoteDscDMG(c *Config, i *info.Info, zr *zip.Reader, dmgPath, folder string, arches []string) ([]string, error) {
+	stepZr, err := tuneRemoteZipReader(c, zr, matchingZipFileName(zr.File, dmgPath))
+	if err != nil {
+		return nil, err
+	}
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store %s: %v", dmgPath, err)
+	}
+	defer os.RemoveAll(tmpDIR)
+	dmgRegex := exactZipNamePattern(dmgPath)
+	extracted, err := utils.SearchZip(stepZr.File, dmgRegex, tmpDIR, c.Flatten, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract %s from remote IPSW: %v", dmgPath, err)
+	}
+	if len(extracted) == 0 {
+		return nil, fmt.Errorf("failed to extract DMG %s from remote IPSW", dmgPath)
+	}
+	return dyld.ExtractFromDMG(i, extracted[0], filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, arches, c.DriverKit, c.AllDSCs)
 }
 
 // DMG extracts the DMG from an IPSW

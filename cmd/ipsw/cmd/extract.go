@@ -75,6 +75,7 @@ func init() {
 			"fs\tFileSystem",
 			"exc\tExclave",
 			"rdisk\tRestoreRamDisk",
+			"rosetta\tRosettaOS",
 		}, cobra.ShellCompDirectiveDefault
 	})
 
