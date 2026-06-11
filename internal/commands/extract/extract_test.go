@@ -324,8 +324,9 @@ func makeUnencryptedKernelPayload(t *testing.T, plaintext []byte) []byte {
 // resolvedDscStep pairs a planned step's resolved remote DMG path with its
 // arches, mirroring what the remote DSC loop feeds extractRemoteDscDMG.
 type resolvedDscStep struct {
-	dmgPath string
-	arches  []string
+	dmgPath    string
+	arches     []string
+	allowEmpty bool
 }
 
 func TestRemoteDscPlanRouting(t *testing.T) {
@@ -333,6 +334,7 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 		name        string
 		info        *info.Info
 		arches      []string
+		driverKit   bool
 		want        []resolvedDscStep
 		wantErr     bool
 		errContains string
@@ -356,6 +358,15 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 			},
 		},
 		{
+			name:      "macOS 27 driverkit default treats rosetta as best effort",
+			info:      testDscInfo(true, "27.0"),
+			driverKit: true,
+			want: []resolvedDscStep{
+				{dmgPath: "system.dmg.aea", allowEmpty: true},
+				{dmgPath: "rosetta.dmg", allowEmpty: true},
+			},
+		},
+		{
 			name:   "x86 stays in system os when rosetta is missing pre-27",
 			info:   testDscInfo(false),
 			arches: []string{"x86_64"},
@@ -366,6 +377,12 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 			info:   testDscInfo(true, "26.5"),
 			arches: []string{"x86_64"},
 			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}},
+		},
+		{
+			name:   "macOS 27 arm-only ignores malformed rosetta metadata",
+			info:   testDscInfoWithConflictingRosetta(),
+			arches: []string{"arm64e"},
+			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"arm64e"}}},
 		},
 		{
 			name:    "macOS 27 x86 without rosetta dmg fails",
@@ -384,7 +401,7 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			steps, err := dyld.DscExtractionPlan(test.info, test.arches)
+			steps, err := dyld.DscExtractionPlan(test.info, test.arches, test.driverKit)
 			if test.wantErr {
 				if err == nil {
 					t.Fatal("DscExtractionPlan() error = nil, want error")
@@ -403,7 +420,7 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 				if err != nil {
 					t.Fatalf("remoteDmgPathForDscStep(%q) error = %v", step.Kind, err)
 				}
-				got = append(got, resolvedDscStep{dmgPath: dmgPath, arches: step.Arches})
+				got = append(got, resolvedDscStep{dmgPath: dmgPath, arches: step.Arches, allowEmpty: step.AllowEmpty})
 			}
 			if !reflect.DeepEqual(got, test.want) {
 				t.Fatalf("resolved steps = %#v, want %#v", got, test.want)
