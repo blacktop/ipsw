@@ -168,7 +168,7 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 				info.ManifestPath = filepath.Join(c.DDIFolder, "Restore/BuildManifest.plist")
 			}
 		}
-	} else if c.DDIFolder != "" {
+	} else if c.ManifestPath == "" && c.DDIFolder != "" {
 		info.ManifestPath = filepath.Join(c.DDIFolder, "Restore/BuildManifest.plist")
 		if _, err := os.Stat(info.ManifestPath); errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("failed to find BuildManifest.plist at '%s' (run `%s -runFirstLaunch`)",
