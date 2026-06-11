@@ -23,13 +23,19 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: update-entitlements-db
+  cancel-in-progress: false
+
 jobs:
   update-entitlements-db:
     runs-on: macos-latest
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      # credentials stay persisted: the last step commits + pushes hack/.ents_cache
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6 # zizmor: ignore[artipacked]
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: "1.26"
 
@@ -39,10 +45,10 @@ jobs:
 
       - name: Determine latest IPSW URLs
         id: get-ipsws
+        env:
+          PLATFORMS: ${{ github.event.inputs.platforms || 'ios,macos' }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          # Determine which platforms to check
-          PLATFORMS="${{ github.event.inputs.platforms || 'ios,macos' }}"
-          VERSION="${{ github.event.inputs.version }}"
           echo "Checking platforms: $PLATFORMS"
           echo "Requested version: ${VERSION:-latest}"
 
@@ -63,7 +69,7 @@ jobs:
             else
               get_cmd+=(--latest)
             fi
-            
+
             get_cmd+=(--urls)
 
             # Try to get latest IPSW URL, handle errors gracefully
@@ -89,16 +95,32 @@ jobs:
             MACOS_URL=$(get_ipsw_url "" "macOS")
           fi
 
+          # An empty URL silently skips the platform downstream — surface it
+          # so a broken `ipsw dl` lookup doesn't leave the DB quietly stale.
+          if echo "$PLATFORMS" | grep -q "ios" && [ -z "$IOS_URL" ]; then
+            echo "::warning::iOS IPSW URL lookup returned nothing; iOS will be skipped"
+          fi
+          if echo "$PLATFORMS" | grep -q "macos" && [ -z "$MACOS_URL" ]; then
+            echo "::warning::macOS IPSW URL lookup returned nothing; macOS will be skipped"
+          fi
+
           # Export URLs to environment
-          echo "IOS_URL=$IOS_URL" >> $GITHUB_ENV
-          echo "MACOS_URL=$MACOS_URL" >> $GITHUB_ENV
+          {
+            echo "IOS_URL=$IOS_URL"
+            echo "MACOS_URL=$MACOS_URL"
+          } >> "$GITHUB_ENV"
 
       - name: Check for new IPSWs
         id: check-ipsws
+        env:
+          FORCE_UPDATE: ${{ github.event.inputs.force_update }}
         run: |
-          # Get cached URLs
-          LAST_IOS=$(jq -r '.latest_ipsw.ios_url // ""' hack/.watch_cache)
-          LAST_MACOS=$(jq -r '.latest_ipsw.macos_url // ""' hack/.watch_cache)
+          # Last successfully ingested URLs live in their own cache file:
+          # hack/.watch_cache is round-tripped through `ipsw watch` structs by
+          # discord.yml every 30 minutes, which drops any keys it doesn't know
+          # about (this is what broke the old .latest_ipsw.{ios,macos}_url keys).
+          LAST_IOS=$(jq -r '.ios_url // ""' hack/.ents_cache 2>/dev/null || echo "")
+          LAST_MACOS=$(jq -r '.macos_url // ""' hack/.ents_cache 2>/dev/null || echo "")
 
           echo "=== Cached URLs ==="
           echo "iOS: $LAST_IOS"
@@ -126,7 +148,7 @@ jobs:
           fi
 
           # Force update if requested
-          if [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+          if [ "$FORCE_UPDATE" = "true" ]; then
             echo "Force update requested"
             SHOULD_UPDATE_ANY="true"
             if [ -n "$IOS_URL" ]; then SHOULD_UPDATE_IOS="true"; fi
@@ -134,9 +156,11 @@ jobs:
           fi
 
           # Export update flags
-          echo "should_update_ios=$SHOULD_UPDATE_IOS" >> $GITHUB_OUTPUT
-          echo "should_update_macos=$SHOULD_UPDATE_MACOS" >> $GITHUB_OUTPUT
-          echo "should_update_any=$SHOULD_UPDATE_ANY" >> $GITHUB_OUTPUT
+          {
+            echo "should_update_ios=$SHOULD_UPDATE_IOS"
+            echo "should_update_macos=$SHOULD_UPDATE_MACOS"
+            echo "should_update_any=$SHOULD_UPDATE_ANY"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "$SHOULD_UPDATE_ANY" = "true" ]; then
             echo "Will proceed with database updates"
@@ -144,96 +168,136 @@ jobs:
             echo "No new IPSWs found; skipping updates"
           fi
 
-      - name: Download IPSWs
+      - name: Free up disk space
         if: steps.check-ipsws.outputs.should_update_any == 'true'
         run: |
-          echo "Downloading new IPSWs..."
-
-          # Download iOS IPSW
-          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ] && [ -n "$IOS_URL" ]; then
-            echo "Downloading iOS IPSW: $IOS_URL"
-            curl -L "$IOS_URL" -o ios_latest.ipsw
-            echo "iOS IPSW downloaded: $(ls -lh ios_latest.ipsw)"
-          fi
-
-          # Download macOS IPSW
-          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ] && [ -n "$MACOS_URL" ]; then
-            echo "Downloading macOS IPSW: $MACOS_URL"
-            curl -L "$MACOS_URL" -o macos_latest.ipsw
-            echo "macOS IPSW downloaded: $(ls -lh macos_latest.ipsw)"
-          fi
+          echo "=== Disk space before cleanup ==="
+          df -h /System/Volumes/Data
+          # This job only needs Go, hdiutil, and /usr/bin/aea — simulator
+          # runtimes (~25GB) and non-selected Xcode versions (~15-30GB each)
+          # are dead weight, and a single IPSW + its decrypted FileSystem DMG
+          # needs ~30GB of scratch space.
+          sudo xcrun simctl runtime delete all 2>/dev/null || true
+          KEEP="$(dirname "$(dirname "$(xcode-select -p)")")"
+          for app in /Applications/Xcode*.app; do
+            if [ -d "$app" ] && [ "$app" != "$KEEP" ]; then
+              sudo rm -rf "$app" &
+            fi
+          done
+          wait
+          echo "=== Disk space after cleanup ==="
+          df -h /System/Volumes/Data
 
       - name: Update entitlements database
+        id: process
         if: steps.check-ipsws.outputs.should_update_any == 'true'
+        env:
+          SHOULD_UPDATE_IOS: ${{ steps.check-ipsws.outputs.should_update_ios }}
+          SHOULD_UPDATE_MACOS: ${{ steps.check-ipsws.outputs.should_update_macos }}
         run: |
           echo "Updating Supabase entitlements database with replacement support..."
 
-          # Function to update database for a platform
+          # Download and ingest one platform at a time: an IPSW plus its
+          # extracted + AEA-decrypted FileSystem DMG needs ~30GB of scratch
+          # space, so holding both IPSWs at once blows the runner's disk.
           update_platform() {
             local platform="$1"
-            local ipsw_file="$2"
+            local url="$2"
+            local ipsw_file="$3"
 
-            if [ -f "$ipsw_file" ]; then
-              echo "Processing $platform IPSW: $ipsw_file"
-              ./ipsw ent --ipsw "$ipsw_file" --replace \
+            echo "=== Disk space before $platform ==="
+            df -h /System/Volumes/Data
+
+            echo "Downloading $platform IPSW: $url"
+            # --retry alone skips non-"transient" failures like mid-transfer
+            # connection resets (curl exit 18/56) and restarts from byte 0;
+            # --retry-all-errors + --continue-at resumes the partial file.
+            curl --fail --silent --show-error --location \
+              --retry 3 --retry-all-errors --continue-at - \
+              "$url" -o "$ipsw_file" || return 1
+            ls -lh "$ipsw_file"
+
+            ./ipsw ent --ipsw "$ipsw_file" --replace \
               --pg-host "${{ secrets.SUPABASE_HOST }}" \
               --pg-port 5432 \
               --pg-user "${{ secrets.SUPABASE_USER }}" \
               --pg-password "${{ secrets.SUPABASE_PASSWORD }}" \
               --pg-database postgres \
               --pg-sslmode require \
-              --pg-poolmode session
-              echo "$platform database update completed successfully"
-            else
-              echo "Skipping $platform (no IPSW file: $ipsw_file)"
-            fi
+              --pg-poolmode session || return 1
+
+            echo "$platform database update completed successfully"
           }
 
-          # Process each platform that needs updating
-          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ]; then
-            update_platform "iOS" "ios_latest.ipsw"
+          # Remove the IPSW and any DMGs left behind by a failed scan so the
+          # next platform starts with a clean disk.
+          cleanup_platform() {
+            rm -f "$1"
+            find . -maxdepth 1 \( -name '*.dmg' -o -name '*.dmg.aea' \) -delete
+          }
+
+          FAILED=0
+
+          if [ "$SHOULD_UPDATE_IOS" = "true" ]; then
+            if update_platform "iOS" "$IOS_URL" "ios_latest.ipsw"; then
+              echo "ios_done=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::iOS entitlements update failed"
+              FAILED=1
+            fi
+            cleanup_platform "ios_latest.ipsw"
           fi
 
-          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ]; then
-            update_platform "macOS" "macos_latest.ipsw"
+          if [ "$SHOULD_UPDATE_MACOS" = "true" ]; then
+            if update_platform "macOS" "$MACOS_URL" "macos_latest.ipsw"; then
+              echo "macos_done=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::macOS entitlements update failed"
+              FAILED=1
+            fi
+            cleanup_platform "macos_latest.ipsw"
           fi
 
-          echo "All database updates completed successfully"
+          exit $FAILED
 
       - name: Update cache and commit
-        if: steps.check-ipsws.outputs.should_update_any == 'true'
+        # always(): record any platform that succeeded even if the other
+        # failed, so the next run doesn't pointlessly re-ingest it.
+        if: always() && steps.check-ipsws.outputs.should_update_any == 'true'
+        env:
+          IOS_DONE: ${{ steps.process.outputs.ios_done }}
+          MACOS_DONE: ${{ steps.process.outputs.macos_done }}
         run: |
-          # Update the cache file with new IPSW URLs
-          echo "Updating cache with new IPSW URLs..."
+          NEW_IOS=$(jq -r '.ios_url // ""' hack/.ents_cache 2>/dev/null || echo "")
+          NEW_MACOS=$(jq -r '.macos_url // ""' hack/.ents_cache 2>/dev/null || echo "")
 
-          # Create temporary cache with current URLs
-          jq --arg ios_url "$IOS_URL" \
-             --arg macos_url "$MACOS_URL" \
-             '.latest_ipsw = {
-               "ios_url": (if $ios_url != "" then $ios_url else .latest_ipsw.ios_url // "" end),
-               "macos_url": (if $macos_url != "" then $macos_url else .latest_ipsw.macos_url // "" end),
-               "url": (if $ios_url != "" then $ios_url else .latest_ipsw.url // "" end)
-             }' hack/.watch_cache > hack/.watch_cache.tmp
-          mv hack/.watch_cache.tmp hack/.watch_cache
+          UPDATED_PLATFORMS=""
+          if [ "$IOS_DONE" = "true" ]; then
+            NEW_IOS="$IOS_URL"
+            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}iOS "
+          fi
+          if [ "$MACOS_DONE" = "true" ]; then
+            NEW_MACOS="$MACOS_URL"
+            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}macOS "
+          fi
+
+          if [ -z "$UPDATED_PLATFORMS" ]; then
+            echo "No platforms were ingested; nothing to commit"
+            exit 0
+          fi
+
+          jq -n --arg ios_url "$NEW_IOS" --arg macos_url "$NEW_MACOS" \
+            '{ios_url: $ios_url, macos_url: $macos_url}' > hack/.ents_cache
 
           # Configure git
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create commit message with updated platforms
-          UPDATED_PLATFORMS=""
-          if [ "${{ steps.check-ipsws.outputs.should_update_ios }}" = "true" ]; then
-            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}iOS "
+          git add hack/.ents_cache
+          if ! git commit -m "chore(ents): update entitlements DB for ${UPDATED_PLATFORMS}[skip ci]"; then
+            echo "No changes to commit"
+            exit 0
           fi
-          if [ "${{ steps.check-ipsws.outputs.should_update_macos }}" = "true" ]; then
-            UPDATED_PLATFORMS="${UPDATED_PLATFORMS}macOS "
-          fi
-
-          COMMIT_MSG="chore(ents): update entitlements DB for ${UPDATED_PLATFORMS}[skip ci]"
-
-          # Commit cache file changes
-          git add hack/.watch_cache
-          git commit -m "$COMMIT_MSG" || echo "No changes to commit"
 
           # Pull latest changes and rebase before pushing to avoid conflicts
           git pull --rebase origin master || {
