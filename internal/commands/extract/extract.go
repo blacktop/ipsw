@@ -995,11 +995,12 @@ func DSC(c *Config) ([]string, error) {
 			}
 			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
-		steps, err := dyld.DscExtractionPlan(i, c.Arches)
+		steps, err := dyld.DscExtractionPlan(i, c.Arches, c.DriverKit)
 		if err != nil {
 			return nil, err
 		}
 		var out []string
+		var emptyErr error
 		for _, step := range steps {
 			dmgPath, err := remoteDmgPathForDscStep(i, step.Kind)
 			if err != nil {
@@ -1007,6 +1008,13 @@ func DSC(c *Config) ([]string, error) {
 			}
 			stepOut, err := extractRemoteDscDMG(c, i, zr, dmgPath, folder, step.Arches)
 			if err != nil {
+				if step.AllowEmpty && dyld.IsDscNotFound(err) {
+					if emptyErr == nil {
+						emptyErr = err
+					}
+					log.Debugf("No matching dyld_shared_cache(s) in optional %s DMG; continuing", step.Kind)
+					continue
+				}
 				return nil, err
 			}
 			if stepOut == nil {
@@ -1015,6 +1023,9 @@ func DSC(c *Config) ([]string, error) {
 				return out, nil
 			}
 			out = append(out, stepOut...)
+		}
+		if len(out) == 0 && emptyErr != nil {
+			return nil, emptyErr
 		}
 		return out, nil
 	}

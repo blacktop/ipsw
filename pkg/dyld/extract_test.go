@@ -2,6 +2,8 @@ package dyld
 
 import (
 	"archive/zip"
+	"errors"
+	"fmt"
 	"slices"
 	"testing"
 )
@@ -68,6 +70,7 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 		arches          []string
 		hasRosettaOS    bool
 		requiresRosetta bool
+		driverKit       bool
 		want            []DscExtractionStep
 		wantErr         bool
 	}{
@@ -86,6 +89,17 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 			want: []DscExtractionStep{
 				{Kind: SystemOSDscDMG},
 				{Kind: RosettaOSDscDMG},
+			},
+		},
+		{
+			name:            "driverkit empty arches allow either dmg to be empty",
+			arches:          nil,
+			hasRosettaOS:    true,
+			requiresRosetta: true,
+			driverKit:       true,
+			want: []DscExtractionStep{
+				{Kind: SystemOSDscDMG, AllowEmpty: true},
+				{Kind: RosettaOSDscDMG, AllowEmpty: true},
 			},
 		},
 		{
@@ -137,18 +151,50 @@ func TestDscExtractionPlanRoutesRosettaArches(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := dscExtractionPlan(test.arches, test.hasRosettaOS, test.requiresRosetta)
+			got, err := dscExtractionPlan(test.arches, test.hasRosettaOS, test.requiresRosetta, test.driverKit)
 			if test.wantErr {
 				if err == nil {
-					t.Fatalf("dscExtractionPlan(%v, %v, %v) error = nil, want error", test.arches, test.hasRosettaOS, test.requiresRosetta)
+					t.Fatalf("dscExtractionPlan(%v, %v, %v, %v) error = nil, want error", test.arches, test.hasRosettaOS, test.requiresRosetta, test.driverKit)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("dscExtractionPlan(%v, %v, %v) error = %v", test.arches, test.hasRosettaOS, test.requiresRosetta, err)
+				t.Fatalf("dscExtractionPlan(%v, %v, %v, %v) error = %v", test.arches, test.hasRosettaOS, test.requiresRosetta, test.driverKit, err)
 			}
 			if !equalDscExtractionSteps(got, test.want) {
-				t.Fatalf("dscExtractionPlan(%v, %v, %v) = %#v, want %#v", test.arches, test.hasRosettaOS, test.requiresRosetta, got, test.want)
+				t.Fatalf("dscExtractionPlan(%v, %v, %v, %v) = %#v, want %#v", test.arches, test.hasRosettaOS, test.requiresRosetta, test.driverKit, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsDscNotFoundRecognizesWrappedMisses(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "missing dsc",
+			err:  fmt.Errorf("%w in DMG: rosetta.dmg", ErrNoDscFound),
+			want: true,
+		},
+		{
+			name: "missing arch",
+			err:  fmt.Errorf("%w: [x86_64]", ErrNoDscForArch),
+			want: true,
+		},
+		{
+			name: "unrelated error",
+			err:  errors.New("mount failed"),
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsDscNotFound(test.err); got != test.want {
+				t.Fatalf("IsDscNotFound(%v) = %t, want %t", test.err, got, test.want)
 			}
 		})
 	}
@@ -167,7 +213,7 @@ func equalDscExtractionSteps(a, b []DscExtractionStep) bool {
 		return false
 	}
 	for idx := range a {
-		if a[idx].Kind != b[idx].Kind || !slices.Equal(a[idx].Arches, b[idx].Arches) {
+		if a[idx].Kind != b[idx].Kind || a[idx].AllowEmpty != b[idx].AllowEmpty || !slices.Equal(a[idx].Arches, b[idx].Arches) {
 			return false
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 )
 
 var ErrNoCryptex = errors.New("cryptex-system NOT found in remote zip")
+var ErrNoDscFound = errors.New("failed to find dyld_shared_cache(s)")
+var ErrNoDscForArch = errors.New("no dyld_shared_cache files found matching the specified archs")
 
 var DscArches = []string{
 	"arm64", "arm64e", "x86_64", "x86_64h", "aot",
@@ -40,10 +43,17 @@ const (
 )
 
 // DscExtractionStep is one DMG to extract dyld_shared_cache(s) from, with the
-// arches to pull out of it (nil means all).
+// arches to pull out of it (nil means all). AllowEmpty lets multi-DMG callers
+// continue past a DMG that has no matching caches and report a miss only if no
+// planned DMG yields artifacts.
 type DscExtractionStep struct {
-	Kind   DscDMGKind
-	Arches []string
+	Kind       DscDMGKind
+	Arches     []string
+	AllowEmpty bool
+}
+
+func IsDscNotFound(err error) bool {
+	return errors.Is(err, ErrNoDscFound) || errors.Is(err, ErrNoDscForArch)
 }
 
 func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
@@ -82,34 +92,45 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 // DscExtractionPlan returns the DMG extraction steps needed to cover the
 // requested arches for the given IPSW. macOS 27+ moves the x86_64 family of
 // dyld_shared_caches into the Cryptex1,RosettaOS DMG, so plans for those
-// IPSWs can span two DMGs.
-func DscExtractionPlan(i *info.Info, arches []string) ([]DscExtractionStep, error) {
+// IPSWs can span two DMGs. driverKit affects whether empty secondary DMGs
+// are fatal: DriverKit extraction with no explicit arch scans any available
+// RosettaOS DMG opportunistically, but a RosettaOS image with no DriverKit
+// caches should not fail a SystemOS result.
+func DscExtractionPlan(i *info.Info, arches []string, driverKit bool) ([]DscExtractionStep, error) {
 	if !macOSX86DscRequiresRosetta(i) {
-		return dscExtractionPlan(arches, false, false)
+		return dscExtractionPlan(arches, false, false, driverKit)
 	}
+
+	requiresRosettaMetadata := (len(arches) == 0 && !driverKit) || hasRosettaDscArch(arches)
+	opportunisticRosettaMetadata := len(arches) == 0 && driverKit
 	hasRosettaOS := false
-	if _, err := i.GetRosettaOsDmg(); err == nil {
-		hasRosettaOS = true
-	} else if !errors.Is(err, info.ErrorCryptexNotFound) {
-		// a truly absent cryptex is handled below; anything else (e.g.
-		// multiple RosettaOS DMGs) would otherwise masquerade as "absent"
-		return nil, fmt.Errorf("failed to determine RosettaOS DMG availability: %w", err)
+	if requiresRosettaMetadata || opportunisticRosettaMetadata {
+		if _, err := i.GetRosettaOsDmg(); err == nil {
+			hasRosettaOS = true
+		} else if !errors.Is(err, info.ErrorCryptexNotFound) {
+			// a truly absent cryptex is handled below; anything else (e.g.
+			// multiple RosettaOS DMGs) would otherwise masquerade as "absent"
+			if requiresRosettaMetadata {
+				return nil, fmt.Errorf("failed to determine RosettaOS DMG availability: %w", err)
+			}
+			log.Warnf("failed to determine optional RosettaOS DMG availability: %v; extracting SystemOS DriverKit caches only", err)
+		}
 	}
-	if !hasRosettaOS && len(arches) == 0 {
+	if !hasRosettaOS && len(arches) == 0 && !driverKit {
 		log.Warn("macOS 27+ moves x86_64 dyld_shared_cache(s) to the RosettaOS cryptex, but BuildManifest has no Cryptex1,RosettaOS; extracting SystemOS caches only")
 	}
-	return dscExtractionPlan(arches, hasRosettaOS, true)
+	return dscExtractionPlan(arches, hasRosettaOS, true, driverKit)
 }
 
-func dscExtractionPlan(arches []string, hasRosettaOS, requiresRosetta bool) ([]DscExtractionStep, error) {
+func dscExtractionPlan(arches []string, hasRosettaOS, requiresRosetta, driverKit bool) ([]DscExtractionStep, error) {
 	if !requiresRosetta {
-		return []DscExtractionStep{{Kind: SystemOSDscDMG, Arches: arches}}, nil
+		return []DscExtractionStep{{Kind: SystemOSDscDMG, Arches: arches, AllowEmpty: driverKit && len(arches) == 0}}, nil
 	}
 
 	if len(arches) == 0 { // all arches: cover every DMG that carries DSCs
-		steps := []DscExtractionStep{{Kind: SystemOSDscDMG}}
+		steps := []DscExtractionStep{{Kind: SystemOSDscDMG, AllowEmpty: driverKit}}
 		if hasRosettaOS {
-			steps = append(steps, DscExtractionStep{Kind: RosettaOSDscDMG})
+			steps = append(steps, DscExtractionStep{Kind: RosettaOSDscDMG, AllowEmpty: driverKit})
 		}
 		return steps, nil
 	}
@@ -155,6 +176,10 @@ func isRosettaDscArch(arch string) bool {
 	default:
 		return false
 	}
+}
+
+func hasRosettaDscArch(arches []string) bool {
+	return slices.ContainsFunc(arches, isRosettaDscArch)
 }
 
 func dscArchRegexParts(arches []string) []string {
@@ -251,6 +276,9 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 	if err != nil {
 		return nil, err
 	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("%w in DMG: %s", ErrNoDscFound, dmgPath)
+	}
 
 	if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") { // Is macOS IPSW
 		if len(arches) == 0 {
@@ -279,14 +307,14 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 			}
 
 			if len(filtered) == 0 {
-				return nil, fmt.Errorf("no dyld_shared_cache files found matching the specified archs: %v", arches)
+				return nil, fmt.Errorf("%w: %v", ErrNoDscForArch, arches)
 			}
 			matches = filtered
 		}
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("failed to find dyld_shared_cache(s) in DMG: %s", dmgPath)
+		return nil, fmt.Errorf("%w in DMG: %s", ErrNoDscFound, dmgPath)
 	}
 
 	var artifacts []string
@@ -320,12 +348,13 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
 	}
 
-	steps, err := DscExtractionPlan(i, arches)
+	steps, err := DscExtractionPlan(i, arches, driverkit)
 	if err != nil {
 		return nil, err
 	}
 
 	var artifacts []string
+	var emptyErr error
 	for _, step := range steps {
 		dmgPath, err := dmgPathForDscStep(i, step.Kind)
 		if err != nil {
@@ -340,6 +369,13 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		stepArtifacts, err := ExtractFromDMG(i, localDMGPath, destPath, pemDB, step.Arches, driverkit, all)
 		cleanup()
 		if err != nil {
+			if step.AllowEmpty && IsDscNotFound(err) {
+				if emptyErr == nil {
+					emptyErr = err
+				}
+				utils.Indent(log.Debug, 2)(fmt.Sprintf("No matching dyld_shared_cache(s) in optional %s DMG; continuing", step.Kind))
+				continue
+			}
 			return nil, err
 		}
 		if stepArtifacts == nil {
@@ -348,6 +384,10 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 			return artifacts, nil
 		}
 		artifacts = append(artifacts, stepArtifacts...)
+	}
+
+	if len(artifacts) == 0 && emptyErr != nil {
+		return nil, emptyErr
 	}
 
 	return artifacts, nil
