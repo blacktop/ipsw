@@ -128,7 +128,9 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 	// If manifest path is already provided, use it
 	if c.ManifestPath != "" {
 		info.ManifestPath = c.ManifestPath
-		c.DDIFolder = filepath.Dir(c.ManifestPath)
+		if c.DDIFolder == "" {
+			c.DDIFolder = filepath.Dir(c.ManifestPath)
+		}
 	}
 	if c.TrustcachePath != "" {
 		info.TrustcachePath = c.TrustcachePath
