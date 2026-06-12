@@ -11,7 +11,7 @@ description: Mount DMG from IPSW
 Mount DMG from IPSW
 
 ```
-ipsw mount [fs|sys|app|exc|rdisk] IPSW [flags]
+ipsw mount [app|sys|fs|exc|rdisk|rosetta] IPSW [flags]
 ```
 
 ### Examples
@@ -34,6 +34,9 @@ $ ipsw mount fs iPhone.ipsw --mount-point /mnt/ios-filesystem
 
 # Mount a RestoreRamDisk by identity (defaults to the first if not specified)
 $ ipsw mount rdisk iPhone.ipsw --ident Erase
+
+# Mount the RosettaOS cryptex DMG from a macOS IPSW (macOS 27+)
+$ ipsw mount rosetta UniversalMac.ipsw
 
 # Mount in background without blocking (detach mode)
 $ ipsw mount fs iPhone.ipsw --detach
