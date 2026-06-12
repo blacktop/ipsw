@@ -75,6 +75,7 @@ var excCmd = &cobra.Command{
 					URL:    args[0],
 					Info:   showInfo,
 					Output: output,
+					Prompt: true,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to extract files from exclave bundle from remote IPSW: %v", err)
@@ -84,6 +85,7 @@ var excCmd = &cobra.Command{
 					IPSW:   infile,
 					Info:   showInfo,
 					Output: output,
+					Prompt: true,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to extract files from exclave bundle from local IPSW: %v", err)
