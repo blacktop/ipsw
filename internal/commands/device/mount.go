@@ -128,7 +128,9 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 	// If manifest path is already provided, use it
 	if c.ManifestPath != "" {
 		info.ManifestPath = c.ManifestPath
-		c.DDIFolder = filepath.Dir(c.ManifestPath)
+		if c.DDIFolder == "" {
+			c.DDIFolder = filepath.Dir(c.ManifestPath)
+		}
 	}
 	if c.TrustcachePath != "" {
 		info.TrustcachePath = c.TrustcachePath
@@ -168,7 +170,7 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 				info.ManifestPath = filepath.Join(c.DDIFolder, "Restore/BuildManifest.plist")
 			}
 		}
-	} else if c.DDIFolder != "" {
+	} else if c.ManifestPath == "" && c.DDIFolder != "" {
 		info.ManifestPath = filepath.Join(c.DDIFolder, "Restore/BuildManifest.plist")
 		if _, err := os.Stat(info.ManifestPath); errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("failed to find BuildManifest.plist at '%s' (run `%s -runFirstLaunch`)",
