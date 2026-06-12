@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
@@ -34,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"golang.org/x/term"
 )
 
 var ErrNoDecryptionKey = errors.New("no decryption key found")
@@ -101,6 +104,8 @@ type Config struct {
 	JSON bool `json:"json,omitempty"`
 	// show info
 	Info bool `json:"info,omitempty"`
+	// interactively prompt the user to pick which matching files to extract
+	Prompt bool `json:"-"`
 	// Lookup decryption keys from theapplewiki.com
 	Lookup bool `json:"lookup,omitempty"`
 	// FirmwareKeys are caller-provided decryption keys from theapplewiki.com
@@ -859,12 +864,7 @@ func SPTM(c *Config) ([]string, error) {
 }
 
 func Exclave(c *Config) ([]string, error) {
-	var (
-		err      error
-		tmpOut   []string
-		outfiles []string
-		excs     [][]byte
-	)
+	var outfiles []string
 
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_exclave")
 	if err != nil {
@@ -880,12 +880,56 @@ func Exclave(c *Config) ([]string, error) {
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no Exclave bundles found")
 	}
-	tmpOut = append(tmpOut, out...)
 
-	for _, f := range tmpOut {
-		if strings.Contains(f, ".restore.") {
-			continue // TODO: skip restore bundles for now
+	interactive := c.Prompt && len(out) > 1 &&
+		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+
+	var bundles []string
+	if interactive {
+		choices := make([]string, len(out))
+		var defaults []int
+		for i, f := range out {
+			choices[i] = filepath.Base(f)
+			if !strings.Contains(f, ".restore.") {
+				defaults = append(defaults, i)
+			}
 		}
+		var selected []int
+		prompt := &survey.MultiSelect{
+			Message: "Select which Exclave bundle(s) to extract:",
+			Options: choices,
+			Default: defaults,
+		}
+		if err := survey.AskOne(prompt, &selected); err != nil {
+			if errors.Is(err, terminal.InterruptErr) {
+				log.Warn("Exiting...")
+				os.RemoveAll(tmpDIR) // deferred cleanup doesn't run on os.Exit
+				os.Exit(0)
+			}
+			return nil, fmt.Errorf("failed to prompt for Exclave bundle selection: %v", err)
+		}
+		if len(selected) == 0 {
+			return nil, fmt.Errorf("no Exclave bundles selected")
+		}
+		for _, idx := range selected {
+			bundles = append(bundles, out[idx])
+		}
+	} else {
+		for _, f := range out {
+			if strings.Contains(f, ".restore.") {
+				log.Debugf("Skipping restore Exclave bundle %s", filepath.Base(f))
+				continue
+			}
+			bundles = append(bundles, f)
+		}
+		if len(bundles) == 0 {
+			return nil, fmt.Errorf("no Exclave bundles to extract (all %d matches are restore bundles)", len(out))
+		}
+	}
+
+	outDir := filepath.Clean(c.Output)
+
+	for _, f := range bundles {
 		im4p, err := img4.OpenPayload(f)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
@@ -894,32 +938,30 @@ func Exclave(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
-		if !c.Info {
-			// save BUND file
-			baseName := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
-			excFile := filepath.Join(filepath.Clean(c.Output), baseName)
-			if err := os.MkdirAll(filepath.Dir(excFile), 0o750); err != nil {
-				return nil, fmt.Errorf("failed to create output directory '%s': %v", excFile, err)
-			}
-			if err := os.WriteFile(excFile, excData, 0o644); err != nil {
-				return nil, fmt.Errorf("failed to write '%s': %v", excFile, err)
-			}
-			outfiles = append(outfiles, excFile)
-		}
-		// append to exclave cores for kernel/app extraction
-		excs = append(excs, excData)
-	}
-
-	for _, exc := range excs {
 		if c.Info {
-			fwcmd.ShowExclaveCores(exc)
+			fwcmd.ShowExclaveCores(excData)
 			continue
 		}
-		out, err := fwcmd.ExtractExclaveCores(exc, filepath.Clean(c.Output))
+		baseName := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
+		folder := outDir
+		if len(bundles) > 1 {
+			// bundles contain identically named files (e.g. SYSTEM/kernel); keep them separate
+			folder = filepath.Join(folder, baseName)
+		}
+		if err := os.MkdirAll(folder, 0o750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
+		}
+		// save BUND file
+		excFile := filepath.Join(folder, baseName)
+		if err := os.WriteFile(excFile, excData, 0o644); err != nil {
+			return nil, fmt.Errorf("failed to write '%s': %v", excFile, err)
+		}
+		outfiles = append(outfiles, excFile)
+		cores, err := fwcmd.ExtractExclaveCores(excData, folder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 		}
-		outfiles = append(outfiles, out...)
+		outfiles = append(outfiles, cores...)
 	}
 
 	if c.Info {
