@@ -373,7 +373,7 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 		if addr == fn.StartAddr {
 			if symName, ok := d.f.AddressToSymbol.Get(addr); ok {
 				if d.Demangle() {
-					if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
+					if swift.IsMangled(symName) {
 						symName, _ = swift.Demangle(symName)
 						return ok, symName
 					}
