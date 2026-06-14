@@ -754,7 +754,7 @@ func (d *MachoDisass) loadDwarf(machoPath string) error {
 				if sym.Name != "" {
 					name := sym.Name
 					if d.cfg.Demangle {
-						if strings.HasPrefix(name, "_$s") {
+						if swift.IsMangled(name) {
 							name, _ = swift.Demangle(name)
 						} else {
 							name = demangle.Do(name, false, false)

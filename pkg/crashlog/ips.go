@@ -815,7 +815,7 @@ func demangleSym(do bool, in string) string {
 		if strings.HasPrefix(in, "__Z") || strings.HasPrefix(in, "_Z") {
 			return demangle.Do(in, false, false)
 		}
-		if strings.HasPrefix(in, "_$s") || strings.HasPrefix(in, "$s") {
+		if swift.IsMangled(in) {
 			in, _ = swift.Demangle(in)
 		}
 	}

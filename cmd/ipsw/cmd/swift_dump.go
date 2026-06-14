@@ -236,7 +236,7 @@ var swiftDumpCmd = &cobra.Command{
 							}
 						}
 						if doDemangle {
-							if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") {
+							if swift.IsMangled(sym.Name) {
 								m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
 							} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
 								m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
