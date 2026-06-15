@@ -53,10 +53,10 @@ func (t *firmwaresTask) Parse(_ context.Context, d *Diff) error {
 }
 
 // firmwaresCacheVersion is the cache payload / output-semantics version for
-// firmwaresTask. Bump it whenever the persisted row layout (the firmware
-// MachoDiff), the firmware enumeration/diff pipeline, or the rendered `## Firmware`
-// section semantics change in a way that invalidates rows written by a prior ipsw
-// build. The feature is unreleased, so it starts at 1; bump only after a release.
+// firmwaresTask. The diff cache shipped in v3.1.693, so bump this whenever the
+// persisted row layout (the firmware MachoDiff), the firmware enumeration/diff
+// pipeline, or the rendered `## Firmware` section semantics change in a way that
+// invalidates rows written by a prior ipsw build.
 const firmwaresCacheVersion = 1
 
 // Version reports the cache payload / output-semantics version. See

@@ -230,10 +230,10 @@ func machoDiffHasContent(d *mcmd.MachoDiff) bool {
 }
 
 // machosCacheVersion is the cache payload / output-semantics version for
-// machosJob. Bump it whenever the persisted row layout (per-volume MachoDiff)
-// or the rendered MachO section semantics change in a way that invalidates
-// rows written by a prior ipsw build. The feature is unreleased, so it starts
-// at 1; bump only after a release ships.
+// machosJob. The diff cache shipped in v3.1.693, so bump this whenever the
+// persisted row layout (per-volume MachoDiff), the InputHash composition, or
+// the rendered MachO section semantics change in a way that invalidates rows
+// written by a prior ipsw build.
 const machosCacheVersion = 1
 
 // Version reports the cache payload / output-semantics version. See
