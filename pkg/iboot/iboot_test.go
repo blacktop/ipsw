@@ -72,6 +72,25 @@ func TestParseKeepsLegacyEmptyReleaseAndVersion(t *testing.T) {
 	}
 }
 
+// TestParseSkipsStrayLZFSEEndBeforeStart is a regression for the iOS 27 iBoot
+// panic "slice bounds out of range [383:193]": an lzfse end marker ("bvx$")
+// occurring before the start marker ("bvx2") must not be paired with that
+// start (which would slice data[start:end+4] with end < start). The end marker
+// is now searched from the start marker, so a stray earlier end is ignored.
+func TestParseSkipsStrayLZFSEEndBeforeStart(t *testing.T) {
+	data := make([]byte, 0x400)
+	writeCString(data, 0x200, "iBoot")
+	binary.LittleEndian.PutUint64(data[0x300:], 0x180000000)
+
+	copy(data[0x40:], lzfseEnd)   // stray end, before any start
+	copy(data[0x80:], lzfseStart) // start
+	copy(data[0xc0:], lzfseEnd)   // matching end, after the start
+
+	if _, err := Parse(data); err != nil {
+		t.Fatalf("Parse() failed: %v", err)
+	}
+}
+
 func writeCString(data []byte, offset int, value string) {
 	copy(data[offset:], value)
 }

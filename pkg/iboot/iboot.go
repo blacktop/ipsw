@@ -113,13 +113,19 @@ func Parse(data []byte) (*IBoot, error) {
 
 	for {
 		start := bytes.Index(data, lzfseStart)
-		end := bytes.Index(data, lzfseEnd)
-
-		if start < 0 || end < 0 {
+		if start < 0 {
 			break
 		}
+		// The end marker must follow the start marker: search from start so a
+		// stray "bvx$" earlier in the buffer can't yield end < start (which
+		// would panic slicing data[start:end+4]).
+		rel := bytes.Index(data[start:], lzfseEnd)
+		if rel < 0 {
+			break
+		}
+		end := start + rel
 
-		decomp := lzfse.DecodeBuffer(data[start : end+4])
+		decomp := lzfse.DecodeBuffer(data[start : end+len(lzfseEnd)])
 
 		strs, err := dumpStrings(bytes.NewReader(decomp), MinStringLength)
 		if err != nil {
@@ -141,7 +147,7 @@ func Parse(data []byte) (*IBoot, error) {
 		iboot.Strings[name] = strs
 
 		found++
-		data = data[end+4:]
+		data = data[end+len(lzfseEnd):]
 	}
 
 	return iboot, nil
