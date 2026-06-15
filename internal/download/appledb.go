@@ -129,6 +129,41 @@ func (fs OsFiles) Swap(i, j int) {
 	fs[i], fs[j] = fs[j], fs[i]
 }
 
+// hasDownloadableSource reports whether f carries at least one source that
+// Query would emit for this query — the same Type/Device match plus the OTA
+// prerequisite/delta filtering Query applies afterward. Latest relies on it so
+// --show-latest only reports a build the download step can actually fetch: an
+// RC that ships OTA-only is skipped under --type ipsw, and a build whose only
+// OTA sources are deltas is skipped under a full-OTA query. Otherwise detect
+// picks a build the download then fails on ("no results found").
+func (f AppleDbOsFile) hasDownloadableSource(query *ADBQuery) bool {
+	if len(query.Type) == 0 && len(query.Device) == 0 {
+		return true // no source constraint to enforce
+	}
+	for _, source := range f.Sources {
+		if len(query.Type) > 0 && source.Type != query.Type {
+			continue
+		}
+		if len(query.Device) > 0 && !slices.Contains(source.DeviceMap, query.Device) {
+			continue
+		}
+		// Mirror Query's OTA-specific source filtering: a prerequisite-build
+		// query keeps only delta sources for that prereq; a default (non-delta)
+		// query keeps only full OTAs (no prerequisite builds).
+		if query.Type == "ota" {
+			if len(query.PrerequisiteBuild) > 0 {
+				if !slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild) {
+					continue
+				}
+			} else if !query.Deltas && len(source.PrerequisiteBuild.Builds) > 0 {
+				continue
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 	var tmpFS OsFiles
 	for _, f := range fs {
@@ -150,6 +185,9 @@ func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 			continue
 		}
 		if query.Latest && f.HideFromLatestVersions {
+			continue
+		}
+		if !f.hasDownloadableSource(query) {
 			continue
 		}
 		tmpFS = append(tmpFS, f)
