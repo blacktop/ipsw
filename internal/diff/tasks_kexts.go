@@ -59,12 +59,12 @@ func (t *kextsTask) Parse(_ context.Context, d *Diff) error {
 }
 
 // kextsCacheVersion is the cache payload / output-semantics version for
-// kextsTask. Bump it whenever the persisted payload layout (the kext MachoDiff
-// plus the rendered Kernel version fields, their display date zones, and the
-// sameKernel short-circuit), the kernelcache parse/diff pipeline, the
-// OptionsHash composition, or the rendered Kexts/Kernel section semantics
-// change in a way that invalidates rows written by a prior ipsw build. The
-// feature is unreleased, so it starts at 1; bump only after a release ships.
+// kextsTask. The diff cache shipped in v3.1.693, so bump this whenever the
+// persisted payload layout (the kext MachoDiff plus the rendered Kernel version
+// fields, their display date zones, and the sameKernel short-circuit), the
+// kernelcache parse/diff pipeline, the OptionsHash composition, or the rendered
+// Kexts/Kernel section semantics change in a way that invalidates rows written
+// by a prior ipsw build.
 const kextsCacheVersion = 1
 
 // Version reports the cache payload / output-semantics version. See
