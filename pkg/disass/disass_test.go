@@ -94,6 +94,143 @@ func TestParseStubsASMADRPAndAddBranchParsesStub(t *testing.T) {
 	}
 }
 
+func TestParseStubsASMArithmeticFarStubParsesTarget(t *testing.T) {
+	// iOS 27 far-target arithmetic stub captured from dyld_shared_cache_arm64e
+	// (build 24A5355q) at 0x188138000:
+	//   adr  x16, 0x18803cc2c
+	//   mov  x17, #0x9b7
+	//   add  x16, x16, x17, lsl #0x15
+	//   br   x16
+	// target = 0x18803cc2c + (0x9b7 << 21) = 0x2bee3cc2c (no GOT load, no PAC).
+	begin := uint64(0x188138000)
+	data := []byte{
+		0x70, 0x61, 0x82, 0x10, // adr  x16, 0x18803cc2c
+		0xf1, 0x36, 0x81, 0xd2, // mov  x17, #0x9b7
+		0x10, 0x56, 0x11, 0x8b, // add  x16, x16, x17, lsl #0x15
+		0x00, 0x02, 0x1f, 0xd6, // br   x16
+	}
+
+	// Derive the expected target from an independent decode so the test verifies
+	// the parser's arithmetic rather than a hand-computed constant.
+	var decoder disassemble.Decoder
+	var adr, mov, add disassemble.Inst
+	if err := decoder.DecomposeInto(begin, binary.LittleEndian.Uint32(data[0:4]), &adr); err != nil {
+		t.Fatalf("failed to decompose adr: %v", err)
+	}
+	if err := decoder.DecomposeInto(begin+4, binary.LittleEndian.Uint32(data[4:8]), &mov); err != nil {
+		t.Fatalf("failed to decompose mov: %v", err)
+	}
+	if err := decoder.DecomposeInto(begin+8, binary.LittleEndian.Uint32(data[8:12]), &add); err != nil {
+		t.Fatalf("failed to decompose add: %v", err)
+	}
+	want := adr.Operands[1].Immediate + (mov.Operands[1].Immediate << uint64(add.Operands[2].ShiftValue))
+
+	stubs, err := ParseStubsASM(data, begin, func(addr uint64) (uint64, error) {
+		return 0, fmt.Errorf("unexpected readPtr call for arithmetic stub: %#x", addr)
+	})
+	if err != nil {
+		t.Fatalf("ParseStubsASM returned error: %v", err)
+	}
+
+	got, ok := stubs[begin]
+	if !ok {
+		t.Fatalf("expected arithmetic stub entry at %#x, got none", begin)
+	}
+	if got != want {
+		t.Fatalf("unexpected arithmetic stub target: got %#x, want %#x", got, want)
+	}
+	if got != 0x2bee3cc2c {
+		t.Fatalf("unexpected arithmetic stub target: got %#x, want %#x", got, uint64(0x2bee3cc2c))
+	}
+}
+
+func TestParseStubsASMArithmeticStubMismatchedBranchRegisterIsIgnored(t *testing.T) {
+	// Same arithmetic stub, but the final branch uses x17 instead of x16, so the
+	// computed value never reaches the destination register: no stub should form.
+	begin := uint64(0x188138000)
+	data := []byte{
+		0x70, 0x61, 0x82, 0x10, // adr  x16, 0x18803cc2c
+		0xf1, 0x36, 0x81, 0xd2, // mov  x17, #0x9b7
+		0x10, 0x56, 0x11, 0x8b, // add  x16, x16, x17, lsl #0x15
+		0x20, 0x02, 0x1f, 0xd6, // br   x17 (mismatched destination)
+	}
+
+	stubs, err := ParseStubsASM(data, begin, func(addr uint64) (uint64, error) {
+		return 0, fmt.Errorf("unexpected readPtr call: %#x", addr)
+	})
+	if err != nil {
+		t.Fatalf("ParseStubsASM returned error: %v", err)
+	}
+	if len(stubs) != 0 {
+		t.Fatalf("expected no stubs for mismatched branch register, got %v", stubs)
+	}
+}
+
+func TestParseStubsASMArithmeticStubRejectsNonStubSequences(t *testing.T) {
+	begin := uint64(0x188138000)
+	adr := []byte{0x70, 0x61, 0x82, 0x10}    // adr x16, 0x18803cc2c
+	movImm := []byte{0xf1, 0x36, 0x81, 0xd2} // mov x17, #0x9b7
+	addLSL := []byte{0x10, 0x56, 0x11, 0x8b} // add x16, x16, x17, lsl #0x15
+	brX16 := []byte{0x00, 0x02, 0x1f, 0xd6}  // br  x16
+
+	concat := func(parts ...[]byte) []byte {
+		var out []byte
+		for _, p := range parts {
+			out = append(out, p...)
+		}
+		return out
+	}
+	decode := func(t *testing.T, b []byte) disassemble.Inst {
+		t.Helper()
+		var dec disassemble.Decoder
+		var inst disassemble.Inst
+		if err := dec.DecomposeInto(begin, binary.LittleEndian.Uint32(b), &inst); err != nil {
+			t.Fatalf("failed to decode %#x: %v", b, err)
+		}
+		return inst
+	}
+	mustNoStub := func(t *testing.T, data []byte) {
+		t.Helper()
+		stubs, err := ParseStubsASM(data, begin, func(addr uint64) (uint64, error) {
+			return 0, fmt.Errorf("unexpected readPtr call: %#x", addr)
+		})
+		if err != nil {
+			t.Fatalf("ParseStubsASM returned error: %v", err)
+		}
+		if len(stubs) != 0 {
+			t.Fatalf("expected no stub for non-stub sequence, got %v", stubs)
+		}
+	}
+
+	t.Run("ConditionalBranchTerminator", func(t *testing.T) {
+		// adr/mov/add followed by cbz (a compute-then-loop idiom), not a br tail-call.
+		cbzX16 := []byte{0x10, 0x00, 0x00, 0xb4} // cbz x16, .
+		if op := decode(t, cbzX16).Operation; op == disassemble.ARM64_BR {
+			t.Fatalf("setup error: terminator decoded as BR, cannot test conditional branch")
+		}
+		mustNoStub(t, concat(adr, movImm, addLSL, cbzX16))
+	})
+
+	t.Run("RegisterMove", func(t *testing.T) {
+		// mov x17, x18 (register move) instead of `mov x17, #imm`.
+		movReg := []byte{0xf1, 0x03, 0x12, 0xaa} // mov x17, x18
+		movInst := decode(t, movReg)
+		if _, isReg := operandRegister(&movInst, 1); !isReg {
+			t.Fatalf("setup error: mov source operand is not a register")
+		}
+		mustNoStub(t, concat(adr, movReg, addLSL, brX16))
+	})
+
+	t.Run("NonShiftedAdd", func(t *testing.T) {
+		// add x16, x16, x17 with no LSL: operandLeftShift must reject it.
+		addPlain := []byte{0x10, 0x02, 0x11, 0x8b} // add x16, x16, x17
+		if decode(t, addPlain).Operands[2].ShiftValueUsed {
+			t.Fatalf("setup error: add unexpectedly carries a shift")
+		}
+		mustNoStub(t, concat(adr, movImm, addPlain, brX16))
+	})
+}
+
 func TestParseStubsASMMismatchedRegistersDoNotCreateStaleStubEntry(t *testing.T) {
 	begin := uint64(0x100002d78)
 

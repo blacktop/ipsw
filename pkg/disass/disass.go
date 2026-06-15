@@ -201,6 +201,20 @@ func operandShiftValue(instr *disassemble.Inst, idx int) (uint64, bool) {
 	return uint64(instr.Operands[idx].ShiftValue), true
 }
 
+// operandLeftShift returns operand idx's shift amount only when it is an explicit
+// logical-left shift (LSL #n). It returns ok=false for unshifted operands or any
+// other shift type (LSR/ASR/ROR), so callers cannot mistake them for a left shift.
+func operandLeftShift(instr *disassemble.Inst, idx int) (uint64, bool) {
+	if instr == nil || int(instr.NumOps) <= idx {
+		return 0, false
+	}
+	op := instr.Operands[idx]
+	if !op.ShiftValueUsed || op.ShiftType != disassemble.SHIFT_TYPE_LSL {
+		return 0, false
+	}
+	return uint64(op.ShiftValue), true
+}
+
 func implSpecificSysReg(op *disassemble.Op) (string, bool) {
 	if op == nil || !op.HasImplSpec {
 		return "", false
@@ -234,8 +248,8 @@ func invalidInstruction(addr uint64, raw uint32, err error) disassemble.Instruct
 
 func logStubDecodeContext(
 	instruction *disassemble.Inst,
-	queue *[2]disassemble.Inst,
-	queueValid *[2]bool,
+	queue *[3]disassemble.Inst,
+	queueValid *[3]bool,
 ) {
 	if instruction != nil {
 		if text, err := instruction.Disassemble(); err == nil {
@@ -724,11 +738,27 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 	return stubs, nil
 }
 
+// arm64InstrSize is the fixed width of an AArch64 instruction in bytes.
+const arm64InstrSize uint64 = 4
+
+// pushStubQueue advances the fixed-depth FIFO of recently decoded instructions
+// used by ParseStubsASM: it shifts slot 0 -> 1 -> 2 and inserts inst at slot 0.
+// valid marks whether inst decoded successfully (false for the decode-error path,
+// where the slot must never be matched against).
+func pushStubQueue(queue *[3]disassemble.Inst, queueValid *[3]bool, inst disassemble.Inst, valid bool) {
+	queue[2] = queue[1]
+	queue[1] = queue[0]
+	queue[0] = inst
+	queueValid[2] = queueValid[1]
+	queueValid[1] = queueValid[0]
+	queueValid[0] = valid
+}
+
 func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, error)) (map[uint64]uint64, error) {
 	var instrValue uint32
 	var decoder disassemble.Decoder
-	var queue [2]disassemble.Inst
-	var queueValid [2]bool
+	var queue [3]disassemble.Inst
+	var queueValid [3]bool
 
 	stubs := make(map[uint64]uint64)
 
@@ -745,10 +775,8 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 
 		var instruction disassemble.Inst
 		if err := decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
-			startAddr += uint64(binary.Size(uint32(0)))
-			queue[1] = queue[0] // push instruction onto const length FIFO queue
-			queueValid[1] = queueValid[0]
-			queueValid[0] = false
+			startAddr += arm64InstrSize
+			pushStubQueue(&queue, &queueValid, instruction, false)
 			continue
 		}
 
@@ -793,7 +821,11 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 				if addRegister, ok := operandRegister(&queue[0], 0); ok {
 					if adrpBase, ok := operandImmediate(&queue[1], 1); ok {
 						if addImm, ok := operandImmediate(&queue[0], 2); ok {
-							if adrpRegister == addRegister {
+							// op2 must be an immediate (`add Xd, Xn, #imm`); a register-form add
+							// (`add Xd, Xn, Xm, lsl #n`) reports Immediate=0 and would otherwise
+							// record a bogus page-base stub.
+							_, addOp2IsReg := operandRegister(&queue[0], 2)
+							if !addOp2IsReg && adrpRegister == addRegister {
 								// adrp     x16, 0x19089b000
 								stubTarget := adrpBase
 								// add      x16, x16, #0x94c ; ___stack_chk_fail
@@ -828,15 +860,41 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 					}
 				}
 			}
+		} else if queueValid[2] && queue[2].Operation == disassemble.ARM64_ADR &&
+			queueValid[1] && queue[1].Operation == disassemble.ARM64_MOV &&
+			queueValid[0] && queue[0].Operation == disassemble.ARM64_ADD &&
+			instruction.Operation == disassemble.ARM64_BR {
+			// iOS 27+ far-target arithmetic stub (no GOT load, no PAC):
+			//   adr  x16, <base>            ; byte-exact base (ADR, not page-granular ADRP)
+			//   mov  x17, #<imm>            ; immediate, not a register move
+			//   add  x16, x16, x17, lsl #<shift>
+			//   br   x16                    ; unconditional indirect tail-call only
+			// target = base + (imm << shift), reaching far/forward beyond ADRP+ADD's ±4 GiB.
+			baseReg, baseOK := operandRegister(&queue[2], 0)
+			movReg, movOK := operandRegister(&queue[1], 0)
+			_, movSrcIsReg := operandRegister(&queue[1], 1) // reject `mov Xd, Xn` (ORR alias); we need `mov Xd, #imm`
+			addReg, addOK := operandRegister(&queue[0], 0)
+			addSrcReg, addSrcOK := operandRegister(&queue[0], 1)
+			addShiftReg, addShiftOK := operandRegister(&queue[0], 2) // op2 must be a register (the shifted reg)
+			brReg, brOK := operandRegister(&instruction, 0)
+			if baseOK && movOK && !movSrcIsReg && addOK && addSrcOK && addShiftOK && brOK &&
+				baseReg == addReg && addReg == addSrcReg && addReg == brReg && // base/add/br share the destination reg
+				movReg == addShiftReg { // add shifts the reg loaded by mov
+				if base, ok := operandImmediate(&queue[2], 1); ok {
+					if imm, ok := operandImmediate(&queue[1], 1); ok {
+						if shift, ok := operandLeftShift(&queue[0], 2); ok { // LSL only
+							// adr x16, <base>  (queue[2] is the start of the stub)
+							stubs[queue[2].Address] = base + (imm << shift)
+						}
+					}
+				}
+			}
 		}
 
 		// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
 
-		queue[1] = queue[0] // push instruction onto const length FIFO queue
-		queueValid[1] = queueValid[0]
-		queue[0] = instruction
-		queueValid[0] = true
-		startAddr += uint64(binary.Size(uint32(0)))
+		pushStubQueue(&queue, &queueValid, instruction, true)
+		startAddr += arm64InstrSize
 	}
 
 	return stubs, nil
