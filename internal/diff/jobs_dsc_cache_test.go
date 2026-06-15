@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"path/filepath"
 	"testing"
 
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
@@ -202,8 +203,112 @@ func TestDSCCacheRoundTrip(t *testing.T) {
 	}
 }
 
+// TestDSCDylibsPersistSplitsPerEntry asserts the dylib MachoDiff is stored as
+// one "dylibs-meta" row plus one "dylib:<name>" row per Updated entry, never a
+// single combined blob. The combined blob routinely exceeded SQLite's
+// SQLITE_MAX_LENGTH (the iOS 26.x DSC diff sums to over a gigabyte) and failed
+// the write with SQLITE_TOOBIG; the per-entry split keeps every row small.
+func TestDSCDylibsPersistSplitsPerEntry(t *testing.T) {
+	oldInfo := testIPSWInfo(map[string]testManifestEntry{
+		"Cryptex1,SystemOS": {path: "old-sys.dmg", digest: []byte{0x10}},
+	})
+	newInfo := testIPSWInfo(map[string]testManifestEntry{
+		"Cryptex1,SystemOS": {path: "new-sys.dmg", digest: []byte{0x20}},
+	})
+
+	src := newDSCJobWithInfo(oldInfo, newInfo)
+	src.d.Dylibs = &mcmd.MachoDiff{
+		New:     []string{"/usr/lib/new.dylib"},
+		Removed: []string{"/usr/lib/gone.dylib"},
+		Updated: map[string]string{
+			"/usr/lib/a.dylib": "diff-a",
+			"/usr/lib/b.dylib": "diff-b",
+		},
+	}
+
+	store := storage.NewMemoryStore()
+	scope, _ := taskScope(oldInfo, newInfo, src)
+	if err := src.persistTo(scope, store); err != nil {
+		t.Fatalf("persistTo: %v", err)
+	}
+
+	keys := make(map[string]bool)
+	if err := store.Iter(scope, func(key string, _ func(v any) error) error {
+		keys[key] = true
+		return nil
+	}); err != nil {
+		t.Fatalf("Iter: %v", err)
+	}
+
+	want := []string{
+		dscRowDylibsMeta,
+		dscRowDylibPrefix + "/usr/lib/a.dylib",
+		dscRowDylibPrefix + "/usr/lib/b.dylib",
+	}
+	for _, k := range want {
+		if !keys[k] {
+			t.Errorf("missing expected row %q", k)
+		}
+	}
+	if len(keys) != len(want) {
+		t.Errorf("persistTo wrote %d rows, want %d (one meta + one per Updated entry): %v", len(keys), len(want), keys)
+	}
+}
+
+// TestDSCDylibsSplitRoundTripSQLite exercises the split-row layout through the
+// persistent SQLite store, not just MemoryStore's compatible gob behavior.
+func TestDSCDylibsSplitRoundTripSQLite(t *testing.T) {
+	oldInfo := testIPSWInfo(map[string]testManifestEntry{
+		"Cryptex1,SystemOS": {path: "old-sys.dmg", digest: []byte{0x10}},
+	})
+	newInfo := testIPSWInfo(map[string]testManifestEntry{
+		"Cryptex1,SystemOS": {path: "new-sys.dmg", digest: []byte{0x20}},
+	})
+
+	src := newDSCJobWithInfo(oldInfo, newInfo)
+	src.d.Dylibs = &mcmd.MachoDiff{
+		New:     []string{"/usr/lib/new.dylib"},
+		Removed: []string{"/usr/lib/gone.dylib"},
+		Updated: map[string]string{
+			"/usr/lib/a.dylib": "diff-a",
+			"/usr/lib/b.dylib": "diff-b",
+		},
+	}
+	src.d.Old.Webkit = "623.2.7.10.4"
+	src.d.New.Webkit = "623.2.7.110.1"
+
+	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "diff.db"))
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	})
+
+	scope, _ := taskScope(oldInfo, newInfo, src)
+	if err := src.persistTo(scope, store); err != nil {
+		t.Fatalf("persistTo: %v", err)
+	}
+
+	dst := newDSCJobWithInfo(oldInfo, newInfo)
+	if err := dst.Hydrate(scope, store); err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if err := dst.Finalize(); err != nil {
+		t.Fatalf("Finalize: %v", err)
+	}
+	if !machoDiffEqual(dst.d.Dylibs, src.d.Dylibs) {
+		t.Errorf("round-trip Dylibs mismatch:\n got=%+v\n want=%+v", dst.d.Dylibs, src.d.Dylibs)
+	}
+	if dst.d.Old.Webkit != src.d.Old.Webkit || dst.d.New.Webkit != src.d.New.Webkit {
+		t.Fatalf("WebKit lost on SQLite round-trip: old=%q new=%q", dst.d.Old.Webkit, dst.d.New.Webkit)
+	}
+}
+
 // TestDSCEmptyDylibsNonEmptyWebkit asserts per-output empty handling: an empty
-// Dylibs writes no "dylibs" row, but the WebKit strings still round-trip. The
+// Dylibs writes no dylib rows, but the WebKit strings still round-trip. The
 // hydrated Dylibs defaults to a non-nil empty *MachoDiff so the published
 // d.Dylibs is byte-identical to a fresh empty run (buildReport keeps the key).
 func TestDSCEmptyDylibsNonEmptyWebkit(t *testing.T) {

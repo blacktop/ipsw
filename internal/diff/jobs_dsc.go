@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
@@ -105,9 +106,11 @@ func (j *dscJob) Finalize() error {
 // dscCacheVersion is the cache payload / output-semantics version for dscJob.
 // Bump it whenever the persisted row layout (the three DSC outputs), the
 // InputHash composition, or the rendered DSC/WebKit/Dylibs section semantics
-// change in a way that invalidates rows written by a prior ipsw build. The
-// feature is unreleased, so it starts at 1; bump only after a release ships.
-const dscCacheVersion = 1
+// change in a way that invalidates rows written by a prior ipsw build.
+//
+// Version 2 splits the former single "dylibs" blob into per-dylib rows to avoid
+// SQLite's SQLITE_MAX_LENGTH on large DSC diffs.
+const dscCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // dscCacheVersion.
@@ -173,18 +176,35 @@ func dscVolumeFor(inf *info.Info) string {
 	return "fs"
 }
 
-// dscCacheRowKey identifies each of the three DSC outputs in the cache.
+// dscCacheRowKey identifies each DSC output in the cache. The dylib MachoDiff
+// is NOT stored as one blob: its per-dylib Updated text routinely sums to over
+// a gigabyte (e.g. iOS 26.x DSC diffs), which exceeds SQLite's SQLITE_MAX_LENGTH
+// and fails the write with SQLITE_TOOBIG. Instead the New/Removed lists go in a
+// single "dylibs-meta" row and every Updated entry gets its own
+// "dylib:<name>" row, so no single blob approaches the limit (the largest
+// individual dylib diff is tens of megabytes).
 const (
-	dscRowDylibs    = "dylibs"
-	dscRowWebkitOld = "webkit-old"
-	dscRowWebkitNew = "webkit-new"
+	dscRowDylibsMeta  = "dylibs-meta"
+	dscRowDylibPrefix = "dylib:"
+	dscRowWebkitOld   = "webkit-old"
+	dscRowWebkitNew   = "webkit-new"
 )
 
-// Hydrate rebuilds the three DSC outputs from a cache hit. The dylib MachoDiff
-// is a gob-encoded *mcmd.MachoDiff under "dylibs"; each WebKit version is a
-// gob-encoded string under "webkit-old" / "webkit-new". A zero-row hit (every
-// output empty, so persistTo wrote nothing) yields a non-nil empty marker so
-// Finalize still takes the hydrate branch and publishes the empty result.
+// dylibsMeta carries the dylib MachoDiff's New/Removed lists in the
+// "dylibs-meta" cache row. The Updated map is stored separately, one row per
+// entry, so the meta row stays small regardless of how much per-dylib diff
+// text the run produced.
+type dylibsMeta struct {
+	New     []string
+	Removed []string
+}
+
+// Hydrate rebuilds the DSC outputs from a cache hit. The dylib MachoDiff is
+// reassembled from a "dylibs-meta" row (New/Removed lists) plus one
+// "dylib:<name>" row per Updated entry; each WebKit version is a gob-encoded
+// string under "webkit-old" / "webkit-new". A zero-row hit (every output empty,
+// so persistTo wrote nothing) yields a non-nil empty marker so Finalize still
+// takes the hydrate branch and publishes the empty result.
 //
 // Dylibs defaults to a non-nil empty *mcmd.MachoDiff (matching dcmd.Diff, which
 // always returns a non-nil value even with zero changes) so the published
@@ -193,18 +213,25 @@ const (
 func (j *dscJob) Hydrate(scope storage.Scope, store storage.Store) error {
 	out := &dscHydrated{Dylibs: &mcmd.MachoDiff{Updated: make(map[string]string)}}
 	err := store.Iter(scope, func(key string, decode func(v any) error) error {
-		switch key {
-		case dscRowDylibs:
-			var diff mcmd.MachoDiff
-			if err := decode(&diff); err != nil {
+		switch {
+		case key == dscRowDylibsMeta:
+			var meta dylibsMeta
+			if err := decode(&meta); err != nil {
 				return fmt.Errorf("dsc: hydrate %s: %w", key, err)
 			}
-			out.Dylibs = &diff
-		case dscRowWebkitOld:
+			out.Dylibs.New = meta.New
+			out.Dylibs.Removed = meta.Removed
+		case strings.HasPrefix(key, dscRowDylibPrefix):
+			var text string
+			if err := decode(&text); err != nil {
+				return fmt.Errorf("dsc: hydrate %s: %w", key, err)
+			}
+			out.Dylibs.Updated[strings.TrimPrefix(key, dscRowDylibPrefix)] = text
+		case key == dscRowWebkitOld:
 			if err := decode(&out.OldWebkit); err != nil {
 				return fmt.Errorf("dsc: hydrate %s: %w", key, err)
 			}
-		case dscRowWebkitNew:
+		case key == dscRowWebkitNew:
 			if err := decode(&out.NewWebkit); err != nil {
 				return fmt.Errorf("dsc: hydrate %s: %w", key, err)
 			}
@@ -222,14 +249,25 @@ func (j *dscJob) Hydrate(scope storage.Scope, store storage.Store) error {
 
 // persistTo writes one row per content-bearing DSC output from the freshly
 // computed result (d.Dylibs / d.Old.Webkit / d.New.Webkit). Empty outputs write
-// no row (the empty-result contract): an empty Dylibs writes no "dylibs" row, an
+// no row (the empty-result contract): an empty Dylibs writes no dylib rows, an
 // empty WebKit string writes no "webkit-*" row. Each output is handled
 // independently, so a non-empty Dylibs with empty WebKit (or vice versa) round-
 // trips correctly.
+//
+// The dylib MachoDiff is split across rows so no single blob exceeds SQLite's
+// SQLITE_MAX_LENGTH: New/Removed go in one "dylibs-meta" row (written only when
+// either is non-empty) and each Updated entry gets its own "dylib:<name>" row.
 func (j *dscJob) persistTo(scope storage.Scope, store storage.Store) error {
-	if machoDiffHasContent(j.d.Dylibs) {
-		if err := store.Put(scope, dscRowDylibs, j.d.Dylibs); err != nil {
-			return fmt.Errorf("dsc: persist dylibs: %w", err)
+	if d := j.d.Dylibs; machoDiffHasContent(d) {
+		if len(d.New) > 0 || len(d.Removed) > 0 {
+			if err := store.Put(scope, dscRowDylibsMeta, dylibsMeta{New: d.New, Removed: d.Removed}); err != nil {
+				return fmt.Errorf("dsc: persist dylibs meta: %w", err)
+			}
+		}
+		for name, text := range d.Updated {
+			if err := store.Put(scope, dscRowDylibPrefix+name, text); err != nil {
+				return fmt.Errorf("dsc: persist dylib %s: %w", name, err)
+			}
 		}
 	}
 	if j.d.Old.Webkit != "" {
