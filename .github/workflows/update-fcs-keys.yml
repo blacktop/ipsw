@@ -29,41 +29,48 @@ jobs:
           set -euo pipefail
           echo "Getting all latest build numbers..."
 
+          # AppleDB tracks release/rc/beta separately and picks the latest by
+          # release DATE, so maintenance betas (e.g. 26.6 beta) are surfaced even
+          # when a newer major's beta exists. It is also the source `make
+          # update_fcs_keys_*` scrapes, so detection and scraping stay in sync.
           get_latest_build() {
-            platform="$1"
+            os="$1"
             device="$2"
             track="$3"
-            if [ "$track" = "beta" ]; then
-              build=$(./ipsw download ota --platform "$platform" --beta --show-latest-build --device "$device" --insecure)
-            else
-              build=$(./ipsw download ota --platform "$platform" --show-latest-build --device "$device" --insecure)
-            fi
-            build=$(printf '%s' "$build" | tr -d '\r\n')
+            case "$track" in
+              release) flag="--release" ;;
+              rc) flag="--rc" ;;
+              beta) flag="--beta" ;;
+              *) echo "::error::unknown track '$track'" >&2; exit 1 ;;
+            esac
+            json=$(./ipsw download appledb --os "$os" "$flag" --latest --show-latest --device "$device" --no-color 2>/dev/null) || {
+              echo "::error::appledb query failed for os=$os device=$device track=$track" >&2
+              exit 1
+            }
+            build=$(printf '%s' "$json" | jq -r '.build // ""' | tr -d '\r\n')
             if [ -z "$build" ]; then
-              echo "::error::No build returned for platform=$platform device=$device track=$track" >&2
+              echo "::error::No build returned for os=$os device=$device track=$track" >&2
               exit 1
             fi
             if ! printf '%s' "$build" | grep -Eq '^[0-9A-Za-z]+$'; then
-              echo "::error::Invalid build identifier '$build' for platform=$platform device=$device track=$track" >&2
+              echo "::error::Invalid build identifier '$build' for os=$os device=$device track=$track" >&2
               exit 1
             fi
             printf '%s' "$build"
           }
 
-          # Get stable builds (use same probe devices as Makefile defaults)
-          STABLE_IOS=$(get_latest_build ios iPhone17,1 stable)
-          STABLE_MACOS=$(get_latest_build macos Mac14,7 stable)
-          STABLE_VISIONOS=$(get_latest_build visionos RealityDevice14,1 stable)
+          # Probe devices match Makefile defaults
+          STABLE_IOS=$(get_latest_build iOS iPhone17,1 release)
+          STABLE_MACOS=$(get_latest_build macOS Mac14,7 release)
+          STABLE_VISIONOS=$(get_latest_build visionOS RealityDevice14,1 release)
 
-          # Get beta builds
-          BETA_IOS=$(get_latest_build ios iPhone17,1 beta)
-          BETA_MACOS=$(get_latest_build macos Mac14,7 beta)
-          BETA_VISIONOS=$(get_latest_build visionos RealityDevice14,1 beta)
+          RC_IOS=$(get_latest_build iOS iPhone17,1 rc)
+          RC_MACOS=$(get_latest_build macOS Mac14,7 rc)
+          RC_VISIONOS=$(get_latest_build visionOS RealityDevice14,1 rc)
 
-          # RC builds use same endpoint as stable for now
-          RC_IOS="$STABLE_IOS"
-          RC_MACOS="$STABLE_MACOS"
-          RC_VISIONOS="$STABLE_VISIONOS"
+          BETA_IOS=$(get_latest_build iOS iPhone17,1 beta)
+          BETA_MACOS=$(get_latest_build macOS Mac14,7 beta)
+          BETA_VISIONOS=$(get_latest_build visionOS RealityDevice14,1 beta)
 
           # Create fingerprints
           STABLE_FP="${STABLE_IOS}_${STABLE_MACOS}_${STABLE_VISIONOS}"
