@@ -47,18 +47,29 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff,
 		}
 		img2 := next[name]
 
+		// freePair releases both images' memoized *macho.File and parsed
+		// symbol tables once the pair has been diffed. The loop previously
+		// called only m.Close() (a no-op for cache-backed MachOs), so every
+		// image's parsed Mach-O — symtab strings, function starts — stayed
+		// resident on its CacheImage for the entire walk, growing heap without
+		// bound across ~3500 images per side. Free() drops i.m so the next GC
+		// reclaims it, keeping the live set to one in-flight pair.
+		freePair := func() {
+			img1.Free()
+			img2.Free()
+		}
+
 		m1, err := img1.GetMacho()
 		if err != nil {
 			log.Errorf("failed to parse MachO for image %s: %v", img1.Name, err)
+			freePair()
 			continue
 		}
 
 		m2, err := img2.GetMacho()
 		if err != nil {
 			log.Errorf("failed to parse MachO for image %s: %v", img2.Name, err)
-			if m1 != nil {
-				m1.Close()
-			}
+			freePair()
 			continue
 		}
 
@@ -82,35 +93,20 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff,
 		info1 := mcmd.GenerateDiffInfo(m1, conf)
 		info2 := mcmd.GenerateDiffInfo(m2, conf)
 		if info2.Equal(*info1) {
-			if m1 != nil {
-				m1.Close()
-			}
-			if m2 != nil {
-				m2.Close()
-			}
+			freePair()
 			continue
 		}
 
 		out, err := mcmd.FormatUpdatedDiff(info1, info2, conf)
 		if err != nil {
-			if m1 != nil {
-				m1.Close()
-			}
-			if m2 != nil {
-				m2.Close()
-			}
+			freePair()
 			return nil, err
 		}
 		if out != "" {
 			diff.Updated[name] = out
 		}
 
-		if m1 != nil {
-			m1.Close()
-		}
-		if m2 != nil {
-			m2.Close()
-		}
+		freePair()
 	}
 
 	return diff, nil
