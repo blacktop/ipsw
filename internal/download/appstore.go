@@ -32,13 +32,15 @@ import (
 // CREDIT - https://github.com/majd/ipatool
 
 const (
-	appStoreBuyHost      = "buy.itunes.apple.com"
-	appStoreAuthPath     = "/WebObjects/MZFinance.woa/wa/authenticate"
-	appStoreDownloadPath = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
-	appStorePurchasePath = "/WebObjects/MZFinance.woa/wa/buyProduct"
-	appStoreBagURL       = "https://init.itunes.apple.com/bag.xml"
-	appStoreSearchURL    = "https://itunes.apple.com/search"
-	appStoreLookupURL    = "https://itunes.apple.com/lookup"
+	appStoreBuyHost        = "buy.itunes.apple.com"
+	appStoreAuthPath       = "/WebObjects/MZFinance.woa/wa/authenticate"
+	appStoreAuthHost       = "auth.itunes.apple.com"
+	appStoreAuthNativePath = "/auth/v1/native/fast/"
+	appStoreDownloadPath   = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	appStorePurchasePath   = "/WebObjects/MZFinance.woa/wa/buyProduct"
+	appStoreBagURL         = "https://init.itunes.apple.com/bag.xml"
+	appStoreSearchURL      = "https://itunes.apple.com/search"
+	appStoreLookupURL      = "https://itunes.apple.com/lookup"
 
 	// AppStoreSearchLimit is the maximum number of results returned by the App Store search API
 	AppStoreSearchLimit = 200
@@ -178,7 +180,10 @@ type loginResponse struct {
 }
 
 type bagResponse struct {
-	URLBag struct {
+	// AuthenticateAccount is advertised at the bag root as of Apple's 26HOTFIX24
+	// (June 2026); older bags only carried it under urlBag.
+	AuthenticateAccount string `plist:"authenticateAccount,omitempty"`
+	URLBag              struct {
 		AuthenticateAccount string `plist:"authenticateAccount,omitempty"`
 	} `plist:"urlBag,omitempty"`
 }
@@ -212,14 +217,6 @@ type downloadRequest struct {
 	SalableAdamId int    `plist:"salableAdamId,omitempty"`
 	SerialNumber  string `plist:"serialNumber,omitempty"`
 }
-
-// type downloadRequest struct {
-// 	GUID              string `plist:"guid,omitempty"`
-// 	Price             string `plist:"price,omitempty"`
-// 	PricingParameters string `plist:"pricingParameters,omitempty"`
-// 	ProductType       string `plist:"productType,omitempty"`
-// 	SalableAdamId     string `plist:"salableAdamId,omitempty"`
-// }
 
 type downloadResponse struct {
 	FailureType     string              `plist:"failureType,omitempty"`
@@ -394,11 +391,36 @@ func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
 		return "", fmt.Errorf("failed to decode bag response: %w", err)
 	}
 
-	return strings.TrimSpace(bag.URLBag.AuthenticateAccount), nil
+	endpoint := strings.TrimSpace(bag.AuthenticateAccount)
+	if endpoint == "" {
+		endpoint = strings.TrimSpace(bag.URLBag.AuthenticateAccount)
+	}
+
+	return normalizeAuthEndpoint(endpoint), nil
+}
+
+// normalizeAuthEndpoint pins the native auth.itunes.apple.com endpoint to the
+// /fast/ path, trailing slash included. After 26HOTFIX24 (June 2026) the bag
+// advertises ".../auth/v1/native"; posting to that, or to /fast without the
+// slash, draws a 301 to an HTML body, so the plist decode dies with "unexpected
+// hex digit 'h'" and the passwordToken Apple returns is later refused by
+// buyProduct (failureType 2034). Only the /fast/ form sent with the Configurator
+// User-Agent yields a token the purchase flow will accept.
+func normalizeAuthEndpoint(endpoint string) string {
+	if !strings.Contains(endpoint, appStoreAuthHost) {
+		return endpoint
+	}
+	if !strings.HasSuffix(endpoint, "/fast") && !strings.HasSuffix(endpoint, "/fast/") {
+		endpoint += "/fast"
+	}
+	if !strings.HasSuffix(endpoint, "/") {
+		endpoint += "/"
+	}
+	return endpoint
 }
 
 func (as *AppStore) resolveAuthEndpoint(guid string) string {
-	fallback := appStoreURL(appStoreBuyHost, appStoreAuthPath)
+	fallback := appStoreURL(appStoreAuthHost, appStoreAuthNativePath)
 
 	endpoint, err := as.getBagAuthEndpoint(guid)
 	if err != nil {
@@ -445,8 +467,14 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 	as := AppStore{
 		Client: &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if len(via) > 0 && via[len(via)-1].URL.Path == appStoreAuthPath {
-					return http.ErrUseLastResponse
+				if len(via) > 0 {
+					last := via[len(via)-1].URL
+					// Don't auto-follow redirects on auth POSTs (legacy MZFinance
+					// path or the native auth.itunes.apple.com host); signIn handles
+					// them manually so the POST body and attempt count are preserved.
+					if last.Path == appStoreAuthPath || last.Host == appStoreAuthHost {
+						return http.ErrUseLastResponse
+					}
 				}
 				return nil
 			},
@@ -659,6 +687,11 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 		fallbackEndpoint := appStoreURL(appStoreBuyHost, appStoreAuthPath)
 		if endpoint == fallbackEndpoint {
 			fallbackEndpoint = as.resolveAuthEndpoint(lr.GuID)
+		} else if strings.Contains(endpoint, appStoreAuthHost) {
+			// Already pointed at the native endpoint; retrying against the legacy
+			// MZFinance URL would walk back into the 26HOTFIX24 breakage (its token
+			// is refused by buyProduct as failureType 2034), so don't downgrade.
+			fallbackEndpoint = ""
 		}
 		if fallbackEndpoint != "" && fallbackEndpoint != endpoint {
 			log.WithFields(log.Fields{
@@ -1077,6 +1110,10 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 		CreditDisplay: "",
 		GUID:          guid,
 		SalableAdamId: app.ID,
+		// Since Apple's 26HOTFIX24 (June 2026) volumeStoreDownloadProduct rejects
+		// popular apps (Google, Microsoft, ...) with failureType 5002 unless a
+		// serialNumber is present; "0" satisfies the check.
+		SerialNumber: "0",
 	}); err != nil {
 		return fmt.Errorf("failed to encode download request: %v", err)
 	}
