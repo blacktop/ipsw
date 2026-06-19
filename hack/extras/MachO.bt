@@ -716,19 +716,37 @@ typedef struct {
 typedef struct {
     SbMagic magic;
     uint32 length;
+    local int64 blobPos = FTell() - (sizeof(uint32) * 2);
+    local int64 blobEnd = blobPos + length;
     if (magic == MAGIC_CODEDIRECTORY) {
-        // local int64 cdPos = FTell();
         CodeDirectoryType codeDirectory <comment="CodeDirectory">;
-        // FSeek(cdPos + codeDirectory.identOffset);
-        string ident;
-        // FSeek(cdPos + codeDirectory.hashOffset);
-        Slot specialSlots[codeDirectory.nSpecialSlots]<optimize=false>;
-        Slot codeSlots[codeDirectory.nCodeSlots]<optimize=false>;
+        local uint64 specialSlotsSize = codeDirectory.nSpecialSlots * codeDirectory.hashSize;
+        local uint64 codeSlotsSize = codeDirectory.nCodeSlots * codeDirectory.hashSize;
+
+        if (codeDirectory.identOffset > 0 && codeDirectory.identOffset < length) {
+            FSeek(blobPos + codeDirectory.identOffset);
+            string ident;
+        }
+
+        if (codeDirectory.version >= SUPPORTS_TEAMID && codeDirectory.TeamOffset > 0 && codeDirectory.TeamOffset < length) {
+            FSeek(blobPos + codeDirectory.TeamOffset);
+            string team;
+        }
+
+        if (codeDirectory.nSpecialSlots > 0 && codeDirectory.hashSize > 0 && codeDirectory.hashOffset >= specialSlotsSize) {
+            FSeek(blobPos + codeDirectory.hashOffset - specialSlotsSize);
+            Slot specialSlots[codeDirectory.nSpecialSlots]<optimize=false>;
+        }
+        if (codeDirectory.nCodeSlots > 0 && codeDirectory.hashSize > 0 && (codeDirectory.hashOffset + codeSlotsSize) <= length) {
+            FSeek(blobPos + codeDirectory.hashOffset);
+            Slot codeSlots[codeDirectory.nCodeSlots]<optimize=false>;
+        }
     } else {
-        if ((length - 8) > 0) {
+        if (length > 8) {
             ubyte data[length - 8];
         }
     }
+    FSeek(blobEnd);
 } CSBlob;
 
 typedef struct {
