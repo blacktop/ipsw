@@ -35,6 +35,8 @@ ipsw dyld disass <DSC> [flags]
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
 # Decompile a function using OpenRouter to access various models
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"
+# Decompile a function using Requesty to access various models
+❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm requesty --dec-model "openai/gpt-4o-mini"
 ```
 
 ### Options

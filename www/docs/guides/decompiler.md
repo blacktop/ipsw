@@ -11,7 +11,7 @@ The **ipsw AI decompiler** revolutionizes binary analysis by leveraging state-of
 
 ## Requirements
 
-There are currently 9 supported LLM providers
+There are currently 10 supported LLM providers
 
 - Github Copilot
 - OpenAI
@@ -22,6 +22,7 @@ There are currently 9 supported LLM providers
 - Gemini (ACP)
 - Ollama (local LLMs)
 - OpenRouter (API access to multiple models)
+- Requesty (API access to multiple models)
 
 ## 🚀 Quick Start
 
@@ -154,6 +155,18 @@ export OPENROUTER_CLIENT_TITLE="ipsw-decompiler"  # Optional: for usage tracking
 
 # 3. Use with ipsw
 ipsw macho disass binary --dec --dec-llm openrouter
+```
+
+### Requesty (Multi-Provider Access)
+
+```bash
+# 1. Get API key from https://app.requesty.ai/api-keys
+# 2. Set environment variables
+export REQUESTY_API_KEY="sk-...here"
+export REQUESTY_CLIENT_TITLE="ipsw-decompiler"  # Optional: for usage tracking
+
+# 3. Use with ipsw (browse models at https://app.requesty.ai/router/list)
+ipsw macho disass binary --dec --dec-llm requesty
 ```
 
 ## 📖 Usage Examples

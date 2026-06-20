@@ -19,6 +19,7 @@ import (
 	"github.com/blacktop/ipsw/internal/ai/ollama"
 	"github.com/blacktop/ipsw/internal/ai/openai"
 	"github.com/blacktop/ipsw/internal/ai/openrouter"
+	"github.com/blacktop/ipsw/internal/ai/requesty"
 	db "github.com/blacktop/ipsw/internal/db/ai"
 	model "github.com/blacktop/ipsw/internal/model/ai"
 	"gorm.io/gorm"
@@ -34,6 +35,7 @@ var Providers = []string{
 	"ollama",
 	"openai",
 	"openrouter",
+	"requesty",
 }
 
 var ProviderAliases = map[string]string{
@@ -335,6 +337,14 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 		})
 	case "openrouter":
 		baseAI, err = openrouter.NewOpenRouter(ctx, &openrouter.Config{
+			Prompt:      cfg.Prompt,
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			TopP:        cfg.TopP,
+			Stream:      cfg.Stream,
+		})
+	case "requesty":
+		baseAI, err = requesty.NewRequesty(ctx, &requesty.Config{
 			Prompt:      cfg.Prompt,
 			Model:       cfg.Model,
 			Temperature: cfg.Temperature,

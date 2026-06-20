@@ -152,7 +152,7 @@ ipsw appstore profile create --name "Development Profile"
 - **Class Dumping**: ObjC and Swift class extraction
 - **SSH Access**: Jailbroken device SSH with debugserver
 - **Frida Integration**: Dynamic instrumentation capabilities
-- **AI Powered Decompiler**: Integration with Claude, OpenAI, Gemini, Ollama and OpenRouter
+- **AI Powered Decompiler**: Integration with Claude, OpenAI, Gemini, Ollama, OpenRouter and Requesty
 
 ```bash
 ipsw symbolicate crash.ips --dsym /path/to/symbols
