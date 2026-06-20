@@ -54,6 +54,26 @@ func getImages(dscPath string) []string {
 	return images
 }
 
+// dscExtractedHint augments errors from class-dumping a standalone MachO. A dylib
+// extracted from a dyld_shared_cache keeps relative ObjC method lists whose
+// selectors are offsets into the cache's shared selector-string table; that table
+// isn't present in a standalone file, so the method names can't be resolved.
+// Point the user at the in-cache path, which resolves everything.
+func dscExtractedHint(err error, m *macho.File, machoPath string) error {
+	if err == nil {
+		return nil
+	}
+	// The sentinel is obscured by %v wraps deeper in the ObjC parse chain, so the
+	// File flag is the reliable signal; errors.Is covers a clean propagation.
+	if !errors.Is(err, macho.ErrObjCSelectorBaseUnavailable) && (m == nil || !m.ObjCSelectorBaseUnavailable()) {
+		return err
+	}
+	return fmt.Errorf("%q looks like a dylib extracted from a dyld_shared_cache: its ObjC method "+
+		"selectors reference the cache's shared selector table, which is unavailable in a standalone "+
+		"file.\n\tClass-dump directly from the cache instead: ipsw class-dump <DSC> %s",
+		machoPath, filepath.Base(machoPath))
+}
+
 func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
@@ -287,41 +307,41 @@ var classDumpCmd = &cobra.Command{
 
 			o, err = mcmd.NewObjC(m, nil, &conf)
 			if err != nil {
-				return err
+				return dscExtractedHint(err, m, machoPath)
 			}
 
 			if viper.GetBool("class-dump.headers") {
-				return o.Headers()
+				return dscExtractedHint(o.Headers(), m, machoPath)
 			}
 
 			if viper.GetBool("class-dump.xcfw") {
-				return o.XCFramework()
+				return dscExtractedHint(o.XCFramework(), m, machoPath)
 			}
 
 			if viper.GetBool("class-dump.spm") {
-				return o.SwiftPackage()
+				return dscExtractedHint(o.SwiftPackage(), m, machoPath)
 			}
 
 			if viper.GetString("class-dump.class") != "" {
 				if err := o.DumpClass(viper.GetString("class-dump.class")); err != nil {
-					return err
+					return dscExtractedHint(err, m, machoPath)
 				}
 			}
 
 			if viper.GetString("class-dump.proto") != "" {
 				if err := o.DumpProtocol(viper.GetString("class-dump.proto")); err != nil {
-					return err
+					return dscExtractedHint(err, m, machoPath)
 				}
 			}
 
 			if viper.GetString("class-dump.cat") != "" {
 				if err := o.DumpCategory(viper.GetString("class-dump.cat")); err != nil {
-					return err
+					return dscExtractedHint(err, m, machoPath)
 				}
 			}
 
 			if doDump {
-				return o.Dump()
+				return dscExtractedHint(o.Dump(), m, machoPath)
 			}
 		} else { /* DSC file */
 			if len(args) < 2 && !viper.GetBool("class-dump.all") {

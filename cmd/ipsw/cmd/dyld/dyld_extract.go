@@ -101,7 +101,7 @@ func init() {
 	dyldExtractCmd.Flags().BoolP("all", "a", false, "Extract all dylibs")
 	dyldExtractCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
 	dyldExtractCmd.Flags().Bool("slide", false, "Apply slide info to extracted dylib(s)")
-	dyldExtractCmd.Flags().Bool("objc", false, "Add ObjC metadata to extracted dylib(s) symtab")
+	dyldExtractCmd.Flags().Bool("objc", false, "Add ObjC metadata to extracted dylib(s) symtab (implies --slide)")
 	dyldExtractCmd.Flags().Bool("stubs", false, "Add stub islands to extracted dylib(s) symtab")
 	dyldExtractCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
@@ -145,6 +145,12 @@ var dyldExtractCmd = &cobra.Command{
 		addStubs := viper.GetBool("dyld.extract.stubs")
 		output := viper.GetString("dyld.extract.output")
 		cacheFile := viper.GetString("dyld.extract.cache")
+		// --objc writes resolved ObjC symbol addresses, so the dylib's own
+		// pointers must be rebased too; otherwise the extracted file holds raw
+		// cache slide-info pointers and cannot be re-parsed (e.g. by class-dump).
+		if addObjc {
+			slide = true
+		}
 		if dumpALL && len(args) > 1 {
 			return fmt.Errorf("cannot specify DYLIB(s) when using --all")
 		} else if !dumpALL && len(args) < 2 {
