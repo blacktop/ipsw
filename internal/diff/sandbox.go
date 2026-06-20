@@ -189,6 +189,9 @@ func buildSandboxDiffFixupMap(kernel *macho.File) (map[uint64]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
+	if _, err := dcf.Parse(); err != nil {
+		return nil, err
+	}
 	for _, start := range dcf.Starts {
 		if start.PageStarts == nil {
 			continue

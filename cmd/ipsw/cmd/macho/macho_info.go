@@ -945,10 +945,13 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("FIXUPS")
 				fmt.Println("======")
 			}
-			if m.HasFixups() {
+			if m.HasDyldChainedFixups() {
 				dcf, err := m.DyldChainedFixups()
 				if err != nil {
 					return err
+				}
+				if _, err := dcf.Parse(); err != nil {
+					return fmt.Errorf("failed to parse dyld chained fixups: %v", err)
 				}
 
 				for _, start := range dcf.Starts {
@@ -982,6 +985,13 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 				}
+			} else if m.HasDyldInfoOnly() {
+				cmd.SilenceUsage = true
+				arch := selectedArch
+				if arch == "" {
+					arch = m.CPU.String()
+				}
+				return fmt.Errorf("--fixups: %s slice uses legacy LC_DYLD_INFO_ONLY rebase/bind opcodes, not chained fixups; try a different --arch (e.g. arm64e)", arch)
 			} else {
 				fmt.Println("  - no fixups")
 			}

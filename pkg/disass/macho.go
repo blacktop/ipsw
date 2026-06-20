@@ -442,9 +442,12 @@ func (d *MachoDisass) parseSymbols() error {
 func (d *MachoDisass) parseRebaseInfo() error {
 	d.sinfo = make(map[uint64]uint64)
 
-	if d.f.HasFixups() {
+	if d.f.HasDyldChainedFixups() {
 		dcf, err := d.f.DyldChainedFixups()
 		if err != nil {
+			return fmt.Errorf("failed to parse fixups: %v", err)
+		}
+		if _, err := dcf.Parse(); err != nil {
 			return fmt.Errorf("failed to parse fixups: %v", err)
 		}
 		for _, start := range dcf.Starts {
@@ -620,11 +623,14 @@ func (d *MachoDisass) parseSwift() error {
 }
 
 func (d *MachoDisass) parseImports() error {
-	if d.f.HasFixups() {
+	if d.f.HasDyldChainedFixups() {
 		var addr uint64
 
 		dcf, err := d.f.DyldChainedFixups()
 		if err != nil {
+			return err
+		}
+		if _, err := dcf.Parse(); err != nil {
 			return err
 		}
 		if dcf.Imports != nil {
