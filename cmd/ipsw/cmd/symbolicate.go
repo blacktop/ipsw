@@ -131,6 +131,10 @@ var symbolicateCmd = &cobra.Command{
 	# Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
 	❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
 
+	# Summarize a JetsamEvent low-memory report (BugType=298): killed process, cause, and top memory consumers
+	❯ ipsw symbolicate JetsamEvent-2026-06-14-150819.ips
+	  # Add --all to list every process, or --proc <name> to filter to one
+
 	# Symbolicate an old style crashlog (BugType=109) requiring a dyld_shared_cache
 	❯ ipsw symbolicate Delta-2024-04-20-135807.ips dyld_shared_cache
 	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)`),
@@ -189,6 +193,16 @@ var symbolicateCmd = &cobra.Command{
 		}
 
 		switch hdr.BugType {
+		case "298": // JETSAM EVENT (low-memory kill report; display only, nothing to symbolicate)
+			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
+				All:     all || Verbose,
+				Process: proc,
+				Verbose: Verbose,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to parse JetsamEvent: %v", err)
+			}
+			fmt.Println(ips)
 		case "210", "288", "309": // NEW JSON STYLE CRASHLOG
 			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
 				All:           all || Verbose,
