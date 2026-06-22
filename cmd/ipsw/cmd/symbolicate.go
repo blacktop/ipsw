@@ -208,7 +208,17 @@ var symbolicateCmd = &cobra.Command{
 				defer cleanup()
 				dscFile = f
 			}
-			return browseSysdiagnose(args[0], &crashlog.Config{All: all || Verbose, Process: proc, Verbose: Verbose}, dscFile)
+			return browseSysdiagnose(args[0], &crashlog.Config{
+				All:         all || Verbose,
+				Running:     running,
+				Process:     proc,
+				Unslid:      unslide,
+				KernelSlide: kcSlide,
+				DSCSlide:    dscSlide,
+				Demangle:    demangleFlag,
+				Hex:         asHex,
+				Verbose:     Verbose,
+			}, dscFile)
 		}
 
 		hdr, err := crashlog.ParseHeader(args[0])
@@ -777,8 +787,17 @@ func openDSCArg(path, pemDB string) (*dyld.File, func(), error) {
 // precedence, otherwise it falls back to the matching Xcode DeviceSupport dump.
 // Returns the cache, a cleanup func, and an error when no cache is available.
 func openMicrostackshotDSC(args []string, ms *crashlog.Microstackshot, pemDB string) (*dyld.File, func(), error) {
+	want := microstackshotCacheUUID(ms) // report's "Shared Cache:" UUID, if any
+
 	if len(args) > 1 {
-		return openDSCArg(filepath.Clean(args[1]), pemDB)
+		f, cleanup, err := openDSCArg(filepath.Clean(args[1]), pemDB)
+		if err != nil {
+			return nil, nil, err
+		}
+		if want != "" && !strings.EqualFold(f.UUID.String(), want) {
+			log.Warnf("supplied cache %s does not match the report's shared cache %s; symbols may be wrong", f.UUID.String(), want)
+		}
+		return f, cleanup, nil
 	}
 
 	ds, err := xcode.FindDeviceSupport(ms.HardwareModel, ms.Header.Version(), ms.Header.Build())
@@ -788,10 +807,35 @@ func openMicrostackshotDSC(args []string, ms *crashlog.Microstackshot, pemDB str
 	if len(ds.DSCs) == 0 {
 		return nil, nil, fmt.Errorf("Xcode DeviceSupport for %s has no dyld_shared_cache (loose-dylib symbolication is not supported here)", filepath.Base(ds.Dir))
 	}
+	// DeviceSupport may carry multiple architectures; prefer the cache whose UUID
+	// matches the report so image+offset doesn't resolve against the wrong cache.
+	if want != "" {
+		for _, p := range ds.DSCs {
+			f, err := dyld.Open(p)
+			if err != nil {
+				continue
+			}
+			if strings.EqualFold(f.UUID.String(), want) {
+				log.Infof("Using Xcode DeviceSupport DSC %s (matches report cache)", filepath.Base(p))
+				return f, func() { f.Close() }, nil
+			}
+			f.Close()
+		}
+		log.Warnf("no Xcode DeviceSupport cache matches the report's shared cache %s; using %s (symbols may be wrong)", want, filepath.Base(ds.DSCs[0]))
+	}
 	log.Infof("Using Xcode DeviceSupport DSC for %s", filepath.Base(ds.Dir))
 	f, err := dyld.Open(ds.DSCs[0])
 	if err != nil {
 		return nil, nil, err
 	}
 	return f, func() { f.Close() }, nil
+}
+
+// microstackshotCacheUUID extracts the cache UUID from the report's
+// "Shared Cache: <UUID> slid base address ..." line, uppercased.
+func microstackshotCacheUUID(ms *crashlog.Microstackshot) string {
+	if fields := strings.Fields(ms.SharedCache); len(fields) > 0 {
+		return strings.ToUpper(fields[0])
+	}
+	return ""
 }

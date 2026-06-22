@@ -1169,15 +1169,40 @@ func (i *Ips) crashFrameAddr(f Frame) (addr uint64, name, slideInfo string) {
 		return f.ImageOffset, fmt.Sprintf("image_%d", f.ImageIndex), ""
 	}
 	img := i.Payload.UsedImages[f.ImageIndex]
-	name = img.Name
 	addr = img.Base + f.ImageOffset
 
+	// Some reports (e.g. 308 ExcUserFault) ship compact usedImages with only
+	// base/source/uuid; fall back to a meaningful name instead of a blank cell.
+	name = img.Name
+	if name == "" {
+		switch {
+		case img.Path != "":
+			name = filepath.Base(img.Path)
+		case img.Source == "S" || img.Source == "C":
+			name = "dyld_shared_cache"
+		case img.Source == "P" && i.Payload.ProcName != "":
+			name = i.Payload.ProcName
+		case len(img.UUID) >= 8:
+			name = "<" + img.UUID[:8] + ">"
+		default:
+			name = fmt.Sprintf("image_%d", f.ImageIndex)
+		}
+	}
+
+	// A frame is in the shared cache if it sits inside the report's sharedCache
+	// range, or its image is sourced from the cache (308 carries no sharedCache
+	// block, so range-checking alone misses its source "S"/"C" frames).
 	sc := i.Payload.SharedCache
-	isDSC := sc.Size > 0 && img.Base >= sc.Base && img.Base < sc.Base+sc.Size
+	inSCRange := sc.Size > 0 && img.Base >= sc.Base && img.Base < sc.Base+sc.Size
+	isDSC := inSCRange || img.Source == "S" || img.Source == "C"
+	cacheBase := sc.Base
+	if isDSC && !inSCRange {
+		cacheBase = img.Base // no sharedCache block: the cache image's base is the cache base
+	}
 
 	switch {
 	case isDSC && i.Config.DSCSlide != 0:
-		addr = i.Config.DSCSlide + (addr - sc.Base)
+		addr = i.Config.DSCSlide + (addr - cacheBase)
 		slideInfo = fmt.Sprintf(" (dsc-slide %#x)", i.Config.DSCSlide)
 	case i.Config.Unslid && f.Slide != 0 && addr >= f.Slide:
 		addr -= f.Slide

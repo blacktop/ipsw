@@ -318,6 +318,45 @@ func TestCrashFrameAddrDSCSlide(t *testing.T) {
 	}
 }
 
+func TestCrashFrameAddrCompactImages(t *testing.T) {
+	// 308 ExcUserFault ships compact usedImages (base/source/uuid, no name) and
+	// no sharedCache block; source "S" frames must get a name and be DSC-aware.
+	const payload = `{
+		"procName": "MobileSMS",
+		"usedImages": [
+			{"base": 6442450944, "source": "S", "uuid": "90bbde82-938a-384b-8837-ed0c790bc5c9", "size": 4764545456},
+			{"base": 4301897728, "source": "P", "uuid": "976fac5d-ceef-36e4-a309-950ecb55350d", "size": 11878400}
+		],
+		"threads": [{"triggered": true, "frames": [
+			{"imageIndex": 0, "imageOffset": 752480},
+			{"imageIndex": 1, "imageOffset": 100}
+		]}]
+	}`
+	var p IPSPayload
+	if err := json.Unmarshal([]byte(payload), &p); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	i := &Ips{Payload: p, Config: &Config{}}
+
+	// source "S" cache image with no name -> "dyld_shared_cache"
+	addr, name, _ := i.crashFrameAddr(p.Threads[0].Frames[0])
+	if name != "dyld_shared_cache" {
+		t.Errorf("frame0 name = %q, want dyld_shared_cache", name)
+	}
+	if addr != 6442450944+752480 {
+		t.Errorf("frame0 addr = %#x, want %#x", addr, uint64(6442450944+752480))
+	}
+	// source "P" with no name -> procName
+	if _, name1, _ := i.crashFrameAddr(p.Threads[0].Frames[1]); name1 != "MobileSMS" {
+		t.Errorf("frame1 name = %q, want MobileSMS", name1)
+	}
+	// --dsc-slide rebases the source-S frame even without a sharedCache block
+	i.Config.DSCSlide = 0x180000000
+	if addr2, _, slide := i.crashFrameAddr(p.Threads[0].Frames[0]); addr2 != 0x180000000+752480 || slide == "" {
+		t.Errorf("dsc-slide frame0 = %#x %q, want %#x + note", addr2, slide, uint64(0x180000000+752480))
+	}
+}
+
 func TestCrashFrameAddrImageIndexOutOfRange(t *testing.T) {
 	// An out-of-range ImageIndex must not panic the render path (the helper owns
 	// the only UsedImages access for 309 frames).
