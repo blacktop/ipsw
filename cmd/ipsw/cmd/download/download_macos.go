@@ -25,13 +25,13 @@ import (
 	"fmt"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/table"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -134,7 +134,7 @@ var downloadMacosCmd = &cobra.Command{
 			}
 			if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) {
 				model := table.NewInteractiveTableWithTitle("🍎 macOS Installers", headers, data, false)
-				p := tea.NewProgram(model, tea.WithAltScreen())
+				p := tea.NewProgram(model)
 				if _, err := p.Run(); err != nil {
 					return fmt.Errorf("error running interactive table: %w", err)
 				}

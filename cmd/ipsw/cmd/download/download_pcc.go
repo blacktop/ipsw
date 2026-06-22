@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/progress"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
@@ -37,7 +38,6 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -124,7 +124,7 @@ var downloadPccCmd = &cobra.Command{
 		var bar func(done, total uint64)
 		var clearBar func()
 		if isatty.IsTerminal(os.Stderr.Fd()) {
-			p := progress.New(progress.WithDefaultGradient(), progress.WithWidth(40), progress.WithoutPercentage())
+			p := progress.New(progress.WithDefaultBlend(), progress.WithWidth(40), progress.WithoutPercentage())
 			clearBar = func() { fmt.Fprint(os.Stderr, "\r\033[K") }
 			bar = func(done, total uint64) {
 				fmt.Fprintf(os.Stderr, "\r   • Fetching PCC log %s %d/%d", p.ViewAs(float64(done)/float64(total)), done, total)

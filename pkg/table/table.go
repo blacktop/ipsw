@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"golang.org/x/term"
 )
 
@@ -480,7 +480,7 @@ func (m *InteractiveTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if m.filterMode {
 			// Handle filter mode
 			switch msg.String() {
@@ -560,7 +560,7 @@ func (m *InteractiveTableModel) applyFilter() {
 	m.table.SetData(m.filteredData)
 }
 
-func (m *InteractiveTableModel) View() string {
+func (m *InteractiveTableModel) View() tea.View {
 	var b strings.Builder
 
 	// Title with filter status
@@ -597,5 +597,7 @@ func (m *InteractiveTableModel) View() string {
 		b.WriteString(helpStyle.Render("↑/↓: navigate • /: filter • esc: clear filter • q/ctrl+c: quit"))
 	}
 
-	return b.String()
+	v := tea.NewView(b.String())
+	v.AltScreen = true
+	return v
 }

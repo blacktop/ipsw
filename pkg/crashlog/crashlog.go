@@ -65,7 +65,7 @@ func (s state) String() string {
 		s["x4"], s["x5"], s["x6"], s["x7"],
 		s["x8"], s["x9"], s["x10"], s["x11"],
 		s["x12"], s["x13"], s["x14"], s["x15"],
-		s["16"], s["x17"], s["x18"], s["x19"],
+		s["x16"], s["x17"], s["x18"], s["x19"],
 		s["x20"], s["x21"], s["x22"], s["x23"],
 		s["x24"], s["x25"], s["x26"], s["x27"],
 		s["x28"], s["fp"], s["lr"],
@@ -421,7 +421,9 @@ func (c *CrashLog) getThreads() error {
 			found = true
 		} else if strings.Contains(line, "Thread State") {
 			isThreadState = true
-			c.Threads[c.CrashedThread].State = make(map[string]uint64)
+			if c.CrashedThread >= 0 && c.CrashedThread < len(c.Threads) {
+				c.Threads[c.CrashedThread].State = make(map[string]uint64)
+			}
 		}
 
 		if found {
@@ -461,7 +463,9 @@ func (c *CrashLog) getThreads() error {
 					if err != nil {
 						return err
 					}
-					c.Threads[c.CrashedThread].State[reg] = addr
+					if c.CrashedThread >= 0 && c.CrashedThread < len(c.Threads) && c.Threads[c.CrashedThread].State != nil {
+						c.Threads[c.CrashedThread].State[reg] = addr
+					}
 				}
 			}
 		}
@@ -479,13 +483,17 @@ func (c *CrashLog) getBackTraces() error {
 	for idx, thread := range c.Threads {
 		for _, btline := range thread.lines {
 			if re.MatchString(btline) {
-				var imgIdx int
 				matches := re.FindStringSubmatch(btline)
 				imageName := matches[re.SubexpIndex("image")]
+				imgIdx, ok := -1, false
 				for iidx, img := range c.Images {
 					if img.Name == imageName {
-						imgIdx = iidx
+						imgIdx, ok = iidx, true
+						break
 					}
+				}
+				if !ok {
+					continue // empty image table or unmatched image: don't index out of range or mis-attribute to image 0
 				}
 				num, err := strconv.Atoi(matches[re.SubexpIndex("num")])
 				if err != nil {

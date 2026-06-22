@@ -32,12 +32,12 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"charm.land/bubbles/v2/progress"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/charmbracelet/bubbles/progress"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -84,7 +84,7 @@ func (m mteScanModel) Init() tea.Cmd {
 
 func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -109,16 +109,16 @@ func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case progress.FrameMsg:
 		progressModel, cmd := m.progress.Update(msg)
-		m.progress = progressModel.(progress.Model)
+		m.progress = progressModel
 		return m, cmd
 	}
 
 	return m, nil
 }
 
-func (m mteScanModel) View() string {
+func (m mteScanModel) View() tea.View {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n", m.err)
+		return tea.NewView(fmt.Sprintf("Error: %v\n", m.err))
 	}
 
 	var s strings.Builder
@@ -177,7 +177,7 @@ func (m mteScanModel) View() string {
 		s.WriteString(contentStyle.Render(helpStyle.Render("Press q to quit")))
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // runMTEScan performs MTE scanning with a progress bar and displays results in a table
@@ -284,7 +284,7 @@ func runMTEScan(f *dyld.File) error {
 
 	// We have a TTY - use Bubble Tea TUI with parallel scanning
 	prog := progress.New(
-		progress.WithDefaultGradient(),
+		progress.WithDefaultBlend(),
 		progress.WithWidth(60),
 	)
 

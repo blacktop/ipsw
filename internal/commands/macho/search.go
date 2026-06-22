@@ -6,15 +6,15 @@ import (
 	"strings"
 	"sync"
 
+	"charm.land/bubbles/v2/progress"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/charmbracelet/bubbles/progress"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/pkg/errors"
 )
 
@@ -59,7 +59,7 @@ func (m mteScanModel) Init() tea.Cmd { return nil }
 
 func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -69,7 +69,7 @@ func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dmgStartMsg:
 		m.mu.Lock()
-		prog := progress.New(progress.WithDefaultGradient(), progress.WithWidth(40))
+		prog := progress.New(progress.WithDefaultBlend(), progress.WithWidth(40))
 		m.dmgs = append(m.dmgs, dmgProgress{name: msg.name, progress: prog})
 		m.mu.Unlock()
 		return m, nil
@@ -125,7 +125,7 @@ func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := make([]tea.Cmd, len(m.dmgs))
 		for i := range m.dmgs {
 			pm, cmd := m.dmgs[i].progress.Update(msg)
-			m.dmgs[i].progress = pm.(progress.Model)
+			m.dmgs[i].progress = pm
 			cmds[i] = cmd
 		}
 		m.mu.Unlock()
@@ -134,9 +134,9 @@ func (m mteScanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m mteScanModel) View() string {
+func (m mteScanModel) View() tea.View {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n", m.err)
+		return tea.NewView(fmt.Sprintf("Error: %v\n", m.err))
 	}
 
 	var s strings.Builder
@@ -224,7 +224,7 @@ func (m mteScanModel) View() string {
 		}
 		s.WriteString(pad.Render(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("Press q to quit")))
 	}
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // RunMTEScanIPSW mounts each DMG once, counts Mach-Os, then scans cached paths.

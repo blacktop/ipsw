@@ -11,15 +11,15 @@ import (
 	"os"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-termimg"
 	"github.com/blacktop/ipsw/pkg/wallpaper"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // wallpaperItem represents a wallpaper in the list
@@ -164,7 +164,7 @@ func NewWallpaperTUI(ctx context.Context) (*model, error) {
 		list:        l,
 		help:        help.New(),
 		spinner:     spinner.New(),
-		viewport:    viewport.New(0, 0),
+		viewport:    viewport.New(),
 		loading:     false,
 		assets:      wp.Assets,
 		download:    make(map[int]bool),
@@ -188,7 +188,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var spinnerCmd tea.Cmd
 		m.spinner, spinnerCmd = m.spinner.Update(msg)
 		return m, spinnerCmd
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			m.quitting = true
@@ -241,8 +241,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.termHeight = msg.Height
 		// Title (3) + Spacing (1) + Status (1) + Legend (2) = 7 lines total
 		availableHeight := msg.Height - 7
-		m.viewport.Width = (msg.Width / 2) - 4
-		m.viewport.Height = availableHeight - 3 // Account for panel borders and padding
+		m.viewport.SetWidth((msg.Width / 2) - 4)
+		m.viewport.SetHeight(availableHeight - 3) // Account for panel borders and padding
 
 		// Update list size for the left panel
 		leftPanelWidth := (msg.Width / 2) - 4
@@ -338,13 +338,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) View() string {
+func (m *model) View() tea.View {
 	if m.quitting {
-		return "Goodbye! 👋"
+		return tea.NewView("Goodbye! 👋")
 	}
 
 	if m.termWidth == 0 || m.termHeight == 0 {
-		return "Loading..."
+		return tea.NewView("Loading...")
 	}
 
 	var b strings.Builder
@@ -428,7 +428,9 @@ func (m *model) View() string {
 	b.WriteString("\n")
 	b.WriteString(legendStyle.Width(m.termWidth).Render(legendText))
 
-	return b.String()
+	v := tea.NewView(b.String())
+	v.AltScreen = true
+	return v
 }
 
 // viewImage renders the image using virtual positioning to avoid layout corruption

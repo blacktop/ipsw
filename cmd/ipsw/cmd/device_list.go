@@ -29,9 +29,9 @@ import (
 	"strconv"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/blacktop/ipsw/pkg/table"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -96,7 +96,7 @@ rather than distinct hardware models.`,
 		if term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && !plain {
 			// Use the fancy interactive BubbleTable
 			model := table.NewInteractiveTable(headers, data, false)
-			p := tea.NewProgram(model, tea.WithAltScreen())
+			p := tea.NewProgram(model)
 			if _, err := p.Run(); err != nil {
 				return fmt.Errorf("error running interactive table: %w", err)
 			}

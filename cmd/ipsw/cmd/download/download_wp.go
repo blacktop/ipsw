@@ -27,9 +27,9 @@ import (
 	"context"
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/blacktop/ipsw/internal/tui"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +51,7 @@ var downloadWpCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+		if _, err := tea.NewProgram(m).Run(); err != nil {
 			return fmt.Errorf("TUI error: %w", err)
 		}
 		return nil

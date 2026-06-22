@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -33,7 +34,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/signature"
-	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -166,17 +166,29 @@ func (p Platform) String() string {
 
 type Timestamp time.Time
 
+// timestampLayouts are tried in order. Apple has shipped several shapes
+// (fractional seconds, ISO-8601) across report types; an unparseable timestamp
+// must never fail the surrounding document — it leaves a zero time.
+var timestampLayouts = []string{
+	"2006-01-02 15:04:05.00 -0700",
+	"2006-01-02 15:04:05 -0700",
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02 15:04:05",
+}
+
 func (ts *Timestamp) UnmarshalJSON(b []byte) error {
 	s := strings.Trim(string(b), "\"")
 	if s == "null" || s == "" {
 		return nil
 	}
-	// 2023-08-04 19:10:03.00 +0200
-	t, err := time.Parse("2006-01-02 15:04:05 -0700", s)
-	if err != nil {
-		return err
+	for _, layout := range timestampLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			*ts = Timestamp(t)
+			return nil
+		}
 	}
-	*ts = Timestamp(t)
+	log.Debugf("crashlog: unrecognized timestamp %q; leaving zero time", s)
 	return nil
 }
 func (r Timestamp) MarshalJSON() ([]byte, error) {
@@ -367,6 +379,9 @@ func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
+	if len(raw) < 3 { // a truncated/reshaped tuple must not panic on raw[1]/raw[2]
+		return fmt.Errorf("binaryImage: expected >=3 elements, got %d", len(raw))
+	}
 	if err := json.Unmarshal(raw[0], &bi.UUID); err != nil {
 		return err
 	}
@@ -392,7 +407,9 @@ func (bi *BinaryImage) UnmarshalJSON(b []byte) error {
 	case "A":
 		bi.Source = "Absolute"
 	default:
-		return fmt.Errorf("invalid binary image source: %v", bi.Source)
+		// An unknown source class (Apple adds one) must not fail the whole
+		// report; keep the raw letter and treat it as a generic image.
+		bi.Source = "Unknown(" + bi.Source + ")"
 	}
 	return nil
 }
@@ -520,6 +537,14 @@ func (s ThreadState) String() string {
 		out.WriteString(fmt.Sprintf("  esr: %s\n", s.ESR))
 		return out.String()
 	} else {
+		// xv guards against a short/absent register file (non-arm64 thread
+		// state, truncated report, future flavor) — never index s.X by a literal.
+		xv := func(i int) uint64 {
+			if i < len(s.X) {
+				return s.X[i].Value
+			}
+			return 0
+		}
 		return fmt.Sprintf(
 			"    x0: %s   x1: %s   x2: %s   x3: %s\n"+
 				"    x4: %s   x5: %s   x6: %s   x7: %s\n"+
@@ -531,14 +556,14 @@ func (s ThreadState) String() string {
 				"   x28: %s   fp: %s   lr: %s\n"+
 				"    sp: %s   pc: %s cpsr: %s\n"+
 				"   esr: %s %s\n",
-			fmtAddr(s.X[0].Value), fmtAddr(s.X[1].Value), fmtAddr(s.X[2].Value), fmtAddr(s.X[3].Value),
-			fmtAddr(s.X[4].Value), fmtAddr(s.X[5].Value), fmtAddr(s.X[6].Value), fmtAddr(s.X[7].Value),
-			fmtAddr(s.X[8].Value), fmtAddr(s.X[9].Value), fmtAddr(s.X[10].Value), fmtAddr(s.X[11].Value),
-			fmtAddr(s.X[12].Value), fmtAddr(s.X[13].Value), fmtAddr(s.X[14].Value), fmtAddr(s.X[15].Value),
-			fmtAddr(s.X[16].Value), fmtAddr(s.X[17].Value), fmtAddr(s.X[18].Value), fmtAddr(s.X[19].Value),
-			fmtAddr(s.X[20].Value), fmtAddr(s.X[21].Value), fmtAddr(s.X[22].Value), fmtAddr(s.X[23].Value),
-			fmtAddr(s.X[24].Value), fmtAddr(s.X[25].Value), fmtAddr(s.X[26].Value), fmtAddr(s.X[27].Value),
-			fmtAddr(s.X[28].Value), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
+			fmtAddr(xv(0)), fmtAddr(xv(1)), fmtAddr(xv(2)), fmtAddr(xv(3)),
+			fmtAddr(xv(4)), fmtAddr(xv(5)), fmtAddr(xv(6)), fmtAddr(xv(7)),
+			fmtAddr(xv(8)), fmtAddr(xv(9)), fmtAddr(xv(10)), fmtAddr(xv(11)),
+			fmtAddr(xv(12)), fmtAddr(xv(13)), fmtAddr(xv(14)), fmtAddr(xv(15)),
+			fmtAddr(xv(16)), fmtAddr(xv(17)), fmtAddr(xv(18)), fmtAddr(xv(19)),
+			fmtAddr(xv(20)), fmtAddr(xv(21)), fmtAddr(xv(22)), fmtAddr(xv(23)),
+			fmtAddr(xv(24)), fmtAddr(xv(25)), fmtAddr(xv(26)), fmtAddr(xv(27)),
+			fmtAddr(xv(28)), fmtAddr(s.FP.Value), fmtAddr(s.LR.Value),
 			fmtAddr(s.SP.Value), fmtAddr(s.PC.Value), fmtAddrSmol(s.CPSR.Value),
 			fmtAddrSmol(s.ESR.Value), colorField(s.ESR.Description))
 	}
@@ -579,16 +604,38 @@ type PanicFrame struct {
 }
 
 func (pf *PanicFrame) UnmarshalJSON(b []byte) error {
-	var s [2]uint64
+	// Frames are [imageIndex, offset] today, but tolerate trailing elements
+	// Apple may append and offsets sent as quoted hex strings.
+	var s []json.RawMessage
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
+	if len(s) < 2 {
+		return fmt.Errorf("panicFrame: expected >=2 elements, got %d", len(s))
+	}
+	idx := jsonUint(s[0])
 	*pf = PanicFrame{
-		ImageIndex:  s[0],
-		ImageName:   fmt.Sprintf("image_%d", s[0]),
-		ImageOffset: s[1],
+		ImageIndex:  idx,
+		ImageName:   fmt.Sprintf("image_%d", idx),
+		ImageOffset: jsonUint(s[1]),
 	}
 	return nil
+}
+
+// jsonUint decodes a JSON number or a quoted (possibly 0x-prefixed) string into
+// a uint64, returning 0 on anything unparseable.
+func jsonUint(raw json.RawMessage) uint64 {
+	var n uint64
+	if err := json.Unmarshal(raw, &n); err == nil {
+		return n
+	}
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		if v, err := strconv.ParseUint(strings.TrimSpace(str), 0, 64); err == nil {
+			return v
+		}
+	}
+	return 0
 }
 
 type Termination struct {
@@ -640,103 +687,6 @@ type AdditionalDetails struct {
 	StackshotTries             int `json:"stackshot_tries,omitempty"`
 	StackshotDurationNsec      int `json:"stackshot_duration_nsec,omitempty"`
 	SystemStateFlags           int `json:"system_state_flags,omitempty"`
-}
-
-// Jetsam is the payload of a JetsamEvent (bug_type 298) report. These are
-// generated when the memory manager (jetsam) terminates one or more processes
-// under memory pressure. Unlike crash/panic reports there are no backtraces to
-// symbolicate; the report is a snapshot of every process and the device's
-// memory state at the moment of the kill.
-type Jetsam struct {
-	Build            string             `json:"build,omitempty"`
-	Product          string             `json:"product,omitempty"`
-	Kernel           string             `json:"kernel,omitempty"`
-	Incident         string             `json:"incident,omitempty"`
-	CrashReporterKey string             `json:"crashReporterKey,omitempty"`
-	Date             string             `json:"date,omitempty"`
-	BugType          string             `json:"bug_type,omitempty"`
-	TimeDelta        int                `json:"timeDelta,omitempty"`
-	MemoryStatus     JetsamMemoryStatus `json:"memoryStatus"`
-	LargestProcess   string             `json:"largestProcess,omitempty"`
-	GenCounter       int                `json:"genCounter,omitempty"`
-	Processes        []JetsamProcess    `json:"processes,omitempty"`
-}
-
-// JetsamMemoryStatus is the device-wide memory snapshot embedded in a 298 report.
-type JetsamMemoryStatus struct {
-	CompressorSize  int64  `json:"compressorSize,omitempty"`
-	Compressions    int64  `json:"compressions,omitempty"`
-	Decompressions  int64  `json:"decompressions,omitempty"`
-	Uncompressed    int64  `json:"uncompressed,omitempty"`
-	PageSize        int64  `json:"pageSize,omitempty"`
-	ZoneMapCap      int64  `json:"zoneMapCap,omitempty"`
-	ZoneMapSize     int64  `json:"zoneMapSize,omitempty"`
-	LargestZone     string `json:"largestZone,omitempty"`
-	LargestZoneSize int64  `json:"largestZoneSize,omitempty"`
-	MemoryPages     struct {
-		Active      int64 `json:"active,omitempty"`
-		Anonymous   int64 `json:"anonymous,omitempty"`
-		FileBacked  int64 `json:"fileBacked,omitempty"`
-		Free        int64 `json:"free,omitempty"`
-		Inactive    int64 `json:"inactive,omitempty"`
-		Purgeable   int64 `json:"purgeable,omitempty"`
-		Speculative int64 `json:"speculative,omitempty"`
-		Throttled   int64 `json:"throttled,omitempty"`
-		Wired       int64 `json:"wired,omitempty"`
-	} `json:"memoryPages"`
-}
-
-// JetsamProcess is one process entry in a 298 report. The Reason field is only
-// present on the process(es) jetsam actually terminated.
-type JetsamProcess struct {
-	PID           int      `json:"pid,omitempty"`
-	Name          string   `json:"name,omitempty"`
-	UUID          string   `json:"uuid,omitempty"`
-	States        []string `json:"states,omitempty"`
-	Priority      int      `json:"priority"`              // jetsam priority band (0 == idle, killed first)
-	RPages        int      `json:"rpages,omitempty"`      // resident pages at time of report
-	LifetimeMax   int      `json:"lifetimeMax,omitempty"` // high-water mark of resident pages
-	Purgeable     int      `json:"purgeable,omitempty"`
-	Reason        string   `json:"reason,omitempty"` // kill cause, only set on terminated processes
-	KillDelta     int      `json:"killDelta,omitempty"`
-	IdleDelta     int64    `json:"idleDelta,omitempty"`
-	Age           int64    `json:"age,omitempty"`
-	CPUTime       float64  `json:"cpuTime,omitempty"`
-	FDs           int      `json:"fds,omitempty"`
-	Coalition     int      `json:"coalition,omitempty"`
-	CSFlags       int64    `json:"csFlags,omitempty"`
-	CSTrustLevel  int      `json:"csTrustLevel,omitempty"`
-	MemRegions    int      `json:"mem_regions,omitempty"`
-	GenCount      int      `json:"genCount,omitempty"`
-	FreezeSkip    string   `json:"freeze_skip_reason:,omitempty"` // trailing colon matches Apple's key
-	PhysicalPages struct {
-		Internal          []int `json:"internal,omitempty"`
-		FrozenToSwapPages int   `json:"frozen_to_swap_pages,omitempty"`
-	} `json:"physicalPages"`
-}
-
-// jetsamReasonExplain maps XNU memorystatus kill-cause strings to a short,
-// human-readable explanation. Strings come from memstat_kill_cause_name[] in
-// bsd/kern/kern_memorystatus.c.
-var jetsamReasonExplain = map[string]string{
-	"jettisoned":                   "generic jetsam kill",
-	"highwater":                    "exceeded the memory high-water mark",
-	"vnode-limit":                  "system hit the vnode limit",
-	"vm-pageshortage":              "system-wide free page shortage",
-	"proc-thrashing":               "process was thrashing",
-	"fc-thrashing":                 "file-cache thrashing",
-	"per-process-limit":            "exceeded its per-process memory limit",
-	"disk-space-shortage":          "low disk space",
-	"idle-exit":                    "idle process reaped",
-	"long-idle-exit":               "long-idle process reaped",
-	"zone-map-exhaustion":          "kernel zone map exhausted",
-	"vm-compressor-thrashing":      "VM compressor thrashing",
-	"vm-compressor-space-shortage": "VM compressor space shortage",
-	"low-swap":                     "low swap space",
-	"sustained-memory-pressure":    "sustained memory pressure",
-	"vm-pageout-starvation":        "pageout thread starvation",
-	"conclave-limit":               "exceeded its conclave memory limit",
-	"diagnostic":                   "diagnostic kill",
 }
 
 type IPSPayload struct {
@@ -1715,6 +1665,9 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
 			for idx, frame := range thread.UserFrames {
+				if int(frame.ImageIndex) >= len(i.Payload.BinaryImages) {
+					continue // frame references an image outside the table (corrupt/truncated)
+				}
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
@@ -1815,6 +1768,9 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 			/* KernelFrames */
 			if kc != nil {
 				for idx, frame := range thread.KernelFrames {
+					if int(frame.ImageIndex) >= len(i.Payload.BinaryImages) {
+						continue // frame references an image outside the table (corrupt/truncated)
+					}
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 					if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
 						i.Payload.ProcessByPid[pid].ThreadByID[tid].KernelFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
@@ -2095,6 +2051,9 @@ func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
 	for pid, proc := range i.Payload.ProcessByPid {
 		for tid, thread := range proc.ThreadByID {
 			for idx, frame := range thread.UserFrames {
+				if int(frame.ImageIndex) >= len(i.Payload.BinaryImages) {
+					continue // frame references an image outside the table (corrupt/truncated)
+				}
 				i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].ImageOffset += i.Payload.BinaryImages[frame.ImageIndex].Base
 				if i.Payload.BinaryImages[frame.ImageIndex].Slide != 0 {
 					i.Payload.ProcessByPid[pid].ThreadByID[tid].UserFrames[idx].Slide = i.Payload.BinaryImages[frame.ImageIndex].Slide
@@ -2244,255 +2203,82 @@ func colorVMSummary(in string) string {
 	return in
 }
 
-// jetsamPages formats a page count as "N pages (humanized bytes)". Memory is
-// reported in binary units (KiB/MiB/GiB) per the convention for RAM footprints.
-func jetsamPages(pages int, pageSize int64) string {
-	if pageSize <= 0 {
-		pageSize = 16384
-	}
-	var nbytes uint64
-	if pages > 0 { // guard a corrupt negative count from rendering as a 16 EiB figure
-		nbytes = uint64(pages) * uint64(pageSize)
-	}
-	return fmt.Sprintf("%s pages (%s)", humanize.Comma(int64(pages)), humanize.IBytes(nbytes))
-}
-
-// iBytesNonNeg formats a signed byte count, clamping negatives to 0 so a corrupt
-// field can't wrap through uint64 into an absurd ~16 EiB figure.
-func iBytesNonNeg(n int64) string {
-	if n < 0 {
-		n = 0
-	}
-	return humanize.IBytes(uint64(n))
-}
-
-// jetsamNameMatches reports whether a process name from the report matches a
-// --proc filter. Jetsam truncates names (comm), so an exact compare misses the
-// full name a user knows; match a substring either direction.
-func jetsamNameMatches(name, filter string) bool {
-	name, filter = strings.ToLower(name), strings.ToLower(filter)
-	return strings.Contains(name, filter) || strings.Contains(filter, name)
-}
-
-// jetsamString renders a JetsamEvent (bug_type 298) report: which process(es)
-// jetsam terminated and why, the device-wide memory snapshot, and the biggest
-// memory consumers at the time of the kill. There are no addresses to
-// symbolicate, so this is a display-only pretty printer.
-func (i *Ips) jetsamString() string {
-	if i.Jetsam == nil {
-		return colorError("malformed JetsamEvent: missing payload")
-	}
-	pageSize := i.Jetsam.MemoryStatus.PageSize
-	if pageSize <= 0 {
-		pageSize = 16384
-	}
-
-	osVersion := i.Jetsam.Build // payload build string, e.g. "iPhone OS 27.0 (24A5355q)"
-	if osVersion == "" {
-		osVersion = i.Header.OsVersion
-	}
-	var out strings.Builder
-	out.WriteString(fmt.Sprintf("[%s] - %s - %s %s\n",
-		colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")),
-		colorError(i.Header.BugTypeDesc),
-		i.Jetsam.Product, osVersion))
-	if i.Jetsam.Kernel != "" {
-		out.WriteString(fmt.Sprintf("%s: %s\n", colorField("Kernel"), i.Jetsam.Kernel))
-	}
-	out.WriteString("\n")
-	out.WriteString(i.jetsamKilledString(pageSize))
-	out.WriteString(i.jetsamMemoryString(pageSize))
-	out.WriteString(i.jetsamProcessesString(pageSize))
-	return out.String()
-}
-
-// jetsamKilledString renders the process(es) jetsam terminated (those carrying a
-// kill Reason), including a plain-English explanation of the kill cause.
-func (i *Ips) jetsamKilledString(pageSize int64) string {
-	var out strings.Builder
-	for _, p := range i.Jetsam.Processes {
-		if p.Reason == "" {
-			continue
-		}
-		reason := p.Reason
-		if explain, ok := jetsamReasonExplain[p.Reason]; ok {
-			reason = fmt.Sprintf("%s (%s)", p.Reason, explain)
-		}
-		out.WriteString(fmt.Sprintf("%s: %s [%s]\n", colorField("Killed Process"), colorImage("%s", p.Name), colorBold("%d", p.PID)))
-		buf := bytes.NewBufferString("")
-		w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(w, "  %s\t%s\n", colorField("Reason"), colorError(reason))
-		fmt.Fprintf(w, "  %s\t%s\n", colorField("Resident"), jetsamPages(p.RPages, pageSize))
-		// physicalPages.internal is [resident, compressed]; the split explains how
-		// much of the footprint was live vs already compressed when jetsam acted.
-		if len(p.PhysicalPages.Internal) >= 2 {
-			fmt.Fprintf(w, "  %s\t%s resident / %s compressed\n", colorField("Internal"),
-				jetsamPages(p.PhysicalPages.Internal[0], pageSize),
-				jetsamPages(p.PhysicalPages.Internal[1], pageSize))
-		}
-		if p.PhysicalPages.FrozenToSwapPages > 0 {
-			fmt.Fprintf(w, "  %s\t%s\n", colorField("Frozen to Swap"), jetsamPages(p.PhysicalPages.FrozenToSwapPages, pageSize))
-		}
-		if p.LifetimeMax > 0 {
-			fmt.Fprintf(w, "  %s\t%s\n", colorField("Lifetime Max"), jetsamPages(p.LifetimeMax, pageSize))
-		}
-		fmt.Fprintf(w, "  %s\t%d\n", colorField("Priority"), p.Priority)
-		if len(p.States) > 0 {
-			fmt.Fprintf(w, "  %s\t%s\n", colorField("States"), strings.Join(p.States, ", "))
-		}
-		if p.CPUTime > 0 {
-			fmt.Fprintf(w, "  %s\t%.3fs\n", colorField("CPU Time"), p.CPUTime)
-		}
-		w.Flush()
-		out.WriteString(buf.String() + "\n")
-	}
-	return out.String()
-}
-
-// jetsamMemoryString renders the device-wide memory snapshot from a 298 report.
-func (i *Ips) jetsamMemoryString(pageSize int64) string {
-	ms := i.Jetsam.MemoryStatus
-	mp := ms.MemoryPages
-	var out strings.Builder
-	out.WriteString(colorField("Memory Status") + ":\n")
-	buf := bytes.NewBufferString("")
-	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Page Size"), humanize.IBytes(uint64(pageSize)))
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Free"), jetsamPages(int(mp.Free), pageSize))
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Active"), jetsamPages(int(mp.Active), pageSize))
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Inactive"), jetsamPages(int(mp.Inactive), pageSize))
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Wired"), jetsamPages(int(mp.Wired), pageSize))
-	if mp.Anonymous > 0 {
-		fmt.Fprintf(w, "  %s\t%s\n", colorField("Anonymous"), jetsamPages(int(mp.Anonymous), pageSize))
-	}
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("File-backed"), jetsamPages(int(mp.FileBacked), pageSize))
-	fmt.Fprintf(w, "  %s\t%s\n", colorField("Purgeable"), jetsamPages(int(mp.Purgeable), pageSize))
-	fmt.Fprintf(w, "  %s\t%s, %s uncompressed\n", colorField("Compressor"), jetsamPages(int(ms.CompressorSize), pageSize), jetsamPages(int(ms.Uncompressed), pageSize))
-	if ms.LargestZone != "" {
-		fmt.Fprintf(w, "  %s\t%s (%s)\n", colorField("Largest Zone"), ms.LargestZone, iBytesNonNeg(ms.LargestZoneSize))
-	}
-	if ms.ZoneMapSize > 0 {
-		fmt.Fprintf(w, "  %s\t%s / %s cap\n", colorField("Zone Map"), iBytesNonNeg(ms.ZoneMapSize), iBytesNonNeg(ms.ZoneMapCap))
-	}
-	w.Flush()
-	out.WriteString(buf.String() + "\n")
-	return out.String()
-}
-
-// jetsamProcessesString renders the process snapshot sorted by resident memory.
-// By default only the top consumers are shown; --all (or --proc) shows the full
-// list, and --proc filters to a single process name.
-func (i *Ips) jetsamProcessesString(pageSize int64) string {
-	total := len(i.Jetsam.Processes)
-	filter := ""
-	if i.Config != nil {
-		filter = i.Config.Process
-	}
-	procs := i.Jetsam.Processes
-	if filter != "" {
-		var filtered []JetsamProcess
-		for _, p := range procs {
-			if jetsamNameMatches(p.Name, filter) {
-				filtered = append(filtered, p)
-			}
-		}
-		procs = filtered
-		if len(procs) == 0 {
-			return fmt.Sprintf("%s: no process matching %q found in this report (%d total)\n", colorField("Processes"), filter, total)
-		}
-	}
-	sorted := make([]JetsamProcess, len(procs))
-	copy(sorted, procs)
-	sort.Slice(sorted, func(a, b int) bool { return sorted[a].RPages > sorted[b].RPages })
-
-	var header string
-	limit := min(15, len(sorted))
-	switch {
-	case filter != "":
-		header = fmt.Sprintf("%s %q (%d of %d):\n", colorField("Processes matching"), filter, len(sorted), total)
-		limit = len(sorted)
-	case i.Config != nil && i.Config.All:
-		header = fmt.Sprintf("%s (%d total):\n", colorField("Processes"), total)
-		limit = len(sorted)
-	default:
-		header = fmt.Sprintf("%s (%d total):\n", colorField("Top Memory Consumers"), total)
-	}
-
-	var out strings.Builder
-	out.WriteString(header)
-	buf := bytes.NewBufferString("")
-	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
-	for idx := 0; idx < limit; idx++ {
-		p := sorted[idx]
-		marker := ""
-		if p.Reason != "" {
-			marker = colorError(" (killed: " + p.Reason + ")")
-		}
-		fmt.Fprintf(w, "  %2d: %s\t[%s]\t%s\tprio=%d\t%s%s\n",
-			idx+1,
-			colorImage("%s", p.Name),
-			colorBold("%d", p.PID),
-			jetsamPages(p.RPages, pageSize),
-			p.Priority,
-			strings.Join(p.States, ","),
-			marker)
-	}
-	w.Flush()
-	out.WriteString(buf.String())
-	if limit < len(sorted) {
-		out.WriteString(fmt.Sprintf("  ... %d more (use --all to show every process)\n", len(sorted)-limit))
-	}
-	return out.String()
-}
-
 func (i *Ips) String() string {
-	var out string
+	if render, ok := ipsRenderers[i.Header.BugType]; ok {
+		return render(i)
+	}
+	return fmt.Sprintf("%s: (unsupported, notify author)", i.Header.BugType)
+}
 
-	switch i.Header.BugType {
-	case "Panic", "210", "288":
-		out = fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
-		if i.Payload.panic210 == nil {
-			var err error
-			i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
-			if err != nil {
-				log.Errorf("failed to parse panic string: %w", err)
-			}
+// panicString renders kernel panic / stackshot reports (bug_type 210 / 288).
+func (i *Ips) panicString() string {
+	out := fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
+	if i.Payload.panic210 == nil {
+		var err error
+		i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
+		if err != nil {
+			log.Errorf("failed to parse panic string: %w", err)
 		}
-		if i.Config.Verbose {
-			if len(i.Payload.PanicString) > 0 {
-				out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
-			}
+	}
+	if i.Payload.panic210 == nil { // never deref a nil panic210 below (empty/garbage panic string)
+		i.Payload.panic210 = &Panic210{}
+	}
+	if i.Config.Verbose {
+		if len(i.Payload.PanicString) > 0 {
+			out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
+		}
+	} else {
+		out += i.Payload.panic210.String()
+	}
+	if len(i.Payload.PanicFlags) > 0 {
+		out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
+	}
+	out += "\n" + i.Payload.MemoryStatus.String()
+	out += i.Payload.OtherString + "\n"
+	var pids []int
+	for pid := range i.Payload.ProcessByPid {
+		pids = append(pids, pid)
+	}
+	sort.Ints(pids)
+	for _, pid := range pids {
+		p := i.Payload.ProcessByPid[pid]
+		paniced := ""
+		if p.ID == i.Payload.panic210.PanickedTask.PID {
+			paniced = colorError(" (Panicked)")
 		} else {
-			out += i.Payload.panic210.String()
+			/* filter procs */
+			if !i.Config.All {
+				if i.Config.Running {
+					notRunning := true
+					// check if any thread is running
+					for _, t := range p.ThreadByID {
+						if slices.Contains(t.State, "TH_RUN") {
+							notRunning = false
+							break
+						}
+					}
+					if notRunning {
+						continue
+					}
+				} else if len(i.Config.Process) > 0 {
+					if p.Name != i.Config.Process {
+						continue
+					}
+				} else {
+					continue
+				}
+			}
 		}
-		if len(i.Payload.PanicFlags) > 0 {
-			out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
-		}
-		out += "\n" + i.Payload.MemoryStatus.String()
-		out += i.Payload.OtherString + "\n"
-		var pids []int
-		for pid := range i.Payload.ProcessByPid {
-			pids = append(pids, pid)
-		}
-		sort.Ints(pids)
-		for _, pid := range pids {
-			p := i.Payload.ProcessByPid[pid]
-			paniced := ""
-			if p.ID == i.Payload.panic210.PanickedTask.PID {
-				paniced = colorError(" (Panicked)")
+		out += fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
+		for _, t := range p.ThreadByID {
+			paniced = ""
+			if t.ID == i.Payload.panic210.PanickedThread.TID {
+				paniced = colorError("       (Panicked)")
 			} else {
-				/* filter procs */
+				/* filter threads */
 				if !i.Config.All {
 					if i.Config.Running {
-						notRunning := true
-						// check if any thread is running
-						for _, t := range p.ThreadByID {
-							if slices.Contains(t.State, "TH_RUN") {
-								notRunning = false
-								break
-							}
-						}
-						if notRunning {
+						if !slices.Contains(t.State, "TH_RUN") {
 							continue
 						}
 					} else if len(i.Config.Process) > 0 {
@@ -2504,262 +2290,239 @@ func (i *Ips) String() string {
 					}
 				}
 			}
-			out += fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
-			for _, t := range p.ThreadByID {
-				paniced = ""
-				if t.ID == i.Payload.panic210.PanickedThread.TID {
-					paniced = colorError("       (Panicked)")
-				} else {
-					/* filter threads */
-					if !i.Config.All {
-						if i.Config.Running {
-							if !slices.Contains(t.State, "TH_RUN") {
-								continue
-							}
-						} else if len(i.Config.Process) > 0 {
-							if p.Name != i.Config.Process {
-								continue
-							}
-						} else {
-							continue
-						}
-					}
-				}
-				out += fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced)
-				if len(t.Name) > 0 {
-					out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
-				}
-				if len(t.DispatchQueueLabel) > 0 {
-					out += fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel)
-				}
-				out += fmt.Sprintf("    State:          %s\n", fmtState(t.State))
-				out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
-				out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
-				out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
-				out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
-				if len(t.UserFrames) > 0 {
-					out += "    User Frames:\n"
-					isPanickedThread := i.Payload.panic210 != nil &&
-						p.ID == i.Payload.panic210.PanickedTask.PID &&
-						t.ID == i.Payload.panic210.PanickedThread.TID
-					buf := bytes.NewBufferString("")
-					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-					for idx, f := range t.UserFrames {
-						if f.ImageName == "absolute" {
-							continue
-						}
-						addr, slideVal, _ := i.panicFrameAddr(f)
-						slideInfo := ""
-						if slideVal > 0 {
-							slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
-						}
-						symloc := i.fmtSymbolLocation(f.SymbolLocation)
-						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
-						// Add peek disassembly for panicked thread frames
-						if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
-							w.Flush()
-							out += buf.String()
-							buf.Reset()
-							isDSC := i.isDSCFrame(f)
-							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
-						}
-					}
-					w.Flush()
-					out += buf.String()
-				}
-				if len(t.KernelFrames) > 0 {
-					out += "    Kernel Frames:\n"
-					isPanickedThread := i.Payload.panic210 != nil &&
-						p.ID == i.Payload.panic210.PanickedTask.PID &&
-						t.ID == i.Payload.panic210.PanickedThread.TID
-					buf := bytes.NewBufferString("")
-					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-					for idx, f := range t.KernelFrames {
-						if f.ImageName == "absolute" {
-							continue
-						}
-						addr, slideVal, _ := i.panicFrameAddr(f)
-						slideInfo := ""
-						if slideVal > 0 {
-							slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
-						}
-						symloc := i.fmtSymbolLocation(f.SymbolLocation)
-						fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
-						// Add peek disassembly for panicked thread frames
-						if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
-							w.Flush()
-							out += buf.String()
-							buf.Reset()
-							// Kernel frames are never DSC frames, so pass false for isDSCFrame
-							out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
-						}
-					}
-					w.Flush()
-					out += buf.String()
-				}
-			}
-			out += "\n"
-		}
-		if len(i.Payload.Notes) > 0 {
-			out += colorField("NOTES") + ":\n"
-			for _, n := range i.Payload.Notes {
-				out += fmt.Sprintf("    - %s\n", n)
-			}
-		}
-	case "Crash", "309":
-		out = fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
-		out += fmt.Sprintf(
-			colorField("Process")+":        %s [%d]\n"+
-				colorField("Path")+":           %s\n"+
-				colorField("Parent")+":         %s [%d]\n"+
-				colorField("Hardware Model")+": %s\n"+
-				colorField("OS Version")+":     %s\n"+
-				colorField("BuildID")+":        %s\n"+
-				colorField("LockdownMode")+":            %d\n"+
-				colorField("Was Unlocked Since Boot")+": %d\n"+
-				colorField("Is Locked")+":               %d\n",
-			i.Payload.ProcName, i.Payload.PID,
-			i.Payload.ProcPath,
-			i.Payload.ParentProc, i.Payload.ParentPid,
-			i.Payload.ModelCode,
-			i.Payload.OsVersion.Train,
-			i.Payload.OsVersion.Build,
-			i.Payload.LockdownMode,
-			i.Payload.WasUnlockedSinceBoot,
-			i.Payload.IsLocked,
-		)
-		if i.Payload.SharedCache.Size > 0 {
-			out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
-		}
-		var exception Exception
-		if err := mapstructure.Decode(i.Payload.Exception, &exception); err == nil {
-			out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), colorBold(exception.Type), exception.Signal, exception.Message)
-			if len(exception.Subtype) > 0 {
-				out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", exception.Subtype)
-			}
-		} else {
-			out += fmt.Sprintf(colorField("Exception")+": %s\n", i.Payload.Exception)
-		}
-		if len(i.Payload.VmRegionInfo) > 0 {
-			out += fmt.Sprintf(colorField("VM Region Info")+": %s\n", i.Payload.VmRegionInfo)
-		}
-		if i.Payload.Asi != nil {
-			out += colorField("ASI") + ":\n"
-			for k, v := range i.Payload.Asi {
-				out += fmt.Sprintf("    %s:\n", k)
-				for _, s := range v {
-					out += fmt.Sprintf("      - %s\n", s)
-				}
-			}
-			out += "\n"
-		}
-		for _, t := range i.Payload.Threads {
-			out += fmt.Sprintf(colorField("Thread")+" %s:", colorBold("%d", t.ID))
+			out += fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced)
 			if len(t.Name) > 0 {
-				out += colorField(" name") + ": " + t.Name
-				if len(t.Queue) > 0 {
-					out += ","
-				}
+				out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
 			}
-			if len(t.Queue) > 0 {
-				out += colorField(" queue") + ": " + t.Queue
+			if len(t.DispatchQueueLabel) > 0 {
+				out += fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel)
 			}
-			if t.Triggered {
-				out += colorError(" (Crashed)\n")
-			} else {
-				out += "\n"
-			}
-			if len(t.Frames) > 0 {
+			out += fmt.Sprintf("    State:          %s\n", fmtState(t.State))
+			out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
+			out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
+			out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
+			out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
+			if len(t.UserFrames) > 0 {
+				out += "    User Frames:\n"
+				isPanickedThread := i.Payload.panic210 != nil &&
+					p.ID == i.Payload.panic210.PanickedTask.PID &&
+					t.ID == i.Payload.panic210.PanickedThread.TID
 				buf := bytes.NewBufferString("")
 				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-				for idx, f := range t.Frames {
-					addr, name, slideInfo := i.crashFrameAddr(f)
+				for idx, f := range t.UserFrames {
+					if f.ImageName == "absolute" {
+						continue
+					}
+					addr, slideVal, _ := i.panicFrameAddr(f)
+					slideInfo := ""
+					if slideVal > 0 {
+						slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
+					}
 					symloc := i.fmtSymbolLocation(f.SymbolLocation)
-					fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+					fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+					// Add peek disassembly for panicked thread frames
+					if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
+						w.Flush()
+						out += buf.String()
+						buf.Reset()
+						isDSC := i.isDSCFrame(f)
+						out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
+					}
 				}
 				w.Flush()
 				out += buf.String()
 			}
-			if t.Triggered || i.Config.All {
-				out += colorField("Thread") + colorBold(" %d ", t.ID) + colorField(t.ThreadState.Flavor) + "\n" + t.ThreadState.String()
-				if t.Triggered {
-					if len(i.Payload.InstructionByteStream.BeforePC) > 0 {
-						out += colorField("Instructions") + "\n"
-						if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.BeforePC); err != nil {
-							log.WithError(err).Errorf("failed to decode BeforePC instruction byte stream")
-						} else {
-							if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value-(10*4), b64data); err != nil {
-								log.WithError(err).Errorf("failed to disassemble BeforePC instructions")
-							} else {
-								pad := "    "
-								for _, block := range instructions.Blocks() {
-									for _, i := range block {
-										opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
-										out += fmt.Sprintf("%s%s:  %s   %s %s\n",
-											pad,
-											colorAddr("%#08x", i.Address),
-											disassemble.GetOpCodeByteString(i.Raw),
-											colorImage("%-7s", i.Operation),
-											disass.ColorOperands(opStr),
-										)
-									}
-									out += "\n"
-								}
-							}
-						}
+			if len(t.KernelFrames) > 0 {
+				out += "    Kernel Frames:\n"
+				isPanickedThread := i.Payload.panic210 != nil &&
+					p.ID == i.Payload.panic210.PanickedTask.PID &&
+					t.ID == i.Payload.panic210.PanickedThread.TID
+				buf := bytes.NewBufferString("")
+				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+				for idx, f := range t.KernelFrames {
+					if f.ImageName == "absolute" {
+						continue
 					}
-					if len(i.Payload.InstructionByteStream.AtPC) > 0 {
-						out = strings.TrimSuffix(out, "\n")
-						if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.AtPC); err != nil {
-							log.WithError(err).Errorf("failed to decode AtPC instruction byte stream")
-						} else {
-							if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value, b64data); err != nil {
-								log.WithError(err).Errorf("failed to disassemble AtPC instructions")
-							} else {
-								for idx, block := range instructions.Blocks() {
-									for jdx, i := range block {
-										pad := "    "
-										if idx == 0 && jdx == 0 {
-											pad = colorError("PC=>")
-										}
-										opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
-										out += fmt.Sprintf("%s%s:  %s   %s %s\n",
-											pad,
-											colorAddr("%#08x", i.Address),
-											disassemble.GetOpCodeByteString(i.Raw),
-											colorImage("%-7s", i.Operation),
-											disass.ColorOperands(opStr),
-										)
-									}
-									out += "\n"
-								}
-							}
-						}
+					addr, slideVal, _ := i.panicFrameAddr(f)
+					slideInfo := ""
+					if slideVal > 0 {
+						slideInfo = fmt.Sprintf(" (slide=%#x)", slideVal)
+					}
+					symloc := i.fmtSymbolLocation(f.SymbolLocation)
+					fmt.Fprintf(w, "      %02d: %s\t%s%s %s%s\n", idx, colorImage(f.ImageName), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+					// Add peek disassembly for panicked thread frames
+					if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
+						w.Flush()
+						out += buf.String()
+						buf.Reset()
+						// Kernel frames are never DSC frames, so pass false for isDSCFrame
+						out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
 					}
 				}
+				w.Flush()
+				out += buf.String()
 			}
+		}
+		out += "\n"
+	}
+	if len(i.Payload.Notes) > 0 {
+		out += colorField("NOTES") + ":\n"
+		for _, n := range i.Payload.Notes {
+			out += fmt.Sprintf("    - %s\n", n)
+		}
+	}
+	return out
+}
+
+// crashString renders userspace crash reports (bug_type 309).
+func (i *Ips) crashString() string {
+	out := fmt.Sprintf("[%s] - %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc))
+	out += fmt.Sprintf(
+		colorField("Process")+":        %s [%d]\n"+
+			colorField("Path")+":           %s\n"+
+			colorField("Parent")+":         %s [%d]\n"+
+			colorField("Hardware Model")+": %s\n"+
+			colorField("OS Version")+":     %s\n"+
+			colorField("BuildID")+":        %s\n"+
+			colorField("LockdownMode")+":            %d\n"+
+			colorField("Was Unlocked Since Boot")+": %d\n"+
+			colorField("Is Locked")+":               %d\n",
+		i.Payload.ProcName, i.Payload.PID,
+		i.Payload.ProcPath,
+		i.Payload.ParentProc, i.Payload.ParentPid,
+		i.Payload.ModelCode,
+		i.Payload.OsVersion.Train,
+		i.Payload.OsVersion.Build,
+		i.Payload.LockdownMode,
+		i.Payload.WasUnlockedSinceBoot,
+		i.Payload.IsLocked,
+	)
+	if i.Payload.SharedCache.Size > 0 {
+		out += fmt.Sprintf(colorField("Shared Cache")+":        %s %s: %#x %s: %d\n", i.Payload.SharedCache.UUID, colorField("base"), i.Payload.SharedCache.Base, colorField("size"), i.Payload.SharedCache.Size)
+	}
+	var exception Exception
+	if err := mapstructure.Decode(i.Payload.Exception, &exception); err == nil {
+		out += fmt.Sprintf("\n%s:      %s (%s) %s\n", colorField("Exception Type"), colorBold(exception.Type), exception.Signal, exception.Message)
+		if len(exception.Subtype) > 0 {
+			out += fmt.Sprintf(colorField("Exception Subtype")+":   %s\n", exception.Subtype)
+		}
+	} else {
+		out += fmt.Sprintf(colorField("Exception")+": %s\n", i.Payload.Exception)
+	}
+	if len(i.Payload.VmRegionInfo) > 0 {
+		out += fmt.Sprintf(colorField("VM Region Info")+": %s\n", i.Payload.VmRegionInfo)
+	}
+	if i.Payload.Asi != nil {
+		out += colorField("ASI") + ":\n"
+		for k, v := range i.Payload.Asi {
+			out += fmt.Sprintf("    %s:\n", k)
+			for _, s := range v {
+				out += fmt.Sprintf("      - %s\n", s)
+			}
+		}
+		out += "\n"
+	}
+	for _, t := range i.Payload.Threads {
+		out += fmt.Sprintf(colorField("Thread")+" %s:", colorBold("%d", t.ID))
+		if len(t.Name) > 0 {
+			out += colorField(" name") + ": " + t.Name
+			if len(t.Queue) > 0 {
+				out += ","
+			}
+		}
+		if len(t.Queue) > 0 {
+			out += colorField(" queue") + ": " + t.Queue
+		}
+		if t.Triggered {
+			out += colorError(" (Crashed)\n")
+		} else {
 			out += "\n"
 		}
-		if len(i.Payload.LastExceptionBacktrace) > 0 {
-			out += colorField("Last Exception Backtrace") + ":\n"
+		if len(t.Frames) > 0 {
 			buf := bytes.NewBufferString("")
 			w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-			for idx, f := range i.Payload.LastExceptionBacktrace {
+			for idx, f := range t.Frames {
 				addr, name, slideInfo := i.crashFrameAddr(f)
 				symloc := i.fmtSymbolLocation(f.SymbolLocation)
 				fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
 			}
 			w.Flush()
-			out += buf.String() + "\n"
+			out += buf.String()
 		}
-		if len(i.Payload.VMSummary) > 0 {
-			out += colorField("VM Summary") + ":\n" + colorVMSummary(i.Payload.VMSummary)
+		if t.Triggered || i.Config.All {
+			out += colorField("Thread") + colorBold(" %d ", t.ID) + colorField(t.ThreadState.Flavor) + "\n" + t.ThreadState.String()
+			if t.Triggered {
+				if len(i.Payload.InstructionByteStream.BeforePC) > 0 {
+					out += colorField("Instructions") + "\n"
+					if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.BeforePC); err != nil {
+						log.WithError(err).Errorf("failed to decode BeforePC instruction byte stream")
+					} else {
+						if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value-(10*4), b64data); err != nil {
+							log.WithError(err).Errorf("failed to disassemble BeforePC instructions")
+						} else {
+							pad := "    "
+							for _, block := range instructions.Blocks() {
+								for _, i := range block {
+									opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+									out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+										pad,
+										colorAddr("%#08x", i.Address),
+										disassemble.GetOpCodeByteString(i.Raw),
+										colorImage("%-7s", i.Operation),
+										disass.ColorOperands(opStr),
+									)
+								}
+								out += "\n"
+							}
+						}
+					}
+				}
+				if len(i.Payload.InstructionByteStream.AtPC) > 0 {
+					out = strings.TrimSuffix(out, "\n")
+					if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(i.Payload.InstructionByteStream.AtPC); err != nil {
+						log.WithError(err).Errorf("failed to decode AtPC instruction byte stream")
+					} else {
+						if instructions, err := disassemble.GetInstructions(t.ThreadState.PC.Value, b64data); err != nil {
+							log.WithError(err).Errorf("failed to disassemble AtPC instructions")
+						} else {
+							for idx, block := range instructions.Blocks() {
+								for jdx, i := range block {
+									pad := "    "
+									if idx == 0 && jdx == 0 {
+										pad = colorError("PC=>")
+									}
+									opStr := strings.TrimSpace(strings.TrimPrefix(i.String(), i.Operation.String()))
+									out += fmt.Sprintf("%s%s:  %s   %s %s\n",
+										pad,
+										colorAddr("%#08x", i.Address),
+										disassemble.GetOpCodeByteString(i.Raw),
+										colorImage("%-7s", i.Operation),
+										disass.ColorOperands(opStr),
+									)
+								}
+								out += "\n"
+							}
+						}
+					}
+				}
+			}
 		}
-	case "Jetsam", "298":
-		out = i.jetsamString()
-	default:
-		return fmt.Sprintf("%s: (unsupported, notify author)", i.Header.BugType)
+		out += "\n"
 	}
-
+	if len(i.Payload.LastExceptionBacktrace) > 0 {
+		out += colorField("Last Exception Backtrace") + ":\n"
+		buf := bytes.NewBufferString("")
+		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+		for idx, f := range i.Payload.LastExceptionBacktrace {
+			addr, name, slideInfo := i.crashFrameAddr(f)
+			symloc := i.fmtSymbolLocation(f.SymbolLocation)
+			fmt.Fprintf(w, "  %02d: %s\t%s%s %s%s\n", idx, colorImage(name), colorAddr("%#x", addr), slideInfo, colorField(f.Symbol), symloc)
+		}
+		w.Flush()
+		out += buf.String() + "\n"
+	}
+	if len(i.Payload.VMSummary) > 0 {
+		out += colorField("VM Summary") + ":\n" + colorVMSummary(i.Payload.VMSummary)
+	}
 	return out
 }
