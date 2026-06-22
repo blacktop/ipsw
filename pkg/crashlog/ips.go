@@ -1193,15 +1193,14 @@ func (i *Ips) crashFrameAddr(f Frame) (addr uint64, name, slideInfo string) {
 	// range, or its image is sourced from the cache (308 carries no sharedCache
 	// block, so range-checking alone misses its source "S"/"C" frames).
 	sc := i.Payload.SharedCache
-	inSCRange := sc.Size > 0 && img.Base >= sc.Base && img.Base < sc.Base+sc.Size
-	isDSC := inSCRange || img.Source == "S" || img.Source == "C"
-	cacheBase := sc.Base
-	if isDSC && !inSCRange {
-		cacheBase = img.Base // no sharedCache block: the cache image's base is the cache base
-	}
+	isDSC := (sc.Size > 0 && img.Base >= sc.Base && img.Base < sc.Base+sc.Size) || img.Source == "S" || img.Source == "C"
+	// The cache base for rebasing must come from the cache itself (sharedCache
+	// block or the source-"S" image), NOT a per-library source-"C" image base —
+	// using img.Base for a "C" frame drops the library's offset within the cache.
+	cacheBase, haveCacheBase := i.sharedCacheBase()
 
 	switch {
-	case isDSC && i.Config.DSCSlide != 0:
+	case isDSC && haveCacheBase && i.Config.DSCSlide != 0:
 		addr = i.Config.DSCSlide + (addr - cacheBase)
 		slideInfo = fmt.Sprintf(" (dsc-slide %#x)", i.Config.DSCSlide)
 	case i.Config.Unslid && f.Slide != 0 && addr >= f.Slide:
@@ -1209,6 +1208,21 @@ func (i *Ips) crashFrameAddr(f Frame) (addr uint64, name, slideInfo string) {
 		slideInfo = fmt.Sprintf(" (unslid %#x)", f.Slide)
 	}
 	return addr, name, slideInfo
+}
+
+// sharedCacheBase returns the shared-cache base address for --dsc-slide
+// rebasing, from the report's sharedCache block or, failing that, a source-"S"
+// usedImage (the whole-cache image). Returns false when neither is present.
+func (i *Ips) sharedCacheBase() (uint64, bool) {
+	if i.Payload.SharedCache.Size > 0 {
+		return i.Payload.SharedCache.Base, true
+	}
+	for idx := range i.Payload.UsedImages {
+		if i.Payload.UsedImages[idx].Source == "S" {
+			return i.Payload.UsedImages[idx].Base, true
+		}
+	}
+	return 0, false
 }
 
 // fmtSymbolLocation renders a frame's symbol offset as " + N" (or " + 0xN" with

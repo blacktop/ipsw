@@ -321,15 +321,20 @@ func TestCrashFrameAddrDSCSlide(t *testing.T) {
 func TestCrashFrameAddrCompactImages(t *testing.T) {
 	// 308 ExcUserFault ships compact usedImages (base/source/uuid, no name) and
 	// no sharedCache block; source "S" frames must get a name and be DSC-aware.
+	// image 0: source "S" whole cache at base 0x180000000 (== cache base)
+	// image 1: source "C" library at base 0x180100000 (0x100000 into the cache)
+	// image 2: source "P" process image, no name
 	const payload = `{
 		"procName": "MobileSMS",
 		"usedImages": [
 			{"base": 6442450944, "source": "S", "uuid": "90bbde82-938a-384b-8837-ed0c790bc5c9", "size": 4764545456},
+			{"base": 6443499520, "source": "C", "uuid": "aa6fac5d-ceef-36e4-a309-950ecb55350d", "size": 262144},
 			{"base": 4301897728, "source": "P", "uuid": "976fac5d-ceef-36e4-a309-950ecb55350d", "size": 11878400}
 		],
 		"threads": [{"triggered": true, "frames": [
 			{"imageIndex": 0, "imageOffset": 752480},
-			{"imageIndex": 1, "imageOffset": 100}
+			{"imageIndex": 1, "imageOffset": 1280},
+			{"imageIndex": 2, "imageOffset": 100}
 		]}]
 	}`
 	var p IPSPayload
@@ -346,14 +351,26 @@ func TestCrashFrameAddrCompactImages(t *testing.T) {
 	if addr != 6442450944+752480 {
 		t.Errorf("frame0 addr = %#x, want %#x", addr, uint64(6442450944+752480))
 	}
-	// source "P" with no name -> procName
-	if _, name1, _ := i.crashFrameAddr(p.Threads[0].Frames[1]); name1 != "MobileSMS" {
-		t.Errorf("frame1 name = %q, want MobileSMS", name1)
+	// source "C" library with no name -> "dyld_shared_cache" too
+	if _, nameC, _ := i.crashFrameAddr(p.Threads[0].Frames[1]); nameC != "dyld_shared_cache" {
+		t.Errorf("frame1 name = %q, want dyld_shared_cache", nameC)
 	}
-	// --dsc-slide rebases the source-S frame even without a sharedCache block
-	i.Config.DSCSlide = 0x180000000
-	if addr2, _, slide := i.crashFrameAddr(p.Threads[0].Frames[0]); addr2 != 0x180000000+752480 || slide == "" {
-		t.Errorf("dsc-slide frame0 = %#x %q, want %#x + note", addr2, slide, uint64(0x180000000+752480))
+	// source "P" with no name -> procName
+	if _, name2, _ := i.crashFrameAddr(p.Threads[0].Frames[2]); name2 != "MobileSMS" {
+		t.Errorf("frame2 name = %q, want MobileSMS", name2)
+	}
+
+	// --dsc-slide rebases against the CACHE base (derived from the source-"S"
+	// image), preserving each library's offset within the cache.
+	i.Config.DSCSlide = 0x190000000
+	// "S" frame: cache base 0x180000000 + offset -> slide + offset
+	if a, _, slide := i.crashFrameAddr(p.Threads[0].Frames[0]); a != 0x190000000+752480 || slide == "" {
+		t.Errorf("dsc-slide S frame = %#x %q, want %#x + note", a, slide, uint64(0x190000000+752480))
+	}
+	// "C" frame: lib base 0x180100000 + 1280 -> slide + (0x100000 + 1280); the
+	// library's 0x100000 offset-in-cache must be preserved (the bug dropped it).
+	if a, _, slide := i.crashFrameAddr(p.Threads[0].Frames[1]); a != 0x190000000+0x100000+1280 || slide == "" {
+		t.Errorf("dsc-slide C frame = %#x %q, want %#x (offset-in-cache preserved)", a, slide, uint64(0x190000000+0x100000+1280))
 	}
 }
 
