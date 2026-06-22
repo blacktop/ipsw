@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -90,10 +91,5 @@ func TestOpenStreamStallBadBody(t *testing.T) {
 }
 
 func contains(s []string, v string) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, v)
 }

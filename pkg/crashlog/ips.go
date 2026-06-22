@@ -2212,7 +2212,8 @@ func (i *Ips) String() string {
 
 // panicString renders kernel panic / stackshot reports (bug_type 210 / 288).
 func (i *Ips) panicString() string {
-	out := fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build)
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build))
 	if i.Payload.panic210 == nil {
 		var err error
 		i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
@@ -2225,16 +2226,16 @@ func (i *Ips) panicString() string {
 	}
 	if i.Config.Verbose {
 		if len(i.Payload.PanicString) > 0 {
-			out += fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString)
+			out.WriteString(fmt.Sprintf("%s: %s\n", colorField("Panic String"), i.Payload.PanicString))
 		}
 	} else {
-		out += i.Payload.panic210.String()
+		out.WriteString(i.Payload.panic210.String())
 	}
 	if len(i.Payload.PanicFlags) > 0 {
-		out += fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags)
+		out.WriteString(fmt.Sprintf("%s: %s\n", colorField("Panic Flags"), i.Payload.PanicFlags))
 	}
-	out += "\n" + i.Payload.MemoryStatus.String()
-	out += i.Payload.OtherString + "\n"
+	out.WriteString("\n" + i.Payload.MemoryStatus.String())
+	out.WriteString(i.Payload.OtherString + "\n")
 	var pids []int
 	for pid := range i.Payload.ProcessByPid {
 		pids = append(pids, pid)
@@ -2269,7 +2270,7 @@ func (i *Ips) panicString() string {
 				}
 			}
 		}
-		out += fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced)
+		out.WriteString(fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced))
 		for _, t := range p.ThreadByID {
 			paniced = ""
 			if t.ID == i.Payload.panic210.PanickedThread.TID {
@@ -2290,20 +2291,20 @@ func (i *Ips) panicString() string {
 					}
 				}
 			}
-			out += fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced)
+			out.WriteString(fmt.Sprintf(colorField("  Thread")+": %s%s\n", colorBold("%d", t.ID), paniced))
 			if len(t.Name) > 0 {
-				out += fmt.Sprintf("    Name:           %s\n", colorTime(t.Name))
+				out.WriteString(fmt.Sprintf("    Name:           %s\n", colorTime(t.Name)))
 			}
 			if len(t.DispatchQueueLabel) > 0 {
-				out += fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel)
+				out.WriteString(fmt.Sprintf("    Queue:          %s\n", t.DispatchQueueLabel))
 			}
-			out += fmt.Sprintf("    State:          %s\n", fmtState(t.State))
-			out += fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority)
-			out += fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority)
-			out += fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec)
-			out += fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec)
+			out.WriteString(fmt.Sprintf("    State:          %s\n", fmtState(t.State)))
+			out.WriteString(fmt.Sprintf("    Base Priority:  %d\n", t.BasePriority))
+			out.WriteString(fmt.Sprintf("    Sched Priority: %d\n", t.SchedPriority))
+			out.WriteString(fmt.Sprintf("    User Time:      %d usec\n", t.UserUsec))
+			out.WriteString(fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec))
 			if len(t.UserFrames) > 0 {
-				out += "    User Frames:\n"
+				out.WriteString("    User Frames:\n")
 				isPanickedThread := i.Payload.panic210 != nil &&
 					p.ID == i.Payload.panic210.PanickedTask.PID &&
 					t.ID == i.Payload.panic210.PanickedThread.TID
@@ -2323,17 +2324,17 @@ func (i *Ips) panicString() string {
 					// Add peek disassembly for panicked thread frames
 					if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
 						w.Flush()
-						out += buf.String()
+						out.WriteString(buf.String())
 						buf.Reset()
 						isDSC := i.isDSCFrame(f)
-						out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
+						out.WriteString(formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, isDSC, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle))
 					}
 				}
 				w.Flush()
-				out += buf.String()
+				out.WriteString(buf.String())
 			}
 			if len(t.KernelFrames) > 0 {
-				out += "    Kernel Frames:\n"
+				out.WriteString("    Kernel Frames:\n")
 				isPanickedThread := i.Payload.panic210 != nil &&
 					p.ID == i.Payload.panic210.PanickedTask.PID &&
 					t.ID == i.Payload.panic210.PanickedThread.TID
@@ -2353,25 +2354,25 @@ func (i *Ips) panicString() string {
 					// Add peek disassembly for panicked thread frames
 					if i.Config.Peek && isPanickedThread && len(f.PeekBytes) > 0 {
 						w.Flush()
-						out += buf.String()
+						out.WriteString(buf.String())
 						buf.Reset()
 						// Kernel frames are never DSC frames, so pass false for isDSCFrame
-						out += formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle)
+						out.WriteString(formatPeekDisassembly(f.PeekBytes, f.PeekAddr, f.PeekFrameIdx, slideVal, i.Config.KernelSlide, i.Config.DSCSlide, false, i.Config.Unslid, f.PeekSymbols, i.Config.Demangle))
 					}
 				}
 				w.Flush()
-				out += buf.String()
+				out.WriteString(buf.String())
 			}
 		}
-		out += "\n"
+		out.WriteString("\n")
 	}
 	if len(i.Payload.Notes) > 0 {
-		out += colorField("NOTES") + ":\n"
+		out.WriteString(colorField("NOTES") + ":\n")
 		for _, n := range i.Payload.Notes {
-			out += fmt.Sprintf("    - %s\n", n)
+			out.WriteString(fmt.Sprintf("    - %s\n", n))
 		}
 	}
-	return out
+	return out.String()
 }
 
 // crashString renders userspace crash reports (bug_type 309).

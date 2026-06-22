@@ -70,7 +70,7 @@ func OpenOTAUpdate(in string, conf *Config) (*OTAUpdate, error) {
 		return o, nil // header-only file (no body)
 	}
 	if body := bytes.TrimRight(data[nl+1:], "\n"); len(body) > 0 {
-		for _, raw := range bytes.Split(body, []byte("\n")) {
+		for raw := range bytes.SplitSeq(body, []byte("\n")) {
 			line := string(raw)
 			o.Body = append(o.Body, line)
 			if m := otaErrRe.FindStringSubmatch(line); m != nil {

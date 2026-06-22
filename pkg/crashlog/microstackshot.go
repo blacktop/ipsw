@@ -59,12 +59,12 @@ func OpenMicrostackshot(in string, conf *Config) (*Microstackshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	nl := bytes.IndexByte(data, '\n')
-	if nl < 0 {
+	before, after, ok := bytes.Cut(data, []byte{'\n'})
+	if !ok {
 		return nil, fmt.Errorf("microstackshot %s: missing header line", in)
 	}
 	ms := &Microstackshot{Config: conf}
-	if err := json.Unmarshal(data[:nl], &ms.Header); err != nil {
+	if err := json.Unmarshal(before, &ms.Header); err != nil {
 		return nil, fmt.Errorf("microstackshot %s: decode header: %w", in, err)
 	}
 	if db, err := GetLogTypes(); err == nil {
@@ -72,7 +72,7 @@ func OpenMicrostackshot(in string, conf *Config) (*Microstackshot, error) {
 			ms.Header.BugTypeDesc = bt.Name
 		}
 	}
-	ms.parseBody(data[nl+1:])
+	ms.parseBody(after)
 	return ms, nil
 }
 
@@ -154,11 +154,11 @@ func splitField(line string) (key, val string, ok bool) {
 	if line == "" || line[0] == ' ' || line[0] == '\t' {
 		return "", "", false // indented lines are not top-level fields
 	}
-	idx := strings.IndexByte(line, ':')
-	if idx < 0 {
+	before, after, ok0 := strings.Cut(line, ":")
+	if !ok0 {
 		return "", "", false
 	}
-	return strings.TrimSpace(line[:idx]), strings.TrimSpace(line[idx+1:]), true
+	return strings.TrimSpace(before), strings.TrimSpace(after), true
 }
 
 func parseFrame(line string) (MicrostackFrame, bool) {
