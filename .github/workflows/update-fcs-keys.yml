@@ -176,12 +176,6 @@ jobs:
           echo "=== Git diff ==="
           git diff pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz || echo "No diff output"
 
-          # Check if any files actually changed
-          if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz; then
-            echo "No changes to FCS keys files despite new builds"
-            exit 0
-          fi
-
           # Update the cache file with all new fingerprints
           cp hack/.watch_cache hack/.watch_cache.tmp
 
@@ -252,11 +246,17 @@ jobs:
           jq --sort-keys . hack/.watch_cache.tmp > hack/.watch_cache
           rm hack/.watch_cache.tmp
 
-          # Also sort the main FCS keys JSON file before commit (if it exists)
+          # Normalize the main FCS keys JSON the same way as hack/make/json_mini.
           if [ -f pkg/aea/data/fcs-keys.json ]; then
-            jq --sort-keys . pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.json.tmp && mv pkg/aea/data/fcs-keys.json.tmp pkg/aea/data/fcs-keys.json
+            jq -c --sort-keys . pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.json.tmp && mv pkg/aea/data/fcs-keys.json.tmp pkg/aea/data/fcs-keys.json
             jq -e 'type == "object" and length > 0' pkg/aea/data/fcs-keys.json >/dev/null
             gzip -cn pkg/aea/data/fcs-keys.json > pkg/aea/data/fcs-keys.gz
+          fi
+
+          # Check if normalization or cache update actually changed anything.
+          if git diff --quiet pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz hack/.watch_cache; then
+            echo "No changes to FCS keys files or watch cache despite new builds"
+            exit 0
           fi
 
           # Configure git
