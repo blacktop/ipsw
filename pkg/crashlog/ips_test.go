@@ -479,3 +479,224 @@ func assertFactorPackIDs(t *testing.T, got FactorPackIDs, want ...string) {
 		t.Fatalf("unexpected factor pack IDs: got %#v, want %#v", got, want)
 	}
 }
+
+// watchdogSample is a trimmed SystemWatchdogCrash (bug_type 409): a userspace
+// watchdog (WindowServer) timed out. Its process/thread tables are nested under
+// "stackshot" (not the payload top level) and there is no single panicked thread.
+const watchdogSample = `{"name":"WindowServer","timestamp":"2026-06-23 22:58:51.00 -0600","os_version":"macOS 26.5.1 (25F80)","incident_id":"775BF885-132F-4CFC-BF2E-58A86445AA47","bug_type":"409","app_name":"WindowServer"}
+{
+  "build": "macOS 26.5.1 (25F80)",
+  "modelCode": "Mac17,6",
+  "bug_type": "409",
+  "pid": 411,
+  "procName": "WindowServer",
+  "displayState": "OFF",
+  "thermalPressureLevel": "ThermalPressureLevelNominal (0)",
+  "termination": {
+    "namespace": "WATCHDOG",
+    "code": 1,
+    "indicator": "monitoring timed out for service",
+    "details": [
+      "(1 monitored services unresponsive): checkin with service: WindowServer (0 induced crashes) returned not alive with context:",
+      "is_alive_func returned unhealthy"
+    ]
+  },
+  "reportNotes": [
+    "task_read_for_pid(400) for resampling UUIDs failed with -1",
+    "resampled 1547 of 10671 threads with truncated backtraces from 243 pids: 466,543",
+    "2 unindexed user-stack frames from 1 pids: 28224",
+    "This is a watchdog-triggered termination event, and not expected to be well-represented in the legacy crash format"
+  ],
+  "stackshot": {
+    "processByPid": {
+      "411": {
+        "pid": 411,
+        "procname": "WindowServer",
+        "threadById": {
+          "5336": {"id": 5336, "name": "com.apple.coreanimation.cursor.primary", "state": ["TH_WAIT"], "basePriority": 79, "schedPriority": 79, "user_usec": 7045119, "system_usec": 10638945, "userFrames": [[14, 4906036], [14, 4941760]]},
+          "5348": {"id": 5348, "name": "com.apple.coreanimation.frameinfo.external-2", "state": ["TH_WAIT"], "basePriority": 79, "schedPriority": 79, "user_usec": 30352966, "system_usec": 17044713, "userFrames": [[14, 4906036]]}
+        }
+      },
+      "1": {
+        "pid": 1,
+        "procname": "launchd",
+        "threadById": {
+          "100": {"id": 100, "state": ["TH_WAIT"], "userFrames": [[2, 1000]]}
+        }
+      }
+    }
+  }
+}`
+
+func writeWatchdogSample(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "WindowServer-watchdog.ips")
+	if err := os.WriteFile(path, []byte(watchdogSample), 0o600); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+	return path
+}
+
+func TestOpenIPSWatchdog409(t *testing.T) {
+	path := writeWatchdogSample(t)
+
+	hdr, err := ParseHeader(path)
+	if err != nil {
+		t.Fatalf("ParseHeader: %v", err)
+	}
+	if hdr.BugType != "409" {
+		t.Fatalf("BugType = %q, want 409", hdr.BugType)
+	}
+	if hdr.BugTypeDesc != "SystemWatchdogCrash" {
+		t.Fatalf("BugTypeDesc = %q, want SystemWatchdogCrash", hdr.BugTypeDesc)
+	}
+
+	ips, err := OpenIPS(path, &Config{})
+	if err != nil {
+		t.Fatalf("OpenIPS: %v", err)
+	}
+	// the nested stackshot.processByPid must be promoted to the payload top level
+	if len(ips.Payload.ProcessByPid) != 2 {
+		t.Fatalf("ProcessByPid promoted count = %d, want 2", len(ips.Payload.ProcessByPid))
+	}
+	if ips.Payload.Termination.Namespace != "WATCHDOG" {
+		t.Errorf("Termination.Namespace = %q, want WATCHDOG", ips.Payload.Termination.Namespace)
+	}
+	if len(ips.Payload.Termination.Details) != 2 {
+		t.Errorf("Termination.Details len = %d, want 2", len(ips.Payload.Termination.Details))
+	}
+	if ips.Payload.DisplayState != "OFF" {
+		t.Errorf("DisplayState = %q, want OFF", ips.Payload.DisplayState)
+	}
+}
+
+func TestWatchdog409Render(t *testing.T) {
+	prev := color.NoColor
+	color.NoColor = true
+	t.Cleanup(func() { color.NoColor = prev })
+
+	ips, err := OpenIPS(writeWatchdogSample(t), &Config{})
+	if err != nil {
+		t.Fatalf("OpenIPS: %v", err)
+	}
+	out := ips.String()
+
+	wantContains := []string{
+		"SystemWatchdogCrash - Mac17,6",
+		"Namespace:  WATCHDOG",
+		"monitoring timed out for service",
+		"checkin with service: WindowServer",
+		"Display State  OFF",
+		"Thermal Level  ThermalPressureLevelNominal (0)",
+		"Process: WindowServer [411] (Panicked)",
+		// the offending process shows ALL its threads even with no single
+		// panicked thread flagged (panickedTID < 0)
+		"com.apple.coreanimation.cursor.primary",
+		"com.apple.coreanimation.frameinfo.external-2",
+		// the lone signal note survives the noise filter
+		"This is a watchdog-triggered termination event",
+	}
+	for _, w := range wantContains {
+		if !strings.Contains(out, w) {
+			t.Errorf("render missing %q\n--- output ---\n%s", w, out)
+		}
+	}
+
+	wantAbsent := []string{
+		"task_read_for_pid(", // stackshot resampling noise, filtered by default
+		"resampled 1547",
+		"unindexed",
+		"launchd", // non-offending process hidden without --all
+	}
+	for _, w := range wantAbsent {
+		if strings.Contains(out, w) {
+			t.Errorf("render should not contain %q (default, non-verbose)\n--- output ---\n%s", w, out)
+		}
+	}
+}
+
+func TestWatchdog409VerboseKeepsNotes(t *testing.T) {
+	prev := color.NoColor
+	color.NoColor = true
+	t.Cleanup(func() { color.NoColor = prev })
+
+	ips, err := OpenIPS(writeWatchdogSample(t), &Config{Verbose: true})
+	if err != nil {
+		t.Fatalf("OpenIPS: %v", err)
+	}
+	out := ips.String()
+
+	// --verbose keeps the full reportNotes, including the resampling diagnostics
+	for _, w := range []string{"task_read_for_pid(400)", "resampled 1547"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("verbose render missing %q\n--- output ---\n%s", w, out)
+		}
+	}
+}
+
+// watchdogNegPIDSample is the other real 409 shape: Apple emits a top-level
+// pid of -1 and NO top-level build (the OS string lives only in the header's
+// os_version). The renderer must identify the offending process by name so its
+// threads still render, and fall back to os_version for the header banner.
+const watchdogNegPIDSample = `{"name":"WindowServer","timestamp":"2026-06-23 22:58:51.00 -0600","os_version":"macOS 26.5.1 (25F80)","incident_id":"AABBCCDD-1122-3344-5566-778899AABBCC","bug_type":"409","app_name":"WindowServer"}
+{
+  "modelCode": "Mac17,6",
+  "bug_type": "409",
+  "pid": -1,
+  "procName": "WindowServer",
+  "termination": {
+    "namespace": "WATCHDOG",
+    "indicator": "monitoring timed out for service"
+  },
+  "stackshot": {
+    "processByPid": {
+      "411": {
+        "pid": 411,
+        "procname": "WindowServer",
+        "threadById": {
+          "5336": {"id": 5336, "name": "com.apple.main-thread", "state": ["TH_WAIT"], "userFrames": [[14, 4906036]]}
+        }
+      },
+      "1": {
+        "pid": 1,
+        "procname": "launchd",
+        "threadById": {
+          "100": {"id": 100, "state": ["TH_WAIT"], "userFrames": [[2, 1000]]}
+        }
+      }
+    }
+  }
+}`
+
+func TestWatchdog409NegativePIDAndOSFallback(t *testing.T) {
+	prev := color.NoColor
+	color.NoColor = true
+	t.Cleanup(func() { color.NoColor = prev })
+
+	path := filepath.Join(t.TempDir(), "wd-negpid.ips")
+	if err := os.WriteFile(path, []byte(watchdogNegPIDSample), 0o600); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+	ips, err := OpenIPS(path, &Config{})
+	if err != nil {
+		t.Fatalf("OpenIPS: %v", err)
+	}
+	out := ips.String()
+
+	wantContains := []string{
+		// pid -1 falls back to procName, so the offending process still renders
+		"Process: WindowServer [411] (Panicked)",
+		"com.apple.main-thread",
+		// no top-level build → header falls back to the header os_version
+		"SystemWatchdogCrash - Mac17,6 macOS 26.5.1 (25F80)",
+	}
+	for _, w := range wantContains {
+		if !strings.Contains(out, w) {
+			t.Errorf("render missing %q\n--- output ---\n%s", w, out)
+		}
+	}
+	// non-offending process still hidden by default (no --all)
+	if strings.Contains(out, "launchd") {
+		t.Errorf("launchd should be hidden by default\n--- output ---\n%s", out)
+	}
+}

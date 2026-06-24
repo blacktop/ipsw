@@ -639,12 +639,13 @@ func jsonUint(raw json.RawMessage) uint64 {
 }
 
 type Termination struct {
-	ByPid     int    `json:"byPid,omitempty"`
-	ByProc    string `json:"byProc,omitempty"`
-	Code      int    `json:"code,omitempty"`
-	Flags     int    `json:"flags,omitempty"` // https://opensource.apple.com/source/xnu/xnu-3789.21.4/bsd/sys/reason.h.auto.html
-	Indicator string `json:"indicator,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
+	ByPid     int      `json:"byPid,omitempty"`
+	ByProc    string   `json:"byProc,omitempty"`
+	Code      int      `json:"code,omitempty"`
+	Flags     int      `json:"flags,omitempty"` // https://opensource.apple.com/source/xnu/xnu-3789.21.4/bsd/sys/reason.h.auto.html
+	Indicator string   `json:"indicator,omitempty"`
+	Namespace string   `json:"namespace,omitempty"`
+	Details   []string `json:"details,omitempty"` // WATCHDOG reports explain the timeout here
 }
 
 type PostSampleVMStats struct {
@@ -796,6 +797,18 @@ type IPSPayload struct {
 	PostSampleVMStats PostSampleVMStats `json:"postSampleVMStats"`
 	AdditionalDetails AdditionalDetails `json:"additionalDetails"`
 
+	// SystemWatchdogCrash (409) fields. Its processByPid/binaryImages live under
+	// a nested "stackshot" object (not at the payload top level); OpenIPS promotes
+	// them so the panic-style process renderer works.
+	ReportNotes          []string `json:"reportNotes,omitempty"`
+	DisplayState         string   `json:"displayState,omitempty"`
+	ThermalPressureLevel string   `json:"thermalPressureLevel,omitempty"`
+	TrmStatus            int      `json:"trmStatus,omitempty"`
+	Stackshot            struct {
+		ProcessByPid map[int]Process `json:"processByPid,omitempty"`
+		BinaryImages []BinaryImage   `json:"binaryImages,omitempty"`
+	} `json:"stackshot"`
+
 	panic210 *Panic210
 }
 
@@ -852,6 +865,12 @@ func OpenIPS(in string, conf *Config) (*Ips, error) {
 		}
 		if len(ips.Payload.Product) == 0 {
 			ips.Payload.Product = ips.Payload.ModelCode
+		}
+		// SystemWatchdogCrash (409) nests its process/image tables under
+		// "stackshot"; promote them so the shared process renderer can use them.
+		if len(ips.Payload.ProcessByPid) == 0 && len(ips.Payload.Stackshot.ProcessByPid) > 0 {
+			ips.Payload.ProcessByPid = ips.Payload.Stackshot.ProcessByPid
+			ips.Payload.BinaryImages = ips.Payload.Stackshot.BinaryImages
 		}
 	}
 
@@ -2249,10 +2268,22 @@ func (i *Ips) String() string {
 	return fmt.Sprintf("%s: (unsupported, notify author)", i.Header.BugType)
 }
 
+// headerLine renders the "[time] - BugType - Product Build" banner shared by the
+// panic (210/288) and watchdog (409) renderers. Watchdog stackshot payloads carry
+// the OS string in osVersion/os_version rather than a top-level build, so fall
+// back to the header's os_version when Payload.Build is empty.
+func (i *Ips) headerLine() string {
+	osVer := i.Payload.Build
+	if osVer == "" {
+		osVer = i.Header.OsVersion
+	}
+	return fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, osVer)
+}
+
 // panicString renders kernel panic / stackshot reports (bug_type 210 / 288).
 func (i *Ips) panicString() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("[%s] - %s - %s %s\n\n", colorTime(i.Header.Timestamp.Format("02Jan2006 15:04:05")), colorError(i.Header.BugTypeDesc), i.Payload.Product, i.Payload.Build))
+	out.WriteString(i.headerLine())
 	if i.Payload.panic210 == nil {
 		var err error
 		i.Payload.panic210, err = parsePanicString210(i.Payload.PanicString)
@@ -2275,6 +2306,23 @@ func (i *Ips) panicString() string {
 	}
 	out.WriteString("\n" + i.Payload.MemoryStatus.String())
 	out.WriteString(i.Payload.OtherString + "\n")
+	out.WriteString(i.processDumpString(i.Payload.panic210.PanickedTask.PID, i.Payload.panic210.PanickedThread.TID))
+	if len(i.Payload.Notes) > 0 {
+		out.WriteString(colorField("NOTES") + ":\n")
+		for _, n := range i.Payload.Notes {
+			out.WriteString(fmt.Sprintf("    - %s\n", n))
+		}
+	}
+	return out.String()
+}
+
+// processDumpString renders the stackshot process/thread table shared by kernel
+// panics (210/288) and SystemWatchdogCrash (409). panickedPID/panickedTID mark
+// the offending process/thread (pass -1 to mark none). With Config.All unset the
+// dump is filtered to the marked process plus any matching Running/Process
+// selection, so callers always surface the process of interest.
+func (i *Ips) processDumpString(panickedPID, panickedTID int) string {
+	var out strings.Builder
 	var pids []int
 	for pid := range i.Payload.ProcessByPid {
 		pids = append(pids, pid)
@@ -2283,7 +2331,7 @@ func (i *Ips) panicString() string {
 	for _, pid := range pids {
 		p := i.Payload.ProcessByPid[pid]
 		paniced := ""
-		if p.ID == i.Payload.panic210.PanickedTask.PID {
+		if p.ID == panickedPID {
 			paniced = colorError(" (Panicked)")
 		} else {
 			/* filter procs */
@@ -2310,11 +2358,20 @@ func (i *Ips) panicString() string {
 			}
 		}
 		out.WriteString(fmt.Sprintf(colorField("Process")+": %s [%s]%s\n", colorImage(p.Name), colorBold("%d", p.ID), paniced))
-		for _, t := range p.ThreadByID {
+		// When the marked process has no single flagged thread (panickedTID < 0,
+		// e.g. a watchdog timeout), show all of its threads — it is the subject.
+		showAllThreads := p.ID == panickedPID && panickedTID < 0
+		tids := make([]int, 0, len(p.ThreadByID))
+		for tid := range p.ThreadByID {
+			tids = append(tids, tid)
+		}
+		sort.Ints(tids)
+		for _, tid := range tids {
+			t := p.ThreadByID[tid]
 			paniced = ""
-			if t.ID == i.Payload.panic210.PanickedThread.TID {
+			if t.ID == panickedTID {
 				paniced = colorError("       (Panicked)")
-			} else {
+			} else if !showAllThreads {
 				/* filter threads */
 				if !i.Config.All {
 					if i.Config.Running {
@@ -2344,9 +2401,7 @@ func (i *Ips) panicString() string {
 			out.WriteString(fmt.Sprintf("    System Time:    %d usec\n", t.SystemUsec))
 			if len(t.UserFrames) > 0 {
 				out.WriteString("    User Frames:\n")
-				isPanickedThread := i.Payload.panic210 != nil &&
-					p.ID == i.Payload.panic210.PanickedTask.PID &&
-					t.ID == i.Payload.panic210.PanickedThread.TID
+				isPanickedThread := p.ID == panickedPID && t.ID == panickedTID
 				buf := bytes.NewBufferString("")
 				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 				for idx, f := range t.UserFrames {
@@ -2374,9 +2429,7 @@ func (i *Ips) panicString() string {
 			}
 			if len(t.KernelFrames) > 0 {
 				out.WriteString("    Kernel Frames:\n")
-				isPanickedThread := i.Payload.panic210 != nil &&
-					p.ID == i.Payload.panic210.PanickedTask.PID &&
-					t.ID == i.Payload.panic210.PanickedThread.TID
+				isPanickedThread := p.ID == panickedPID && t.ID == panickedTID
 				buf := bytes.NewBufferString("")
 				w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 				for idx, f := range t.KernelFrames {
@@ -2405,13 +2458,92 @@ func (i *Ips) panicString() string {
 		}
 		out.WriteString("\n")
 	}
-	if len(i.Payload.Notes) > 0 {
-		out.WriteString(colorField("NOTES") + ":\n")
-		for _, n := range i.Payload.Notes {
-			out.WriteString(fmt.Sprintf("    - %s\n", n))
+	return out.String()
+}
+
+// watchdogString renders SystemWatchdogCrash reports (bug_type 409): a userspace
+// watchdog (e.g. WindowServer) hung past its deadline and the system watchdog
+// took the device down. The actionable signal is the termination block naming
+// the service that timed out; the nested stackshot follows for context.
+func (i *Ips) watchdogString() string {
+	var out strings.Builder
+	out.WriteString(i.headerLine())
+
+	if len(i.Payload.Termination.Namespace) > 0 || len(i.Payload.Termination.Details) > 0 {
+		out.WriteString(colorField("Termination") + ":\n")
+		if len(i.Payload.Termination.Namespace) > 0 {
+			out.WriteString(fmt.Sprintf("  Namespace:  %s\n", colorError(i.Payload.Termination.Namespace)))
+		}
+		if i.Payload.Termination.Code != 0 {
+			out.WriteString(fmt.Sprintf("  Code:       %d\n", i.Payload.Termination.Code))
+		}
+		if len(i.Payload.Termination.Indicator) > 0 {
+			out.WriteString(fmt.Sprintf("  Indicator:  %s\n", i.Payload.Termination.Indicator))
+		}
+		for _, d := range i.Payload.Termination.Details {
+			out.WriteString(fmt.Sprintf("  - %s\n", colorError(d)))
+		}
+		out.WriteString("\n")
+	}
+
+	buf := bytes.NewBufferString("")
+	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
+	if len(i.Payload.ProcName) > 0 {
+		fmt.Fprintf(w, "%s\t%s [%d]\n", colorField("Process"), colorImage("%s", i.Payload.ProcName), i.Payload.PID)
+	}
+	if len(i.Payload.DisplayState) > 0 {
+		fmt.Fprintf(w, "%s\t%s\n", colorField("Display State"), i.Payload.DisplayState)
+	}
+	if len(i.Payload.ThermalPressureLevel) > 0 {
+		fmt.Fprintf(w, "%s\t%s\n", colorField("Thermal Level"), i.Payload.ThermalPressureLevel)
+	}
+	w.Flush()
+	if buf.Len() > 0 {
+		out.WriteString(buf.String() + "\n")
+	}
+
+	notes := i.Payload.ReportNotes
+	if !i.Config.Verbose {
+		notes = filterStackshotNoise(notes)
+	}
+	if len(notes) > 0 {
+		out.WriteString(colorField("Report Notes") + ":\n")
+		for _, n := range notes {
+			out.WriteString(fmt.Sprintf("  - %s\n", n))
+		}
+		out.WriteString("\n")
+	}
+
+	// Apple sometimes emits a top-level pid of -1 for watchdog timeouts; identify
+	// the offending process by name so its threads still render (lowest matching
+	// pid for a deterministic pick).
+	markedPID := i.Payload.PID
+	if markedPID < 0 && len(i.Payload.ProcName) > 0 {
+		for pid, p := range i.Payload.ProcessByPid {
+			if p.Name == i.Payload.ProcName && (markedPID < 0 || pid < markedPID) {
+				markedPID = pid
+			}
 		}
 	}
+	out.WriteString(i.processDumpString(markedPID, -1))
 	return out.String()
+}
+
+// filterStackshotNoise drops the per-PID stackshot resampling diagnostics
+// ("task_read_for_pid(...) failed", "resampled N of M ...", "... unindexed ...
+// frames from ... pids") that dominate a watchdog report's reportNotes but carry
+// no signal. The remaining notes (e.g. the watchdog explanation) are kept.
+func filterStackshotNoise(notes []string) []string {
+	var out []string
+	for _, n := range notes {
+		if strings.HasPrefix(n, "task_read_for_pid(") ||
+			strings.HasPrefix(n, "resampled ") ||
+			strings.Contains(n, "unindexed") {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 // crashString renders userspace crash reports (bug_type 309).

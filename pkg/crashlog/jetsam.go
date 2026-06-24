@@ -320,4 +320,5 @@ func init() {
 	registerIpsRenderer((*Ips).panicString, "Panic", "210", "288")
 	// 308 (ExcUserFault) shares the 309 crash payload shape and renderer.
 	registerIpsRenderer((*Ips).crashString, "Crash", "308", "309")
+	registerIpsRenderer((*Ips).watchdogString, "409", "SystemWatchdogCrash")
 }

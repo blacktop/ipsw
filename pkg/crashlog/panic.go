@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -127,9 +128,14 @@ func (t TPIDRx_ELy) String() string {
 	if len(t) == 0 {
 		return ""
 	}
+	keys := make([]string, 0, len(t))
+	for key := range t {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
 	var tpidrx strings.Builder
-	for key, val := range t {
-		tpidrx.WriteString(fmt.Sprintf(colorImage("    %-3s", key)+": %#016x\n", val))
+	for _, key := range keys {
+		tpidrx.WriteString(fmt.Sprintf(colorImage("    %-3s", key)+": %#016x\n", t[key]))
 	}
 	return fmt.Sprintf(colorField("TPIDRx_ELy")+"\n%s\n", tpidrx.String())
 }

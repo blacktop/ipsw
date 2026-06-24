@@ -23,13 +23,6 @@ debug
 __debug_*
 .env
 
-# AI
-.claude
-CLAUDE*.md
-.gemini
-GEMINI*.md
-AGENTS.md
-
 # Go Work
 *.work
 *.work.sum
@@ -75,6 +68,8 @@ www/docs/static/releases*.json
 *.mobileprovision
 *.img
 *.pkg
+*.ips
+*.golden
 internal/commands/ida/dscu/data/dscu.py
 internal/download/data/proto
 venv/

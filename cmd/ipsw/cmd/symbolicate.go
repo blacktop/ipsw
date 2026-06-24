@@ -247,14 +247,15 @@ var symbolicateCmd = &cobra.Command{
 				log.WithError(err).Warn("heaviest-stack symbolication unavailable; showing image+offset (supply an IPSW/DSC, or install matching Xcode DeviceSupport)")
 			}
 			fmt.Println(ms)
-		case "298": // JETSAM EVENT (low-memory kill report; display only, nothing to symbolicate)
+		case "298", "409": // JETSAM EVENT / SYSTEM WATCHDOG CRASH (display only, nothing to symbolicate)
 			ips, err := crashlog.OpenIPS(args[0], &crashlog.Config{
 				All:     all || Verbose,
+				Running: running,
 				Process: proc,
 				Verbose: Verbose,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to parse JetsamEvent: %v", err)
+				return fmt.Errorf("failed to parse %s report: %v", hdr.BugTypeDesc, err)
 			}
 			fmt.Println(ips)
 		case "183": // OTASUPDATE (software update/restore log; display only)
@@ -727,7 +728,7 @@ func renderCrashlog(path string, conf *crashlog.Config, dscFile *dyld.File) stri
 			ms.Symbolicate(dscFile)
 		}
 		return ms.String()
-	case "210", "288", "298", "308", "309":
+	case "210", "288", "298", "308", "309", "409":
 		ips, err := crashlog.OpenIPS(path, conf)
 		if err != nil {
 			return fmt.Sprintf("failed to parse %s: %v", filepath.Base(path), err)

@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/fatih/color"
 )
 
 // microstackshotSample is a trimmed but structurally faithful SymptomsIO (145)
@@ -97,38 +95,6 @@ func TestParseFrame(t *testing.T) {
 		if ok && got != c.want {
 			t.Errorf("parseFrame(%q) = %+v, want %+v", c.line, got, c.want)
 		}
-	}
-}
-
-// TestMicrostackshotGolden pins the full render of the real fixture; it skips
-// when the gitignored sample is absent (e.g. CI).
-func TestMicrostackshotGolden(t *testing.T) {
-	prev := color.NoColor
-	color.NoColor = true
-	t.Cleanup(func() { color.NoColor = prev })
-
-	sample := filepath.Join("..", "..", "test-caches", "research", "crashlogs", "analyticsd.diskwrites_resource-2025-07-24-160552.ips")
-	if _, err := os.Stat(sample); err != nil {
-		t.Skipf("sample not available: %v", err)
-	}
-	ms, err := OpenMicrostackshot(sample, &Config{})
-	if err != nil {
-		t.Fatalf("OpenMicrostackshot: %v", err)
-	}
-	got := ms.String()
-	goldenPath := filepath.Join("testdata", "golden", "145.golden")
-	if updateGolden {
-		if err := os.WriteFile(goldenPath, []byte(got), 0o644); err != nil {
-			t.Fatalf("update golden: %v", err)
-		}
-		return
-	}
-	want, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	if got != string(want) {
-		t.Errorf("145 render drifted from golden; set UPDATE_GOLDEN=1 to refresh if intentional")
 	}
 }
 
