@@ -20,7 +20,13 @@ import (
 const (
 	defaultMaxFunctionInstructions       = 320
 	defaultSwitchMaxFunctionInstructions = 2048
-	defaultMaxVtableSlots                = 240
+	// defaultMaxVtableSlots is the upper bound on vtable slots inspected when
+	// locating externalMethod. On recent kernelcaches the IOUserClient and
+	// IOUserClient2022 vtables place externalMethod at slot 272 and the legacy
+	// getTargetAndMethodForIndex at slot 302, so the bound must clear those
+	// indices. VtableEntries terminates at the genuine vtable end on its own
+	// (the first non-pointer slot), so this is only a safety ceiling.
+	defaultMaxVtableSlots = 768
 )
 
 type analyzer struct {
