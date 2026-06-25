@@ -243,6 +243,9 @@ func (a *analyzer) readDispatchEntry(analysis methodAnalysis, selector int) (dis
 	if !ok || function == 0 {
 		return dispatchEntry{}, "indirect"
 	}
+	if !a.dispatchFunctionResolves(function) {
+		return dispatchEntry{}, "indirect"
+	}
 	scalarIn, err := a.scanner.ReadUint32At(analysis.owner, addr+8)
 	if err != nil {
 		return dispatchEntry{function: function}, "indirect"
@@ -281,6 +284,18 @@ func (a *analyzer) readDispatchEntry(analysis methodAnalysis, selector int) (dis
 		}
 	}
 	return entry, ""
+}
+
+// dispatchFunctionResolves reports whether a dispatch-entry function pointer
+// lands in a real function body. The forward pointer cache is populated both
+// from genuine chained-fixup rebases and from a raw scan of every 8-byte slot
+// in __DATA_CONST. A scalar field (for example a 0/1/4 count) that the raw
+// scan slid into a kernel-range value passes ReadPointerAt but does not point
+// at code, so it must be rejected as "indirect" rather than rendered as a
+// bogus method.
+func (a *analyzer) dispatchFunctionResolves(function uint64) bool {
+	_, err := a.scanner.FunctionBodyAt(function)
+	return err == nil
 }
 
 func (a *analyzer) unresolvedMethodRecord(info *classInfo, analysis methodAnalysis, selector int, note string) Record {

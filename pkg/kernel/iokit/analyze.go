@@ -307,6 +307,9 @@ func cloneSelectedDispatchEntries(entries map[int]uint64) map[int]uint64 {
 
 func (a *analyzer) dispatchAnalysisFromExpr(addr uint64, owner *macho.File, dispatchExpr, countExpr linearExpr, count int, kindHint string) (methodAnalysis, bool) {
 	if count <= 0 && countExpr.valid && countExpr.coeff == 0 && countExpr.base > 0 && countExpr.base <= maxSelectorCount {
+		if !a.registerCountCorroborated(owner, dispatchExpr, int(countExpr.base), kindHint) {
+			return methodAnalysis{}, false
+		}
 		count = int(countExpr.base)
 	}
 	if dispatchExpr.valid && dispatchExpr.coeff == 0 && dispatchExpr.base != 0 && count > 0 && count <= maxSelectorCount {
@@ -360,6 +363,56 @@ func (a *analyzer) dispatchAnalysisFromExpr(addr uint64, owner *macho.File, disp
 		analysis.note = "bounds_unknown"
 	}
 	return analysis, true
+}
+
+// registerCountCorroborated guards the register-derived dispatch count.
+// The dispatchCount lives in X4 only for the IOUserClient2022
+// dispatchExternalMethod(selector, args, dispatch, count, target, ref)
+// form, where the count is also CMP'd against the selector (the
+// selectorBound path). When no such comparison bound exists, an X4 value
+// is just as likely to be a leaked constant from the single-method
+// externalMethod form (for example the low bits of a kIOReturn* error
+// immediate). The count is accepted only when the last spanned dispatch
+// entry of EVERY candidate base resolves to a real function body.
+// dispatchRecords later emits count selectors for every base in
+// arrayBases, so for a conditional-array dispatch a single bogus/shorter
+// alternate base would otherwise be over-read into adjacent data;
+// requiring all bases to corroborate fails the whole table closed instead.
+func (a *analyzer) registerCountCorroborated(owner *macho.File, dispatchExpr linearExpr, count int, kindHint string) bool {
+	if count <= 0 {
+		return false
+	}
+	bases := exprBases(dispatchExpr)
+	if len(bases) == 0 {
+		return false
+	}
+	for _, base := range bases {
+		if !a.lastDispatchEntryResolves(owner, base, count, kindHint) {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *analyzer) lastDispatchEntryResolves(owner *macho.File, base uint64, count int, kindHint string) bool {
+	strides := []uint64{dispatchSizeClassic, dispatchSize2022}
+	switch kindHint {
+	case DispatchExternalMethod2022:
+		strides = []uint64{dispatchSize2022}
+	case DispatchExternalMethod:
+		strides = []uint64{dispatchSizeClassic}
+	}
+	for _, stride := range strides {
+		addr := base + uint64(count-1)*stride
+		fn, ok := a.scanner.ReadPointerAt(owner, addr)
+		if !ok || fn == 0 {
+			continue
+		}
+		if _, err := a.scanner.FunctionBodyAt(fn); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analyzer) inferDispatchStride(owner *macho.File, bases []uint64, count int, kindHint string) (uint64, string, bool) {
