@@ -14,6 +14,20 @@ const (
 	machoHdrSize = 0x20       // mach_header_64 size
 	segment64Sz  = 0x48       // minimum LC_SEGMENT_64 command size (no sections)
 
+	// mach_header_64 / load command field offsets (see <mach-o/loader.h>).
+	hdrNcmdsOff   = 16 // mach_header_64.ncmds
+	lcCmdSizeOff  = 4  // load_command.cmdsize
+	lcHeaderSize  = 8  // sizeof(load_command): cmd (u32) + cmdsize (u32)
+	lcBodyOff     = 8  // first command-specific field, after cmd+cmdsize
+	symtabBodyEnd = 24 // end of symoff..strsize in symtab_command (4×u32 after the header)
+
+	// segment_command_64 field offsets, relative to the command start.
+	segNameOff   = 8  // segname[16]
+	segNameLen   = 16 // sizeof(segname)
+	segVMSizeOff = 32 // vmsize
+	segFileOff   = 40 // fileoff
+	segFileSzOff = 48 // filesz
+
 	// maxOutputSize caps the reconstructed image to guard against a malformed
 	// bundle declaring an absurd segment size that would exhaust memory. The
 	// real DCP runtime image is ~15 MiB; 1 GiB is a generous ceiling.
@@ -135,7 +149,7 @@ func parseLoadCommands(blob []byte, base uint64) ([]loadCmd, error) {
 	if base+machoHdrSize > uint64(len(blob)) {
 		return nil, fmt.Errorf("mach-o header at 0x%x out of bounds", base)
 	}
-	ncmds := binary.LittleEndian.Uint32(blob[base+16:])
+	ncmds := binary.LittleEndian.Uint32(blob[base+hdrNcmdsOff:])
 	off := base + machoHdrSize
 	// ncmds is attacker-controlled here (a false-positive MH_MAGIC_64 found while
 	// scanning the nold blob, or a malformed bundle), so never trust it for the
@@ -147,12 +161,12 @@ func parseLoadCommands(blob []byte, base uint64) ([]loadCmd, error) {
 	}
 	cmds := make([]loadCmd, 0, capHint)
 	for range ncmds {
-		if off+8 > uint64(len(blob)) {
+		if off+lcHeaderSize > uint64(len(blob)) {
 			return nil, fmt.Errorf("load command at 0x%x out of bounds", off)
 		}
 		cmd := binary.LittleEndian.Uint32(blob[off:])
-		cmdSize := binary.LittleEndian.Uint32(blob[off+4:])
-		if cmdSize < 8 {
+		cmdSize := binary.LittleEndian.Uint32(blob[off+lcCmdSizeOff:])
+		if cmdSize < lcHeaderSize {
 			return nil, fmt.Errorf("undersized load command (cmdsize=0x%x) at 0x%x", cmdSize, off)
 		}
 		if off+uint64(cmdSize) > uint64(len(blob)) {
@@ -174,14 +188,14 @@ func textVMSize(blob []byte, cmds []loadCmd) (uint64, bool) {
 		if segName(blob, c.off) != "__TEXT" {
 			continue
 		}
-		return binary.LittleEndian.Uint64(blob[c.off+32:]), true // vmsize at +32
+		return binary.LittleEndian.Uint64(blob[c.off+segVMSizeOff:]), true
 	}
 	return 0, false
 }
 
 // segName returns the 16-byte segname of an LC_SEGMENT_64 at coff.
 func segName(blob []byte, coff uint64) string {
-	raw := blob[coff+8 : coff+24]
+	raw := blob[coff+segNameOff : coff+segNameOff+segNameLen]
 	n := 0
 	for n < len(raw) && raw[n] != 0 {
 		n++
@@ -213,16 +227,16 @@ func assembleRuntimeMachO(blob []byte, moff uint64, rtxt, rdat typ4Range) ([]byt
 				return nil, fmt.Errorf("undersized LC_SEGMENT_64 (cmdsize=0x%x) at 0x%x", c.cmdSize, c.off)
 			}
 			segs = append(segs, machoSegment{
-				fileOff: binary.LittleEndian.Uint64(blob[c.off+40:]), // fileoff at +40
-				fileSz:  binary.LittleEndian.Uint64(blob[c.off+48:]), // filesz at +48
+				fileOff: binary.LittleEndian.Uint64(blob[c.off+segFileOff:]),
+				fileSz:  binary.LittleEndian.Uint64(blob[c.off+segFileSzOff:]),
 			})
 		case lcSymtab:
-			if c.cmdSize < 24 {
+			if c.cmdSize < symtabBodyEnd {
 				return nil, fmt.Errorf("undersized LC_SYMTAB (cmdsize=0x%x) at 0x%x", c.cmdSize, c.off)
 			}
-			zero(hdr[rel+8 : rel+24]) // symoff, nsyms, stroff, strsize
+			zero(hdr[rel+lcBodyOff : rel+symtabBodyEnd]) // symoff, nsyms, stroff, strsize
 		case lcDysymtab:
-			zero(hdr[rel+8 : rel+uint64(c.cmdSize)])
+			zero(hdr[rel+lcBodyOff : rel+uint64(c.cmdSize)])
 		}
 	}
 	if len(segs) == 0 {
