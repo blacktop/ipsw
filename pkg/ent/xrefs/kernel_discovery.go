@@ -15,7 +15,12 @@ import (
 
 const (
 	kernelCStringThreshold = 20
-	kernelMaxVtableSlots   = 240
+	// kernelMaxVtableSlots bounds the vtable slots scanned when locating an
+	// IOUserClient virtual (e.g. externalMethod) by slot index. On recent
+	// kernelcaches that virtual sits at slot 272+ (past the old 240 ceiling),
+	// so the bound must clear it. cpp.Scanner.VtableEntries terminates at the
+	// genuine vtable end, so this is only a safety ceiling.
+	kernelMaxVtableSlots = 768
 )
 
 type kernelScanImage struct {
