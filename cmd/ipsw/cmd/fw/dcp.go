@@ -43,6 +43,24 @@ import (
 //   Firmware/dcp/t8130dcp.im4p
 //   Firmware/dcp/t8130dcp_restore.im4p
 
+// dcpFwPattern matches the DCP firmware IM4P payloads shipped in an IPSW.
+const dcpFwPattern = `Firmware/dcp/.*\.im4p$`
+
+// writeMachO writes a Mach-O blob next to (or under output) the input file,
+// trimming the input extension and appending ".macho".
+func writeMachO(input, output string, data []byte) error {
+	if output == "" {
+		output = filepath.Dir(input) // default: write next to the input file
+	}
+	if err := os.MkdirAll(output, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory: %v", err)
+	}
+	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input))
+	fname := filepath.Join(output, base+".macho")
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
+	return os.WriteFile(fname, data, 0o644)
+}
+
 func init() {
 	FwCmd.AddCommand(dcpCmd)
 
@@ -74,21 +92,38 @@ var dcpCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to open im4p: %v", err)
 			}
-			if showInfo {
-				m, err := macho.NewFile(bytes.NewReader(im4p.Data))
-				if err != nil {
-					return fmt.Errorf("failed to open macho: %v", err)
-				}
-				fmt.Println(m.FileTOC.String())
-			} else {
-				fname := strings.TrimSuffix(input, filepath.Ext(input))
-				if output != "" {
-					fname = filepath.Join(output, filepath.Base(fname))
-				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting MachO to file %s", fname))
-				return os.WriteFile(fname, im4p.Data, 0o644)
+			data, err := im4p.GetData()
+			if err != nil {
+				return fmt.Errorf("failed to get im4p payload data: %v", err)
 			}
-			return nil
+
+			if ok, err := magic.IsMachOData(data); err != nil {
+				return err
+			} else if ok {
+				if showInfo {
+					m, err := macho.NewFile(bytes.NewReader(data))
+					if err != nil {
+						return fmt.Errorf("failed to open macho: %v", err)
+					}
+					fmt.Println(m.FileTOC.String())
+					return nil
+				}
+				return writeMachO(input, output, data)
+			}
+
+			bn, err := bundle.Parse(bytes.NewReader(data))
+			if err != nil {
+				return fmt.Errorf("failed to parse dcp payload as bundle: %v", err)
+			}
+			if showInfo {
+				fmt.Println(bn)
+				return nil
+			}
+			runtime, err := bn.ExtractRuntimeMachO()
+			if err != nil {
+				return fmt.Errorf("failed to extract runtime MachO from bundle: %v", err)
+			}
+			return writeMachO(input, output, runtime)
 		}
 
 		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.dcp.remote") {
@@ -98,7 +133,7 @@ var dcpCmd = &cobra.Command{
 			if viper.GetBool("fw.dcp.remote") {
 				out, err = extract.Search(&extract.Config{
 					URL:     args[0],
-					Pattern: "dcp.*/.im4p$",
+					Pattern: dcpFwPattern,
 					Output:  output,
 				})
 				if err != nil {
@@ -107,7 +142,7 @@ var dcpCmd = &cobra.Command{
 			} else {
 				out, err = extract.Search(&extract.Config{
 					IPSW:    infile,
-					Pattern: "dcp.*/.im4p$",
+					Pattern: dcpFwPattern,
 					Output:  output,
 				})
 				if err != nil {
@@ -120,21 +155,25 @@ var dcpCmd = &cobra.Command{
 					return err
 				}
 			}
+			return nil
 		} else if ok, _ := magic.IsIm4p(infile); ok {
 			return dowork(infile, output)
-		} else {
-			if showInfo {
-				bn, err := bundle.Open(infile)
-				if err != nil {
-					return fmt.Errorf("failed to open bundle: %v", err)
-				}
-				defer bn.Close()
-				fmt.Println(bn)
-			} else {
-				return fmt.Errorf("extraction not yet supported for this file type")
-			}
 		}
 
-		return fmt.Errorf("unsupported file type")
+		// direct DNUB/BUND bundle input
+		bn, err := bundle.Open(infile)
+		if err != nil {
+			return fmt.Errorf("failed to open bundle: %v", err)
+		}
+		defer bn.Close()
+		if showInfo {
+			fmt.Println(bn)
+			return nil
+		}
+		runtime, err := bn.ExtractRuntimeMachO()
+		if err != nil {
+			return fmt.Errorf("failed to extract runtime MachO from bundle: %v", err)
+		}
+		return writeMachO(infile, output, runtime)
 	},
 }
