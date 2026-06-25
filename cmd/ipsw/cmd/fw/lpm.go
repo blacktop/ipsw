@@ -34,10 +34,10 @@ func init() {
 
 	lpmCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	lpmCmd.MarkFlagDirname("output")
-	viper.BindPFlag("fw.ane.output", lpmCmd.Flags().Lookup("output"))
+	viper.BindPFlag("fw.lpm.output", lpmCmd.Flags().Lookup("output"))
 }
 
-// lpmCmd represents the ane command
+// lpmCmd represents the lpm command
 var lpmCmd = &cobra.Command{
 	Use:     "lpm",
 	Aliases: []string{"l"},
@@ -47,7 +47,7 @@ var lpmCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// flags
-		// output := viper.GetString("fw.ane.output")
+		// output := viper.GetString("fw.lpm.output")
 
 		panic("not implemented")
 

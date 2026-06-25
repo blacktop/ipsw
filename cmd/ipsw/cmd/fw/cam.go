@@ -102,7 +102,7 @@ var camCmd = &cobra.Command{
 					}
 					fmt.Println(m.FileTOC.String())
 				} else {
-					fname := filepath.Join(output, strings.TrimSuffix(infile, filepath.Ext(infile)))
+					fname := filepath.Join(output, strings.TrimSuffix(filepath.Base(f), filepath.Ext(f)))
 					if err := os.MkdirAll(output, 0o755); err != nil {
 						return fmt.Errorf("failed to create output directory: %v", err)
 					}
