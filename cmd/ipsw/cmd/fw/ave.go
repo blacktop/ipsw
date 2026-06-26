@@ -39,10 +39,13 @@ import (
 )
 
 // NOTE:
-//   Firmware/ave/AppleAVE2FW_H17D.im4p (plain arm64e MH_PRELOAD MachO)
+//   Firmware/ave/AppleAVE2FW.im4p          (older devices, e.g. iPhone11/12-era)
+//   Firmware/ave/AppleAVE2FW_H17D.im4p     (newer devices, board-suffixed)
+//   both are a plain arm64e MH_PRELOAD MachO
 
-// aveFwPattern matches the AVE firmware IM4P payloads shipped in an IPSW.
-const aveFwPattern = `Firmware/ave/AppleAVE2FW_.*\.im4p$`
+// aveFwPattern matches the AVE firmware IM4P payloads shipped in an IPSW. The
+// board suffix is optional (AppleAVE2FW.im4p vs AppleAVE2FW_<board>.im4p).
+const aveFwPattern = `Firmware/ave/AppleAVE2FW.*\.im4p$`
 
 func init() {
 	FwCmd.AddCommand(aveCmd)
