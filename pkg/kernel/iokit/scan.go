@@ -216,6 +216,16 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 				records = append(records, recs...)
 				continue
 			}
+			if strings.Contains(a.symbolName(entry.Address), ioavExternalMethodSymbol) {
+				if ioavAnalysis, ok := a.resolveIOAVDispatch(info); ok {
+					recs, err := a.dispatchRecords(info, ioavAnalysis)
+					if err != nil {
+						return nil, err
+					}
+					records = append(records, recs...)
+					continue
+				}
+			}
 			note := analysis.note
 			if note == "" {
 				note = "indirect"

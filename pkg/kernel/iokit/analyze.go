@@ -79,7 +79,9 @@ func (a *analyzer) analyzeExternalMethodUncached(addr uint64, kindHint string) m
 	regs[1] = linearExpr{valid: true, coeff: 1}
 
 	selectorBound := -1
+	biasedBound := -1
 	pendingCompare := -1
+	pendingBiased := -1
 	lastSelectorCompare := -1
 	sawSelectorBranch := false
 	var selectedDispatch [31]map[int]uint64
@@ -94,11 +96,22 @@ func (a *analyzer) analyzeExternalMethodUncached(addr uint64, kindHint string) m
 			}
 			pendingCompare = -1
 		}
+		if pendingBiased >= 0 {
+			if count, ok := selectorCountFromBranch(inst, pendingBiased); ok {
+				biasedBound = count
+			}
+			pendingBiased = -1
+		}
 		if count, ok := selectorCompareCount(inst, regs); ok {
 			pendingCompare = count
 			lastSelectorCompare = count
 			if selectorBound < 0 {
 				selectorBound = count
+			}
+		} else if count, ok := biasedSelectorCompareCount(inst, regs); ok {
+			pendingBiased = count
+			if biasedBound < 0 {
+				biasedBound = count
 			}
 		}
 		applySelectedDispatchInstruction(inst, regs[:], &selectedDispatch, lastSelectorCompare)
@@ -107,7 +120,7 @@ func (a *analyzer) analyzeExternalMethodUncached(addr uint64, kindHint string) m
 			if hint == "" {
 				hint = kindHint
 			}
-			if analysis, ok := a.dispatchAnalysisFromExpr(addr, body.Owner, regs[3], regs[4], selectorBound, hint); ok {
+			if analysis, ok := a.dispatchAnalysisFromExpr(addr, body.Owner, regs[3], regs[4], dispatchSelectorBound(selectorBound, biasedBound), hint); ok {
 				best = analysis
 			} else if analysis, ok := selectedDispatchAnalysis(addr, body.Owner, selectedDispatch[3], hint); ok {
 				best = analysis
@@ -560,6 +573,8 @@ func applyMethodInstruction(a *analyzer, owner *macho.File, inst *disassemble.In
 		}
 	case disassemble.ARM64_ADD:
 		applyAdd(inst, regs)
+	case disassemble.ARM64_SUB:
+		applySub(inst, regs)
 	case disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
 		applyLoad(a, owner, inst, regs)
 	case disassemble.ARM64_MOV:
@@ -614,6 +629,35 @@ func applyAdd(inst *disassemble.Inst, regs []linearExpr) {
 	}
 	right := shiftedExpr(regs[rightIdx], &inst.Operands[2])
 	regs[rd] = combineExpr(left, right)
+}
+
+// applySub models only the `SUB rD, rN, #imm` immediate form, which the
+// compiler emits to bias a selector before bounding it (the canonical
+// (selector - k) > N idiom in IOUserClient::externalMethod dispatchers that
+// reserve selector 0). The biased value is tracked as a linear expression so
+// biasedSelectorCompareCount can recover the true selector bound. Register-
+// operand SUBs clear the destination (they are not part of this idiom).
+func applySub(inst *disassemble.Inst, regs []linearExpr) {
+	rd, ok := destRegIndex(inst)
+	if !ok {
+		return
+	}
+	leftIdx, ok := operandRegIndex(inst, 1)
+	if !ok {
+		clearReg(regs, rd, "indirect")
+		return
+	}
+	imm, ok := operandImm(inst, 2)
+	if !ok || !operandIsImmediate(inst, 2) {
+		clearReg(regs, rd, "indirect")
+		return
+	}
+	left := regs[leftIdx]
+	if !left.valid {
+		clearReg(regs, rd, left.note)
+		return
+	}
+	regs[rd] = addImmediateExpr(left, 0-imm)
 }
 
 func applyLoad(a *analyzer, owner *macho.File, inst *disassemble.Inst, regs []linearExpr) {
@@ -952,6 +996,57 @@ func compareCountForIndexReg(inst *disassemble.Inst, regs [31]linearExpr, isInde
 		return int(val.base), true
 	}
 	return 0, false
+}
+
+// biasedSelectorCompareCount recovers a selector bound from the
+// `SUB rTmp, selector, #k; CMP rTmp, #N` idiom, where the compared register
+// holds the selector biased by a nonzero constant (coeff == 1, base != 0). The
+// comparison `(selector - k) <op> N` is equivalent to `selector <op> N + k`, so
+// the selector-space immediate is `imm - base` (base == -k as an unsigned
+// wrap). This is intentionally separate from selectorCompareCount: the bound it
+// produces feeds only the static dispatch-table path, never the switch
+// fallback, so switch dispatchers that happen to bias their selector keep their
+// existing classification.
+func biasedSelectorCompareCount(inst *disassemble.Inst, regs [31]linearExpr) (int, bool) {
+	if inst == nil || operandCount(inst) < 2 {
+		return 0, false
+	}
+	opName := strings.ToLower(inst.Operation.String())
+	if opName != "cmp" && opName != "subs" {
+		return 0, false
+	}
+	reg, ok := operandReg(inst, 0)
+	if !ok || isSelectorReg(reg) {
+		return 0, false
+	}
+	idx, ok := regIndex(reg)
+	if !ok || idx >= len(regs) {
+		return 0, false
+	}
+	val := regs[idx]
+	if !val.valid || val.coeff != 1 || val.base == 0 || len(val.alts) != 0 {
+		return 0, false
+	}
+	imm, ok := operandImm(inst, 1)
+	if !ok {
+		return 0, false
+	}
+	selectorImm := imm - val.base
+	if selectorImm > maxSelectorCount {
+		return 0, false
+	}
+	return int(selectorImm), true
+}
+
+// dispatchSelectorBound picks the selector count handed to the dispatch-table
+// path. The direct X1/W1 compare wins when present; the biased-selector bound
+// (from the SUB-then-compare idiom) is the fallback so a static dispatch table
+// can still be sized when the only bound is on a biased copy of the selector.
+func dispatchSelectorBound(selectorBound, biasedBound int) int {
+	if selectorBound > 0 {
+		return selectorBound
+	}
+	return biasedBound
 }
 
 func selectorCountFromBranch(inst *disassemble.Inst, compare int) (int, bool) {

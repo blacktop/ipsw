@@ -374,6 +374,165 @@ func TestLegacyCountsForUnknownFlags(t *testing.T) {
 	}
 }
 
+func TestApplySubModelsImmediateSelectorBias(t *testing.T) {
+	t.Parallel()
+
+	regs := make([]linearExpr, 31)
+	regs[22] = linearExpr{valid: true, coeff: 1}
+	inst := disassemble.Inst{Operation: disassemble.ARM64_SUB, NumOps: 3}
+	inst.Operands[0].NumRegisters = 1
+	inst.Operands[0].Registers[0] = disassemble.REG_W8
+	inst.Operands[1].NumRegisters = 1
+	inst.Operands[1].Registers[0] = disassemble.REG_W22
+	inst.Operands[2].Class = disassemble.IMM32
+	inst.Operands[2].Immediate = 1
+
+	applySub(&inst, regs)
+	if !regs[8].valid || regs[8].coeff != 1 || regs[8].base != ^uint64(0) {
+		t.Fatalf("biased selector expr=%+v, want coeff 1 base -1", regs[8])
+	}
+}
+
+func TestApplySubClearsRegisterOperandForm(t *testing.T) {
+	t.Parallel()
+
+	regs := make([]linearExpr, 31)
+	regs[22] = linearExpr{valid: true, coeff: 1}
+	regs[9] = linearExpr{valid: true, base: 3}
+	inst := disassemble.Inst{Operation: disassemble.ARM64_SUB, NumOps: 3}
+	inst.Operands[0].NumRegisters = 1
+	inst.Operands[0].Registers[0] = disassemble.REG_W8
+	inst.Operands[1].NumRegisters = 1
+	inst.Operands[1].Registers[0] = disassemble.REG_W22
+	inst.Operands[2].NumRegisters = 1
+	inst.Operands[2].Registers[0] = disassemble.REG_W9
+
+	applySub(&inst, regs)
+	if regs[8].valid {
+		t.Fatalf("register-operand SUB should clear dest, got %+v", regs[8])
+	}
+}
+
+func TestBiasedSelectorCompareCountRecoversSelectorSpaceBound(t *testing.T) {
+	t.Parallel()
+
+	var regs [31]linearExpr
+	regs[8] = linearExpr{valid: true, coeff: 1, base: ^uint64(0)} // selector - 1
+	inst := disassemble.Inst{Operation: disassemble.ARM64_SUBS, NumOps: 2}
+	inst.Operands[0].NumRegisters = 1
+	inst.Operands[0].Registers[0] = disassemble.REG_W8
+	inst.Operands[1].Class = disassemble.IMM32
+	inst.Operands[1].Immediate = 9
+
+	count, ok := biasedSelectorCompareCount(&inst, regs)
+	if !ok || count != 10 {
+		t.Fatalf("biased compare count=(%d,%t), want 10,true", count, ok)
+	}
+	// b.hi adds the inclusive +1, so the full table spans selectors 0..10.
+	bhi, ok := disassemble.OperationFromString("b.hi")
+	if !ok {
+		t.Fatal("could not resolve b.hi operation")
+	}
+	if got, ok := selectorCountFromBranch(&disassemble.Inst{Operation: bhi}, count); !ok || got != 11 {
+		t.Fatalf("branch-adjusted count=(%d,%t), want 11,true", got, ok)
+	}
+}
+
+func TestBiasedSelectorCompareCountIgnoresDirectAndZeroBias(t *testing.T) {
+	t.Parallel()
+
+	var regs [31]linearExpr
+	regs[1] = linearExpr{valid: true, coeff: 1}  // direct selector in W1
+	regs[21] = linearExpr{valid: true, coeff: 1} // unbiased copy of selector
+	directW1 := disassemble.Inst{Operation: disassemble.ARM64_SUBS, NumOps: 2}
+	directW1.Operands[0].NumRegisters = 1
+	directW1.Operands[0].Registers[0] = disassemble.REG_W1
+	directW1.Operands[1].Class = disassemble.IMM32
+	directW1.Operands[1].Immediate = 9
+	if _, ok := biasedSelectorCompareCount(&directW1, regs); ok {
+		t.Fatal("biased compare should ignore the direct W1 selector")
+	}
+
+	zeroBias := disassemble.Inst{Operation: disassemble.ARM64_SUBS, NumOps: 2}
+	zeroBias.Operands[0].NumRegisters = 1
+	zeroBias.Operands[0].Registers[0] = disassemble.REG_W21
+	zeroBias.Operands[1].Class = disassemble.IMM32
+	zeroBias.Operands[1].Immediate = 7
+	if _, ok := biasedSelectorCompareCount(&zeroBias, regs); ok {
+		t.Fatal("biased compare should ignore an unbiased (base 0) selector copy")
+	}
+}
+
+func TestDispatchSelectorBoundPrefersDirectBound(t *testing.T) {
+	t.Parallel()
+
+	if got := dispatchSelectorBound(8, 11); got != 8 {
+		t.Fatalf("dispatchSelectorBound=%d, want direct bound 8", got)
+	}
+	if got := dispatchSelectorBound(-1, 11); got != 11 {
+		t.Fatalf("dispatchSelectorBound=%d, want biased fallback 11", got)
+	}
+	if got := dispatchSelectorBound(-1, -1); got != -1 {
+		t.Fatalf("dispatchSelectorBound=%d, want -1", got)
+	}
+}
+
+func TestIOAVTableAndCountRecoversStartLiterals(t *testing.T) {
+	t.Parallel()
+
+	var regs [31]linearExpr
+	regs[2] = linearExpr{valid: true, base: 0xfffffe0008366e10} // table from adrp/add
+	regs[3] = linearExpr{valid: true, base: 33}                 // mov w3, #0x21
+
+	base, count, ok := ioavTableAndCount(regs)
+	if !ok || base != 0xfffffe0008366e10 || count != 33 {
+		t.Fatalf("ioavTableAndCount=(%#x,%d,%t), want table 0xfffffe0008366e10 count 33", base, count, ok)
+	}
+}
+
+func TestIOAVTableAndCountRejectsBadShapes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		table linearExpr
+		count linearExpr
+	}{
+		{"zero table", linearExpr{valid: true, base: 0}, linearExpr{valid: true, base: 33}},
+		{"non-constant table", linearExpr{valid: true, base: 0x1000, coeff: 24}, linearExpr{valid: true, base: 33}},
+		{"conditional table", linearExpr{valid: true, base: 0x1000, alts: []uint64{0x1000, 0x2000}}, linearExpr{valid: true, base: 33}},
+		{"zero count", linearExpr{valid: true, base: 0x1000}, linearExpr{valid: true, base: 0}},
+		{"count out of range", linearExpr{valid: true, base: 0x1000}, linearExpr{valid: true, base: maxSelectorCount + 1}},
+		{"invalid count", linearExpr{valid: true, base: 0x1000}, linearExpr{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var regs [31]linearExpr
+			regs[2] = tc.table
+			regs[3] = tc.count
+			if _, _, ok := ioavTableAndCount(regs); ok {
+				t.Fatalf("ioavTableAndCount accepted %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestIsIOAVStartTailCallOnlyFollowsStartBranches(t *testing.T) {
+	t.Parallel()
+
+	tailB := &disassemble.Inst{Operation: disassemble.ARM64_B}
+	if !isIOAVStartTailCall(tailB, "IOAVServiceUserClient::start(IOService*)") {
+		t.Fatal("tail B into ::start should continue the chain")
+	}
+	if isIOAVStartTailCall(tailB, "IOAVServiceUserClient::stop(IOService*)") {
+		t.Fatal("tail B into ::stop should not continue the chain")
+	}
+	call := &disassemble.Inst{Operation: disassemble.ARM64_BL}
+	if isIOAVStartTailCall(call, "IOAVServiceUserClient::start(IOService*)") {
+		t.Fatal("BL (regular call) must not continue the chain")
+	}
+}
+
 func TestSwitchRecordsAnnotateStructureInputReads(t *testing.T) {
 	t.Parallel()
 
