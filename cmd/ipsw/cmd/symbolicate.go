@@ -40,6 +40,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/tui"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/internal/xcode"
@@ -333,31 +334,39 @@ var symbolicateCmd = &cobra.Command{
 			} else {
 				// TODO: use IPSW to populate symbol server if both are supplied
 				if hdr.BugType == "210" || hdr.BugType == "288" {
-					/* validate IPSW */
-					i, err := info.Parse(args[1])
-					if err != nil {
-						return err
-					}
-					if i.Plists.BuildManifest.ProductVersion != ips.Header.Version() ||
-						i.Plists.BuildManifest.ProductBuildVersion != ips.Header.Build() ||
-						!slices.Contains(i.Plists.Restore.SupportedProductTypes, ips.Payload.Product) {
-						if !force {
-							return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s) (use --force to override)",
+					// A bare kernelcache (Mach-O fileset) can be used directly for
+					// kernel-frame symbolication; only an IPSW needs validation.
+					if isMacho, _ := magic.IsMachO(filepath.Clean(args[1])); isMacho {
+						if err := ips.Symbolicate210(filepath.Clean(args[1]), nil, ""); err != nil {
+							return err
+						}
+					} else {
+						/* validate IPSW */
+						i, err := info.Parse(args[1])
+						if err != nil {
+							return err
+						}
+						if i.Plists.BuildManifest.ProductVersion != ips.Header.Version() ||
+							i.Plists.BuildManifest.ProductBuildVersion != ips.Header.Build() ||
+							!slices.Contains(i.Plists.Restore.SupportedProductTypes, ips.Payload.Product) {
+							if !force {
+								return fmt.Errorf("supplied IPSW %s does NOT match crashlog: NEED %s; %s (%s), GOT %s; %s (%s) (use --force to override)",
+									filepath.Base(args[1]),
+									ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
+									strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
+									i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
+								)
+							}
+							log.Warnf("IPSW %s does not match crashlog (NEED %s; %s (%s), GOT %s; %s (%s)) - continuing anyway due to --force",
 								filepath.Base(args[1]),
 								ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
 								strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
 								i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
 							)
 						}
-						log.Warnf("IPSW %s does not match crashlog (NEED %s; %s (%s), GOT %s; %s (%s)) - continuing anyway due to --force",
-							filepath.Base(args[1]),
-							ips.Payload.Product, ips.Header.Version(), ips.Header.Build(),
-							strings.Join(i.Plists.Restore.SupportedProductTypes, ", "),
-							i.Plists.BuildManifest.ProductVersion, i.Plists.BuildManifest.ProductBuildVersion,
-						)
-					}
-					if err := ips.Symbolicate210(filepath.Clean(args[1]), nil, ""); err != nil {
-						return err
+						if err := ips.Symbolicate210(filepath.Clean(args[1]), nil, ""); err != nil {
+							return err
+						}
 					}
 				}
 			}

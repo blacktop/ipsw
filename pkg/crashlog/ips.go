@@ -28,6 +28,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -1360,70 +1361,89 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	machoFuncMap := make(map[string][]types.Function)
 	uuidFuncMap := make(map[string][]types.Function)
 
+	// A bare kernelcache (Mach-O fileset) can be supplied instead of an IPSW;
+	// detect it once so the IPSW-only filesystem/DSC paths are skipped below.
+	bareKC := false
+	if ipswPath != "" {
+		bareKC, _ = magic.IsMachO(ipswPath)
+	}
+
 	/* SYMBOLICATE KERNELCACHE */
 	var kc *macho.File
 	if ipswPath != "" {
-		// If crashlog has no device identifier, prompt user to select from available devices
-		device := i.Payload.Product
-		log.WithField("device", device).Debug("Looking for kernelcache matching crashlog device")
-		if device == "" {
-			ipswInfo, err := info.Parse(ipswPath)
-			if err != nil {
-				return fmt.Errorf("crashlog has no device identifier and failed to parse IPSW info: %w", err)
-			}
-			var devices []string
-			for _, dtree := range ipswInfo.DeviceTrees {
-				if dt, err := dtree.Summary(); err == nil {
-					devices = append(devices, dt.ProductType)
+		var kcPaths []string
+		if bareKC {
+			// A bare kernelcache (Mach-O fileset) was supplied directly: use it
+			// as-is for kernel-frame symbolication; never extract from an IPSW or
+			// delete the user's file.
+			log.WithField("kernelcache", filepath.Base(ipswPath)).Info("Using supplied kernelcache")
+			kcPaths = []string{ipswPath}
+		} else {
+			// If crashlog has no device identifier, prompt user to select from available devices
+			device := i.Payload.Product
+			log.WithField("device", device).Debug("Looking for kernelcache matching crashlog device")
+			if device == "" {
+				ipswInfo, err := info.Parse(ipswPath)
+				if err != nil {
+					return fmt.Errorf("crashlog has no device identifier and failed to parse IPSW info: %w", err)
 				}
-			}
-			if len(devices) == 0 {
-				return fmt.Errorf("crashlog has no device identifier and no devices found in IPSW")
-			}
-			sort.Strings(devices)
-			if len(devices) == 1 {
-				device = devices[0]
-				log.Warnf("crashlog has no device identifier; using only available device: %s", device)
-			} else {
-				var choice string
-				prompt := &survey.Select{
-					Message:  "Crashlog has no device identifier. Select target device:",
-					Options:  devices,
-					PageSize: 15,
-				}
-				if err := survey.AskOne(prompt, &choice); err != nil {
-					if err == terminal.InterruptErr {
-						return fmt.Errorf("user cancelled device selection")
+				var devices []string
+				for _, dtree := range ipswInfo.DeviceTrees {
+					if dt, err := dtree.Summary(); err == nil {
+						devices = append(devices, dt.ProductType)
 					}
-					return fmt.Errorf("failed to select device: %w", err)
 				}
-				device = choice
+				if len(devices) == 0 {
+					return fmt.Errorf("crashlog has no device identifier and no devices found in IPSW")
+				}
+				sort.Strings(devices)
+				if len(devices) == 1 {
+					device = devices[0]
+					log.Warnf("crashlog has no device identifier; using only available device: %s", device)
+				} else {
+					var choice string
+					prompt := &survey.Select{
+						Message:  "Crashlog has no device identifier. Select target device:",
+						Options:  devices,
+						PageSize: 15,
+					}
+					if err := survey.AskOne(prompt, &choice); err != nil {
+						if err == terminal.InterruptErr {
+							return fmt.Errorf("user cancelled device selection")
+						}
+						return fmt.Errorf("failed to select device: %w", err)
+					}
+					device = choice
+				}
 			}
-		}
 
-		out, err := extract.Kernelcache(&extract.Config{
-			IPSW:         ipswPath,
-			KernelDevice: device,
-			Output:       os.TempDir(),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract kernelcache: %w", err)
-		}
-		if len(out) == 0 {
-			return fmt.Errorf("no kernelcache found for device %s in IPSW (multi-device IPSW may not contain this device)", device)
-		}
-		// Log which kernelcache(s) were found for the device
-		for k := range out {
-			log.WithFields(log.Fields{
-				"device":      device,
-				"kernelcache": filepath.Base(k),
-			}).Debug("Found kernelcache for device")
-		}
-		defer func() {
-			for k := range out {
-				os.Remove(k)
+			out, err := extract.Kernelcache(&extract.Config{
+				IPSW:         ipswPath,
+				KernelDevice: device,
+				Output:       os.TempDir(),
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract kernelcache: %w", err)
 			}
-		}()
+			if len(out) == 0 {
+				return fmt.Errorf("no kernelcache found for device %s in IPSW (multi-device IPSW may not contain this device)", device)
+			}
+			// Log which kernelcache(s) were found for the device
+			for k := range out {
+				log.WithFields(log.Fields{
+					"device":      device,
+					"kernelcache": filepath.Base(k),
+				}).Debug("Found kernelcache for device")
+			}
+			defer func() {
+				for k := range out {
+					os.Remove(k)
+				}
+			}()
+			for k := range out {
+				kcPaths = append(kcPaths, k)
+			}
+		}
 
 		// Collect all kernel-related UUIDs from crashlog for validation
 		// kc.UUID() returns the LC_UUID of the kernelcache container
@@ -1467,7 +1487,7 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 			}
 		}
 
-		for k := range out {
+		for _, k := range kcPaths {
 			smap := signature.NewSymbolMap()
 			log.WithField("kernelcache", filepath.Base(k)).Info("Symbolicating...")
 			if err := smap.Symbolicate(k, sigs, !i.Config.Verbose); err != nil {
@@ -1620,7 +1640,7 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	}
 
 	/* SYMBOLICATE FILESYSTEM MACHOS */
-	if ipswPath != "" {
+	if ipswPath != "" && !bareKC {
 		if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
 			if total == 0 {
 				return ErrDone // break
@@ -1701,7 +1721,11 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	// 	}
 	// }
 
-	fs, closeDSCs, err := i.openDSCs(ipswPath, dscPaths)
+	dscIPSW := ipswPath
+	if bareKC {
+		dscIPSW = "" // a bare kernelcache has no DSC; userspace frames stay raw
+	}
+	fs, closeDSCs, err := i.openDSCs(dscIPSW, dscPaths)
 	if err != nil {
 		return err
 	}
