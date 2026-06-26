@@ -229,7 +229,7 @@ func TestDispatchAnalysisPreservesScaledConditionalArrayBases(t *testing.T) {
 		&macho.File{},
 		linearExpr{valid: true, base: 0x1000, coeff: dispatchSizeClassic, alts: []uint64{0x1000, 0x2000}},
 		linearExpr{},
-		2,
+		selectorWindow{count: 2},
 		DispatchExternalMethod,
 	)
 	if !ok {
@@ -413,7 +413,7 @@ func TestApplySubClearsRegisterOperandForm(t *testing.T) {
 	}
 }
 
-func TestBiasedSelectorCompareCountRecoversSelectorSpaceBound(t *testing.T) {
+func TestBiasedSelectorCompareRecoversLowerBound(t *testing.T) {
 	t.Parallel()
 
 	var regs [31]linearExpr
@@ -424,17 +424,18 @@ func TestBiasedSelectorCompareCountRecoversSelectorSpaceBound(t *testing.T) {
 	inst.Operands[1].Class = disassemble.IMM32
 	inst.Operands[1].Immediate = 9
 
-	count, ok := biasedSelectorCompareCount(&inst, regs)
-	if !ok || count != 10 {
-		t.Fatalf("biased compare count=(%d,%t), want 10,true", count, ok)
+	pending, ok := biasedSelectorCompare(&inst, regs)
+	if !ok || pending.compare != 9 || pending.lowerBound != 1 {
+		t.Fatalf("biased compare=(%+v,%t), want compare 9 lower 1", pending, ok)
 	}
-	// b.hi adds the inclusive +1, so the full table spans selectors 0..10.
+	// b.hi adds the inclusive +1 in biased-index space, so a selector-1
+	// dispatch spans table entries 0..9 and externally reachable selectors 1..10.
 	bhi, ok := disassemble.OperationFromString("b.hi")
 	if !ok {
 		t.Fatal("could not resolve b.hi operation")
 	}
-	if got, ok := selectorCountFromBranch(&disassemble.Inst{Operation: bhi}, count); !ok || got != 11 {
-		t.Fatalf("branch-adjusted count=(%d,%t), want 11,true", got, ok)
+	if got, ok := selectorCountFromBranch(&disassemble.Inst{Operation: bhi}, pending.compare); !ok || got != 10 {
+		t.Fatalf("branch-adjusted count=(%d,%t), want 10,true", got, ok)
 	}
 }
 
@@ -449,7 +450,7 @@ func TestBiasedSelectorCompareCountIgnoresDirectAndZeroBias(t *testing.T) {
 	directW1.Operands[0].Registers[0] = disassemble.REG_W1
 	directW1.Operands[1].Class = disassemble.IMM32
 	directW1.Operands[1].Immediate = 9
-	if _, ok := biasedSelectorCompareCount(&directW1, regs); ok {
+	if _, ok := biasedSelectorCompare(&directW1, regs); ok {
 		t.Fatal("biased compare should ignore the direct W1 selector")
 	}
 
@@ -458,7 +459,7 @@ func TestBiasedSelectorCompareCountIgnoresDirectAndZeroBias(t *testing.T) {
 	zeroBias.Operands[0].Registers[0] = disassemble.REG_W21
 	zeroBias.Operands[1].Class = disassemble.IMM32
 	zeroBias.Operands[1].Immediate = 7
-	if _, ok := biasedSelectorCompareCount(&zeroBias, regs); ok {
+	if _, ok := biasedSelectorCompare(&zeroBias, regs); ok {
 		t.Fatal("biased compare should ignore an unbiased (base 0) selector copy")
 	}
 }
@@ -466,14 +467,49 @@ func TestBiasedSelectorCompareCountIgnoresDirectAndZeroBias(t *testing.T) {
 func TestDispatchSelectorBoundPrefersDirectBound(t *testing.T) {
 	t.Parallel()
 
-	if got := dispatchSelectorBound(8, 11); got != 8 {
-		t.Fatalf("dispatchSelectorBound=%d, want direct bound 8", got)
+	if got := dispatchSelectorBound(8, selectorWindow{count: 11, lowerBound: 1}); got.count != 8 || got.lowerBound != 0 {
+		t.Fatalf("dispatchSelectorBound=%+v, want direct bound count 8 lower 0", got)
 	}
-	if got := dispatchSelectorBound(-1, 11); got != 11 {
-		t.Fatalf("dispatchSelectorBound=%d, want biased fallback 11", got)
+	if got := dispatchSelectorBound(-1, selectorWindow{count: 10, lowerBound: 1}); got.count != 10 || got.lowerBound != 1 {
+		t.Fatalf("dispatchSelectorBound=%+v, want biased fallback count 10 lower 1", got)
 	}
-	if got := dispatchSelectorBound(-1, -1); got != -1 {
-		t.Fatalf("dispatchSelectorBound=%d, want -1", got)
+	if got := dispatchSelectorBound(-1, selectorWindow{count: -1}); got.count != -1 {
+		t.Fatalf("dispatchSelectorBound=%+v, want count -1", got)
+	}
+}
+
+func TestDispatchAnalysisNormalizesBiasedSelectorBase(t *testing.T) {
+	t.Parallel()
+
+	analysis, ok := (&analyzer{}).dispatchAnalysisFromExpr(
+		0x3000,
+		&macho.File{},
+		linearExpr{valid: true, base: 0x1000 - dispatchSizeClassic, coeff: dispatchSizeClassic},
+		linearExpr{},
+		selectorWindow{count: 10, lowerBound: 1},
+		DispatchExternalMethod,
+	)
+	if !ok {
+		t.Fatal("dispatchAnalysisFromExpr rejected biased dispatch expression")
+	}
+	if analysis.arrayBase != 0x1000 || analysis.selectorLowerBound != 1 || analysis.count != 10 {
+		t.Fatalf("analysis=(base:%#x lower:%d count:%d), want base 0x1000 lower 1 count 10",
+			analysis.arrayBase, analysis.selectorLowerBound, analysis.count)
+	}
+}
+
+func TestDispatchSelectorsStartAtLowerBound(t *testing.T) {
+	t.Parallel()
+
+	got := dispatchSelectors(methodAnalysis{count: 3, selectorLowerBound: 1})
+	want := []int{1, 2, 3}
+	if len(got) != len(want) {
+		t.Fatalf("selectors=%#v, want %#v", got, want)
+	}
+	for idx := range want {
+		if got[idx] != want[idx] {
+			t.Fatalf("selectors=%#v, want %#v", got, want)
+		}
 	}
 }
 

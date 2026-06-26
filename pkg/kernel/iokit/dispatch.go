@@ -38,7 +38,7 @@ func (a *analyzer) dispatchRecords(info *classInfo, analysis methodAnalysis) ([]
 		if analysis.note == "conditional_array" {
 			tableAnalysis.note = ""
 		}
-		for selector := 0; selector < analysis.count; selector++ {
+		for _, selector := range dispatchSelectors(analysis) {
 			rec := a.dispatchRecord(info, tableAnalysis, selector)
 			if analysis.note == "conditional_array" {
 				addConditionalTableExtra(rec.Extra, tableIndex, tableBase)
@@ -47,6 +47,18 @@ func (a *analyzer) dispatchRecords(info *classInfo, analysis methodAnalysis) ([]
 		}
 	}
 	return records, nil
+}
+
+func dispatchSelectors(analysis methodAnalysis) []int {
+	if analysis.count <= 0 {
+		return nil
+	}
+	start := max(analysis.selectorLowerBound, 0)
+	selectors := make([]int, 0, analysis.count)
+	for idx := 0; idx < analysis.count; idx++ {
+		selectors = append(selectors, start+idx)
+	}
+	return selectors
 }
 
 func (a *analyzer) selectedDispatchRecords(info *classInfo, analysis methodAnalysis) []Record {
@@ -84,7 +96,7 @@ func addConditionalTableExtra(extra map[string]string, tableIndex int, tableBase
 }
 
 func (a *analyzer) dispatchRecord(info *classInfo, analysis methodAnalysis, selector int) Record {
-	entry, note := a.readDispatchEntry(analysis, selector)
+	entry, note := a.readDispatchEntry(analysis, selector-analysis.selectorLowerBound)
 	rec := Record{
 		Kind:              KindMethod,
 		Class:             info.Name,
@@ -238,6 +250,9 @@ func legacyCountToInt64(count uint64) int64 {
 }
 
 func (a *analyzer) readDispatchEntry(analysis methodAnalysis, selector int) (dispatchEntry, string) {
+	if selector < 0 {
+		return dispatchEntry{}, "selector_out_of_range"
+	}
 	addr := analysis.arrayBase + uint64(selector)*analysis.stride
 	function, ok := a.scanner.ReadPointerAt(analysis.owner, addr)
 	if !ok || function == 0 {
