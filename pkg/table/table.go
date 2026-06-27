@@ -377,14 +377,36 @@ func NewBubbleTable(headers []string, styled bool) *BubbleTable {
 		table.WithColumns(columns),
 		table.WithFocused(true),
 		table.WithHeight(tableHeight),
-		// Don't force width - let it size based on content
 	)
 	t.SetStyles(tableStyle)
 
-	return &BubbleTable{
+	bt := &BubbleTable{
 		table:  t,
 		styled: styled,
 	}
+	bt.fitWidth()
+	return bt
+}
+
+// cellHPadding is the horizontal frame each column adds on top of its content
+// width. The bubbles/table cell and header styles both use Padding(0, 1), so
+// every column occupies Column.Width+2 cells once rendered.
+const cellHPadding = 2
+
+// fitWidth sizes the table's viewport to span all columns. bubbles/table v2
+// delegates body rendering to a viewport whose visibleLines() returns nothing
+// when its width is 0, so without an explicit width the rows render blank.
+// Sizing to the full content width also matches the previous v1 behavior of
+// emitting untruncated lines.
+func (bt *BubbleTable) fitWidth() {
+	total := 0
+	for _, col := range bt.table.Columns() {
+		if col.Width <= 0 {
+			continue
+		}
+		total += col.Width + cellHPadding
+	}
+	bt.table.SetWidth(total)
 }
 
 // SetData sets the table data and auto-adjusts column widths based on content
@@ -423,6 +445,10 @@ func (bt *BubbleTable) SetData(data [][]string) {
 		rows[i] = table.Row(row)
 	}
 	bt.table.SetRows(rows)
+
+	// Re-fit the viewport width to the freshly computed column widths so the
+	// body renders (see fitWidth).
+	bt.fitWidth()
 }
 
 // AppendData adds rows to the table
