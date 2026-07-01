@@ -171,9 +171,8 @@ func (t *sandboxTask) Markdown(w *strings.Builder, outputDir string) error {
 				label:         source.Name,
 				groupDir:      source.Slug,
 			}
-			title := group.title
 			if err := renderSideCarEntries(w, sec, bodies, outputDir, func(name, fence string) string {
-				return fmt.Sprintf("## %s\n\n> Group: %s\n\n%s\n", name, title, fence)
+				return fmt.Sprintf("## %s\n\n> Group: %s\n\n%s\n", name, group.title, fence)
 			}); err != nil {
 				return err
 			}
@@ -254,6 +253,13 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 	}
 
 	for lineNumber, line := range lines {
+		// lineOnce runs the mutually-exclusive per-line checks below exactly
+		// once; break exits it early once a check matches. staticcheck flags
+		// this as SA4004 ("loop always terminates"), but a labeled plain block
+		// cannot take a break label in Go (only for/switch/select can), so the
+		// one-iteration for loop is the correct, compiling way to get an early
+		// exit out of this sequence of checks.
+	lineOnce:
 		for {
 			if currentProfile != "" {
 				if !inFence && sandboxMarkdownIsHeader(line) {
@@ -265,7 +271,7 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 					if strings.HasPrefix(strings.TrimSpace(line), "```") {
 						inFence = !inFence
 					}
-					break
+					break lineOnce
 				}
 			}
 
@@ -280,7 +286,7 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 				})
 				sourceIndex = len(report.Sources) - 1
 				currentGroup = ""
-				break
+				break lineOnce
 			}
 
 			if groupName, ok := parseSandboxGroupHeader(line); ok {
@@ -292,7 +298,7 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 					return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unsupported group %q at line %d", groupName, lineNumber+1)
 				}
 				currentGroup = group
-				break
+				break lineOnce
 			}
 
 			if profileName, ok := parseSandboxProfileHeader(line); ok {
@@ -302,13 +308,13 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 				currentProfile = profileName
 				profileLines = nil
 				inFence = false
-				break
+				break lineOnce
 			}
 
 			if strings.TrimSpace(line) != "" {
 				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unexpected content at line %d", lineNumber+1)
 			}
-			break
+			break lineOnce
 		}
 	}
 

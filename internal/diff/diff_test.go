@@ -314,6 +314,37 @@ func (j *recordingPlainSysJob) ProcessVolume(_, oldRoot, newRoot string) error {
 	return nil
 }
 
+// TestRunVolumeTasksNormalizesMountTaskRoots covers the APFS-FUSE (Linux)
+// mount shape, where the mount point holds a "root" subdirectory instead of
+// exposing "System" etc. directly. The Mach-O walk root already normalized via
+// utils.MountedFilesystemRoot; MountTask.ProcessVolume must receive the same
+// normalized root so files/features/locs/dsc/launchd key their entries
+// consistently and never surface a spurious top-level "root/" volume.
+func TestRunVolumeTasksNormalizesMountTaskRoots(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldRoot := filepath.Join(tmpDir, "old")
+	newRoot := filepath.Join(tmpDir, "new")
+	// APFS-FUSE shape: <mount>/root/System/... with no <mount>/System.
+	if err := os.MkdirAll(filepath.Join(oldRoot, "root", "System"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(newRoot, "root", "System"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	job := &recordingPlainSysJob{}
+	if errs := runVolumeTasks("sys", volumeRoots{old: oldRoot, new: newRoot}, []Task{job}); len(errs) != 0 {
+		t.Fatalf("runVolumeTasks() errors = %v", errs)
+	}
+
+	if want := filepath.Join(oldRoot, "root"); job.gotOld != want {
+		t.Errorf("gotOld = %q, want %q", job.gotOld, want)
+	}
+	if want := filepath.Join(newRoot, "root"); job.gotNew != want {
+		t.Errorf("gotNew = %q, want %q", job.gotNew, want)
+	}
+}
+
 // TestVolumeJobOrchestratorSessionFallbackForMixedPair covers the mixed
 // pre-cryptex-vs-cryptex case: the old IPSW has no SystemOS cryptex, so the
 // sys phase mounts nothing for it via the strict resolver, but a
