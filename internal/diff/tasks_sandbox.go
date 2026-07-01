@@ -150,30 +150,13 @@ func (t *sandboxTask) Markdown(w *strings.Builder, outputDir string) error {
 
 	w.WriteString("## Sandbox Profiles\n\n")
 	for _, source := range report.Sources {
-		if source.Total() == 0 {
+		total := source.Total()
+		if total == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "### %s (%d)\n\n", source.Name, source.Total())
+		fmt.Fprintf(w, "### %s (%d)\n\n", source.Name, total)
 		for _, group := range sandboxMarkdownGroups {
-			profiles := source.Groups[group.key]
-			if len(profiles) == 0 {
-				continue
-			}
-			bodies := make(map[string]string, len(profiles))
-			for _, p := range profiles {
-				bodies[p.Name] = p.Fence
-			}
-			sec := listSection{
-				headingPrefix: "####",
-				title:         group.title,
-				tag:           group.tag,
-				subDir:        sandboxMarkdownSidecarDir,
-				label:         source.Name,
-				groupDir:      source.Slug,
-			}
-			if err := renderSideCarEntries(w, sec, bodies, outputDir, func(name, fence string) string {
-				return fmt.Sprintf("## %s\n\n> Group: %s\n\n%s\n", name, group.title, fence)
-			}); err != nil {
+			if err := renderSandboxProfileGroup(w, source, group, outputDir); err != nil {
 				return err
 			}
 		}
@@ -181,14 +164,42 @@ func (t *sandboxTask) Markdown(w *strings.Builder, outputDir string) error {
 	return nil
 }
 
+// renderSandboxProfileGroup writes one change-group's profiles for a source as
+// per-profile side-cars plus the README link list (via the shared
+// renderSideCarEntries path). An empty group renders nothing.
+func renderSandboxProfileGroup(w *strings.Builder, source sandboxMarkdownSource, group sandboxMarkdownGroup, outputDir string) error {
+	profiles := source.Groups[group.key]
+	if len(profiles) == 0 {
+		return nil
+	}
+	bodies := make(map[string]string, len(profiles))
+	for _, p := range profiles {
+		bodies[p.Name] = p.Fence
+	}
+	sec := listSection{
+		headingPrefix: "####",
+		title:         group.title,
+		tag:           group.tag,
+		subDir:        sandboxMarkdownSidecarDir,
+		label:         source.Name,
+		groupDir:      source.Slug,
+	}
+	return renderSideCarEntries(w, sec, bodies, outputDir, func(name, fence string) string {
+		return fmt.Sprintf("## %s\n\n> Group: %s\n\n%s\n", name, group.title, fence)
+	})
+}
+
 // sandboxMarkdownSidecarDir is the side-car directory holding per-profile
 // sandbox diff documents.
 const sandboxMarkdownSidecarDir = "SANDBOX"
 
+// sandboxMarkdownGroup pairs a normalized parse key with the emoji title and
+// filename tag the shared list renderer uses.
+type sandboxMarkdownGroup struct{ key, title, tag string }
+
 // sandboxMarkdownGroups is the deterministic render order for the three profile
-// groups, pairing the normalized parse key with the emoji title and filename
-// tag used by the shared list renderer.
-var sandboxMarkdownGroups = [...]struct{ key, title, tag string }{
+// groups.
+var sandboxMarkdownGroups = [...]sandboxMarkdownGroup{
 	{"Added", "🆕 NEW", "NEW"},
 	{"Removed", "❌ Removed", "Removed"},
 	{"Updated", "⬆️ Updated", "Updated"},
@@ -226,94 +237,126 @@ type sandboxMarkdownProfile struct {
 // requires each profile to carry one complete fenced block. It errors on any
 // content it cannot place so a renderer change never silently drops profiles.
 func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
-	lines := strings.Split(body, "\n")
-	report := sandboxMarkdownReport{}
-	sourceIndex := -1
-	currentGroup := ""
-	currentProfile := ""
-	var profileLines []string
-	inFence := false
-
-	flushProfile := func() error {
-		if currentProfile == "" {
-			return nil
-		}
-		fence := strings.TrimSpace(strings.Join(profileLines, "\n"))
-		if !strings.HasPrefix(fence, "```") || !sandboxMarkdownFenceComplete(profileLines) {
-			return fmt.Errorf("sandbox markdown profile %q has an incomplete fenced block", currentProfile)
-		}
-		report.Sources[sourceIndex].Groups[currentGroup] = append(
-			report.Sources[sourceIndex].Groups[currentGroup],
-			sandboxMarkdownProfile{Name: currentProfile, Fence: fence},
-		)
-		currentProfile = ""
-		profileLines = nil
-		inFence = false
-		return nil
-	}
-
-	for lineNumber, line := range lines {
-		// While inside a profile, collect its body lines until the next header
-		// (outside a fenced block) closes it. A header seen here flushes the
-		// profile and falls through to be classified below.
-		if currentProfile != "" {
-			if inFence || !sandboxMarkdownIsHeader(line) {
-				profileLines = append(profileLines, line)
-				if strings.HasPrefix(strings.TrimSpace(line), "```") {
-					inFence = !inFence
-				}
-				continue
-			}
-			if err := flushProfile(); err != nil {
-				return sandboxMarkdownReport{}, err
-			}
-		}
-
-		if sourceName, ok := parseSandboxSourceHeader(line); ok {
-			report.Sources = append(report.Sources, sandboxMarkdownSource{
-				Name:   sourceName,
-				Slug:   sandboxMarkdownSourceSlug(sourceName),
-				Groups: make(map[string][]sandboxMarkdownProfile),
-			})
-			sourceIndex = len(report.Sources) - 1
-			currentGroup = ""
-			continue
-		}
-
-		if groupName, ok := parseSandboxGroupHeader(line); ok {
-			if sourceIndex < 0 {
-				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown group before source at line %d", lineNumber+1)
-			}
-			group, ok := normalizeSandboxMarkdownGroup(groupName)
-			if !ok {
-				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unsupported group %q at line %d", groupName, lineNumber+1)
-			}
-			currentGroup = group
-			continue
-		}
-
-		if profileName, ok := parseSandboxProfileHeader(line); ok {
-			if sourceIndex < 0 || currentGroup == "" {
-				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown profile before group at line %d", lineNumber+1)
-			}
-			currentProfile = profileName
-			profileLines = nil
-			inFence = false
-			continue
-		}
-
-		if strings.TrimSpace(line) != "" {
-			return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unexpected content at line %d", lineNumber+1)
+	p := sandboxMarkdownParser{sourceIndex: -1}
+	for lineNumber, line := range strings.Split(body, "\n") {
+		if err := p.consume(lineNumber, line); err != nil {
+			return sandboxMarkdownReport{}, err
 		}
 	}
-
-	if err := flushProfile(); err != nil {
+	if err := p.flushProfile(); err != nil {
 		return sandboxMarkdownReport{}, err
 	}
-	if !report.HasProfiles() {
+	if !p.report.HasProfiles() {
 		return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown has no profiles")
 	}
-	return report, nil
+	return p.report, nil
+}
+
+// sandboxMarkdownParser is the line-oriented state machine parseSandboxMarkdown
+// drives one line at a time.
+type sandboxMarkdownParser struct {
+	report         sandboxMarkdownReport
+	sourceIndex    int
+	currentGroup   string
+	currentProfile string
+	profileLines   []string
+	inFence        bool
+}
+
+// consume routes one line: while a profile is open its body lines are collected
+// until a header (outside a fenced block) closes it; the closing header then
+// falls through to be classified as a source/group/profile heading.
+func (p *sandboxMarkdownParser) consume(lineNumber int, line string) error {
+	if p.currentProfile != "" {
+		consumed, err := p.appendOrCloseProfile(line)
+		if err != nil {
+			return err
+		}
+		if consumed {
+			return nil
+		}
+	}
+	return p.classify(lineNumber, line)
+}
+
+// appendOrCloseProfile adds line to the open profile's body, toggling the fence
+// state. It returns true when the line was consumed as body; false (after
+// flushing the profile) when line is a header the caller must still classify.
+func (p *sandboxMarkdownParser) appendOrCloseProfile(line string) (bool, error) {
+	if p.inFence || !sandboxMarkdownIsHeader(line) {
+		p.profileLines = append(p.profileLines, line)
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			p.inFence = !p.inFence
+		}
+		return true, nil
+	}
+	return false, p.flushProfile()
+}
+
+// classify handles a source/group/profile heading, ignores blank lines, and
+// errors on anything else so a renderer-format drift never silently drops data.
+func (p *sandboxMarkdownParser) classify(lineNumber int, line string) error {
+	if sourceName, ok := parseSandboxSourceHeader(line); ok {
+		p.report.Sources = append(p.report.Sources, sandboxMarkdownSource{
+			Name:   sourceName,
+			Slug:   sandboxMarkdownSourceSlug(sourceName),
+			Groups: make(map[string][]sandboxMarkdownProfile),
+		})
+		p.sourceIndex = len(p.report.Sources) - 1
+		p.currentGroup = ""
+		return nil
+	}
+	if groupName, ok := parseSandboxGroupHeader(line); ok {
+		return p.setGroup(lineNumber, groupName)
+	}
+	if profileName, ok := parseSandboxProfileHeader(line); ok {
+		if p.sourceIndex < 0 || p.currentGroup == "" {
+			return fmt.Errorf("sandbox markdown profile before group at line %d", lineNumber+1)
+		}
+		p.currentProfile = profileName
+		p.profileLines = nil
+		p.inFence = false
+		return nil
+	}
+	if strings.TrimSpace(line) != "" {
+		return fmt.Errorf("sandbox markdown unexpected content at line %d", lineNumber+1)
+	}
+	return nil
+}
+
+// setGroup records the current change-group, requiring a source to be open and
+// the group name to be one the renderer emits.
+func (p *sandboxMarkdownParser) setGroup(lineNumber int, groupName string) error {
+	if p.sourceIndex < 0 {
+		return fmt.Errorf("sandbox markdown group before source at line %d", lineNumber+1)
+	}
+	group, ok := normalizeSandboxMarkdownGroup(groupName)
+	if !ok {
+		return fmt.Errorf("sandbox markdown unsupported group %q at line %d", groupName, lineNumber+1)
+	}
+	p.currentGroup = group
+	return nil
+}
+
+// flushProfile appends the open profile (with its complete fenced block) to the
+// current source/group and resets the profile state. It is a no-op when no
+// profile is open.
+func (p *sandboxMarkdownParser) flushProfile() error {
+	if p.currentProfile == "" {
+		return nil
+	}
+	fence := strings.TrimSpace(strings.Join(p.profileLines, "\n"))
+	if !strings.HasPrefix(fence, "```") || !sandboxMarkdownFenceComplete(p.profileLines) {
+		return fmt.Errorf("sandbox markdown profile %q has an incomplete fenced block", p.currentProfile)
+	}
+	p.report.Sources[p.sourceIndex].Groups[p.currentGroup] = append(
+		p.report.Sources[p.sourceIndex].Groups[p.currentGroup],
+		sandboxMarkdownProfile{Name: p.currentProfile, Fence: fence},
+	)
+	p.currentProfile = ""
+	p.profileLines = nil
+	p.inFence = false
+	return nil
 }
 
 // HasProfiles reports whether any source carries at least one profile.
