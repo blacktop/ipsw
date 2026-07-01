@@ -404,6 +404,17 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 				newRoot = roots.newFallback
 			}
 		}
+		// Normalize like the Mach-O walk root above so APFS-FUSE mounts descend
+		// into <mount>/root. Without this, MountTasks (files/features/locs/dsc/
+		// launchd) key their entries against the raw mount and surface a
+		// spurious top-level "root/" volume. MountedFilesystemRoot is a no-op
+		// for roots that are already a filesystem root.
+		if oldRoot != "" {
+			oldRoot = utils.MountedFilesystemRoot(oldRoot)
+		}
+		if newRoot != "" {
+			newRoot = utils.MountedFilesystemRoot(newRoot)
+		}
 		if err := mt.ProcessVolume(typ, oldRoot, newRoot); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", mt.Name(), err))
 		}
