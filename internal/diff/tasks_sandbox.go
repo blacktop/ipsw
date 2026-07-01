@@ -253,68 +253,57 @@ func parseSandboxMarkdown(body string) (sandboxMarkdownReport, error) {
 	}
 
 	for lineNumber, line := range lines {
-		// lineOnce runs the mutually-exclusive per-line checks below exactly
-		// once; break exits it early once a check matches. staticcheck flags
-		// this as SA4004 ("loop always terminates"), but a labeled plain block
-		// cannot take a break label in Go (only for/switch/select can), so the
-		// one-iteration for loop is the correct, compiling way to get an early
-		// exit out of this sequence of checks.
-	lineOnce:
-		for {
-			if currentProfile != "" {
-				if !inFence && sandboxMarkdownIsHeader(line) {
-					if err := flushProfile(); err != nil {
-						return sandboxMarkdownReport{}, err
-					}
-				} else {
-					profileLines = append(profileLines, line)
-					if strings.HasPrefix(strings.TrimSpace(line), "```") {
-						inFence = !inFence
-					}
-					break lineOnce
+		// While inside a profile, collect its body lines until the next header
+		// (outside a fenced block) closes it. A header seen here flushes the
+		// profile and falls through to be classified below.
+		if currentProfile != "" {
+			if inFence || !sandboxMarkdownIsHeader(line) {
+				profileLines = append(profileLines, line)
+				if strings.HasPrefix(strings.TrimSpace(line), "```") {
+					inFence = !inFence
 				}
+				continue
 			}
+			if err := flushProfile(); err != nil {
+				return sandboxMarkdownReport{}, err
+			}
+		}
 
-			if sourceName, ok := parseSandboxSourceHeader(line); ok {
-				if err := flushProfile(); err != nil {
-					return sandboxMarkdownReport{}, err
-				}
-				report.Sources = append(report.Sources, sandboxMarkdownSource{
-					Name:   sourceName,
-					Slug:   sandboxMarkdownSourceSlug(sourceName),
-					Groups: make(map[string][]sandboxMarkdownProfile),
-				})
-				sourceIndex = len(report.Sources) - 1
-				currentGroup = ""
-				break lineOnce
-			}
+		if sourceName, ok := parseSandboxSourceHeader(line); ok {
+			report.Sources = append(report.Sources, sandboxMarkdownSource{
+				Name:   sourceName,
+				Slug:   sandboxMarkdownSourceSlug(sourceName),
+				Groups: make(map[string][]sandboxMarkdownProfile),
+			})
+			sourceIndex = len(report.Sources) - 1
+			currentGroup = ""
+			continue
+		}
 
-			if groupName, ok := parseSandboxGroupHeader(line); ok {
-				if sourceIndex < 0 {
-					return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown group before source at line %d", lineNumber+1)
-				}
-				group, ok := normalizeSandboxMarkdownGroup(groupName)
-				if !ok {
-					return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unsupported group %q at line %d", groupName, lineNumber+1)
-				}
-				currentGroup = group
-				break lineOnce
+		if groupName, ok := parseSandboxGroupHeader(line); ok {
+			if sourceIndex < 0 {
+				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown group before source at line %d", lineNumber+1)
 			}
+			group, ok := normalizeSandboxMarkdownGroup(groupName)
+			if !ok {
+				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unsupported group %q at line %d", groupName, lineNumber+1)
+			}
+			currentGroup = group
+			continue
+		}
 
-			if profileName, ok := parseSandboxProfileHeader(line); ok {
-				if sourceIndex < 0 || currentGroup == "" {
-					return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown profile before group at line %d", lineNumber+1)
-				}
-				currentProfile = profileName
-				profileLines = nil
-				inFence = false
-				break lineOnce
+		if profileName, ok := parseSandboxProfileHeader(line); ok {
+			if sourceIndex < 0 || currentGroup == "" {
+				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown profile before group at line %d", lineNumber+1)
 			}
+			currentProfile = profileName
+			profileLines = nil
+			inFence = false
+			continue
+		}
 
-			if strings.TrimSpace(line) != "" {
-				return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unexpected content at line %d", lineNumber+1)
-			}
-			break lineOnce
+		if strings.TrimSpace(line) != "" {
+			return sandboxMarkdownReport{}, fmt.Errorf("sandbox markdown unexpected content at line %d", lineNumber+1)
 		}
 	}
 

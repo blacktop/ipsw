@@ -309,6 +309,13 @@ func sessionFallbackWanted(jobs []Task, typ string) bool {
 func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 	var errs []error
 
+	// Resolve every mount root to its filesystem root (<mount>/root on
+	// APFS-FUSE) once so the Mach-O walk and every MountTask key their entries
+	// against the same path. Without it, MountTasks surface a spurious
+	// top-level "root/" volume. MountedFilesystemRoot is a no-op for roots
+	// already at the filesystem root.
+	roots = normalizeVolumeRoots(roots)
+
 	var machoTasks []MachoWalkTask
 	var mountTasks []MountTask
 	for _, j := range jobs {
@@ -344,10 +351,6 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 		if root == "" {
 			return
 		}
-		// Normalize the walk root so APFS-FUSE mounts (Linux) descend into
-		// <mount>/root, matching the path keys the legacy entsJob and other
-		// utils.MountedFilesystemRoot-aware callers produced.
-		walkRoot := utils.MountedFilesystemRoot(root)
 		handlers := make([]search.NamedMachoScanHandler, 0, len(machoTasks))
 		for _, mw := range machoTasks {
 			if disabled[mw.Name()] {
@@ -365,7 +368,7 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 		if len(handlers) == 0 {
 			return
 		}
-		if err := search.ForEachMachoInMountMulti(walkRoot, handlers); err != nil {
+		if err := search.ForEachMachoInMountMulti(root, handlers); err != nil {
 			for _, perTask := range splitJoinedErrors(err) {
 				if name, ok := taskNameFromError(perTask); ok {
 					disabled[name] = true
@@ -375,10 +378,10 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 					// Keep the task name as the leading prefix so the
 					// orchestrator can attribute the failure back to the
 					// task (and skip its cache completion sentinel).
-					errs = append(errs, fmt.Errorf("%s: %s mount %s: %w", name, side, walkRoot, perTask))
+					errs = append(errs, fmt.Errorf("%s: %s mount %s: %w", name, side, root, perTask))
 					continue
 				}
-				errs = append(errs, fmt.Errorf("%s mount %s: %w", side, walkRoot, perTask))
+				errs = append(errs, fmt.Errorf("%s mount %s: %w", side, root, perTask))
 			}
 		}
 	}
@@ -404,22 +407,27 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 				newRoot = roots.newFallback
 			}
 		}
-		// Normalize like the Mach-O walk root above so APFS-FUSE mounts descend
-		// into <mount>/root. Without this, MountTasks (files/features/locs/dsc/
-		// launchd) key their entries against the raw mount and surface a
-		// spurious top-level "root/" volume. MountedFilesystemRoot is a no-op
-		// for roots that are already a filesystem root.
-		if oldRoot != "" {
-			oldRoot = utils.MountedFilesystemRoot(oldRoot)
-		}
-		if newRoot != "" {
-			newRoot = utils.MountedFilesystemRoot(newRoot)
-		}
 		if err := mt.ProcessVolume(typ, oldRoot, newRoot); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", mt.Name(), err))
 		}
 	}
 	return errs
+}
+
+// normalizeVolumeRoots resolves each non-empty mount root to its filesystem
+// root via utils.MountedFilesystemRoot, so APFS-FUSE mounts descend into
+// <mount>/root. It is a no-op for roots already at the filesystem root and for
+// empty (absent-side) roots.
+func normalizeVolumeRoots(r volumeRoots) volumeRoots {
+	norm := func(p string) string {
+		if p == "" {
+			return ""
+		}
+		return utils.MountedFilesystemRoot(p)
+	}
+	r.old, r.new = norm(r.old), norm(r.new)
+	r.oldFallback, r.newFallback = norm(r.oldFallback), norm(r.newFallback)
+	return r
 }
 
 func abortMachoVolume(mw MachoWalkTask, typ string) {
