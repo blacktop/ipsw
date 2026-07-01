@@ -294,8 +294,13 @@ func hashMachoDiffConfig(h io.Writer, conf *mcmd.DiffConfig) {
 	}
 	// The cache stores rendered diff bodies, not DiffInfo. Fold fixed renderer
 	// semantics here so rows rendered by older local builds do not hydrate into
-	// reports after the text format changes.
-	_, _ = h.Write([]byte("macho-report-hides-load-command-hash"))
+	// reports after the text format changes. The current marker also covers
+	// dropping the per-section/per-function sha256 walls (sections render as
+	// name+size only, same-size content edits summarize as "content changed",
+	// Version/UUID are Verbose-gated). Update this string on ANY rendered-body
+	// format change: it orphans stale rows for every task that folds
+	// hashMachoDiffConfig (machos, dsc, kexts, firmwares).
+	_, _ = h.Write([]byte("macho-report-hides-load-command-hash+drops-sha256-walls"))
 	_, _ = h.Write([]byte{0})
 	writeStringList := func(label string, items []string) {
 		_, _ = h.Write([]byte(label))

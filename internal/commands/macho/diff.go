@@ -24,10 +24,10 @@ import (
 )
 
 // hashStreamPool reuses sha256 hashers and copy buffers across the many
-// per-section and per-function hashes a single GenerateDiffInfo computes, so
-// section/function content is hashed incrementally instead of slurped whole
-// into a []byte (Section.Data / GetFunctionData were the dominant cold-path
-// allocations: ~71% of alloc-space and most of the alloc-count).
+// non-code per-section hashes a single GenerateDiffInfo computes, so section
+// content is hashed incrementally instead of slurped whole into a []byte
+// (Section.Data was the dominant cold-path allocation: ~71% of alloc-space
+// and most of the alloc-count).
 var hashStreamPool = sync.Pool{New: func() any {
 	return &hashStream{h: sha256.New(), buf: make([]byte, 32*1024)}
 }}
