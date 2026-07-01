@@ -143,8 +143,24 @@ func testFixtureDiff(t *testing.T, outputDir string) *Diff {
 		"AppOS":      "```diff\n- ENTS AppOS old\n+ ENTS AppOS new\n```",
 	}
 
-	// Sandbox string.
-	d.Sandbox = "```diff\n- SANDBOX old profile\n+ SANDBOX new profile\n```"
+	// Sandbox: a rendered source/group/profile structure (the shape
+	// renderSandboxProfileDiffMarkdown emits) so the per-profile side-car split
+	// runs. Two sources exercise the source loop and slug rules; each group
+	// stays at one profile, below every collapse/spill threshold.
+	d.Sandbox = "### Sandbox Collection\n\n" +
+		"#### New (1)\n\n" +
+		"##### SANDBOX_collection_new\n\n" +
+		"```scheme\n(version 1) ; SANDBOX collection new\n```\n\n" +
+		"#### Removed (1)\n\n" +
+		"##### SANDBOX_collection_removed\n\n" +
+		"```scheme\n(version 1) ; SANDBOX collection removed\n```\n\n" +
+		"#### Changed (1)\n\n" +
+		"##### SANDBOX_collection_updated\n\n" +
+		"```diff\n- SANDBOX collection old\n+ SANDBOX collection new\n```\n\n" +
+		"### Platform Profile\n\n" +
+		"#### Changed (1)\n\n" +
+		"##### SANDBOX_platform_updated\n\n" +
+		"```diff\n- SANDBOX platform old\n+ SANDBOX platform new\n```\n"
 
 	// Firmwares: small set.
 	d.Firmwares = &mcmd.MachoDiff{

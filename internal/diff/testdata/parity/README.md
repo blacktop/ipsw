@@ -71,9 +71,27 @@
 
 - [Entitlements DIFF](Entitlements.md)
 
-### Sandbox Profiles
+## Sandbox Profiles
 
-- [Sandbox Profiles DIFF](Sandbox.md)
+### Sandbox Collection (3)
+
+#### 🆕 NEW (1)
+
+- [SANDBOX_collection_new](SANDBOX/Sandbox-Collection/SANDBOX_collection_new.md)
+
+#### ❌ Removed (1)
+
+- [SANDBOX_collection_removed](SANDBOX/Sandbox-Collection/SANDBOX_collection_removed.md)
+
+#### ⬆️ Updated (1)
+
+- [SANDBOX_collection_updated](SANDBOX/Sandbox-Collection/SANDBOX_collection_updated.md)
+
+### Platform Profile (1)
+
+#### ⬆️ Updated (1)
+
+- [SANDBOX_platform_updated](SANDBOX/Platform/SANDBOX_platform_updated.md)
 
 ## Firmware
 

@@ -190,6 +190,6 @@
       }
     }
   },
-  "sandbox": "```diff\n- SANDBOX old profile\n+ SANDBOX new profile\n```",
+  "sandbox": "### Sandbox Collection\n\n#### New (1)\n\n##### SANDBOX_collection_new\n\n```scheme\n(version 1) ; SANDBOX collection new\n```\n\n#### Removed (1)\n\n##### SANDBOX_collection_removed\n\n```scheme\n(version 1) ; SANDBOX collection removed\n```\n\n#### Changed (1)\n\n##### SANDBOX_collection_updated\n\n```diff\n- SANDBOX collection old\n+ SANDBOX collection new\n```\n\n### Platform Profile\n\n#### Changed (1)\n\n##### SANDBOX_platform_updated\n\n```diff\n- SANDBOX platform old\n+ SANDBOX platform new\n```\n",
   "title": "26.5_22F76__vs__26.5.1_22F84"
 }
