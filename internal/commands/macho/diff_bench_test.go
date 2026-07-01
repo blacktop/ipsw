@@ -1,8 +1,6 @@
 package macho
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"testing"
 
@@ -114,45 +112,6 @@ func BenchmarkGitDiffSubprocess(b *testing.B) {
 	for b.Loop() {
 		if _, err := utils.GitDiff(src+"\n", dst+"\n", &utils.GitDiffConfig{Tool: "git"}); err != nil {
 			b.Fatal(err)
-		}
-	}
-}
-
-// TestFunctionHashesMatchPerFunctionRead pins the section-batched function
-// hashing against the original per-function GetFunctionData path: every
-// function's digest must be byte-identical, since --starts change detection
-// keys on these hashes.
-func TestFunctionHashesMatchPerFunctionRead(t *testing.T) {
-	m := openSelfT(t)
-	conf := &DiffConfig{FuncStarts: true}
-	funcs := m.GetFunctions()
-	if len(funcs) == 0 {
-		t.Skip("test binary has no LC_FUNCTION_STARTS")
-	}
-
-	got := functionContentHashes(m, funcs, conf)
-
-	// Reference: the old behavior — read each function directly and hash.
-	want := make(map[uint64]string, len(funcs))
-	for _, fn := range funcs {
-		sec := m.FindSectionForVMAddr(fn.StartAddr)
-		if sec != nil && !sectionIncluded(sec.Seg+"."+sec.Name, conf) {
-			continue
-		}
-		data, err := m.GetFunctionData(fn)
-		if err != nil || len(data) == 0 {
-			continue
-		}
-		sum := sha256.Sum256(data)
-		want[fn.StartAddr] = hex.EncodeToString(sum[:])
-	}
-
-	if len(got) != len(want) {
-		t.Fatalf("hash count mismatch: batched=%d per-function=%d", len(got), len(want))
-	}
-	for addr, w := range want {
-		if got[addr] != w {
-			t.Fatalf("function %#x hash mismatch: batched=%s per-function=%s", addr, got[addr], w)
 		}
 	}
 }

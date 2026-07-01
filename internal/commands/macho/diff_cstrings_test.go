@@ -32,9 +32,10 @@ func TestDiffInfoEqualUsesLoadCmdHash(t *testing.T) {
 func TestDiffInfoStringOmitsLoadCmdHash(t *testing.T) {
 	info := baseDiffInfo()
 	info.LoadCmdHash = strings.Repeat("a", 64)
+	info.Sections[0].Hash = strings.Repeat("b", 64)
 
-	if got := info.String(); strings.Contains(got, "load_commands") || strings.Contains(got, info.LoadCmdHash) {
-		t.Fatalf("DiffInfo.String rendered LoadCmdHash:\n%s", got)
+	if got := info.String(); strings.Contains(got, "load_commands") || strings.Contains(got, "sha256") || strings.Contains(got, info.LoadCmdHash) {
+		t.Fatalf("DiffInfo.String rendered internal hash evidence:\n%s", got)
 	}
 }
 
@@ -43,6 +44,8 @@ func TestFormatUpdatedDiffOmitsLoadCommandOnlyChanges(t *testing.T) {
 	newInfo := baseDiffInfo()
 	oldInfo.LoadCmdHash = strings.Repeat("a", 64)
 	newInfo.LoadCmdHash = strings.Repeat("b", 64)
+	newInfo.Version = "2.0.0"
+	newInfo.UUID = "22222222-2222-2222-2222-222222222222"
 
 	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
 	if err != nil {
@@ -79,6 +82,47 @@ func TestGenerateDiffInfoCanIgnoreLoadCommands(t *testing.T) {
 	}
 }
 
+func TestSectionContentHashSkipsCodeSections(t *testing.T) {
+	for _, flags := range []types.SectionFlag{
+		types.PURE_INSTRUCTIONS,
+		types.SOME_INSTRUCTIONS,
+		types.SymbolStubs,
+		types.SELF_MODIFYING_CODE,
+	} {
+		hash, ok := sectionContentHash(&types.Section{
+			SectionHeader: types.SectionHeader{
+				Size:  4,
+				Flags: flags,
+			},
+		})
+		if ok || hash != "" {
+			t.Fatalf("sectionContentHash(%s) = (%q, %t), want no hash", flags, hash, ok)
+		}
+	}
+}
+
+func TestGenerateDiffInfoSkipsCodeSectionHashes(t *testing.T) {
+	m := openSelfT(t)
+	info := GenerateDiffInfo(m, &DiffConfig{})
+	if len(info.Sections) != len(m.Sections) {
+		t.Fatalf("sections = %d, want %d", len(info.Sections), len(m.Sections))
+	}
+
+	sawSkippedSection := false
+	for idx, raw := range m.Sections {
+		if !sectionContainsCode(raw) {
+			continue
+		}
+		sawSkippedSection = true
+		if got := info.Sections[idx].Hash; got != "" {
+			t.Fatalf("%s.%s hash = %q, want empty for code section", raw.Seg, raw.Name, got)
+		}
+	}
+	if !sawSkippedSection {
+		t.Skip("test binary has no skipped code sections")
+	}
+}
+
 func TestDiffInfoEqualUsesSectionHash(t *testing.T) {
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
@@ -95,6 +139,8 @@ func TestFormatUpdatedDiffReportsSameSizeSectionHashChanges(t *testing.T) {
 	newInfo := baseDiffInfo()
 	oldHash := strings.Repeat("a", 64)
 	newHash := strings.Repeat("b", 64)
+	oldInfo.Sections[0].Name = "__DATA_CONST.__const"
+	newInfo.Sections[0].Name = "__DATA_CONST.__const"
 	oldInfo.Sections[0].Hash = oldHash
 	newInfo.Sections[0].Hash = newHash
 
@@ -103,24 +149,46 @@ func TestFormatUpdatedDiffReportsSameSizeSectionHashChanges(t *testing.T) {
 		t.Fatalf("FormatUpdatedDiff failed: %v", err)
 	}
 
-	if !strings.Contains(out, "sha256:") {
-		t.Fatalf("expected section hash label in output, got:\n%s", out)
+	if !strings.Contains(out, "Sections:\n~ __DATA_CONST.__const : content changed") {
+		t.Fatalf("expected section content change summary in output, got:\n%s", out)
 	}
-	if !strings.Contains(out, oldHash) {
-		t.Fatalf("expected old section hash in output, got:\n%s", out)
+	if strings.Contains(out, "size unchanged") {
+		t.Fatalf("expected section content summary to omit unchanged size, got:\n%s", out)
 	}
-	if !strings.Contains(out, newHash) {
-		t.Fatalf("expected new section hash in output, got:\n%s", out)
+	if strings.Contains(out, "sha256") || strings.Contains(out, oldHash) || strings.Contains(out, newHash) {
+		t.Fatalf("expected section hashes to stay hidden, got:\n%s", out)
 	}
 }
 
-func TestFormatUpdatedDiffReportsSameSizeFunctionHashChanges(t *testing.T) {
+func TestFormatUpdatedDiffDoesNotDuplicateSizeChangedSectionHash(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Sections[0] = section{Name: "__DATA_CONST.__const", Size: 0x100, Hash: strings.Repeat("a", 64)}
+	newInfo.Sections[0] = section{Name: "__DATA_CONST.__const", Size: 0x200, Hash: strings.Repeat("b", 64)}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if out == "" {
+		t.Fatal("expected section size diff output")
+	}
+	if got := strings.Count(out, "__DATA_CONST.__const"); got != 1 {
+		t.Fatalf("section size change rendered %d times, want 1; output:\n%s", got, out)
+	}
+	if strings.Contains(out, "content changed (0x100 -> 0x200)") {
+		t.Fatalf("expected size change to omit sized content-change row, got:\n%s", out)
+	}
+	if strings.Contains(out, "Sections:\n") || strings.Contains(out, "~ __DATA_CONST.__const : content changed") {
+		t.Fatalf("expected size change to be reported only by the git diff block, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffOmitsSameSizeFunctionHashNoise(t *testing.T) {
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
 	oldSectionHash := strings.Repeat("a", 64)
 	newSectionHash := strings.Repeat("b", 64)
-	oldFunctionHash := strings.Repeat("c", 64)
-	newFunctionHash := strings.Repeat("d", 64)
 	fn := types.Function{StartAddr: 0x1000, EndAddr: 0x1020}
 	oldInfo.Sections[0].Hash = oldSectionHash
 	newInfo.Sections[0].Hash = newSectionHash
@@ -128,8 +196,6 @@ func TestFormatUpdatedDiffReportsSameSizeFunctionHashChanges(t *testing.T) {
 	newInfo.Starts = []types.Function{fn}
 	oldInfo.SymbolMap = map[uint64]string{fn.StartAddr: "_foo"}
 	newInfo.SymbolMap = map[uint64]string{fn.StartAddr: "_foo"}
-	oldInfo.FunctionHashes = map[uint64]string{fn.StartAddr: oldFunctionHash}
-	newInfo.FunctionHashes = map[uint64]string{fn.StartAddr: newFunctionHash}
 
 	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{
 		DiffTool:   "go",
@@ -139,8 +205,26 @@ func TestFormatUpdatedDiffReportsSameSizeFunctionHashChanges(t *testing.T) {
 		t.Fatalf("FormatUpdatedDiff failed: %v", err)
 	}
 
-	if !strings.Contains(out, "~ _foo : sha256 "+oldFunctionHash+" -> "+newFunctionHash) {
-		t.Fatalf("expected same-size function hash change in output, got:\n%s", out)
+	if strings.Contains(out, "Functions:") || strings.Contains(out, "sha256") {
+		t.Fatalf("expected same-size function bytes to stay out of report, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffOmitsMarkdownFenceForSummaryOnlyChanges(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
+	newInfo.Sections[0].Hash = strings.Repeat("b", 64)
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{
+		Markdown: true,
+		DiffTool: "go",
+	})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if strings.Contains(out, "```diff") {
+		t.Fatalf("expected summary-only Markdown to omit diff fence, got:\n%s", out)
 	}
 }
 

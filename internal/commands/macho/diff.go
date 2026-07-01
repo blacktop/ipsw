@@ -135,16 +135,18 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 	if err != nil {
 		return "", err
 	}
-	if len(out) == 0 {
-		return "", nil
-	}
 
 	var b strings.Builder
-	if conf.Markdown {
-		b.WriteString("```diff\n")
+	if len(out) > 0 {
 		b.WriteString(out)
-	} else {
-		b.WriteString(out)
+	}
+
+	sectionChanges := sectionContentChanges(oldInfo, newInfo)
+	if len(sectionChanges) > 0 {
+		b.WriteString("Sections:\n")
+		for _, name := range sectionChanges {
+			b.WriteString(fmt.Sprintf("~ %s : content changed\n", name))
+		}
 	}
 
 	// Symbols
@@ -177,12 +179,6 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 		n1, n2 := len(funcs1), len(funcs2)
 
 		var fb strings.Builder
-		appendLine := func(s string) {
-			if fb.Len() == 0 {
-				fb.WriteString("Functions:\n")
-			}
-			fb.WriteString(s)
-		}
 
 		if n1 == n2 {
 			consecutiveMismatch := 0
@@ -198,9 +194,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					sz1 := f1.EndAddr - f1.StartAddr
 					sz2 := f2.EndAddr - f2.StartAddr
 					if sz1 != sz2 {
-						appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
-					} else {
-						appendFunctionHashChange(appendLine, oldInfo, newInfo, f1, f2)
+						fb.WriteString(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
 					}
 					consecutiveMismatch = 0
 					continue
@@ -210,12 +204,11 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 				sz2 := f2.EndAddr - f2.StartAddr
 
 				if sz1 == sz2 {
-					appendFunctionHashChange(appendLine, oldInfo, newInfo, f1, f2)
 					consecutiveMismatch = 0
 					continue
 				}
 
-				appendLine(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
+				fb.WriteString(fmt.Sprintf("~ %s -> %s : %d -> %d\n", f1.Name, f2.Name, sz1, sz2))
 				consecutiveMismatch++
 
 				if consecutiveMismatch >= maxMismatch {
@@ -242,9 +235,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 				}
 			}
 
-			if fb.Len() > 0 {
-				b.WriteString(fb.String())
-			}
+			appendFunctionSummary(&b, &fb)
 		} else {
 			i, j := 0, 0
 			consecutiveNoise := 0
@@ -259,9 +250,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					sz1 := f1.EndAddr - f1.StartAddr
 					sz2 := f2.EndAddr - f2.StartAddr
 					if sz1 != sz2 {
-						appendLine(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
-					} else {
-						appendFunctionHashChange(appendLine, oldInfo, newInfo, f1, f2)
+						fb.WriteString(fmt.Sprintf("~ %s : %d -> %d\n", f1.Name, sz1, sz2))
 					}
 					i++
 					j++
@@ -270,7 +259,6 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 				}
 
 				if (f1.EndAddr - f1.StartAddr) == (f2.EndAddr - f2.StartAddr) {
-					appendFunctionHashChange(appendLine, oldInfo, newInfo, f1, f2)
 					i++
 					j++
 					consecutiveNoise = 0
@@ -278,11 +266,11 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 				}
 
 				if j+1 < n2 && (f1.EndAddr-f1.StartAddr) == (funcs2[j+1].EndAddr-funcs2[j+1].StartAddr) {
-					appendLine(fmt.Sprintf("+ %s\n", f2.Name))
+					fb.WriteString(fmt.Sprintf("+ %s\n", f2.Name))
 					j++
 					consecutiveNoise++
 				} else if i+1 < n1 && (funcs1[i+1].EndAddr-funcs1[i+1].StartAddr) == (f2.EndAddr-f2.StartAddr) {
-					appendLine(fmt.Sprintf("- %s\n", f1.Name))
+					fb.WriteString(fmt.Sprintf("- %s\n", f1.Name))
 					i++
 					consecutiveNoise++
 				} else {
@@ -295,9 +283,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 				}
 			}
 
-			if fb.Len() > 0 {
-				b.WriteString(fb.String())
-			}
+			appendFunctionSummary(&b, &fb)
 		}
 	}
 
@@ -315,11 +301,17 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 		}
 	}
 
-	if conf.Markdown {
-		b.WriteString("\n```\n")
+	if b.Len() == 0 {
+		return "", nil
+	}
+	if !conf.Markdown {
+		return b.String(), nil
+	}
+	if !containsDiffRows(b.String()) {
+		return b.String(), nil
 	}
 
-	return b.String(), nil
+	return "```diff\n" + b.String() + "\n```\n", nil
 }
 
 type DiffConfig struct {
@@ -349,18 +341,17 @@ type section struct {
 }
 
 type DiffInfo struct {
-	Version        string
-	UUID           string
-	LoadCmdHash    string // internal structural digest; not rendered in reports
-	Imports        []string
-	Sections       []section
-	Functions      int
-	Starts         []types.Function
-	FunctionHashes map[uint64]string
-	Symbols        []string
-	CStrings       []string
-	SymbolMap      map[uint64]string
-	Verbose        bool
+	Version     string
+	UUID        string
+	LoadCmdHash string // internal structural digest; not rendered in reports
+	Imports     []string
+	Sections    []section
+	Functions   int
+	Starts      []types.Function
+	Symbols     []string
+	CStrings    []string
+	SymbolMap   map[uint64]string
+	Verbose     bool
 }
 
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.SymbolMap) *DiffInfo {
@@ -383,7 +374,6 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	if fns := m.GetFunctions(); fns != nil {
 		starts = fns
 	}
-	functionHashes := functionContentHashes(m, starts, conf)
 	var sourceVersion string
 	if m.SourceVersion() != nil {
 		sourceVersion = m.SourceVersion().Version.String()
@@ -429,18 +419,17 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 		loadCmdHash, _ = loadCommandsHash(m)
 	}
 	return &DiffInfo{
-		Version:        sourceVersion,
-		UUID:           uuidStr,
-		LoadCmdHash:    loadCmdHash,
-		Imports:        m.ImportedLibraries(),
-		Sections:       secs,
-		Functions:      len(starts),
-		Starts:         starts,
-		FunctionHashes: functionHashes,
-		Symbols:        syms,
-		CStrings:       strs,
-		SymbolMap:      smap,
-		Verbose:        conf.Verbose,
+		Version:     sourceVersion,
+		UUID:        uuidStr,
+		LoadCmdHash: loadCmdHash,
+		Imports:     m.ImportedLibraries(),
+		Sections:    secs,
+		Functions:   len(starts),
+		Starts:      starts,
+		Symbols:     syms,
+		CStrings:    strs,
+		SymbolMap:   smap,
+		Verbose:     conf.Verbose,
 	}
 }
 
@@ -552,112 +541,75 @@ func sectionIncluded(name string, conf *DiffConfig) bool {
 }
 
 func sectionContentHash(s *types.Section) (string, bool) {
-	if s == nil || s.Size == 0 {
+	if s == nil || s.Size == 0 || sectionContainsCode(s) {
 		return "", false
 	}
 	// Stream the section through the hasher rather than slurping s.Data():
-	// __TEXT and DSC dylib sections are multi-MB, and this runs for every
-	// included section of every binary on both sides.
+	// DSC dylib sections can be multi-MB, and this runs for every included
+	// non-code section of every binary on both sides.
 	return streamSHA256(s.Open())
 }
 
-func functionContentHashes(m *macho.File, funcs []types.Function, conf *DiffConfig) map[uint64]string {
-	if !conf.FuncStarts || len(funcs) == 0 {
+func sectionContainsCode(s *types.Section) bool {
+	if s == nil {
+		return false
+	}
+	flags := s.Flags
+	return flags.IsPureInstructions() ||
+		flags.IsSomeInstructions() ||
+		flags.IsSymbolStubs() ||
+		flags.IsSelfModifyingCode()
+}
+
+func appendFunctionSummary(out, functions *strings.Builder) {
+	if functions.Len() == 0 {
+		return
+	}
+	out.WriteString("Functions:\n")
+	out.WriteString(functions.String())
+}
+
+// sectionContentChanges reports the sections whose content hash changed while
+// their size stayed the same. A size change already shows in the diff'd section
+// list, so those are skipped; this surfaces the same-size content edits that
+// dropping the per-section sha256 from DiffInfo.String would otherwise hide,
+// without re-introducing the sha256 wall.
+func sectionContentChanges(oldInfo, newInfo *DiffInfo) []string {
+	if len(oldInfo.Sections) == 0 || len(newInfo.Sections) == 0 {
 		return nil
 	}
-
-	hashes := make(map[uint64]string, len(funcs))
-	// secReader reads each containing section's bytes once and slices every
-	// function out of that in-memory buffer. Functions arrive address-sorted
-	// from LC_FUNCTION_STARTS, so this reads each section at most once instead
-	// of issuing a pread per function (the cold-path profile showed ~66% of
-	// CPU was GetFunctionData's per-function read, redundant with the section
-	// content hash that already read the same code section).
-	var r functionSectionReader
-	for _, fn := range funcs {
-		sec := m.FindSectionForVMAddr(fn.StartAddr)
-		if sec != nil && !sectionIncluded(sec.Seg+"."+sec.Name, conf) {
-			continue
-		}
-		if hash, ok := r.hash(m, sec, fn); ok {
-			hashes[fn.StartAddr] = hash
+	newSections := make(map[string]section, len(newInfo.Sections))
+	for _, sec := range newInfo.Sections {
+		newSections[sec.Name] = sec
+	}
+	var changes []string
+	for _, oldSec := range oldInfo.Sections {
+		if newSec, ok := newSections[oldSec.Name]; ok && sameSizeContentChanged(oldSec, newSec) {
+			changes = append(changes, oldSec.Name)
 		}
 	}
-	return hashes
+	return changes
 }
 
-// functionSectionReader caches the bytes of the section the previous function
-// belonged to, so a run of functions in the same section reads that section
-// only once. It is reset implicitly when a function maps to a different
-// section.
-type functionSectionReader struct {
-	sec  *types.Section
-	data []byte
+// sameSizeContentChanged reports whether two same-named sections have different
+// content hashes but the same size (a size change already shows in the diff'd
+// section list, so it is excluded here).
+func sameSizeContentChanged(oldSec, newSec section) bool {
+	return oldSec.Hash != "" && newSec.Hash != "" &&
+		oldSec.Hash != newSec.Hash &&
+		oldSec.Size == newSec.Size
 }
 
-// hash returns sha256(fn's bytes) as hex. It slices the function out of the
-// cached section buffer when possible and falls back to a direct per-function
-// read for functions with no resolvable section or whose range escapes the
-// section bytes. The digest is byte-identical to hashing GetFunctionData(fn).
-func (r *functionSectionReader) hash(m *macho.File, sec *types.Section, fn types.Function) (string, bool) {
-	size := fn.EndAddr - fn.StartAddr
-	if size == 0 {
-		return "", false
-	}
-	if sec != nil {
-		if r.sec != sec {
-			data, err := sec.Data()
-			if err != nil {
-				r.sec, r.data = nil, nil
-			} else {
-				r.sec, r.data = sec, data
-			}
-		}
-		if r.sec == sec && fn.StartAddr >= sec.Addr {
-			off := fn.StartAddr - sec.Addr
-			if off+size <= uint64(len(r.data)) {
-				sum := sha256.Sum256(r.data[off : off+size])
-				return hex.EncodeToString(sum[:]), true
-			}
+// containsDiffRows reports whether body has any git-diff row (a hunk header or
+// an added/removed line), so a body that is only summary lines is not wrapped
+// in a ```diff fence that would render those lines as diff context.
+func containsDiffRows(body string) bool {
+	for line := range strings.SplitSeq(body, "\n") {
+		if strings.HasPrefix(line, "@@") || strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") {
+			return true
 		}
 	}
-	// Fallback: unknown section, read error, or range outside the section.
-	data, err := m.GetFunctionData(fn)
-	if err != nil || len(data) == 0 {
-		return "", false
-	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), true
-}
-
-func appendFunctionHashChange(appendLine func(string), oldInfo, newInfo *DiffInfo, oldFunc, newFunc types.Function) {
-	line, ok := functionHashChangeLine(oldInfo, newInfo, oldFunc, newFunc)
-	if ok {
-		appendLine(line)
-	}
-}
-
-func functionHashChangeLine(oldInfo, newInfo *DiffInfo, oldFunc, newFunc types.Function) (string, bool) {
-	oldHash, newHash, ok := changedFunctionHash(oldInfo, newInfo, oldFunc, newFunc)
-	if !ok {
-		return "", false
-	}
-	if oldFunc.Name != "" && oldFunc.Name == newFunc.Name {
-		return fmt.Sprintf("~ %s : sha256 %s -> %s\n", oldFunc.Name, oldHash, newHash), true
-	}
-	return fmt.Sprintf("~ %s -> %s : sha256 %s -> %s\n", oldFunc.Name, newFunc.Name, oldHash, newHash), true
-}
-
-func changedFunctionHash(oldInfo, newInfo *DiffInfo, oldFunc, newFunc types.Function) (string, string, bool) {
-	if len(oldInfo.FunctionHashes) == 0 || len(newInfo.FunctionHashes) == 0 {
-		return "", "", false
-	}
-	oldHash := oldInfo.FunctionHashes[oldFunc.StartAddr]
-	newHash := newInfo.FunctionHashes[newFunc.StartAddr]
-	if oldHash == "" || newHash == "" || oldHash == newHash {
-		return "", "", false
-	}
-	return oldHash, newHash, true
+	return false
 }
 
 // Equal checks if two Info structs are equal
@@ -700,19 +652,19 @@ func (i DiffInfo) Equal(x DiffInfo) bool {
 
 func (i *DiffInfo) String() string {
 	var out strings.Builder
-	out.WriteString(i.Version + "\n")
+	if i.Verbose && i.Version != "" {
+		out.WriteString(i.Version + "\n")
+	}
 	for _, sec := range i.Sections {
-		if sec.Hash != "" {
-			out.WriteString(fmt.Sprintf("  %s: %#x sha256:%s\n", sec.Name, sec.Size, sec.Hash))
-			continue
-		}
 		out.WriteString(fmt.Sprintf("  %s: %#x\n", sec.Name, sec.Size))
 	}
 	slices.Sort(i.Imports)
 	for _, i := range i.Imports {
 		out.WriteString(fmt.Sprintf("  - %s\n", i))
 	}
-	out.WriteString(fmt.Sprintf("  UUID: %s\n", i.UUID))
+	if i.Verbose && i.UUID != "" {
+		out.WriteString(fmt.Sprintf("  UUID: %s\n", i.UUID))
+	}
 	out.WriteString(fmt.Sprintf("  Functions: %d\n", i.Functions))
 	out.WriteString(fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols)))
 	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings)))
