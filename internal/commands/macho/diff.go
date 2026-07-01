@@ -52,21 +52,26 @@ func streamSHA256(r io.Reader) (string, bool) {
 	return hex.EncodeToString(hs.h.Sum(sum[:0])), true
 }
 
-var xbsTemporaryBuildPathRE = regexp.MustCompile(`^/Library/Caches/com\.apple\.xbs/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/TemporaryDirectory\.[^/\s]+`)
+// xbsTemporaryBuildPathRE matches the per-build rotating XBS temp-dir token. It
+// is intentionally NOT anchored: these paths appear both as a whole symbol/
+// string value AND embedded mid-string (e.g. inside a libmalloc assertion
+// message: `... failed (/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory
+// .<TMP>/Sources/.../file.c:114)`), and both forms churn every build.
+var xbsTemporaryBuildPathRE = regexp.MustCompile(`/Library/Caches/com\.apple\.xbs/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/TemporaryDirectory\.[^/\s]+`)
 
 const xbsTemporaryBuildPathPlaceholder = "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>"
 
 // appleInternalBuildRootRE matches the per-build rotating token in an
 // /AppleInternal/Library/BuildRoots/<token>/... path (the meaningful SDK/path
-// suffix is kept). The token changes every build, so without collapsing it the
-// same object-file reference churns across two builds of the same source.
-var appleInternalBuildRootRE = regexp.MustCompile(`^/AppleInternal/Library/BuildRoots/[^/\s]+`)
+// suffix is kept). Also unanchored, for the same embedded-in-a-longer-string
+// reason as xbsTemporaryBuildPathRE.
+var appleInternalBuildRootRE = regexp.MustCompile(`/AppleInternal/Library/BuildRoots/[^/\s]+`)
 
 const appleInternalBuildRootPlaceholder = "/AppleInternal/Library/BuildRoots/<BUILDROOT>"
 
-// normalizeBuildPathForDiff collapses the two per-build rotating build-root path
-// prefixes Apple embeds in Mach-O strings and object-file (debug-map) symbols so
-// a rebuild of identical source does not show as a diff.
+// normalizeBuildPathForDiff collapses every occurrence of the two per-build
+// rotating build-root paths Apple embeds in Mach-O strings and object-file
+// (debug-map) symbols so a rebuild of identical source does not show as a diff.
 func normalizeBuildPathForDiff(value string) string {
 	value = xbsTemporaryBuildPathRE.ReplaceAllString(value, xbsTemporaryBuildPathPlaceholder)
 	return appleInternalBuildRootRE.ReplaceAllString(value, appleInternalBuildRootPlaceholder)

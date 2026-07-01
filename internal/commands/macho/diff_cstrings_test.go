@@ -283,10 +283,24 @@ func TestFormatUpdatedDiffStillReportsNonIgnoredCStrings(t *testing.T) {
 	}
 }
 
-func TestNormalizeCStringForDiffAnchoredPrefixOnly(t *testing.T) {
-	value := "prefix /Library/Caches/com.apple.xbs/CB2898C6-8518-483E-977F-2D0117CA94BE/TemporaryDirectory.puUfSg/Sources/hfs/core/file.c"
-	if got := normalizeCStringForDiff(value); got != value {
-		t.Fatalf("expected non-path-prefixed CString to remain unchanged, got %q", got)
+// TestNormalizeCStringForDiffNormalizesEmbeddedBuildPath covers build paths that
+// appear mid-string (e.g. libmalloc assertion messages), which the linker
+// re-tokenizes every build. The normalizer is unanchored so these collapse and
+// cancel instead of churning.
+func TestNormalizeCStringForDiffNormalizesEmbeddedBuildPath(t *testing.T) {
+	value := `"BUG IN LIBMALLOC: malloc assertion \"zone\" failed (/Library/Caches/com.apple.xbs/CB2898C6-8518-483E-977F-2D0117CA94BE/TemporaryDirectory.puUfSg/Sources/x/y.c:114)"`
+	want := `"BUG IN LIBMALLOC: malloc assertion \"zone\" failed (/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>/Sources/x/y.c:114)"`
+	if got := normalizeCStringForDiff(value); got != want {
+		t.Fatalf("normalizeCStringForDiff(%q) = %q, want %q", value, got, want)
+	}
+
+	// Two builds of the same assertion differ only by the rotating UUID/TMP;
+	// after normalization they must be identical (so they cancel in the diff).
+	old := "assert (/Library/Caches/com.apple.xbs/20022CBB-7987-4277-B5C3-995958015464/TemporaryDirectory.VvPQcD/Sources/a.c:9)"
+	newer := "assert (/Library/Caches/com.apple.xbs/89507FCF-0946-4F63-8219-988EAE885958/TemporaryDirectory.6Xk4l2/Sources/a.c:9)"
+	if normalizeCStringForDiff(old) != normalizeCStringForDiff(newer) {
+		t.Fatalf("embedded XBS paths differing only by token should normalize equal:\n old=%q\n new=%q",
+			normalizeCStringForDiff(old), normalizeCStringForDiff(newer))
 	}
 }
 
