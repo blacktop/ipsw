@@ -320,3 +320,65 @@ func TestFormatUpdatedDiffReportsTailChangesAfterXBSNormalization(t *testing.T) 
 		t.Fatalf("expected normalized added CString in output, got:\n%s", out)
 	}
 }
+
+func TestNormalizeSymbolForDiff(t *testing.T) {
+	cases := map[string]string{
+		"___28-[BTSDevicesController init]_block_invoke.323":             "___28-[BTSDevicesController init]_block_invoke",
+		"___28-[BTSDevicesController init]_block_invoke.317":             "___28-[BTSDevicesController init]_block_invoke",
+		"___52-[C migrateHKPairedHealthDevices]_block_invoke.870.cold.1": "___52-[C migrateHKPairedHealthDevices]_block_invoke",
+		"___50-[C startOutgoingCarPlaySetup:]_block_invoke_2.857":        "___50-[C startOutgoingCarPlaySetup:]_block_invoke_2",
+		"___block_literal_global.686":                                    "___block_literal_global",
+		"_OBJC_CLASS_$_NSMutableDictionary":                              "_OBJC_CLASS_$_NSMutableDictionary",
+		"/Library/Caches/com.apple.xbs/20022CBB-7987-4277-B5C3-995958015464/TemporaryDirectory.VvPQcD/Binaries/x.a(sha256.o)": "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>/Binaries/x.a(sha256.o)",
+		"/AppleInternal/Library/BuildRoots/4~CReaugCYOfRv/SDKs/iPhoneOS.Internal.sdk/x.a(y.o)":                                "/AppleInternal/Library/BuildRoots/<BUILDROOT>/SDKs/iPhoneOS.Internal.sdk/x.a(y.o)",
+	}
+	for in, want := range cases {
+		if got := normalizeSymbolForDiff(in); got != want {
+			t.Errorf("normalizeSymbolForDiff(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestFormatUpdatedDiffCancelsRenumberedLocalSymbols locks the counter-strip:
+// the same block/global with a different linker-assigned .NNN counter must not
+// show as churn.
+func TestFormatUpdatedDiffCancelsRenumberedLocalSymbols(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Symbols = []string{"___28-[C init]_block_invoke.317", "___block_literal_global.680"}
+	newInfo.Symbols = []string{"___28-[C init]_block_invoke.323", "___block_literal_global.686"}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if strings.Contains(out, "Symbols:") {
+		t.Fatalf("renumbered local symbols should cancel, got:\n%s", out)
+	}
+	if strings.Contains(out, "block_invoke") || strings.Contains(out, "block_literal_global") {
+		t.Fatalf("expected no renumbered-symbol churn, got:\n%s", out)
+	}
+}
+
+// TestFormatUpdatedDiffReportsGenuinelyNewSymbolFamily confirms a truly new
+// local symbol still surfaces (normalized, without its counter).
+func TestFormatUpdatedDiffReportsGenuinelyNewSymbolFamily(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Symbols = []string{"_foo"}
+	newInfo.Symbols = []string{"_foo", "-[NewClass newMethod]_block_invoke.42"}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if !strings.Contains(out, "Symbols:") {
+		t.Fatalf("a genuinely new symbol family should show, got:\n%s", out)
+	}
+	if !strings.Contains(out, "+ -[NewClass newMethod]_block_invoke") {
+		t.Fatalf("expected normalized new symbol, got:\n%s", out)
+	}
+	if strings.Contains(out, ".42") {
+		t.Fatalf("counter should be stripped from the reported symbol, got:\n%s", out)
+	}
+}

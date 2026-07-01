@@ -56,8 +56,66 @@ var xbsTemporaryBuildPathRE = regexp.MustCompile(`^/Library/Caches/com\.apple\.x
 
 const xbsTemporaryBuildPathPlaceholder = "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>"
 
+// appleInternalBuildRootRE matches the per-build rotating token in an
+// /AppleInternal/Library/BuildRoots/<token>/... path (the meaningful SDK/path
+// suffix is kept). The token changes every build, so without collapsing it the
+// same object-file reference churns across two builds of the same source.
+var appleInternalBuildRootRE = regexp.MustCompile(`^/AppleInternal/Library/BuildRoots/[^/\s]+`)
+
+const appleInternalBuildRootPlaceholder = "/AppleInternal/Library/BuildRoots/<BUILDROOT>"
+
+// normalizeBuildPathForDiff collapses the two per-build rotating build-root path
+// prefixes Apple embeds in Mach-O strings and object-file (debug-map) symbols so
+// a rebuild of identical source does not show as a diff.
+func normalizeBuildPathForDiff(value string) string {
+	value = xbsTemporaryBuildPathRE.ReplaceAllString(value, xbsTemporaryBuildPathPlaceholder)
+	return appleInternalBuildRootRE.ReplaceAllString(value, appleInternalBuildRootPlaceholder)
+}
+
 func normalizeCStringForDiff(value string) string {
-	return xbsTemporaryBuildPathRE.ReplaceAllString(value, xbsTemporaryBuildPathPlaceholder)
+	return normalizeBuildPathForDiff(value)
+}
+
+// generatedSymbolCounterRE matches the trailing compiler-assigned disambiguator
+// on local symbols — e.g. ..._block_invoke.323, ..._block_invoke.870.cold.1,
+// ___block_literal_global.686 — which the linker renumbers every build. Only
+// the trailing dotted counter/.cold run is stripped, so distinct blocks keep
+// their base name (..._block_invoke vs ..._block_invoke_2).
+var generatedSymbolCounterRE = regexp.MustCompile(`(\.cold|\.[0-9]+)+$`)
+
+// normalizeSymbolForDiff collapses build-root path churn and strips the
+// trailing generated disambiguator counter so recompiled-but-unchanged local
+// symbols cancel in the diff instead of flooding it with renumber noise.
+func normalizeSymbolForDiff(value string) string {
+	value = normalizeBuildPathForDiff(value)
+	return generatedSymbolCounterRE.ReplaceAllString(value, "")
+}
+
+func normalizeSymbolsForDiff(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	normalized := make([]string, len(values))
+	for idx, value := range values {
+		normalized[idx] = normalizeSymbolForDiff(value)
+	}
+	return normalized
+}
+
+// diffNormalizedSymbols returns the added and removed symbols after normalizing
+// both sides (build-root paths + generated counters). utils.Difference is
+// set-based, so renumbered duplicates collapse and cancel; a genuinely new or
+// removed symbol family still surfaces.
+func diffNormalizedSymbols(oldValues, newValues []string) ([]string, []string) {
+	normalizedOld := normalizeSymbolsForDiff(oldValues)
+	normalizedNew := normalizeSymbolsForDiff(newValues)
+
+	added := utils.Difference(normalizedNew, normalizedOld)
+	sort.Strings(added)
+	removed := utils.Difference(normalizedOld, normalizedNew)
+	sort.Strings(removed)
+
+	return added, removed
 }
 
 func normalizeCStringsForDiff(values []string) []string {
@@ -150,10 +208,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 	}
 
 	// Symbols
-	newSyms := utils.Difference(newInfo.Symbols, oldInfo.Symbols)
-	sort.Strings(newSyms)
-	rmSyms := utils.Difference(oldInfo.Symbols, newInfo.Symbols)
-	sort.Strings(rmSyms)
+	newSyms, rmSyms := diffNormalizedSymbols(oldInfo.Symbols, newInfo.Symbols)
 	if len(newSyms) > 0 || len(rmSyms) > 0 {
 		b.WriteString("Symbols:\n")
 		for _, s := range newSyms {
