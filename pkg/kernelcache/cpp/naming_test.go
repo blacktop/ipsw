@@ -162,6 +162,30 @@ func TestNameMethodTablesFnFallback(t *testing.T) {
 	}
 }
 
+func TestNameMethodTablesExternalRelocUsesBindSymbol(t *testing.T) {
+	t.Parallel()
+
+	classes := []Class{{Name: "Foo", MetaPtr: 0x1000}}
+	tables := []MethodTable{{Class: "Foo", Methods: []VtableEntry{
+		{
+			Index:         0,
+			ExternalReloc: true,
+			Symbol:        "__ZN3Foo3barEv",
+			Mangled:       "__ZN3Foo3barEv",
+		},
+	}}}
+
+	nameMethodTables(classes, tables)
+
+	slot := tables[0].Methods[0]
+	if slot.Class != "Foo" || slot.Method != "bar()" || !slot.Authoritative {
+		t.Fatalf("external bind slot = %+v, want Foo::bar() authoritative", slot)
+	}
+	if slot.Overrides {
+		t.Fatalf("external bind slot must not report override: %+v", slot)
+	}
+}
+
 func TestClassBasename(t *testing.T) {
 	t.Parallel()
 
@@ -191,6 +215,8 @@ func TestSplitClassMethod(t *testing.T) {
 		{"GrandParent::~GrandParent()", "GrandParent", "~GrandParent()", true},
 		{"Foo::bar(int)", "Foo", "bar(int)", true},
 		{"Foo<A::B>::baz()", "Foo<A::B>", "baz()", true},
+		{"non-virtual thunk to Foo::bar()", "Foo", "bar()", true},
+		{"virtual thunk to Foo::Bar<int>::baz()", "Foo::Bar<int>", "baz()", true},
 		{"noColons", "", "", false},
 	}
 	for _, tc := range cases {

@@ -103,6 +103,29 @@ func TestDecodeSlotAuthArm64e(t *testing.T) {
 	}
 }
 
+func TestDecodeSlotAuthArm64eAuthBind(t *testing.T) {
+	t.Parallel()
+
+	fx := fixupchains.DyldChainedPtrArm64eAuthBind{
+		Fixup: 0x208,
+		Pointer: encArm64eAuthRebaseSlot(arm64eAuthRebaseSlot{
+			target: 0x12, diversity: 0xbeef, addrDiv: 1, key: 3, next: 2,
+		}) | (1 << 62),
+		Import: "_external_vmethod",
+	}
+
+	sa, ok := decodeSlotAuth(fx)
+	if !ok {
+		t.Fatal("decodeSlotAuth should recognize an arm64e auth-bind slot")
+	}
+	if !sa.bind || sa.bindName != "_external_vmethod" {
+		t.Fatalf("bind metadata = bind:%v name:%q, want true/_external_vmethod", sa.bind, sa.bindName)
+	}
+	if !sa.auth || sa.pac != 0xbeef || sa.key != 3 || !sa.addrDiv {
+		t.Fatalf("auth metadata = %+v, want Auth=true PAC=0xbeef Key=3 AddrDiv=true", sa)
+	}
+}
+
 func TestDecodeSlotAuthPlainRebaseHasNoAuthInfo(t *testing.T) {
 	t.Parallel()
 
@@ -143,8 +166,9 @@ func newPACFixture(t *testing.T) *pacFixture {
 	targets := []uint64{
 		0xfffffe0000010000, // slot 0: auth
 		0xfffffe0000010100, // slot 1: unsigned
-		cxaPureVirtual,     // slot 2: pure virtual
-		0xfffffe0000010300, // slot 3: arm64e auth
+		0,                  // slot 2: external bind, no in-image target
+		cxaPureVirtual,     // slot 3: pure virtual
+		0xfffffe0000010300, // slot 4: arm64e auth
 	}
 
 	s := NewScanner(owner, Config{})
@@ -154,6 +178,9 @@ func newPACFixture(t *testing.T) *pacFixture {
 
 	fwd := make(map[uint64]uint64, len(targets))
 	for i, ptr := range targets {
+		if ptr == 0 {
+			continue
+		}
 		fwd[vtableAddr+uint64(i*8)] = ptr
 	}
 	s.forwardPointers[owner] = fwd
@@ -165,6 +192,10 @@ func newPACFixture(t *testing.T) *pacFixture {
 		fixupchains.DyldChainedPtr64KernelCacheRebase{Pointer: encKCRebaseSlot(kcRebaseSlot{
 			target: 0x10100, cacheLevel: 1, diversity: 0x9999, key: 3, auth: false,
 		})},
+		fixupchains.DyldChainedPtr64Bind{
+			Pointer: 1 << 63,
+			Import:  "_external_vmethod",
+		},
 		fixupchains.DyldChainedPtr64KernelCacheRebase{Pointer: encKCRebaseSlot(kcRebaseSlot{
 			target: 0xabcde, diversity: 0x1111, key: 0, auth: true,
 		})},
@@ -232,14 +263,20 @@ func TestVtableSlotsPACReadsPerSlotAuth(t *testing.T) {
 		t.Fatalf("slot 1 cacheLevel = %d, want 1", slots[1].CacheLevel)
 	}
 
-	// Slot 2: authenticated and pointing at __cxa_pure_virtual.
-	if s := slots[2]; !s.Auth || s.PAC != 0x1111 || !s.PureVirtual {
-		t.Fatalf("slot 2 = %+v, want Auth=true PAC=0x1111 PureVirtual=true", s)
+	// Slot 2: external bind with no in-image target; it must not truncate the
+	// vtable walk before later slots.
+	if s := slots[2]; !s.ExternalReloc || s.Address != 0 || s.Symbol != "_external_vmethod" {
+		t.Fatalf("slot 2 = %+v, want ExternalReloc=true Address=0 Symbol=_external_vmethod", s)
 	}
 
-	// Slot 3: arm64e auth rebase (IB key, addrDiv, pac 0x1357).
-	if s := slots[3]; !s.Auth || s.PAC != 0x1357 || s.Key != 1 || !s.AddrDiv {
-		t.Fatalf("slot 3 = %+v, want Auth=true PAC=0x1357 Key=1 AddrDiv=true", s)
+	// Slot 3: authenticated and pointing at __cxa_pure_virtual.
+	if s := slots[3]; !s.Auth || s.PAC != 0x1111 || !s.PureVirtual {
+		t.Fatalf("slot 3 = %+v, want Auth=true PAC=0x1111 PureVirtual=true", s)
+	}
+
+	// Slot 4: arm64e auth rebase (IB key, addrDiv, pac 0x1357).
+	if s := slots[4]; !s.Auth || s.PAC != 0x1357 || s.Key != 1 || !s.AddrDiv {
+		t.Fatalf("slot 4 = %+v, want Auth=true PAC=0x1357 Key=1 AddrDiv=true", s)
 	}
 }
 

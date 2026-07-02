@@ -1,6 +1,7 @@
 package cpp
 
 import (
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 )
 
@@ -19,6 +20,7 @@ type slotAuth struct {
 	addrDiv    bool
 	auth       bool
 	bind       bool
+	bindName   string
 	cacheLevel uint8
 }
 
@@ -47,9 +49,31 @@ func decodeSlotAuth(fx fixupchains.Fixup) (slotAuth, bool) {
 			key:     uint8(f.Key()),
 			addrDiv: f.AddrDiv() == 1,
 		}, true
+	case fixupchains.DyldChainedPtrArm64eAuthBind:
+		return slotAuth{
+			auth:     true,
+			pac:      uint16(f.Diversity()),
+			key:      uint8(f.Key()),
+			addrDiv:  f.AddrDiv() == 1,
+			bind:     true,
+			bindName: f.Name(),
+		}, true
+	case fixupchains.DyldChainedPtrArm64eAuthBind24:
+		return slotAuth{
+			auth:     true,
+			pac:      uint16(f.Diversity()),
+			key:      uint8(f.Key()),
+			addrDiv:  f.AddrDiv() == 1,
+			bind:     true,
+			bindName: f.Name(),
+		}, true
 	default:
 		if fx != nil && fx.IsBind() {
-			return slotAuth{bind: true}, true
+			sa := slotAuth{bind: true}
+			if bind, ok := fx.(fixupchains.Bind); ok {
+				sa.bindName = bind.Name()
+			}
+			return sa, true
 		}
 		return slotAuth{}, false
 	}
@@ -120,8 +144,8 @@ func (s *Scanner) VtableSlotPAC(class Class, index int) (VtableEntry, bool) {
 		return VtableEntry{}, false
 	}
 	slotAddr := class.VtableAddr + uint64(index*8)
-	target, ok := s.fallbackPointerAt(owner, slotAddr)
-	if !ok || !validKernelPointer(target) {
+	target, targetOK, sa, authOK, ok := s.vtableSlotValue(owner, slotAddr)
+	if !ok {
 		return VtableEntry{}, false
 	}
 	entry := VtableEntry{
@@ -129,24 +153,30 @@ func (s *Scanner) VtableSlotPAC(class Class, index int) (VtableEntry, bool) {
 		Offset:      uint64(index * 8),
 		SlotAddress: slotAddr,
 		Address:     target,
-		Symbol:      s.SymbolName(target),
 	}
-	if sa, ok := s.slotAuthAt(slotAddr); ok {
+	if targetOK {
+		entry.Symbol = s.SymbolName(target)
+	}
+	if authOK {
 		entry.Auth = sa.auth
 		entry.PAC = sa.pac
 		entry.Key = sa.key
 		entry.AddrDiv = sa.addrDiv
 		entry.CacheLevel = sa.cacheLevel
 		entry.ExternalReloc = sa.bind
+		if entry.Symbol == "" {
+			entry.Symbol = sa.bindName
+		}
 	}
-	if s.cxaPureVirtual != 0 && target == s.cxaPureVirtual {
+	if targetOK && s.isPureVirtualTarget(owner, target) {
 		entry.PureVirtual = true
 	}
 	return entry, true
 }
 
 // VtableSlotsPAC returns up to max decoded vtable slots for class with per-slot
-// PAC metadata. It stops at the first slot without a resolvable pointer.
+// PAC metadata. It stops at the first absent slot; external bind slots count as
+// present even when they have no in-image target address.
 func (s *Scanner) VtableSlotsPAC(class Class, max int) []VtableEntry {
 	if max <= 0 || class.VtableAddr == 0 {
 		return nil
@@ -198,11 +228,10 @@ func (s *Scanner) BuildMethodTable(class Class) MethodTable {
 	return mt
 }
 
-// vtableMethodCount bounds the vtable at its real end. A slot ends the table
-// when it falls past the owning section, lacks a resolvable fixup pointer (the
-// zero terminator or the header of the next vtable), or the MaxMethods ceiling
-// is hit. In a kernelcache the forward-pointer cache is populated exclusively
-// from chained fixups, so a resolvable pointer implies fixup presence.
+// vtableMethodCount bounds the vtable at its real end. A slot ends the table when
+// it falls past the owning section, is neither a resolvable pointer nor an
+// external bind fixup, or the MaxMethods ceiling is hit. Bind slots are valid
+// vtable methods and must not truncate the walk.
 func (s *Scanner) vtableMethodCount(class Class) int {
 	owner := s.ClassOwner(class)
 	if owner == nil || class.VtableAddr == 0 {
@@ -218,11 +247,41 @@ func (s *Scanner) vtableMethodCount(class Class) int {
 		if secEnd != 0 && slotAddr+8 > secEnd {
 			break
 		}
-		ptr, ok := s.fallbackPointerAt(owner, slotAddr)
-		if !ok || ptr == 0 || ptr == 0xffffffffffffffff || !validKernelPointer(ptr) {
+		if _, _, _, _, ok := s.vtableSlotValue(owner, slotAddr); !ok {
 			break
 		}
 		count++
 	}
 	return count
+}
+
+func (s *Scanner) vtableSlotValue(owner *macho.File, slotAddr uint64) (uint64, bool, slotAuth, bool, bool) {
+	sa, authOK := s.slotAuthAt(slotAddr)
+	if target, ok := s.fallbackPointerAt(owner, slotAddr); ok &&
+		target != 0 &&
+		target != 0xffffffffffffffff &&
+		validKernelPointer(target) {
+		return target, true, sa, authOK, true
+	}
+	if authOK && sa.bind {
+		return 0, false, sa, true, true
+	}
+	return 0, false, sa, authOK, false
+}
+
+func (s *Scanner) isPureVirtualTarget(owner *macho.File, target uint64) bool {
+	if s.cxaPureVirtual == 0 || target == 0 {
+		return false
+	}
+	if target == s.cxaPureVirtual {
+		return true
+	}
+	stubOwner := owner
+	if resolved := s.fileForVMAddr(target); resolved != nil {
+		stubOwner = resolved
+	}
+	if stubOwner == nil || stubOwner.FindSectionForVMAddr(target) == nil {
+		return false
+	}
+	return s.isStubFor(stubOwner, target, s.cxaPureVirtual)
 }

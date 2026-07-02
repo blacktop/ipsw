@@ -19,7 +19,11 @@ func (s *Scanner) BuildNamedMethodTables(classes []Class) []MethodTable {
 	for i := range tables {
 		for j := range tables[i].Methods {
 			e := &tables[i].Methods[j]
-			e.Mangled = s.rawSymbolName(e.Address)
+			if mangled := s.rawSymbolName(e.Address); mangled != "" {
+				e.Mangled = mangled
+			} else if e.ExternalReloc && e.Symbol != "" {
+				e.Mangled = e.Symbol
+			}
 		}
 	}
 	nameMethodTables(classes, tables)
@@ -187,7 +191,7 @@ func resolveOwnName(e *VtableEntry) {
 	if demangled == e.Mangled {
 		return
 	}
-	class, method, ok := splitClassMethod(demangled)
+	class, method, ok := splitClassMethod(stripThunkPrefix(demangled))
 	if !ok {
 		return
 	}
@@ -278,6 +282,7 @@ func (ns *nameState) backPropagate(i, idx int, method string) {
 // class ("Foo::Bar") and method ("baz(int)"), ignoring "::" nested inside
 // template arguments. ok is false when no top-level "::" separator exists.
 func splitClassMethod(demangled string) (string, string, bool) {
+	demangled = stripThunkPrefix(demangled)
 	argStart := len(demangled)
 	depth := 0
 	for i := 0; i < len(demangled); i++ {
@@ -311,6 +316,20 @@ func splitClassMethod(demangled string) (string, string, bool) {
 		}
 	}
 	return "", "", false
+}
+
+func stripThunkPrefix(demangled string) string {
+	for {
+		demangled = strings.TrimSpace(demangled)
+		switch {
+		case strings.HasPrefix(demangled, "non-virtual thunk to "):
+			demangled = strings.TrimPrefix(demangled, "non-virtual thunk to ")
+		case strings.HasPrefix(demangled, "virtual thunk to "):
+			demangled = strings.TrimPrefix(demangled, "virtual thunk to ")
+		default:
+			return demangled
+		}
+	}
 }
 
 // classBasename returns the last "::"-separated component of a class name,
