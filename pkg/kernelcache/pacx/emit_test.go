@@ -188,7 +188,7 @@ func TestWriteR2CommentsAndFlags(t *testing.T) {
 		}
 	}
 	// Flag names must be radare2-safe (no spaces, no parens).
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(line, "f ") {
 			continue
 		}

@@ -123,7 +123,7 @@ var kernelCppPacxCmd = &cobra.Command{
 func parsePacxFormats(raw string) ([]string, error) {
 	seen := make(map[string]struct{})
 	out := make([]string, 0, 3)
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		f := strings.ToLower(strings.TrimSpace(part))
 		if f == "" {
 			continue
