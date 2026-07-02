@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/blacktop/go-macho"
 	mtypes "github.com/blacktop/go-macho/types"
 )
 
@@ -53,5 +54,19 @@ func TestFunctionsForScanReturnsGeneratedError(t *testing.T) {
 		t.Fatal("functionsForScan returned nil error")
 	} else if !errors.Is(err, want) {
 		t.Fatalf("functionsForScan error = %v, want wrapping %v", err, want)
+	}
+}
+
+func TestCollectFilesetImageFuncsReturnsCollectionError(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("no function starts")
+	_, err := collectFilesetImageFuncs(
+		[]*macho.FilesetEntry{{EntryID: "com.apple.driver.Example"}},
+		func(string) (*macho.File, error) { return &macho.File{}, nil },
+		func(string, *macho.File) ([]imageFunc, error) { return nil, want },
+	)
+	if !errors.Is(err, want) {
+		t.Fatalf("collectFilesetImageFuncs error = %v, want wrapping %v", err, want)
 	}
 }

@@ -132,9 +132,9 @@ func TestEntitlementSpecsForPacCandidateUsesVirtualRegisters(t *testing.T) {
 		t.Fatalf("direct target KeyReg=%d, want x1 before virtual conversion", target.KeyReg)
 	}
 
-	got := entitlementSpecsForPacCandidate(pacx.PacCandidate{Vfunc: 0xfffffe0007001234}, map[uint64][]targetSpec{
+	got := entitlementSpecsForPacCandidate(pacx.PacRecord{}, pacx.PacCandidate{Vfunc: 0xfffffe0007001234}, map[uint64][]targetSpec{
 		0xfffffe0007001234: {target},
-	})
+	}, nil)
 	if len(got) != 1 {
 		t.Fatalf("targets=%d, want 1: %#v", len(got), got)
 	}
@@ -143,6 +143,33 @@ func TestEntitlementSpecsForPacCandidateUsesVirtualRegisters(t *testing.T) {
 	}
 	if got[0].Discovery != "pacx" {
 		t.Fatalf("discovery=%q, want pacx", got[0].Discovery)
+	}
+}
+
+func TestEntitlementSpecsForPacCandidateUsesVirtualSlot(t *testing.T) {
+	got := entitlementSpecsForPacCandidate(
+		pacx.PacRecord{SlotOffset: 0x28, SlotIndex: 5},
+		pacx.PacCandidate{Vfunc: 0xfffffe0007009999, Class: "ExampleUserClient"},
+		nil,
+		map[int][]targetSpec{
+			5: {{
+				Source:      SourceKernelcache,
+				Canonical:   "IOUserClient::copyClientEntitlement",
+				KeyReg:      1,
+				ValueReg:    -1,
+				Discovery:   "vtable_slot",
+				VirtualSlot: 5,
+			}},
+		},
+	)
+	if len(got) != 1 {
+		t.Fatalf("targets=%d, want 1: %#v", len(got), got)
+	}
+	if got[0].Canonical != "IOUserClient::copyClientEntitlement" || got[0].KeyReg != 2 {
+		t.Fatalf("target=%#v, want virtual copyClientEntitlement with x2 key", got[0])
+	}
+	if got[0].Discovery != "pacx,vtable_slot" {
+		t.Fatalf("discovery=%q, want pacx,vtable_slot", got[0].Discovery)
 	}
 }
 

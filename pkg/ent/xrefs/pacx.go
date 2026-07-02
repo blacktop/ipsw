@@ -28,7 +28,7 @@ type pacEntTargetKey struct {
 	class      string
 }
 
-func collectPacEntitlementTargets(root *macho.File, name string, targets map[uint64][]targetSpec, stderr io.Writer) map[uint64]map[uint64][]pacEntTarget {
+func collectPacEntitlementTargets(root *macho.File, name string, targets map[uint64][]targetSpec, virtualSlots map[int][]targetSpec, stderr io.Writer) map[uint64]map[uint64][]pacEntTarget {
 	records, err := pacx.ScanKernelcache(root, pacx.ScanConfig{Name: name})
 	if err != nil {
 		progress(stderr, "kernelcache: pacx entitlement edge scan failed: %v\n", err)
@@ -40,7 +40,7 @@ func collectPacEntitlementTargets(root *macho.File, name string, targets map[uin
 	added := 0
 	for _, rec := range records {
 		for _, cand := range rec.Candidates {
-			for _, target := range entitlementSpecsForPacCandidate(cand, targets) {
+			for _, target := range entitlementSpecsForPacCandidate(rec, cand, targets, virtualSlots) {
 				key := pacEntTargetKey{
 					callerFunc: rec.CallerFunc,
 					callsite:   rec.Callsite,
@@ -72,10 +72,13 @@ func collectPacEntitlementTargets(root *macho.File, name string, targets map[uin
 	return byFunc
 }
 
-func entitlementSpecsForPacCandidate(cand pacx.PacCandidate, targets map[uint64][]targetSpec) []targetSpec {
+func entitlementSpecsForPacCandidate(rec pacx.PacRecord, cand pacx.PacCandidate, targets map[uint64][]targetSpec, virtualSlots map[int][]targetSpec) []targetSpec {
 	seen := make(map[string]struct{})
 	var out []targetSpec
 	for _, target := range targets[cand.Vfunc] {
+		out = appendPacTarget(out, seen, target)
+	}
+	for _, target := range virtualSlotSpecsForPacRecord(rec, virtualSlots) {
 		out = appendPacTarget(out, seen, target)
 	}
 	if cand.VfuncSymbol != "" {
@@ -84,6 +87,18 @@ func entitlementSpecsForPacCandidate(cand pacx.PacCandidate, targets map[uint64]
 		}
 	}
 	return out
+}
+
+func virtualSlotSpecsForPacRecord(rec pacx.PacRecord, virtualSlots map[int][]targetSpec) []targetSpec {
+	if rec.SlotIndex >= 0 {
+		if targets := virtualSlots[rec.SlotIndex]; len(targets) > 0 {
+			return targets
+		}
+	}
+	if rec.SlotOffset%8 != 0 {
+		return nil
+	}
+	return virtualSlots[int(rec.SlotOffset/8)]
 }
 
 func appendPacTarget(out []targetSpec, seen map[string]struct{}, target targetSpec) []targetSpec {

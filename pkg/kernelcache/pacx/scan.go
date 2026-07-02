@@ -104,24 +104,28 @@ func authForKeyB(keyB bool) string {
 // fileset entry; otherwise from the single Mach-O.
 func collectImageFuncs(root *macho.File) ([]imageFunc, error) {
 	if root.FileTOC.FileHeader.Type == mtypes.MH_FILESET {
-		var out []imageFunc
-		for _, entry := range root.FileSets() {
-			m, err := root.GetFileSetFileByName(entry.EntryID)
-			if err != nil {
-				continue
-			}
-			bodies, err := funcBodiesFor(entry.EntryID, m)
-			if err != nil {
-				continue
-			}
-			out = append(out, bodies...)
-		}
-		return out, nil
+		return collectFilesetImageFuncs(root.FileSets(), root.GetFileSetFileByName, funcBodiesFor)
 	}
 	return funcBodiesFor(kernelImageName, root)
 }
 
 const kernelImageName = "com.apple.kernel"
+
+func collectFilesetImageFuncs(entries []*macho.FilesetEntry, open func(string) (*macho.File, error), collect func(string, *macho.File) ([]imageFunc, error)) ([]imageFunc, error) {
+	var out []imageFunc
+	for _, entry := range entries {
+		m, err := open(entry.EntryID)
+		if err != nil {
+			continue
+		}
+		bodies, err := collect(entry.EntryID, m)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, bodies...)
+	}
+	return out, nil
+}
 
 // funcBodiesFor reads every function body in m, tagging each with image.
 func funcBodiesFor(image string, m *macho.File) ([]imageFunc, error) {

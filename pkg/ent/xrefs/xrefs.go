@@ -80,7 +80,7 @@ func ScanKernelcache(path string, stderr io.Writer) ([]Record, int, error) {
 	mem := machoMemory{m: m}
 	targetAddrs := targetSetFromSpecs(targets)
 	hints := hintsForTargets(targets, virtualSlots)
-	pacEntTargets := collectPacEntitlementTargets(m, filepath.Base(path), targets, stderr)
+	pacEntTargets := collectPacEntitlementTargets(m, filepath.Base(path), targets, virtualSlots, stderr)
 	var scanner xref.Scanner
 	var records []Record
 	for _, fn := range sortedFunctions(m.GetFunctions()) {
@@ -127,7 +127,7 @@ func scanKernelFileset(root *macho.File, symbolicatedTargets map[uint64][]target
 
 	targetAddrs := targetSetFromSpecs(globalTargets)
 	hints := hintsForTargets(globalTargets, virtualSlots)
-	pacEntTargets := collectPacEntitlementTargets(root, "", globalTargets, stderr)
+	pacEntTargets := collectPacEntitlementTargets(root, "", globalTargets, virtualSlots, stderr)
 	var records []Record
 	for _, image := range images {
 		m := image.m
