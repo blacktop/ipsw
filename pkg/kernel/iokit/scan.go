@@ -44,6 +44,7 @@ type analyzer struct {
 	maxSwitchInst int
 	maxSlots      int
 	userClient    map[string]struct{}
+	namedByVtable map[uint64][]cpp.VtableEntry
 }
 
 type classInfo struct {
@@ -386,10 +387,37 @@ func (a *analyzer) vtableEntry(class cpp.Class, slot int) (cpp.VtableEntry, bool
 	if a == nil || a.scanner == nil {
 		return cpp.VtableEntry{}, false
 	}
+	// Prefer the named method table: its entries carry the same PAC metadata as
+	// VtableSlotPAC plus the resolved Class/Method/Mangled names, so external
+	// method records are fully annotated. Fall back to the raw slot accessors for
+	// slots past the recovered method count.
+	if methods := a.namedMethods(class); slot >= 0 && slot < len(methods) {
+		return methods[slot], true
+	}
 	if entry, ok := a.scanner.VtableSlotPAC(class, slot); ok {
 		return entry, true
 	}
 	return a.scanner.VtableEntry(class, slot)
+}
+
+// namedMethods returns the named vtable method entries for class, or nil. The
+// per-class tables are built once from the full discovered class set (naming
+// needs the whole hierarchy to resolve overrides and inherited names) and cached
+// by vtable address.
+func (a *analyzer) namedMethods(class cpp.Class) []cpp.VtableEntry {
+	if a == nil || a.scanner == nil || class.VtableAddr == 0 {
+		return nil
+	}
+	if a.namedByVtable == nil {
+		tables := a.scanner.BuildNamedMethodTables(a.classes)
+		a.namedByVtable = make(map[uint64][]cpp.VtableEntry, len(tables))
+		for _, mt := range tables {
+			if mt.VtableAddr != 0 {
+				a.namedByVtable[mt.VtableAddr] = mt.Methods
+			}
+		}
+	}
+	return a.namedByVtable[class.VtableAddr]
 }
 
 func isNamedMethod(symbolName string, method string) bool {
