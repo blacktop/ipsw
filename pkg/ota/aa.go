@@ -94,7 +94,7 @@ type Config struct {
 func getKeyFromName(name string) (string, error) {
 	_, rest, ok := strings.Cut(name, "[")
 	if !ok {
-		return "", fmt.Errorf("begining of KEY '[' not found in '%s'", name)
+		return "", fmt.Errorf("beginning of KEY '[' not found in '%s'", name)
 	}
 	key, _, ok := strings.Cut(rest, "]")
 	if !ok {

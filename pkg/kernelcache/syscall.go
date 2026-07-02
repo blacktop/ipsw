@@ -363,7 +363,7 @@ func GetSyscallTable(m *macho.File) (uint64, []Sysent, error) {
 				})
 			}
 		} else {
-			return tableAddr, nil, fmt.Errorf("failed to find begining of syscalls sysent data")
+			return tableAddr, nil, fmt.Errorf("failed to find beginning of syscalls sysent data")
 		}
 	} else {
 		return tableAddr, nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
