@@ -254,7 +254,7 @@ var fridaObjcCmd = &cobra.Command{
 				log.Info("Compiling bundle...")
 				script, err = session.CreateScript(bundle)
 				if err != nil {
-					log.Errorf("error ocurred creating script: %v", err)
+					log.Errorf("error occurred creating script: %v", err)
 					return
 				}
 
@@ -273,7 +273,7 @@ var fridaObjcCmd = &cobra.Command{
 		} else {
 			script, err = session.CreateScript(string(objcScriptData))
 			if err != nil {
-				return fmt.Errorf("error ocurred creating script: %v", err)
+				return fmt.Errorf("error occurred creating script: %v", err)
 			}
 
 			script.On("message", onMessage)
