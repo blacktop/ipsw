@@ -733,13 +733,13 @@ func applyMoveKeep(inst *disassemble.Inst, regs []linearExpr) {
 	if !ok {
 		return
 	}
-	imm, ok := operandImm(inst, 1)
-	if !ok || !regs[rd].valid {
+	if !operandIsImmediate(inst, 1) || !regs[rd].valid {
 		clearReg(regs, rd, "indirect")
 		return
 	}
+	imm := inst.Operands[1].Immediate
 	shift := uint64(0)
-	if inst.NumOps > 1 && inst.Operands[1].ShiftValueUsed {
+	if inst.Operands[1].ShiftValueUsed {
 		shift = uint64(inst.Operands[1].ShiftValue)
 	}
 	if regs[rd].coeff != 0 {

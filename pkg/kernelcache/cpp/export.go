@@ -10,11 +10,56 @@ import (
 )
 
 // VtableEntry is a decoded function pointer from a recovered C++ vtable.
+//
+// The base fields (Index, SlotAddress, Address, Symbol) are populated by the
+// symtab-only accessors (VtableEntries/VtableEntry). The per-slot PAC fields
+// (Offset, PAC, Key, AddrDiv, Auth, PureVirtual, ExternalReloc, CacheLevel)
+// are populated only by the raw-fixup accessors (VtableSlotsPAC/VtableSlotPAC)
+// and stay zero-valued otherwise.
 type VtableEntry struct {
 	Index       int
+	Offset      uint64
 	SlotAddress uint64
 	Address     uint64
 	Symbol      string
+	// PAC is the 16-bit pointer-authentication diversifier for the slot. It is
+	// meaningful only when Auth is true; unsigned slots report PAC == 0 rather
+	// than the garbage diversity bits a non-auth fixup would otherwise expose.
+	PAC uint16
+	// Key is the ptrauth key selector (IA=0, IB=1, DA=2, DB=3).
+	Key uint8
+	// AddrDiv reports whether the slot address is blended into the diversifier.
+	AddrDiv bool
+	// Auth reports whether the slot is an authenticated (signed) pointer.
+	Auth bool
+	// PureVirtual reports whether the slot target is __cxa_pure_virtual.
+	PureVirtual bool
+	// ExternalReloc reports whether the slot is bound to an external symbol.
+	ExternalReloc bool
+	// CacheLevel is the DYLD_CHAINED_PTR_64_KERNEL_CACHE cache-level selector.
+	CacheLevel uint8
+	// Class is the resolved owning class name for the method occupying this slot.
+	// It is the demangling class for authoritative names, the inheriting class
+	// for overrides, or the declaring class for inherited names.
+	Class string
+	// Method is the resolved method name (with argument list, e.g. "foo(int)").
+	// It falls back to a synthesized structor name or "fn_0x<off>()" when no
+	// symbol is available.
+	Method string
+	// Mangled is the raw (still-mangled) symtab/export symbol backing the slot,
+	// or empty on stripped slots.
+	Mangled string
+	// Structor reports whether the slot holds a constructor or destructor.
+	Structor bool
+	// Authoritative reports whether Class/Method came from a real demangle (or a
+	// name back-propagated from a descendant that demangled) rather than a guess.
+	Authoritative bool
+	// Overrides reports whether the slot overrides the parent's same-index slot
+	// (no parent slot, or a different target). External-reloc slots report false.
+	Overrides bool
+	// ParentAddress is the target of the effective parent class' same-index slot,
+	// or zero when there is no parent slot.
+	ParentAddress uint64
 }
 
 // FunctionBody is the bounded analysis input for a recovered function.

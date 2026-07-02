@@ -884,17 +884,23 @@ func softLinkApplyMoveKeep(inst *disassemble.Inst, state *[31]softLinkRegValue) 
 	if !ok {
 		return
 	}
-	imm, ok := xref.OperandImm(inst, 1)
-	if !ok || !state[rd].known {
+	if inst.NumOps <= 1 || !state[rd].known {
+		state[rd] = softLinkRegValue{}
+		return
+	}
+	op := &inst.Operands[1]
+	switch op.Class {
+	case disassemble.IMM32, disassemble.IMM64, disassemble.STR_IMM:
+	default:
 		state[rd] = softLinkRegValue{}
 		return
 	}
 	shift := uint64(0)
-	if inst.NumOps > 1 && inst.Operands[1].ShiftValueUsed {
-		shift = uint64(inst.Operands[1].ShiftValue)
+	if op.ShiftValueUsed {
+		shift = uint64(op.ShiftValue)
 	}
 	mask := uint64(0xffff) << shift
-	state[rd].addr = (state[rd].addr &^ mask) | ((imm << shift) & mask)
+	state[rd].addr = (state[rd].addr &^ mask) | ((op.Immediate << shift) & mask)
 }
 
 func softLinkApplyORRMove(inst *disassemble.Inst, state *[31]softLinkRegValue) bool {

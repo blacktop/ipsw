@@ -212,6 +212,7 @@ func (s *Scanner) buildPointerIndex(m *macho.File) map[uint64][]uint64 {
 				if err != nil {
 					continue
 				}
+				s.captureSlotAuth(slotAddr, fx)
 				if s.fileForVMAddr(slotAddr) != m {
 					continue
 				}
@@ -293,6 +294,7 @@ func (s *Scanner) seedRootFixupIndexes() {
 			if err != nil {
 				continue
 			}
+			s.captureSlotAuth(slotAddr, fx)
 			owner := s.fileForVMAddr(slotAddr)
 			if owner == nil {
 				continue

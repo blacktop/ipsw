@@ -67,6 +67,9 @@ func init() {
 		"Show inheritance hierarchy")
 	kernelCppCmd.Flags().IntP("limit", "l", 0,
 		"Limit number of classes to display (0 = all)")
+	kernelCppCmd.Flags().Bool("methods", false,
+		"List per-slot vtable methods with PAC metadata")
+	_ = kernelCppCmd.Flags().MarkHidden("methods")
 
 	// Profiling flags
 	kernelCppCmd.Flags().String("cpuprofile", "",
@@ -95,6 +98,7 @@ func init() {
 	viper.BindPFlag("kernel.cpp.arch", kernelCppCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("kernel.cpp.inheritance", kernelCppCmd.Flags().Lookup("inheritance"))
 	viper.BindPFlag("kernel.cpp.limit", kernelCppCmd.Flags().Lookup("limit"))
+	viper.BindPFlag("kernel.cpp.methods", kernelCppCmd.Flags().Lookup("methods"))
 	viper.BindPFlag("kernel.cpp.cpuprofile", kernelCppCmd.Flags().Lookup("cpuprofile"))
 	viper.BindPFlag("kernel.cpp.memprofile", kernelCppCmd.Flags().Lookup("memprofile"))
 	viper.BindPFlag("kernel.cpp.blockprofile", kernelCppCmd.Flags().Lookup("blockprofile"))
@@ -134,6 +138,7 @@ var kernelCppCmd = &cobra.Command{
 		asJSON := viper.GetBool("kernel.cpp.json")
 		className := viper.GetString("kernel.cpp.class")
 		showInheritance := viper.GetBool("kernel.cpp.inheritance")
+		methodsMode := viper.GetBool("kernel.cpp.methods")
 		limit := viper.GetInt("kernel.cpp.limit")
 		showTimings := viper.GetBool("kernel.cpp.timings") ||
 			viper.GetBool("verbose")
@@ -190,8 +195,10 @@ var kernelCppCmd = &cobra.Command{
 		// --- scan ---
 		tScan := time.Now()
 		scanner := cpp.NewScanner(m.File, cpp.Config{
-			Entries:   viper.GetStringSlice("kernel.cpp.entry"),
-			ClassName: scannerClassFilter(className, showInheritance),
+			Entries: viper.GetStringSlice("kernel.cpp.entry"),
+			// --methods needs the full class set so override/inheritance/naming
+			// can resolve parent classes even when -c filters the display.
+			ClassName: scannerClassFilter(className, showInheritance || methodsMode),
 			LogStats:  showTimings,
 			LogTrace:  showTrace,
 		})
@@ -232,7 +239,11 @@ var kernelCppCmd = &cobra.Command{
 			out = os.Stdout
 		}
 
-		if asJSON {
+		if methodsMode {
+			if err := writeMethodTables(scanner, classes, display, out, asJSON); err != nil {
+				return err
+			}
+		} else if asJSON {
 			enc := json.NewEncoder(out)
 			enc.SetIndent("", "  ")
 			if err := enc.Encode(display); err != nil {

@@ -89,6 +89,12 @@ type Scanner struct {
 	stats scanStats
 
 	rootFixupsSeeded bool
+
+	// slotAuthByVMAddr maps a fixup slot VM address to the PAC metadata decoded
+	// from its raw chained-fixup word. It is populated as a side effect of the
+	// root fixup walks (seedRootFixupIndexes / buildPointerIndex) so per-slot
+	// diversity is retained without a second chain read.
+	slotAuthByVMAddr map[uint64]slotAuth
 }
 
 type scanTarget struct {
