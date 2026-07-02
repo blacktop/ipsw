@@ -69,7 +69,6 @@ func init() {
 		"Limit number of classes to display (0 = all)")
 	kernelCppCmd.Flags().Bool("methods", false,
 		"List per-slot vtable methods with PAC metadata")
-	_ = kernelCppCmd.Flags().MarkHidden("methods")
 
 	// Profiling flags
 	kernelCppCmd.Flags().String("cpuprofile", "",
@@ -123,6 +122,8 @@ var kernelCppCmd = &cobra.Command{
 		❯ ipsw kernel cpp --json kernelcache.release.iPhone17,1
 		# Show inheritance hierarchy
 		❯ ipsw kernel cpp --inheritance kernelcache.release.iPhone17,1
+		# List per-slot vtable methods with PAC metadata
+		❯ ipsw kernel cpp --methods -c IOUserClient kernelcache.release.iPhone17,1
 		# Profile CPU usage
 		❯ ipsw kernel cpp --cpuprofile cpu.prof kernelcache.release.iPhone17,1`),
 	Args:          cobra.ExactArgs(1),
