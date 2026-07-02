@@ -194,7 +194,7 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 			records = append(records, a.unknownMethodRecord(info, 0, "vtable_unresolved"))
 			continue
 		}
-		entry, ok := a.scanner.VtableEntry(info.Class, slot)
+		entry, ok := a.vtableEntry(info.Class, slot)
 		if !ok || entry.Address == 0 {
 			records = append(records, a.unknownMethodRecord(info, 0, "vtable_unresolved"))
 			continue
@@ -206,9 +206,12 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 			if err != nil {
 				return nil, err
 			}
+			annotateExternalMethodVtableRecords(recs, entry)
 			records = append(records, recs...)
 		case DispatchSwitch:
-			records = append(records, a.switchRecords(info, analysis)...)
+			recs := a.switchRecords(info, analysis)
+			annotateExternalMethodVtableRecords(recs, entry)
+			records = append(records, recs...)
 		default:
 			if recs, ok, err := a.legacyMethodRecordsForInfo(info, legacySlots); err != nil {
 				return nil, err
@@ -222,6 +225,7 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 					if err != nil {
 						return nil, err
 					}
+					annotateExternalMethodVtableRecords(recs, entry)
 					records = append(records, recs...)
 					continue
 				}
@@ -230,7 +234,9 @@ func (a *analyzer) methodRecords(userClients []*classInfo) ([]Record, error) {
 			if note == "" {
 				note = "indirect"
 			}
-			records = append(records, a.unknownMethodRecord(info, entry.Address, note))
+			rec := a.unknownMethodRecord(info, entry.Address, note)
+			annotateExternalMethodVtable(&rec, entry)
+			records = append(records, rec)
 		}
 	}
 	return records, nil
@@ -326,7 +332,7 @@ func (a *analyzer) legacyMethodRecordsForInfo(info *classInfo, legacySlots map[s
 	if !ok {
 		return nil, false, nil
 	}
-	entry, ok := a.scanner.VtableEntry(info.Class, slot)
+	entry, ok := a.vtableEntry(info.Class, slot)
 	if !ok || entry.Address == 0 {
 		return nil, false, nil
 	}
@@ -338,6 +344,7 @@ func (a *analyzer) legacyMethodRecordsForInfo(info *classInfo, legacySlots map[s
 	if err != nil {
 		return nil, false, err
 	}
+	annotateExternalMethodVtableRecords(records, entry)
 	return records, true, nil
 }
 
@@ -373,6 +380,16 @@ func chooseSlot(family string, slots map[int]int, source string) (int, error) {
 		return -1, fmt.Errorf("externalMethod vtable slot differs across %s hierarchy (%s candidates: %v)", family, source, slots)
 	}
 	return candidates[0].slot, nil
+}
+
+func (a *analyzer) vtableEntry(class cpp.Class, slot int) (cpp.VtableEntry, bool) {
+	if a == nil || a.scanner == nil {
+		return cpp.VtableEntry{}, false
+	}
+	if entry, ok := a.scanner.VtableSlotPAC(class, slot); ok {
+		return entry, true
+	}
+	return a.scanner.VtableEntry(class, slot)
 }
 
 func isNamedMethod(symbolName string, method string) bool {

@@ -287,12 +287,16 @@ func sortRefs(r []InverseRef) {
 	})
 }
 
-// Lookup returns the candidate targets for a (offset, pac) key, or nil.
+// Lookup returns the candidate targets for a (offset, pac) key, or nil. Forward
+// is sorted by (Offset, PAC) in finish(), so this is a binary search — Join calls
+// it once per call-site key, where a linear scan would be O(keys x forward).
 func (ix *Index) Lookup(offset uint64, pac uint16) []Candidate {
-	for i := range ix.Forward {
-		if ix.Forward[i].Offset == offset && ix.Forward[i].PAC == pac {
-			return ix.Forward[i].Candidates
-		}
+	i := sort.Search(len(ix.Forward), func(i int) bool {
+		e := &ix.Forward[i]
+		return e.Offset > offset || (e.Offset == offset && e.PAC >= pac)
+	})
+	if i < len(ix.Forward) && ix.Forward[i].Offset == offset && ix.Forward[i].PAC == pac {
+		return ix.Forward[i].Candidates
 	}
 	return nil
 }

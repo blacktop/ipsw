@@ -14,7 +14,6 @@ import (
 	"github.com/blacktop/go-macho"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/kernelcache/cpp"
-	"github.com/blacktop/ipsw/pkg/xref"
 )
 
 // ScanConfig controls a kernelcache PAC-xref scan.
@@ -60,50 +59,41 @@ func ScanKernelcache(root *macho.File, conf ScanConfig) ([]PacRecord, error) {
 		return nil, err
 	}
 	funcs := make([]FuncBody, len(imageFuncs))
-	bodyByStart := make(map[uint64]imageFunc, len(imageFuncs))
+	imageByStart := make(map[uint64]string, len(imageFuncs))
 	for i, f := range imageFuncs {
 		funcs[i] = f.body
-		bodyByStart[f.body.Addr] = f
+		imageByStart[f.body.Addr] = f.image
 	}
 
 	csi := BuildCallSiteIndex(funcs, conf.Window)
-	records := Join(index, csi, siteAttributor(scanner, bodyByStart), conf.IncludeUnresolved)
+	records := Join(index, csi, siteAttributor(scanner, imageByStart), conf.IncludeUnresolved)
 	progress(conf.Stderr, "pacx: emitted %d resolved edges\n", len(records))
 	return records, nil
 }
 
-// siteAttributor builds the per-call-site metadata resolver: image and caller
-// symbol from the containing function, and the auth mnemonic from the call
-// instruction word.
-func siteAttributor(scanner *cpp.Scanner, bodyByStart map[uint64]imageFunc) SiteAttributor {
+// siteAttributor builds the per-call-site metadata resolver: the caller symbol
+// and fileset image of the containing function, and the auth mnemonic taken
+// straight from the call's already-decoded key bit. Caller symbols are memoized
+// because one function commonly hosts many resolved call sites.
+func siteAttributor(scanner *cpp.Scanner, imageByStart map[uint64]string) SiteAttributor {
+	symByFunc := make(map[uint64]string)
 	return func(site CallSite) SiteMeta {
-		meta := SiteMeta{CallerSymbol: scanner.SymbolName(site.CallerFuncAddr)}
-		f, ok := bodyByStart[site.CallerFuncAddr]
+		sym, ok := symByFunc[site.CallerFuncAddr]
 		if !ok {
-			return meta
+			sym = scanner.SymbolName(site.CallerFuncAddr)
+			symByFunc[site.CallerFuncAddr] = sym
 		}
-		meta.Image = f.image
-		off := site.Addr - f.body.Addr
-		if off+4 <= uint64(len(f.body.Code)) {
-			meta.Auth = authMnemonic(f.body.Code[off:off+4], site.Addr)
+		return SiteMeta{
+			CallerSymbol: sym,
+			Image:        imageByStart[site.CallerFuncAddr],
+			Auth:         authForKeyB(site.KeyB),
 		}
-		return meta
 	}
 }
 
-// authMnemonic decodes a single call-site instruction word and reports "blraa"
-// or "blrab", or an empty string when the word is not a register-form
-// authenticated call.
-func authMnemonic(word []byte, addr uint64) string {
-	instrs := xref.Decode(word, addr)
-	if len(instrs) == 0 {
-		return ""
-	}
-	call, ok := xref.DecodeAuthCallReg(&instrs[0].Inst)
-	if !ok {
-		return ""
-	}
-	if call.KeyB {
+// authForKeyB maps a register-form authenticated call's key bit to its mnemonic.
+func authForKeyB(keyB bool) string {
+	if keyB {
 		return "blrab"
 	}
 	return "blraa"
@@ -122,7 +112,7 @@ func collectImageFuncs(root *macho.File) ([]imageFunc, error) {
 			}
 			bodies, err := funcBodiesFor(entry.EntryID, m)
 			if err != nil {
-				return nil, err
+				continue
 			}
 			out = append(out, bodies...)
 		}
@@ -158,10 +148,13 @@ func functionsForScan(funcs []mtypes.Function, generate func() ([]mtypes.Functio
 		}
 		funcs = generated
 	}
-	sort.Slice(funcs, func(i, j int) bool {
-		return funcs[i].StartAddr < funcs[j].StartAddr
+	// Copy before sorting: m.GetFunctions() returns go-macho's cached slice, and
+	// sorting in place would mutate shared Mach-O state (cf. ent/xrefs sortedFunctions).
+	out := append([]mtypes.Function(nil), funcs...)
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].StartAddr < out[j].StartAddr
 	})
-	return funcs, nil
+	return out, nil
 }
 
 func progress(w io.Writer, format string, args ...any) {

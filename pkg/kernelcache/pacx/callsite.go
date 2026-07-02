@@ -82,8 +82,11 @@ func BuildCallSiteIndex(funcs []FuncBody, window int) CallSiteIndex {
 		window = DefaultCallSiteWindow
 	}
 	idx := make(CallSiteIndex)
+	// Reuse one decode buffer across functions; scan copies only scalar fields
+	// out of each decoded slice, so nothing outlives the iteration.
+	var dec xref.Scanner
 	for _, fb := range funcs {
-		idx.scan(xref.Decode(fb.Code, fb.Addr), fb.Addr, window)
+		idx.scan(dec.Decode(fb.Code, fb.Addr), fb.Addr, window)
 	}
 	idx.sortSites()
 	return idx
@@ -241,12 +244,15 @@ func classifyStep(inst *disassemble.Inst, ctx disassemble.Register) regStep {
 			return regStep{kind: stepStatic}
 		}
 		return regStep{kind: stepNone}
-	case disassemble.ARM64_MOVK, disassemble.ARM64_LDR, disassemble.ARM64_LDUR:
+	case disassemble.ARM64_MOVK:
 		if dst, ok := xref.OperandReg(inst, 0); ok && sameReg(dst, ctx) {
 			return regStep{kind: stepClobber}
 		}
 		return regStep{kind: stepNone}
 	}
+	// LDR/LDUR (offset or post-index forms; pre-index handled above) fall through
+	// to writesReg, which catches both a dest clobber and a post-index base
+	// writeback of ctx — a bare case here would miss the latter.
 	if writesReg(inst, ctx) {
 		return regStep{kind: stepClobber}
 	}

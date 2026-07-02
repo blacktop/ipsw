@@ -65,6 +65,46 @@ func TestWriteJSONLSortsByContractKey(t *testing.T) {
 	}
 }
 
+func TestAnnotateExternalMethodVtableAddsPACMetadata(t *testing.T) {
+	t.Parallel()
+
+	rec := Record{Kind: KindMethod, Extra: map[string]string{}}
+	annotateExternalMethodVtable(&rec, cpp.VtableEntry{
+		Index:       272,
+		Offset:      0x880,
+		SlotAddress: 0xfffffe0007004880,
+		Auth:        true,
+		PAC:         0x3771,
+		Key:         2,
+		AddrDiv:     true,
+		Class:       "ExampleUserClient",
+		Method:      "externalMethod(uint32_t, IOExternalMethodArguments*, IOExternalMethodDispatch*, OSObject*, void*)",
+		Overrides:   true,
+		Structor:    true,
+	})
+
+	want := map[string]string{
+		"external_method_slot":      "272",
+		"external_method_slot_addr": "0xfffffe0007004880",
+		"external_method_offset":    "0x880",
+		"external_method_auth":      "true",
+		"external_method_pac":       "0x3771",
+		"external_method_key":       "DA",
+		"external_method_addr_div":  "true",
+		"external_method_class":     "ExampleUserClient",
+	}
+	for key, value := range want {
+		if rec.Extra[key] != value {
+			t.Fatalf("extra[%s]=%q, want %q (all extras %#v)", key, rec.Extra[key], value, rec.Extra)
+		}
+	}
+	for _, key := range []string{"external_method_override", "external_method_structor"} {
+		if _, ok := rec.Extra[key]; ok {
+			t.Fatalf("extra[%s] should be omitted when not computed by the vtable accessor: %#v", key, rec.Extra)
+		}
+	}
+}
+
 func TestReachesClassFollowsSuperIndex(t *testing.T) {
 	t.Parallel()
 

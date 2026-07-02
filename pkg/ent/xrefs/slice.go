@@ -21,19 +21,20 @@ type resolvedArg struct {
 }
 
 type functionScan struct {
-	source       Source
-	image        string
-	callerSymbol string
-	data         []byte
-	start        uint64
-	targets      map[uint64][]targetSpec
-	targetAddrs  xref.TargetSet
-	virtualSlots map[int][]targetSpec
-	mem          memoryReader
-	skipIndirect bool
-	allowVirtual bool
-	scanner      *xref.Scanner
-	targetHints  targetHints
+	source        Source
+	image         string
+	callerSymbol  string
+	data          []byte
+	start         uint64
+	targets       map[uint64][]targetSpec
+	targetAddrs   xref.TargetSet
+	virtualSlots  map[int][]targetSpec
+	pacEntTargets map[uint64][]pacEntTarget
+	mem           memoryReader
+	skipIndirect  bool
+	allowVirtual  bool
+	scanner       *xref.Scanner
+	targetHints   targetHints
 }
 
 type targetHints struct {
@@ -47,12 +48,13 @@ func scanFunction(scan functionScan) []Record {
 	var special specialScanResult
 	needsArrayScan := scan.targetHints.hasKeyArray
 	needsVirtualSlotScan := scan.targetHints.hasVirtualSlot
+	needsPacEntitlementScan := len(scan.pacEntTargets) > 0
 	if !scan.targetHints.set {
 		needsArrayScan = hasKeyArrayTargets(scan.targets)
 		needsVirtualSlotScan = len(scan.virtualSlots) > 0
 	}
 	needsVirtualSlotScan = needsVirtualSlotScan && scan.allowVirtual
-	if needsArrayScan || needsVirtualSlotScan {
+	if needsArrayScan || needsVirtualSlotScan || needsPacEntitlementScan {
 		if scan.scanner != nil {
 			instrs = scan.scanner.Decode(scan.data, scan.start)
 		} else {
@@ -112,6 +114,9 @@ func scanFunction(scan functionScan) []Record {
 				records = append(records, buildRecord(scan, result.Address, target, key, value))
 			}
 		}
+	}
+	if needsPacEntitlementScan {
+		records = append(records, scanPacEntitlementCalls(scan, instrs, records)...)
 	}
 	return records
 }

@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/blacktop/ipsw/pkg/kernelcache/pacx"
 )
 
 type mockMemory struct {
@@ -118,6 +120,29 @@ func TestKernelCFunctionTargetsMatchDemangledSignatures(t *testing.T) {
 	}
 	if target.Canonical != "IOTaskHasEntitlement" || target.KeyReg != 1 {
 		t.Fatalf("target=%#v, want IOTaskHasEntitlement key x1", target)
+	}
+}
+
+func TestEntitlementSpecsForPacCandidateUsesVirtualRegisters(t *testing.T) {
+	target, ok := matchTarget(SourceKernelcache, "IOUserClient::copyClientEntitlement(task_t, char const*)")
+	if !ok {
+		t.Fatal("copyClientEntitlement target did not match")
+	}
+	if target.KeyReg != 1 {
+		t.Fatalf("direct target KeyReg=%d, want x1 before virtual conversion", target.KeyReg)
+	}
+
+	got := entitlementSpecsForPacCandidate(pacx.PacCandidate{Vfunc: 0xfffffe0007001234}, map[uint64][]targetSpec{
+		0xfffffe0007001234: {target},
+	})
+	if len(got) != 1 {
+		t.Fatalf("targets=%d, want 1: %#v", len(got), got)
+	}
+	if got[0].KeyReg != 2 {
+		t.Fatalf("PAC virtual target KeyReg=%d, want x2: %#v", got[0].KeyReg, got[0])
+	}
+	if got[0].Discovery != "pacx" {
+		t.Fatalf("discovery=%q, want pacx", got[0].Discovery)
 	}
 }
 
@@ -571,6 +596,173 @@ func TestScanFunctionSkipsVirtualSlotWhenReceiverIsNotSelf(t *testing.T) {
 
 	if len(records) != 0 {
 		t.Fatalf("records=%d, want 0: %#v", len(records), records)
+	}
+}
+
+func TestScanFunctionResolvesPacEntitlementCallWithoutSelfReceiver(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	callsite := base + 8
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.IOUserClientTest",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		pacEntTargets: map[uint64][]pacEntTarget{
+			callsite: {{
+				target: targetSpec{
+					Source:    SourceKernelcache,
+					Canonical: "IOUserClient::copyClientEntitlement",
+					KeyReg:    2,
+					ValueReg:  -1,
+					Discovery: "pacx",
+				},
+				record: pacx.PacRecord{
+					Callsite:   callsite,
+					Auth:       "blraa",
+					SlotOffset: 0x28,
+					SlotIndex:  5,
+					PAC:        0x1234,
+					Confidence: pacx.ConfidenceExact,
+					Candidates: []pacx.PacCandidate{{
+						Vfunc:       0xfffffe0007001234,
+						VfuncSymbol: "IOUserClient::copyClientEntitlement(task_t, char const*)",
+						Class:       "IOUserClient",
+					}},
+				},
+				candidate: pacx.PacCandidate{
+					Vfunc:       0xfffffe0007001234,
+					VfuncSymbol: "IOUserClient::copyClientEntitlement(task_t, char const*)",
+					Class:       "IOUserClient",
+				},
+			}},
+		},
+		mem: mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+	})
+
+	if len(records) != 1 {
+		t.Fatalf("records=%d, want 1: %#v", len(records), records)
+	}
+	rec := records[0]
+	if rec.CheckFn != "IOUserClient::copyClientEntitlement" || rec.Key != "com.apple.private.iokit.test" {
+		t.Fatalf("unexpected record: %#v", rec)
+	}
+	if rec.Extra["target_discovery"] != "pacx" ||
+		rec.Extra["pacx_pac"] != "0x1234" ||
+		rec.Extra["pacx_slot_index"] != "5" ||
+		rec.Extra["pacx_class"] != "IOUserClient" {
+		t.Fatalf("missing pacx provenance: %#v", rec.Extra)
+	}
+}
+
+func TestScanFunctionSuppressesPacDuplicateOfVirtualSlotRecord(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	callsite := base + 16
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encLDRUnsigned(8, 0, 0),
+		encLDRUnsigned(8, 8, 0x28),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.IOUserClientTest",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		virtualSlots: map[int][]targetSpec{
+			5: {{Source: SourceKernelcache, Canonical: "IOUserClient::copyClientEntitlement", KeyReg: 2, ValueReg: -1, Discovery: "vtable_slot", VirtualSlot: 5}},
+		},
+		pacEntTargets: map[uint64][]pacEntTarget{
+			callsite: {{
+				target: targetSpec{
+					Source:    SourceKernelcache,
+					Canonical: "IOUserClient::copyClientEntitlement",
+					KeyReg:    2,
+					ValueReg:  -1,
+					Discovery: "pacx",
+				},
+				record: pacx.PacRecord{
+					Callsite:   callsite,
+					SlotOffset: 0x28,
+					SlotIndex:  5,
+					PAC:        0x1234,
+					Confidence: pacx.ConfidenceExact,
+					Candidates: []pacx.PacCandidate{{Vfunc: 0xfffffe0007001234, Class: "IOUserClient"}},
+				},
+				candidate: pacx.PacCandidate{Vfunc: 0xfffffe0007001234, Class: "IOUserClient"},
+			}},
+		},
+		mem:          mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+		allowVirtual: true,
+	})
+
+	if len(records) != 1 {
+		t.Fatalf("records=%d, want existing virtual-slot record only: %#v", len(records), records)
+	}
+	if records[0].Extra["target_discovery"] != "vtable_slot" {
+		t.Fatalf("pac duplicate should not replace existing record: %#v", records[0])
+	}
+}
+
+func TestScanFunctionKeepsAmbiguousPacCandidates(t *testing.T) {
+	base := uint64(0x100000000)
+	keyAddr := uint64(0x100002120)
+	callsite := base + 8
+	target := targetSpec{
+		Source:    SourceKernelcache,
+		Canonical: "IOUserClient::copyClientEntitlement",
+		KeyReg:    2,
+		ValueReg:  -1,
+		Discovery: "pacx",
+	}
+	record := pacx.PacRecord{
+		Callsite:   callsite,
+		SlotOffset: 0x28,
+		SlotIndex:  5,
+		PAC:        0x1234,
+		Confidence: pacx.ConfidenceAmbiguous,
+		Candidates: []pacx.PacCandidate{
+			{Vfunc: 0xfffffe0007001234, Class: "A"},
+			{Vfunc: 0xfffffe0007005678, Class: "B"},
+		},
+	}
+	data := words(
+		encADRP(2, base, keyAddr),
+		encADDImm(2, 2, keyAddr&0xfff),
+		encBLR(8),
+	)
+
+	records := scanFunction(functionScan{
+		source:  SourceKernelcache,
+		image:   "com.apple.iokit.IOUserClientTest",
+		data:    data,
+		start:   base,
+		targets: map[uint64][]targetSpec{},
+		pacEntTargets: map[uint64][]pacEntTarget{
+			callsite: {
+				{target: target, record: record, candidate: record.Candidates[0]},
+				{target: target, record: record, candidate: record.Candidates[1]},
+			},
+		},
+		mem: mockMemory{strs: map[uint64]string{keyAddr: "com.apple.private.iokit.test"}},
+	})
+
+	if len(records) != 2 {
+		t.Fatalf("records=%d, want both ambiguous candidates: %#v", len(records), records)
+	}
+	if records[0].Extra["pacx_candidate_count"] != "2" || records[1].Extra["pacx_candidate_count"] != "2" {
+		t.Fatalf("missing ambiguity provenance: %#v", records)
 	}
 }
 

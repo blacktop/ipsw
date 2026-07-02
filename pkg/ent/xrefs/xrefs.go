@@ -80,6 +80,7 @@ func ScanKernelcache(path string, stderr io.Writer) ([]Record, int, error) {
 	mem := machoMemory{m: m}
 	targetAddrs := targetSetFromSpecs(targets)
 	hints := hintsForTargets(targets, virtualSlots)
+	pacEntTargets := collectPacEntitlementTargets(m, filepath.Base(path), targets, stderr)
 	var scanner xref.Scanner
 	var records []Record
 	for _, fn := range sortedFunctions(m.GetFunctions()) {
@@ -89,18 +90,19 @@ func ScanKernelcache(path string, stderr io.Writer) ([]Record, int, error) {
 			continue
 		}
 		records = append(records, scanFunction(functionScan{
-			source:       SourceKernelcache,
-			image:        ranges.imageFor(fn.StartAddr),
-			callerSymbol: functionSymbol(m, fn.StartAddr),
-			data:         data,
-			start:        fn.StartAddr,
-			targets:      targets,
-			targetAddrs:  targetAddrs,
-			virtualSlots: virtualSlots,
-			mem:          mem,
-			allowVirtual: virtualCallers.Has(fn.StartAddr),
-			scanner:      &scanner,
-			targetHints:  hints,
+			source:        SourceKernelcache,
+			image:         ranges.imageFor(fn.StartAddr),
+			callerSymbol:  functionSymbol(m, fn.StartAddr),
+			data:          data,
+			start:         fn.StartAddr,
+			targets:       targets,
+			targetAddrs:   targetAddrs,
+			virtualSlots:  virtualSlots,
+			pacEntTargets: pacEntTargets[fn.StartAddr],
+			mem:           mem,
+			allowVirtual:  virtualCallers.Has(fn.StartAddr),
+			scanner:       &scanner,
+			targetHints:   hints,
 		})...)
 	}
 	SortRecords(records)
@@ -125,6 +127,7 @@ func scanKernelFileset(root *macho.File, symbolicatedTargets map[uint64][]target
 
 	targetAddrs := targetSetFromSpecs(globalTargets)
 	hints := hintsForTargets(globalTargets, virtualSlots)
+	pacEntTargets := collectPacEntitlementTargets(root, "", globalTargets, stderr)
 	var records []Record
 	for _, image := range images {
 		m := image.m
@@ -138,18 +141,19 @@ func scanKernelFileset(root *macho.File, symbolicatedTargets map[uint64][]target
 				continue
 			}
 			records = append(records, scanFunction(functionScan{
-				source:       SourceKernelcache,
-				image:        image.name,
-				callerSymbol: functionSymbol(m, fn.StartAddr),
-				data:         data,
-				start:        fn.StartAddr,
-				targets:      targets,
-				targetAddrs:  targetAddrs,
-				virtualSlots: virtualSlots,
-				mem:          mem,
-				allowVirtual: virtualCallers.Has(fn.StartAddr),
-				scanner:      &scanner,
-				targetHints:  hints,
+				source:        SourceKernelcache,
+				image:         image.name,
+				callerSymbol:  functionSymbol(m, fn.StartAddr),
+				data:          data,
+				start:         fn.StartAddr,
+				targets:       targets,
+				targetAddrs:   targetAddrs,
+				virtualSlots:  virtualSlots,
+				pacEntTargets: pacEntTargets[fn.StartAddr],
+				mem:           mem,
+				allowVirtual:  virtualCallers.Has(fn.StartAddr),
+				scanner:       &scanner,
+				targetHints:   hints,
 			})...)
 		}
 	}
