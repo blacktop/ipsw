@@ -3,6 +3,7 @@ package xrefs
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -116,10 +117,8 @@ func appendDiscovery(existing, next string) string {
 		return next
 	}
 	parts := strings.Split(existing, ",")
-	for _, part := range parts {
-		if part == next {
-			return existing
-		}
+	if slices.Contains(parts, next) {
+		return existing
 	}
 	parts = append(parts, next)
 	sort.Strings(parts)
