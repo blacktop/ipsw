@@ -27,6 +27,8 @@ ipsw kernel cpp <kernelcache> [flags]
 ❯ ipsw kernel cpp --json kernelcache.release.iPhone17,1
 # Show inheritance hierarchy
 ❯ ipsw kernel cpp --inheritance kernelcache.release.iPhone17,1
+# List per-slot vtable methods with PAC metadata
+❯ ipsw kernel cpp --methods -c IOUserClient kernelcache.release.iPhone17,1
 # Profile CPU usage
 ❯ ipsw kernel cpp --cpuprofile cpu.prof kernelcache.release.iPhone17,1
 ```
@@ -45,6 +47,7 @@ ipsw kernel cpp <kernelcache> [flags]
   -j, --json                    Output classes as JSON
   -l, --limit int               Limit number of classes to display (0 = all)
       --memprofile string       Write heap profile to file
+      --methods                 List per-slot vtable methods with PAC metadata
       --mutexprofile string     Write mutex profile to file
   -o, --output string           Write output to file
       --pprof string            Serve net/http/pprof on address (e.g. localhost:6060)

@@ -58,6 +58,16 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 # Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
 ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
 
+# Summarize a JetsamEvent low-memory report (BugType=298): killed process, cause, and top memory consumers
+❯ ipsw symbolicate JetsamEvent-2026-06-14-150819.ips
+  # Add --all to list every process, or --proc <name> to filter to one
+
+# Summarize a Microstackshots resource report (BugType=145 SymptomsIO disk-writes, 202 CPU usage)
+❯ ipsw symbolicate analyticsd.diskwrites_resource-2025-07-24-160552.ips
+  # Shows the resource Event, the limit that was exceeded, and the heaviest stack
+  # Pass an IPSW/DSC (or rely on matching Xcode DeviceSupport) to symbolicate the stack:
+❯ ipsw symbolicate analyticsd.diskwrites_resource-2025-07-24-160552.ips iPhone17,1_26.0_23A5297m_Restore.ipsw
+
 # Symbolicate an old style crashlog (BugType=109) requiring a dyld_shared_cache
 ❯ ipsw symbolicate Delta-2024-04-20-135807.ips dyld_shared_cache
   ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)

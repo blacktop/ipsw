@@ -21,7 +21,7 @@ ipsw dyld extract <DSC> <DYLIB> [flags]
   -c, --cache string    Path to .a2s addr to sym cache file (speeds up analysis)
       --force           Overwrite existing extracted dylib(s)
   -h, --help            help for extract
-      --objc            Add ObjC metadata to extracted dylib(s) symtab
+      --objc            Add ObjC metadata to extracted dylib(s) symtab (implies --slide)
   -o, --output string   Directory to extract the dylib(s)
       --slide           Apply slide info to extracted dylib(s)
       --stubs           Add stub islands to extracted dylib(s) symtab

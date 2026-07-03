@@ -33,7 +33,9 @@ ipsw fw [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw fw aea](/docs/cli/ipsw/fw/aea)	 - Parse AEA1 DMGs
+* [ipsw fw ane](/docs/cli/ipsw/fw/ane)	 - Dump ANE (Apple Neural Engine) MachOs
 * [ipsw fw aop](/docs/cli/ipsw/fw/aop)	 - Dump MachOs
+* [ipsw fw ave](/docs/cli/ipsw/fw/ave)	 - Dump AVE (Apple Video Encoder) MachOs
 * [ipsw fw c1](/docs/cli/ipsw/fw/c1)	 - Dump C1 Baseband Firmware
 * [ipsw fw cam](/docs/cli/ipsw/fw/cam)	 - Dump MachOs
 * [ipsw fw dcp](/docs/cli/ipsw/fw/dcp)	 - Dump MachOs
