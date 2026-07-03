@@ -302,6 +302,72 @@ func TestMethodTableNumMethodsBound(t *testing.T) {
 	}
 }
 
+func TestMethodTableNumMethodsCanExceedOldCap(t *testing.T) {
+	t.Parallel()
+
+	const sectionVM = uint64(0xfffffe0008000000)
+	const sectionSize = uint64(0x4000)
+	vtableAddr := sectionVM + 16
+	const methodCount = 600
+
+	owner := &macho.File{}
+	owner.Sections = []*types.Section{
+		{SectionHeader: types.SectionHeader{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
+		}},
+	}
+
+	s := NewScanner(owner, Config{})
+	s.rootFixupsSeeded = true
+	s.sectionData[sectionKey{file: owner, addr: sectionVM}] = make([]byte, sectionSize)
+	fwd := make(map[uint64]uint64, methodCount)
+	for i := range methodCount {
+		fwd[vtableAddr+uint64(i*8)] = 0xfffffe0001000000 + uint64(i*0x10)
+	}
+	s.forwardPointers[owner] = fwd
+
+	mt := s.BuildMethodTable(Class{Name: "LargeSyntheticClass", VtableAddr: vtableAddr, MetaPtr: vtableAddr})
+	if mt.NumMethods() != methodCount {
+		t.Fatalf("NumMethods() = %d, want %d (walk must stop at the real end, not 512)", mt.NumMethods(), methodCount)
+	}
+	last := mt.Methods[len(mt.Methods)-1]
+	if last.Index != methodCount-1 {
+		t.Fatalf("last method index = %d, want %d", last.Index, methodCount-1)
+	}
+}
+
+func TestVtableMethodCountBoundedByMaxMethods(t *testing.T) {
+	t.Parallel()
+
+	// A mis-recovered vtable start with no terminator: every slot up to the
+	// section end resolves to a valid pointer. The walk must stop at MaxMethods
+	// rather than allocating one VtableEntry for the whole (larger) section.
+	sectionVM := uint64(0xfffffe0009000000)
+	sectionSize := uint64((MaxMethods + 1000) * 8)
+	vtableAddr := sectionVM
+
+	owner := &macho.File{}
+	owner.Sections = []*types.Section{
+		{SectionHeader: types.SectionHeader{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
+		}},
+	}
+
+	s := NewScanner(owner, Config{})
+	s.rootFixupsSeeded = true
+	s.sectionData[sectionKey{file: owner, addr: sectionVM}] = make([]byte, sectionSize)
+	fwd := make(map[uint64]uint64, MaxMethods+1000)
+	for i := range MaxMethods + 1000 {
+		fwd[vtableAddr+uint64(i*8)] = 0xfffffe0001000000 + uint64(i*0x10)
+	}
+	s.forwardPointers[owner] = fwd
+
+	mt := s.BuildMethodTable(Class{Name: "UnterminatedClass", VtableAddr: vtableAddr, MetaPtr: vtableAddr})
+	if mt.NumMethods() != MaxMethods {
+		t.Fatalf("NumMethods() = %d, want %d (MaxMethods fail-safe must bound an unterminated run)", mt.NumMethods(), MaxMethods)
+	}
+}
+
 func TestBuildMethodTableEmptyForNoVtable(t *testing.T) {
 	t.Parallel()
 

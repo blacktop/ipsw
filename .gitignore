@@ -75,6 +75,7 @@ internal/download/data/proto
 venv/
 keybag.plist
 OPC/
+hack/iometa-compare/
 
 # Unicorn EMU
 unicorn2/

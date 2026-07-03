@@ -104,23 +104,21 @@ func methodTableToDTO(mt cpp.MethodTable) methodTableDTO {
 // Method tables are built over allClasses (the full discovered set) so override,
 // inheritance, and PAC-name back-propagation can resolve parent classes; the
 // display filter (e.g. -c / --limit, captured in display) is applied only at
-// emit time. Classes without a vtable have no virtual methods and are omitted.
+// emit time. Classes without a vtable are emitted as header-only tables.
 func writeMethodTables(scanner *cpp.Scanner, allClasses, display []cpp.Class, out io.Writer, asJSON bool) error {
+	// BuildNamedMethodTables returns one table per class, index-aligned with allClasses.
 	tables := scanner.BuildNamedMethodTables(allClasses)
-	byVtable := make(map[uint64]cpp.MethodTable, len(tables))
-	for _, mt := range tables {
-		if mt.VtableAddr != 0 {
-			byVtable[mt.VtableAddr] = mt
-		}
+	byClass := make(map[methodTableClassKey]cpp.MethodTable, len(tables))
+	for i, mt := range tables {
+		byClass[classMethodTableKey(allClasses[i])] = mt
 	}
 	selected := make([]cpp.MethodTable, 0, len(display))
 	for _, c := range display {
-		if c.VtableAddr == 0 {
+		if mt, ok := byClass[classMethodTableKey(c)]; ok {
+			selected = append(selected, mt)
 			continue
 		}
-		if mt, ok := byVtable[c.VtableAddr]; ok {
-			selected = append(selected, mt)
-		}
+		selected = append(selected, cpp.MethodTable{Class: c.Name, Bundle: c.Bundle, VtableAddr: c.VtableAddr})
 	}
 	if asJSON {
 		dtos := make([]methodTableDTO, 0, len(selected))
@@ -138,6 +136,34 @@ func writeMethodTables(scanner *cpp.Scanner, allClasses, display []cpp.Class, ou
 		}
 	}
 	return nil
+}
+
+type methodTableClassKey struct {
+	kind   string
+	bundle string
+	name   string
+	value  uint64
+	size   uint32
+	parent uint64
+}
+
+func classMethodTableKey(c cpp.Class) methodTableClassKey {
+	switch {
+	case c.MetaPtr != 0:
+		return methodTableClassKey{kind: "meta", value: c.MetaPtr}
+	case c.Ctor != 0:
+		return methodTableClassKey{kind: "ctor", bundle: c.Bundle, name: c.Name, value: c.Ctor}
+	case c.VtableAddr != 0:
+		return methodTableClassKey{kind: "vtable", bundle: c.Bundle, name: c.Name, value: c.VtableAddr}
+	default:
+		return methodTableClassKey{
+			kind:   "name",
+			bundle: c.Bundle,
+			name:   c.Name,
+			size:   c.Size,
+			parent: c.SuperMeta,
+		}
+	}
 }
 
 // formatMethodTable renders one class' method table as an indented text listing.

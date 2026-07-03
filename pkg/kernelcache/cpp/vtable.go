@@ -108,25 +108,6 @@ func (s *Scanner) isLikelyAbstractVtable(owner *macho.File, addr uint64) bool {
 	return false
 }
 
-func shouldKeepZeroVtableOnMultiCandidateGetMeta(class discoveredClass, candidateCount int) bool {
-	if candidateCount <= 2 {
-		return false
-	}
-	switch class.Bundle {
-	case "com.apple.driver.AppleEmbeddedPCIE":
-		switch class.Name {
-		case "AppleEmbeddedPCIEPortControlFunction", "AppleEmbeddedPCIE", "AppleEmbeddedPCIEPort":
-			return true
-		}
-	case "com.apple.driver.AppleT8150PCIe":
-		switch class.Name {
-		case "APCIECoreRCGen4", "APCIECoreRCGen4Port":
-			return true
-		}
-	}
-	return false
-}
-
 func (s *Scanner) resolveUniqueVtableViaGetMetaCandidates(owner *macho.File, metaVtableAddr uint64, getMetaCandidates []uint64) uint64 {
 	var resolved uint64
 	for _, getMeta := range getMetaCandidates {
@@ -188,9 +169,6 @@ func (s *Scanner) resolveVtables(classes []discoveredClass) error {
 		if classes[i].MetaPtr != 0 {
 			getMetaCandidates = s.findClassGetMetaClassCandidates(owner, classes[i].MetaPtr)
 			getMetaVtable = s.resolveUniqueVtableViaGetMetaCandidates(owner, classes[i].MetaVtableAddr, getMetaCandidates)
-		}
-		if shouldKeepZeroVtableOnMultiCandidateGetMeta(classes[i], len(getMetaCandidates)) {
-			continue
 		}
 		if getMetaVtable == 0 && classes[i].Bundle == kernelBundleName && classes[i].Name == "OSMetaClass" {
 			if vt := s.recoverVtableNearMeta(owner, classes[i].MetaVtableAddr, getMetaCandidates); vt != 0 {

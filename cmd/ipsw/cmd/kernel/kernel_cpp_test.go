@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +58,44 @@ func TestPrintInheritanceWithFilteredDisplay(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "OSObject") {
 		t.Fatalf("missing ancestor in inheritance output: %q", rendered)
+	}
+}
+
+func TestWriteMethodTablesIncludesClassesWithoutVtables(t *testing.T) {
+	t.Parallel()
+
+	classes := []cpp.Class{
+		{
+			Name:    "NoVtableA",
+			Bundle:  "com.apple.driver.synthetic",
+			MetaPtr: 0xfffffe0000010000,
+		},
+		{
+			Name:    "NoVtableB",
+			Bundle:  "com.apple.driver.synthetic",
+			MetaPtr: 0xfffffe0000011000,
+		},
+	}
+
+	var out bytes.Buffer
+	if err := writeMethodTables(cpp.NewScanner(nil, cpp.Config{}), classes, classes, &out, true); err != nil {
+		t.Fatalf("writeMethodTables: %v", err)
+	}
+
+	var got []methodTableDTO
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal method tables: %v\n%s", err, out.String())
+	}
+	if len(got) != len(classes) {
+		t.Fatalf("emitted %d tables, want %d: %s", len(got), len(classes), out.String())
+	}
+	for i, dto := range got {
+		if dto.Class != classes[i].Name {
+			t.Fatalf("table %d class = %q, want %q", i, dto.Class, classes[i].Name)
+		}
+		if dto.VtableAddr != "0x0" || dto.NumMethods != 0 || len(dto.Methods) != 0 {
+			t.Fatalf("table %d = %+v, want header-only no-vtable table", i, dto)
+		}
 	}
 }
 

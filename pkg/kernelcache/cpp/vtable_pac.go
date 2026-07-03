@@ -5,10 +5,13 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 )
 
-// MaxMethods caps the number of vtable slots inspected when bounding a method
-// table. Real IOKit vtables stay well under this ceiling; it exists to keep a
-// malformed or unterminated slot run from scanning an entire section.
-const MaxMethods = 512
+// MaxMethods is a fail-safe ceiling on the number of vtable slots the method
+// walk inspects. Real IOKit vtables stay far below it (the largest observed is
+// ~500 methods), so it never truncates a genuine table; it exists only to stop
+// a malformed kernelcache or a mis-recovered vtable start with no terminator
+// before a large section boundary from walking the whole section and allocating
+// a VtableEntry per slot.
+const MaxMethods = 8192
 
 // slotAuth holds the pointer-authentication metadata decoded from a single
 // chained-fixup slot. Diversity/Key/AddrDiv are only meaningful when auth is
@@ -229,9 +232,9 @@ func (s *Scanner) BuildMethodTable(class Class) MethodTable {
 }
 
 // vtableMethodCount bounds the vtable at its real end. A slot ends the table when
-// it falls past the owning section, is neither a resolvable pointer nor an
-// external bind fixup, or the MaxMethods ceiling is hit. Bind slots are valid
-// vtable methods and must not truncate the walk.
+// it falls past the owning section or is neither a resolvable pointer nor an
+// external bind fixup. Bind slots are valid vtable methods and must not
+// truncate the walk. MaxMethods is a fail-safe ceiling for malformed input.
 func (s *Scanner) vtableMethodCount(class Class) int {
 	owner := s.ClassOwner(class)
 	if owner == nil || class.VtableAddr == 0 {
