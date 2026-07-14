@@ -52,7 +52,7 @@ const (
 	downloadOSesURL     = "https://developer.apple.com/download/os/"
 	downloadMoreURL     = "https://developer.apple.com/download/all/"
 	downloadAppsURL     = "https://developer.apple.com/download/applications/"
-	downloadProfilesURL = "https://developer.apple.com/bug-reporting/profiles-and-logs/"
+	downloadProfilesURL = "https://developer.apple.com/feedback-assistant/profiles-and-logs/"
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
@@ -1463,7 +1463,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 		}
 
 		for _, df := range dfiles {
-			output := filepath.Join(folder, strings.ReplaceAll(df, " ", "_"))
+			output := filepath.Join(folder, devProfileOutputName(df))
 			if err := os.MkdirAll(output, 0750); err != nil {
 				return fmt.Errorf("failed to create folder '%s': %v", output, err)
 			}
@@ -1472,6 +1472,10 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 	}
 
 	return nil
+}
+
+func devProfileOutputName(name string) string {
+	return strings.NewReplacer(" ", "_", "/", "_", `\`, "_").Replace(name)
 }
 
 // Download downloads a file that requires a valid dev portal session
@@ -1757,10 +1761,8 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	return ipsws, nil
 }
 
-// getDevLoggingProfiles scrapes the https://developer.apple.com/bug-reporting/profiles-and-logs/ page for links
+// getDevLoggingProfiles scrapes Apple's Profiles and Logs page for profile links.
 func (dp *DevPortal) getDevLoggingProfiles() (map[string]string, error) {
-	profiles := make(map[string]string)
-
 	req, err := http.NewRequest("GET", downloadProfilesURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
@@ -1772,8 +1774,8 @@ func (dp *DevPortal) getDevLoggingProfiles() (map[string]string, error) {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadURL, response.Status)
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadProfilesURL, response.Status)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(response.Body)
@@ -1781,30 +1783,41 @@ func (dp *DevPortal) getDevLoggingProfiles() (map[string]string, error) {
 		return nil, err
 	}
 
-	doc.Find("#main > section").Each(func(i int, s *goquery.Selection) {
-		s.Find("li.profile > section").Each(func(index int, row *goquery.Selection) {
-			var title string
-			var platform string
-			// Get ALL the profile links
-			row.Find("section.column").Each(func(_ int, section *goquery.Selection) {
-				section.Find("span").Each(func(_ int, span *goquery.Selection) {
-					if _, ok := span.Attr("data-profile-detail"); ok {
-						title = span.Text()
-					}
-					if _, ok := span.Attr("class"); ok {
-						platform = span.Text()
-					}
-				})
-				section.Find("ul > li").Each(func(_ int, li *goquery.Selection) {
-					a := li.Find("a[href]")
-					href, _ := a.Attr("href")
-					if strings.HasSuffix(href, ".mobileconfig") {
-						profiles[fmt.Sprintf("%s (%s)", title, platform)] = href
-					}
-				})
-			})
+	profiles := parseDevLoggingProfiles(doc)
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("no logging profiles found at %s; page format may have changed", downloadProfilesURL)
+	}
+	return profiles, nil
+}
+
+func parseDevLoggingProfiles(doc *goquery.Document) map[string]string {
+	profiles := make(map[string]string)
+	doc.Find("#main li.profile").Each(func(_ int, row *goquery.Selection) {
+		title := strings.TrimSpace(row.Find("[data-profile-detail]").First().Text())
+		platform, _ := row.Attr("data-platform-name")
+		platform = strings.TrimSpace(platform)
+		if platform == "" {
+			platform = strings.TrimSpace(row.Find(".lighter, span[class]").Last().Text())
+			platform = strings.TrimSpace(strings.TrimPrefix(platform, "for "))
+		}
+		if title == "" || platform == "" {
+			return
+		}
+		name := fmt.Sprintf("%s (%s)", title, platform)
+
+		row.Find("a[href]").Each(func(_ int, link *goquery.Selection) {
+			href, _ := link.Attr("href")
+			if href == "" {
+				return
+			}
+			if !strings.EqualFold(strings.TrimSpace(link.Text()), "Profile") && !strings.HasSuffix(href, ".mobileconfig") {
+				return
+			}
+			if strings.HasPrefix(href, "/") {
+				href = developerURL + href
+			}
+			profiles[name] = sanitizeURL(href)
 		})
 	})
-
-	return profiles, nil
+	return profiles
 }
