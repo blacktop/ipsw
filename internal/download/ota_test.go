@@ -16,16 +16,19 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 		platform        string
 		developerBetaID string
 		appleSeedBetaID string
+		publicBetaID    string
 	}{
 		{
 			platform:        "ios",
 			developerBetaID: "a5f921db-50af-448c-8f7e-3f093ca2c954",
 			appleSeedBetaID: "c0ef13a7-d2dd-4e85-81c2-6f2b485271c0",
+			publicBetaID:    "f0d176bc-9177-466c-9b82-35ab5c2e20a6",
 		},
 		{
 			platform:        "macos",
 			developerBetaID: "621ba5ab-54b6-4a71-891a-425ac0ce4551",
 			appleSeedBetaID: "72407f94-0bee-4e80-a7a3-c246572648dd",
+			publicBetaID:    "8c08f86a-5899-4e65-8a06-fbaa7abe410b",
 		},
 		{
 			platform:        "tvos",
@@ -36,6 +39,7 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 			platform:        "watchos",
 			developerBetaID: "973a069a-8d0c-4247-8239-9493f14ee56e",
 			appleSeedBetaID: "19b667c1-6315-436c-ad40-5c27dcd73470",
+			publicBetaID:    "befb9f8e-527d-496b-8414-65b84665d509",
 		},
 		{
 			platform:        "audioos",
@@ -66,6 +70,12 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 
 			if got := audienceVersion.AppleSeedBeta; got != tt.appleSeedBetaID {
 				t.Fatalf("%s version %s appleseed (customer) beta audience ID = %q, want %q", tt.platform, version, got, tt.appleSeedBetaID)
+			}
+
+			if tt.publicBetaID != "" {
+				if got := audienceVersion.PublicBeta; got != tt.publicBetaID {
+					t.Fatalf("%s version %s public beta audience ID = %q, want %q", tt.platform, version, got, tt.publicBetaID)
+				}
 			}
 
 			if got := audiences.LatestVersion(tt.platform); got != version {
