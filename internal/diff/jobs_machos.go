@@ -145,7 +145,7 @@ func (j *machosJob) MachoHandler(typ string, side Side) MachoScanHandler {
 				return err
 			}
 			newInfo := mcmd.GenerateDiffInfo(m, j.conf)
-			if newInfo.Equal(*oldInfo) {
+			if newInfo.Equivalent(*oldInfo, j.conf) {
 				prevKeys[path] = true
 				return nil
 			}
@@ -296,11 +296,11 @@ func hashMachoDiffConfig(h io.Writer, conf *mcmd.DiffConfig) {
 	// semantics here so rows rendered by older local builds do not hydrate into
 	// reports after the text format changes. The current marker also covers
 	// dropping the per-section/per-function sha256 walls (sections render as
-	// name+size only, same-size content edits summarize as "content changed",
+	// name+size only, same-size content edits render as a compact section list,
 	// Version/UUID are Verbose-gated). Update this string on ANY rendered-body
 	// format change: it orphans stale rows for every task that folds
 	// hashMachoDiffConfig (machos, dsc, kexts, firmwares).
-	_, _ = h.Write([]byte("macho-report-hides-load-command-hash+drops-sha256-walls+normalizes-symbol-churn+embedded-buildpaths"))
+	_, _ = h.Write([]byte("macho-report-markdown-section-lists+semantic-equivalence+uniform-section-hashes"))
 	_, _ = h.Write([]byte{0})
 	writeStringList := func(label string, items []string) {
 		_, _ = h.Write([]byte(label))

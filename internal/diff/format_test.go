@@ -96,6 +96,55 @@ func TestRenderHTMLDiffHighlighting(t *testing.T) {
 	}
 }
 
+func TestRenderHTMLTextFenceHighlighting(t *testing.T) {
+	d := newHTMLTestDiff("Test Diff")
+	d.Dylibs = &mcmd.MachoDiff{
+		Updated: map[string]string{
+			"/System/Library/Frameworks/WebCore.framework/WebCore": "```text\nsummary line\n- __TEXT.__const\n~modified line\n```",
+		},
+	}
+	rendered := mustRenderHTML(t, d)
+
+	if !strings.Contains(rendered, `class="diff-mod"`) {
+		t.Fatalf("missing modified-line highlighting in text fence")
+	}
+	if strings.Contains(rendered, `class="diff-del"`) {
+		t.Fatalf("text-fence list bullet was highlighted as a deletion")
+	}
+	if strings.Contains(rendered, "```text") || strings.Contains(rendered, "\n```</code></pre>") {
+		t.Fatalf("text fence markers leaked into rendered HTML")
+	}
+	if !strings.Contains(rendered, "summary line") {
+		t.Fatalf("text-fence content was not rendered")
+	}
+	if !strings.Contains(rendered, "- __TEXT.__const") {
+		t.Fatalf("text-fence list bullet was not rendered")
+	}
+}
+
+func TestRenderHTMLMarkdownSectionList(t *testing.T) {
+	d := newHTMLTestDiff("Test Diff")
+	d.Dylibs = &mcmd.MachoDiff{
+		Updated: map[string]string{
+			"/System/Library/Frameworks/WebCore.framework/WebCore": "### Sections with Same Size but Changed Content\n\n- `__TEXT.__const`\n\n```diff\n+new string\n-old string\n```\n",
+		},
+	}
+	rendered := mustRenderHTML(t, d)
+
+	if !strings.Contains(rendered, "<h3>Sections with Same Size but Changed Content</h3>") {
+		t.Fatalf("section summary heading was not rendered as Markdown")
+	}
+	if !strings.Contains(rendered, "<li><code>__TEXT.__const</code></li>") {
+		t.Fatalf("section summary item was not rendered as a Markdown list")
+	}
+	if strings.Contains(rendered, "```text") {
+		t.Fatalf("section summary unexpectedly contains a text fence")
+	}
+	if !strings.Contains(rendered, `class="diff-add"`) || !strings.Contains(rendered, `class="diff-del"`) {
+		t.Fatalf("mixed section summary did not preserve diff highlighting")
+	}
+}
+
 func TestRenderHTMLDetailsRendered(t *testing.T) {
 	d := newHTMLTestDiff("Test Diff")
 	d.Dylibs = &mcmd.MachoDiff{

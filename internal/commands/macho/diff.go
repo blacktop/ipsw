@@ -200,21 +200,23 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 	}
 
 	var b strings.Builder
+	hasDiffRows := containsAddedOrRemovedRows(out)
 	if len(out) > 0 {
 		b.WriteString(out)
 	}
 
 	sectionChanges := sectionContentChanges(oldInfo, newInfo)
-	if len(sectionChanges) > 0 {
-		b.WriteString("Sections:\n")
+	if len(sectionChanges) > 0 && !conf.Markdown {
+		b.WriteString("Sections with same size but changed content:\n")
 		for _, name := range sectionChanges {
-			b.WriteString(fmt.Sprintf("~ %s : content changed\n", name))
+			b.WriteString(fmt.Sprintf("- %s\n", name))
 		}
 	}
 
 	// Symbols
 	newSyms, rmSyms := diffNormalizedSymbols(oldInfo.Symbols, newInfo.Symbols)
 	if len(newSyms) > 0 || len(rmSyms) > 0 {
+		hasDiffRows = true
 		b.WriteString("Symbols:\n")
 		for _, s := range newSyms {
 			b.WriteString(fmt.Sprintf("+ %s\n", s))
@@ -294,8 +296,6 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					}
 				}
 			}
-
-			appendFunctionSummary(&b, &fb)
 		} else {
 			i, j := 0, 0
 			consecutiveNoise := 0
@@ -342,15 +342,17 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 					break
 				}
 			}
-
-			appendFunctionSummary(&b, &fb)
 		}
+
+		hasDiffRows = hasDiffRows || containsAddedOrRemovedRows(fb.String())
+		appendFunctionSummary(&b, &fb)
 	}
 
 	// CStrings
 	if conf.CStrings {
 		newStrs, rmStrs := diffNormalizedCStrings(oldInfo.CStrings, newInfo.CStrings)
 		if len(newStrs) > 0 || len(rmStrs) > 0 {
+			hasDiffRows = true
 			b.WriteString("CStrings:\n")
 			for _, s := range newStrs {
 				b.WriteString(fmt.Sprintf("+ %#v\n", s))
@@ -361,17 +363,36 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 		}
 	}
 
-	if b.Len() == 0 {
+	if b.Len() == 0 && len(sectionChanges) == 0 {
 		return "", nil
 	}
 	if !conf.Markdown {
 		return b.String(), nil
 	}
-	if !containsDiffRows(b.String()) {
-		return b.String(), nil
-	}
 
-	return "```diff\n" + b.String() + "\n```\n", nil
+	var md strings.Builder
+	if len(sectionChanges) > 0 {
+		md.WriteString("### Sections with Same Size but Changed Content\n\n")
+		for _, name := range sectionChanges {
+			md.WriteString(fmt.Sprintf("- `%s`\n", name))
+		}
+	}
+	if b.Len() == 0 {
+		return md.String(), nil
+	}
+	if md.Len() > 0 {
+		md.WriteByte('\n')
+	}
+	fence := "text"
+	if hasDiffRows {
+		fence = "diff"
+	}
+	body := b.String()
+	if !strings.HasSuffix(body, "\n") {
+		body += "\n"
+	}
+	md.WriteString("```" + fence + "\n" + body + "```\n")
+	return md.String(), nil
 }
 
 type DiffConfig struct {
@@ -425,9 +446,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 			Name: name,
 			Size: s.Size,
 		}
-		if hash, ok := sectionContentHash(s); ok {
-			sec.Hash = hash
-		}
+		sec.Hash, _ = sectionContentHash(s)
 		secs = append(secs, sec)
 	}
 	var starts []types.Function
@@ -660,50 +679,100 @@ func sameSizeContentChanged(oldSec, newSec section) bool {
 		oldSec.Size == newSec.Size
 }
 
-// containsDiffRows reports whether body has any git-diff row (a hunk header or
-// an added/removed line), so a body that is only summary lines is not wrapped
-// in a ```diff fence that would render those lines as diff context.
-func containsDiffRows(body string) bool {
+// containsAddedOrRemovedRows reports whether body has a real added or removed
+// row. Summary-only rows (including "~" modified rows) belong in a text fence.
+func containsAddedOrRemovedRows(body string) bool {
 	for line := range strings.SplitSeq(body, "\n") {
-		if strings.HasPrefix(line, "@@") || strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") {
+		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") {
 			return true
 		}
 	}
 	return false
 }
 
-// Equal checks if two Info structs are equal
-func (i DiffInfo) Equal(x DiffInfo) bool {
-	if len(i.Imports) != len(x.Imports) {
+// Equivalent reports whether two DiffInfos have the same report-visible
+// semantics for conf. It deliberately ignores absolute function addresses,
+// which shift when unrelated layout changes move a function without changing
+// its size sequence.
+func (i DiffInfo) Equivalent(x DiffInfo, conf *DiffConfig) bool {
+	if conf == nil {
+		conf = &DiffConfig{}
+	}
+	if !equivalentStringSet(i.Imports, x.Imports) ||
+		!equivalentSections(i.Sections, x.Sections) ||
+		!equivalentNormalizedStrings(i.Symbols, x.Symbols, normalizeSymbolForDiff) {
 		return false
 	}
-	for i, imp := range i.Imports {
-		if imp != x.Imports[i] {
-			return false
-		}
-	}
-	if len(i.Sections) != len(x.Sections) {
+	if conf.CStrings && !equivalentNormalizedStrings(i.CStrings, x.CStrings, normalizeCStringForDiff) {
 		return false
-	}
-	for i, sec := range i.Sections {
-		if sec != x.Sections[i] {
-			return false
-		}
 	}
 	if i.Functions != x.Functions {
 		return false
 	}
-	if len(i.Symbols) != len(x.Symbols) {
+	if conf.FuncStarts && !equivalentFunctions(i, x) {
 		return false
 	}
-	if i.LoadCmdHash != "" && x.LoadCmdHash != "" && i.LoadCmdHash != x.LoadCmdHash {
+	if !conf.IgnoreLoadCommands && i.LoadCmdHash != "" && x.LoadCmdHash != "" && i.LoadCmdHash != x.LoadCmdHash {
 		return false
 	}
-	if i.Verbose && x.Verbose {
-		if i.Version != x.Version { // (this could be a lie)
+	if conf.Verbose && (i.Version != x.Version || i.UUID != x.UUID) {
+		return false
+	}
+	return true
+}
+
+func equivalentStringSet(a, b []string) bool {
+	if slices.Equal(a, b) {
+		return true
+	}
+	left := slices.Clone(a)
+	right := slices.Clone(b)
+	slices.Sort(left)
+	slices.Sort(right)
+	left = slices.Compact(left)
+	right = slices.Compact(right)
+	return slices.Equal(left, right)
+}
+
+func equivalentNormalizedStrings(a, b []string, normalize func(string) string) bool {
+	if slices.Equal(a, b) {
+		return true
+	}
+	left := normalizedStringSet(a, normalize)
+	right := normalizedStringSet(b, normalize)
+	return slices.Equal(left, right)
+}
+
+func normalizedStringSet(values []string, normalize func(string) string) []string {
+	normalized := make([]string, len(values))
+	for idx := range values {
+		normalized[idx] = normalize(values[idx])
+	}
+	slices.Sort(normalized)
+	return slices.Compact(normalized)
+}
+
+func equivalentSections(a, b []section) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for idx := range a {
+		if a[idx].Name != b[idx].Name || a[idx].Size != b[idx].Size {
 			return false
 		}
-		if i.UUID != x.UUID {
+		if a[idx].Hash != "" && b[idx].Hash != "" && a[idx].Hash != b[idx].Hash {
+			return false
+		}
+	}
+	return true
+}
+
+func equivalentFunctions(i, x DiffInfo) bool {
+	if len(i.Starts) != len(x.Starts) {
+		return false
+	}
+	for idx := range i.Starts {
+		if i.Starts[idx].EndAddr-i.Starts[idx].StartAddr != x.Starts[idx].EndAddr-x.Starts[idx].StartAddr {
 			return false
 		}
 	}
@@ -726,8 +795,8 @@ func (i *DiffInfo) String() string {
 		out.WriteString(fmt.Sprintf("  UUID: %s\n", i.UUID))
 	}
 	out.WriteString(fmt.Sprintf("  Functions: %d\n", i.Functions))
-	out.WriteString(fmt.Sprintf("  Symbols:   %d\n", len(i.Symbols)))
-	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(i.CStrings)))
+	out.WriteString(fmt.Sprintf("  Symbols:   %d\n", len(normalizedStringSet(i.Symbols, normalizeSymbolForDiff))))
+	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(normalizedStringSet(i.CStrings, normalizeCStringForDiff))))
 	return out.String()
 }
 
@@ -745,7 +814,7 @@ func (diff *MachoDiff) Generate(prev, next map[string]*DiffInfo, conf *DiffConfi
 	for _, currentFileKey := range slices.Sorted(maps.Keys(next)) {
 		dat2 := next[currentFileKey]
 		if dat1, ok := prev[currentFileKey]; ok {
-			if dat2.Equal(*dat1) {
+			if dat2.Equivalent(*dat1, conf) {
 				continue
 			}
 			var formatted string
@@ -805,7 +874,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 			return err
 		}
 		newInfo := GenerateDiffInfo(m, conf)
-		if newInfo.Equal(*oldInfo) {
+		if newInfo.Equivalent(*oldInfo, conf) {
 			prevKeys[path] = true
 			return nil
 		}
@@ -882,7 +951,7 @@ func DiffMounts(oldRoots, newRoots []MountRoot, conf *DiffConfig) (*MachoDiff, e
 				return err
 			}
 			newInfo := GenerateDiffInfo(m, conf)
-			if newInfo.Equal(*oldInfo) {
+			if newInfo.Equivalent(*oldInfo, conf) {
 				prevKeys[path] = true
 				return nil
 			}
@@ -956,7 +1025,7 @@ func DiffFirmwares(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error
 			return err
 		}
 		newInfo := GenerateDiffInfo(m, conf)
-		if newInfo.Equal(*oldInfo) {
+		if newInfo.Equivalent(*oldInfo, conf) {
 			prevKeys[path] = true
 			return nil
 		}

@@ -64,8 +64,11 @@ func TestMachosOptionsHashChangesPerField(t *testing.T) {
 		"DiffTool":   func(c *mcmd.DiffConfig) { c.DiffTool = "delta" },
 		"CStrings":   func(c *mcmd.DiffConfig) { c.CStrings = !c.CStrings },
 		"FuncStarts": func(c *mcmd.DiffConfig) { c.FuncStarts = !c.FuncStarts },
-		"PemDB":      func(c *mcmd.DiffConfig) { c.PemDB = "/tmp/pem.db" },
-		"Verbose":    func(c *mcmd.DiffConfig) { c.Verbose = !c.Verbose },
+		"IgnoreLoadCommands": func(c *mcmd.DiffConfig) {
+			c.IgnoreLoadCommands = !c.IgnoreLoadCommands
+		},
+		"PemDB":   func(c *mcmd.DiffConfig) { c.PemDB = "/tmp/pem.db" },
+		"Verbose": func(c *mcmd.DiffConfig) { c.Verbose = !c.Verbose },
 	}
 
 	for field, mutate := range mutations {

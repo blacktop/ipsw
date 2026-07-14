@@ -18,13 +18,13 @@ func baseDiffInfo() *DiffInfo {
 	}
 }
 
-func TestDiffInfoEqualUsesLoadCmdHash(t *testing.T) {
+func TestDiffInfoEquivalentUsesLoadCmdHash(t *testing.T) {
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
 	oldInfo.LoadCmdHash = strings.Repeat("a", 64)
 	newInfo.LoadCmdHash = strings.Repeat("b", 64)
 
-	if newInfo.Equal(*oldInfo) {
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
 		t.Fatal("expected differing LoadCmdHash to make diff info unequal")
 	}
 }
@@ -56,16 +56,16 @@ func TestFormatUpdatedDiffOmitsLoadCommandOnlyChanges(t *testing.T) {
 	}
 }
 
-func TestDiffInfoEqualSkipsLoadCmdHashWhenMissingOnEitherSide(t *testing.T) {
+func TestDiffInfoEquivalentSkipsLoadCmdHashWhenMissingOnEitherSide(t *testing.T) {
 	// Backward compatibility: if one side has no LoadCmdHash (e.g. older
 	// cached DiffInfo, or a binary where loadCommandsHash returned ""),
-	// Equal should not flip on the LoadCmdHash leg.
+	// Equivalent should not flip on the LoadCmdHash leg.
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
 	oldInfo.LoadCmdHash = ""
 	newInfo.LoadCmdHash = strings.Repeat("a", 64)
-	if !newInfo.Equal(*oldInfo) {
-		t.Fatal("expected Equal to ignore LoadCmdHash when one side is missing")
+	if !newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
+		t.Fatal("expected Equivalent to ignore LoadCmdHash when one side is missing")
 	}
 }
 
@@ -123,14 +123,25 @@ func TestGenerateDiffInfoSkipsCodeSectionHashes(t *testing.T) {
 	}
 }
 
-func TestDiffInfoEqualUsesSectionHash(t *testing.T) {
-	oldInfo := baseDiffInfo()
-	newInfo := baseDiffInfo()
-	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
-	newInfo.Sections[0].Hash = strings.Repeat("b", 64)
+func TestDiffInfoEquivalentUsesSectionHash(t *testing.T) {
+	configs := []struct {
+		name string
+		conf *DiffConfig
+	}{
+		{name: "ordinary Mach-O", conf: &DiffConfig{}},
+		{name: "DSC", conf: &DiffConfig{IgnoreLoadCommands: true}},
+	}
+	for _, tc := range configs {
+		t.Run(tc.name, func(t *testing.T) {
+			oldInfo := baseDiffInfo()
+			newInfo := baseDiffInfo()
+			oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
+			newInfo.Sections[0].Hash = strings.Repeat("b", 64)
 
-	if newInfo.Equal(*oldInfo) {
-		t.Fatal("expected section hash changes to make diff info unequal")
+			if newInfo.Equivalent(*oldInfo, tc.conf) {
+				t.Fatal("expected section hash changes to make diff info unequal")
+			}
+		})
 	}
 }
 
@@ -149,7 +160,7 @@ func TestFormatUpdatedDiffReportsSameSizeSectionHashChanges(t *testing.T) {
 		t.Fatalf("FormatUpdatedDiff failed: %v", err)
 	}
 
-	if !strings.Contains(out, "Sections:\n~ __DATA_CONST.__const : content changed") {
+	if !strings.Contains(out, "Sections with same size but changed content:\n- __DATA_CONST.__const") {
 		t.Fatalf("expected section content change summary in output, got:\n%s", out)
 	}
 	if strings.Contains(out, "size unchanged") {
@@ -179,7 +190,7 @@ func TestFormatUpdatedDiffDoesNotDuplicateSizeChangedSectionHash(t *testing.T) {
 	if strings.Contains(out, "content changed (0x100 -> 0x200)") {
 		t.Fatalf("expected size change to omit sized content-change row, got:\n%s", out)
 	}
-	if strings.Contains(out, "Sections:\n") || strings.Contains(out, "~ __DATA_CONST.__const : content changed") {
+	if strings.Contains(out, "Sections with same size but changed content:\n") || strings.Contains(out, "- __DATA_CONST.__const") {
 		t.Fatalf("expected size change to be reported only by the git diff block, got:\n%s", out)
 	}
 }
@@ -210,7 +221,7 @@ func TestFormatUpdatedDiffOmitsSameSizeFunctionHashNoise(t *testing.T) {
 	}
 }
 
-func TestFormatUpdatedDiffOmitsMarkdownFenceForSummaryOnlyChanges(t *testing.T) {
+func TestFormatUpdatedDiffUsesMarkdownForSectionSummary(t *testing.T) {
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
 	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
@@ -223,8 +234,130 @@ func TestFormatUpdatedDiffOmitsMarkdownFenceForSummaryOnlyChanges(t *testing.T) 
 	if err != nil {
 		t.Fatalf("FormatUpdatedDiff failed: %v", err)
 	}
-	if strings.Contains(out, "```diff") {
-		t.Fatalf("expected summary-only Markdown to omit diff fence, got:\n%s", out)
+	want := "### Sections with Same Size but Changed Content\n\n- `__TEXT.__text`\n"
+	if out != want {
+		t.Fatalf("expected same-size section changes to render as Markdown, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffUsesTextFenceForFunctionSummary(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Starts = []types.Function{{StartAddr: 0x1000, EndAddr: 0x1020}}
+	newInfo.Starts = []types.Function{{StartAddr: 0x1000, EndAddr: 0x1021}}
+	oldInfo.SymbolMap = map[uint64]string{0x1000: "_foo"}
+	newInfo.SymbolMap = map[uint64]string{0x1000: "_foo"}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{Markdown: true, DiffTool: "go", FuncStarts: true})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	want := "```text\nFunctions:\n~ _foo : 32 -> 33\n```\n"
+	if out != want {
+		t.Fatalf("expected function summary Markdown to use a text fence, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffUsesDiffFenceForMixedSummaryAndDiffRows(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
+	newInfo.Sections[0].Hash = strings.Repeat("b", 64)
+	oldInfo.CStrings = []string{"old"}
+	newInfo.CStrings = []string{"new"}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{Markdown: true, DiffTool: "go", CStrings: true})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if !strings.Contains(out, "\n```diff\n") {
+		t.Fatalf("expected added/removed rows to use a diff fence, got:\n%s", out)
+	}
+	if !strings.HasPrefix(out, "### Sections with Same Size but Changed Content\n\n- `__TEXT.__text`\n") {
+		t.Fatalf("expected section summary list in mixed output, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffLeavesPlainTextUnfenced(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Sections[0].Hash = strings.Repeat("a", 64)
+	newInfo.Sections[0].Hash = strings.Repeat("b", 64)
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if strings.Contains(out, "```") {
+		t.Fatalf("expected non-Markdown output to remain unfenced, got:\n%s", out)
+	}
+}
+
+func TestDiffInfoEquivalentDetectsEqualCountSemanticReplacements(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Symbols = []string{"_old"}
+	newInfo.Symbols = []string{"_new"}
+	oldInfo.CStrings = []string{"old"}
+	newInfo.CStrings = []string{"new"}
+
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{CStrings: true}) {
+		t.Fatal("expected equal-count symbol and CString replacements to be detected")
+	}
+}
+
+func TestDiffInfoEquivalentCancelsNormalizedBuildChurn(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Symbols = []string{"___block_literal_global.680"}
+	newInfo.Symbols = []string{"___block_literal_global.686"}
+	oldInfo.CStrings = []string{"/Library/Caches/com.apple.xbs/20022CBB-7987-4277-B5C3-995958015464/TemporaryDirectory.VvPQcD/Sources/a.c"}
+	newInfo.CStrings = []string{"/Library/Caches/com.apple.xbs/89507FCF-0946-4F63-8219-988EAE885958/TemporaryDirectory.6Xk4l2/Sources/a.c"}
+
+	if !newInfo.Equivalent(*oldInfo, &DiffConfig{CStrings: true}) {
+		t.Fatal("expected normalized build-path and counter churn to cancel")
+	}
+}
+
+func TestDiffInfoEquivalentUsesFunctionSizeSequence(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Starts = []types.Function{{StartAddr: 0x1000, EndAddr: 0x1020}}
+	newInfo.Starts = []types.Function{{StartAddr: 0x2000, EndAddr: 0x2020}}
+
+	if !newInfo.Equivalent(*oldInfo, &DiffConfig{FuncStarts: true}) {
+		t.Fatal("expected shifted functions with identical sizes to be equivalent")
+	}
+	newInfo.Starts[0].EndAddr++
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{FuncStarts: true}) {
+		t.Fatal("expected a function-size change to be detected")
+	}
+}
+
+func TestDiffInfoEquivalentUsesFunctionCountWithoutStarts(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	newInfo.Functions++
+
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
+		t.Fatal("expected a report-visible function-count change to be detected without --starts")
+	}
+}
+
+func TestFormatUpdatedDiffOmitsNormalizedSetCountChurn(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	oldInfo.Symbols = []string{"___block_literal_global.680", "___block_literal_global.681"}
+	newInfo.Symbols = []string{"___block_literal_global.686"}
+	oldInfo.CStrings = []string{"same", "same"}
+	newInfo.CStrings = []string{"same"}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go", CStrings: true})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if out != "" {
+		t.Fatalf("expected normalized set-equivalent count churn to render nothing, got:\n%s", out)
 	}
 }
 

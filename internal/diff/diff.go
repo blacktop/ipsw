@@ -1065,9 +1065,9 @@ func (d *Diff) machoDiffConfig() *mcmd.DiffConfig {
 }
 
 // dscDiffConfig builds the mcmd.DiffConfig used for dyld_shared_cache image
-// diffs. Cache-image load-command bytes are noisy across point releases even
-// when the image's rendered sections are unchanged, so DSC reports rely on the
-// section/function/string/symbol legs and suppress load-command comparison.
+// diffs. DSC suppresses only noisy cache-image load-command bytes; section
+// names, sizes, content hashes, and semantic signals follow the same rules as
+// every other Mach-O report.
 func (d *Diff) dscDiffConfig() *mcmd.DiffConfig {
 	conf := d.machoDiffConfig()
 	conf.IgnoreLoadCommands = true

@@ -407,7 +407,7 @@ const htmlTaskPartials = `
   <div class="diff-entry">
     <h5>{{ .Name }}</h5>
     <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-    <pre><code>{{ .Diff }}</code></pre>
+    {{ .Diff }}
   </div>
   {{- end }}
 </details>
@@ -1186,7 +1186,7 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
   <div class="diff-entry">
     <h5>{{ .Name }}</h5>
     <div class="diff-entry-path"><code>{{ .Path }}</code></div>
-    <pre><code>{{ .Diff }}</code></pre>
+    {{ .Diff }}
   </div>
   {{- end }}
 </details>
@@ -1239,26 +1239,6 @@ func renderCodeBlock(raw string) template.HTML {
 	return template.HTML(buf.String())
 }
 
-func stripDiffFence(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if !strings.HasPrefix(trimmed, "```diff") {
-		return raw
-	}
-
-	body := strings.TrimPrefix(trimmed, "```diff")
-	body = strings.TrimPrefix(body, "\r\n")
-	body = strings.TrimPrefix(body, "\n")
-
-	if idx := strings.LastIndex(body, "\n```"); idx >= 0 {
-		return body[:idx]
-	}
-	if before, ok := strings.CutSuffix(body, "```"); ok {
-		return before
-	}
-
-	return raw
-}
-
 func renderMarkdownChunk(md string) string {
 	if strings.TrimSpace(md) == "" {
 		return ""
@@ -1270,7 +1250,7 @@ func renderMarkdownChunk(md string) string {
 	return string(markdown.ToHTML([]byte(md), nil, renderer))
 }
 
-func highlightDiff(raw string) template.HTML {
+func highlightDiff(raw string, highlightAddedRemoved bool) template.HTML {
 	var buf strings.Builder
 	first := true
 	for line := range strings.SplitSeq(raw, "\n") {
@@ -1280,11 +1260,11 @@ func highlightDiff(raw string) template.HTML {
 		first = false
 		escaped := html.EscapeString(line)
 		switch {
-		case strings.HasPrefix(line, "+"):
+		case highlightAddedRemoved && strings.HasPrefix(line, "+"):
 			buf.WriteString(`<span class="diff-add">`)
 			buf.WriteString(escaped)
 			buf.WriteString("</span>")
-		case strings.HasPrefix(line, "-"):
+		case highlightAddedRemoved && strings.HasPrefix(line, "-"):
 			buf.WriteString(`<span class="diff-del">`)
 			buf.WriteString(escaped)
 			buf.WriteString("</span>")
@@ -1299,14 +1279,14 @@ func highlightDiff(raw string) template.HTML {
 	return template.HTML(buf.String())
 }
 
-func renderHighlightedDiffBlock(raw string) string {
+func renderHighlightedDiffBlock(raw string, highlightAddedRemoved bool) string {
 	if raw == "" {
 		return ""
 	}
 
 	var buf strings.Builder
 	buf.WriteString("<pre><code>")
-	buf.WriteString(string(highlightDiff(raw)))
+	buf.WriteString(string(highlightDiff(raw, highlightAddedRemoved)))
 	buf.WriteString("</code></pre>")
 	return buf.String()
 }
@@ -1318,8 +1298,9 @@ func renderMarkdownFragment(md string) template.HTML {
 
 	var out strings.Builder
 	var markdownBuf strings.Builder
-	var diffBuf strings.Builder
-	inDiffFence := false
+	var fencedBuf strings.Builder
+	inFence := false
+	fenceLang := ""
 
 	flushMarkdown := func() {
 		if markdownBuf.Len() == 0 {
@@ -1329,34 +1310,36 @@ func renderMarkdownFragment(md string) template.HTML {
 		markdownBuf.Reset()
 	}
 
-	flushDiff := func() {
-		if diffBuf.Len() == 0 {
+	flushFence := func() {
+		if fencedBuf.Len() == 0 {
 			return
 		}
-		out.WriteString(renderHighlightedDiffBlock(diffBuf.String()))
-		diffBuf.Reset()
+		out.WriteString(renderHighlightedDiffBlock(fencedBuf.String(), fenceLang == "```diff"))
+		fencedBuf.Reset()
 	}
 
 	lines := strings.Split(md, "\n")
 	for idx, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		if inDiffFence {
+		if inFence {
 			if trimmed == "```" {
-				flushDiff()
-				inDiffFence = false
+				flushFence()
+				inFence = false
+				fenceLang = ""
 				continue
 			}
-			if diffBuf.Len() > 0 {
-				diffBuf.WriteByte('\n')
+			if fencedBuf.Len() > 0 {
+				fencedBuf.WriteByte('\n')
 			}
-			diffBuf.WriteString(line)
+			fencedBuf.WriteString(line)
 			continue
 		}
 
-		if trimmed == "```diff" {
+		if trimmed == "```diff" || trimmed == "```text" {
 			flushMarkdown()
-			inDiffFence = true
+			inFence = true
+			fenceLang = trimmed
 			continue
 		}
 
@@ -1366,9 +1349,9 @@ func renderMarkdownFragment(md string) template.HTML {
 		}
 	}
 
-	if inDiffFence {
-		markdownBuf.WriteString("```diff\n")
-		markdownBuf.WriteString(diffBuf.String())
+	if inFence {
+		markdownBuf.WriteString(fenceLang + "\n")
+		markdownBuf.WriteString(fencedBuf.String())
 	}
 
 	flushMarkdown()
@@ -1388,7 +1371,7 @@ func convertMachoDiff(md *mcmd.MachoDiff) *htmlMachoDiff {
 		h.Updated = append(h.Updated, htmlUpdatedEntry{
 			Name: filepath.Base(k),
 			Path: k,
-			Diff: highlightDiff(stripDiffFence(md.Updated[k])),
+			Diff: renderMarkdownFragment(md.Updated[k]),
 		})
 	}
 	return h

@@ -64,6 +64,24 @@ func BenchmarkGenerateDiffInfoStrsStarts(b *testing.B) {
 	}
 }
 
+// BenchmarkDiffInfoEquivalentDSC measures the common unchanged DSC-image path.
+// Identical sorted inputs should return without normalization allocations.
+func BenchmarkDiffInfoEquivalentDSC(b *testing.B) {
+	m := openSelf(b)
+	conf := &DiffConfig{
+		CStrings:           true,
+		FuncStarts:         true,
+		IgnoreLoadCommands: true,
+	}
+	info := GenerateDiffInfo(m, conf)
+	b.ReportAllocs()
+	for b.Loop() {
+		if !info.Equivalent(*info, conf) {
+			b.Fatal("identical DiffInfo is not equivalent")
+		}
+	}
+}
+
 // BenchmarkDiffInfoGobRoundTrip measures the temp-dir gob write+read that the
 // machos job performs once per old-side binary (write) and once per matched
 // new-side binary (read).

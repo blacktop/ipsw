@@ -92,7 +92,7 @@ func Diff(f1 *dyld.File, f2 *dyld.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff,
 
 		info1 := mcmd.GenerateDiffInfo(m1, conf)
 		info2 := mcmd.GenerateDiffInfo(m2, conf)
-		if info2.Equal(*info1) {
+		if info2.Equivalent(*info1, conf) {
 			freePair()
 			continue
 		}
