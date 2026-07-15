@@ -39,13 +39,32 @@ func TestDiffInfoStringOmitsLoadCmdHash(t *testing.T) {
 	}
 }
 
+func TestDiffInfoStringReportsVersionWithoutVerbose(t *testing.T) {
+	info := baseDiffInfo()
+	got := info.String()
+
+	if !strings.HasPrefix(got, info.Version+"\n") {
+		t.Fatalf("DiffInfo.String omitted source version without verbose mode:\n%s", got)
+	}
+	if strings.Contains(got, info.UUID) {
+		t.Fatalf("DiffInfo.String rendered UUID without verbose mode:\n%s", got)
+	}
+}
+
+func TestDiffInfoStringReportsUUIDOnlyWhenVerbose(t *testing.T) {
+	info := baseDiffInfo()
+	info.Verbose = true
+
+	if got := info.String(); !strings.Contains(got, info.UUID) {
+		t.Fatalf("DiffInfo.String omitted UUID in verbose mode:\n%s", got)
+	}
+}
+
 func TestFormatUpdatedDiffOmitsLoadCommandOnlyChanges(t *testing.T) {
 	oldInfo := baseDiffInfo()
 	newInfo := baseDiffInfo()
 	oldInfo.LoadCmdHash = strings.Repeat("a", 64)
 	newInfo.LoadCmdHash = strings.Repeat("b", 64)
-	newInfo.Version = "2.0.0"
-	newInfo.UUID = "22222222-2222-2222-2222-222222222222"
 
 	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{DiffTool: "go"})
 	if err != nil {
@@ -53,6 +72,58 @@ func TestFormatUpdatedDiffOmitsLoadCommandOnlyChanges(t *testing.T) {
 	}
 	if out != "" {
 		t.Fatalf("expected no rendered diff for a load-command-only change, got:\n%s", out)
+	}
+}
+
+func TestFormatUpdatedDiffReportsVersionWhenOtherMetricsDiffer(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	newInfo.Version = "2.0.0"
+	newInfo.UUID = "22222222-2222-2222-2222-222222222222"
+	newInfo.Sections[0].Size++
+
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
+		t.Fatal("expected the section-size change to make the binary reportable")
+	}
+
+	out, err := FormatUpdatedDiff(oldInfo, newInfo, &DiffConfig{Markdown: true, DiffTool: "git"})
+	if err != nil {
+		t.Fatalf("FormatUpdatedDiff failed: %v", err)
+	}
+	if !strings.Contains(out, "-1.0.0") || !strings.Contains(out, "+2.0.0") {
+		t.Fatalf("expected source-version context for a reportable binary, got:\n%s", out)
+	}
+	if !strings.HasPrefix(out, "```diff\n") {
+		t.Fatalf("expected source-version changes to use a diff fence, got:\n%s", out)
+	}
+	if strings.Contains(out, oldInfo.UUID) || strings.Contains(out, newInfo.UUID) {
+		t.Fatalf("expected UUIDs to remain hidden without verbose mode, got:\n%s", out)
+	}
+}
+
+func TestDiffInfoEquivalentIgnoresVersionWithoutVerbose(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	newInfo.Version = "2.0.0"
+
+	if !newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
+		t.Fatal("expected a source-version-only change to be ignored without verbose mode")
+	}
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{Verbose: true}) {
+		t.Fatal("expected a source-version change to be detected in verbose mode")
+	}
+}
+
+func TestDiffInfoEquivalentGatesUUIDOnVerbose(t *testing.T) {
+	oldInfo := baseDiffInfo()
+	newInfo := baseDiffInfo()
+	newInfo.UUID = "22222222-2222-2222-2222-222222222222"
+
+	if !newInfo.Equivalent(*oldInfo, &DiffConfig{}) {
+		t.Fatal("expected a UUID-only change to be ignored without verbose mode")
+	}
+	if newInfo.Equivalent(*oldInfo, &DiffConfig{Verbose: true}) {
+		t.Fatal("expected a UUID-only change to be detected in verbose mode")
 	}
 }
 

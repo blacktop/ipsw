@@ -781,7 +781,7 @@ func equivalentFunctions(i, x DiffInfo) bool {
 
 func (i *DiffInfo) String() string {
 	var out strings.Builder
-	if i.Verbose && i.Version != "" {
+	if i.Version != "" {
 		out.WriteString(i.Version + "\n")
 	}
 	for _, sec := range i.Sections {

@@ -297,10 +297,11 @@ func hashMachoDiffConfig(h io.Writer, conf *mcmd.DiffConfig) {
 	// reports after the text format changes. The current marker also covers
 	// dropping the per-section/per-function sha256 walls (sections render as
 	// name+size only, same-size content edits render as a compact section list,
-	// Version/UUID are Verbose-gated). Update this string on ANY rendered-body
-	// format change: it orphans stale rows for every task that folds
-	// hashMachoDiffConfig (machos, dsc, kexts, firmwares).
-	_, _ = h.Write([]byte("macho-report-markdown-section-lists+semantic-equivalence+uniform-section-hashes"))
+	// source versions are always rendered as context for reportable binaries,
+	// and Version/UUID are inclusion signals only in Verbose mode). Update this
+	// string on ANY rendered-body format change: it orphans stale rows for every
+	// task that folds hashMachoDiffConfig (machos, dsc, kexts, firmwares).
+	_, _ = h.Write([]byte("macho-report-markdown-section-lists+semantic-equivalence+uniform-section-hashes+source-version-context"))
 	_, _ = h.Write([]byte{0})
 	writeStringList := func(label string, items []string) {
 		_, _ = h.Write([]byte(label))
