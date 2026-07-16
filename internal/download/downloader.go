@@ -141,7 +141,14 @@ func (d *Download) getHEAD() error {
 // into Copy() to report progress on the download.
 func (d *Download) Do() error {
 
+	d.size = 0
+	d.bytesResumed = 0
+	d.resume = false
+	d.canResume = false
 	d.getHEAD()
+	if len(d.Sha1) > 0 && d.ignoreSha1 {
+		utils.Indent(log.Warn, 2)("SHA-1 verification disabled")
+	}
 
 	req, err := http.NewRequest("GET", d.URL, nil)
 	if err != nil {
@@ -155,18 +162,16 @@ func (d *Download) Do() error {
 		}
 	}
 
-	d.resume = false
 	if d.canResume {
 		if f, err := os.Stat(d.DestName + ".download"); !os.IsNotExist(err) {
 			// don't try to download files being downloaded elsewhere
 			if d.skipAll {
-				d.resume = false
 				return nil
-			} else if d.resumeAll {
+			}
+			if d.resumeAll {
 				d.resume = true
 			} else if d.restartAll {
 				log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
-				d.resume = false
 			} else {
 				choice := ""
 				prompt := &survey.Select{
@@ -180,21 +185,24 @@ func (d *Download) Do() error {
 					d.resume = true
 				case "restart":
 					log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
-					d.resume = false
 				case "skip":
 					log.Infof("%s - SKIPPED", d.DestName+".download")
-					d.resume = false
 					return nil
 				case "skip all":
 					log.Info("Skipping ALL active downloads (you are performing a distributed download)")
 					d.skipAll = true
-					d.resume = false
 					return nil
 				}
 			}
 
 			if d.resume {
 				d.bytesResumed = f.Size()
+				if d.bytesResumed == d.size {
+					if err := d.verifyDownloadedFile(); err != nil {
+						return err
+					}
+					return d.finalizeDownload()
+				}
 				rangeHeader := fmt.Sprintf("bytes=%d-", d.bytesResumed)
 				utils.Indent(log.WithField("range", rangeHeader).Debug, 2)("Setting Header")
 				req.Header.Add("Range", rangeHeader)
@@ -354,15 +362,8 @@ func (d *Download) Do() error {
 			return fmt.Errorf("failed to close %s: %v", d.DestName+".download", err)
 		}
 
-		if len(d.Sha1) > 0 && !d.ignoreSha1 {
-			utils.Indent(log.Info, 2)("verifying sha1sum...")
-			if ok, _ := utils.Verify(d.Sha1, d.DestName+".download"); !ok {
-				// fileLock.Unlock()
-				if err := os.Remove(d.DestName + ".download"); err != nil {
-					return fmt.Errorf("cannot remove downloaded file with checksum mismatch: %v", err)
-				}
-				return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", d.DestName+".download")
-			}
+		if err := d.verifyDownloadedFile(); err != nil {
+			return err
 		}
 
 	} else {
@@ -385,27 +386,48 @@ func (d *Download) Do() error {
 
 		if len(d.Sha1) > 0 && !d.ignoreSha1 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
-			checksum, _ := hex.DecodeString(d.Sha1)
+			checksum, err := hex.DecodeString(d.Sha1)
+			if err != nil {
+				return fmt.Errorf("invalid expected sha1 checksum %q: %v", d.Sha1, err)
+			}
 
 			if !bytes.Equal(h.Sum(nil), checksum) {
+				actual := fmt.Sprintf("%x", h.Sum(nil))
 				utils.Indent(log.WithFields(log.Fields{
 					"expected": d.Sha1,
-					"actual":   fmt.Sprintf("%x", h.Sum(nil)),
+					"actual":   actual,
 				}).Error, 3)("❌ BAD CHECKSUM")
-				// fileLock.Unlock()
-				if err := os.Remove(d.DestName); err != nil {
-					return fmt.Errorf("cannot remove downloaded file with checksum mismatch: %v", err)
-				}
+				return fmt.Errorf("sha1 checksum mismatch for %s (expected %s, got %s); downloaded file retained", d.DestName+".download", d.Sha1, actual)
 			}
 		}
 	}
 
+	return d.finalizeDownload()
+}
+
+func (d *Download) verifyDownloadedFile() error {
+	if len(d.Sha1) == 0 || d.ignoreSha1 {
+		return nil
+	}
+
+	utils.Indent(log.Info, 2)("verifying sha1sum...")
+	ok, err := utils.Verify(d.Sha1, d.DestName+".download")
+	if err != nil {
+		return fmt.Errorf("failed to verify sha1 checksum for %s: %v", d.DestName+".download", err)
+	}
+	if !ok {
+		return fmt.Errorf("sha1 checksum mismatch for %s (expected %s); downloaded file retained", d.DestName+".download", d.Sha1)
+	}
+
+	return nil
+}
+
+func (d *Download) finalizeDownload() error {
 	if err := os.Rename(d.DestName+".download", d.DestName); err != nil {
 		if linkErr, ok := err.(*os.LinkError); ok {
 			return fmt.Errorf("failed to rename %s to %s: link error: %v", d.DestName+".download", d.DestName, linkErr.Err)
-		} else {
-			return fmt.Errorf("failed to rename %s to %s: %v", d.DestName+".download", d.DestName, err)
 		}
+		return fmt.Errorf("failed to rename %s to %s: %v", d.DestName+".download", d.DestName, err)
 	}
 
 	return nil
