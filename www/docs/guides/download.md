@@ -92,6 +92,18 @@ To disable SSL cert verification
 ❯ ipsw download ipsw --insecure --device iPhone16,1 --latest
 ```
 
+To download an IPSW when the SHA-1 reported by ipsw.me is known to be incorrect
+
+```bash
+❯ ipsw download ipsw --ignore-sha1 --device iPhone4,1 --version 6.0
+```
+
+:::warning
+Only skip SHA-1 verification after independently validating the download. Downloads made with `--ignore-sha1` are not added to `checksums.txt.sha1`.
+
+If a previous attempt retained a complete `.download` file, add `--resume-all` to finalize it without downloading it again.
+:::
+
 ### download `ipsw` config
 
 You can also use a config file with `ipsw` so you don't have to use the flags

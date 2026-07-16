@@ -43,6 +43,7 @@ ipsw download ipsw [flags]
   -f, --flat                     Do NOT preserve directory structure when downloading with --pattern
   -h, --help                     help for ipsw
       --ibridge                  Download iBridge IPSWs
+      --ignore-sha1              skip SHA-1 verification
       --insecure                 do not verify ssl certs
       --kernel                   Extract kernelcache from remote IPSW
       --latest                   Download latest IPSWs
