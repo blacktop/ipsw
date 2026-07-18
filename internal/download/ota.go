@@ -333,6 +333,9 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 		if o.Config.Platform == "ios" {
 			return []assetType{softwareUpdate}, nil
 		}
+		if o.Config.Platform == "watchos" && !o.Config.Delta {
+			return []assetType{softwareUpdate}, nil
+		}
 		return []assetType{recoveryOSUpdate, softwareUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil

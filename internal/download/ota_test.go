@@ -1,6 +1,48 @@
 package download
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
+
+func TestGetRequestAssetTypesDeltaSelection(t *testing.T) {
+	tests := []struct {
+		name     string
+		platform string
+		delta    bool
+		want     []assetType
+	}{
+		{
+			name:     "watchOS full OTA",
+			platform: "watchos",
+			want:     []assetType{softwareUpdate},
+		},
+		{
+			name:     "watchOS delta OTA",
+			platform: "watchos",
+			delta:    true,
+			want:     []assetType{recoveryOSUpdate, softwareUpdate},
+		},
+		{
+			name:     "visionOS keeps recovery assets",
+			platform: "visionos",
+			want:     []assetType{recoveryOSUpdate, softwareUpdate},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := Ota{Config: OtaConf{Platform: tt.platform, Delta: tt.delta}}
+			got, err := o.getRequestAssetTypes()
+			if err != nil {
+				t.Fatalf("getRequestAssetTypes() failed: %v", err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("getRequestAssetTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 	t.Parallel()
