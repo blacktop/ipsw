@@ -71,6 +71,13 @@ func matchesPostBOMPattern(re *regexp.Regexp, name string) bool {
 	return re.MatchString(name) || re.MatchString(filepath.Base(name))
 }
 
+func dyldPayloadPattern(pattern string, cryptexErr error) string {
+	if cryptexErr != nil {
+		return dyld.CacheUberRegex
+	}
+	return pattern
+}
+
 func outputPathForExtraction(outputDir, name string, flat bool) (string, error) {
 	if flat {
 		return filepath.Join(outputDir, filepath.Base(name)), nil
@@ -225,9 +232,10 @@ var otaExtractCmd = &cobra.Command{
 			if dyldExtract {
 				log.Info("Extracting dyld_shared_cache files")
 				out, err := o.ExtractFromCryptexes(dyld.CacheUberRegex, output)
+				pattern = dyldPayloadPattern(pattern, err)
 				if err != nil {
 					log.WithError(err).Error("failed to extract dyld_shared_cache from cryptexes; falling back to OTA asset files/payloads")
-					viper.Set("ota.extract.pattern", dyld.CacheUberRegex)
+					viper.Set("ota.extract.pattern", pattern)
 				}
 				for _, fname := range out {
 					if rel, err := filepath.Rel(cwd, fname); err != nil {

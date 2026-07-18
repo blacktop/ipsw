@@ -1,10 +1,39 @@
 package ota
 
 import (
+	"errors"
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
+
+func TestDyldPayloadPattern(t *testing.T) {
+	t.Run("cryptex success preserves cryptex-first behavior", func(t *testing.T) {
+		if got := dyldPayloadPattern("", nil); got != "" {
+			t.Fatalf("dyldPayloadPattern(\"\", nil) = %q, want no payload fallback", got)
+		}
+	})
+
+	t.Run("cryptex failure matches watchOS payload paths", func(t *testing.T) {
+		pattern := dyldPayloadPattern("", errors.New("no cryptexes found"))
+		if pattern != dyld.CacheUberRegex {
+			t.Fatalf("dyldPayloadPattern() = %q, want %q", pattern, dyld.CacheUberRegex)
+		}
+
+		re := regexp.MustCompile(pattern)
+		paths := []string{
+			"System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
+			"System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e",
+		}
+		for _, path := range paths {
+			if !matchesPostBOMPattern(re, path) {
+				t.Errorf("fallback pattern %q does not match full path %q", pattern, path)
+			}
+		}
+	})
+}
 
 func TestMatchesPostBOMPattern(t *testing.T) {
 	tests := []struct {
