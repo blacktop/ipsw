@@ -16,7 +16,7 @@ func TestDyldPayloadPattern(t *testing.T) {
 		}
 	})
 
-	t.Run("cryptex failure matches watchOS payload paths", func(t *testing.T) {
+	t.Run("cryptex failure matches payload dyld cache paths", func(t *testing.T) {
 		pattern := dyldPayloadPattern("", errors.New("no cryptexes found"))
 		if pattern != dyld.CacheUberRegex {
 			t.Fatalf("dyldPayloadPattern() = %q, want %q", pattern, dyld.CacheUberRegex)
@@ -26,10 +26,26 @@ func TestDyldPayloadPattern(t *testing.T) {
 		paths := []string{
 			"System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
 			"System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e",
+			"System/Library/dyld/aot_shared_cache.0",
+			"System/Library/dyld/aot_shared_cache.6",
+			"System/Library/dyld/dyld_shared_cache_x86_64",
 		}
 		for _, path := range paths {
 			if !matchesPostBOMPattern(re, path) {
 				t.Errorf("fallback pattern %q does not match full path %q", pattern, path)
+			}
+		}
+
+		falsePositives := []string{
+			"System/Library/dyld/aot_shared_cache",
+			"System/Library/dyld/aot_shared_cache.foo",
+			"System/Library/dyld/aot_shared_cache.0.map",
+			"System/Library/Caches/com.apple.dyld/aot_shared_cache.0",
+			"usr/lib/aot_shared_cache.0",
+		}
+		for _, path := range falsePositives {
+			if matchesPostBOMPattern(re, path) {
+				t.Errorf("fallback pattern %q unexpectedly matches full path %q", pattern, path)
 			}
 		}
 	})
