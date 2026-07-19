@@ -1041,35 +1041,32 @@ func DSC(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		var out []string
-		var emptyErr error
+		dmgs := make([]dyld.DscExtractionDMG, 0, len(steps))
+		var cleanups []func()
+		defer func() {
+			for idx := len(cleanups) - 1; idx >= 0; idx-- {
+				cleanups[idx]()
+			}
+		}()
+
 		for _, step := range steps {
 			dmgPath, err := remoteDmgPathForDscStep(i, step.Kind)
 			if err != nil {
 				return nil, err
 			}
-			stepOut, err := extractRemoteDscDMG(c, i, zr, dmgPath, folder, step.Arches)
+			localDMGPath, cleanup, err := extractRemoteDscDMG(c, zr, dmgPath)
 			if err != nil {
-				if step.AllowEmpty && dyld.IsDscNotFound(err) {
-					if emptyErr == nil {
-						emptyErr = err
-					}
-					log.Debugf("No matching dyld_shared_cache(s) in optional %s DMG; continuing", step.Kind)
-					continue
-				}
 				return nil, err
 			}
-			if stepOut == nil {
-				// nil output with no error means the user interrupted the
-				// interactive cache selection; don't prompt for remaining DMGs
-				return out, nil
-			}
-			out = append(out, stepOut...)
+			cleanups = append(cleanups, cleanup)
+			dmgs = append(dmgs, dyld.DscExtractionDMG{
+				Path:       localDMGPath,
+				Kind:       step.Kind,
+				Arches:     step.Arches,
+				AllowEmpty: step.AllowEmpty,
+			})
 		}
-		if len(out) == 0 && emptyErr != nil {
-			return nil, emptyErr
-		}
-		return out, nil
+		return dyld.ExtractFromDMGs(i, dmgs, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
@@ -1100,25 +1097,27 @@ func remoteSystemDscDMG(i *info.Info) (string, error) {
 	return sysDMG, nil
 }
 
-func extractRemoteDscDMG(c *Config, i *info.Info, zr *zip.Reader, dmgPath, folder string, arches []string) ([]string, error) {
+func extractRemoteDscDMG(c *Config, zr *zip.Reader, dmgPath string) (string, func(), error) {
 	stepZr, err := tuneRemoteZipReader(c, zr, matchingZipFileName(zr.File, dmgPath))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory to store %s: %v", dmgPath, err)
+		return "", nil, fmt.Errorf("failed to create temporary directory to store %s: %v", dmgPath, err)
 	}
-	defer os.RemoveAll(tmpDIR)
+	cleanup := func() { os.RemoveAll(tmpDIR) }
 	dmgRegex := exactZipNamePattern(dmgPath)
 	extracted, err := utils.SearchZip(stepZr.File, dmgRegex, tmpDIR, c.Flatten, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract %s from remote IPSW: %v", dmgPath, err)
+		cleanup()
+		return "", nil, fmt.Errorf("failed to extract %s from remote IPSW: %v", dmgPath, err)
 	}
 	if len(extracted) == 0 {
-		return nil, fmt.Errorf("failed to extract DMG %s from remote IPSW", dmgPath)
+		cleanup()
+		return "", nil, fmt.Errorf("failed to extract DMG %s from remote IPSW", dmgPath)
 	}
-	return dyld.ExtractFromDMG(i, extracted[0], filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, arches, c.DriverKit, c.AllDSCs)
+	return extracted[0], cleanup, nil
 }
 
 // DMG extracts the DMG from an IPSW

@@ -52,6 +52,29 @@ type DscExtractionStep struct {
 	AllowEmpty bool
 }
 
+// DscExtractionDMG is a prepared DMG used by one DSC extraction step.
+type DscExtractionDMG struct {
+	Path       string
+	Kind       DscDMGKind
+	Arches     []string
+	AllowEmpty bool
+}
+
+type mountedDscDMG struct {
+	DscExtractionDMG
+	mountPoint     string
+	mountedRoot    string
+	alreadyMounted bool
+	removePath     string
+}
+
+type dscCandidate struct {
+	path        string
+	mountedRoot string
+}
+
+type dscCandidateSelector func([]dscCandidate) ([]dscCandidate, error)
+
 func IsDscNotFound(err error) bool {
 	return errors.Is(err, ErrNoDscFound) || errors.Is(err, ErrNoDscForArch)
 }
@@ -90,24 +113,26 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 }
 
 // DscExtractionPlan returns the DMG extraction steps needed to cover the
-// requested arches for the given IPSW. macOS 27+ moves the x86_64 family of
-// dyld_shared_caches into the Cryptex1,RosettaOS DMG, so plans for those
-// IPSWs can span two DMGs. driverKit affects whether empty secondary DMGs
-// are fatal: DriverKit extraction with no explicit arch scans any available
-// RosettaOS DMG opportunistically, but a RosettaOS image with no DriverKit
-// caches should not fail a SystemOS result.
+// requested arches for the given IPSW. A manifest-declared Cryptex1,RosettaOS
+// carries the x86_64 cache family separately from SystemOS; macOS 27+ requires
+// that split. driverKit affects whether empty secondary DMGs are fatal:
+// DriverKit extraction with no explicit arch scans any available RosettaOS DMG
+// opportunistically, but a RosettaOS image with no DriverKit caches should not
+// fail a SystemOS result.
 func DscExtractionPlan(i *info.Info, arches []string, driverKit bool) ([]DscExtractionStep, error) {
-	if !macOSX86DscRequiresRosetta(i) {
+	if !isMacOS(i) {
 		return dscExtractionPlan(arches, false, false, driverKit)
 	}
 
+	requiresRosetta := macOSX86DscRequiresRosetta(i)
 	requiresRosettaMetadata := (len(arches) == 0 && !driverKit) || hasRosettaDscArch(arches)
-	opportunisticRosettaMetadata := len(arches) == 0 && driverKit
-	hasRosettaOS := false
-	if requiresRosettaMetadata || opportunisticRosettaMetadata {
-		if _, err := i.GetRosettaOsDmg(); err == nil {
-			hasRosettaOS = true
-		} else if !errors.Is(err, info.ErrorCryptexNotFound) {
+	inspectRosettaMetadata := len(arches) == 0 || requiresRosettaMetadata
+	if inspectRosettaMetadata {
+		_, err := i.GetRosettaOsDmg()
+		if err == nil {
+			return dscExtractionPlan(arches, true, true, driverKit)
+		}
+		if !errors.Is(err, info.ErrorCryptexNotFound) {
 			// a truly absent cryptex is handled below; anything else (e.g.
 			// multiple RosettaOS DMGs) would otherwise masquerade as "absent"
 			if requiresRosettaMetadata {
@@ -116,10 +141,13 @@ func DscExtractionPlan(i *info.Info, arches []string, driverKit bool) ([]DscExtr
 			log.Warnf("failed to determine optional RosettaOS DMG availability: %v; extracting SystemOS DriverKit caches only", err)
 		}
 	}
-	if !hasRosettaOS && len(arches) == 0 && !driverKit {
+	if !requiresRosetta {
+		return dscExtractionPlan(arches, false, false, driverKit)
+	}
+	if len(arches) == 0 && !driverKit {
 		log.Warn("macOS 27+ moves x86_64 dyld_shared_cache(s) to the RosettaOS cryptex, but BuildManifest has no Cryptex1,RosettaOS; extracting SystemOS caches only")
 	}
-	return dscExtractionPlan(arches, hasRosettaOS, true, driverKit)
+	return dscExtractionPlan(arches, false, true, driverKit)
 }
 
 func dscExtractionPlan(arches []string, hasRosettaOS, requiresRosetta, driverKit bool) ([]DscExtractionStep, error) {
@@ -160,13 +188,12 @@ func dscExtractionPlan(arches []string, hasRosettaOS, requiresRosetta, driverKit
 }
 
 func macOSX86DscRequiresRosetta(i *info.Info) bool {
-	if i == nil || i.Plists == nil || i.Plists.BuildManifest == nil {
-		return false
-	}
-	if !utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
-		return false
-	}
-	return utils.Compare(i.Plists.BuildManifest.ProductVersion, "27.0") >= 0
+	return isMacOS(i) && utils.Compare(i.Plists.BuildManifest.ProductVersion, "27.0") >= 0
+}
+
+func isMacOS(i *info.Info) bool {
+	return i != nil && i.Plists != nil && i.Plists.BuildManifest != nil &&
+		utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac")
 }
 
 func isRosettaDscArch(arch string) bool {
@@ -205,22 +232,39 @@ func dscPathRegex(driverkit, all bool) string {
 	return CacheRegex
 }
 
-func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
-	skipCleanup := false
+func dscArchRegex(arches []string, driverkit, all bool) *regexp.Regexp {
+	archPatterns := dscArchRegexParts(arches)
+	pattern := fmt.Sprintf("%s(%s)%s", dscPathRegex(driverkit, all), strings.Join(archPatterns, "|"), CacheRegexEnding)
+	if !driverkit && slices.Contains(arches, "aot") {
+		pattern += `|` + aotCacheRegex + `$`
+	}
+	return regexp.MustCompile(pattern)
+}
 
-	// For AEA-encrypted DMGs, check if the decrypted version already exists
-	// (e.g. already extracted + mounted by a prior step).
-	// Reuse it to avoid overwriting a mounted DMG's backing file.
+func ensureDscDestination(destPath string) error {
+	destination := destPath
+	if runtime.GOOS != "darwin" {
+		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
+			destination = filepath.Join("/data", destPath)
+		}
+	}
+	if err := os.MkdirAll(destination, 0750); err != nil {
+		return fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
+	}
+	return nil
+}
+
+func mountDscDMG(dmg DscExtractionDMG, pemDB string) (mountedDscDMG, error) {
+	dmgPath := dmg.Path
+	var removePath string
+
+	// Reuse a decrypted AEA image when one already exists (for example, when a
+	// prior mount command owns it) instead of overwriting its backing file.
 	if filepath.Ext(dmgPath) == ".aea" {
 		decryptedPath := strings.TrimSuffix(dmgPath, filepath.Ext(dmgPath))
 		if _, err := os.Stat(decryptedPath); err == nil {
 			dmgPath = decryptedPath
-			skipCleanup = true
-		}
-	}
-
-	if !skipCleanup {
-		if filepath.Ext(dmgPath) == ".aea" {
+		} else {
 			var err error
 			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
 				Input:    dmgPath,
@@ -230,110 +274,184 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 				Insecure: false, // TODO: make insecure configurable
 			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+				return mountedDscDMG{}, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}
-			defer os.Remove(dmgPath)
+			removePath = dmgPath
 		}
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	var alreadyMounted bool
 	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
+		if removePath != "" {
+			_ = os.Remove(removePath)
+		}
+		return mountedDscDMG{}, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
 	if alreadyMounted {
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
-	} else {
-		defer func() {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, true)
-			}); err != nil {
-				log.Errorf("failed to unmount DMG %s at %s: %v", dmgPath, mountPoint, err)
-			}
-		}()
 	}
 
-	if runtime.GOOS == "darwin" {
-		if err := os.MkdirAll(destPath, 0750); err != nil {
-			return nil, fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
+	return mountedDscDMG{
+		DscExtractionDMG: dmg,
+		mountPoint:       mountPoint,
+		mountedRoot:      utils.MountedFilesystemRoot(mountPoint),
+		alreadyMounted:   alreadyMounted,
+		removePath:       removePath,
+	}, nil
+}
+
+func (dmg mountedDscDMG) close() {
+	if !dmg.alreadyMounted {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmg.Path))
+		if err := utils.Retry(3, 2*time.Second, func() error {
+			return utils.Unmount(dmg.mountPoint, true)
+		}); err != nil {
+			log.Errorf("failed to unmount DMG %s at %s: %v", dmg.Path, dmg.mountPoint, err)
 		}
-	} else {
-		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
-			if err := os.MkdirAll(filepath.Join("/data", destPath), 0750); err != nil {
-				return nil, fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
+	}
+	if dmg.removePath != "" {
+		_ = os.Remove(dmg.removePath)
+	}
+}
+
+func collectDscCandidates(i *info.Info, dmgs []mountedDscDMG, driverkit, all bool) ([]dscCandidate, error) {
+	macOS := isMacOS(i)
+	var candidates []dscCandidate
+	var emptyErr error
+
+	for _, dmg := range dmgs {
+		matches, err := GetDscPathsInMount(dmg.mountPoint, driverkit, all)
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) == 0 {
+			err = fmt.Errorf("%w in DMG: %s", ErrNoDscFound, dmg.Path)
+		} else if macOS && len(dmg.Arches) > 0 {
+			r := dscArchRegex(dmg.Arches, driverkit, all)
+			matches = slices.DeleteFunc(matches, func(match string) bool {
+				return !r.MatchString(match)
+			})
+			if len(matches) == 0 {
+				err = fmt.Errorf("%w: %v", ErrNoDscForArch, dmg.Arches)
 			}
-		} else {
-			if err := os.MkdirAll(destPath, 0750); err != nil {
-				return nil, fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
+		}
+
+		if err != nil {
+			if dmg.AllowEmpty && IsDscNotFound(err) {
+				if emptyErr == nil {
+					emptyErr = err
+				}
+				utils.Indent(log.Debug, 2)(fmt.Sprintf("No matching dyld_shared_cache(s) in optional %s DMG; continuing", dmg.Kind))
+				continue
 			}
+			return nil, err
+		}
+
+		for _, match := range matches {
+			candidates = append(candidates, dscCandidate{path: match, mountedRoot: dmg.mountedRoot})
 		}
 	}
 
-	mountedRoot := utils.MountedFilesystemRoot(mountPoint)
-	matches, err := GetDscPathsInMount(mountPoint, driverkit, all)
+	if len(candidates) == 0 {
+		if emptyErr != nil {
+			return nil, emptyErr
+		}
+		return nil, ErrNoDscFound
+	}
+	return candidates, nil
+}
+
+func promptForDscCandidates(candidates []dscCandidate) ([]dscCandidate, error) {
+	options := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		options = append(options, candidate.path)
+	}
+
+	var selected []string
+	prompt := &survey.MultiSelect{
+		Message:  "Which files would you like to extract:",
+		Options:  options,
+		PageSize: 15,
+	}
+	if err := survey.AskOne(prompt, &selected); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	selectedSet := make(map[string]struct{}, len(selected))
+	for _, path := range selected {
+		selectedSet[path] = struct{}{}
+	}
+	return slices.DeleteFunc(candidates, func(candidate dscCandidate) bool {
+		_, ok := selectedSet[candidate.path]
+		return !ok
+	}), nil
+}
+
+func extractFromMountedDscDMGs(i *info.Info, dmgs []mountedDscDMG, destPath string, requestedArches []string, driverkit, all bool, selectCandidates dscCandidateSelector) ([]string, error) {
+	if err := ensureDscDestination(destPath); err != nil {
+		return nil, err
+	}
+
+	candidates, err := collectDscCandidates(i, dmgs, driverkit, all)
 	if err != nil {
 		return nil, err
 	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w in DMG: %s", ErrNoDscFound, dmgPath)
-	}
-
-	if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") { // Is macOS IPSW
-		if len(arches) == 0 {
-			selMatches := []string{}
-			prompt := &survey.MultiSelect{
-				Message:  "Which files would you like to extract:",
-				Options:  matches,
-				PageSize: 15,
-			}
-			if err := survey.AskOne(prompt, &selMatches); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					return nil, nil
-				}
-				return nil, err
-			}
-			matches = selMatches
-		} else {
-			var filtered []string
-			archPatterns := dscArchRegexParts(arches)
-			r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dscPathRegex(driverkit, all), strings.Join(archPatterns, "|"), CacheRegexEnding))
-			for _, match := range matches {
-				if r.MatchString(match) {
-					filtered = append(filtered, match)
-				}
-			}
-
-			if len(filtered) == 0 {
-				return nil, fmt.Errorf("%w: %v", ErrNoDscForArch, arches)
-			}
-			matches = filtered
+	if isMacOS(i) && len(requestedArches) == 0 {
+		candidates, err = selectCandidates(candidates)
+		if err != nil || candidates == nil {
+			return nil, err
 		}
 	}
 
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w in DMG: %s", ErrNoDscFound, dmgPath)
+	if len(candidates) == 0 {
+		return nil, ErrNoDscFound
 	}
 
 	var artifacts []string
-	for _, match := range matches {
-		dyldDest := filepath.Join(destPath, filepath.Base(match))
+	for _, candidate := range candidates {
+		dyldDest := filepath.Join(destPath, filepath.Base(candidate.path))
 		if all {
-			if rel, err := filepath.Rel(mountedRoot, match); err == nil && !strings.HasPrefix(rel, "..") {
+			if rel, err := filepath.Rel(candidate.mountedRoot, candidate.path); err == nil && !strings.HasPrefix(rel, "..") {
 				dyldDest = filepath.Join(destPath, rel)
 			}
 		}
-		// TODO: remove this (was commented out because I added --json to `ipsw extract` so the higher level func is now where this is printed)
-		// utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", filepath.Base(match), dyldDest))
-		if err := utils.Copy(match, dyldDest); err != nil {
-			return nil, fmt.Errorf("failed to copy %s to %s: %v", match, dyldDest, err)
+		if err := utils.Copy(candidate.path, dyldDest); err != nil {
+			return nil, fmt.Errorf("failed to copy %s to %s: %v", candidate.path, dyldDest, err)
 		}
 		artifacts = append(artifacts, dyldDest)
 	}
 
 	return artifacts, nil
+}
+
+// ExtractFromDMGs mounts all planned DSC-bearing DMGs, presents one combined
+// macOS cache picker, and extracts the selected caches before unmounting them.
+func ExtractFromDMGs(i *info.Info, dmgs []DscExtractionDMG, destPath, pemDB string, requestedArches []string, driverkit, all bool) ([]string, error) {
+	mounted := make([]mountedDscDMG, 0, len(dmgs))
+	defer func() {
+		for idx := len(mounted) - 1; idx >= 0; idx-- {
+			mounted[idx].close()
+		}
+	}()
+
+	for _, dmg := range dmgs {
+		mnt, err := mountDscDMG(dmg, pemDB)
+		if err != nil {
+			return nil, err
+		}
+		mounted = append(mounted, mnt)
+	}
+	return extractFromMountedDscDMGs(i, mounted, destPath, requestedArches, driverkit, all, promptForDscCandidates)
+}
+
+// ExtractFromDMG extracts DSCs from one DMG.
+func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+	return ExtractFromDMGs(i, []DscExtractionDMG{{Path: dmgPath, Arches: arches}}, destPath, pemDB, arches, driverkit, all)
 }
 
 // Extract extracts dyld_shared_cache from IPSW
@@ -353,8 +471,14 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		return nil, err
 	}
 
-	var artifacts []string
-	var emptyErr error
+	dmgs := make([]DscExtractionDMG, 0, len(steps))
+	var cleanups []func()
+	defer func() {
+		for idx := len(cleanups) - 1; idx >= 0; idx-- {
+			cleanups[idx]()
+		}
+	}()
+
 	for _, step := range steps {
 		dmgPath, err := dmgPathForDscStep(i, step.Kind)
 		if err != nil {
@@ -365,32 +489,16 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 		if err != nil {
 			return nil, err
 		}
-
-		stepArtifacts, err := ExtractFromDMG(i, localDMGPath, destPath, pemDB, step.Arches, driverkit, all)
-		cleanup()
-		if err != nil {
-			if step.AllowEmpty && IsDscNotFound(err) {
-				if emptyErr == nil {
-					emptyErr = err
-				}
-				utils.Indent(log.Debug, 2)(fmt.Sprintf("No matching dyld_shared_cache(s) in optional %s DMG; continuing", step.Kind))
-				continue
-			}
-			return nil, err
-		}
-		if stepArtifacts == nil {
-			// nil artifacts with no error means the user interrupted the
-			// interactive cache selection; don't prompt for remaining DMGs
-			return artifacts, nil
-		}
-		artifacts = append(artifacts, stepArtifacts...)
+		cleanups = append(cleanups, cleanup)
+		dmgs = append(dmgs, DscExtractionDMG{
+			Path:       localDMGPath,
+			Kind:       step.Kind,
+			Arches:     step.Arches,
+			AllowEmpty: step.AllowEmpty,
+		})
 	}
 
-	if len(artifacts) == 0 && emptyErr != nil {
-		return nil, emptyErr
-	}
-
-	return artifacts, nil
+	return ExtractFromDMGs(i, dmgs, destPath, pemDB, arches, driverkit, all)
 }
 
 func dmgPathForDscStep(i *info.Info, kind DscDMGKind) (string, error) {

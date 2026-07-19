@@ -4,9 +4,235 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestGetDscPathsInMountMatchesRosettaAOTCaches(t *testing.T) {
+	root := t.TempDir()
+	paths := []string{
+		"System/Library/dyld/aot_shared_cache.0",
+		"System/Library/dyld/aot_shared_cache.6",
+		"System/Library/dyld/dyld_shared_cache_x86_64",
+		"System/Library/dyld/dyld_shared_cache_x86_64.01",
+		"System/DriverKit/System/Library/dyld/dyld_shared_cache_x86_64",
+		"System/x86Support/System/Library/dyld/dyld_shared_cache_x86_64",
+		"System/Library/dyld/aot_shared_cache",
+		"System/Library/dyld/aot_shared_cache.foo",
+		"System/Library/dyld/aot_shared_cache.0.map",
+		"System/Library/Caches/com.apple.dyld/aot_shared_cache.0",
+		"usr/lib/aot_shared_cache.0",
+	}
+	for _, path := range paths {
+		writeDscFixture(t, root, path, "")
+	}
+
+	tests := []struct {
+		name string
+		all  bool
+		want []string
+	}{
+		{
+			name: "default cache paths",
+			want: []string{
+				"System/Library/dyld/aot_shared_cache.0",
+				"System/Library/dyld/aot_shared_cache.6",
+				"System/Library/dyld/dyld_shared_cache_x86_64",
+				"System/Library/dyld/dyld_shared_cache_x86_64.01",
+			},
+		},
+		{
+			name: "all cache paths",
+			all:  true,
+			want: []string{
+				"System/DriverKit/System/Library/dyld/dyld_shared_cache_x86_64",
+				"System/Library/dyld/aot_shared_cache.0",
+				"System/Library/dyld/aot_shared_cache.6",
+				"System/Library/dyld/dyld_shared_cache_x86_64",
+				"System/Library/dyld/dyld_shared_cache_x86_64.01",
+				"System/x86Support/System/Library/dyld/dyld_shared_cache_x86_64",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matches, err := GetDscPathsInMount(root, false, test.all)
+			if err != nil {
+				t.Fatalf("GetDscPathsInMount() failed: %v", err)
+			}
+			got := make([]string, 0, len(matches))
+			for _, match := range matches {
+				rel, err := filepath.Rel(root, match)
+				if err != nil {
+					t.Fatalf("failed to make %q relative: %v", match, err)
+				}
+				got = append(got, filepath.ToSlash(rel))
+			}
+			slices.Sort(got)
+			slices.Sort(test.want)
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("GetDscPathsInMount(all=%t) = %v, want %v", test.all, got, test.want)
+			}
+		})
+	}
+}
+
+func TestDscArchRegexMatchesAOTCacheFamily(t *testing.T) {
+	re := dscArchRegex([]string{"aot"}, false, false)
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{path: "System/Library/dyld/aot_shared_cache.0", want: true},
+		{path: "System/Library/dyld/aot_shared_cache.6", want: true},
+		{path: "System/Library/dyld/dyld_shared_cache_x86_64", want: true},
+		{path: "System/Library/dyld/dyld_shared_cache_x86_64.01", want: true},
+		{path: "System/Library/dyld/dyld_shared_cache_x86_64.atlas", want: true},
+		{path: "System/Library/dyld/dyld_shared_cache_x86_64.map", want: true},
+		{path: "System/Library/dyld/dyld_shared_cache_arm64e", want: false},
+		{path: "System/Library/dyld/aot_shared_cache", want: false},
+		{path: "System/Library/dyld/aot_shared_cache.foo", want: false},
+		{path: "System/Library/dyld/aot_shared_cache.0.map", want: false},
+		{path: "System/Library/Caches/com.apple.dyld/aot_shared_cache.0", want: false},
+		{path: "usr/lib/aot_shared_cache.0", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			if got := re.MatchString(test.path); got != test.want {
+				t.Fatalf("dscArchRegex(aot).MatchString(%q) = %t, want %t", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestExtractFromMountedDscDMGsCombinesSystemAndRosettaPicker(t *testing.T) {
+	systemRoot := t.TempDir()
+	rosettaRoot := t.TempDir()
+	arm64e := writeDscFixture(t, systemRoot, "System/Library/dyld/dyld_shared_cache_arm64e", "arm64e")
+	aot := writeDscFixture(t, rosettaRoot, "System/Library/dyld/aot_shared_cache.0", "aot")
+	x86 := writeDscFixture(t, rosettaRoot, "System/Library/dyld/dyld_shared_cache_x86_64", "x86")
+
+	dmgs := []mountedDscDMG{
+		testMountedDscDMG(SystemOSDscDMG, systemRoot, nil),
+		testMountedDscDMG(RosettaOSDscDMG, rosettaRoot, nil),
+	}
+	var pickerCalls int
+	var pickerOptions []string
+	selectAOT := func(candidates []dscCandidate) ([]dscCandidate, error) {
+		pickerCalls++
+		for _, candidate := range candidates {
+			pickerOptions = append(pickerOptions, candidate.path)
+		}
+		return slices.DeleteFunc(candidates, func(candidate dscCandidate) bool {
+			return candidate.path != aot
+		}), nil
+	}
+
+	dest := t.TempDir()
+	artifacts, err := extractFromMountedDscDMGs(testMacOSDscInfo(), dmgs, dest, nil, false, false, selectAOT)
+	if err != nil {
+		t.Fatalf("extractFromMountedDscDMGs() failed: %v", err)
+	}
+	if pickerCalls != 1 {
+		t.Fatalf("combined picker called %d times, want 1", pickerCalls)
+	}
+	wantOptions := []string{arm64e, aot, x86}
+	slices.Sort(pickerOptions)
+	slices.Sort(wantOptions)
+	if !slices.Equal(pickerOptions, wantOptions) {
+		t.Fatalf("combined picker options = %v, want %v", pickerOptions, wantOptions)
+	}
+	if len(artifacts) != 1 || filepath.Base(artifacts[0]) != "aot_shared_cache.0" {
+		t.Fatalf("artifacts = %v, want selected AOT cache", artifacts)
+	}
+	data, err := os.ReadFile(artifacts[0])
+	if err != nil {
+		t.Fatalf("failed to read extracted AOT cache: %v", err)
+	}
+	if string(data) != "aot" {
+		t.Fatalf("extracted AOT cache contents = %q, want %q", data, "aot")
+	}
+}
+
+func TestExtractFromMountedDscDMGsExplicitArchesSkipPicker(t *testing.T) {
+	systemRoot := t.TempDir()
+	rosettaRoot := t.TempDir()
+	writeDscFixture(t, systemRoot, "System/Library/dyld/dyld_shared_cache_arm64e", "arm64e")
+	writeDscFixture(t, systemRoot, "System/Library/dyld/dyld_shared_cache_x86_64", "wrong-volume")
+	writeDscFixture(t, rosettaRoot, "System/Library/dyld/aot_shared_cache.0", "aot")
+	writeDscFixture(t, rosettaRoot, "System/Library/dyld/dyld_shared_cache_x86_64", "x86")
+	writeDscFixture(t, rosettaRoot, "System/Library/dyld/dyld_shared_cache_arm64e", "wrong-volume")
+
+	dmgs := []mountedDscDMG{
+		testMountedDscDMG(SystemOSDscDMG, systemRoot, []string{"arm64e"}),
+		testMountedDscDMG(RosettaOSDscDMG, rosettaRoot, []string{"aot"}),
+	}
+	unexpectedPicker := func([]dscCandidate) ([]dscCandidate, error) {
+		t.Fatal("explicit architecture extraction must not prompt")
+		return nil, nil
+	}
+
+	artifacts, err := extractFromMountedDscDMGs(
+		testMacOSDscInfo(),
+		dmgs,
+		t.TempDir(),
+		[]string{"arm64e", "aot"},
+		false,
+		false,
+		unexpectedPicker,
+	)
+	if err != nil {
+		t.Fatalf("extractFromMountedDscDMGs() failed: %v", err)
+	}
+	got := make([]string, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		got = append(got, filepath.Base(artifact))
+	}
+	slices.Sort(got)
+	want := []string{"aot_shared_cache.0", "dyld_shared_cache_arm64e", "dyld_shared_cache_x86_64"}
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("explicit architecture artifacts = %v, want %v", got, want)
+	}
+}
+
+func writeDscFixture(t *testing.T, root, path, contents string) string {
+	t.Helper()
+	path = filepath.Join(root, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatalf("failed to create DSC fixture directory: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatalf("failed to create DSC fixture: %v", err)
+	}
+	return path
+}
+
+func testMountedDscDMG(kind DscDMGKind, root string, arches []string) mountedDscDMG {
+	return mountedDscDMG{
+		DscExtractionDMG: DscExtractionDMG{Kind: kind, Arches: arches},
+		mountPoint:       root,
+		mountedRoot:      root,
+		alreadyMounted:   true,
+	}
+}
+
+func testMacOSDscInfo() *info.Info {
+	return &info.Info{
+		Plists: &plist.Plists{
+			BuildManifest: &plist.BuildManifest{
+				SupportedProductTypes: []string{"Mac17,1"},
+			},
+		},
+	}
+}
 
 func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 	files := []*zip.File{

@@ -373,10 +373,18 @@ func TestRemoteDscPlanRouting(t *testing.T) {
 			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}},
 		},
 		{
-			name:   "rosetta dmg is ignored before macOS 27",
+			name:   "manifest rosetta dmg routes x86 before macOS 27",
 			info:   testDscInfo(true, "26.5"),
 			arches: []string{"x86_64"},
-			want:   []resolvedDscStep{{dmgPath: "system.dmg.aea", arches: []string{"x86_64"}}},
+			want:   []resolvedDscStep{{dmgPath: "rosetta.dmg", arches: []string{"x86_64"}}},
+		},
+		{
+			name: "manifest rosetta dmg joins default picker before macOS 27",
+			info: testDscInfo(true, "26.5"),
+			want: []resolvedDscStep{
+				{dmgPath: "system.dmg.aea"},
+				{dmgPath: "rosetta.dmg"},
+			},
 		},
 		{
 			name:   "macOS 27 arm-only ignores malformed rosetta metadata",
