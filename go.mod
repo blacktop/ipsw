@@ -56,7 +56,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.14.0
-	github.com/klauspost/compress v1.19.0
+	github.com/klauspost/compress v1.19.1
 	github.com/mattn/go-isatty v0.0.23
 	github.com/mattn/go-mastodon v0.0.13
 	github.com/mitchellh/mapstructure v1.5.0
@@ -73,16 +73,16 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.5.15
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
-	github.com/vbauerster/mpb/v8 v8.12.1
+	github.com/vbauerster/mpb/v8 v8.13.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.54.0
-	golang.org/x/exp v0.0.0-20260709172345-9ea1abe57597
+	golang.org/x/exp v0.0.0-20260718201538-764159d718ef
 	golang.org/x/net v0.57.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
-	google.golang.org/genai v1.63.0
+	google.golang.org/genai v1.64.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0

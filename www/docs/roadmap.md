@@ -7,7 +7,7 @@
 ## ✅ Major Milestones Achieved
 
 ### 🔥 Recent Breakthroughs (2024-2025)
-- [x] **AI-Powered Decompiler** - Integration with OpenAI, Claude, Gemini, Ollama, and GitHub Copilot
+- [x] **AI-Powered Decompiler** - Integration with OpenAI, Claude, Gemini, Ollama, OpenRouter, and ACP agents including GitHub Copilot
 - [x] **Comprehensive Device Support** - Full iPhone, iPad, Apple Watch, Vision Pro, and Apple TV support
 - [x] **App Store Connect Integration** - Complete API for certificates, devices, and app management
 - [x] **Modern iOS Compatibility** - Support for latest iOS versions and features

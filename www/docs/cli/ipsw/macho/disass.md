@@ -23,7 +23,7 @@ ipsw macho disass <MACHO> [flags]
   -c, --count uint                   Number of instructions to disassemble
   -D, --dec                          Decompile assembly
       --dec-lang string              Language to decompile to (C, ObjC or Swift)
-      --dec-llm string               LLM provider to use for decompilation (ollama, copilot, etc.) (default "copilot")
+      --dec-llm string               LLM provider to use for decompilation
       --dec-model string             LLM model to use for decompilation
       --dec-nocache                  Do not use decompilation cache
       --dec-retries int              Number of retries for LLM decompilation
@@ -56,4 +56,3 @@ ipsw macho disass <MACHO> [flags]
 ### SEE ALSO
 
 * [ipsw macho](/docs/cli/ipsw/macho)	 - Parse MachO
-

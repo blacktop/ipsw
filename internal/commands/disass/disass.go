@@ -83,6 +83,7 @@ func Decompile(asm string, cfg *Config) (string, error) {
 				if err := llm.SetModel("default"); err != nil {
 					return "", fmt.Errorf("failed to set llm model: %v", err)
 				}
+				cfg.Model = "default"
 				goto decompile
 			}
 		}
@@ -97,9 +98,11 @@ func Decompile(asm string, cfg *Config) (string, error) {
 			log.Warn("Exiting...")
 			return "", nil
 		}
-		if err := llm.SetModel(choice); err != nil {
+		selectedModel := reusableModel(cfg.LLM, modelMap, choice)
+		if err := llm.SetModel(selectedModel); err != nil {
 			return "", fmt.Errorf("failed to set llm model: %v", err)
 		}
+		cfg.Model = selectedModel
 	}
 
 decompile:
@@ -120,6 +123,16 @@ decompile:
 		return buf.String(), nil
 	}
 	return decmp, nil
+}
+
+func reusableModel(provider string, models map[string]string, choice string) string {
+	switch ai.NormalizeProvider(provider) {
+	case "claude", "copilot", "codex", "gemini":
+		if modelID := strings.TrimSpace(models[choice]); modelID != "" {
+			return modelID
+		}
+	}
+	return choice
 }
 
 // FlagWasProvided reports whether a CLI flag was explicitly set via the command line

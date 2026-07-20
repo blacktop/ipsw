@@ -55,7 +55,7 @@ func init() {
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
 	machoDisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
-	machoDisassCmd.Flags().String("dec-llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	machoDisassCmd.Flags().String("dec-llm", "", "LLM provider to use for decompilation")
 	machoDisassCmd.RegisterFlagCompletionFunc("dec-llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return ai.Providers, cobra.ShellCompDirectiveDefault
 	})
@@ -155,10 +155,12 @@ var machoDisassCmd = &cobra.Command{
 		} else if viper.GetBool("macho.disass.all-fileset-entries") && len(segmentSection) == 0 {
 			log.Warn("you probably want to add --section '__TEXT_EXEC.__text'; as the NEW MH_FILESET entries don't ALL have LC_FUNCTION_STARTS (iOS18 added LC_FUNCTION_STARTS to all KEXTs ❤️)")
 		}
-		if viper.GetString("macho.disass.dec-llm") != "" {
-			if !ai.IsValidProvider(viper.GetString("macho.disass.dec-llm")) {
-				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("macho.disass.dec-llm"), strings.Join(ai.Providers, ", "))
-			}
+		provider := viper.GetString("macho.disass.dec-llm")
+		if decompile && provider == "" {
+			return fmt.Errorf("--dec requires --dec-llm; choose one of: %s", strings.Join(ai.Providers, ", "))
+		}
+		if provider != "" && !ai.IsValidProvider(provider) {
+			return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", provider, strings.Join(ai.Providers, ", "))
 		}
 
 		machoPath := filepath.Clean(args[0])
@@ -204,9 +206,31 @@ var machoDisassCmd = &cobra.Command{
 		} else {
 			ms = append(ms, m)
 		}
+		var decompConfig *dcmd.Config
+		if decompile {
+			decompConfig = &dcmd.Config{
+				LLM:            provider,
+				Language:       viper.GetString("macho.disass.dec-lang"),
+				Model:          viper.GetString("macho.disass.dec-model"),
+				Temperature:    viper.GetFloat64("macho.disass.dec-temp"),
+				TemperatureSet: tempFlagSet,
+				TopP:           viper.GetFloat64("macho.disass.dec-top-p"),
+				TopPSet:        topPFlagSet,
+				Stream:         false,
+				DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
+				Verbose:        viper.GetBool("verbose"),
+				Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+				Theme:          viper.GetString("macho.disass.dec-theme"),
+				MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
+				RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
+			}
+		}
 
 		if err := ctrlc.Default.Run(context.Background(), func() error {
 			for _, m := range ms {
+				if decompile {
+					decompConfig.UUID = m.UUID().String()
+				}
 				if entryStart {
 					if main := m.GetLoadsByName("LC_MAIN"); len(main) == 0 {
 						return fmt.Errorf("failed to find LC_MAIN in target when using --entry flag")
@@ -270,23 +294,7 @@ var machoDisassCmd = &cobra.Command{
 						//***************
 						asm := disass.Disassemble(engine)
 						if decompile && len(asm) > 0 {
-							decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-								UUID:           m.UUID().String(),
-								LLM:            viper.GetString("macho.disass.dec-llm"),
-								Language:       viper.GetString("macho.disass.dec-lang"),
-								Model:          viper.GetString("macho.disass.dec-model"),
-								Temperature:    viper.GetFloat64("macho.disass.dec-temp"),
-								TemperatureSet: tempFlagSet,
-								TopP:           viper.GetFloat64("macho.disass.dec-top-p"),
-								TopPSet:        topPFlagSet,
-								Stream:         false,
-								DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
-								Verbose:        viper.GetBool("verbose"),
-								Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
-								Theme:          viper.GetString("macho.disass.dec-theme"),
-								MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
-								RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
-							})
+							decmp, err := dcmd.Decompile(asm, decompConfig)
 							if err != nil {
 								return fmt.Errorf("failed to decompile via llm: %v", err)
 							}
@@ -401,23 +409,7 @@ var machoDisassCmd = &cobra.Command{
 					//***************
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
-						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:           m.UUID().String(),
-							LLM:            viper.GetString("macho.disass.dec-llm"),
-							Language:       viper.GetString("macho.disass.dec-lang"),
-							Model:          viper.GetString("macho.disass.dec-model"),
-							Temperature:    viper.GetFloat64("macho.disass.dec-temp"),
-							TemperatureSet: tempFlagSet,
-							TopP:           viper.GetFloat64("macho.disass.dec-top-p"),
-							TopPSet:        topPFlagSet,
-							Stream:         false,
-							DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
-							Verbose:        viper.GetBool("verbose"),
-							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:          viper.GetString("macho.disass.dec-theme"),
-							MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
-							RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
-						})
+						decmp, err := dcmd.Decompile(asm, decompConfig)
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}

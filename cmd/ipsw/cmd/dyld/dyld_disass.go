@@ -53,7 +53,7 @@ func init() {
 	DisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	DisassCmd.Flags().BoolP("dec", "D", false, "Decompile assembly")
 	DisassCmd.Flags().String("dec-lang", "", "Language to decompile to (C, ObjC or Swift)")
-	DisassCmd.Flags().String("dec-llm", "copilot", "LLM provider to use for decompilation (ollama, copilot, etc.)")
+	DisassCmd.Flags().String("dec-llm", "", "LLM provider to use for decompilation")
 	DisassCmd.RegisterFlagCompletionFunc("dec-llm", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return ai.Providers, cobra.ShellCompDirectiveDefault
 	})
@@ -120,8 +120,8 @@ var DisassCmd = &cobra.Command{
 		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --demangle
 		# Disassemble a function at a virtual address in dyld_shared_cache and do NOT markup analysis (Faster)
 		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
-		# Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
-		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
+		# Decompile a function at a virtual address in dyld_shared_cache via OpenAI
+		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openai
 		# Decompile a function using OpenRouter to access various models
 		❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"`),
 	Args: cobra.ExactArgs(1),
@@ -157,10 +157,12 @@ var DisassCmd = &cobra.Command{
 		if len(symbolImageName) > 0 && len(symbolName) == 0 {
 			return fmt.Errorf("you must also supply a --symbol with --symbol-image flag")
 		}
-		if viper.GetString("dyld.disass.dec-llm") != "" {
-			if !ai.IsValidProvider(viper.GetString("dyld.disass.dec-llm")) {
-				return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", viper.GetString("dyld.disass.dec-llm"), strings.Join(ai.Providers, ", "))
-			}
+		provider := viper.GetString("dyld.disass.dec-llm")
+		if decompile && provider == "" {
+			return fmt.Errorf("--dec requires --dec-llm; choose one of: %s", strings.Join(ai.Providers, ", "))
+		}
+		if provider != "" && !ai.IsValidProvider(provider) {
+			return fmt.Errorf("invalid LLM provider '%s', must be one of: %s", provider, strings.Join(ai.Providers, ", "))
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -192,6 +194,26 @@ var DisassCmd = &cobra.Command{
 		if !f.IsArm64() {
 			log.Errorf("can only disassemble arm64 caches")
 			return nil
+		}
+		var decompConfig *dcmd.Config
+		if decompile {
+			decompConfig = &dcmd.Config{
+				UUID:           f.UUID.String(),
+				LLM:            provider,
+				Language:       viper.GetString("dyld.disass.dec-lang"),
+				Model:          viper.GetString("dyld.disass.dec-model"),
+				Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
+				TemperatureSet: tempFlagSet,
+				TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
+				TopPSet:        topPFlagSet,
+				Stream:         false,
+				DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
+				Verbose:        viper.GetBool("verbose"),
+				Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+				Theme:          viper.GetString("dyld.disass.dec-theme"),
+				MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
+				RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
+			}
 		}
 
 		if !quiet || len(symbolName) > 0 {
@@ -277,23 +299,7 @@ var DisassCmd = &cobra.Command{
 					//***************
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
-						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:           f.UUID.String(),
-							LLM:            viper.GetString("dyld.disass.dec-llm"),
-							Language:       viper.GetString("dyld.disass.dec-lang"),
-							Model:          viper.GetString("dyld.disass.dec-model"),
-							Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
-							TemperatureSet: tempFlagSet,
-							TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
-							TopPSet:        topPFlagSet,
-							Stream:         false,
-							DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
-							Verbose:        viper.GetBool("verbose"),
-							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:          viper.GetString("dyld.disass.dec-theme"),
-							MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
-							RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
-						})
+						decmp, err := dcmd.Decompile(asm, decompConfig)
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
@@ -401,23 +407,7 @@ var DisassCmd = &cobra.Command{
 					//***************
 					asm := disass.Disassemble(engine)
 					if decompile && len(asm) > 0 {
-						decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-							UUID:           f.UUID.String(),
-							LLM:            viper.GetString("dyld.disass.dec-llm"),
-							Language:       viper.GetString("dyld.disass.dec-lang"),
-							Model:          viper.GetString("dyld.disass.dec-model"),
-							Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
-							TemperatureSet: tempFlagSet,
-							TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
-							TopPSet:        topPFlagSet,
-							Stream:         false,
-							DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
-							Verbose:        viper.GetBool("verbose"),
-							Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
-							Theme:          viper.GetString("dyld.disass.dec-theme"),
-							MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
-							RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
-						})
+						decmp, err := dcmd.Decompile(asm, decompConfig)
 						if err != nil {
 							return fmt.Errorf("failed to decompile via llm: %v", err)
 						}
@@ -540,23 +530,7 @@ var DisassCmd = &cobra.Command{
 				//***************
 				asm := disass.Disassemble(engine)
 				if decompile && len(asm) > 0 {
-					decmp, err := dcmd.Decompile(asm, &dcmd.Config{
-						UUID:           f.UUID.String(),
-						LLM:            viper.GetString("dyld.disass.dec-llm"),
-						Language:       viper.GetString("dyld.disass.dec-lang"),
-						Model:          viper.GetString("dyld.disass.dec-model"),
-						Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),
-						TemperatureSet: tempFlagSet,
-						TopP:           viper.GetFloat64("dyld.disass.dec-top-p"),
-						TopPSet:        topPFlagSet,
-						Stream:         false,
-						DisableCache:   viper.GetBool("dyld.disass.dec-nocache"),
-						Verbose:        viper.GetBool("verbose"),
-						Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
-						Theme:          viper.GetString("dyld.disass.dec-theme"),
-						MaxRetries:     viper.GetInt("dyld.disass.dec-retries"),
-						RetryBackoff:   viper.GetDuration("dyld.disass.dec-retry-backoff"),
-					})
+					decmp, err := dcmd.Decompile(asm, decompConfig)
 					if err != nil {
 						return fmt.Errorf("failed to decompile via llm: %v", err)
 					}

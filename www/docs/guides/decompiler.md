@@ -11,13 +11,14 @@ The **ipsw AI decompiler** revolutionizes binary analysis by leveraging state-of
 
 ## Requirements
 
-There are currently 9 supported LLM providers
+There are currently 9 supported LLM providers. Select one explicitly with
+`--dec-llm` whenever you use `--dec`.
 
-- Github Copilot
 - OpenAI
 - Anthropic (Claude API)
 - Google (Gemini API)
 - Claude (ACP)
+- GitHub Copilot (ACP)
 - Codex (ACP)
 - Gemini (ACP)
 - Ollama (local LLMs)
@@ -27,42 +28,16 @@ There are currently 9 supported LLM providers
 
 ```bash
 # Decompile a binary's entry point with AI
-ipsw macho disass /path/to/binary --entry --dec --dec-model "Claude 3.5 Sonnet"
+ipsw macho disass /path/to/binary --entry --dec --dec-llm openai
 
 # Analyze a specific function with context
 ipsw macho disass /path/to/binary --symbol "_main" --dec --dec-llm "openai"
 
 # Decompile dyld_shared_cache function as Swift
-ipsw dsc disass dyld_shared_cache --vaddr 0x123456 --dec --dec-lang "Swift"
+ipsw dsc disass dyld_shared_cache --vaddr 0x123456 --dec --dec-lang "Swift" --dec-llm anthropic
 ```
 
 ## 🔧 Provider Setup
-
-### GitHub Copilot ⭐ *Recommended*
-
-**Why Copilot?** Best value with access to premium models (GPT-4, Claude 3.5), plus you can use it in your IDE.
-
-1. **Sign up**: https://github.com/features/copilot
-2. **Enable models**: Go to https://github.com/settings/copilot and enable all available models
-3. **Authenticate via one of these methods**:
-
-   **Option A: Zed Editor** *(Easiest)*
-   ```bash
-   # Install Zed: https://zed.dev
-   # Open Zed → Agent Panel (Cmd+?) → Settings (Opt+Cmd+C) → Sign in to GitHub Copilot Chat
-   ```
-
-   **Option B: Xcode**
-   ```bash
-   # Follow GitHub's Xcode setup guide
-   # https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/installing-the-github-copilot-extension-in-your-environment?tool=xcode
-   ```
-
-4. **Verify setup**: Check that `~/.config/github-copilot/` contains `apps.json` or `hosts.json`
-
-:::tip Free Models Available
-GitHub Copilot offers FREE access to many premium models! See the [full list here](https://docs.github.com/en/copilot/about-github-copilot/plans-for-github-copilot#models).
-:::
 
 ### OpenAI
 
@@ -100,13 +75,21 @@ ipsw macho disass binary --dec --dec-llm google
 # (API providers do not support the "default" placeholder model)
 ```
 
-### CLI Agent Providers (Claude / Codex / Gemini)
+### CLI Agent Providers (Claude / Copilot / Codex / Gemini)
 
-For the adapters below, you need `npx` (Node.js) available.
+The Claude, Codex, and Gemini adapters require `npx` (Node.js). GitHub Copilot
+uses the official Copilot CLI and its authenticated ACP server. After logging
+in, launch `copilot` once from your analysis directory and accept its directory
+trust prompt before using the provider through `ipsw`.
 
 ```bash
 # Claude (ACP)
 ipsw macho disass binary --dec --dec-llm claude
+
+# GitHub Copilot (ACP)
+brew install --cask copilot-cli
+copilot login
+ipsw macho disass binary --dec --dec-llm copilot
 
 # Codex (ACP)
 ipsw macho disass binary --dec --dec-llm codex
@@ -167,13 +150,13 @@ There are 2 `ipsw` disassemblers:
 
 ```bash
 # Analyze iOS app main function
-ipsw macho disass /Applications/MyApp.app/MyApp --symbol "_main" --dec
+ipsw macho disass /Applications/MyApp.app/MyApp --symbol "_main" --dec --dec-llm openai
 
 # Decompile with specific model
 ipsw macho disass binary --entry --dec --dec-model "GPT-4" --dec-llm "openai"
 
 # Force language interpretation
-ipsw macho disass ObjCBinary --symbol "initWithFrame:" --dec --dec-lang "Objective-C"
+ipsw macho disass ObjCBinary --symbol "initWithFrame:" --dec --dec-lang "Objective-C" --dec-llm openai
 ```
 
 ### Kernelcache Analysis
@@ -182,20 +165,20 @@ ipsw macho disass ObjCBinary --symbol "initWithFrame:" --dec --dec-lang "Objecti
 # Extract and analyze kernel function
 ipsw download ipsw --device iPhone15,2 --latest --kernel
 ipsw extract --kernel *.ipsw
-ipsw macho disass kernelcache.* --symbol "_panic" --dec --dec-llm copilot
+ipsw macho disass kernelcache.* --symbol "_panic" --dec --dec-llm anthropic
 
 # Analyze KEXT with context
-ipsw macho disass kernelcache --fileset-entry com.apple.driver.AppleMobileFileIntegrity --entry --dec
+ipsw macho disass kernelcache --fileset-entry com.apple.driver.AppleMobileFileIntegrity --entry --dec --dec-llm anthropic
 ```
 
 ### dyld_shared_cache Analysis
 
 ```bash
 # Analyze specific virtual address
-ipsw dsc disass dyld_shared_cache_arm64e --vaddr 0x1234567890 --dec
+ipsw dsc disass dyld_shared_cache_arm64e --vaddr 0x1234567890 --dec --dec-llm openai
 
 # Decompile with symbol context
-ipsw dsc disass dyld_shared_cache_arm64e --symbol "_objc_msgSend" --demangle --dec
+ipsw dsc disass dyld_shared_cache_arm64e --symbol "_objc_msgSend" --demangle --dec --dec-llm openai
 
 # Swift function analysis
 ipsw dsc disass dyld_shared_cache --vaddr 0x... --dec --dec-lang "Swift" --dec-llm "anthropic"
@@ -277,16 +260,16 @@ ipsw macho disass binary --dec --dec-llm openai
     gpt-3.5-turbo
 
 # Direct model specification
-ipsw macho disass binary --dec --dec-model "Claude 3.5 Sonnet" --dec-llm copilot
+ipsw macho disass binary --dec --dec-model "MODEL_ID" --dec-llm openai
 ```
 
 ### Context Enhancement
 ```bash
 # Include symbol information for better context
-ipsw macho disass binary --symbol "functionName" --dec --demangle
+ipsw macho disass binary --symbol "functionName" --dec --demangle --dec-llm openai
 
 # Include multiple functions for context
-ipsw macho disass binary --vaddr 0x1000 --size 200 --dec
+ipsw macho disass binary --vaddr 0x1000 --size 200 --dec --dec-llm openai
 ```
 
 ## 🎯 Best Practices
@@ -300,19 +283,19 @@ ipsw macho disass binary --vaddr 0x1000 --size 200 --dec
 ### 2. **Provide Context**
 ```bash
 # Better: Include symbol names and demangling
-ipsw macho disass binary --symbol "_objc_msgSend" --demangle --dec
+ipsw macho disass binary --symbol "_objc_msgSend" --demangle --dec --dec-llm openai
 
 # Best: Include surrounding code for context
-ipsw macho disass binary --vaddr 0x1000 --size 500 --dec
+ipsw macho disass binary --vaddr 0x1000 --size 500 --dec --dec-llm openai
 ```
 
 ### 3. **Language Hints**
 ```bash
 # When analyzing ObjC runtime functions
-ipsw dsc disass cache --symbol "_objc_msgSend" --dec --dec-lang "Objective-C"
+ipsw dsc disass cache --symbol "_objc_msgSend" --dec --dec-lang "Objective-C" --dec-llm openai
 
 # When analyzing Swift compiled code
-ipsw dsc disass cache --symbol "swift_" --dec --dec-lang "Swift"
+ipsw dsc disass cache --symbol "swift_" --dec --dec-lang "Swift" --dec-llm anthropic
 ```
 
 ### 4. **Performance Tips**
@@ -328,7 +311,7 @@ ipsw dsc disass cache --symbol "swift_" --dec --dec-lang "Swift"
 # Analyze all exported functions in a binary
 for symbol in $(ipsw macho info binary --symbols | grep "T _" | cut -d' ' -f3); do
     echo "Analyzing $symbol..."
-    ipsw macho disass binary --symbol "$symbol" --dec --dec-model "Claude 3.5 Sonnet" > "analysis_$symbol.txt"
+    ipsw macho disass binary --symbol "$symbol" --dec --dec-llm anthropic > "analysis_$symbol.txt"
 done
 ```
 
@@ -337,11 +320,11 @@ done
 # 1. Extract and analyze iOS kernel panic function
 ipsw download ipsw --device iPhone15,2 --latest --kernel
 ipsw extract --kernel *.ipsw
-ipsw macho disass kernelcache.* --symbol "_panic" --dec --dec-llm copilot
+ipsw macho disass kernelcache.* --symbol "_panic" --dec --dec-llm anthropic
 
 # 2. Analyze specific iOS framework function
 ipsw dsc extract dyld_shared_cache_arm64e --dylib Foundation
-ipsw macho disass Foundation --symbol "NSStringFromClass" --dec --dec-lang "Objective-C"
+ipsw macho disass Foundation --symbol "NSStringFromClass" --dec --dec-lang "Objective-C" --dec-llm openai
 ```
 
 ## Custom Endpoints
@@ -374,7 +357,6 @@ ipsw macho disass binary --dec --dec-llm anthropic
 
 **"No API key found"**
 - Ensure environment variables are set correctly
-- For Copilot, verify the config files exist in `~/.config/github-copilot/`
 
 **"Model not available"**
 - Check model names with `ipsw macho disass --dec --dec-llm provider` (without --dec-model)

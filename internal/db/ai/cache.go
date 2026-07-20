@@ -19,9 +19,6 @@ const cacheDBName = "dec.db"
 type CacheDB interface {
 	Get(uuid, provider, modelName, prompt string, temperature, topP float64) (*model.ChatResponse, error)
 	Set(entry *model.ChatResponse) error
-	// Copilot Token Caching
-	GetToken(key string) (*model.CopilotToken, error)
-	SetToken(token *model.CopilotToken) error
 	// Provider Models Caching
 	GetProviderModels(providerName string) (*model.ProviderModels, error)
 	SetProviderModels(models *model.ProviderModels) error
@@ -61,7 +58,6 @@ func NewCacheDB(verbose bool) (CacheDB, error) {
 
 	if err := gormDB.AutoMigrate(
 		&model.ChatResponse{},
-		&model.CopilotToken{},
 		&model.ProviderModels{},
 	); err != nil {
 		sqlDB, closeErr := gormDB.DB()
@@ -113,32 +109,6 @@ func (d *DB) Close() error {
 		return fmt.Errorf("failed to get underlying DB instance: %w", err)
 	}
 	return sqlDB.Close()
-}
-
-/*
-	Copilot Token Caching Methods
-*/
-
-// GetToken retrieves a cached Copilot token.
-func (d *DB) GetToken(key string) (*model.CopilotToken, error) {
-	var token model.CopilotToken
-	if err := d.db.Where("key = ?", key).First(&token).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, model.ErrNotFound // Use your defined ErrNotFound from model pkg
-		}
-		return nil, fmt.Errorf("failed to get copilot token from cache: %w", err)
-	}
-	return &token, nil
-}
-
-// SetToken stores or updates a Copilot token in the cache.
-func (d *DB) SetToken(tokenToSet *model.CopilotToken) error {
-	// Attempt to find by key, then update or create.
-	// Using Assign to either update the existing record or create a new one if not found.
-	if err := d.db.Where(model.CopilotToken{Key: tokenToSet.Key}).Assign(tokenToSet).FirstOrCreate(tokenToSet).Error; err != nil {
-		return fmt.Errorf("failed to set copilot token in cache: %w", err)
-	}
-	return nil
 }
 
 /*

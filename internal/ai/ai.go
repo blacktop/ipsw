@@ -14,7 +14,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ai/acp"
 	"github.com/blacktop/ipsw/internal/ai/anthropic"
-	"github.com/blacktop/ipsw/internal/ai/copilot"
 	"github.com/blacktop/ipsw/internal/ai/gemini"
 	"github.com/blacktop/ipsw/internal/ai/ollama"
 	"github.com/blacktop/ipsw/internal/ai/openai"
@@ -279,14 +278,30 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			Stream:         cfg.Stream,
 		})
 	case "copilot":
-		baseAI, err = copilot.NewCopilot(ctx, &copilot.Config{
+		baseAI, err = acp.New(ctx, &acp.Config{
 			Prompt:      cfg.Prompt,
 			Model:       cfg.Model,
 			Temperature: cfg.Temperature,
 			TopP:        cfg.TopP,
 			Stream:      cfg.Stream,
-			Cache:       cache,
+			Command:     "copilot",
+			Args: []string{
+				"--acp",
+				"--stdio",
+				"--available-tools=",
+				"--disable-builtin-mcps",
+				"--no-ask-user",
+				"--no-auto-update",
+				"--no-custom-instructions",
+				"--no-remote",
+				"--no-remote-export",
+				"--log-level=none",
+			},
+			Verbose: cfg.Verbose,
 		})
+		// Do not reuse model IDs or chat responses cached by the retired
+		// editor-token-backed Copilot implementation.
+		cfg.Provider = "copilot-acp"
 	case "codex":
 		baseAI, err = acp.New(ctx, &acp.Config{
 			Prompt:      cfg.Prompt,

@@ -31,8 +31,8 @@ ipsw dyld disass <DSC> [flags]
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --demangle
 # Disassemble a function at a virtual address in dyld_shared_cache and do NOT markup analysis (Faster)
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --quiet
-# Decompile a function at a virtual address in dyld_shared_cache (via GitHub Copilot)
-❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-model "Claude 3.7 Sonnet"
+# Decompile a function at a virtual address in dyld_shared_cache via OpenAI
+❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openai
 # Decompile a function using OpenRouter to access various models
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"
 ```
@@ -44,7 +44,7 @@ ipsw dyld disass <DSC> [flags]
   -c, --count uint                   Number of instructions to disassemble
   -D, --dec                          Decompile assembly
       --dec-lang string              Language to decompile to (C, ObjC or Swift)
-      --dec-llm string               LLM provider to use for decompilation (ollama, copilot, etc.) (default "copilot")
+      --dec-llm string               LLM provider to use for decompilation
       --dec-model string             LLM model to use for decompilation
       --dec-nocache                  Do not use decompilation cache
       --dec-retries int              Number of retries for LLM decompilation
@@ -77,4 +77,3 @@ ipsw dyld disass <DSC> [flags]
 ### SEE ALSO
 
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
-
