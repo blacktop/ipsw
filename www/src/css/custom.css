@@ -113,11 +113,6 @@
   background-size: contain;
 }
 
-.header-discord-link::before {
-  background: url("/icons/discord-white.svg");
-  background-size: contain;
-}
-
 .header-twitter-link::before {
   background: url("/icons/twitter-white.svg");
   background-size: contain;

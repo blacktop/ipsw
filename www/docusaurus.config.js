@@ -225,10 +225,6 @@ const config = {
                 label: "Mastodon",
                 href: "https://mastodon.social/@blacktop",
               },
-              {
-                label: "Discord",
-                href: "https://discord.gg/BEamsHAWAh",
-              },
             ],
           },
           {
