@@ -157,7 +157,7 @@ var fridaObjcCmd = &cobra.Command{
 			}
 			session, err = dev.Attach(procPID, nil)
 			if err != nil {
-				return fmt.Errorf("failed to attach to spawned process with PID %d: %v", err, spawnPath, procPID)
+				return fmt.Errorf("failed to attach to spawned process with PID %d: %w", procPID, err)
 			}
 			defer session.Detach()
 		} else {

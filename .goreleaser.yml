@@ -108,14 +108,14 @@ builds:
     env:
       - CGO_ENABLED=1
       - CGO_LDFLAGS=-L/usr/local/homebrew/lib
-      - CGO_CFLAGS=-I/usr/local/homebrew/include
+      - CGO_CFLAGS=-I{{ .Env.PWD }}/hack/frida-compat -I/usr/local/homebrew/include
       - >-
         {{- if eq .Arch "amd64" }}CGO_LDFLAGS=-L/usr/local/homebrew/lib
         {{- else if eq .Arch "arm64" }}CGO_LDFLAGS=-L/opt/homebrew/lib
         {{- end }}
       - >-
-        {{- if eq .Arch "amd64" }}CGO_CFLAGS=-I/usr/local/homebrew/include
-        {{- else if eq .Arch "arm64" }}CGO_CFLAGS=-I/opt/homebrew/include
+        {{- if eq .Arch "amd64" }}CGO_CFLAGS=-I{{ .Env.PWD }}/hack/frida-compat -I/usr/local/homebrew/include
+        {{- else if eq .Arch "arm64" }}CGO_CFLAGS=-I{{ .Env.PWD }}/hack/frida-compat -I/opt/homebrew/include
         {{- end }}
     goos:
       - darwin
