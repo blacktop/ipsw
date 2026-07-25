@@ -101,6 +101,12 @@ func init() {
 	viper.BindPFlag("ent.replace-strategy", entCmd.Flags().Lookup("replace-strategy"))
 	viper.BindPFlag("ent.dry-run", entCmd.Flags().Lookup("dry-run"))
 
+	// Declared here rather than checked in RunE so cobra compares what was actually passed on the
+	// command line; the viper-resolved values also carry config.yml defaults, which are not a conflict.
+	entCmd.MarkFlagsMutuallyExclusive("fs", "sqlite")
+	entCmd.MarkFlagsMutuallyExclusive("fs", "pg-host")
+	entCmd.MarkFlagsMutuallyExclusive("sqlite", "pg-host")
+	entCmd.MarkFlagsMutuallyExclusive("ipsw", "input")
 }
 
 // entCmd represents the ent command
@@ -189,16 +195,10 @@ var entCmd = &cobra.Command{
 		}
 
 		if fsMode {
-			if len(ipsws) > 0 && len(inputs) > 0 {
-				return fmt.Errorf("--ipsw and --input are mutually exclusive")
-			}
-			if sqliteDB != "" || pgHost != "" {
-				return fmt.Errorf("--fs cannot be combined with database flags")
-			}
 			if showStats || replace || dryRun {
 				return fmt.Errorf("--fs cannot be combined with --stats, --replace, or --dry-run")
 			}
-			if versionFilter != "" {
+			if cmd.Flags().Changed("version") {
 				return fmt.Errorf("--version only applies to database searches")
 			}
 			if len(ipsws) == 0 && len(inputs) == 0 {
@@ -218,25 +218,22 @@ var entCmd = &cobra.Command{
 			})
 		}
 
-		// Validate mutually exclusive flags (works for CLI, ENV, and config values)
-		if sqliteDB != "" && pgHost != "" {
-			return fmt.Errorf("--sqlite and --pg-host are mutually exclusive")
+		// Selecting a backend on the command line drops one inherited from config/env; only two
+		// ambient backends are ambiguous enough to be worth an error.
+		switch {
+		case cmd.Flags().Changed("sqlite"):
+			pgHost = ""
+		case cmd.Flags().Changed("pg-host"):
+			sqliteDB = ""
+		case sqliteDB != "" && pgHost != "":
+			return fmt.Errorf("both sqlite and pg-host are configured; pass --sqlite or --pg-host to choose one")
 		}
 
-		if len(ipsws) > 0 && len(inputs) > 0 {
-			return fmt.Errorf("--ipsw and --input are mutually exclusive")
-		}
-
-		if len(hasKeys) > 0 || len(withoutKeys) > 0 {
+		if cmd.Flags().Changed("has") || cmd.Flags().Changed("without") {
 			return fmt.Errorf("--has and --without require --fs")
 		}
-		if format != "" && format != "text" {
+		if cmd.Flags().Changed("format") {
 			return fmt.Errorf("--format only applies to --fs")
-		}
-
-		// Validate required flags
-		if sqliteDB == "" && pgHost == "" {
-			return fmt.Errorf("either --sqlite (SQLite) or --pg-host (PostgreSQL) is required")
 		}
 
 		// Count search/operation flags
@@ -255,6 +252,16 @@ var entCmd = &cobra.Command{
 		}
 		if searchOpCount > 1 {
 			return fmt.Errorf("--key, --value, --file, and --stats are mutually exclusive")
+		}
+
+		// Without --fs, --ipsw/--input ingest into the database; search flags would be ignored
+		if (len(ipsws) > 0 || len(inputs) > 0) && searchOpCount > 0 {
+			return fmt.Errorf("--ipsw/--input ingest into the database and cannot be combined with --key, --value, --file, or --stats; add --fs to search the IPSW filesystem directly")
+		}
+
+		// Checked after flag-shape validation so misuse reports the real problem, not a missing database
+		if sqliteDB == "" && pgHost == "" {
+			return fmt.Errorf("either --sqlite (SQLite) or --pg-host (PostgreSQL) is required")
 		}
 
 		// Validate replacement flags
