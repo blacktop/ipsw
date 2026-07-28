@@ -81,6 +81,9 @@ const diffMarkdownTemplate = `
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Kernel.Version.KernelVersion.Darwin }} | {{ .Old.Kernel.Version.KernelVersion.XNU }} | {{ .Old.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Kernel.Version.KernelVersion.Darwin }} | {{ .New.Kernel.Version.KernelVersion.XNU }} | {{ .New.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
 {{ end -}}
+{{ with .SameKernelNote }}
+{{ . }}
+{{ end -}}
 {{ if .Kexts }}
 ### Kexts
 {{ if .Kexts.New }}
@@ -525,6 +528,10 @@ type diffHTMLPageData struct {
 	NewKernelDarwin  string
 	NewKernelXNU     string
 	NewKernelDate    string
+	// SameKernelNote is [sameKernelNote] rendered to HTML (empty when the
+	// kernelcache changed), so a Kernel section with no KEXT diff is never left
+	// unexplained. Sourced from Diff.SameKernelNote like every other renderer.
+	SameKernelNote template.HTML
 
 	// TOC-only converted views: every in-scope task (mount-based or
 	// top-level) keeps its sidebar TOC entry while the section bodies
@@ -1095,6 +1102,9 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             </tbody>
           </table>
           {{- end }}
+          {{- with .SameKernelNote }}
+          {{ . }}
+          {{- end }}
 
           {{- if not .KextsFragment.Empty }}{{ .KextsFragment.Body }}{{- end }}
 
@@ -1654,6 +1664,7 @@ func (d *Diff) renderHTML() (string, error) {
 		FeaturesFragment:      featuresFrag,
 	}
 
+	data.SameKernelNote = renderMarkdownFragment(d.SameKernelNote())
 	if d.Old.Kernel.Version != nil {
 		data.HasKernelVersion = true
 		data.OldKernelDarwin = d.Old.Kernel.Version.KernelVersion.Darwin

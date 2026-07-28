@@ -438,7 +438,10 @@ func (d *Diff) Diff() (err error) {
 		if directoryMode {
 			log.Debug("Skipping KERNELCACHES for directory inputs")
 		} else if d.sameKernel {
-			log.Info("Skipping KERNELCACHES (BuildManifest digest unchanged)")
+			log.Info("Kernelcache unchanged (BuildManifest digest); parsing version only")
+			if err := d.parseKernelVersion(); err != nil {
+				log.WithError(err).Warn("failed to parse unchanged kernelcache version")
+			}
 		} else {
 			log.Info("Diffing KERNELCACHES")
 			pre = append(pre, newKextsTask(d))
@@ -748,13 +751,37 @@ func (d *Diff) extractKernelcaches() error {
 // they are empty. extractKernelcaches sets them as a side effect of the kexts
 // task's Parse, but a warm cache hit on kexts SKIPS that Parse, so a sibling
 // task that runs fresh (e.g. a partial-hit sandbox task) would otherwise find an
-// empty path. Extraction treats an existing extraction as a cache hit, so this is
-// idempotent and cheap; it is a no-op once either prior extraction has run.
+// empty path. The path check is the only guard: kernelcache.Extract re-does the
+// full unzip+decompress every call (it does NOT skip an already-extracted file),
+// so callers that just need the paths must go through here rather than calling
+// extractKernelcaches directly.
 func (d *Diff) ensureKernelcachePaths() error {
 	if d.Old.Kernel.Path != "" && d.New.Kernel.Path != "" {
 		return nil
 	}
 	return d.extractKernelcaches()
+}
+
+// parseKernelVersion parses only the kernelcache version (no KEXT diff) so the
+// report's Kernel section still renders when the kernelcache is unchanged
+// between builds and the full diff is skipped. Both builds share an identical
+// kernelcache in that case, so one open supplies the version for both sides.
+func (d *Diff) parseKernelVersion() error {
+	if err := d.ensureKernelcachePaths(); err != nil {
+		return err
+	}
+	m, err := macho.Open(d.Old.Kernel.Path)
+	if err != nil {
+		return fmt.Errorf("failed to open kernelcache: %v", err)
+	}
+	defer m.Close()
+	version, err := kernelcache.GetVersion(m)
+	if err != nil {
+		return fmt.Errorf("failed to get kernelcache version: %v", err)
+	}
+	d.Old.Kernel.Version = version
+	d.New.Kernel.Version = version
+	return nil
 }
 
 func (d *Diff) parseKernelcache() error {

@@ -13,6 +13,23 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 )
 
+// sameKernelNote explains a Kernel section rendered without a KEXT diff. Worded
+// to stay true for every path that sets Diff.sameKernel, including the one where
+// only wrapper bytes (UUID, build-root strings) differ.
+const sameKernelNote = "_Kernelcache functionally unchanged; KEXT diff skipped._"
+
+// SameKernelNote returns [sameKernelNote] when the kernelcache was found
+// functionally unchanged, else "". It is the single source every renderer reads
+// (Markdown below, the text template via `{{ .SameKernelNote }}`, and the HTML
+// page data), so a Kernel section without a KEXT diff is never left unexplained
+// in one output format but not another. Exported for template access.
+func (d *Diff) SameKernelNote() string {
+	if !d.sameKernel {
+		return ""
+	}
+	return sameKernelNote
+}
+
 // Markdown saves the diff as Markdown files.
 func (d *Diff) Markdown() error {
 	d.conf.Output = filepath.Join(d.conf.Output, d.TitleToFilename())
@@ -36,12 +53,17 @@ func (d *Diff) Markdown() error {
 		),
 	)
 
-	// SECTION: Kernel
-	if d.Old.Kernel.Version != nil && d.New.Kernel.Version != nil {
-		out.WriteString(
-			fmt.Sprintf(
-				"## Kernel\n\n"+
-					"### Version\n\n"+
+	// SECTION: Kernel — heading, optional version table, optional state note,
+	// mirroring the HTML template's shape. The note carries the section when the
+	// version could not be parsed, so an unchanged kernel never renders as a
+	// bare heading (or vanishes entirely).
+	hasKernelVersion := d.Old.Kernel.Version != nil && d.New.Kernel.Version != nil
+	note := d.SameKernelNote()
+	if hasKernelVersion || note != "" {
+		out.WriteString("## Kernel\n\n")
+		if hasKernelVersion {
+			fmt.Fprintf(&out,
+				"### Version\n\n"+
 					"| iOS | Version | Build | Date |\n"+
 					"| :-- | :------ | :---- | :--- |\n"+
 					"| %s *(%s)* | %s | %s | %s |\n"+
@@ -52,8 +74,11 @@ func (d *Diff) Markdown() error {
 				d.New.Version, d.New.Build,
 				d.New.Kernel.Version.KernelVersion.Darwin, d.New.Kernel.Version.KernelVersion.XNU,
 				d.New.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
-			),
-		)
+			)
+		}
+		if note != "" {
+			out.WriteString(note + "\n\n")
+		}
 	}
 
 	// SUB-SECTION: Kexts — owned by kextsTask (body in tasks_kexts.go).

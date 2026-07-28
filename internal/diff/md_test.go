@@ -7,9 +7,98 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
+
+// newSameKernelDiff builds a Diff whose kernelcache was found functionally
+// unchanged, optionally carrying a parsed version.
+func newSameKernelDiff(t *testing.T, kv *kernelcache.Version) *Diff {
+	t.Helper()
+	d := New(&Config{Title: "26.6_25G70__vs__26.6_25G72", Output: t.TempDir()})
+	d.sameKernel = true
+	d.Old.Version, d.Old.Build = "26.6", "25G70"
+	d.New.Version, d.New.Build = "26.6", "25G72"
+	d.Old.Kernel.Version, d.New.Kernel.Version = kv, kv
+	return d
+}
+
+// testKernelVersion is a fixed parsed kernelcache version for render tests.
+func testKernelVersion() *kernelcache.Version {
+	return &kernelcache.Version{KernelVersion: kernelcache.KernelVersion{
+		Darwin: "25.6.0",
+		XNU:    "xnu-12377.160.19~1",
+		Date:   time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC),
+	}}
+}
+
+// TestMarkdownUnchangedKernelSection covers an unchanged kernelcache
+// (sameKernel): the KEXT diff is skipped, but the Kernel section must still
+// render -- with the identical version table when it parsed, and with the note
+// alone when it did not -- rather than vanishing or leaving a bare heading.
+func TestMarkdownUnchangedKernelSection(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kv   *kernelcache.Version
+		want []string
+	}{
+		{
+			name: "with version table",
+			kv:   testKernelVersion(),
+			want: []string{
+				"## Kernel",
+				"### Version",
+				"| 26.6 *(25G70)* | 25.6.0 |",
+				"| 26.6 *(25G72)* | 25.6.0 |",
+				sameKernelNote,
+			},
+		},
+		{
+			name: "version unparsed",
+			kv:   nil,
+			want: []string{"## Kernel\n\n" + sameKernelNote},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newSameKernelDiff(t, tc.kv)
+			if err := d.Markdown(); err != nil {
+				t.Fatalf("Markdown: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(d.conf.Output, "README.md"))
+			if err != nil {
+				t.Fatalf("read README: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(string(data), want) {
+					t.Fatalf("README missing %q\n%s", want, data)
+				}
+			}
+		})
+	}
+}
+
+// TestUnchangedKernelNoteInEveryRenderer pins renderer parity: all three output
+// formats must explain an unchanged kernel. Markdown/HTML each regressed once by
+// being fixed independently, so this asserts them together.
+func TestUnchangedKernelNoteInEveryRenderer(t *testing.T) {
+	// Plain-text template (Diff.String, the default stdout path).
+	if got := newSameKernelDiff(t, testKernelVersion()).String(); !strings.Contains(got, sameKernelNote) {
+		t.Errorf("Diff.String missing %q:\n%s", sameKernelNote, got)
+	}
+	// HTML page.
+	d := newSameKernelDiff(t, testKernelVersion())
+	if got := mustRenderHTML(t, d); !strings.Contains(got, "Kernelcache functionally unchanged") {
+		t.Error("renderHTML missing the unchanged-kernel note")
+	}
+	// A changed kernel must NOT claim it is unchanged.
+	changed := newSameKernelDiff(t, testKernelVersion())
+	changed.sameKernel = false
+	if got := changed.String(); strings.Contains(got, "functionally unchanged") {
+		t.Errorf("changed kernel should not render the unchanged note:\n%s", got)
+	}
+}
 
 // smallDiff is a tiny rendered diff body used to populate Updated maps.
 const smallDiff = "```diff\n- a\n+ b\n```"
