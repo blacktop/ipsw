@@ -74,14 +74,24 @@ func (d *Diff) allIPSWOSVolumesUnchanged() bool {
 }
 
 func ipswKernelcacheManifestDigestsEqual(oldInfo, newInfo *info.Info) bool {
+	_, ok := matchingIPSWKernelcacheManifestMember(oldInfo, newInfo)
+	return ok
+}
+
+// matchingIPSWKernelcacheManifestMember reports whether the per-model
+// kernelcache digests used by the unchanged-kernel fast path match and returns
+// one Old-side member whose digest was part of that comparison. Returning the
+// compared member together with the decision keeps later version parsing from
+// selecting a different, unchecked entry when a model has multiple paths.
+func matchingIPSWKernelcacheManifestMember(oldInfo, newInfo *info.Info) (string, bool) {
 	if !hasBuildManifest(oldInfo) || !hasBuildManifest(newInfo) {
-		return false
+		return "", false
 	}
 
 	oldKCs := oldInfo.Plists.BuildManifest.GetKernelCaches()
 	newKCs := newInfo.Plists.BuildManifest.GetKernelCaches()
 	if len(oldKCs) == 0 || len(oldKCs) != len(newKCs) {
-		return false
+		return "", false
 	}
 
 	models := make([]string, 0, len(oldKCs))
@@ -90,26 +100,30 @@ func ipswKernelcacheManifestDigestsEqual(oldInfo, newInfo *info.Info) bool {
 	}
 	slices.Sort(models)
 
+	var member string
 	for _, model := range models {
 		oldPaths := oldKCs[model]
 		newPaths, ok := newKCs[model]
 		if !ok || len(oldPaths) == 0 || len(newPaths) == 0 {
-			return false
+			return "", false
 		}
 
 		oldDigest, ok := uniqueManifestDigestForPath(oldInfo, "KernelCache", oldPaths[0])
 		if !ok {
-			return false
+			return "", false
 		}
 		newDigest, ok := uniqueManifestDigestForPath(newInfo, "KernelCache", newPaths[0])
 		if !ok {
-			return false
+			return "", false
 		}
 		if !bytes.Equal(oldDigest, newDigest) {
-			return false
+			return "", false
+		}
+		if member == "" {
+			member = oldPaths[0]
 		}
 	}
-	return true
+	return member, member != ""
 }
 
 func ipswVolumeManifestDigestsEqual(oldInfo, newInfo *info.Info, typ string) bool {

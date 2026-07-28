@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +12,67 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
+
+func TestSameKernelVersionIsPersistedForExtractionFreeWarmRun(t *testing.T) {
+	oldInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x01}},
+	})
+	newInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x01}},
+	})
+	cachePath := filepath.Join(t.TempDir(), "diff.db")
+
+	coldDir := t.TempDir()
+	kernelPath := filepath.Join(coldDir, oldInfo.GetKernelCacheFileName("kernelcache.release.v53"))
+	const version = "Darwin Kernel Version 24.0.0: Thu May 1 00:00:00 PDT 2025; root:xnu-11215.0.0~1/RELEASE_ARM64_T6000"
+	writeTextSectionMachO(t, kernelPath, "__const", append([]byte(version), 0))
+
+	newDiff := func(folder string, store storage.Store) *Diff {
+		d := &Diff{conf: &Config{}, sameKernel: true}
+		d.Old.Info = oldInfo
+		d.New.Info = newInfo
+		d.Old.Folder = folder
+		d.Old.IPSWPath = filepath.Join(folder, "missing-old.ipsw")
+		d.New.IPSWPath = filepath.Join(folder, "missing-new.ipsw")
+		d.SetStore(store)
+		return d
+	}
+
+	coldStore, err := storage.NewSQLiteStore(cachePath)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore(cold): %v", err)
+	}
+	cold := newDiff(coldDir, coldStore)
+	if err := cold.runTopLevelTasks(context.Background(), []TopLevelTask{newKextsTask(cold)}); err != nil {
+		t.Fatalf("cold runTopLevelTasks: %v", err)
+	}
+	if cold.Old.Kernel.Version == nil || cold.Old.Kernel.Version.KernelVersion.Darwin != "24.0.0" {
+		t.Fatalf("cold parsed version = %+v, want Darwin 24.0.0", cold.Old.Kernel.Version)
+	}
+	if err := coldStore.Close(); err != nil {
+		t.Fatalf("Close cold store: %v", err)
+	}
+
+	warmStore, err := storage.NewSQLiteStore(cachePath)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore(warm): %v", err)
+	}
+	t.Cleanup(func() { _ = warmStore.Close() })
+	warm := newDiff(filepath.Join(t.TempDir(), "no-extracted-kernel"), warmStore)
+	counted := &parseCountingTopLevel{inner: newKextsTask(warm)}
+	if err := warm.runTopLevelTasks(context.Background(), []TopLevelTask{counted}); err != nil {
+		t.Fatalf("warm runTopLevelTasks: %v", err)
+	}
+	if counted.parsed != 0 {
+		t.Fatalf("warm Parse calls = %d, want 0", counted.parsed)
+	}
+	if warm.Old.Kernel.Version == nil || warm.Old.Kernel.Version.KernelVersion.Darwin != "24.0.0" {
+		t.Fatalf("warm hydrated version = %+v, want Darwin 24.0.0", warm.Old.Kernel.Version)
+	}
+	if !warm.sameKernel {
+		t.Fatal("warm hydration cleared sameKernel")
+	}
+}
 
 // newKextsTaskWithConf builds a kextsTask whose render config is conf and whose
 // old/new Info are inserted for InputHash resolution.

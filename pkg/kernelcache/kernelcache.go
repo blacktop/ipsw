@@ -334,6 +334,31 @@ func Extract(ipsw, destPath, device string) (map[string][]string, error) {
 		}
 	}
 
+	return extractKernelcaches(i, ipsw, destPath, targetKCs)
+}
+
+// ExtractWithInfo extracts only the named kernelcache(s) from ipsw, reusing
+// already-parsed IPSW metadata instead of re-running info.Parse. Each target is
+// a BuildManifest kernelcache path (as returned by
+// BuildManifest.GetKernelCaches or Info.GetKernelCacheForDevice); passing none
+// extracts every kernelcache in the IPSW, matching [Extract].
+//
+// Prefer this over Extract when the caller already holds an *info.Info and
+// knows which kernelcache it needs: Extract with an empty device inflates and
+// decompresses every kernelcache in the archive, which on a multi-device IPSW is
+// many ~100MB writes the caller may not want.
+func ExtractWithInfo(i *info.Info, ipsw, destPath string, targets ...string) (map[string][]string, error) {
+	if i == nil {
+		return nil, fmt.Errorf("missing IPSW metadata")
+	}
+	return extractKernelcaches(i, ipsw, destPath, targets)
+}
+
+// extractKernelcaches unzips the kernelcache entries selected by targetKCs (all
+// of them when targetKCs is empty), decompresses each im4p payload, and writes
+// the result under destPath. It returns each written path mapped to the devices
+// that kernelcache supports.
+func extractKernelcaches(i *info.Info, ipsw, destPath string, targetKCs []string) (map[string][]string, error) {
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory to store kernelcache: %v", err)

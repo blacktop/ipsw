@@ -439,9 +439,7 @@ func (d *Diff) Diff() (err error) {
 			log.Debug("Skipping KERNELCACHES for directory inputs")
 		} else if d.sameKernel {
 			log.Info("Kernelcache unchanged (BuildManifest digest); parsing version only")
-			if err := d.parseKernelVersion(); err != nil {
-				log.WithError(err).Warn("failed to parse unchanged kernelcache version")
-			}
+			pre = append(pre, newKextsTask(d))
 		} else {
 			log.Info("Diffing KERNELCACHES")
 			pre = append(pre, newKextsTask(d))
@@ -709,12 +707,12 @@ func (d *Diff) extractKernelcaches() error {
 
 	// IPSW mode.
 	if d.Old.IsMacOS || d.New.IsMacOS {
-		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, "Macmini9,1"); err != nil {
+		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, macOSKernelcacheDevice); err != nil {
 			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
 		} else {
 			d.Old.Kernel.Path = maps.Keys(out)[0]
 		}
-		if out, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, "Macmini9,1"); err != nil {
+		if out, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, macOSKernelcacheDevice); err != nil {
 			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
 		} else {
 			d.New.Kernel.Path = maps.Keys(out)[0]
@@ -767,10 +765,11 @@ func (d *Diff) ensureKernelcachePaths() error {
 // between builds and the full diff is skipped. Both builds share an identical
 // kernelcache in that case, so one open supplies the version for both sides.
 func (d *Diff) parseKernelVersion() error {
-	if err := d.ensureKernelcachePaths(); err != nil {
+	path, err := d.extractOldKernelcache()
+	if err != nil {
 		return err
 	}
-	m, err := macho.Open(d.Old.Kernel.Path)
+	m, err := macho.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open kernelcache: %v", err)
 	}
@@ -782,6 +781,54 @@ func (d *Diff) parseKernelVersion() error {
 	d.Old.Kernel.Version = version
 	d.New.Kernel.Version = version
 	return nil
+}
+
+// extractOldKernelcache resolves a single Old-side kernelcache on disk and
+// returns its path, doing the least work that can produce one:
+//
+//   - a file extracted earlier in the current run is reused (kernelcache.Extract
+//     has no such guard);
+//   - only the Old IPSW is touched, and only one kernelcache member within it.
+//
+// Callers must therefore only use it when the New side is known to carry the
+// same kernel (the sameKernel short-circuit); [Diff.extractKernelcaches] remains
+// the path that populates both sides for the real KEXT diff.
+func (d *Diff) extractOldKernelcache() (string, error) {
+	if d.Old.Kernel.Path != "" {
+		return d.Old.Kernel.Path, nil
+	}
+	member, ok := d.oldKernelcacheMember()
+	if !ok {
+		// No resolvable member: fall back to the both-sides extraction so the
+		// version is still reported rather than silently dropped.
+		if err := d.extractKernelcaches(); err != nil {
+			return "", err
+		}
+		return d.Old.Kernel.Path, nil
+	}
+	fname := filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(member))
+	if _, err := os.Stat(fname); err == nil {
+		d.Old.Kernel.Path = fname
+		return fname, nil
+	}
+	out, err := kernelcache.ExtractWithInfo(d.Old.Info, d.Old.IPSWPath, d.Old.Folder, member)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract 'Old' kernelcache %s: %w", member, err)
+	}
+	if len(out) == 0 {
+		return "", fmt.Errorf("no kernelcache extracted for %s", member)
+	}
+	paths := maps.Keys(out)
+	slices.Sort(paths)
+	d.Old.Kernel.Path = paths[0]
+	return d.Old.Kernel.Path, nil
+}
+
+// oldKernelcacheMember returns an Old-side BuildManifest path whose digest was
+// compared successfully with the corresponding New-side path by the
+// sameKernel fast-path predicate.
+func (d *Diff) oldKernelcacheMember() (string, bool) {
+	return matchingIPSWKernelcacheManifestMember(d.Old.Info, d.New.Info)
 }
 
 func (d *Diff) parseKernelcache() error {

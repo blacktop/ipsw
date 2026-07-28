@@ -50,11 +50,14 @@ func (t *kextsTask) Empty() bool {
 		(len(t.d.Kexts.New) == 0 && len(t.d.Kexts.Removed) == 0 && len(t.d.Kexts.Updated) == 0)
 }
 
-// Parse runs the kernelcache extraction and diff. Wraps the existing
-// [Diff.parseKernelcache] so behavior (sameKernel short-circuit,
-// signature symbolication, MachO diff) is preserved. Skipped by the
-// orchestrator on a cache hit (Hydrate publishes the result).
+// Parse runs the targeted version-only parse when BuildManifest digests already
+// established that the kernel is unchanged; otherwise it runs the full
+// kernelcache extraction and diff. The orchestrator persists either result, so
+// a warm unchanged-kernel run hydrates the version without extraction.
 func (t *kextsTask) Parse(_ context.Context, d *Diff) error {
+	if d.sameKernel {
+		return d.parseKernelVersion()
+	}
 	return d.parseKernelcache()
 }
 
@@ -222,10 +225,9 @@ func (t *kextsTask) Hydrate(scope storage.Scope, store storage.Store) error {
 }
 
 // persistTo writes the kernelcache result from the freshly-parsed Diff. It runs
-// only after a successful Parse. An empty result (no kext diff and no kernel
-// version fields, i.e. the sameKernel short-circuit fired) writes zero rows so a
-// later zero-row Hydrate yields a non-nil empty payload and publishes the same
-// nil d.Kexts / nil Kernel.Version a fresh short-circuited run produces.
+// only after a successful Parse. A result with neither a kext diff nor parsed
+// versions writes zero rows; version-only sameKernel results are content-bearing
+// and persist the version table for extraction-free warm hydration.
 func (t *kextsTask) persistTo(scope storage.Scope, store storage.Store) error {
 	oldZoneName, oldZoneOff := kernelVersionDateZone(t.d.Old.Kernel.Version)
 	newZoneName, newZoneOff := kernelVersionDateZone(t.d.New.Kernel.Version)

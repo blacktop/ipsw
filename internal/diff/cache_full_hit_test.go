@@ -13,12 +13,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 )
 
-// writeLaunchdMachO writes a minimal ARM64 Mach-O at path carrying a single
-// __TEXT,__config section whose bytes are configBody. launchdJob extracts that
-// section verbatim, so two different bodies produce a real git diff. The layout
-// is mach_header_64 + one LC_SEGMENT_64 (with one section_64) + the section
-// payload, which is the smallest input launchdConfigFromRoots can read.
-func writeLaunchdMachO(t *testing.T, path, configBody string) {
+// writeTextSectionMachO writes a minimal ARM64 Mach-O at path carrying one
+// named __TEXT section. The layout is mach_header_64 + one LC_SEGMENT_64 (with
+// one section_64) + the section payload.
+func writeTextSectionMachO(t *testing.T, path, sectionName string, body []byte) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("MkdirAll(%s): %v", filepath.Dir(path), err)
@@ -30,7 +28,6 @@ func writeLaunchdMachO(t *testing.T, path, configBody string) {
 		sectionSize = 80
 		loadSize    = segCmdSize + sectionSize
 	)
-	body := []byte(configBody)
 	sectOffset := uint32(headerSize + loadSize)
 
 	buf := make([]byte, sectOffset)
@@ -62,7 +59,7 @@ func writeLaunchdMachO(t *testing.T, path, configBody string) {
 
 	// section_64
 	sect := seg[segCmdSize:]
-	copy(sect[0:16], "__config")                // sectname
+	copy(sect[0:16], sectionName)               // sectname
 	copy(sect[16:32], "__TEXT")                 // segname
 	le.PutUint64(sect[32:], uint64(sectOffset)) // addr
 	le.PutUint64(sect[40:], uint64(len(body)))  // size
@@ -74,6 +71,13 @@ func writeLaunchdMachO(t *testing.T, path, configBody string) {
 	if err := os.WriteFile(path, buf, 0o755); err != nil {
 		t.Fatalf("WriteFile(%s): %v", path, err)
 	}
+}
+
+// writeLaunchdMachO writes the minimal __TEXT,__config Mach-O consumed by
+// launchdJob.
+func writeLaunchdMachO(t *testing.T, path, configBody string) {
+	t.Helper()
+	writeTextSectionMachO(t, path, "__config", []byte(configBody))
 }
 
 // writeMinimalIPSWZip writes a tiny but valid zip at path with a single loose
