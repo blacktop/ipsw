@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/asn1"
@@ -913,28 +914,48 @@ func UniquePCCReleases(releases []*PCCRelease) []*PCCRelease {
 	return unique
 }
 
+// PCCLogSnapshot identifies one view of Apple's PCC transparency log.
+// HeadIndex is the exclusive log head, so newly appended leaves have indexes
+// greater than or equal to the previous snapshot's HeadIndex.
+type PCCLogSnapshot struct {
+	TreeID    uint64
+	HeadIndex uint64
+	Releases  []*PCCRelease
+}
+
 // GetPCCReleases returns parsed releases from Apple's PCC AT transparency
 // log, using the on-disk pcc_log.json cache for incremental fetch. Steady
 // state is two POSTs (ListTrees + LogHead) instead of the full ~15-batch
 // replay of the entire log every invocation.
 func GetPCCReleases(proxy string, insecure bool, progress func(done, total uint64)) ([]*PCCRelease, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
+	snapshot, err := GetPCCLogSnapshot(context.Background(), proxy, insecure, progress)
+	if err != nil {
+		return nil, err
 	}
+	return snapshot.Releases, nil
+}
 
-	bag, err := fetchPCCBag(client)
+// GetPCCLogSnapshot returns releases together with the transparency-log
+// identity and exclusive head needed by incremental consumers.
+func GetPCCLogSnapshot(
+	ctx context.Context,
+	proxy string,
+	insecure bool,
+	progress func(done, total uint64),
+) (*PCCLogSnapshot, error) {
+	client := NewRemoteHTTPClient(proxy, insecure)
+	defer client.CloseIdleConnections()
+
+	bag, err := fetchPCCBag(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 	requestUUID := uuid.NewString()
-	tree, err := fetchPCCTree(client, bag.AtResearcherListTrees, requestUUID)
+	tree, err := fetchPCCTree(ctx, client, bag.AtResearcherListTrees, requestUUID)
 	if err != nil {
 		return nil, err
 	}
-	logSize, err := fetchPCCLogSize(client, bag.AtResearcherLogHead, tree, requestUUID)
+	logSize, err := fetchPCCLogSize(ctx, client, bag.AtResearcherLogHead, tree, requestUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -958,11 +979,15 @@ func GetPCCReleases(proxy string, insecure bool, progress func(done, total uint6
 	}
 
 	if cache.HeadIndex >= logSize && len(prior) > 0 {
-		return prior, nil
+		return &PCCLogSnapshot{
+			TreeID:    tree.GetTreeId(),
+			HeadIndex: logSize,
+			Releases:  prior,
+		}, nil
 	}
 
 	fetchLeaves := func(startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
-		return fetchPCCLogLeaves(client, bag.AtResearcherLogLeaves, tree, requestUUID, startIndex, endIndex)
+		return fetchPCCLogLeaves(ctx, client, bag.AtResearcherLogLeaves, tree, requestUUID, startIndex, endIndex)
 	}
 	newReleases, err := collectPCCReleases(cache.HeadIndex, logSize, pccLogLeavesBatchSize, progress, fetchLeaves)
 	if err != nil {
@@ -979,11 +1004,15 @@ func GetPCCReleases(proxy string, insecure bool, progress func(done, total uint6
 	cache.HeadIndex = logSize
 	savePCCLogCache(cache)
 
-	return append(prior, newReleases...), nil
+	return &PCCLogSnapshot{
+		TreeID:    tree.GetTreeId(),
+		HeadIndex: logSize,
+		Releases:  append(prior, newReleases...),
+	}, nil
 }
 
-func fetchPCCBag(client *http.Client) (*BagResponse, error) {
-	req, err := http.NewRequest("GET", bagURL, nil)
+func fetchPCCBag(ctx context.Context, client *http.Client) (*BagResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", bagURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http GET request: %v", err)
 	}
@@ -1006,7 +1035,7 @@ func fetchPCCBag(client *http.Client) (*BagResponse, error) {
 	return &bag, nil
 }
 
-func fetchPCCTree(client *http.Client, url, requestUUID string) (*pcc.ListTreesResponse_Tree, error) {
+func fetchPCCTree(ctx context.Context, client *http.Client, url, requestUUID string) (*pcc.ListTreesResponse_Tree, error) {
 	data, err := proto.Marshal(&pcc.ListTreesRequest{
 		Version:     pcc.ProtocolVersion_V3,
 		RequestUuid: requestUUID,
@@ -1014,7 +1043,7 @@ func fetchPCCTree(client *http.Client, url, requestUUID string) (*pcc.ListTreesR
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal ListTreesRequest: %v", err)
 	}
-	body, err := pccProtoPOST(client, url, requestUUID, data)
+	body, err := pccProtoPOST(ctx, client, url, requestUUID, data)
 	if err != nil {
 		return nil, err
 	}
@@ -1034,7 +1063,7 @@ func fetchPCCTree(client *http.Client, url, requestUUID string) (*pcc.ListTreesR
 	return nil, fmt.Errorf("failed to find private cloud compute tree in list trees response")
 }
 
-func fetchPCCLogSize(client *http.Client, url string, tree *pcc.ListTreesResponse_Tree, requestUUID string) (uint64, error) {
+func fetchPCCLogSize(ctx context.Context, client *http.Client, url string, tree *pcc.ListTreesResponse_Tree, requestUUID string) (uint64, error) {
 	data, err := proto.Marshal(&pcc.LogHeadRequest{
 		Version:     pcc.ProtocolVersion_V3,
 		TreeId:      tree.GetTreeId(),
@@ -1044,7 +1073,7 @@ func fetchPCCLogSize(client *http.Client, url string, tree *pcc.ListTreesRespons
 	if err != nil {
 		return 0, fmt.Errorf("cannot marshal LogHeadRequest: %v", err)
 	}
-	body, err := pccProtoPOST(client, url, requestUUID, data)
+	body, err := pccProtoPOST(ctx, client, url, requestUUID, data)
 	if err != nil {
 		return 0, err
 	}
@@ -1065,7 +1094,7 @@ func fetchPCCLogSize(client *http.Client, url string, tree *pcc.ListTreesRespons
 	return logHead.GetLogSize(), nil
 }
 
-func fetchPCCLogLeaves(client *http.Client, url string, tree *pcc.ListTreesResponse_Tree, requestUUID string, startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+func fetchPCCLogLeaves(ctx context.Context, client *http.Client, url string, tree *pcc.ListTreesResponse_Tree, requestUUID string, startIndex, endIndex uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
 	data, err := proto.Marshal(&pcc.LogLeavesRequest{
 		Version:         pcc.ProtocolVersion_V3,
 		TreeId:          tree.GetTreeId(),
@@ -1078,7 +1107,7 @@ func fetchPCCLogLeaves(client *http.Client, url string, tree *pcc.ListTreesRespo
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal LogLeavesRequest: %v", err)
 	}
-	body, err := pccProtoPOST(client, url, requestUUID, data)
+	body, err := pccProtoPOST(ctx, client, url, requestUUID, data)
 	if err != nil {
 		return nil, fmt.Errorf("pcc log leaves [%d,%d): %w", startIndex, endIndex, err)
 	}
@@ -1092,8 +1121,8 @@ func fetchPCCLogLeaves(client *http.Client, url string, tree *pcc.ListTreesRespo
 	return lls.GetLeaves(), nil
 }
 
-func pccProtoPOST(client *http.Client, url, requestUUID string, body []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+func pccProtoPOST(ctx context.Context, client *http.Client, url, requestUUID string, body []byte) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http POST request: %v", err)
 	}

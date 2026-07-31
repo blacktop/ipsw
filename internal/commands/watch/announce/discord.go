@@ -2,6 +2,7 @@ package announce
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,6 +79,11 @@ func parseColor(colorStr string) (int, error) {
 
 // Discord posts a message to a discord webhook
 func Discord(msg string, cfg *DiscordConfig) error {
+	return DiscordContext(context.Background(), http.DefaultClient, msg, cfg)
+}
+
+// DiscordContext posts a message using the supplied context and HTTP client.
+func DiscordContext(ctx context.Context, client *http.Client, msg string, cfg *DiscordConfig) error {
 	log.Infof("posting to discord:\n%s", msg)
 
 	color, err := parseColor(cfg.DiscordColor)
@@ -117,7 +123,13 @@ func Discord(msg string, cfg *DiscordConfig) error {
 		return fmt.Errorf("discord: %w", err)
 	}
 
-	resp, err := http.Post(u.String(), "application/json", bytes.NewReader(bts))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(bts))
+	if err != nil {
+		return fmt.Errorf("DiscordAnnounce failed to create POST request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("DiscordAnnounce failed to POST: %w", err)
 	}

@@ -66,6 +66,13 @@ func highlightHeader(re *regexp.Regexp, input string) string {
 	return highlighted.String()
 }
 
+func validateDiscordFlags() error {
+	if viper.GetString("watch.discord-id") == "" || viper.GetString("watch.discord-token") == "" {
+		return fmt.Errorf("--discord announce requires --discord-id and --discord-token")
+	}
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(watchCmd)
 
@@ -80,10 +87,10 @@ func init() {
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
 	watchCmd.Flags().StringP("command", "c", "", "Command to run on new commit")
 	watchCmd.Flags().Bool("post", false, "Create social media post for NEW tags")
-	watchCmd.Flags().Bool("discord", false, "Annouce to Discord")
-	watchCmd.Flags().String("discord-id", "", "Discord Webhook ID")
-	watchCmd.Flags().String("discord-token", "", "Discord Webhook Token")
-	watchCmd.Flags().String("discord-icon", "", "Discord Post Icon URL")
+	watchCmd.PersistentFlags().Bool("discord", false, "Announce to Discord")
+	watchCmd.PersistentFlags().String("discord-id", "", "Discord Webhook ID")
+	watchCmd.PersistentFlags().String("discord-token", "", "Discord Webhook Token")
+	watchCmd.PersistentFlags().String("discord-icon", "", "Discord Post Icon URL")
 	watchCmd.Flags().Bool("mastodon", false, "Annouce to Mastodon")
 	watchCmd.Flags().String("mastodon-server", "https://mastodon.social", "Mastodon Server URL")
 	watchCmd.Flags().String("mastodon-client-id", "", "Mastodon Client ID")
@@ -102,10 +109,10 @@ func init() {
 	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
 	viper.BindPFlag("watch.command", watchCmd.Flags().Lookup("command"))
 	viper.BindPFlag("watch.post", watchCmd.Flags().Lookup("post"))
-	viper.BindPFlag("watch.discord", watchCmd.Flags().Lookup("discord"))
-	viper.BindPFlag("watch.discord-id", watchCmd.Flags().Lookup("discord-id"))
-	viper.BindPFlag("watch.discord-token", watchCmd.Flags().Lookup("discord-token"))
-	viper.BindPFlag("watch.discord-icon", watchCmd.Flags().Lookup("discord-icon"))
+	viper.BindPFlag("watch.discord", watchCmd.PersistentFlags().Lookup("discord"))
+	viper.BindPFlag("watch.discord-id", watchCmd.PersistentFlags().Lookup("discord-id"))
+	viper.BindPFlag("watch.discord-token", watchCmd.PersistentFlags().Lookup("discord-token"))
+	viper.BindPFlag("watch.discord-icon", watchCmd.PersistentFlags().Lookup("discord-icon"))
 	viper.BindPFlag("watch.mastodon", watchCmd.Flags().Lookup("mastodon"))
 	viper.BindPFlag("watch.mastodon-server", watchCmd.Flags().Lookup("mastodon-server"))
 	viper.BindPFlag("watch.mastodon-client-id", watchCmd.Flags().Lookup("mastodon-client-id"))
@@ -118,12 +125,12 @@ func init() {
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
 	Use:   "watch <ORG/REPO>",
-	Short: "Watch Github Commits",
+	Short: "Watch repositories and firmware releases",
 	Example: heredoc.Doc(`
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes with the pattern '254930' for the last 30 days
 		❯ ipsw watch --pattern '254930' --days 30 WebKit/WebKit --branch main --timeout 5m
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and announce to Discord
-		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --discord --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
 		# Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and run a command on new commits
 		# NOTE: the command will have access to the following environment variables:
 		#   - IPSW_WATCH_OID
@@ -133,7 +140,7 @@ var watchCmd = &cobra.Command{
 		#   - IPSW_WATCH_MESSAGE
 		❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
 		# Watch WebKit/WebKit for new tags every 5 minutes and announce to Discord
-		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m
+		❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --discord WebKit/WebKit --tags --timeout 5m
 		# Watch a specific function in a local repo
 		❯ ipsw watch /path/to/local/REPO --func "MyFunction" --file "path/to/file.go" --timeout 5m`),
 	Args:          cobra.ExactArgs(1),
@@ -180,8 +187,8 @@ var watchCmd = &cobra.Command{
 			}
 		}
 		if discord {
-			if viper.GetString("watch.discord-id") == "" || viper.GetString("watch.discord-token") == "" {
-				return fmt.Errorf("--discord announce requires --discord-id and --discord-token")
+			if err := validateDiscordFlags(); err != nil {
+				return err
 			}
 		}
 		if mastodon {

@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,9 +34,9 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
+	pcccmd "github.com/blacktop/ipsw/internal/commands/pcc"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -59,6 +58,9 @@ func init() {
 	downloadPccCmd.Flags().String("build", "", "Filter by cloudOS build version prefix (e.g. 5E, 5E290)")
 	downloadPccCmd.Flags().String("train", "", "Filter by cloudOS build train substring (e.g. LuckE)")
 	downloadPccCmd.Flags().String("app", "", "Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')")
+	downloadPccCmd.Flags().Bool("vphone", false, "Filter to OS IPSWs containing vphone600 firmware; resolved via partial-zip, cached")
+	downloadPccCmd.Flags().BoolP("urls", "u", false, "Show compact release summaries and asset URLs without saving assets")
+	downloadPccCmd.Flags().Bool("latest", false, "Show only the newest PCC release after filtering")
 	// TODO: write to '/var/root/Library/Application Support/com.apple.security-research.pccvre/instances/<NAME>' to create a PCC VM w/o needing to set the csrutil first
 	downloadPccCmd.Flags().StringP("output", "o", "", "Output directory to save files to")
 	downloadPccCmd.MarkFlagDirname("output")
@@ -75,6 +77,9 @@ func init() {
 	viper.BindPFlag("download.pcc.build", downloadPccCmd.Flags().Lookup("build"))
 	viper.BindPFlag("download.pcc.train", downloadPccCmd.Flags().Lookup("train"))
 	viper.BindPFlag("download.pcc.app", downloadPccCmd.Flags().Lookup("app"))
+	viper.BindPFlag("download.pcc.vphone", downloadPccCmd.Flags().Lookup("vphone"))
+	viper.BindPFlag("download.pcc.urls", downloadPccCmd.Flags().Lookup("urls"))
+	viper.BindPFlag("download.pcc.latest", downloadPccCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.pcc.output", downloadPccCmd.Flags().Lookup("output"))
 }
 
@@ -100,6 +105,15 @@ var downloadPccCmd = &cobra.Command{
 		# Filter by OS BuildManifest ProductBuildVersion prefix
 		❯ ipsw download pcc --os-build 23E5207q --info
 
+		# Show only releases whose OS IPSW contains vphone600 firmware
+		❯ ipsw download pcc --vphone --info
+
+		# Show compact release summaries and labeled asset URLs
+		❯ ipsw download pcc --info --urls
+
+		# Show only the newest vphone release as a compact summary
+		❯ ipsw download pcc --vphone --latest
+
 		# Download PCC VM files interactively
 		❯ ipsw download pcc
 
@@ -120,6 +134,10 @@ var downloadPccCmd = &cobra.Command{
 		buildFilter := viper.GetString("download.pcc.build")
 		trainFilter := viper.GetString("download.pcc.train")
 		appFilter := viper.GetString("download.pcc.app")
+		showInfo := viper.GetBool("download.pcc.info")
+		vphoneOnly := viper.GetBool("download.pcc.vphone")
+		urlsOnly := viper.GetBool("download.pcc.urls")
+		latestOnly := viper.GetBool("download.pcc.latest")
 
 		var bar func(done, total uint64)
 		var clearBar func()
@@ -206,21 +224,35 @@ var downloadPccCmd = &cobra.Command{
 			releases = filtered
 		}
 
-		// Log index does not track chronology — releases can be appended out
-		// of build order. Sort by the metadata timestamp so newest is first.
-		sort.Slice(releases, func(i, j int) bool {
-			return releases[i].ReleaseCreationTime().After(releases[j].ReleaseCreationTime())
-		})
+		if vphoneOnly {
+			// VRE metadata only says that the release is research-bootable.
+			// Inspect the OS IPSW itself so --vphone returns only releases
+			// with confirmed vphone600 firmware, excluding unresolved assets.
+			download.ResolveVPhoneFirmware(releases, pccVPhoneFetcher(proxy, insecure))
+			releases = filterVPhoneReleases(releases)
+
+			// The ordinary picker avoids paying to resolve every OS version.
+			// A --vphone query is already doing remote partial-zip work, so
+			// resolve the smaller result set and show useful version labels.
+			download.ResolvePCCVersions(releases, pccVersionFetcher(proxy, insecure))
+		}
+
+		releases = sortAndLimitPCCReleases(releases, latestOnly)
 
 		if len(releases) == 0 {
 			return fmt.Errorf("no PCC Releases found")
 		}
 
-		if viper.GetBool("download.pcc.info") {
-			log.Infof("Found %d PCC Releases", len(releases))
+		compactOutput := urlsOnly || (latestOnly && !showInfo)
+		if showInfo || compactOutput {
 			// Warm BuildManifest ProductVersion/ProductBuildVersion so the
 			// cloudOS agent build line can include the OS build next to it.
 			download.ResolvePCCVersions(releases, pccVersionFetcher(proxy, insecure))
+			if compactOutput {
+				return writePCCURLSummaries(cmd.OutOrStdout(), releases)
+			}
+
+			log.Infof("Found %d PCC Releases", len(releases))
 			// Resolve any releases whose VPhone hasn't been populated yet from
 			// the cache; new entries since the last run pay the partial-zip
 			// cost once and persist the result.
@@ -292,25 +324,49 @@ var downloadPccCmd = &cobra.Command{
 	},
 }
 
+func sortAndLimitPCCReleases(releases []*download.PCCRelease, latestOnly bool) []*download.PCCRelease {
+	// Log index does not track chronology — releases can be appended out
+	// of build order. Sort by the metadata timestamp so newest is first.
+	sort.Slice(releases, func(i, j int) bool {
+		return releases[i].ReleaseCreationTime().After(releases[j].ReleaseCreationTime())
+	})
+	if latestOnly && len(releases) > 0 {
+		return releases[:1]
+	}
+	return releases
+}
+
+func writePCCURLSummaries(w io.Writer, releases []*download.PCCRelease) error {
+	for i, release := range releases {
+		if i > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return fmt.Errorf("failed to write PCC URL summary: %w", err)
+			}
+		}
+		if _, err := fmt.Fprintln(w, pcccmd.ReleaseURLSummary(release)); err != nil {
+			return fmt.Errorf("failed to write PCC URL summary: %w", err)
+		}
+	}
+	return nil
+}
+
+func filterVPhoneReleases(releases []*download.PCCRelease) []*download.PCCRelease {
+	filtered := releases[:0]
+	for _, release := range releases {
+		if release.VPhone != nil && release.VPhone.Present {
+			filtered = append(filtered, release)
+		}
+	}
+	return filtered
+}
+
 // pccVPhoneFetcher partial-zips an OS asset's central directory and reports
 // whether the IPSW carries vphone600 research-device firmware. Apple shipped
 // vphone600 through cloudOS train 5E (iOS 26.3); train 5F (iOS 26.4) dropped
 // it, breaking iPhone-shaped virtualization (vphone-cli). Only the zip
 // listing is fetched — no file body reads — so this is cheap.
 func pccVPhoneFetcher(proxy string, insecure bool) func(url string) (download.VPhoneFirmware, error) {
-	return func(url string) (download.VPhoneFirmware, error) {
-		zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{Proxy: proxy, Insecure: insecure})
-		if err != nil {
-			return download.VPhoneFirmware{}, err
-		}
-		var count int
-		for _, f := range zr.File {
-			if strings.Contains(f.Name, download.VPhoneFirmwareToken) {
-				count++
-			}
-		}
-		return download.VPhoneFirmware{Present: count > 0, Count: count}, nil
-	}
+	return pcccmd.VPhoneFetcher(&download.RemoteConfig{Proxy: proxy, Insecure: insecure})
 }
 
 // vphoneState classifies a release into one of four display buckets shared
@@ -391,33 +447,5 @@ func pccVersionFields(v download.PCCVersion) log.Fields {
 // plist plus parse all DeviceTree im4p files). ~85% of releases serve Range
 // requests; the newest few sometimes 403 before CDN sync.
 func pccVersionFetcher(proxy string, insecure bool) func(url string) (download.PCCVersion, error) {
-	return func(url string) (download.PCCVersion, error) {
-		if url == "" {
-			return download.PCCVersion{}, fmt.Errorf("no OS asset URL")
-		}
-		zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{Proxy: proxy, Insecure: insecure})
-		if err != nil {
-			return download.PCCVersion{}, err
-		}
-		for _, f := range zr.File {
-			if path.Base(f.Name) != "BuildManifest.plist" {
-				continue
-			}
-			rc, err := f.Open()
-			if err != nil {
-				return download.PCCVersion{}, err
-			}
-			data, err := io.ReadAll(rc)
-			rc.Close()
-			if err != nil {
-				return download.PCCVersion{}, err
-			}
-			bm, err := plist.ParseBuildManifest(data)
-			if err != nil {
-				return download.PCCVersion{}, err
-			}
-			return download.PCCVersion{Version: bm.ProductVersion, Build: bm.ProductBuildVersion}, nil
-		}
-		return download.PCCVersion{}, fmt.Errorf("no BuildManifest in IPSW")
-	}
+	return pcccmd.VersionFetcher(&download.RemoteConfig{Proxy: proxy, Insecure: insecure})
 }
