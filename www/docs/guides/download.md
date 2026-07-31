@@ -726,6 +726,65 @@ Download Private Cloud Compute VM files
 ❯ ipsw download pcc
 ```
 
+PCC releases are bundles: the OS restore image, PrivateCloudSupport cryptex,
+optional research model, host tools, and debug shell can all be separate
+assets. To list only releases whose OS IPSW is confirmed to contain the
+`vphone600` virtual-iPhone firmware, use:
+
+```bash
+❯ ipsw download pcc --vphone --info
+```
+
+That query inspects the remote IPSW ZIP directories and caches successful
+firmware-presence and OS-version results. A VRE metadata marker alone is not
+treated as proof that `vphone600` is present.
+
+Use `--urls` with `--info` for a compact release identity and labeled URL for
+each asset, without the full ticket and DarwinInit output:
+
+```bash
+❯ ipsw download pcc --info --urls
+29605) 26.1  5C235 / 23B83 (LuckCLining)  TIE  2025-11-04
+  OS           https://updates.cdn-apple.com/private-cloud-compute/<digest>
+  PCS          https://updates.cdn-apple.com/private-cloud-compute/<digest>
+  MODEL        https://updates.cdn-apple.com/private-cloud-compute/<digest>
+  HOST_TOOLS   https://updates.cdn-apple.com/private-cloud-compute/<digest>
+  DEBUG_SHELL  https://updates.cdn-apple.com/private-cloud-compute/<digest>
+```
+
+`--urls` also works without `--info` and never saves the assets. Combine it with
+filters such as `--vphone`, `--version`, `--build`, or an index.
+
+Use `--latest` to keep only the newest release after all other filters. By
+itself, it uses the compact summary; combine it with `--info` for the full
+details of that one release:
+
+```bash
+❯ ipsw download pcc --vphone --latest
+```
+
+To watch the PCC transparency log for newly uploaded OS assets that contain
+`vphone600`, use:
+
+```bash
+❯ ipsw watch pcc
+```
+
+The first run creates a durable baseline without notifying for existing
+releases. Later polls print a compact release summary and OS URL. Unresolved
+CDN assets are retried, and transparency-log tree rotations are deduplicated
+using the OS asset digest.
+
+Use the existing watch webhook settings to announce new vphone firmware to
+Discord:
+
+```bash
+❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch pcc --discord --interval 5m
+```
+
+Pass `--notify-initial` to report existing vphone releases while creating the
+initial state, or `--interval 0` to poll once and exit.
+
 Get info about a PCC release
 
 ```bash

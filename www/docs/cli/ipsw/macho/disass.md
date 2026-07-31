@@ -56,3 +56,4 @@ ipsw macho disass <MACHO> [flags]
 ### SEE ALSO
 
 * [ipsw macho](/docs/cli/ipsw/macho)	 - Parse MachO
+

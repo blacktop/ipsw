@@ -4,11 +4,11 @@ title: watch
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: watch
-description: Watch Github Commits
+description: Watch repositories and firmware releases
 ---
 ## ipsw watch
 
-Watch Github Commits
+Watch repositories and firmware releases
 
 ```
 ipsw watch <ORG/REPO> [flags]
@@ -20,7 +20,7 @@ ipsw watch <ORG/REPO> [flags]
 # Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes with the pattern '254930' for the last 30 days
 ❯ ipsw watch --pattern '254930' --days 30 WebKit/WebKit --branch main --timeout 5m
 # Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and announce to Discord
-❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
+❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --discord --pattern 'Lockdown Mode' --days 1 --timeout 5m WebKit/WebKit
 # Watch the main branch of the WebKit/WebKit repo for new commits every 5 minutes and run a command on new commits
 # NOTE: the command will have access to the following environment variables:
 #   - IPSW_WATCH_OID
@@ -30,7 +30,7 @@ ipsw watch <ORG/REPO> [flags]
 #   - IPSW_WATCH_MESSAGE
 ❯ ipsw watch WebKit/WebKit --command 'echo "New Commit: $IPSW_WATCH_URL"'
 # Watch WebKit/WebKit for new tags every 5 minutes and announce to Discord
-❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch WebKit/WebKit --tags --timeout 5m
+❯ IPSW_WATCH_DISCORD_ID=1234 IPSW_WATCH_DISCORD_TOKEN=SECRET ipsw watch --discord WebKit/WebKit --tags --timeout 5m
 # Watch a specific function in a local repo
 ❯ ipsw watch /path/to/local/REPO --func "MyFunction" --file "path/to/file.go" --timeout 5m
 ```
@@ -43,7 +43,7 @@ ipsw watch <ORG/REPO> [flags]
       --cache string                    Cache file to store seen commits/tags
   -c, --command string                  Command to run on new commit
   -d, --days int                        Days back to search for commits (default 1)
-      --discord                         Annouce to Discord
+      --discord                         Announce to Discord
       --discord-icon string             Discord Post Icon URL
       --discord-id string               Discord Webhook ID
       --discord-token string            Discord Webhook Token
@@ -75,4 +75,5 @@ ipsw watch <ORG/REPO> [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw watch pcc](/docs/cli/ipsw/watch/pcc)	 - Watch for new PCC vphone600 firmware
 

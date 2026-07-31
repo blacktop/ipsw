@@ -77,3 +77,4 @@ ipsw dyld disass <DSC> [flags]
 ### SEE ALSO
 
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
+

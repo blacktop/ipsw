@@ -32,6 +32,15 @@ ipsw download pcc [INDEX] [flags]
 # Filter by OS BuildManifest ProductBuildVersion prefix
 ❯ ipsw download pcc --os-build 23E5207q --info
 
+# Show only releases whose OS IPSW contains vphone600 firmware
+❯ ipsw download pcc --vphone --info
+
+# Show compact release summaries and labeled asset URLs
+❯ ipsw download pcc --info --urls
+
+# Show only the newest vphone release as a compact summary
+❯ ipsw download pcc --vphone --latest
+
 # Download PCC VM files interactively
 ❯ ipsw download pcc
 
@@ -48,6 +57,7 @@ ipsw download pcc [INDEX] [flags]
   -h, --help              help for pcc
   -i, --info              Show PCC Release info
       --insecure          do not verify ssl certs
+      --latest            Show only the newest PCC release after filtering
       --os-build string   Filter by OS ProductBuildVersion prefix (e.g. 23E5207q); resolved via partial-zip, cached
   -o, --output string     Output directory to save files to
       --proxy string      HTTP/HTTPS proxy
@@ -55,7 +65,9 @@ ipsw download pcc [INDEX] [flags]
       --resume-all        always resume resumable IPSWs
       --skip-all          always skip resumable IPSWs
       --train string      Filter by cloudOS build train substring (e.g. LuckE)
+  -u, --urls              Show compact release summaries and asset URLs without saving assets
       --version string    Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached
+      --vphone            Filter to OS IPSWs containing vphone600 firmware; resolved via partial-zip, cached
 ```
 
 ### Options inherited from parent commands
