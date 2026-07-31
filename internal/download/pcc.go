@@ -943,7 +943,10 @@ func GetPCCLogSnapshot(
 	insecure bool,
 	progress func(done, total uint64),
 ) (*PCCLogSnapshot, error) {
-	client := NewRemoteHTTPClient(proxy, insecure)
+	// The bag host and the at_researcher endpoints it hands back are served
+	// under "Apple Root CA", which Debian/Ubuntu's ca-certificates omits — so
+	// the default system pool cannot verify them on Linux.
+	client := &http.Client{Transport: newAppleHTTPTransport(proxy, insecure)}
 	defer client.CloseIdleConnections()
 
 	bag, err := fetchPCCBag(ctx, client)
