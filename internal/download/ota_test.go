@@ -76,6 +76,7 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 			platform:        "tvos",
 			developerBetaID: "6ca2978e-e976-48b5-9b85-cba646d5dea8",
 			appleSeedBetaID: "077f811f-5ff5-4162-8bed-2820ffc2538f",
+			publicBetaID:    "976a551-4987-4dc5-aadf-e89d885515f0",
 		},
 		{
 			platform:        "watchos",
