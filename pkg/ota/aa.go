@@ -45,7 +45,12 @@ var (
 	reOTARestorePlist   = regexp.MustCompile(`Restore\.plist$`)
 	reOTABuildManifest  = regexp.MustCompile(`BuildManifest\.plist$`)
 	reOTASystemVersion  = regexp.MustCompile(`SystemVersion\.plist$`)
-	reOTADscCryptex     = regexp.MustCompile(`^cryptex-system-(arm64e?|x86_64h?|rosetta)$`)
+	reOTADscCryptex     = regexp.MustCompile(`^cryptex-system-(arm64(_32|e)?|x86_64h?|rosetta)$`)
+	// reAnySystemCryptex selects a system cryptex when the caller named no
+	// architecture. arm64_32 must be present: `arm64e?` cannot match it, so a
+	// watchOS OTA carrying only cryptex-system-arm64_32 would otherwise report
+	// "cryptex not found" unless the arch was passed explicitly.
+	reAnySystemCryptex = regexp.MustCompile(`cryptex-system-(arm64(_32|e)?|x86_64h?)$`)
 )
 
 type File struct {
@@ -157,32 +162,33 @@ func Open(name string, conf *Config) (*AA, error) {
 			Insecure:  conf.Insecure,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt AEA: %v (try providing --key-val, --key-db, or ensure you're online for automatic key lookup)", err)
+			return nil, wrapPhase(PhaseAEADecrypt, "", fmt.Errorf("failed to decrypt AEA: %v (try providing --key-val, --key-db, or ensure you're online for automatic key lookup)", err))
 		}
 		defer os.Remove(name)
 	}
 	f, err := os.Open(name)
 	if err != nil {
-		return nil, err
+		return nil, wrapPhase(PhaseOTAOpen, "", err)
 	}
 	fi, err := f.Stat()
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, wrapPhase(PhaseOTAOpen, "", err)
 	}
 	r := new(AA)
 	if r.isZip, err = magic.IsZip(name); err != nil {
-		return nil, err
+		f.Close()
+		return nil, wrapPhase(PhaseOTAOpen, "", err)
 	} else if r.isZip { // check if file is a zip
 		r.isZip = true
 		if err = r.initZip(f, fi.Size()); err != nil {
 			f.Close()
-			return nil, err
+			return nil, wrapPhase(PhaseOTAOpen, "", err)
 		}
 	} else {
 		if err = r.init(f, fi.Size()); err != nil {
 			f.Close()
-			return nil, err
+			return nil, wrapPhase(PhaseOTAOpen, "", err)
 		}
 	}
 	r.f = f
@@ -461,67 +467,109 @@ func (r *Reader) PostFiles() []fs.FileInfo {
 	return r.bomFiles
 }
 
+// GetPayloadFiles extracts every file matching pattern from the OTA's
+// payloadv2 members into output.
+//
+// It exists to keep the pre-callback signature compiling for downstream Go
+// consumers. New callers that need the destination path of each materialized
+// file should use [Reader.GetPayloadFilesWithCallback] instead.
 func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
+	return r.GetPayloadFilesWithCallback(pattern, payloadRange, output, nil)
+}
+
+// GetPayloadFilesWithCallback extracts every file matching pattern from the
+// OTA's payloadv2 members into output. onFile, when non-nil, is called with the
+// destination path of each materialized file; callers extracting the entire
+// filesystem pass nil to avoid accumulating one string per OTA member.
+func (r *Reader) GetPayloadFilesWithCallback(pattern, payloadRange, output string, onFile func(dst string)) error {
 	r.initFileList()
 	pre := regexp.MustCompile(`^payload.\d+$`)
 	if payloadRange != "" {
-		pre = regexp.MustCompile(payloadRange)
+		// payloadRange comes straight from --range, so it must never panic.
+		var err error
+		if pre, err = regexp.Compile(payloadRange); err != nil {
+			return wrapPhase(PhasePayloadExtract, "",
+				fmt.Errorf("failed to compile payload range regex '%s': %w", payloadRange, err))
+		}
 	}
+	var errs []error
 	for _, file := range r.Files() {
-		if file.isDir {
+		if file.isDir || !pre.MatchString(file.Base()) {
 			continue
 		}
-		if pre.MatchString(file.Base()) {
-			f, err := r.Open(file.Name(), false)
-			if err != nil {
-				return err
-			}
-			tmpdir, err := os.MkdirTemp("", "ota_payload_extract")
-			if err != nil {
-				_ = f.Close()
-				return err
-			}
-			if err := aaExtractPattern(f, pattern, tmpdir); err != nil {
-				_ = f.Close()
-				_ = os.RemoveAll(tmpdir)
-				return err
-			}
-			if err := f.Close(); err != nil {
-				_ = os.RemoveAll(tmpdir)
-				return err
-			}
-			if err := filepath.Walk(tmpdir, func(path string, f os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				if !f.IsDir() {
-					rel, err := filepath.Rel(tmpdir, path)
-					if err != nil {
-						return fmt.Errorf("failed to compute relative path for %s: %v", path, err)
-					}
-					fname, err := utils.SanitizeArchivePath(output, rel)
-					if err != nil {
-						return err
-					}
-					if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-						return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
-					}
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(f.Size())), fname))
-					if err := os.Rename(path, fname); err != nil {
-						return fmt.Errorf("failed to mv file %s to %s: %v", rel, fname, err)
-					}
-				}
-				return nil
-			}); err != nil {
-				_ = os.RemoveAll(tmpdir)
-				return fmt.Errorf("failed to read files in tmp folder: %v", err)
-			}
-			if err := os.RemoveAll(tmpdir); err != nil {
-				return fmt.Errorf("failed to remove tmp OTA payload dir %s: %v", tmpdir, err)
-			}
+		if err := r.getPayloadFile(file, pattern, output, onFile); err != nil {
+			errs = append(errs, wrapPhase(PhasePayloadExtract, file.Base(), err))
 		}
 	}
+	return errors.Join(errs...)
+}
+
+func (r *Reader) getPayloadFile(file *File, pattern, output string, onFile func(dst string)) (err error) {
+	tmpdir, err := r.extractPayloadToTemp(file, pattern)
+	if err != nil {
+		return err
+	}
+	defer func() { err = joinRemoveTempDir(err, file.Base(), tmpdir) }()
+
+	if err := filepath.Walk(tmpdir, func(path string, fi os.FileInfo, werr error) error {
+		if werr != nil || fi.IsDir() {
+			return werr
+		}
+		fname, err := movePayloadFile(tmpdir, output, path)
+		if err != nil {
+			return err
+		}
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(fi.Size())), fname))
+		if onFile != nil {
+			onFile(fname)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to read files in tmp folder: %w", err)
+	}
 	return nil
+}
+
+// extractPayloadToTemp unpacks the parts of a payloadv2 member matching
+// pattern into a new temp dir the caller owns.
+func (r *Reader) extractPayloadToTemp(file *File, pattern string) (string, error) {
+	f, err := r.Open(file.Name(), false)
+	if err != nil {
+		return "", err
+	}
+	tmpdir, err := os.MkdirTemp("", "ota_payload_extract")
+	if err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	// On these paths the staging dir is abandoned, so a failed removal leaks it.
+	// Cleanup is part of the report contract, so keep both failures.
+	if err := aaExtractPattern(f, pattern, tmpdir); err != nil {
+		_ = f.Close()
+		return "", joinRemoveTempDir(err, file.Base(), tmpdir)
+	}
+	if err := f.Close(); err != nil {
+		return "", joinRemoveTempDir(err, file.Base(), tmpdir)
+	}
+	return tmpdir, nil
+}
+
+func movePayloadFile(tmpdir, output, path string) (string, error) {
+	rel, err := filepath.Rel(tmpdir, path)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute relative path for %s: %v", path, err)
+	}
+	fname, err := utils.SanitizeArchivePath(output, rel)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+		return "", fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
+	}
+	if err := os.Rename(path, fname); err != nil {
+		return "", fmt.Errorf("failed to mv file %s to %s: %v", rel, fname, err)
+	}
+	return fname, nil
 }
 
 func (r *Reader) PayloadFiles(pattern string, json bool) error {
@@ -586,20 +634,24 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 	}
 	cmd := exec.Command(aaPath, "extract", "-d", output, "-include-regex", pattern)
 	cmd.Stdin = in
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if _, ok := err.(*exec.ExitError); !ok {
-			return fmt.Errorf("%v: %s", err, out)
-		}
+	// aa exits 0 when the regex simply matches nothing, so any non-zero status
+	// is a real failure. Suppressing it would let a failed payload member
+	// vanish from the report and leave `complete` claiming otherwise.
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("aa extract failed: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
-func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
+// ExtractCryptex patches the named cryptex member into a mountable DMG under
+// output and returns its path. A failure to remove the staging directory is
+// joined onto the result, matching the dyld_shared_cache sources: a leaked
+// temp dir means the operation did not finish cleanly.
+func (r *Reader) ExtractCryptex(cryptex, output string) (dmg string, err error) {
 	var re *regexp.Regexp
 	switch cryptex {
 	case "system":
-		re = regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+		re = reAnySystemCryptex
 	case "system-arm64e":
 		re = regexp.MustCompile(`cryptex-system-arm64e$`)
 	case "system-x86_64h":
@@ -612,9 +664,9 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 
 	tmpdir, err := os.MkdirTemp("", "ota_extract_cryptexes")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %v", err)
+		return "", wrapPhase(PhaseOutputSetup, "", fmt.Errorf("failed to create temp dir: %w", err))
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() { err = joinRemoveTempDir(err, "", tmpdir) }()
 
 	for _, file := range r.Files() {
 		if re.MatchString(file.Base()) {
@@ -649,7 +701,48 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (string, error) {
 	return "", fmt.Errorf("%w: '%s'", ErrCryptexNotFound, cryptex)
 }
 
+// ExtractFromCryptexes extracts every file matching pattern from the OTA's
+// dyld_shared_cache cryptex members and returns their destination paths.
+//
+// It exists to keep the pre-attribution signature compiling for downstream Go
+// consumers. New callers that need to know which cryptex each file came from
+// should use [Reader.ExtractFromCryptexesWithSources] instead.
 func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) {
+	return extractedPaths(r.ExtractFromCryptexesWithSources(pattern, output))
+}
+
+// extractedPaths flattens an extraction result to its destination paths.
+//
+// It converts before inspecting err because a non-empty result alongside a
+// non-nil error is load-bearing: a cryptex can fail to mount, unmount or walk
+// after another already wrote caches to disk, so `if err != nil { return nil,
+// err }` would discard files that exist and are valid. nil is returned for an
+// empty result so callers comparing against nil behave as they always have.
+func extractedPaths(files []ExtractedFile, err error) ([]string, error) {
+	if len(files) == 0 {
+		return nil, err
+	}
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
+		paths = append(paths, f.Path)
+	}
+	return paths, err
+}
+
+// ExtractFromCryptexesWithSources extracts every file matching pattern from the
+// OTA's dyld_shared_cache cryptex members, pairing each destination path with
+// the cryptex member it came from. It returns ErrNoDscInCryptexes when the OTA
+// carries no matching cryptex content, which means the source does not apply
+// rather than that it failed.
+func (r *Reader) ExtractFromCryptexesWithSources(pattern, output string) (files []ExtractedFile, err error) {
+	return r.ExtractFromCryptexesWithSourcesForArches(pattern, output, nil)
+}
+
+// ExtractFromCryptexesWithSourcesForArches is the architecture-filtered form
+// of [Reader.ExtractFromCryptexesWithSources]. It skips cryptex members that
+// cannot carry any requested cache family before staging or mounting them.
+// An empty arches slice preserves the all-cryptex behavior.
+func (r *Reader) ExtractFromCryptexesWithSourcesForArches(pattern, output string, arches []string) (files []ExtractedFile, err error) {
 	match, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile extract regex pattern '%s': %v", pattern, err)
@@ -657,112 +750,173 @@ func (r *Reader) ExtractFromCryptexes(pattern, output string) ([]string, error) 
 
 	tmpdir, err := os.MkdirTemp("", "ota_extract_cryptexes")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp dir: %v", err)
+		return nil, wrapPhase(PhaseOutputSetup, "", fmt.Errorf("failed to create temp dir: %w", err))
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() { err = joinRemoveTempDir(err, "", tmpdir) }()
 
-	out, err := extractFromDscCryptexFiles(r.Files(), func(file *File) ([]string, error) {
+	out, err := extractFromDscCryptexFilesForArches(r.Files(), arches, func(file *File) ([]string, error) {
 		return r.extractFromCryptexFile(file, match, tmpdir, output)
 	})
 	if err != nil {
 		return out, err
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no files found matching pattern '%s'", pattern)
+		return nil, ErrNoDscInCryptexes
 	}
 	return out, nil
 }
 
-func extractFromDscCryptexFiles(files []*File, extract func(*File) ([]string, error)) ([]string, error) {
-	var out []string
+func extractFromDscCryptexFiles(files []*File, extract func(*File) ([]string, error)) ([]ExtractedFile, error) {
+	return extractFromDscCryptexFilesForArches(files, nil, extract)
+}
+
+func extractFromDscCryptexFilesForArches(files []*File, arches []string, extract func(*File) ([]string, error)) ([]ExtractedFile, error) {
+	var out []ExtractedFile
 	var extractErrs []error
 
 	for _, file := range files {
-		if !reOTADscCryptex.MatchString(file.Base()) {
+		if !reOTADscCryptex.MatchString(file.Base()) || !cryptexMatchesArches(file.Base(), arches) {
 			continue
 		}
 		extracted, err := extract(file)
-		if err != nil {
-			extractErrs = append(extractErrs, fmt.Errorf("failed to extract from %s: %w", file.Base(), err))
-			continue
+		for _, path := range extracted {
+			out = append(out, ExtractedFile{Path: path, Source: file.Base()})
 		}
-		out = append(out, extracted...)
+		if err != nil {
+			extractErrs = append(extractErrs, wrapPhase(PhaseCryptexDiscovery, file.Base(), err))
+		}
 	}
 
 	return out, errors.Join(extractErrs...)
 }
 
-func (r *Reader) extractFromCryptexFile(file *File, match *regexp.Regexp, tmpdir, output string) ([]string, error) {
+// cryptexMatchesArches reports whether a cryptex member can carry at least one
+// requested cache family. Rosetta cryptexes can carry x86_64, x86_64h and AOT
+// caches; older OTAs can name the x86 cryptex directly.
+func cryptexMatchesArches(source string, arches []string) bool {
+	if len(arches) == 0 {
+		return true
+	}
+	sourceArch := strings.TrimPrefix(source, "cryptex-system-")
+	for _, arch := range arches {
+		switch arch {
+		case "aot":
+			if sourceArch == "rosetta" || sourceArch == "x86_64" || sourceArch == "x86_64h" {
+				return true
+			}
+		case "x86_64", "x86_64h":
+			if sourceArch == arch || sourceArch == "rosetta" {
+				return true
+			}
+		default:
+			if sourceArch == arch {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *Reader) extractFromCryptexFile(file *File, match *regexp.Regexp, tmpdir, output string) (out []string, err error) {
+	dmg, err := r.stageCryptexDMG(file, tmpdir)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmg))
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmg, "")
+	if err != nil {
+		return nil, wrapPhase(PhaseMount, file.Base(), fmt.Errorf("failed to mount cryptex DMG %s: %w", dmg, err))
+	}
+	// Detach only what this invocation attached. A pre-existing attachment
+	// belongs to another process -- on Linux the mount point is derived from
+	// the DMG basename alone, so a concurrent run shares it and would have its
+	// filesystem yanked out from under an in-progress walk.
+	if alreadyMounted {
+		utils.Indent(log.Warn, 2)(fmt.Sprintf(
+			"%s was already mounted at %s; leaving it attached", dmg, mountPoint))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmg))
+			if uerr := utils.Retry(3, 2*time.Second, func() error {
+				return utils.Unmount(mountPoint, true)
+			}); uerr != nil {
+				err = errors.Join(err, wrapPhase(PhaseCleanup, file.Base(),
+					fmt.Errorf("failed to unmount DMG %s at %s: %v", dmg, mountPoint, uerr)))
+			}
+		}()
+	}
+
+	return copyMatchesFromMount(file, match, mountPoint, output)
+}
+
+// copyMatchesFromMount copies every file under mountPoint matching match into
+// output, preserving the mount-relative directory structure. It keeps walking
+// past an unreadable entry so one bad subtree cannot discard the files already
+// copied, but it reports every such entry: an untraversed subtree is not proof
+// that it held no caches.
+func copyMatchesFromMount(file *File, match *regexp.Regexp, mountPoint, output string) ([]string, error) {
+	var out []string
+	var walkErrs []error
+	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, werr error) error {
+		if werr != nil {
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to walk %s: %v", path, werr))
+			walkErrs = append(walkErrs, wrapPhase(PhaseDSCDiscovery, file.Base(),
+				fmt.Errorf("failed to walk %s: %w", path, werr)))
+			return nil
+		}
+		if info.IsDir() || !match.MatchString(path) {
+			return nil
+		}
+		fname := filepath.Join(output, strings.TrimPrefix(path, mountPoint))
+		if cerr := utils.MkdirAndCopy(path, fname); cerr != nil {
+			return wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to copy %s to %s: %v", path, fname, cerr))
+		}
+		out = append(out, fname)
+		return nil
+	}); err != nil {
+		// %w, not %v: the walk closure already classifies its own failures
+		// (PhaseCopy), and flattening the chain here would silently relabel
+		// them with the PhaseDSCDiscovery default.
+		return out, wrapPhase(PhaseDSCDiscovery, file.Base(),
+			fmt.Errorf("failed to read files in cryptex folder: %w", err))
+	}
+	return out, errors.Join(walkErrs...)
+}
+
+// stageCryptexDMG copies the OTA cryptex member into tmpdir and RIDIFF-patches
+// it into a mountable DMG, returning the patched DMG path.
+func (r *Reader) stageCryptexDMG(file *File, tmpdir string) (string, error) {
 	cryptexFile, err := r.Open(file.Name(), false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open cryptex file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to open cryptex file: %v", err))
 	}
 	defer cryptexFile.Close()
 
 	cf, err := os.Create(filepath.Join(tmpdir, file.Base()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to create file: %v", err))
 	}
 	if _, err := io.Copy(cf, cryptexFile); err != nil {
 		_ = cf.Close()
-		return nil, fmt.Errorf("failed to write file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to write file: %v", err))
 	}
 	if err := cf.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close cryptex file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to close cryptex file: %v", err))
 	}
 
 	dcf, err := os.Create(filepath.Join(tmpdir, file.Base()+".dmg"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to create file: %v", err))
 	}
 	if err := dcf.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close patched cryptex file: %v", err)
+		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to close patched cryptex file: %v", err))
 	}
 	if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
-		return nil, fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err)
+		return "", wrapPhase(PhaseCryptexPatch, file.Base(),
+			fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err))
 	}
-
-	utils.Indent(log.Info, 4)(fmt.Sprintf("Mounting DMG %s", dcf.Name()))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dcf.Name(), "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
-	}
-	if alreadyMounted {
-		utils.Indent(log.Debug, 5)(fmt.Sprintf("%s already mounted", dcf.Name()))
-	} else {
-		defer func() {
-			utils.Indent(log.Debug, 4)(fmt.Sprintf("Unmounting %s", dcf.Name()))
-			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, true)
-			}); err != nil {
-				log.Errorf("failed to unmount DMG %s at %s: %v", dcf.Name(), mountPoint, err)
-			}
-		}()
-	}
-
-	var out []string
-	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("failed to walk %s: %v", path, err)
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if match.MatchString(path) {
-			fname := filepath.Join(output, strings.TrimPrefix(path, mountPoint))
-			if err := utils.MkdirAndCopy(path, fname); err != nil {
-				return fmt.Errorf("failed to copy %s to %s: %v", path, fname, err)
-			}
-			out = append(out, fname)
-		}
-		return nil
-	}); err != nil {
-		if errors.Is(err, filepath.SkipDir) {
-			return out, nil
-		}
-		return nil, fmt.Errorf("failed to read files in cryptex folder: %v", err)
-	}
-	return out, nil
+	return dcf.Name(), nil
 }
 
 // Open opens the named file in the ZIP archive,

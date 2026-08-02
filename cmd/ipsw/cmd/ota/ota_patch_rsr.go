@@ -65,7 +65,9 @@ func validateOTAPatchRSRArgs(cmd *cobra.Command, args []string, cryptex, input, 
 
 func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
 	if len(dyldArches) == 0 {
-		return regexp.MustCompile(`cryptex-system-(arm64e?|x86_64h?)$`)
+		// arm64_32 must be here: `arm64e?` cannot match it, so an unfiltered RSR
+		// patch would skip a watchOS system cryptex it was asked to handle.
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e)?|x86_64h?)$`)
 	}
 
 	patterns := make([]string, 0, len(dyldArches))

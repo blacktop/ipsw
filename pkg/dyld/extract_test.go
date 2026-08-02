@@ -249,6 +249,10 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 		want   []string
 	}{
 		{
+			// arm64_32 is a supported cryptex family (it is in DscArches), so an
+			// unfiltered request must select it. Excluding it meant a watchOS OTA
+			// whose only system cryptex is cryptex-system-arm64_32 was skipped
+			// unless the caller named the arch explicitly.
 			name:   "empty matches supported cryptex families",
 			arches: nil,
 			want: []string{
@@ -256,6 +260,7 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 				"cryptex-system-arm64e",
 				"cryptex-system-x86_64",
 				"cryptex-system-x86_64h",
+				"cryptex-system-arm64_32",
 			},
 		},
 		{
@@ -274,9 +279,9 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 			want:   []string{"cryptex-system-x86_64", "cryptex-system-x86_64h"},
 		},
 		{
-			name:   "unknown arches do not fall back to x86",
+			name:   "arm64_32 stays exact",
 			arches: []string{"arm64_32"},
-			want:   nil,
+			want:   []string{"cryptex-system-arm64_32"},
 		},
 	}
 
@@ -444,4 +449,32 @@ func equalDscExtractionSteps(a, b []DscExtractionStep) bool {
 		}
 	}
 	return true
+}
+
+// TestRemoteCryptexPatternDefaultCoversArm64_32 pins that the UNFILTERED
+// selector accepts every cryptex arch in DscArches that can name a cryptex.
+// `arm64e?` cannot match arm64_32, so a watchOS OTA whose only system cryptex
+// is cryptex-system-arm64_32 was skipped unless -a arm64_32 was passed.
+func TestRemoteCryptexPatternDefaultCoversArm64_32(t *testing.T) {
+	re := RemoteCryptexPattern(nil)
+	for _, name := range []string{
+		"cryptex-system-arm64",
+		"cryptex-system-arm64e",
+		"cryptex-system-arm64_32",
+		"cryptex-system-x86_64",
+		"cryptex-system-x86_64h",
+	} {
+		if !re.MatchString(name) {
+			t.Errorf("RemoteCryptexPattern(nil) does not match %q", name)
+		}
+	}
+	for _, name := range []string{"cryptex-app", "cryptex-system-arm64_64", "cryptex-system-"} {
+		if re.MatchString(name) {
+			t.Errorf("RemoteCryptexPattern(nil) unexpectedly matches %q", name)
+		}
+	}
+	// The explicit form already worked; keep it working.
+	if !RemoteCryptexPattern([]string{"arm64_32"}).MatchString("cryptex-system-arm64_32") {
+		t.Error("RemoteCryptexPattern([arm64_32]) does not match its own arch")
+	}
 }
