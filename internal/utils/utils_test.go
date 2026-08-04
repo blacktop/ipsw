@@ -2,9 +2,12 @@ package utils
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
+	"time"
 )
 
 func TestSanitizeArchivePath(t *testing.T) {
@@ -71,6 +74,36 @@ func TestMountedFilesystemRoot(t *testing.T) {
 			t.Fatalf("MountedFilesystemRoot() = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestRunCommandWithFileOutputDoesNotWaitForDescendantDescriptors(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires /bin/sh")
+	}
+
+	cmd := exec.Command("/bin/sh", "-c", `printf attached; sleep 1 &`)
+	cmd.WaitDelay = 100 * time.Millisecond
+	out, err := runCommandWithFileOutput(cmd)
+	if err != nil {
+		t.Fatalf("runCommandWithFileOutput() failed: %v", err)
+	}
+	if got, want := string(out), "attached"; got != want {
+		t.Fatalf("runCommandWithFileOutput() output = %q, want %q", got, want)
+	}
+}
+
+func TestRunCommandWithFileOutputPreservesFailureOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires /bin/sh")
+	}
+
+	out, err := runCommandWithFileOutput(exec.Command("/bin/sh", "-c", `printf 'hdiutil: mount failed - Resource busy' >&2; exit 9`))
+	if err == nil {
+		t.Fatal("runCommandWithFileOutput() error = nil, want command failure")
+	}
+	if got, want := string(out), "hdiutil: mount failed - Resource busy"; got != want {
+		t.Fatalf("runCommandWithFileOutput() output = %q, want %q", got, want)
+	}
 }
 
 func TestDifference(t *testing.T) {

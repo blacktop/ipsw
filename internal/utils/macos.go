@@ -478,10 +478,37 @@ func GetKernelCollectionPath() (string, error) {
 
 var ErrMountResourceBusy = errors.New("hdiutil: mount failed - Resource busy")
 
+// runCommandWithFileOutput captures combined output without using an os.Pipe.
+// Some hdiutil helpers keep stdout or stderr open after hdiutil exits, which
+// makes exec.Cmd.Wait block forever waiting for CombinedOutput's pipe to reach
+// EOF. A regular file lets Wait return with the direct process while preserving
+// the command output needed for error reporting.
+func runCommandWithFileOutput(cmd *exec.Cmd) ([]byte, error) {
+	outputFile, err := os.CreateTemp("", "ipsw-command-output-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command output file: %w", err)
+	}
+	outputPath := outputFile.Name()
+	defer os.Remove(outputPath)
+
+	cmd.Stdout = outputFile
+	cmd.Stderr = outputFile
+	runErr := cmd.Run()
+	if err := outputFile.Close(); err != nil {
+		return nil, errors.Join(runErr, fmt.Errorf("failed to close command output file: %w", err))
+	}
+
+	out, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, errors.Join(runErr, fmt.Errorf("failed to read command output file: %w", err))
+	}
+	return out, runErr
+}
+
 // Mount mounts a DMG with hdiutil
 func Mount(image, mountPoint string) error {
 	if runtime.GOOS == "darwin" {
-		out, err := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image).CombinedOutput()
+		out, err := runCommandWithFileOutput(exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image))
 		if err != nil {
 			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
 				return ErrMountResourceBusy
@@ -623,7 +650,7 @@ func MountEncrypted(image, mountPoint, password string) error {
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, "-stdinpass", image)
 		cmd.Stdin = strings.NewReader(password)
-		out, err := cmd.CombinedOutput()
+		out, err := runCommandWithFileOutput(cmd)
 		if err != nil {
 			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
 				return ErrMountResourceBusy
