@@ -17,7 +17,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/alecthomas/chroma/v2 v2.27.0
-	github.com/anthropics/anthropic-sdk-go v1.61.0
+	github.com/anthropics/anthropic-sdk-go v1.62.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
@@ -44,7 +44,7 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.11.2
 	github.com/gin-gonic/gin v1.12.0
-	github.com/glebarez/go-sqlite v1.22.0
+	github.com/glebarez/go-sqlite v1.23.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-viper/mapstructure/v2 v2.5.0
@@ -56,11 +56,11 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.14.0
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-mastodon v0.0.13
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.32.5
+	github.com/ollama/ollama v0.32.6
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
@@ -73,7 +73,7 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.5.16
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
-	github.com/vbauerster/mpb/v8 v8.14.0
+	github.com/vbauerster/mpb/v8 v8.15.1
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.54.0
 	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743
@@ -82,7 +82,7 @@ require (
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
-	google.golang.org/genai v1.66.0
+	google.golang.org/genai v1.67.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.2
@@ -261,8 +261,8 @@ require (
 	google.golang.org/grpc v1.79.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
-	modernc.org/libc v1.68.0 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.46.1 // indirect
+	modernc.org/sqlite v1.55.0 // indirect
 )
