@@ -1,13 +1,17 @@
 package macho
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"hash"
 	"io"
 	"maps"
+	"math/bits"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,13 +27,17 @@ import (
 	"github.com/blacktop/ipsw/pkg/signature"
 )
 
+// hashStreamBufSize is the streaming read size, and also the point at which
+// bufio.Scanner refills in the normalized CString hashers.
+const hashStreamBufSize = 32 * 1024
+
 // hashStreamPool reuses sha256 hashers and copy buffers across the many
-// non-code per-section hashes a single GenerateDiffInfo computes, so section
-// content is hashed incrementally instead of slurped whole into a []byte
-// (Section.Data was the dominant cold-path allocation: ~71% of alloc-space
-// and most of the alloc-count).
+// per-section hashes a single GenerateDiffInfo computes, so section content is
+// hashed incrementally instead of slurped whole into a []byte (Section.Data was
+// the dominant cold-path allocation: ~71% of alloc-space and most of the
+// alloc-count).
 var hashStreamPool = sync.Pool{New: func() any {
-	return &hashStream{h: sha256.New(), buf: make([]byte, 32*1024)}
+	return &hashStream{h: sha256.New(), buf: make([]byte, hashStreamBufSize)}
 }}
 
 type hashStream struct {
@@ -52,19 +60,43 @@ func streamSHA256(r io.Reader) (string, bool) {
 	return hex.EncodeToString(hs.h.Sum(sum[:0])), true
 }
 
-// xbsTemporaryBuildPathRE matches the per-build rotating XBS temp-dir token. It
-// is intentionally NOT anchored: these paths appear both as a whole symbol/
-// string value AND embedded mid-string (e.g. inside a libmalloc assertion
-// message: `... failed (/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory
-// .<TMP>/Sources/.../file.c:114)`), and both forms churn every build.
-var xbsTemporaryBuildPathRE = regexp.MustCompile(`/Library/Caches/com\.apple\.xbs/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/TemporaryDirectory\.[^/\s]+`)
+// xbsBuildUUIDRE matches the per-build XBS job UUID directory. It is
+// intentionally NOT anchored: these paths appear both as a whole symbol/string
+// value AND embedded mid-string (e.g. inside a libmalloc assertion message:
+// `... failed (/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>/
+// Sources/.../file.c:114)`), and both forms churn every build.
+var xbsBuildUUIDRE = regexp.MustCompile(`/Library/Caches/com\.apple\.xbs/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(/|$)`)
 
-const xbsTemporaryBuildPathPlaceholder = "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>"
+const xbsBuildUUIDPlaceholder = "/Library/Caches/com.apple.xbs/<UUID>"
+const xbsBuildUUIDReplacement = xbsBuildUUIDPlaceholder + "${1}"
+
+// xbsTemporaryDirectoryRE matches the mkdtemp-rotated `TemporaryDirectory.<TOK>`
+// path component on its own rather than as a suffix of xbsBuildUUIDRE, because
+// the two rotate independently and appear in more than one combination:
+//
+//	/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TOK>/Sources/...
+//	/AppleInternal/Library/BuildRoots/<ROOT>/Library/Caches/com.apple.xbs/TemporaryDirectory.<TOK>/Sources/...
+//
+// It is deliberately narrow, because collapsing a token that is NOT a build
+// temp dir would make two genuinely different paths compare equal:
+//
+//   - the XBS prefix is required, so `/tmp/TemporaryDirectory.alpha/x` and a
+//     source file named `.../TemporaryDirectory.h` are left alone;
+//   - the token is exactly the six characters mkdtemp substitutes for XXXXXX,
+//     so a real extension cannot be swallowed;
+//   - a trailing `/` or end-of-string is required, so the match covers a whole
+//     path component.
+//
+// It runs after xbsBuildUUIDRE, hence the literal `<UUID>` in the optional
+// group.
+var xbsTemporaryDirectoryRE = regexp.MustCompile(`(/Library/Caches/com\.apple\.xbs(?:/<UUID>)?)/TemporaryDirectory\.[A-Za-z0-9]{6}(/|$)`)
+
+const xbsTemporaryDirectoryReplacement = "${1}/TemporaryDirectory.<TMP>${2}"
 
 // appleInternalBuildRootRE matches the per-build rotating token in an
 // /AppleInternal/Library/BuildRoots/<token>/... path (the meaningful SDK/path
 // suffix is kept). Also unanchored, for the same embedded-in-a-longer-string
-// reason as xbsTemporaryBuildPathRE.
+// reason as xbsBuildUUIDRE.
 var appleInternalBuildRootRE = regexp.MustCompile(`/AppleInternal/Library/BuildRoots/[^/\s]+`)
 
 const appleInternalBuildRootPlaceholder = "/AppleInternal/Library/BuildRoots/<BUILDROOT>"
@@ -73,12 +105,56 @@ const appleInternalBuildRootPlaceholder = "/AppleInternal/Library/BuildRoots/<BU
 // rotating build-root paths Apple embeds in Mach-O strings and object-file
 // (debug-map) symbols so a rebuild of identical source does not show as a diff.
 func normalizeBuildPathForDiff(value string) string {
-	value = xbsTemporaryBuildPathRE.ReplaceAllString(value, xbsTemporaryBuildPathPlaceholder)
+	// Every pattern below is rooted at a '/', so a value without one cannot
+	// match any of them. The gate matters because this runs over every symbol
+	// and every cstring of both sides in DiffInfo.Equivalent: regexp allocates
+	// even when it does not match, so three unconditional passes cost ~9
+	// allocations per string, and ~99% of strings hold no path at all.
+	if !strings.ContainsRune(value, '/') {
+		return value
+	}
+	value = xbsBuildUUIDRE.ReplaceAllString(value, xbsBuildUUIDReplacement)
+	value = xbsTemporaryDirectoryRE.ReplaceAllString(value, xbsTemporaryDirectoryReplacement)
 	return appleInternalBuildRootRE.ReplaceAllString(value, appleInternalBuildRootPlaceholder)
 }
 
 func normalizeCStringForDiff(value string) string {
 	return normalizeBuildPathForDiff(value)
+}
+
+// compilerBuildTimestampRE matches whole CString forms produced from
+// __DATE__, __TIME__, __TIMESTAMP__, and Apple's timezone-bearing equivalent.
+// Anchoring is intentional: a timestamp inside a diagnostic or other
+// meaningful string must remain reportable.
+const (
+	compilerMonthPattern   = `(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)`
+	compilerWeekdayPattern = `(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)`
+	compilerDayPattern     = `(?: [1-9]|[12][0-9]|3[01])`
+	compilerTimePattern    = `(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]`
+)
+
+var compilerBuildTimestampRE = regexp.MustCompile(
+	`^(?:` +
+		compilerTimePattern + `|` +
+		compilerMonthPattern + ` ` + compilerDayPattern + ` [0-9]{4}(?:(?: |, )?` + compilerTimePattern + `)?|` +
+		compilerWeekdayPattern + ` ` + compilerMonthPattern + ` ` + compilerDayPattern + ` ` + compilerTimePattern + `(?: [A-Z]{2,5})? [0-9]{4}` +
+		`)$`,
+)
+
+const compilerBuildTimestampPlaceholder = "<BUILD_TIMESTAMP>"
+
+func normalizeCStringForDiffIgnoringBuildTimestamp(value string) string {
+	if compilerBuildTimestampRE.MatchString(value) {
+		return compilerBuildTimestampPlaceholder
+	}
+	return normalizeCStringForDiff(value)
+}
+
+func cstringNormalizer(ignoreBuildTimestamps bool) func(string) string {
+	if ignoreBuildTimestamps {
+		return normalizeCStringForDiffIgnoringBuildTimestamp
+	}
+	return normalizeCStringForDiff
 }
 
 // generatedSymbolCounterRE matches the trailing compiler-assigned disambiguator
@@ -123,21 +199,22 @@ func diffNormalizedSymbols(oldValues, newValues []string) ([]string, []string) {
 	return added, removed
 }
 
-func normalizeCStringsForDiff(values []string) []string {
+func normalizeCStringsForDiff(values []string, ignoreBuildTimestamps bool) []string {
 	if len(values) == 0 {
 		return nil
 	}
 
+	normalize := cstringNormalizer(ignoreBuildTimestamps)
 	normalized := make([]string, len(values))
 	for idx, value := range values {
-		normalized[idx] = normalizeCStringForDiff(value)
+		normalized[idx] = normalize(value)
 	}
 	return normalized
 }
 
-func diffNormalizedCStrings(oldValues, newValues []string) ([]string, []string) {
-	normalizedOldValues := normalizeCStringsForDiff(oldValues)
-	normalizedNewValues := normalizeCStringsForDiff(newValues)
+func diffNormalizedCStrings(oldValues, newValues []string, ignoreBuildTimestamps bool) ([]string, []string) {
+	normalizedOldValues := normalizeCStringsForDiff(oldValues, ignoreBuildTimestamps)
+	normalizedNewValues := normalizeCStringsForDiff(newValues, ignoreBuildTimestamps)
 
 	added := utils.Difference(normalizedNewValues, normalizedOldValues)
 	sort.Strings(added)
@@ -194,7 +271,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 		return "", fmt.Errorf("nil diff info")
 	}
 
-	out, err := utils.GitDiff(oldInfo.String()+"\n", newInfo.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
+	out, err := utils.GitDiff(oldInfo.stringForDiff(conf)+"\n", newInfo.stringForDiff(conf)+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
 	if err != nil {
 		return "", err
 	}
@@ -350,7 +427,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 
 	// CStrings
 	if conf.CStrings {
-		newStrs, rmStrs := diffNormalizedCStrings(oldInfo.CStrings, newInfo.CStrings)
+		newStrs, rmStrs := diffNormalizedCStrings(oldInfo.CStrings, newInfo.CStrings, conf.IgnoreBuildTimestamps)
 		if len(newStrs) > 0 || len(rmStrs) > 0 {
 			hasDiffRows = true
 			b.WriteString("CStrings:\n")
@@ -396,17 +473,18 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 }
 
 type DiffConfig struct {
-	Markdown           bool
-	Color              bool
-	DiffTool           string
-	AllowList          []string
-	BlockList          []string
-	CStrings           bool
-	FuncStarts         bool
-	IgnoreLoadCommands bool
-	PemDB              string
-	SymMap             map[string]signature.SymbolMap
-	Verbose            bool
+	Markdown              bool
+	Color                 bool
+	DiffTool              string
+	AllowList             []string
+	BlockList             []string
+	CStrings              bool
+	FuncStarts            bool
+	IgnoreBuildTimestamps bool
+	IgnoreLoadCommands    bool
+	PemDB                 string
+	SymMap                map[string]signature.SymbolMap
+	Verbose               bool
 }
 
 type MachoDiff struct {
@@ -416,9 +494,11 @@ type MachoDiff struct {
 }
 
 type section struct {
-	Name string `json:"name,omitempty"`
-	Size uint64 `json:"size,omitempty"`
-	Hash string `json:"hash,omitempty"`
+	Name     string            `json:"name,omitempty"`
+	Size     uint64            `json:"size,omitempty"`
+	Hash     string            `json:"hash,omitempty"`
+	Type     types.SectionFlag `json:"-"`
+	HashMode sectionHashMode   `json:"-"`
 }
 
 type DiffInfo struct {
@@ -435,7 +515,20 @@ type DiffInfo struct {
 	Verbose     bool
 }
 
+// GenerateDiffInfo generates diff information for a standalone Mach-O, whose
+// non-code section bytes are meaningful without container relocation context.
 func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.SymbolMap) *DiffInfo {
+	return generateDiffInfo(m, conf, false, smaps...)
+}
+
+// GenerateContainerDiffInfo generates diff information for an image whose
+// relocations are owned by a shared cache or fileset container.
+func GenerateContainerDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.SymbolMap) *DiffInfo {
+	return generateDiffInfo(m, conf, true, smaps...)
+}
+
+func generateDiffInfo(m *macho.File, conf *DiffConfig, containerImage bool, smaps ...signature.SymbolMap) *DiffInfo {
+	compareAllContent := !containerImage || len(conf.AllowList) > 0
 	var secs []section
 	for _, s := range m.Sections {
 		name := s.Seg + "." + s.Name
@@ -443,10 +536,12 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 			continue
 		}
 		sec := section{
-			Name: name,
-			Size: s.Size,
+			Name:     name,
+			Size:     s.Size,
+			Type:     s.Flags & types.SectionType,
+			HashMode: sectionContentHashMode(s, compareAllContent),
 		}
-		sec.Hash, _ = sectionContentHash(s)
+		sec.Hash, _ = sectionContentHashWithMode(s, sec.HashMode, conf.IgnoreBuildTimestamps)
 		secs = append(secs, sec)
 	}
 	var starts []types.Function
@@ -495,7 +590,7 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	}
 	var loadCmdHash string
 	if !conf.IgnoreLoadCommands {
-		loadCmdHash, _ = loadCommandsHash(m)
+		loadCmdHash, _ = loadCommandsHash(m, conf)
 	}
 	return &DiffInfo{
 		Version:     sourceVersion,
@@ -512,14 +607,14 @@ func GenerateDiffInfo(m *macho.File, conf *DiffConfig, smaps ...signature.Symbol
 	}
 }
 
-// loadCommandsHash returns sha256(header || load_commands) with volatile
-// build-metadata and linkedit-position fields zeroed. Structural load-command
-// changes — dependency names, rpaths, segment layout, command additions/removals
-// — still flip the hash, while point-release metadata churn does not.
+// loadCommandsHash returns a digest of the Mach header and load commands with
+// volatile build metadata and linkedit positions removed. When section filters
+// are active, segment commands are represented canonically so excluded sections
+// and address/offset shifts cannot bypass the filter.
 //
 // Returns ("", err) on read failure; callers should treat an empty hash as
 // "not available" and skip the LoadCmdHash leg of the comparison.
-func loadCommandsHash(m *macho.File) (string, error) {
+func loadCommandsHash(m *macho.File, conf *DiffConfig) (string, error) {
 	if m == nil {
 		return "", nil
 	}
@@ -536,18 +631,13 @@ func loadCommandsHash(m *macho.File) (string, error) {
 	if err != nil || n != region {
 		return "", err
 	}
-	return loadCommandsDigest(buf, hdrSize, m.Loads), nil
+	return loadCommandsDigest(buf, hdrSize, m.Loads, m.Sections, conf), nil
 }
 
-// loadCommandsDigest hashes the header + load-command region with each
-// command's VOLATILE bytes zeroed, so the digest flips only on STRUCTURAL
-// load-command changes (a dependency added/removed/renamed, an rpath change,
-// segment layout) and not on the per-release build-metadata churn that
-// rebuilds every binary in a point release (SDK/min-OS/source/dylib versions,
-// re-signed code-signature size, shifted linkedit offsets). This mirrors the
-// kernelcache diff's "functional segments unchanged; only build metadata
-// differs -> skip" stance so the two paths agree on what counts as a change.
-func loadCommandsDigest(buf []byte, hdrSize int, loads []macho.Load) string {
+// loadCommandsDigest hashes the header + load-command region with volatile
+// fields zeroed. With an allow- or block-list, raw segment commands are replaced
+// by a policy-aware representation produced by writeFilteredSegmentDigest.
+func loadCommandsDigest(buf []byte, hdrSize int, loads []macho.Load, sections []*types.Section, conf *DiffConfig) string {
 	off := hdrSize
 	for _, l := range loads {
 		sz := int(l.LoadSize())
@@ -562,14 +652,103 @@ func loadCommandsDigest(buf []byte, hdrSize int, loads []macho.Load) string {
 			if end > off+sz {
 				end = off + sz
 			}
-			for i := start; i < end; i++ {
-				buf[i] = 0
-			}
+			clear(buf[start:end])
 		}
 		off += sz
 	}
-	sum := sha256.Sum256(buf)
-	return hex.EncodeToString(sum[:])
+
+	filtered := conf != nil && (len(conf.AllowList) > 0 || len(conf.BlockList) > 0)
+	if !filtered {
+		sum := sha256.Sum256(buf)
+		return hex.EncodeToString(sum[:])
+	}
+
+	// sizeofcmds includes every raw section record, including blocked ones.
+	// The canonical command stream below already carries its own boundaries.
+	if hdrSize >= 24 {
+		clear(buf[20:24])
+	}
+	h := sha256.New()
+	_, _ = h.Write(buf[:hdrSize])
+	off = hdrSize
+	for _, l := range loads {
+		sz := int(l.LoadSize())
+		if sz <= 0 || off+sz > len(buf) {
+			break
+		}
+		if l.Command() == types.LC_SEGMENT || l.Command() == types.LC_SEGMENT_64 {
+			if seg, ok := l.(*macho.Segment); ok {
+				writeFilteredSegmentDigest(h, seg, sections, conf)
+				off += sz
+				continue
+			}
+		}
+		_, _ = h.Write(buf[off : off+sz])
+		off += sz
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// writeFilteredSegmentDigest retains structural segment data while omitting
+// excluded sections and positions derived from section layout. Included section
+// sizes and selected content hashes are compared separately in DiffInfo.Sections,
+// but flags, alignment, relocation counts, and section-type-specific reserved
+// fields still need representation here.
+func writeFilteredSegmentDigest(h hash.Hash, seg *macho.Segment, sections []*types.Section, conf *DiffConfig) {
+	var lane [8]byte
+	writeUint32 := func(value uint32) {
+		binary.LittleEndian.PutUint32(lane[:4], value)
+		_, _ = h.Write(lane[:4])
+	}
+	writeUint64 := func(value uint64) {
+		binary.LittleEndian.PutUint64(lane[:], value)
+		_, _ = h.Write(lane[:])
+	}
+	writeName := func(value string) {
+		var name [16]byte
+		copy(name[:], value)
+		_, _ = h.Write(name[:])
+	}
+
+	writeUint32(uint32(seg.Command()))
+	writeName(seg.Name)
+	writeUint32(uint32(seg.Maxprot))
+	writeUint32(uint32(seg.Prot))
+	writeUint32(uint32(seg.Flag))
+	// __PAGEZERO has no sections, so its guard size has no other semantic
+	// representation. Other segment positions are derived from section layout.
+	if seg.Name == "__PAGEZERO" {
+		writeUint64(seg.Addr)
+		writeUint64(seg.Memsz)
+		writeUint64(seg.Offset)
+		writeUint64(seg.Filesz)
+	}
+
+	start := uint64(seg.Firstsect)
+	end := min(start+uint64(seg.Nsect), uint64(len(sections)))
+	var included uint32
+	for idx := start; idx < end; idx++ {
+		s := sections[idx]
+		if s != nil && sectionIncluded(s.Seg+"."+s.Name, conf) {
+			included++
+		}
+	}
+	writeUint32(included)
+	for idx := start; idx < end; idx++ {
+		s := sections[idx]
+		if s == nil || !sectionIncluded(s.Seg+"."+s.Name, conf) {
+			continue
+		}
+		writeName(s.Seg)
+		writeName(s.Name)
+		writeUint64(s.Size)
+		writeUint32(s.Align)
+		writeUint32(s.Nreloc)
+		writeUint32(uint32(s.Flags))
+		writeUint32(s.Reserved1)
+		writeUint32(s.Reserved2)
+		writeUint32(s.Reserved3)
+	}
 }
 
 // volatileLoadCmdRanges returns the byte ranges (relative to the start of a
@@ -619,14 +798,239 @@ func sectionIncluded(name string, conf *DiffConfig) bool {
 	return true
 }
 
-func sectionContentHash(s *types.Section) (string, bool) {
-	if s == nil || s.Size == 0 || sectionContainsCode(s) {
+// sectionHashMode says how — or whether — a section's content is digested.
+type sectionHashMode int
+
+const (
+	// hashSkip means section content is intentionally ignored. It is the zero
+	// value so missing classification metadata defaults to no content hash.
+	hashSkip sectionHashMode = iota
+	// hashVerbatim digests the raw bytes.
+	hashVerbatim
+	// hashCStringsOrdered digests normalized NUL-terminated strings in section
+	// order. Standalone and explicitly allowed section bytes are address-sensitive.
+	hashCStringsOrdered
+	// hashCStringsMultiset ignores literal-pool order in a default container
+	// comparison, where linker reshuffling is otherwise dominant noise.
+	hashCStringsMultiset
+)
+
+// stableSectionHashModes names the sections whose bytes still mean the same
+// thing after everything around them moves. Literal section TYPES are recognized
+// by flag in sectionContentHashMode, so only sections typed S_REGULAR belong here.
+//
+// Most non-code sections are deliberately absent. In a shared-cache or fileset
+// image, pointer slots are stored as cache-/collection-relative offsets, and the
+// __TEXT metadata sections (__unwind_info, __eh_frame, __objc_methlist, the
+// __swift5_* tables) store image-relative offsets. Every one of those bytes
+// changes when an unrelated image earlier in the container grows by a byte, so
+// hashing them reports "this container was rebuilt", not "this binary changed":
+// across two adjacent iOS betas it flagged 4515 of 4646 dylibs, which buried the
+// real diffs. Literal data has no such dependence, so that is all we hash.
+//
+// Expect this list to grow: Apple adds literal sections (particularly __swift*)
+// most releases. For container images without an explicit allow-list, a missing
+// entry fails quiet — the section simply stops being compared — so new literal
+// sections belong here as they appear.
+var stableSectionHashModes = map[string]sectionHashMode{
+	// Runs of NUL-terminated strings a producer may emit as S_REGULAR rather
+	// than S_CSTRING_LITERALS. __os_log is listed because go-macho's GetCStrings
+	// counts it, and the rendered CStrings list and the section hash have to
+	// agree about what a literal pool is.
+	"__TEXT.__objc_methname":  hashCStringsMultiset,
+	"__TEXT.__objc_classname": hashCStringsMultiset,
+	"__TEXT.__objc_methtype":  hashCStringsMultiset,
+	"__TEXT.__swift5_reflstr": hashCStringsMultiset,
+	"__TEXT.__os_log":         hashCStringsMultiset,
+
+	// __ustring is UTF-16, so splitting it on single NUL bytes would be wrong.
+	"__TEXT.__ustring":              hashVerbatim,
+	"__TEXT.__info_plist":           hashVerbatim,
+	"__TEXT.__entitlements":         hashVerbatim,
+	"__DATA_CONST.__objc_imageinfo": hashVerbatim,
+}
+
+// sectionContentHashMode reports how a section's content should be digested.
+// compareAllContent is true for standalone Mach-Os and for container images
+// whose caller supplied an explicit allow-list.
+func sectionContentHashMode(s *types.Section, compareAllContent bool) sectionHashMode {
+	if s == nil {
+		return hashSkip
+	}
+	flags := s.Flags
+	if sectionContainsCode(s) ||
+		flags.IsZerofill() || flags.IsGbZerofill() || flags.IsThreadLocalZerofill() {
+		return hashSkip
+	}
+	if flags.IsCstringLiterals() {
+		if compareAllContent {
+			return hashCStringsOrdered
+		}
+		return hashCStringsMultiset
+	}
+	if flags.Is4ByteLiterals() || flags.Is8ByteLiterals() || flags.Is16ByteLiterals() {
+		return hashVerbatim
+	}
+	if mode, ok := stableSectionHashModes[s.Seg+"."+s.Name]; ok {
+		if compareAllContent && mode == hashCStringsMultiset {
+			return hashCStringsOrdered
+		}
+		return mode
+	}
+	if compareAllContent {
+		// Standalone content is meaningful verbatim; an explicit container
+		// allow-list requests the same comparison for otherwise unclassified
+		// sections despite relocation noise.
+		return hashVerbatim
+	}
+	return hashSkip
+}
+
+func sectionContentHashWithMode(s *types.Section, mode sectionHashMode, ignoreBuildTimestamps bool) (string, bool) {
+	if s == nil || s.Size == 0 {
 		return "", false
 	}
-	// Stream the section through the hasher rather than slurping s.Data():
-	// DSC dylib sections can be multi-MB, and this runs for every included
-	// non-code section of every binary on both sides.
-	return streamSHA256(s.Open())
+	switch mode {
+	case hashCStringsOrdered:
+		return normalizedCStringOrderedHash(s, ignoreBuildTimestamps)
+	case hashCStringsMultiset:
+		return normalizedCStringMultisetHash(s, ignoreBuildTimestamps)
+	case hashVerbatim:
+		// Stream the section through the hasher rather than slurping s.Data():
+		// DSC dylib sections can be multi-MB, and this runs for every included
+		// section of every binary on both sides.
+		return streamSHA256(s.Open())
+	default:
+		return "", false
+	}
+}
+
+// normalizedCStringBytes collapses rotating build-path tokens in one literal.
+// The '/' gate keeps the ~99% of strings that hold no path off the regex path
+// and avoids their []byte->string copy.
+func normalizedCStringBytes(value []byte, ignoreBuildTimestamps bool) []byte {
+	if ignoreBuildTimestamps && compilerBuildTimestampRE.Match(value) {
+		return []byte(compilerBuildTimestampPlaceholder)
+	}
+	if bytes.IndexByte(value, '/') < 0 {
+		return value
+	}
+	return []byte(normalizeBuildPathForDiff(string(value)))
+}
+
+// maxCStringToken bounds how far bufio.Scanner may grow its buffer for a single
+// string in a literal pool.
+const maxCStringToken = 1 << 20
+
+// splitCString is a bufio.SplitFunc yielding each NUL-terminated string in a
+// literal pool, plus any unterminated tail. Empty strings between adjacent NULs
+// are emitted too, so alignment padding counts toward the digest.
+func splitCString(data []byte, atEOF bool) (int, []byte, error) {
+	if i := bytes.IndexByte(data, 0); i >= 0 {
+		return i + 1, data[:i], nil
+	}
+	if atEOF && len(data) > 0 {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
+}
+
+func newCStringScanner(s *types.Section, buf []byte) *bufio.Scanner {
+	sc := bufio.NewScanner(s.Open())
+	// Keep the token cap independent of the input-controlled section size. A
+	// malformed unterminated token then fails without driving an equally large
+	// allocation, and callers fall back to the bounded raw section hash.
+	limit := maxCStringToken
+	if s.Size < uint64(limit) {
+		limit = int(s.Size) + 1
+	}
+	sc.Buffer(buf, limit)
+	sc.Split(splitCString)
+	return sc
+}
+
+// normalizedCStringOrderedHash preserves the address order of normalized
+// literals. Length prefixes keep token boundaries unambiguous after build-path
+// normalization.
+func normalizedCStringOrderedHash(s *types.Section, ignoreBuildTimestamps bool) (string, bool) {
+	hs := hashStreamPool.Get().(*hashStream)
+	defer hashStreamPool.Put(hs)
+	hs.h.Reset()
+
+	sc := newCStringScanner(s, hs.buf)
+	var count uint64
+	var lane [8]byte
+	for sc.Scan() {
+		value := normalizedCStringBytes(sc.Bytes(), ignoreBuildTimestamps)
+		binary.LittleEndian.PutUint64(lane[:], uint64(len(value)))
+		_, _ = hs.h.Write(lane[:])
+		_, _ = hs.h.Write(value)
+		count++
+	}
+	if sc.Err() != nil {
+		return streamSHA256(s.Open())
+	}
+	if count == 0 {
+		return "", false
+	}
+
+	var sum [sha256.Size]byte
+	return hex.EncodeToString(hs.h.Sum(sum[:0])), true
+}
+
+// addCStringDigest adds a SHA-256 digest to a 256-bit wrapping accumulator.
+func addCStringDigest(acc *[4]uint64, digest [sha256.Size]byte) {
+	var carry uint64
+	for idx := range acc {
+		acc[idx], carry = bits.Add64(acc[idx], binary.LittleEndian.Uint64(digest[idx*8:(idx+1)*8]), carry)
+	}
+}
+
+// normalizedCStringMultisetHash digests a section's literal pool as a
+// MULTISET: every string is normalized, reduced to a SHA-256 digest, and added
+// to a 256-bit wrapping accumulator. Addition is commutative and still counts
+// duplicates (n copies contribute n*d). The string count is folded in as well
+// so multisets of different sizes cannot agree on the accumulator alone.
+//
+// Discarding order is deliberate only for a default container comparison, where
+// the linker may reshuffle a pool and rewrite its references as part of the same
+// rebuild. That reshuffling alone accounted for 106 of the 233 dylibs still
+// flagged after build-path normalization across two adjacent iOS betas.
+// Standalone and explicitly allowed sections use normalizedCStringOrderedHash.
+//
+// Addition rather than sorting the digests keeps memory bounded and avoids the
+// sorting cost while retaining a 256-bit accumulator of cryptographic digests.
+//
+// The section is streamed rather than slurped: __cstring runs to several MB in
+// the larger dylibs, and this runs for both sides of every binary.
+func normalizedCStringMultisetHash(s *types.Section, ignoreBuildTimestamps bool) (string, bool) {
+	hs := hashStreamPool.Get().(*hashStream)
+	defer hashStreamPool.Put(hs)
+
+	sc := newCStringScanner(s, hs.buf)
+	var acc [4]uint64
+	var count uint64
+	for sc.Scan() {
+		addCStringDigest(&acc, sha256.Sum256(normalizedCStringBytes(sc.Bytes(), ignoreBuildTimestamps)))
+		count++
+	}
+	if sc.Err() != nil {
+		return streamSHA256(s.Open())
+	}
+	if count == 0 {
+		return "", false
+	}
+
+	hs.h.Reset()
+	var lane [8]byte
+	for _, value := range acc {
+		binary.LittleEndian.PutUint64(lane[:], value)
+		_, _ = hs.h.Write(lane[:])
+	}
+	binary.LittleEndian.PutUint64(lane[:], count)
+	_, _ = hs.h.Write(lane[:])
+	var sum [sha256.Size]byte
+	return hex.EncodeToString(hs.h.Sum(sum[:0])), true
 }
 
 func sectionContainsCode(s *types.Section) bool {
@@ -648,11 +1052,11 @@ func appendFunctionSummary(out, functions *strings.Builder) {
 	out.WriteString(functions.String())
 }
 
-// sectionContentChanges reports the sections whose content hash changed while
-// their size stayed the same. A size change already shows in the diff'd section
-// list, so those are skipped; this surfaces the same-size content edits that
-// dropping the per-section sha256 from DiffInfo.String would otherwise hide,
-// without re-introducing the sha256 wall.
+// sectionContentChanges reports the sections whose hash mode or content hash
+// changed while their size stayed the same. A size change already shows in the
+// diff'd section list, so those are skipped; this surfaces the same-size content
+// edits that dropping the per-section sha256 from DiffInfo.String would otherwise
+// hide, without re-introducing the sha256 wall.
 func sectionContentChanges(oldInfo, newInfo *DiffInfo) []string {
 	if len(oldInfo.Sections) == 0 || len(newInfo.Sections) == 0 {
 		return nil
@@ -671,12 +1075,23 @@ func sectionContentChanges(oldInfo, newInfo *DiffInfo) []string {
 }
 
 // sameSizeContentChanged reports whether two same-named sections have different
-// content hashes but the same size (a size change already shows in the diff'd
-// section list, so it is excluded here).
+// section types, hash modes, or content hashes but the same size (a size change
+// already shows in the diff'd section list, so it is excluded here).
 func sameSizeContentChanged(oldSec, newSec section) bool {
-	return oldSec.Hash != "" && newSec.Hash != "" &&
-		oldSec.Hash != newSec.Hash &&
-		oldSec.Size == newSec.Size
+	return oldSec.Size == newSec.Size &&
+		(oldSec.Type != newSec.Type || !equivalentSectionContent(oldSec, newSec))
+}
+
+// equivalentSectionContent compares both the selected hash policy and its
+// result. A missing required hash is a change; a skipped hash stays a wildcard.
+func equivalentSectionContent(a, b section) bool {
+	if a.HashMode != b.HashMode {
+		return false
+	}
+	if a.HashMode != hashSkip && (a.Hash == "") != (b.Hash == "") {
+		return false
+	}
+	return a.Hash == "" || b.Hash == "" || a.Hash == b.Hash
 }
 
 // containsAddedOrRemovedRows reports whether body has a real added or removed
@@ -703,7 +1118,7 @@ func (i DiffInfo) Equivalent(x DiffInfo, conf *DiffConfig) bool {
 		!equivalentNormalizedStrings(i.Symbols, x.Symbols, normalizeSymbolForDiff) {
 		return false
 	}
-	if conf.CStrings && !equivalentNormalizedStrings(i.CStrings, x.CStrings, normalizeCStringForDiff) {
+	if conf.CStrings && !equivalentNormalizedStrings(i.CStrings, x.CStrings, cstringNormalizer(conf.IgnoreBuildTimestamps)) {
 		return false
 	}
 	if i.Functions != x.Functions {
@@ -757,10 +1172,8 @@ func equivalentSections(a, b []section) bool {
 		return false
 	}
 	for idx := range a {
-		if a[idx].Name != b[idx].Name || a[idx].Size != b[idx].Size {
-			return false
-		}
-		if a[idx].Hash != "" && b[idx].Hash != "" && a[idx].Hash != b[idx].Hash {
+		if a[idx].Name != b[idx].Name || a[idx].Size != b[idx].Size || a[idx].Type != b[idx].Type ||
+			!equivalentSectionContent(a[idx], b[idx]) {
 			return false
 		}
 	}
@@ -780,6 +1193,11 @@ func equivalentFunctions(i, x DiffInfo) bool {
 }
 
 func (i *DiffInfo) String() string {
+	return i.stringForDiff(nil)
+}
+
+func (i *DiffInfo) stringForDiff(conf *DiffConfig) string {
+	ignoreBuildTimestamps := conf != nil && conf.IgnoreBuildTimestamps
 	var out strings.Builder
 	if i.Version != "" {
 		out.WriteString(i.Version + "\n")
@@ -796,7 +1214,7 @@ func (i *DiffInfo) String() string {
 	}
 	out.WriteString(fmt.Sprintf("  Functions: %d\n", i.Functions))
 	out.WriteString(fmt.Sprintf("  Symbols:   %d\n", len(normalizedStringSet(i.Symbols, normalizeSymbolForDiff))))
-	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(normalizedStringSet(i.CStrings, normalizeCStringForDiff))))
+	out.WriteString(fmt.Sprintf("  CStrings:  %d\n", len(normalizedStringSet(i.CStrings, cstringNormalizer(ignoreBuildTimestamps)))))
 	return out.String()
 }
 

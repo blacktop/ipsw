@@ -65,8 +65,9 @@ func (t *firmwaresTask) Version() int { return firmwaresCacheVersion }
 
 // OptionsHash digests every output-affecting option for the firmware diff.
 // parseFirmwares builds a mcmd.DiffConfig from d.conf
-// (AllowList/BlockList/CStrings/FuncStarts/Verbose) with the same fixed cosmetic
-// fields machosJob renders with (Markdown=true, Color=false, DiffTool="git").
+// (AllowList/BlockList/CStrings/IgnoreBuildTimestamps/FuncStarts/Verbose) with
+// the same fixed cosmetic fields machosJob renders with (Markdown=true,
+// Color=false, DiffTool="git").
 // The hash folds the same DiffConfig fields machosJob folds (via
 // hashMachoDiffConfig) — built to mirror the DiffFirmwares config — so a rerun
 // with different allow/block lists or strings/starts options cannot serve a stale
@@ -84,16 +85,7 @@ func (t *firmwaresTask) OptionsHash() string {
 // firmwareDiffConfig mirrors the output-affecting fields of the mcmd.DiffConfig
 // parseFirmwares passes to DiffFirmwares.
 func (t *firmwaresTask) firmwareDiffConfig() *mcmd.DiffConfig {
-	return &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  t.d.conf.AllowList,
-		BlockList:  t.d.conf.BlockList,
-		CStrings:   t.d.conf.CStrings,
-		FuncStarts: t.d.conf.FuncStarts,
-		Verbose:    t.d.conf.Verbose,
-	}
+	return t.d.machoDiffConfig()
 }
 
 // InputHash digests the task-scope inputs: the old and new IPSW zip

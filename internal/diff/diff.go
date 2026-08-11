@@ -65,28 +65,29 @@ type IBootDiff struct {
 }
 
 type Config struct {
-	Title         string
-	IpswOld       string
-	IpswNew       string
-	KDKs          []string
-	LaunchD       bool
-	Firmware      bool
-	Features      bool
-	Files         bool
-	Localizations bool
-	Sandbox       bool
-	CStrings      bool
-	FuncStarts    bool
-	Entitlements  bool
-	AllowList     []string
-	BlockList     []string
-	PemDB         string
-	Signatures    string
-	Output        string
-	Verbose       bool
-	AEAKeyDB      string
-	AEAKeyVal     string
-	AEAInsecure   bool
+	Title                 string
+	IpswOld               string
+	IpswNew               string
+	KDKs                  []string
+	LaunchD               bool
+	Firmware              bool
+	Features              bool
+	Files                 bool
+	Localizations         bool
+	Sandbox               bool
+	CStrings              bool
+	IgnoreBuildTimestamps bool
+	FuncStarts            bool
+	Entitlements          bool
+	AllowList             []string
+	BlockList             []string
+	PemDB                 string
+	Signatures            string
+	Output                string
+	Verbose               bool
+	AEAKeyDB              string
+	AEAKeyVal             string
+	AEAInsecure           bool
 	// Cache holds the persistent-cache lifecycle options used in IPSW
 	// mode. A zero value disables persistent caching and falls back to
 	// the per-orchestrator MemoryStore that the directory/OTA paths use.
@@ -898,17 +899,9 @@ func (d *Diff) parseKernelcache() error {
 		}
 	}
 
-	d.Kexts, err = kcmd.Diff(m1, m2, &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  d.conf.AllowList,
-		BlockList:  d.conf.BlockList,
-		CStrings:   d.conf.CStrings,
-		FuncStarts: d.conf.FuncStarts,
-		SymMap:     smap,
-		Verbose:    d.conf.Verbose,
-	})
+	conf := d.machoDiffConfig()
+	conf.SymMap = smap
+	d.Kexts, err = kcmd.Diff(m1, m2, conf)
 	if err != nil {
 		return err
 	}
@@ -1127,14 +1120,15 @@ func (d *Diff) parseMachos() (err error) {
 // Shared by parseMachos (OTA/Directory) and machosJob (IPSW).
 func (d *Diff) machoDiffConfig() *mcmd.DiffConfig {
 	return &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  d.conf.AllowList,
-		BlockList:  d.conf.BlockList,
-		CStrings:   d.conf.CStrings,
-		FuncStarts: d.conf.FuncStarts,
-		Verbose:    d.conf.Verbose,
+		Markdown:              true,
+		Color:                 false,
+		DiffTool:              "git",
+		AllowList:             d.conf.AllowList,
+		BlockList:             d.conf.BlockList,
+		CStrings:              d.conf.CStrings,
+		IgnoreBuildTimestamps: d.conf.IgnoreBuildTimestamps,
+		FuncStarts:            d.conf.FuncStarts,
+		Verbose:               d.conf.Verbose,
 	}
 }
 
@@ -1190,16 +1184,7 @@ func (d *Diff) applyLaunchdGitDiff(oldConfig, newConfig string) error {
 }
 
 func (d *Diff) parseFirmwares() (err error) {
-	conf := &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  d.conf.AllowList,
-		BlockList:  d.conf.BlockList,
-		CStrings:   d.conf.CStrings,
-		FuncStarts: d.conf.FuncStarts,
-		Verbose:    d.conf.Verbose,
-	}
+	conf := d.machoDiffConfig()
 	if d.Old.InputMode == inputModeOTA {
 		d.Firmwares, err = diffFirmwaresFromOTA(&d.Old, &d.New, conf)
 		return

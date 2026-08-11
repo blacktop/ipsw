@@ -48,7 +48,10 @@ func TestDSCOptionsHashFoldsDiffConfig(t *testing.T) {
 		"BlockList":  func(c *Config) { c.BlockList = []string{"/usr/lib/bar.dylib"} },
 		"CStrings":   func(c *Config) { c.CStrings = true },
 		"FuncStarts": func(c *Config) { c.FuncStarts = true },
-		"Verbose":    func(c *Config) { c.Verbose = true },
+		"IgnoreBuildTimestamps": func(c *Config) {
+			c.IgnoreBuildTimestamps = true
+		},
+		"Verbose": func(c *Config) { c.Verbose = true },
 	}
 	for field, mutate := range mutations {
 		d := &Diff{conf: &Config{}}

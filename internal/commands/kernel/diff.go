@@ -33,7 +33,7 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 				}
 				smaps = append(smaps, smap)
 			}
-			prev[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf, smaps...)
+			prev[fe.EntryID] = mcmd.GenerateContainerDiffInfo(mfe, conf, smaps...)
 		}
 	}
 
@@ -55,7 +55,7 @@ func Diff(k1, k2 *macho.File, conf *mcmd.DiffConfig) (*mcmd.MachoDiff, error) {
 				}
 				smaps = append(smaps, smap)
 			}
-			next[fe.EntryID] = mcmd.GenerateDiffInfo(mfe, conf, smaps...)
+			next[fe.EntryID] = mcmd.GenerateContainerDiffInfo(mfe, conf, smaps...)
 		}
 	}
 

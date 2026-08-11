@@ -233,7 +233,9 @@ func machoDiffHasContent(d *mcmd.MachoDiff) bool {
 // machosJob. The diff cache shipped in v3.1.693, so bump this whenever the
 // persisted row layout (per-volume MachoDiff), the InputHash composition, or
 // the rendered MachO section semantics change in a way that invalidates rows
-// written by a prior ipsw build.
+// written by a prior ipsw build. A change to the SHARED rendered-body semantics
+// belongs on the marker string in hashMachoDiffConfig instead, which orphans
+// stale rows for every task that folds it.
 const machosCacheVersion = 1
 
 // Version reports the cache payload / output-semantics version. See
@@ -256,6 +258,7 @@ func (j *machosJob) Version() int { return machosCacheVersion }
 //   - DiffTool
 //   - CStrings   (--strs / cstrings section content)
 //   - FuncStarts (--starts / func-starts section content)
+//   - IgnoreBuildTimestamps (only when enabled; false preserves legacy scope)
 //   - IgnoreLoadCommands (only when enabled; false is the legacy/default scope)
 //   - PemDB      (signature PEM database path)
 //   - SymMap     (signature symbol maps; sorted by map key then address)
@@ -301,7 +304,7 @@ func hashMachoDiffConfig(h io.Writer, conf *mcmd.DiffConfig) {
 	// and Version/UUID are inclusion signals only in Verbose mode). Update this
 	// string on ANY rendered-body format change: it orphans stale rows for every
 	// task that folds hashMachoDiffConfig (machos, dsc, kexts, firmwares).
-	_, _ = h.Write([]byte("macho-report-markdown-section-lists+semantic-equivalence+uniform-section-hashes+source-version-context"))
+	_, _ = h.Write([]byte("macho-report-markdown-section-lists+semantic-equivalence+container-provenance-section-hashes+hash-mode-transitions+allow-list-hash-override+ordered-cstrings+sha256-multiset-digests+hash-availability+source-version-context+filtered-segment-loadcmds+section-type-transitions+section-reserved1"))
 	_, _ = h.Write([]byte{0})
 	writeStringList := func(label string, items []string) {
 		_, _ = h.Write([]byte(label))
@@ -336,6 +339,9 @@ func hashMachoDiffConfig(h io.Writer, conf *mcmd.DiffConfig) {
 	writeString("DiffTool", conf.DiffTool)
 	writeBool("CStrings", conf.CStrings)
 	writeBool("FuncStarts", conf.FuncStarts)
+	if conf.IgnoreBuildTimestamps {
+		writeBool("IgnoreBuildTimestamps", true)
+	}
 	if conf.IgnoreLoadCommands {
 		writeBool("IgnoreLoadCommands", true)
 	}

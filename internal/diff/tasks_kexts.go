@@ -75,9 +75,10 @@ const kextsCacheVersion = 1
 func (t *kextsTask) Version() int { return kextsCacheVersion }
 
 // OptionsHash digests every output-affecting option for the kernelcache diff.
-// parseKernelcache builds a mcmd.DiffConfig inline from d.conf
-// (AllowList/BlockList/CStrings/FuncStarts/Verbose) with the same fixed cosmetic
-// fields machosJob renders with (Markdown=true, Color=false, DiffTool="git"),
+// parseKernelcache builds a mcmd.DiffConfig from d.conf
+// (AllowList/BlockList/CStrings/IgnoreBuildTimestamps/FuncStarts/Verbose) with
+// the same fixed cosmetic fields machosJob renders with (Markdown=true,
+// Color=false, DiffTool="git"),
 // plus the SymMap derived from d.conf.Signatures. The hash folds the same
 // DiffConfig fields machosJob folds (via hashMachoDiffConfig) — built to mirror
 // the kcmd.Diff config — and additionally folds d.conf.Signatures: the PATH so
@@ -150,21 +151,11 @@ var signaturesDirIdentity = func(dir string) (digest []byte, ok bool) {
 	return h.Sum(nil), true
 }
 
-// kextDiffConfig mirrors the output-affecting fields of the mcmd.DiffConfig
-// parseKernelcache passes to kcmd.Diff. SymMap is omitted: it is derived from
-// d.conf.Signatures, which OptionsHash folds separately, and is unset on the
-// kernelcaches the hash never opens.
+// kextDiffConfig mirrors parseKernelcache's base Mach-O config. SymMap is
+// omitted: it is derived from d.conf.Signatures, which OptionsHash folds
+// separately, and is unset on the kernelcaches the hash never opens.
 func (t *kextsTask) kextDiffConfig() *mcmd.DiffConfig {
-	return &mcmd.DiffConfig{
-		Markdown:   true,
-		Color:      false,
-		DiffTool:   "git",
-		AllowList:  t.d.conf.AllowList,
-		BlockList:  t.d.conf.BlockList,
-		CStrings:   t.d.conf.CStrings,
-		FuncStarts: t.d.conf.FuncStarts,
-		Verbose:    t.d.conf.Verbose,
-	}
+	return t.d.machoDiffConfig()
 }
 
 // InputHash digests the task-scope inputs: the old and new BuildManifest

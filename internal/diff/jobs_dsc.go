@@ -129,6 +129,7 @@ func (j *dscJob) Version() int { return dscCacheVersion }
 //   - Color
 //   - DiffTool
 //   - CStrings
+//   - IgnoreBuildTimestamps
 //   - FuncStarts
 //   - IgnoreLoadCommands (true for DSC)
 //   - PemDB (empty for DSC; folded for parity with machos)

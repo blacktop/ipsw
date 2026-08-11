@@ -1,6 +1,8 @@
 package macho
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"testing"
 
@@ -73,7 +75,7 @@ func BenchmarkDiffInfoEquivalentDSC(b *testing.B) {
 		FuncStarts:         true,
 		IgnoreLoadCommands: true,
 	}
-	info := GenerateDiffInfo(m, conf)
+	info := GenerateContainerDiffInfo(m, conf)
 	b.ReportAllocs()
 	for b.Loop() {
 		if !info.Equivalent(*info, conf) {
@@ -151,8 +153,8 @@ func TestLoadCommandsDigestIgnoresBuildMetadata(t *testing.T) {
 	}
 
 	dup := func() []byte { b := make([]byte, len(base)); copy(b, base); return b }
-	want := loadCommandsDigest(dup(), hdrSize, m.Loads)
-	if loadCommandsDigest(dup(), hdrSize, m.Loads) != want {
+	want := loadCommandsDigest(dup(), hdrSize, m.Loads, m.Sections, &DiffConfig{})
+	if loadCommandsDigest(dup(), hdrSize, m.Loads, m.Sections, &DiffConfig{}) != want {
 		t.Fatal("digest is not stable across identical input")
 	}
 
@@ -184,7 +186,7 @@ func TestLoadCommandsDigestIgnoresBuildMetadata(t *testing.T) {
 	if !touchedVolatile {
 		t.Skip("test binary has no volatile load-command fields to exercise")
 	}
-	if got := loadCommandsDigest(meta, hdrSize, m.Loads); got != want {
+	if got := loadCommandsDigest(meta, hdrSize, m.Loads, m.Sections, &DiffConfig{}); got != want {
 		t.Fatalf("digest changed on a build-metadata-only mutation:\n want %s\n  got %s", want, got)
 	}
 
@@ -192,7 +194,192 @@ func TestLoadCommandsDigestIgnoresBuildMetadata(t *testing.T) {
 	// header that is never zeroed) must change the digest.
 	structural := dup()
 	structural[hdrSize] ^= 0xFF
-	if got := loadCommandsDigest(structural, hdrSize, m.Loads); got == want {
+	if got := loadCommandsDigest(structural, hdrSize, m.Loads, m.Sections, &DiffConfig{}); got == want {
 		t.Fatal("digest unchanged on a structural mutation; it is over-zeroing")
+	}
+}
+
+func TestLoadCommandsDigestHonorsSectionFilters(t *testing.T) {
+	m := openSelfT(t)
+	hdrSize := 28
+	if m.Magic == types.Magic64 {
+		hdrSize = 32
+	}
+	region := hdrSize + int(m.SizeCommands)
+	base := make([]byte, region)
+	if n, err := m.ReadAt(base, 0); err != nil || n != region {
+		t.Fatalf("read region: n=%d err=%v", n, err)
+	}
+
+	segmentOffset := hdrSize
+	segmentIndex := -1
+	var segment *macho.Segment
+	for idx, load := range m.Loads {
+		seg, ok := load.(*macho.Segment)
+		if ok && seg.Nsect >= 2 && uint64(seg.Firstsect)+uint64(seg.Nsect) <= uint64(len(m.Sections)) {
+			segmentIndex = idx
+			segment = seg
+			break
+		}
+		segmentOffset += int(load.LoadSize())
+	}
+	if segment == nil {
+		t.Skip("test binary has no segment with two sections")
+	}
+
+	changedBytes := append([]byte(nil), base...)
+	changedBytes[segmentOffset+24] ^= 0xff // segment vmaddr
+	changedSections := make([]*types.Section, len(m.Sections))
+	for idx, section := range m.Sections {
+		clone := *section
+		changedSections[idx] = &clone
+	}
+	blockedIndex := int(segment.Firstsect)
+	includedIndex := blockedIndex + 1
+	changedSections[blockedIndex].Size++
+	changedSections[includedIndex].Addr += 4
+	changedSections[includedIndex].Offset += 4
+
+	blockList := &DiffConfig{BlockList: []string{m.Sections[blockedIndex].Seg + "." + m.Sections[blockedIndex].Name}}
+	want := loadCommandsDigest(append([]byte(nil), base...), hdrSize, m.Loads, m.Sections, blockList)
+	if got := loadCommandsDigest(changedBytes, hdrSize, m.Loads, changedSections, blockList); got != want {
+		t.Fatalf("blocked section/layout drift changed digest:\n want %s\n  got %s", want, got)
+	}
+	if got := loadCommandsDigest(append([]byte(nil), changedBytes...), hdrSize, m.Loads, changedSections, &DiffConfig{}); got == loadCommandsDigest(append([]byte(nil), base...), hdrSize, m.Loads, m.Sections, &DiffConfig{}) {
+		t.Fatal("unfiltered digest ignored segment layout drift")
+	}
+
+	changedLoads := append([]macho.Load(nil), m.Loads...)
+	changedSegment := *segment
+	changedSegment.Prot ^= 1
+	changedLoads[segmentIndex] = &changedSegment
+	if got := loadCommandsDigest(append([]byte(nil), base...), hdrSize, changedLoads, m.Sections, blockList); got == want {
+		t.Fatal("filtered digest ignored a segment protection change")
+	}
+}
+
+func filteredSegmentDigest(seg *macho.Segment, sections []*types.Section, conf *DiffConfig) string {
+	h := sha256.New()
+	writeFilteredSegmentDigest(h, seg, sections, conf)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func TestFilteredSegmentDigestKeepsPageZeroSize(t *testing.T) {
+	conf := &DiffConfig{BlockList: []string{"__TEXT.__info_plist"}}
+	pageZero := &macho.Segment{SegmentHeader: macho.SegmentHeader{
+		LoadCmd: types.LC_SEGMENT_64,
+		Name:    "__PAGEZERO",
+		Memsz:   0x100000000,
+	}}
+	want := filteredSegmentDigest(pageZero, nil, conf)
+	changed := *pageZero
+	changed.Memsz += 0x1000
+	if got := filteredSegmentDigest(&changed, nil, conf); got == want {
+		t.Fatal("filtered digest ignored __PAGEZERO guard-size change")
+	}
+}
+
+func TestFilteredSegmentDigestKeepsIncludedSectionReserved1(t *testing.T) {
+	conf := &DiffConfig{AllowList: []string{"__TEXT.__stubs"}}
+	segment := &macho.Segment{SegmentHeader: macho.SegmentHeader{
+		LoadCmd: types.LC_SEGMENT_64,
+		Name:    "__TEXT",
+		Nsect:   1,
+	}}
+	section := &types.Section{SectionHeader: types.SectionHeader{
+		Name:      "__stubs",
+		Seg:       "__TEXT",
+		Size:      6,
+		Flags:     types.SymbolStubs,
+		Reserved1: 4,
+		Reserved2: 6,
+	}}
+
+	want := filteredSegmentDigest(segment, []*types.Section{section}, conf)
+	changed := *section
+	changed.Reserved1++
+	if got := filteredSegmentDigest(segment, []*types.Section{&changed}, conf); got == want {
+		t.Fatal("filtered digest ignored included section reserved1 change")
+	}
+}
+
+func TestGenerateDiffInfoBlockListExcludesSegmentLayout(t *testing.T) {
+	m := openSelfT(t)
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	segmentOffset := 28
+	if m.Magic == types.Magic64 {
+		segmentOffset = 32
+	}
+	localSection := -1
+	var segment *macho.Segment
+	for _, load := range m.Loads {
+		seg, ok := load.(*macho.Segment)
+		if ok && uint64(seg.Firstsect)+uint64(seg.Nsect) <= uint64(len(m.Sections)) {
+			for idx := 0; idx+1 < int(seg.Nsect); idx++ {
+				first := m.Sections[int(seg.Firstsect)+idx]
+				second := m.Sections[int(seg.Firstsect)+idx+1]
+				if first.Size > 0 && sectionContainsCode(first) && sectionContainsCode(second) {
+					segment = seg
+					localSection = idx
+					break
+				}
+			}
+		}
+		if segment != nil {
+			break
+		}
+		segmentOffset += int(load.LoadSize())
+	}
+	if segment == nil {
+		t.Skip("test binary has no adjacent code sections to patch")
+	}
+
+	segmentHeaderSize, sectionHeaderSize := 56, 68
+	sectionSizeOffset, sectionAddressOffset, sectionFileOffset := 36, 32, 40
+	if segment.Command() == types.LC_SEGMENT_64 {
+		segmentHeaderSize, sectionHeaderSize = 72, 80
+		sectionSizeOffset, sectionAddressOffset, sectionFileOffset = 40, 32, 48
+	}
+	blockedHeader := segmentOffset + segmentHeaderSize + localSection*sectionHeaderSize
+	includedHeader := blockedHeader + sectionHeaderSize
+	if includedHeader+sectionHeaderSize > len(raw) {
+		t.Fatal("section headers extend beyond test binary")
+	}
+	if segment.Command() == types.LC_SEGMENT_64 {
+		m.ByteOrder.PutUint64(raw[blockedHeader+sectionSizeOffset:], m.ByteOrder.Uint64(raw[blockedHeader+sectionSizeOffset:])+1)
+		m.ByteOrder.PutUint64(raw[includedHeader+sectionAddressOffset:], m.ByteOrder.Uint64(raw[includedHeader+sectionAddressOffset:])+4)
+	} else {
+		m.ByteOrder.PutUint32(raw[blockedHeader+sectionSizeOffset:], m.ByteOrder.Uint32(raw[blockedHeader+sectionSizeOffset:])+1)
+		m.ByteOrder.PutUint32(raw[includedHeader+sectionAddressOffset:], m.ByteOrder.Uint32(raw[includedHeader+sectionAddressOffset:])+4)
+	}
+	m.ByteOrder.PutUint32(raw[includedHeader+sectionFileOffset:], m.ByteOrder.Uint32(raw[includedHeader+sectionFileOffset:])+4)
+
+	patchedPath := t.TempDir() + "/patched-macho"
+	if err := os.WriteFile(patchedPath, raw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	patched, err := macho.Open(patchedPath)
+	if err != nil {
+		t.Fatalf("open patched Mach-O: %v", err)
+	}
+	t.Cleanup(func() { _ = patched.Close() })
+
+	blocked := m.Sections[int(segment.Firstsect)+localSection]
+	conf := &DiffConfig{BlockList: []string{blocked.Seg + "." + blocked.Name}}
+	oldInfo := GenerateDiffInfo(m, conf)
+	newInfo := GenerateDiffInfo(patched, conf)
+	if oldInfo.LoadCmdHash != newInfo.LoadCmdHash {
+		t.Fatal("blocked section/layout drift changed GenerateDiffInfo LoadCmdHash")
+	}
+	if !newInfo.Equivalent(*oldInfo, conf) {
+		t.Fatal("blocked section/layout drift made GenerateDiffInfo unequal")
 	}
 }

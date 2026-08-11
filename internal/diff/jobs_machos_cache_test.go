@@ -64,6 +64,9 @@ func TestMachosOptionsHashChangesPerField(t *testing.T) {
 		"DiffTool":   func(c *mcmd.DiffConfig) { c.DiffTool = "delta" },
 		"CStrings":   func(c *mcmd.DiffConfig) { c.CStrings = !c.CStrings },
 		"FuncStarts": func(c *mcmd.DiffConfig) { c.FuncStarts = !c.FuncStarts },
+		"IgnoreBuildTimestamps": func(c *mcmd.DiffConfig) {
+			c.IgnoreBuildTimestamps = !c.IgnoreBuildTimestamps
+		},
 		"IgnoreLoadCommands": func(c *mcmd.DiffConfig) {
 			c.IgnoreLoadCommands = !c.IgnoreLoadCommands
 		},
