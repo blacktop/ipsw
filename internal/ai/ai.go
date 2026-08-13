@@ -92,9 +92,21 @@ type Config struct {
 }
 
 type CachingAI struct {
-	ai     AI
-	cache  db.CacheDB
-	config *Config
+	ai             AI
+	cache          db.CacheDB
+	config         *Config
+	modelsCacheKey string
+}
+
+// Version the OrcaRouter model cache because older entries contain models for
+// endpoints that the text decompiler cannot use.
+const orcarouterTextChatModelsCacheKey = "orcarouter-text-chat-v1"
+
+func modelsCacheKeyForProvider(provider string) string {
+	if provider == "orcarouter" {
+		return orcarouterTextChatModelsCacheKey
+	}
+	return provider
 }
 
 func (c *CachingAI) Chat() (string, error) {
@@ -122,7 +134,7 @@ func (c *CachingAI) Chat() (string, error) {
 			strings.Contains(errStr, "400") {
 			log.Warnf("Potential model error detected ('%s'), clearing DB models cache for provider %s", err.Error(), c.config.Provider)
 			if c.cache != nil {
-				if delErr := c.cache.DeleteProviderModels(c.config.Provider); delErr != nil {
+				if delErr := c.cache.DeleteProviderModels(c.modelsCacheKey); delErr != nil {
 					log.Warnf("Failed to delete provider models from cache for %s: %v", c.config.Provider, delErr)
 				}
 			}
@@ -155,7 +167,7 @@ func (c *CachingAI) Chat() (string, error) {
 
 func (c *CachingAI) Models() (map[string]string, error) {
 	if c.cache != nil {
-		cachedProviderModels, err := c.cache.GetProviderModels(c.config.Provider)
+		cachedProviderModels, err := c.cache.GetProviderModels(c.modelsCacheKey)
 		if err == nil && cachedProviderModels != nil && cachedProviderModels.ModelsJSON != "" {
 			var modelsList map[string]string
 			if err := json.Unmarshal([]byte(cachedProviderModels.ModelsJSON), &modelsList); err != nil {
@@ -179,7 +191,7 @@ func (c *CachingAI) Models() (map[string]string, error) {
 			return nil, fmt.Errorf("failed to marshal models for provider %s: %w", c.config.Provider, err)
 		} else {
 			providerModelsToCache := &model.ProviderModels{
-				Provider:   c.config.Provider,
+				Provider:   c.modelsCacheKey,
 				ModelsJSON: string(modelsJSON),
 			}
 			if err := c.cache.SetProviderModels(providerModelsToCache); err != nil {
@@ -190,7 +202,7 @@ func (c *CachingAI) Models() (map[string]string, error) {
 		log.Debugf("Underlying AI returned no models for provider %s. Caching empty list.", c.config.Provider)
 		modelsJSON, _ := json.Marshal([]string{})
 		providerModelsToCache := &model.ProviderModels{
-			Provider:   c.config.Provider,
+			Provider:   c.modelsCacheKey,
 			ModelsJSON: string(modelsJSON),
 		}
 		if err := c.cache.SetProviderModels(providerModelsToCache); err != nil {
@@ -375,9 +387,10 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	}
 
 	ai := &CachingAI{
-		ai:     baseAI,
-		cache:  cache,
-		config: cfg,
+		ai:             baseAI,
+		cache:          cache,
+		config:         cfg,
+		modelsCacheKey: modelsCacheKeyForProvider(cfg.Provider),
 	}
 
 	if _, err := ai.Models(); err != nil {

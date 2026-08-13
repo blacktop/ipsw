@@ -8,15 +8,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/ai/utils"
 )
 
-const (
-	orcarouterChatCompletionsEndpoint = "https://api.orcarouter.ai/v1/chat/completions"
-	orcarouterModelsEndpoint          = "https://api.orcarouter.ai/v1/models"
-)
+const orcarouterBaseURL = "https://api.orcarouter.ai/v1"
 
 // Config holds the configuration for the OrcaRouter LLM API client
 type Config struct {
@@ -29,11 +28,12 @@ type Config struct {
 
 // OrcaRouter represents a client for the OrcaRouter API
 type OrcaRouter struct {
-	ctx    context.Context
-	conf   *Config
-	client *http.Client
-	models map[string]string
-	apiKey string
+	ctx     context.Context
+	conf    *Config
+	client  *http.Client
+	models  map[string]string
+	apiKey  string
+	baseURL string
 }
 
 // chatMessage represents a single message in the conversation
@@ -71,34 +71,53 @@ type chatResponse struct {
 	} `json:"usage"`
 }
 
+type modelArchitecture struct {
+	InputModalities  []string `json:"input_modalities"`
+	OutputModalities []string `json:"output_modalities"`
+}
+
+type modelInfo struct {
+	ID                     string            `json:"id"`
+	Object                 string            `json:"object"`
+	SupportedEndpointTypes []string          `json:"supported_endpoint_types"`
+	Architecture           modelArchitecture `json:"architecture"`
+}
+
 // modelsResponse represents the response from the OrcaRouter models API.
 // It follows the OpenAI-compatible shape: model IDs are the lookup keys.
 type modelsResponse struct {
-	Data []struct {
-		ID                     string   `json:"id"`
-		Object                 string   `json:"object"`
-		Created                int64    `json:"created"`
-		OwnedBy                string   `json:"owned_by"`
-		SupportedEndpointTypes []string `json:"supported_endpoint_types"`
-	} `json:"data"`
+	Data []modelInfo `json:"data"`
 }
 
 // NewOrcaRouter creates a new OrcaRouter API client
 func NewOrcaRouter(ctx context.Context, conf *Config) (*OrcaRouter, error) {
-	apiKey := os.Getenv("ORCAROUTER_API_KEY")
+	return newOrcaRouter(
+		ctx,
+		conf,
+		os.Getenv("ORCAROUTER_API_KEY"),
+		orcarouterBaseURL,
+		&http.Client{Timeout: 300 * time.Second},
+	)
+}
+
+func newOrcaRouter(ctx context.Context, conf *Config, apiKey, baseURL string, httpClient *http.Client) (*OrcaRouter, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("failed to create OrcaRouter client: ORCAROUTER_API_KEY environment variable is not set")
 	}
 
-	client := &OrcaRouter{
-		ctx:    ctx,
-		conf:   conf,
-		client: &http.Client{Timeout: 300 * time.Second},
-		models: make(map[string]string),
-		apiKey: apiKey,
+	baseURL = strings.TrimRight(baseURL, "/")
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 300 * time.Second}
 	}
 
-	return client, nil
+	return &OrcaRouter{
+		ctx:     ctx,
+		conf:    conf,
+		client:  httpClient,
+		models:  make(map[string]string),
+		apiKey:  apiKey,
+		baseURL: baseURL,
+	}, nil
 }
 
 // Models returns the available models from OrcaRouter
@@ -106,17 +125,32 @@ func (c *OrcaRouter) Models() (map[string]string, error) {
 	if len(c.models) > 0 {
 		return c.models, nil
 	}
-	modelsResponse, err := c.getModels()
+	response, err := c.getModels()
 	if err != nil {
 		return nil, fmt.Errorf("orcarouter: failed to get models: %w", err)
 	}
 
-	// Populate the models map with the model IDs
-	for _, model := range modelsResponse.Data {
-		c.models[model.ID] = model.ID
+	// The catalog includes models for image, audio, video, and native-only APIs.
+	// The decompiler requires OpenAI-compatible text input and text output.
+	for _, model := range response.Data {
+		if supportsTextChat(model) {
+			c.models[model.ID] = model.ID
+		}
+	}
+	if len(c.models) == 0 {
+		return nil, fmt.Errorf("orcarouter: no text chat models found")
 	}
 
 	return c.models, nil
+}
+
+func supportsTextChat(model modelInfo) bool {
+	return model.Object == "model" &&
+		model.ID != "" &&
+		model.ID == strings.TrimSpace(model.ID) &&
+		slices.Contains(model.SupportedEndpointTypes, "openai") &&
+		slices.Contains(model.Architecture.InputModalities, "text") &&
+		slices.Contains(model.Architecture.OutputModalities, "text")
 }
 
 // SetModel sets the model to use for the OrcaRouter client
@@ -165,7 +199,7 @@ func (c *OrcaRouter) Verify() error {
 
 // getModels retrieves the available models from OrcaRouter API
 func (c *OrcaRouter) getModels() (*modelsResponse, error) {
-	req, err := http.NewRequestWithContext(c.ctx, "GET", orcarouterModelsEndpoint, nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", c.baseURL+"/models", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -211,7 +245,7 @@ func (c *OrcaRouter) Chat() (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", orcarouterChatCompletionsEndpoint, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", c.baseURL+"/chat/completions", bytes.NewBuffer(data))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
