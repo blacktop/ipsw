@@ -11,7 +11,7 @@ The **ipsw AI decompiler** revolutionizes binary analysis by leveraging state-of
 
 ## Requirements
 
-There are currently 9 supported LLM providers. Select one explicitly with
+There are currently 10 supported LLM providers. Select one explicitly with
 `--dec-llm` whenever you use `--dec`.
 
 - OpenAI
@@ -23,6 +23,7 @@ There are currently 9 supported LLM providers. Select one explicitly with
 - Gemini (ACP)
 - Ollama (local LLMs)
 - OpenRouter (API access to multiple models)
+- OrcaRouter (API access to multiple models)
 
 ## 🚀 Quick Start
 
@@ -138,6 +139,20 @@ export OPENROUTER_CLIENT_TITLE="ipsw-decompiler"  # Optional: for usage tracking
 # 3. Use with ipsw
 ipsw macho disass binary --dec --dec-llm openrouter
 ```
+
+### OrcaRouter (Multi-Provider Access)
+
+```bash
+# 1. Get API key from https://www.orcarouter.ai/console
+# 2. Set environment variables
+export ORCAROUTER_API_KEY="sk-orca-your-key-here"
+
+# 3. Use with ipsw
+ipsw macho disass binary --dec --dec-llm orcarouter
+```
+
+OrcaRouter uses namespaced model ids (e.g. `openai/gpt-5.5`, `anthropic/claude-sonnet-4.6`),
+so pass the full id with `--dec-model` when you want a specific model.
 
 ## 📖 Usage Examples
 
