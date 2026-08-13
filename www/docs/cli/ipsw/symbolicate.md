@@ -77,6 +77,7 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 
 ```
   -a, --all                 Show all threads in crashlog
+  -t, --api-token string    Symbol Server API bearer token
   -d, --demangle            Demangle symbol names
       --dsc-slide string    Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)
   -x, --extra string        Path to folder with extra files for symbolication

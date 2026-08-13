@@ -41,6 +41,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/syms/server"
 	"github.com/blacktop/ipsw/internal/tui"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/internal/xcode"
@@ -66,6 +67,7 @@ func init() {
 	symbolicateCmd.Flags().Bool("peek", false, "Show disassembly instructions around each panicked frame")
 	symbolicateCmd.Flags().Int("peek-count", 5, "Number of instructions to show with --peek (centered on frame, respects function boundaries)")
 	symbolicateCmd.Flags().StringP("server", "s", "", "Symbol Server DB URL")
+	symbolicateCmd.Flags().StringP("api-token", "t", "", "Symbol Server API bearer token")
 	symbolicateCmd.Flags().Bool("force", false, "Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)")
 	symbolicateCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolicateCmd.Flags().String("signatures", "", "Path to signatures folder")
@@ -84,6 +86,7 @@ func init() {
 	viper.BindPFlag("symbolicate.peek", symbolicateCmd.Flags().Lookup("peek"))
 	viper.BindPFlag("symbolicate.peek-count", symbolicateCmd.Flags().Lookup("peek-count"))
 	viper.BindPFlag("symbolicate.server", symbolicateCmd.Flags().Lookup("server"))
+	viper.BindPFlag("symbolicate.api-token", symbolicateCmd.Flags().Lookup("api-token"))
 	viper.BindPFlag("symbolicate.force", symbolicateCmd.Flags().Lookup("force"))
 	viper.BindPFlag("symbolicate.pem-db", symbolicateCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbolicate.signatures", symbolicateCmd.Flags().Lookup("signatures"))
@@ -309,8 +312,12 @@ var symbolicateCmd = &cobra.Command{
 					if u.Scheme == "" || u.Host == "" {
 						return fmt.Errorf("invalid symbol server URL: %s (needs a valid schema AND host)", u.String())
 					}
+					token := viper.GetString("symbolicate.api-token")
+					if err := server.ValidateToken(token); err != nil {
+						return err
+					}
 					log.WithField("server", u.String()).Info("Symbolicating 210 Panic with Symbol Server")
-					if err := ips.Symbolicate210WithDatabase(u.String()); err != nil {
+					if err := ips.Symbolicate210WithDatabaseToken(u.String(), token); err != nil {
 						return err
 					}
 				} else if ds, err := xcode.FindDeviceSupport(ips.Payload.Product, ips.Header.Version(), ips.Header.Build()); err == nil {

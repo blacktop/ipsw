@@ -163,12 +163,21 @@ func expandConfigPaths() {
 	}
 }
 
+// sensitiveConfigKeys are credentials, not paths: they are never expanded and
+// their values are never logged.
+var sensitiveConfigKeys = map[string]bool{
+	"symbolicate.api-token": true,
+}
+
 // expandSettings recursively processes all configuration values and expands relative paths
 func expandSettings(settings map[string]any, prefix string, quiet bool) {
 	for key, value := range settings {
 		fullKey := key
 		if prefix != "" {
 			fullKey = prefix + "." + key
+		}
+		if sensitiveConfigKeys[fullKey] {
+			continue
 		}
 
 		switch v := value.(type) {

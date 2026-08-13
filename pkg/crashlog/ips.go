@@ -2041,9 +2041,20 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	return nil
 }
 
-func (i *Ips) Symbolicate210WithDatabase(dbURL string) (err error) {
+// Symbolicate210WithDatabase symbolicates a 210 panic using an unauthenticated
+// symbol server at dbURL.
+func (i *Ips) Symbolicate210WithDatabase(dbURL string) error {
+	return i.Symbolicate210WithDatabaseToken(dbURL, "")
+}
 
-	db := server.NewServer(dbURL)
+// Symbolicate210WithDatabaseToken is Symbolicate210WithDatabase with an optional
+// bearer token; an empty token means unauthenticated. A malformed token fails
+// before any request is made.
+func (i *Ips) Symbolicate210WithDatabaseToken(dbURL, token string) (err error) {
+	db, err := server.NewServerWithToken(dbURL, token)
+	if err != nil {
+		return err
+	}
 
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("failed symbolicate panic 210: %w", err)
