@@ -36,6 +36,7 @@ import (
 	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
 	"github.com/pkg/errors"
@@ -219,7 +220,7 @@ var machoDisassCmd = &cobra.Command{
 				Stream:         false,
 				DisableCache:   viper.GetBool("macho.disass.dec-nocache"),
 				Verbose:        viper.GetBool("verbose"),
-				Color:          viper.GetBool("color") && !viper.GetBool("no-color"),
+				Color:          utils.ColorEnabled(),
 				Theme:          viper.GetString("macho.disass.dec-theme"),
 				MaxRetries:     viper.GetInt("macho.disass.dec-retries"),
 				RetryBackoff:   viper.GetDuration("macho.disass.dec-retry-backoff"),
@@ -265,7 +266,7 @@ var machoDisassCmd = &cobra.Command{
 							AsJSON:       asJSON,
 							Demangle:     demangleFlag,
 							Quiet:        quiet,
-							Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
+							Color:        utils.ColorEnabled() && !decompile,
 						})
 
 						//***********************
@@ -377,7 +378,7 @@ var machoDisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quiet:        quiet,
-						Color:        viper.GetBool("color") && !viper.GetBool("no-color") && !decompile,
+						Color:        utils.ColorEnabled() && !decompile,
 					})
 
 					//***********************

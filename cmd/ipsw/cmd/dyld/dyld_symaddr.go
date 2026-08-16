@@ -32,7 +32,6 @@ import (
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,9 +66,7 @@ var SymAddrCmd = &cobra.Command{
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		useColor := viper.GetBool("color") && !viper.GetBool("no-color")
-		color.NoColor = !useColor
+		useColor := utils.ColorEnabled()
 
 		imageName := viper.GetString("dyld.symaddr.image")
 		symbolFile := viper.GetString("dyld.symaddr.in")

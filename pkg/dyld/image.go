@@ -1088,7 +1088,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					Nlist64:      nlist,
 					Macho:        m,
 					FoundInDylib: filepath.Base(i.Name),
-				}.String(true))
+				}.String(utils.ColorAllowed()))
 			}
 		}
 

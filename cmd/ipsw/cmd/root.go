@@ -66,7 +66,9 @@ var rootCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		if viper.GetBool("no-color") {
+			color.NoColor = true
+		}
 	},
 }
 

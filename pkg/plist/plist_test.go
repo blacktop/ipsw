@@ -30,7 +30,7 @@ func (f *testPlistFile) IsDir() bool                { return false }
 func (f *testPlistFile) Sys() any                   { return nil }
 
 func syntheticBuildManifest(build string) []byte {
-	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+	return fmt.Appendf(nil, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -45,7 +45,7 @@ func syntheticBuildManifest(build string) []byte {
 		<string>iSim1,1</string>
 	</array>
 </dict>
-</plist>`, build))
+</plist>`, build)
 }
 
 func TestParsePlistFilesUsesRestoreBuildManifestFallback(t *testing.T) {

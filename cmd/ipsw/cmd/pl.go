@@ -160,7 +160,7 @@ var plistCmd = &cobra.Command{
 						}
 
 						if prev, ok := cache[event.Name]; ok {
-							out, err := utils.GitDiff(prev+"\n", string(jdata)+"\n", &utils.GitDiffConfig{Color: true})
+							out, err := utils.GitDiff(prev+"\n", string(jdata)+"\n", &utils.GitDiffConfig{Color: utils.ColorAllowed()})
 							if err != nil {
 								log.Fatal(err.Error())
 							}
@@ -242,7 +242,7 @@ var plistCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal json: %v", err)
 		}
 
-		if viper.GetBool("color") && !viper.GetBool("no-color") {
+		if utils.ColorEnabled() {
 			if err := quick.Highlight(os.Stdout, string(jsonData)+"\n", "json", "terminal256", "nord"); err != nil {
 				return fmt.Errorf("failed to highlight json: %v", err)
 			}

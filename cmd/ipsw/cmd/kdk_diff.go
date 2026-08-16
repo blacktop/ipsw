@@ -288,7 +288,7 @@ var kdkDiffCmd = &cobra.Command{
 
 		showBinaryDetails := viper.GetBool("kdk-diff.binary-details")
 		diffTool := viper.GetString("diff-tool")
-		useColor := viper.GetBool("color") && !viper.GetBool("no-color")
+		useColor := utils.ColorEnabled()
 
 		var (
 			addedBin, removedBin, modifiedBin []string

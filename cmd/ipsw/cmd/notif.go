@@ -64,7 +64,9 @@ var notifCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		if viper.GetBool("no-color") {
+			color.NoColor = true
+		}
 
 		dbPath := viper.GetString("notif.db")
 		bundleID := viper.GetString("notif.app")

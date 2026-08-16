@@ -378,7 +378,11 @@ var pkgCmd = &cobra.Command{
 				utils.Indent(log.Info, 2)("Distribution Scripts")
 				if main, ok := dist.GetScripts()["main"]; ok {
 					for _, script := range main {
-						quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
+						if utils.ColorAllowed() {
+							quick.Highlight(os.Stdout, script, "js", "terminal256", "nord")
+						} else {
+							fmt.Print(script)
+						}
 					}
 				}
 			}
@@ -440,7 +444,11 @@ var pkgCmd = &cobra.Command{
 						}
 						break
 					}
-					quick.Highlight(os.Stdout, string(data), lexerName, "terminal256", "nord")
+					if utils.ColorAllowed() {
+						quick.Highlight(os.Stdout, string(data), lexerName, "terminal256", "nord")
+					} else {
+						fmt.Print(string(data))
+					}
 				}
 			}
 		}

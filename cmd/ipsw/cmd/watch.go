@@ -371,7 +371,7 @@ var watchCmd = &cobra.Command{
 					} else {
 						diff, err := utils.GitDiff(previousContent, latestChange.Content,
 							&utils.GitDiffConfig{
-								Color: viper.GetBool("color") && !viper.GetBool("no-color"),
+								Color: utils.ColorEnabled(),
 								Tool:  viper.GetString("diff-tool"),
 							})
 						if err != nil {

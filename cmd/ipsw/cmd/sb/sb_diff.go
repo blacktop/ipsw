@@ -216,7 +216,7 @@ var sbDiffCmd = &cobra.Command{
 		for _, f := range files {
 			newSbData := sbDBs[1][f]
 			if oldSbData, ok := sbDBs[0][f]; ok {
-				out, err := utils.GitDiff(oldSbData+"\n", newSbData+"\n", &utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color")})
+				out, err := utils.GitDiff(oldSbData+"\n", newSbData+"\n", &utils.GitDiffConfig{Color: utils.ColorEnabled()})
 				if err != nil {
 					return fmt.Errorf("failed to diff %s: %v", f, err)
 				}
@@ -236,7 +236,11 @@ var sbDiffCmd = &cobra.Command{
 				}
 				fmt.Println(color.New(color.Bold).Sprintf("\n🆕 %s\n", f))
 				fmt.Println(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
-				quick.Highlight(os.Stdout, newSbData, "scheme", "terminal256", "nord")
+				if utils.ColorAllowed() {
+					quick.Highlight(os.Stdout, newSbData, "scheme", "terminal256", "nord")
+				} else {
+					fmt.Print(newSbData)
+				}
 				fmt.Println(" ╰╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴")
 			}
 

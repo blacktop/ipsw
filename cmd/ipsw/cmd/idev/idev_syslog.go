@@ -126,7 +126,7 @@ var SyslogCmd = &cobra.Command{
 			}
 			defer r.Close()
 
-			if viper.GetBool("color") && !viper.GetBool("no-color") {
+			if utils.ColorEnabled() {
 				br := bufio.NewReader(r)
 				for {
 					line, err := br.ReadString('\x00')

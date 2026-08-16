@@ -204,7 +204,9 @@ var entCmd = &cobra.Command{
 			if len(ipsws) == 0 && len(inputs) == 0 {
 				return fmt.Errorf("--fs requires an IPSW argument, --ipsw, or --input")
 			}
-			color.NoColor = viper.GetBool("no-color") || fileOnly || format == "jsonl" || format == "tsv"
+			if viper.GetBool("no-color") || fileOnly || format == "jsonl" || format == "tsv" {
+				color.NoColor = true
+			}
 			return ent.SearchFilesystemEntitlements(ipsws, inputs, ent.FilesystemQuery{
 				PemDB:        pemDB,
 				KeyPattern:   keyPattern,
@@ -307,7 +309,9 @@ var entCmd = &cobra.Command{
 			return ent.CreateSQLiteDatabase(sqliteDB, ipsws, inputs)
 		}
 
-		color.NoColor = viper.GetBool("no-color") || fileOnly
+		if viper.GetBool("no-color") || fileOnly {
+			color.NoColor = true
+		}
 
 		if showStats {
 			if pgHost != "" {

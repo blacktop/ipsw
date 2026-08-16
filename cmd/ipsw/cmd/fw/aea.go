@@ -126,7 +126,7 @@ var aeaCmd = &cobra.Command{
 				} else if b64data, err := base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(string(v)); err == nil {
 					fmt.Printf("%s:\n%s\n", bold("["+k+"]"), utils.HexDump(b64data, 0))
 				} else {
-					if viper.GetBool("color") && !viper.GetBool("no-color") {
+					if utils.ColorEnabled() {
 						fmt.Println(bold("[" + k + "]"))
 						if err := quick.Highlight(os.Stdout, string(v)+"\n\n", "json", "terminal256", "nord"); err != nil {
 							return fmt.Errorf("failed to highlight json: %v", err)
@@ -154,7 +154,7 @@ var aeaCmd = &cobra.Command{
 			if err := os.WriteFile(fname, data, 0o644); err != nil {
 				return fmt.Errorf("failed to write private key to file: %v", err)
 			}
-			if viper.GetBool("color") && !viper.GetBool("no-color") {
+			if utils.ColorEnabled() {
 				if err := quick.Highlight(os.Stdout, string(data)+"\n\n", "json", "terminal256", "nord"); err != nil {
 					return fmt.Errorf("failed to highlight json: %v", err)
 				}

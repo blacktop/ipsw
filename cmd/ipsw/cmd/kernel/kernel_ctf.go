@@ -150,7 +150,7 @@ var ctfdumpCmd = &cobra.Command{
 			out, err := utils.GitDiff(
 				t1.String(),
 				t2.String(),
-				&utils.GitDiffConfig{Color: viper.GetBool("color") && !viper.GetBool("no-color"), Tool: viper.GetString("diff-tool")})
+				&utils.GitDiffConfig{Color: utils.ColorEnabled(), Tool: viper.GetString("diff-tool")})
 			if err != nil {
 				return err
 			}

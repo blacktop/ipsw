@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/swift"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -275,7 +276,7 @@ var MachoCmd = &cobra.Command{
 							Addrs:    true,
 							ObjcRefs: showObjcRefs,
 							Demangle: doDemangle,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+							Color:    utils.ColorEnabled(),
 							Theme:    "nord",
 						})
 						if err != nil {
@@ -323,7 +324,7 @@ var MachoCmd = &cobra.Command{
 							Addrs:    true,
 							All:      showSwiftAll,
 							Demangle: doDemangle,
-							Color:    viper.GetBool("color") && !viper.GetBool("no-color") && !viper.GetBool("no-color"),
+							Color:    utils.ColorEnabled(),
 							Theme:    "nord",
 						})
 						if err != nil {

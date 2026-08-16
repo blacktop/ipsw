@@ -2,10 +2,13 @@ package dyld
 
 import (
 	"errors"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	dyldpkg "github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
+	"github.com/spf13/viper"
 )
 
 type fakeDscFuncImageResolver struct {
@@ -68,5 +71,28 @@ func TestFilterImportRowsUsesRegex(t *testing.T) {
 	want := []string{"_xmlXPathNewContext", "_xmlSchemaFreeValidCtxt"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("filterImportRows=%#v, want %#v", got, want)
+	}
+}
+
+func TestSymAddrPreservesAutoDetectedNoColor(t *testing.T) {
+	previousNoColor := color.NoColor
+	previousColorSetting := viper.Get("color")
+	previousNoColorSetting := viper.Get("no-color")
+	t.Cleanup(func() {
+		color.NoColor = previousNoColor
+		viper.Set("color", previousColorSetting)
+		viper.Set("no-color", previousNoColorSetting)
+	})
+
+	color.NoColor = true
+	viper.Set("color", true)
+	viper.Set("no-color", false)
+
+	err := SymAddrCmd.RunE(SymAddrCmd, []string{filepath.Join(t.TempDir(), "missing")})
+	if err == nil {
+		t.Fatal("expected missing DSC to return an error")
+	}
+	if !color.NoColor {
+		t.Fatal("symaddr enabled color after stdout was detected as non-terminal")
 	}
 }
