@@ -313,10 +313,6 @@ Huge thanks to:
 - **The iOS research community** for continuous innovation and knowledge sharing
 - All contributors who help make this project better
 
-## Stargazers
-
-[![Stargazers over time](https://starchart.cc/blacktop/ipsw.svg?variant=adaptive)](https://starchart.cc/blacktop/ipsw)
-
 ## License
 
-MIT Copyright (c) 2018-2026 **blacktop**
+MIT License - see [LICENSE](LICENSE) for details.
