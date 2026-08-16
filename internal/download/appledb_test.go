@@ -1,6 +1,26 @@
 package download
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestWalkLocalAppleDBReturnsPathErrorBeforeVisit(t *testing.T) {
+	t.Parallel()
+
+	visited := false
+	err := walkLocalAppleDB(filepath.Join(t.TempDir(), "missing"), func(string, os.FileInfo) error {
+		visited = true
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected walk error for missing path")
+	}
+	if visited {
+		t.Fatal("visitor called without valid file info")
+	}
+}
 
 func TestOsFilesLatestSkipsHiddenLatestVersions(t *testing.T) {
 	t.Parallel()

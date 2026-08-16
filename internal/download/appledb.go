@@ -325,7 +325,7 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 	}
 
 	var folders []string
-	if err := filepath.Walk(filepath.Join(q.ConfigDir, "appledb"), func(path string, f os.FileInfo, err error) error {
+	if err := walkLocalAppleDB(filepath.Join(q.ConfigDir, "appledb"), func(path string, f os.FileInfo) error {
 		if f.IsDir() {
 			for _, os := range q.OSes {
 				if strings.Contains(path, filepath.Join("osFiles", os)) {
@@ -333,7 +333,7 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 				}
 			}
 		}
-		return err
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 				continue
 			}
 		}
-		if err := filepath.Walk(folder, func(path string, f os.FileInfo, err error) error {
+		if err := walkLocalAppleDB(folder, func(path string, f os.FileInfo) error {
 			var osfile AppleDbOsFile
 			if !f.IsDir() {
 				dat, err := os.ReadFile(path)
@@ -374,13 +374,22 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 
 				osfiles = append(osfiles, osfile)
 			}
-			return err
+			return nil
 		}); err != nil {
 			return nil, err
 		}
 	}
 
 	return osfiles, nil
+}
+
+func walkLocalAppleDB(root string, visit func(string, os.FileInfo) error) error {
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return visit(path, info)
+	})
 }
 
 func LocalAppleDBLatest(q *ADBQuery) (*AppleDbOsFile, error) {
