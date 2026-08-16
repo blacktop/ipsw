@@ -226,6 +226,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 
 func ParsePlistFiles(files []fs.File) (*Plists, error) {
 	ipsw := &Plists{Type: "IPSW"}
+	var restoreBuildManifest fs.File
 
 	for _, f := range files {
 		fi, err := f.Stat()
@@ -244,6 +245,9 @@ func ParsePlistFiles(files []fs.File) (*Plists, error) {
 			}
 		case strings.HasSuffix(fi.Name(), "BuildManifest.plist"):
 			if strings.Contains(fi.Name(), "Restore") {
+				if restoreBuildManifest == nil {
+					restoreBuildManifest = f
+				}
 				continue
 			}
 			dat, err := io.ReadAll(f)
@@ -283,6 +287,16 @@ func ParsePlistFiles(files []fs.File) (*Plists, error) {
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+	if ipsw.BuildManifest == nil && restoreBuildManifest != nil {
+		dat, err := io.ReadAll(restoreBuildManifest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read plist file: %s", err)
+		}
+		ipsw.BuildManifest, err = ParseBuildManifest(dat)
+		if err != nil {
+			return nil, err
 		}
 	}
 
