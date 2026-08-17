@@ -632,7 +632,11 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(aaPath, "extract", "-d", output, "-include-regex", pattern)
+	// Directory entries are not materialized into the destination: the caller
+	// walks files and creates their parents itself. Excluding them here also
+	// prevents archived directory modes without a search bit (for example 0600)
+	// from making the staging tree impossible to walk or remove.
+	cmd := exec.Command(aaPath, "extract", "-d", output, "-include-regex", pattern, "-exclude-type", "d")
 	cmd.Stdin = in
 	// aa exits 0 when the regex simply matches nothing, so any non-zero status
 	// is a real failure. Suppressing it would let a failed payload member
