@@ -108,6 +108,30 @@ func TestExtractDSCCryptexSuccessStopsThere(t *testing.T) {
 	}
 }
 
+func TestExtractDSCRequestedArchCanComeFromDifferentlyNamedCryptex(t *testing.T) {
+	src := &fakeDSCSource{cryptexFiles: []ota.ExtractedFile{{
+		Path:   "out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_x86_64",
+		Source: "cryptex-system-arm64e",
+	}}}
+	opts := testOpts()
+	opts.Arches = []string{"x86_64"}
+
+	rep := extractDSC(src, opts)
+
+	if !rep.Complete {
+		t.Fatalf("report.Complete = false, errors = %+v", rep.Errors)
+	}
+	if len(rep.Files) != 1 {
+		t.Fatalf("report.Files = %+v, want one x86_64 entry", rep.Files)
+	}
+	if got := rep.Files[0]; got.Arch != "x86_64" || got.Source != "cryptex-system-arm64e" {
+		t.Fatalf("report file = {arch:%q source:%q}, want {x86_64 cryptex-system-arm64e}", got.Arch, got.Source)
+	}
+	if src.payloadCalls != 0 || len(src.copied) != 0 {
+		t.Fatalf("later sources ran after x86_64 was covered: asset=%v payload=%d", src.copied, src.payloadCalls)
+	}
+}
+
 func TestExtractDSCRequestedArchesFallThroughUntilCovered(t *testing.T) {
 	src := &fakeDSCSource{
 		cryptexFiles: []ota.ExtractedFile{{
@@ -144,6 +168,33 @@ func TestExtractDSCRequestedArchesFallThroughUntilCovered(t *testing.T) {
 	}
 	if len(src.cryptexArches) != 1 || strings.Join(src.cryptexArches[0], ",") != "arm64e,x86_64" {
 		t.Errorf("cryptex architecture filter = %v, want [arm64e x86_64]", src.cryptexArches)
+	}
+}
+
+func TestExtractDSCAbsentRequestedArchHasStructuralDiscoveryOutcome(t *testing.T) {
+	src := &fakeDSCSource{}
+	opts := testOpts()
+	opts.Arches = []string{"x86_64"}
+
+	rep := extractDSC(src, opts)
+
+	if rep.Complete {
+		t.Fatal("report.Complete = true with x86_64 absent")
+	}
+	if len(rep.Files) != 0 {
+		t.Fatalf("report.Files = %+v, want none", rep.Files)
+	}
+	if len(rep.Errors) != 1 {
+		t.Fatalf("report.Errors = %+v, want one absence entry", rep.Errors)
+	}
+	if got := rep.Errors[0]; got.Phase != ota.PhaseDSCDiscovery || got.Source != "" {
+		t.Fatalf("absence error = {phase:%q source:%q}, want {dsc-discovery <empty>}", got.Phase, got.Source)
+	}
+	if rep.fatalErr() == nil {
+		t.Fatal("fatalErr() = nil for an explicitly requested architecture")
+	}
+	if src.payloadCalls != 1 {
+		t.Fatalf("payload source ran %d time(s), want exhaustive final fallback", src.payloadCalls)
 	}
 }
 

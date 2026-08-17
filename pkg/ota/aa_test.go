@@ -159,48 +159,112 @@ func TestExtractFromDscCryptexFilesReturnsNilErrorWhenAllCryptexesSucceed(t *tes
 	}
 }
 
-func TestExtractFromDscCryptexFilesFiltersArchesBeforeExtraction(t *testing.T) {
+func TestExtractFromDscCryptexFilesForArchesSearchesContentsInsteadOfBasenames(t *testing.T) {
 	files := []*File{
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64"},
 		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64e"},
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64_32"},
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-rosetta"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64"},
 	}
 	var called []string
-	out, err := extractFromDscCryptexFilesForArches(files, []string{"arm64_32"}, func(file *File) ([]string, error) {
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
 		called = append(called, file.Base())
-		return []string{"out/System/Library/dyld/dyld_shared_cache_arm64_32"}, nil
+		if file.Base() != "cryptex-system-arm64e" {
+			t.Fatalf("extraction continued with %q after x86_64 was already materialized", file.Base())
+		}
+		return []string{"out/System/Library/dyld/dyld_shared_cache_x86_64"}, nil
 	})
 	if err != nil {
 		t.Fatalf("extractFromDscCryptexFilesForArches() unexpected error: %v", err)
 	}
-	if want := []string{"cryptex-system-arm64_32"}; !slices.Equal(called, want) {
+	if want := []string{"cryptex-system-arm64e"}; !slices.Equal(called, want) {
 		t.Fatalf("extracted cryptexes = %v, want %v", called, want)
 	}
-	if len(out) != 1 || out[0].Source != "cryptex-system-arm64_32" {
-		t.Fatalf("output = %+v, want one arm64_32-sourced file", out)
+	want := []ExtractedFile{{
+		Path:   "out/System/Library/dyld/dyld_shared_cache_x86_64",
+		Source: "cryptex-system-arm64e",
+	}}
+	if !slices.Equal(out, want) {
+		t.Fatalf("output = %+v, want %+v", out, want)
 	}
 }
 
-func TestCryptexMatchesArches(t *testing.T) {
+func TestExtractFromDscCryptexFilesForArchesDoesNotStopOnPartialFailure(t *testing.T) {
+	files := []*File{
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64e"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64"},
+	}
+	var called []string
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
+		called = append(called, file.Base())
+		path := "out/System/Library/dyld/dyld_shared_cache_x86_64"
+		if file.Base() == "cryptex-system-arm64e" {
+			return []string{path}, errors.New("copy failed after a partial result")
+		}
+		return []string{path}, nil
+	})
+	if err == nil {
+		t.Fatal("extractFromDscCryptexFilesForArches() error = nil, want the partial failure preserved")
+	}
+	wantCalled := []string{"cryptex-system-arm64e", "cryptex-system-x86_64"}
+	if !slices.Equal(called, wantCalled) {
+		t.Fatalf("extracted cryptexes = %v, want %v", called, wantCalled)
+	}
+	if len(out) != 2 {
+		t.Fatalf("output = %+v, want both partial and later successful results", out)
+	}
+}
+
+func TestExtractFromDscCryptexFilesForArchesSearchesEveryCandidateWhenAbsent(t *testing.T) {
+	files := []*File{
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64e"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64_32"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64h"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-system-rosetta"},
+		{name: "AssetData/payloadv2/image_patches/cryptex-app"},
+	}
+	var called []string
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
+		called = append(called, file.Base())
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("extractFromDscCryptexFilesForArches() unexpected error: %v", err)
+	}
+	want := []string{
+		"cryptex-system-arm64",
+		"cryptex-system-arm64e",
+		"cryptex-system-arm64_32",
+		"cryptex-system-x86_64",
+		"cryptex-system-x86_64h",
+		"cryptex-system-rosetta",
+	}
+	if !slices.Equal(called, want) {
+		t.Fatalf("extracted cryptexes = %v, want exhaustive search of %v", called, want)
+	}
+	if out != nil {
+		t.Fatalf("output = %+v, want nil", out)
+	}
+}
+
+func TestDscPathMatchesArch(t *testing.T) {
 	tests := []struct {
-		name   string
-		source string
-		arches []string
-		want   bool
+		name string
+		path string
+		arch string
+		want bool
 	}{
-		{name: "empty selects all", source: "cryptex-system-arm64e", want: true},
-		{name: "native exact", source: "cryptex-system-arm64e", arches: []string{"arm64e"}, want: true},
-		{name: "native mismatch", source: "cryptex-system-arm64", arches: []string{"arm64e"}},
-		{name: "arm64_32 exact", source: "cryptex-system-arm64_32", arches: []string{"arm64_32"}, want: true},
-		{name: "rosetta carries x86", source: "cryptex-system-rosetta", arches: []string{"x86_64"}, want: true},
-		{name: "rosetta carries aot", source: "cryptex-system-rosetta", arches: []string{"aot"}, want: true},
-		{name: "older x86 cryptex can carry aot", source: "cryptex-system-x86_64h", arches: []string{"aot"}, want: true},
+		{name: "primary", path: "out/System/Library/dyld/dyld_shared_cache_arm64", arch: "arm64", want: true},
+		{name: "subcache", path: "out/System/Library/dyld/dyld_shared_cache_x86_64.06", arch: "x86_64", want: true},
+		{name: "symbols", path: "out/System/Library/dyld/dyld_shared_cache_arm64e.symbols", arch: "arm64e", want: true},
+		{name: "architecture boundary", path: "out/System/Library/dyld/dyld_shared_cache_arm64e", arch: "arm64"},
+		{name: "aot", path: "out/System/Library/dyld/aot_shared_cache.0", arch: "aot", want: true},
+		{name: "not aot", path: "out/System/Library/dyld/dyld_shared_cache_x86_64", arch: "aot"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cryptexMatchesArches(tt.source, tt.arches); got != tt.want {
-				t.Fatalf("cryptexMatchesArches(%q, %v) = %t, want %t", tt.source, tt.arches, got, tt.want)
+			if got := dscPathMatchesArch(tt.path, tt.arch); got != tt.want {
+				t.Fatalf("dscPathMatchesArch(%q, %q) = %t, want %t", tt.path, tt.arch, got, tt.want)
 			}
 		})
 	}
