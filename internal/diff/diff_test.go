@@ -25,6 +25,54 @@ type fakeVolumeFileSession struct {
 	rootCalls int
 }
 
+func TestSandboxOnlyRequested(t *testing.T) {
+	base := Config{
+		Sandbox:     true,
+		Output:      "/tmp/report",
+		Verbose:     true,
+		PemDB:       "/tmp/pem.json",
+		AEAKeyDB:    "/tmp/keys.json",
+		AEAKeyVal:   "key",
+		AEAInsecure: true,
+		Cache:       CacheConfig{NoCache: true, MaxBytes: 1},
+	}
+	if !base.sandboxOnlyRequested() {
+		t.Fatal("output, cache, verbosity, and decryption options must preserve sandbox-only mode")
+	}
+
+	tests := []struct {
+		name  string
+		widen func(*Config)
+	}{
+		{name: "kdk", widen: func(c *Config) { c.KDKs = []string{"old", "new"} }},
+		{name: "launchd", widen: func(c *Config) { c.LaunchD = true }},
+		{name: "firmware", widen: func(c *Config) { c.Firmware = true }},
+		{name: "features", widen: func(c *Config) { c.Features = true }},
+		{name: "files", widen: func(c *Config) { c.Files = true }},
+		{name: "localizations", widen: func(c *Config) { c.Localizations = true }},
+		{name: "cstrings", widen: func(c *Config) { c.CStrings = true }},
+		{name: "timestamps", widen: func(c *Config) { c.IgnoreBuildTimestamps = true }},
+		{name: "function starts", widen: func(c *Config) { c.FuncStarts = true }},
+		{name: "entitlements", widen: func(c *Config) { c.Entitlements = true }},
+		{name: "allow list", widen: func(c *Config) { c.AllowList = []string{"__TEXT.__text"} }},
+		{name: "block list", widen: func(c *Config) { c.BlockList = []string{"__TEXT.__info_plist"} }},
+		{name: "signatures", widen: func(c *Config) { c.Signatures = "/tmp/signatures" }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := base
+			tc.widen(&conf)
+			if conf.sandboxOnlyRequested() {
+				t.Fatal("additional content analysis must disable sandbox-only mode")
+			}
+		})
+	}
+
+	if (&Config{}).sandboxOnlyRequested() {
+		t.Fatal("sandbox-only mode requires --sandbox")
+	}
+}
+
 func (f *fakeVolumeFileSession) Root(typ string) (string, error) {
 	f.rootCalls++
 	root, ok := f.roots[typ]

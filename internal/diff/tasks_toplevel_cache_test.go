@@ -2,6 +2,7 @@ package diff
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/blacktop/ipsw/internal/diff/storage"
@@ -19,13 +20,53 @@ type fakeTopLevelTask struct {
 	parsed    int
 	persisted int
 	hydrated  int
+	parseErr  error
 }
 
 func (t *fakeTopLevelTask) Name() string { return t.name }
 
 func (t *fakeTopLevelTask) Parse(_ context.Context, _ *Diff) error {
 	t.parsed++
-	return nil
+	return t.parseErr
+}
+
+func TestTopLevelTaskParseFailureIsReturnedAfterSiblingsComplete(t *testing.T) {
+	oldInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x01}},
+	})
+	newInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x02}},
+	})
+
+	store := storage.NewMemoryStore()
+	parseErr := errors.New("sandbox parse failed")
+	failing := &fakeTopLevelTask{name: "sandbox", version: 1, optsHash: "fail", inputHash: "input", parseErr: parseErr}
+	successful := &fakeTopLevelTask{name: "firmware", version: 1, optsHash: "pass", inputHash: "input"}
+
+	d := &Diff{
+		Old: Context{Info: oldInfo},
+		New: Context{Info: newInfo},
+	}
+	d.SetStore(store)
+
+	err := d.runTopLevelTasks(context.Background(), []TopLevelTask{failing, successful})
+	if !errors.Is(err, parseErr) {
+		t.Fatalf("runTopLevelTasks error = %v, want wrapped parse error", err)
+	}
+	if successful.parsed != 1 || successful.persisted != 1 {
+		t.Fatalf("successful sibling calls = (parsed %d, persisted %d), want (1, 1)", successful.parsed, successful.persisted)
+	}
+	if failing.persisted != 0 {
+		t.Fatalf("failed task persisted = %d, want 0", failing.persisted)
+	}
+
+	scope, ok := taskScope(oldInfo, newInfo, successful)
+	if !ok {
+		t.Fatal("taskScope returned ok=false for successful sibling")
+	}
+	if done, completeErr := store.Complete(scope); completeErr != nil || !done {
+		t.Fatalf("successful sibling store.Complete = (%v,%v), want (true,nil)", done, completeErr)
+	}
 }
 
 func (t *fakeTopLevelTask) Version() int        { return t.version }

@@ -94,6 +94,28 @@ type Config struct {
 	Cache CacheConfig
 }
 
+// sandboxOnlyRequested reports whether sandbox is the only content analysis
+// selected. Output, cache, verbosity, and OTA decryption options do not widen
+// the requested diff surface; every option below does.
+func (c *Config) sandboxOnlyRequested() bool {
+	if c == nil || !c.Sandbox {
+		return false
+	}
+	return len(c.KDKs) == 0 &&
+		!c.LaunchD &&
+		!c.Firmware &&
+		!c.Features &&
+		!c.Files &&
+		!c.Localizations &&
+		!c.CStrings &&
+		!c.IgnoreBuildTimestamps &&
+		!c.FuncStarts &&
+		!c.Entitlements &&
+		len(c.AllowList) == 0 &&
+		len(c.BlockList) == 0 &&
+		c.Signatures == ""
+}
+
 // CacheConfig mirrors the CLI flags that govern the SQLite-backed diff
 // cache. It is consumed by [Diff.Diff] after parsing IPSW Info structs;
 // non-IPSW input modes ignore it.
@@ -413,6 +435,20 @@ func (d *Diff) Diff() (err error) {
 	directoryMode := d.Old.InputMode == inputModeDirectory
 	otaMode := d.Old.InputMode == inputModeOTA
 
+	// --sandbox by itself is a kernelcache-only workflow. Keep it ahead of
+	// every volume mount and the default KEXT/DSC/Mach-O pipeline so OTA users
+	// do not pay to materialize cryptexes or payload files they did not request.
+	if d.conf.sandboxOnlyRequested() {
+		if directoryMode {
+			log.Warn("Directory inputs do not support --sandbox; skipping that section")
+			return nil
+		}
+		if err := d.runSandboxDiff(); err != nil {
+			return fmt.Errorf("failed to diff sandbox profiles: %w", err)
+		}
+		return nil
+	}
+
 	if directoryMode {
 		if unsupported := unsupportedFlagsForDirectoryMode(d.conf); len(unsupported) > 0 {
 			log.Warnf("Directory inputs do not support %s; skipping those sections", strings.Join(unsupported, ", "))
@@ -455,13 +491,8 @@ func (d *Diff) Diff() (err error) {
 	}
 
 	if d.conf.Sandbox && !directoryMode {
-		if d.sameKernel {
-			utils.Indent(log.Warn, 2)("Skipping Sandbox Profiles (kernelcache unchanged)")
-		} else {
-			log.Info("Diffing Sandbox Profiles")
-			if err := d.runTopLevelTasks(context.Background(), []TopLevelTask{newSandboxTask(d)}); err != nil {
-				log.WithError(err).Error("failed to diff sandbox profiles")
-			}
+		if err := d.runSandboxDiff(); err != nil {
+			log.WithError(err).Error("failed to diff sandbox profiles")
 		}
 	}
 
@@ -561,6 +592,15 @@ func (d *Diff) Diff() (err error) {
 	return nil
 }
 
+func (d *Diff) runSandboxDiff() error {
+	if d.sameKernel {
+		utils.Indent(log.Warn, 2)("Skipping Sandbox Profiles (kernelcache unchanged)")
+		return nil
+	}
+	log.Info("Diffing Sandbox Profiles")
+	return d.runTopLevelTasks(context.Background(), []TopLevelTask{newSandboxTask(d)})
+}
+
 // runIPSWVolumeJobsForMode dispatches the per-flag jobs that have been
 // migrated to the volume-major orchestrator. OTA and Directory modes fall
 // back to the legacy feature-major parser for Files; the other parsers
@@ -581,8 +621,8 @@ func (d *Diff) runIPSWVolumeJobsForMode(directoryMode, otaMode bool) error {
 
 	var jobs []Task
 
-	// DSC always runs in IPSW mode (the existing behavior); the per-volume
-	// skip in the orchestrator handles the "sys unchanged" case.
+	// DSC always runs when the general IPSW pipeline reaches this orchestrator;
+	// the per-volume skip handles the "sys unchanged" case.
 	if !d.dscVolumeUnchanged() {
 		log.Info("Diffing DYLD_SHARED_CACHES")
 		jobs = append(jobs, newDSCJob(d))
@@ -626,8 +666,8 @@ func (d *Diff) runIPSWVolumeJobsForMode(directoryMode, otaMode bool) error {
 		}
 	}
 
-	// MachOs always runs in IPSW mode (the existing behavior); the per-volume
-	// skip in the orchestrator handles the "all OS DMGs unchanged" case.
+	// MachOs always runs when the general IPSW pipeline reaches this orchestrator;
+	// the per-volume skip handles the "all OS DMGs unchanged" case.
 	if d.allIPSWOSVolumesUnchanged() {
 		log.Info("Skipping MachOs (OS DMGs unchanged)")
 	} else {

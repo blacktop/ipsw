@@ -64,7 +64,7 @@ func collectSandboxProfileDocuments(ctx *Context) (sandboxProfileDocuments, erro
 
 	out := make(sandboxProfileDocuments)
 	for _, source := range sandboxDiffSourceOrder {
-		profiles, err := renderSandboxSourceProfiles(kernel, fixups, source)
+		profiles, err := renderSandboxSourceProfiles(ctx, kernel, fixups, source)
 		if err != nil {
 			if isSandboxSourceUnavailable(err) {
 				log.WithError(err).Debugf("skipping unavailable %s sandbox source", source)
@@ -80,11 +80,8 @@ func collectSandboxProfileDocuments(ctx *Context) (sandboxProfileDocuments, erro
 	return out, nil
 }
 
-func renderSandboxSourceProfiles(kernel *macho.File, fixups map[uint64]uint64, source string) (map[string]string, error) {
-	conf := &sandbox.Config{Kernel: kernel, Quiet: true}
-	if fixups != nil {
-		conf.Fixups = fixups
-	}
+func renderSandboxSourceProfiles(ctx *Context, kernel *macho.File, fixups map[uint64]uint64, source string) (map[string]string, error) {
+	conf := sandboxParserConfig(ctx, kernel, fixups)
 
 	sbObj, err := sandbox.NewSandbox(conf)
 	if err != nil {
@@ -118,6 +115,24 @@ func renderSandboxSourceProfiles(kernel *macho.File, fixups map[uint64]uint64, s
 	}
 
 	return renderSandboxProfiles(sbObj, source)
+}
+
+func sandboxParserConfig(ctx *Context, kernel *macho.File, fixups map[uint64]uint64) *sandbox.Config {
+	conf := &sandbox.Config{
+		Kernel: kernel,
+		Fixups: fixups,
+		Quiet:  true,
+	}
+	version := strings.TrimSpace(ctx.Version)
+	if version == "" {
+		return conf
+	}
+	conf.CatalogPlatform = "iOS"
+	if ctx.IsMacOS {
+		conf.CatalogPlatform = "macOS"
+	}
+	conf.CatalogOSVersion = version
+	return conf
 }
 
 func renderSandboxProfiles(sbObj *sandbox.Sandbox, source string) (map[string]string, error) {

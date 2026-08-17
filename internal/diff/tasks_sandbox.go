@@ -50,19 +50,19 @@ func (t *sandboxTask) Parse(_ context.Context, d *Diff) error {
 // sandbox-diff string), the sandbox parse/normalize/render pipeline, or the
 // rendered `### Sandbox Profiles` section semantics change in a way that
 // invalidates rows written by a prior ipsw build.
-const sandboxCacheVersion = 1
+const sandboxCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // sandboxCacheVersion.
 func (t *sandboxTask) Version() int { return sandboxCacheVersion }
 
 // OptionsHash digests every output-affecting option for sandboxTask. The task
-// has no output-affecting flags: the `--sandbox` flag only toggles whether the
-// task runs at all (it gates registration, not output), and parseSandboxProfiles
-// always walks the fixed sandboxDiffSourceOrder (collection / protobox / platform
-// profile) with the fixed normalize node/byte budgets, rendering through the
-// fixed sandbox diff path. There are no allow/block lists, no verbosity, and no
-// profile-selection flags. The only things that can change the rendered bytes are
+// has no output-affecting flags: `--sandbox` selects whether the task runs but
+// does not alter its parser output. parseSandboxProfiles always walks the fixed
+// sandboxDiffSourceOrder (collection / protobox / platform profile) with the
+// fixed normalize node/byte budgets, rendering through the fixed sandbox diff
+// path. There are no allow/block lists, no verbosity, and no profile-selection
+// flags. The only things that can change the rendered bytes are
 // the parse/normalize/render logic itself (tracked by sandboxCacheVersion) and
 // whether the binary was built with -tags sandbox at all (tracked by
 // sandboxBuildTag): a stub build returns ErrSandboxDiffUnavailable and can never

@@ -32,3 +32,32 @@ func TestUniqueSandboxProfileDocumentNameAvoidsExistingSuffix(t *testing.T) {
 		t.Fatalf("uniqueSandboxProfileDocumentName() = %q, want %q", got, "profile#1.2")
 	}
 }
+
+func TestSandboxParserConfigUsesContextProductVersion(t *testing.T) {
+	macOS := sandboxParserConfig(&Context{IsMacOS: true, Version: "26.7"}, nil, nil)
+	if macOS.CatalogPlatform != "macOS" || macOS.CatalogOSVersion != "26.7" {
+		t.Fatalf(
+			"macOS catalog selection = %s %s, want macOS 26.7",
+			macOS.CatalogPlatform,
+			macOS.CatalogOSVersion,
+		)
+	}
+
+	iOS := sandboxParserConfig(&Context{Version: "26.7"}, nil, nil)
+	if iOS.CatalogPlatform != "iOS" || iOS.CatalogOSVersion != "26.7" {
+		t.Fatalf(
+			"iOS catalog selection = %s %s, want iOS 26.7",
+			iOS.CatalogPlatform,
+			iOS.CatalogOSVersion,
+		)
+	}
+
+	fallback := sandboxParserConfig(&Context{IsMacOS: true, Version: "  "}, nil, nil)
+	if fallback.CatalogPlatform != "" || fallback.CatalogOSVersion != "" {
+		t.Fatalf(
+			"missing product version catalog selection = %q %q, want Darwin-family fallback",
+			fallback.CatalogPlatform,
+			fallback.CatalogOSVersion,
+		)
+	}
+}

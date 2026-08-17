@@ -8,7 +8,7 @@ import (
 )
 
 func registerDiffSandboxFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("sandbox", false, "Diff compiled sandbox profiles")
+	cmd.Flags().Bool("sandbox", false, "Diff compiled sandbox profiles (alone, runs kernelcache-only)")
 	viper.BindPFlag("diff.sandbox", cmd.Flags().Lookup("sandbox"))
 }
 

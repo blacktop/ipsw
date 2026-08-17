@@ -483,11 +483,11 @@ func releaseVolumePair(typ string, oldSession, newSession ipswVolumeFileSession)
 	return errors.Join(errs...)
 }
 
-// runTopLevelTasks invokes Parse on each top-level task that opts in via
-// the registered filter. A MemoryStore is allocated for the duration of
-// the call and closed afterward, providing the same [TaskSetup] surface
-// mount-based jobs receive. Errors are logged per-task and the loop
-// continues so a single failure does not poison sibling tasks.
+// runTopLevelTasks invokes Parse on each supplied top-level task. A MemoryStore
+// is allocated for the duration of the call and closed afterward, providing the
+// same [TaskSetup] surface mount-based jobs receive. Parse errors are logged and
+// collected while the loop continues so a single failure does not poison sibling
+// tasks. The collected errors are returned after successful siblings persist.
 //
 // The cache lifecycle mirrors runVolumeJobsAcrossSessions exactly: after
 // setup, resolve each CacheableTask's scope and hydrate the hits; a hydrated
@@ -524,6 +524,7 @@ func (d *Diff) runTopLevelTasks(ctx context.Context, tasks []TopLevelTask) error
 	// never marked complete. Hydrated tasks have their result published by
 	// Hydrate, so their Parse is skipped entirely.
 	lc := newCacheLifecycle(d.Old.Info, d.New.Info, topLevelTasksAsTaskSlice(tasks), store)
+	var parseErrs []error
 
 	for _, t := range tasks {
 		if lc.isHydrated(t) {
@@ -532,6 +533,7 @@ func (d *Diff) runTopLevelTasks(ctx context.Context, tasks []TopLevelTask) error
 		if err := t.Parse(ctx, d); err != nil {
 			lc.markErrored(map[string]bool{t.Name(): true})
 			log.WithError(err).Errorf("failed to parse %s", t.Name())
+			parseErrs = append(parseErrs, fmt.Errorf("failed to parse %s: %w", t.Name(), err))
 		}
 	}
 
@@ -547,7 +549,7 @@ func (d *Diff) runTopLevelTasks(ctx context.Context, tasks []TopLevelTask) error
 			}
 		}
 	}
-	return nil
+	return errors.Join(parseErrs...)
 }
 
 // topLevelTasksAsTaskSlice widens a []TopLevelTask to the []Task the
