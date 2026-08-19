@@ -742,10 +742,10 @@ func (r *Reader) ExtractFromCryptexesWithSources(pattern, output string) (files 
 	return r.ExtractFromCryptexesWithSourcesForArches(pattern, output, nil)
 }
 
-// ExtractFromCryptexesWithSourcesForArches is the architecture-filtered form
-// of [Reader.ExtractFromCryptexesWithSources]. It skips cryptex members that
-// cannot carry any requested cache family before staging or mounting them.
-// An empty arches slice preserves the all-cryptex behavior.
+// ExtractFromCryptexesWithSourcesForArches limits extraction to requested
+// architectures. It checks system cryptexes in order because their filenames
+// do not always describe every cache inside, and stops once every requested
+// cache family is found. An empty arches slice checks every system cryptex.
 func (r *Reader) ExtractFromCryptexesWithSourcesForArches(pattern, output string, arches []string) (files []ExtractedFile, err error) {
 	match, err := regexp.Compile(pattern)
 	if err != nil {
@@ -777,9 +777,13 @@ func extractFromDscCryptexFiles(files []*File, extract func(*File) ([]string, er
 func extractFromDscCryptexFilesForArches(files []*File, arches []string, extract func(*File) ([]string, error)) ([]ExtractedFile, error) {
 	var out []ExtractedFile
 	var extractErrs []error
+	missing := make(map[string]struct{}, len(arches))
+	for _, arch := range arches {
+		missing[arch] = struct{}{}
+	}
 
 	for _, file := range files {
-		if !reOTADscCryptex.MatchString(file.Base()) || !cryptexMatchesArches(file.Base(), arches) {
+		if !reOTADscCryptex.MatchString(file.Base()) {
 			continue
 		}
 		extracted, err := extract(file)
@@ -788,37 +792,32 @@ func extractFromDscCryptexFilesForArches(files []*File, arches []string, extract
 		}
 		if err != nil {
 			extractErrs = append(extractErrs, wrapPhase(PhaseCryptexDiscovery, file.Base(), err))
+		} else {
+			for _, path := range extracted {
+				for arch := range missing {
+					if dscPathMatchesArch(path, arch) {
+						delete(missing, arch)
+					}
+				}
+			}
+		}
+		if len(arches) > 0 && len(missing) == 0 {
+			break
 		}
 	}
 
 	return out, errors.Join(extractErrs...)
 }
 
-// cryptexMatchesArches reports whether a cryptex member can carry at least one
-// requested cache family. Rosetta cryptexes can carry x86_64, x86_64h and AOT
-// caches; older OTAs can name the x86 cryptex directly.
-func cryptexMatchesArches(source string, arches []string) bool {
-	if len(arches) == 0 {
-		return true
+// dscPathMatchesArch uses the materialized cache basename, which identifies
+// cache contents authoritatively. The enclosing cryptex basename does not.
+func dscPathMatchesArch(path, arch string) bool {
+	base := filepath.Base(path)
+	if arch == "aot" {
+		return strings.HasPrefix(base, "aot_shared_cache.")
 	}
-	sourceArch := strings.TrimPrefix(source, "cryptex-system-")
-	for _, arch := range arches {
-		switch arch {
-		case "aot":
-			if sourceArch == "rosetta" || sourceArch == "x86_64" || sourceArch == "x86_64h" {
-				return true
-			}
-		case "x86_64", "x86_64h":
-			if sourceArch == arch || sourceArch == "rosetta" {
-				return true
-			}
-		default:
-			if sourceArch == arch {
-				return true
-			}
-		}
-	}
-	return false
+	prefix := "dyld_shared_cache_" + arch
+	return base == prefix || strings.HasPrefix(base, prefix+".")
 }
 
 func (r *Reader) extractFromCryptexFile(file *File, match *regexp.Regexp, tmpdir, output string) (out []string, err error) {
