@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -19,6 +20,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v8"
@@ -592,82 +594,184 @@ func RemoteCryptexFiles(files []*zip.File, arches []string) []*zip.File {
 	return matches
 }
 
+// remoteCryptexCandidates orders the remote OTA's system cryptex members for
+// extraction: members whose basename names a requested architecture first.
+// When sweepAll is set the remaining system cryptexes follow, because cryptex
+// basenames do not always describe every cache inside -- a macOS arm64e
+// cryptex can carry the x86_64 caches.
+func remoteCryptexCandidates(files []*zip.File, arches []string, sweepAll bool) []*zip.File {
+	if len(arches) == 0 {
+		return RemoteCryptexFiles(files, nil)
+	}
+	var likely, rest []*zip.File
+	for _, f := range files {
+		if f.FileInfo().IsDir() || !ota.IsDscCryptexBasename(path.Base(f.Name)) {
+			continue
+		}
+		if ota.CryptexBasenameSuggestsArches(path.Base(f.Name), arches) {
+			likely = append(likely, f)
+		} else if sweepAll {
+			rest = append(rest, f)
+		}
+	}
+	return append(likely, rest...)
+}
+
 // ExtractFromRemoteCryptex extracts the dyld_shared_cache from the
-// cryptex-system file in the given zip.Reader.
+// cryptex-system files in the given zip.Reader. Members whose basename names a
+// requested architecture are downloaded first; on macOS OTAs requesting a
+// rosetta-family cache the remaining system cryptexes are swept while a
+// requested primary cache is still missing, because the basename is not
+// authoritative for what a cryptex carries.
 func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
-	re := RemoteCryptexPattern(arches)
-	for _, zf := range zr.File {
-		if re.MatchString(zf.Name) {
-			rc, err := zf.Open()
-			if err != nil {
-				return nil, fmt.Errorf("failed to open %s: %v", zf.Name, err)
+	// Rosetta-family caches are the ones that live in cryptexes named after
+	// other architectures; arm-only requests keep the basename authoritative.
+	sweep := hasRosettaDscArch(arches)
+	// The empty check runs before parsing info: a no-cryptex OTA must return
+	// the sentinel with zero extra remote I/O so the caller's payload-file
+	// fallback for older OTAs stays cheap.
+	if len(remoteCryptexCandidates(zr.File, arches, sweep)) == 0 {
+		return nil, ErrNoCryptex
+	}
+	i, err := info.ParseZipFiles(zr.File)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse info from remote OTA: %v", err)
+	}
+	candidates := remoteCryptexCandidates(zr.File, arches, sweep && isMacOS(i))
+	if len(candidates) == 0 {
+		return nil, ErrNoCryptex
+	}
+
+	e := remoteCryptexExtraction{
+		info: i, destPath: destPath, pemDB: pemDB,
+		driverkit: driverkit, all: all,
+	}
+	missing := make(map[string]struct{}, len(arches))
+	for _, arch := range arches {
+		missing[arch] = struct{}{}
+	}
+	var artifacts []string
+	var notFound error
+	for _, zf := range candidates {
+		// Ask each member only for the still-missing arches so a swept member
+		// never re-copies multi-GB caches an earlier member already delivered.
+		remaining := make([]string, 0, len(missing))
+		for _, arch := range arches {
+			if _, ok := missing[arch]; ok {
+				remaining = append(remaining, arch)
 			}
-			defer rc.Close()
-			// setup progress bar
-			var total int64 = int64(zf.UncompressedSize64)
-			p := mpb.New(
-				mpb.WithWidth(60),
-				mpb.WithRefreshRate(180*time.Millisecond),
-			)
-			bar := p.New(total,
-				mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
-				mpb.PrependDecorators(
-					decor.CountersKibiByte("\t% .2f / % .2f"),
-				),
-				mpb.AppendDecorators(
-					decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
-					decor.Name(" ] "),
-					decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
-				),
-			)
-			// create proxy reader
-			proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
-			defer proxyReader.Close()
-
-			in, err := os.CreateTemp("", "cryptex-system")
-			if err != nil {
-				return nil, fmt.Errorf("failed to create temp file for %s: %v", zf.Name, err)
-			}
-			defer os.Remove(in.Name())
-
-			log.Infof("Extracting %s from remote OTA", filepath.Base(zf.Name))
-			io.Copy(in, proxyReader)
-			// wait for our bar to complete and flush and close remote zip and temp file
-			p.Wait()
-			in.Close()
-
-			out, err := os.CreateTemp("", "cryptex-system.decrypted.*.dmg")
-			if err != nil {
-				return nil, fmt.Errorf("failed to create temp file for %s: %v", in.Name(), err)
-			}
-			defer os.Remove(out.Name())
-			out.Close()
-
-			log.Infof("Patching %s to %s", zf.Name, out.Name())
-			if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
-				return nil, fmt.Errorf("failed to patch %s: %v", zf.Name, err)
-
-			}
-
-			i, err := info.ParseZipFiles(zr.File)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse info from %s: %v", zf.Name, err)
-			}
-
-			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, pemDB, arches, driverkit, all)
-			if err != nil {
-				tmpcopy := filepath.Join(os.TempDir(), filepath.Base(out.Name()))
-				tcerr := utils.Copy(out.Name(), tmpcopy)
-				exterr := fmt.Errorf("failed to extract 'dyld_shared_cache' from %s: %v", zf.Name, err)
-				if tcerr != nil {
-					return nil, fmt.Errorf("%v: attempted to copy downloaded file: failed to copy '%s' to '%s': %v", out.Name(), exterr, tmpcopy, tcerr)
+		}
+		found, err := e.extractMember(zf, remaining)
+		if err != nil {
+			// A member without matching caches is not fatal while other system
+			// cryptexes remain: the requested caches can live in one of them.
+			if IsDscNotFound(err) && len(arches) > 0 {
+				if notFound == nil {
+					notFound = fmt.Errorf("failed to extract 'dyld_shared_cache' from %s: %w", zf.Name, err)
 				}
-				return nil, fmt.Errorf("%v (copied downloaded file to '%s')", exterr, tmpcopy)
+				log.Debugf("no matching dyld_shared_cache in %s; trying remaining system cryptexes", zf.Name)
+				continue
 			}
-
+			return nil, err
+		}
+		artifacts = append(artifacts, found...)
+		for _, artifact := range found {
+			if arch, primary := ota.DSCFileArch(artifact); primary {
+				delete(missing, arch)
+			}
+		}
+		if len(missing) == 0 {
 			return artifacts, nil
 		}
 	}
+	if len(artifacts) == 0 && notFound != nil {
+		return nil, notFound
+	}
+	return artifacts, nil
+}
 
-	return nil, ErrNoCryptex
+type remoteCryptexExtraction struct {
+	info      *info.Info
+	destPath  string
+	pemDB     string
+	driverkit bool
+	all       bool
+}
+
+// extractMember downloads one cryptex member, patches it into a mountable DMG
+// and extracts the caches matching arches from it. Its temp files live only
+// for the duration of the call, so sweeping several members never accumulates
+// multi-GB downloads on disk.
+func (e remoteCryptexExtraction) extractMember(zf *zip.File, arches []string) ([]string, error) {
+	rc, err := zf.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %v", zf.Name, err)
+	}
+	defer rc.Close()
+	// setup progress bar
+	var total int64 = int64(zf.UncompressedSize64)
+	p := mpb.New(
+		mpb.WithWidth(60),
+		mpb.WithRefreshRate(180*time.Millisecond),
+	)
+	bar := p.New(total,
+		mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
+		mpb.PrependDecorators(
+			decor.CountersKibiByte("\t% .2f / % .2f"),
+		),
+		mpb.AppendDecorators(
+			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+			decor.Name(" ] "),
+			decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
+		),
+	)
+	// create proxy reader
+	proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
+	defer proxyReader.Close()
+
+	in, err := os.CreateTemp("", "cryptex-system")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for %s: %v", zf.Name, err)
+	}
+	defer os.Remove(in.Name())
+
+	log.Infof("Extracting %s from remote OTA", filepath.Base(zf.Name))
+	if _, err := io.Copy(in, proxyReader); err != nil {
+		return nil, fmt.Errorf("failed to download %s: %v", zf.Name, err)
+	}
+	// wait for our bar to complete and flush and close remote zip and temp file
+	p.Wait()
+	in.Close()
+
+	out, err := os.CreateTemp("", "cryptex-system.decrypted.*.dmg")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for %s: %v", in.Name(), err)
+	}
+	defer os.Remove(out.Name())
+	out.Close()
+
+	log.Infof("Patching %s to %s", zf.Name, out.Name())
+	if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
+		return nil, fmt.Errorf("failed to patch %s: %v", zf.Name, err)
+	}
+
+	artifacts, err := ExtractFromDMG(e.info, out.Name(), e.destPath, e.pemDB,
+		arches, e.driverkit, e.all)
+	if err != nil {
+		// A no-matching-caches result needs no DMG preserved for debugging;
+		// return it unwrapped so the caller can identify it with IsDscNotFound.
+		if IsDscNotFound(err) {
+			return nil, err
+		}
+		tmpcopy := filepath.Join(os.TempDir(), filepath.Base(out.Name()))
+		tcerr := utils.Copy(out.Name(), tmpcopy)
+		exterr := fmt.Errorf("failed to extract 'dyld_shared_cache' from %s: %v", zf.Name, err)
+		if tcerr != nil {
+			return nil, fmt.Errorf("%v: attempted to copy downloaded file: failed to copy '%s' to '%s': %v",
+				out.Name(), exterr, tmpcopy, tcerr)
+		}
+		return nil, fmt.Errorf("%v (copied downloaded file to '%s')", exterr, tmpcopy)
+	}
+
+	return artifacts, nil
 }

@@ -197,13 +197,20 @@ func (r *dscReport) satisfied(arches []string) bool {
 	return true
 }
 
+// missingArches reports the requested architectures with no primary cache in
+// the report. Sidecars (.symbols, .map, subcaches) do not count: they are
+// useless without the primary cache, so an architecture they belong to still
+// needs a later source to materialize it.
 func (r *dscReport) missingArches(requested []string) []string {
 	var missing []string
 	for _, arch := range requested {
 		if slices.Contains(missing, arch) {
 			continue
 		}
-		if !slices.ContainsFunc(r.Files, func(f dscFileEntry) bool { return f.Arch == arch }) {
+		if !slices.ContainsFunc(r.Files, func(f dscFileEntry) bool {
+			a, primary := ota.DSCFileArch(f.Path)
+			return primary && a == arch
+		}) {
 			missing = append(missing, arch)
 		}
 	}
@@ -377,15 +384,7 @@ func dscReportPath(root, dst string) string {
 }
 
 func dscArch(p string) string {
-	base := filepath.Base(p)
-	if strings.HasPrefix(base, "aot_shared_cache.") {
-		return "aot"
-	}
-	rest, ok := strings.CutPrefix(base, "dyld_shared_cache_")
-	if !ok {
-		return ""
-	}
-	arch, _, _ := strings.Cut(rest, ".") // strips .01 / .symbols / .dylddata / .map
+	arch, _ := ota.DSCFileArch(p)
 	return arch
 }
 

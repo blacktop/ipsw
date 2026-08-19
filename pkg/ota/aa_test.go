@@ -159,24 +159,38 @@ func TestExtractFromDscCryptexFilesReturnsNilErrorWhenAllCryptexesSucceed(t *tes
 	}
 }
 
-func TestExtractFromDscCryptexFilesForArchesSearchesContentsInsteadOfBasenames(t *testing.T) {
-	files := []*File{
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64e"},
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64"},
+// cryptexFiles builds OTA member fixtures for the given cryptex basenames.
+func cryptexFiles(bases ...string) []*File {
+	files := make([]*File, 0, len(bases))
+	for _, base := range bases {
+		files = append(files, &File{name: "AssetData/payloadv2/image_patches/" + base})
 	}
+	return files
+}
+
+// TestExtractFromDscCryptexFilesForArchesFindsArchInDifferentlyNamedCryptex
+// pins the content-based search: the requested cache family can live in a
+// cryptex named after another architecture, so a basename miss in the likely
+// candidate sweeps the rest instead of giving up.
+func TestExtractFromDscCryptexFilesForArchesFindsArchInDifferentlyNamedCryptex(t *testing.T) {
+	files := cryptexFiles("cryptex-system-arm64e", "cryptex-system-x86_64")
 	var called []string
-	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
-		called = append(called, file.Base())
-		if file.Base() != "cryptex-system-arm64e" {
-			t.Fatalf("extraction continued with %q after x86_64 was already materialized", file.Base())
-		}
-		return []string{"out/System/Library/dyld/dyld_shared_cache_x86_64"}, nil
-	})
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"},
+		func(file *File) ([]string, error) {
+			called = append(called, file.Base())
+			if file.Base() == "cryptex-system-arm64e" {
+				return []string{"out/System/Library/dyld/dyld_shared_cache_x86_64"}, nil
+			}
+			return nil, nil
+		})
 	if err != nil {
 		t.Fatalf("extractFromDscCryptexFilesForArches() unexpected error: %v", err)
 	}
-	if want := []string{"cryptex-system-arm64e"}; !slices.Equal(called, want) {
-		t.Fatalf("extracted cryptexes = %v, want %v", called, want)
+	// The basename-matching cryptex is staged first; the sweep finds the
+	// caches in the differently named one.
+	wantCalled := []string{"cryptex-system-x86_64", "cryptex-system-arm64e"}
+	if !slices.Equal(called, wantCalled) {
+		t.Fatalf("extracted cryptexes = %v, want %v", called, wantCalled)
 	}
 	want := []ExtractedFile{{
 		Path:   "out/System/Library/dyld/dyld_shared_cache_x86_64",
@@ -187,29 +201,73 @@ func TestExtractFromDscCryptexFilesForArchesSearchesContentsInsteadOfBasenames(t
 	}
 }
 
-func TestExtractFromDscCryptexFilesForArchesDoesNotStopOnPartialFailure(t *testing.T) {
-	files := []*File{
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-arm64e"},
-		{name: "AssetData/payloadv2/image_patches/cryptex-system-x86_64"},
-	}
+// TestExtractFromDscCryptexFilesForArchesStopsAfterLikelyCryptexSatisfies pins
+// the fast path: when the basename-matching cryptex delivers the requested
+// primary cache, no other cryptex is staged or mounted.
+func TestExtractFromDscCryptexFilesForArchesStopsAfterLikelyCryptexSatisfies(t *testing.T) {
+	files := cryptexFiles("cryptex-system-arm64", "cryptex-system-arm64e", "cryptex-system-rosetta")
 	var called []string
-	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
-		called = append(called, file.Base())
-		path := "out/System/Library/dyld/dyld_shared_cache_x86_64"
-		if file.Base() == "cryptex-system-arm64e" {
-			return []string{path}, errors.New("copy failed after a partial result")
-		}
-		return []string{path}, nil
-	})
-	if err == nil {
-		t.Fatal("extractFromDscCryptexFilesForArches() error = nil, want the partial failure preserved")
+	_, err := extractFromDscCryptexFilesForArches(files, []string{"arm64e"},
+		func(file *File) ([]string, error) {
+			called = append(called, file.Base())
+			return []string{"out/System/Library/dyld/dyld_shared_cache_arm64e"}, nil
+		})
+	if err != nil {
+		t.Fatalf("extractFromDscCryptexFilesForArches() unexpected error: %v", err)
 	}
-	wantCalled := []string{"cryptex-system-arm64e", "cryptex-system-x86_64"}
+	if want := []string{"cryptex-system-arm64e"}; !slices.Equal(called, want) {
+		t.Fatalf("extracted cryptexes = %v, want only the basename match", called)
+	}
+}
+
+// TestExtractFromDscCryptexFilesForArchesCreditsFilesExtractedBeforeFailure
+// pins that a copied primary cache satisfies its architecture even when the
+// same cryptex also reports an error (an unmount flake, a walk warning): the
+// file is on disk, so staging further cryptexes would only overwrite it.
+func TestExtractFromDscCryptexFilesForArchesCreditsFilesExtractedBeforeFailure(t *testing.T) {
+	files := cryptexFiles("cryptex-system-arm64e", "cryptex-system-x86_64")
+	var called []string
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"},
+		func(file *File) ([]string, error) {
+			called = append(called, file.Base())
+			return []string{"out/System/Library/dyld/dyld_shared_cache_x86_64"},
+				&PhaseError{Phase: PhaseCleanup, Source: file.Base(),
+					Err: errors.New("hdiutil: detach failed - Resource busy")}
+		})
+	if err == nil {
+		t.Fatal("extractFromDscCryptexFilesForArches() error = nil, want the cleanup failure preserved")
+	}
+	if want := []string{"cryptex-system-x86_64"}; !slices.Equal(called, want) {
+		t.Fatalf("extracted cryptexes = %v, want the search stopped after the primary landed", called)
+	}
+	if len(out) != 1 {
+		t.Fatalf("output = %+v, want the one extracted cache", out)
+	}
+}
+
+// TestExtractFromDscCryptexFilesForArchesContinuesPastFailureWhileArchMissing
+// pins that a cryptex failing with nothing extracted does not end the search:
+// the requested cache family may still live in a later candidate.
+func TestExtractFromDscCryptexFilesForArchesContinuesPastFailureWhileArchMissing(t *testing.T) {
+	files := cryptexFiles("cryptex-system-arm64e", "cryptex-system-x86_64")
+	var called []string
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"},
+		func(file *File) ([]string, error) {
+			called = append(called, file.Base())
+			if file.Base() == "cryptex-system-x86_64" {
+				return nil, errors.New("hdiutil attach: Device not configured")
+			}
+			return []string{"out/System/Library/dyld/dyld_shared_cache_x86_64"}, nil
+		})
+	if err == nil {
+		t.Fatal("extractFromDscCryptexFilesForArches() error = nil, want the mount failure preserved")
+	}
+	wantCalled := []string{"cryptex-system-x86_64", "cryptex-system-arm64e"}
 	if !slices.Equal(called, wantCalled) {
 		t.Fatalf("extracted cryptexes = %v, want %v", called, wantCalled)
 	}
-	if len(out) != 2 {
-		t.Fatalf("output = %+v, want both partial and later successful results", out)
+	if len(out) != 1 {
+		t.Fatalf("output = %+v, want the cache from the later cryptex", out)
 	}
 }
 
@@ -224,20 +282,23 @@ func TestExtractFromDscCryptexFilesForArchesSearchesEveryCandidateWhenAbsent(t *
 		{name: "AssetData/payloadv2/image_patches/cryptex-app"},
 	}
 	var called []string
-	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"}, func(file *File) ([]string, error) {
-		called = append(called, file.Base())
-		return nil, nil
-	})
+	out, err := extractFromDscCryptexFilesForArches(files, []string{"x86_64"},
+		func(file *File) ([]string, error) {
+			called = append(called, file.Base())
+			return nil, nil
+		})
 	if err != nil {
 		t.Fatalf("extractFromDscCryptexFilesForArches() unexpected error: %v", err)
 	}
+	// Basename matches (x86_64 itself and rosetta, which carries x86 caches)
+	// are staged first; the sweep then covers every other system cryptex.
 	want := []string{
+		"cryptex-system-x86_64",
+		"cryptex-system-rosetta",
 		"cryptex-system-arm64",
 		"cryptex-system-arm64e",
 		"cryptex-system-arm64_32",
-		"cryptex-system-x86_64",
 		"cryptex-system-x86_64h",
-		"cryptex-system-rosetta",
 	}
 	if !slices.Equal(called, want) {
 		t.Fatalf("extracted cryptexes = %v, want exhaustive search of %v", called, want)
@@ -247,24 +308,38 @@ func TestExtractFromDscCryptexFilesForArchesSearchesEveryCandidateWhenAbsent(t *
 	}
 }
 
-func TestDscPathMatchesArch(t *testing.T) {
+func TestDSCFileArch(t *testing.T) {
 	tests := []struct {
-		name string
-		path string
-		arch string
-		want bool
+		name        string
+		path        string
+		wantArch    string
+		wantPrimary bool
 	}{
-		{name: "primary", path: "out/System/Library/dyld/dyld_shared_cache_arm64", arch: "arm64", want: true},
-		{name: "subcache", path: "out/System/Library/dyld/dyld_shared_cache_x86_64.06", arch: "x86_64", want: true},
-		{name: "symbols", path: "out/System/Library/dyld/dyld_shared_cache_arm64e.symbols", arch: "arm64e", want: true},
-		{name: "architecture boundary", path: "out/System/Library/dyld/dyld_shared_cache_arm64e", arch: "arm64"},
-		{name: "aot", path: "out/System/Library/dyld/aot_shared_cache.0", arch: "aot", want: true},
-		{name: "not aot", path: "out/System/Library/dyld/dyld_shared_cache_x86_64", arch: "aot"},
+		{name: "primary arm64", path: "out/System/Library/dyld/dyld_shared_cache_arm64",
+			wantArch: "arm64", wantPrimary: true},
+		{name: "primary arm64e", path: "out/System/Library/dyld/dyld_shared_cache_arm64e",
+			wantArch: "arm64e", wantPrimary: true},
+		{name: "primary arm64_32", path: "out/System/Library/dyld/dyld_shared_cache_arm64_32",
+			wantArch: "arm64_32", wantPrimary: true},
+		{name: "subcache", path: "out/System/Library/dyld/dyld_shared_cache_x86_64.06",
+			wantArch: "x86_64"},
+		{name: "symbols sidecar", path: "out/System/Library/dyld/dyld_shared_cache_arm64e.symbols",
+			wantArch: "arm64e"},
+		{name: "dylddata sidecar", path: "out/System/Library/dyld/dyld_shared_cache_arm64e.dylddata",
+			wantArch: "arm64e"},
+		{name: "aot primary", path: "out/System/Library/dyld/aot_shared_cache.0",
+			wantArch: "aot", wantPrimary: true},
+		{name: "aot sidecar", path: "out/System/Library/dyld/aot_shared_cache.0.map",
+			wantArch: "aot"},
+		{name: "not a cache", path: "out/System/Library/Caches/kernelcache"},
+		{name: "bare prefix", path: "out/System/Library/dyld/dyld_shared_cache_"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := dscPathMatchesArch(tt.path, tt.arch); got != tt.want {
-				t.Fatalf("dscPathMatchesArch(%q, %q) = %t, want %t", tt.path, tt.arch, got, tt.want)
+			arch, primary := DSCFileArch(tt.path)
+			if arch != tt.wantArch || primary != tt.wantPrimary {
+				t.Fatalf("DSCFileArch(%q) = (%q, %t), want (%q, %t)",
+					tt.path, arch, primary, tt.wantArch, tt.wantPrimary)
 			}
 		})
 	}

@@ -742,10 +742,13 @@ func (r *Reader) ExtractFromCryptexesWithSources(pattern, output string) (files 
 	return r.ExtractFromCryptexesWithSourcesForArches(pattern, output, nil)
 }
 
-// ExtractFromCryptexesWithSourcesForArches limits extraction to requested
-// architectures. It checks system cryptexes in order because their filenames
-// do not always describe every cache inside, and stops once every requested
-// cache family is found. An empty arches slice checks every system cryptex.
+// ExtractFromCryptexesWithSourcesForArches bounds the cryptex search by the
+// requested architectures. pattern alone decides which files are copied, so a
+// caller that wants only the requested architectures must narrow it to them.
+// arches decides where to look and when to stop (see
+// [orderDscCryptexesForArches]): the search ends as soon as every requested
+// cache family has its primary cache on disk. An empty arches slice checks
+// every system cryptex.
 func (r *Reader) ExtractFromCryptexesWithSourcesForArches(pattern, output string, arches []string) (files []ExtractedFile, err error) {
 	match, err := regexp.Compile(pattern)
 	if err != nil {
@@ -782,9 +785,9 @@ func extractFromDscCryptexFilesForArches(files []*File, arches []string, extract
 		missing[arch] = struct{}{}
 	}
 
-	for _, file := range files {
-		if !reOTADscCryptex.MatchString(file.Base()) {
-			continue
+	for _, file := range orderDscCryptexesForArches(files, arches) {
+		if len(arches) > 0 && len(missing) == 0 {
+			break
 		}
 		extracted, err := extract(file)
 		for _, path := range extracted {
@@ -792,32 +795,95 @@ func extractFromDscCryptexFilesForArches(files []*File, arches []string, extract
 		}
 		if err != nil {
 			extractErrs = append(extractErrs, wrapPhase(PhaseCryptexDiscovery, file.Base(), err))
-		} else {
-			for _, path := range extracted {
-				for arch := range missing {
-					if dscPathMatchesArch(path, arch) {
-						delete(missing, arch)
-					}
-				}
-			}
 		}
-		if len(arches) > 0 && len(missing) == 0 {
-			break
+		// Paths are only reported after a successful copy, so credit them even
+		// when the cryptex also errored -- re-staging further cryptexes would
+		// only overwrite files already on disk.
+		for _, path := range extracted {
+			if arch, primary := DSCFileArch(path); primary {
+				delete(missing, arch)
+			}
 		}
 	}
 
 	return out, errors.Join(extractErrs...)
 }
 
-// dscPathMatchesArch uses the materialized cache basename, which identifies
-// cache contents authoritatively. The enclosing cryptex basename does not.
-func dscPathMatchesArch(path, arch string) bool {
-	base := filepath.Base(path)
-	if arch == "aot" {
-		return strings.HasPrefix(base, "aot_shared_cache.")
+// orderDscCryptexesForArches returns the DSC-bearing system cryptexes with the
+// ones whose basename names a requested architecture first. The basename is an
+// ordering heuristic, not a filter: caches for one architecture can live in
+// another architecture's cryptex, so every candidate stays in the list and the
+// caller sweeps the rest while an architecture is still missing. Ordering
+// makes the common case cheap -- when the expected cryptex delivers, the
+// search stops before staging and mounting the others.
+func orderDscCryptexesForArches(files []*File, arches []string) []*File {
+	var likely, rest []*File
+	for _, file := range files {
+		if !reOTADscCryptex.MatchString(file.Base()) {
+			continue
+		}
+		if CryptexBasenameSuggestsArches(file.Base(), arches) {
+			likely = append(likely, file)
+		} else {
+			rest = append(rest, file)
+		}
 	}
-	prefix := "dyld_shared_cache_" + arch
-	return base == prefix || strings.HasPrefix(base, prefix+".")
+	return append(likely, rest...)
+}
+
+// IsDscCryptexBasename reports whether base names a DSC-bearing system
+// cryptex OTA member.
+func IsDscCryptexBasename(base string) bool {
+	return reOTADscCryptex.MatchString(base)
+}
+
+// CryptexBasenameSuggestsArches reports whether a cryptex member's basename
+// names at least one requested cache family. Rosetta cryptexes carry x86_64,
+// x86_64h and AOT caches; older OTAs can name the x86 cryptex directly.
+func CryptexBasenameSuggestsArches(source string, arches []string) bool {
+	if len(arches) == 0 {
+		return true
+	}
+	sourceArch := strings.TrimPrefix(source, "cryptex-system-")
+	for _, arch := range arches {
+		if sourceArch == arch {
+			return true
+		}
+		switch arch {
+		case "aot":
+			if sourceArch == "rosetta" || sourceArch == "x86_64" || sourceArch == "x86_64h" {
+				return true
+			}
+		case "x86_64", "x86_64h":
+			if sourceArch == "rosetta" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// DSCFileArch classifies a shared-cache file by its basename, which identifies
+// cache contents authoritatively (the enclosing cryptex basename does not).
+// It returns the architecture the file belongs to -- "aot" for AOT caches, ""
+// when the name is not a shared-cache family member -- and whether the file is
+// the primary cache: the one dyld actually loads, as opposed to a subcache
+// (.01), .symbols, .map or .dylddata sidecar that is useless without it.
+func DSCFileArch(path string) (arch string, primary bool) {
+	base := filepath.Base(path)
+	if rest, ok := strings.CutPrefix(base, "aot_shared_cache."); ok {
+		nonDigit := func(r rune) bool { return r < '0' || r > '9' }
+		return "aot", rest != "" && !strings.ContainsFunc(rest, nonDigit)
+	}
+	rest, ok := strings.CutPrefix(base, "dyld_shared_cache_")
+	if !ok {
+		return "", false
+	}
+	arch, _, hasSuffix := strings.Cut(rest, ".")
+	if arch == "" {
+		return "", false
+	}
+	return arch, !hasSuffix
 }
 
 func (r *Reader) extractFromCryptexFile(file *File, match *regexp.Regexp, tmpdir, output string) (out []string, err error) {

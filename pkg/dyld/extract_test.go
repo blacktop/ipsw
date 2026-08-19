@@ -478,3 +478,46 @@ func TestRemoteCryptexPatternDefaultCoversArm64_32(t *testing.T) {
 		t.Error("RemoteCryptexPattern([arm64_32]) does not match its own arch")
 	}
 }
+
+// TestRemoteCryptexCandidatesSweepCoversAllSystemCryptexes pins the remote
+// arch search order: cryptexes whose basename suggests a requested cache
+// family first (rosetta carries the x86 and AOT families), then -- only when
+// sweeping -- the remaining system cryptexes, because the requested caches
+// can live in a cryptex named after another architecture.
+func TestRemoteCryptexCandidatesSweepCoversAllSystemCryptexes(t *testing.T) {
+	files := []*zip.File{
+		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e"}},
+		{FileHeader: zip.FileHeader{Name: "cryptex-system-x86_64"}},
+		{FileHeader: zip.FileHeader{Name: "cryptex-system-rosetta"}},
+		{FileHeader: zip.FileHeader{Name: "cryptex-app"}},
+	}
+
+	candidateNames := func(arches []string, sweep bool) []string {
+		var names []string
+		for _, f := range remoteCryptexCandidates(files, arches, sweep) {
+			names = append(names, f.Name)
+		}
+		return names
+	}
+
+	got := candidateNames([]string{"x86_64"}, true)
+	want := []string{"cryptex-system-x86_64", "cryptex-system-rosetta", "cryptex-system-arm64e"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("remoteCryptexCandidates(sweep) = %v, want %v", got, want)
+	}
+
+	// Without the sweep only the suggested cryptexes are candidates: cryptex
+	// names describe their contents outside the macOS rosetta split.
+	got = candidateNames([]string{"x86_64"}, false)
+	if want := []string{"cryptex-system-x86_64", "cryptex-system-rosetta"}; !slices.Equal(got, want) {
+		t.Fatalf("remoteCryptexCandidates(no sweep) = %v, want %v", got, want)
+	}
+
+	// An AOT request ranks rosetta as likely even though no arch pattern
+	// names it.
+	got = candidateNames([]string{"aot"}, true)
+	want = []string{"cryptex-system-x86_64", "cryptex-system-rosetta", "cryptex-system-arm64e"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("remoteCryptexCandidates(aot sweep) = %v, want %v", got, want)
+	}
+}

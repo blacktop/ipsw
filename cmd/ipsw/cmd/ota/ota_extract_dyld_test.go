@@ -125,10 +125,40 @@ func TestExtractDSCRequestedArchCanComeFromDifferentlyNamedCryptex(t *testing.T)
 		t.Fatalf("report.Files = %+v, want one x86_64 entry", rep.Files)
 	}
 	if got := rep.Files[0]; got.Arch != "x86_64" || got.Source != "cryptex-system-arm64e" {
-		t.Fatalf("report file = {arch:%q source:%q}, want {x86_64 cryptex-system-arm64e}", got.Arch, got.Source)
+		t.Fatalf("report file = {arch:%q source:%q}, want {x86_64 cryptex-system-arm64e}",
+			got.Arch, got.Source)
 	}
 	if src.payloadCalls != 0 || len(src.copied) != 0 {
-		t.Fatalf("later sources ran after x86_64 was covered: asset=%v payload=%d", src.copied, src.payloadCalls)
+		t.Fatalf("later sources ran after x86_64 was covered: asset=%v payload=%d",
+			src.copied, src.payloadCalls)
+	}
+}
+
+// TestExtractDSCSidecarOnlyDoesNotSatisfyArch pins that a .symbols (or any
+// other sidecar) alone does not count as coverage for its architecture: the
+// primary cache is what dyld loads, so later sources must still run and its
+// absence must still be reported.
+func TestExtractDSCSidecarOnlyDoesNotSatisfyArch(t *testing.T) {
+	src := &fakeDSCSource{cryptexFiles: []ota.ExtractedFile{{
+		Path:   "out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e.symbols",
+		Source: "cryptex-system-arm64e",
+	}}}
+	opts := testOpts()
+	opts.Arches = []string{"arm64e"}
+
+	rep := extractDSC(src, opts)
+
+	if rep.Complete {
+		t.Fatal("report.Complete = true with only a sidecar materialized")
+	}
+	if src.payloadCalls != 1 {
+		t.Errorf("payload source ran %d time(s), want the fallback attempted", src.payloadCalls)
+	}
+	if missing := rep.missingArches(opts.Arches); len(missing) != 1 || missing[0] != "arm64e" {
+		t.Fatalf("missingArches() = %v, want [arm64e]", missing)
+	}
+	if rep.fatalErr() == nil {
+		t.Error("fatalErr() = nil; the requested primary cache is missing")
 	}
 }
 
@@ -188,7 +218,8 @@ func TestExtractDSCAbsentRequestedArchHasStructuralDiscoveryOutcome(t *testing.T
 		t.Fatalf("report.Errors = %+v, want one absence entry", rep.Errors)
 	}
 	if got := rep.Errors[0]; got.Phase != ota.PhaseDSCDiscovery || got.Source != "" {
-		t.Fatalf("absence error = {phase:%q source:%q}, want {dsc-discovery <empty>}", got.Phase, got.Source)
+		t.Fatalf("absence error = {phase:%q source:%q}, want {dsc-discovery <empty>}",
+			got.Phase, got.Source)
 	}
 	if rep.fatalErr() == nil {
 		t.Fatal("fatalErr() = nil for an explicitly requested architecture")
