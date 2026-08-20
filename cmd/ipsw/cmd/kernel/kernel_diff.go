@@ -50,9 +50,5 @@ var kernelDiffCmd = &cobra.Command{
 
 		// FIXME: implement
 		panic("ipsw kernel diff - not implemented yet")
-
-		return nil
-
-		// return kernelcache.ParseMachO(args[0])
 	},
 }
