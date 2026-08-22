@@ -785,6 +785,65 @@ func TestExtractDSCAssetSourceMaterializesFiles(t *testing.T) {
 	}
 }
 
+func payloadV2ReconstructionInputs() []string {
+	return []string{
+		"AssetData/payloadv2/ecc_data/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
+		"AssetData/payloadv2/patches/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
+	}
+}
+
+func TestExtractDSCAssetSourceSkipsPayloadV2ReconstructionInputs(t *testing.T) {
+	src := &fakeDSCSource{
+		cryptexErr: ota.ErrNoDscInCryptexes,
+		assets:     payloadV2ReconstructionInputs(),
+		payload: []string{
+			"out/24G720__MacOS/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
+		},
+	}
+	opts := testOpts()
+	opts.Arches = []string{"arm64e"}
+
+	rep := extractDSC(src, opts)
+
+	if !rep.Complete {
+		t.Fatalf("report.Complete = false, errors = %+v", rep.Errors)
+	}
+	if len(src.copied) != 0 {
+		t.Fatalf("asset source copied reconstruction inputs: %v", src.copied)
+	}
+	if src.payloadCalls != 1 {
+		t.Fatalf("payload source ran %d time(s), want 1", src.payloadCalls)
+	}
+	if len(rep.Files) != 1 || rep.Files[0].Source != sourcePayloadV2 {
+		t.Fatalf("report.Files = %+v, want one payloadv2 cache", rep.Files)
+	}
+}
+
+func TestExtractDSCReconstructionInputsAloneAreIncomplete(t *testing.T) {
+	src := &fakeDSCSource{
+		cryptexErr: ota.ErrNoDscInCryptexes,
+		assets:     payloadV2ReconstructionInputs(),
+	}
+
+	rep := extractDSC(src, testOpts())
+
+	if rep.Complete {
+		t.Fatal("report.Complete = true with only payloadv2 reconstruction inputs")
+	}
+	if len(rep.Files) != 0 {
+		t.Fatalf("report.Files = %+v, want none", rep.Files)
+	}
+	if len(src.copied) != 0 {
+		t.Fatalf("asset source copied reconstruction inputs: %v", src.copied)
+	}
+	if src.payloadCalls != 1 {
+		t.Fatalf("payload source ran %d time(s), want 1", src.payloadCalls)
+	}
+	if len(rep.Errors) != 1 || rep.Errors[0].Phase != ota.PhaseDSCDiscovery {
+		t.Fatalf("report.Errors = %+v, want one dsc-discovery entry", rep.Errors)
+	}
+}
+
 const wantFullSuccessReport = `{"schema_version":1,"complete":true,"files":[{"path":"24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e","arch":"arm64e","source":"cryptex-system-arm64e"},{"path":"24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e.01","arch":"arm64e","source":"cryptex-system-arm64e"},{"path":"24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e.symbols","arch":"arm64e","source":"cryptex-system-arm64e"},{"path":"24G720__MacOS/System/Library/dyld/aot_shared_cache.0","arch":"aot","source":"cryptex-system-rosetta"},{"path":"24G720__MacOS/System/Library/dyld/dyld_shared_cache_x86_64","arch":"x86_64","source":"cryptex-system-rosetta"}],"errors":[]}`
 
 func TestWriteDSCReportFullSuccess(t *testing.T) {

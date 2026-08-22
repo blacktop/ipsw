@@ -250,10 +250,19 @@ func dscFromCryptexes(src dscSource, opts dscOptions, rep *dscReport) {
 	}
 }
 
+// isPayloadV2ReconstructionInput reports archive members whose paths mirror
+// final filesystem paths but whose bytes are ECC or delta reconstruction data,
+// not materialized files. They must not satisfy the direct-asset source.
+func isPayloadV2ReconstructionInput(name string) bool {
+	clean := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(name)), "/")
+	return strings.HasPrefix(clean, "AssetData/payloadv2/ecc_data/") ||
+		strings.HasPrefix(clean, "AssetData/payloadv2/patches/")
+}
+
 func dscFromAssets(src dscSource, opts dscOptions, rep *dscReport) {
 	log.Info("Searching OTA asset files for dyld_shared_cache files")
 	for _, name := range src.AssetNames() {
-		if !matchesPostBOMPattern(opts.pattern, name) {
+		if isPayloadV2ReconstructionInput(name) || !matchesPostBOMPattern(opts.pattern, name) {
 			continue
 		}
 		fname, err := outputPathForExtraction(opts.Output, name, false)
