@@ -56,7 +56,7 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
   -m, --markdown                  Output diff as Markdown
       --no-cache                  Disable persistent cache; use a temp SQLite DB cleaned on exit
   -o, --output string             Folder to save diff output
-      --sandbox                   Diff compiled sandbox profiles
+      --sandbox                   Diff compiled sandbox profiles (alone, runs kernelcache-only)
   -s, --signatures string         Path to symbolicator signatures folder
       --starts                    Diff MachO function starts
       --strs                      Diff MachO cstrings

@@ -35,8 +35,6 @@ ipsw dyld disass <DSC> [flags]
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openai
 # Decompile a function using OpenRouter to access various models
 ❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm openrouter --dec-model "OpenAI: GPT-4o-mini"
-# Decompile a function using OrcaRouter (namespaced model ids)
-❯ ipsw dsc disass DSC --vaddr 0x1b19d6940 --dec --dec-llm orcarouter --dec-model "openai/gpt-5.5"
 ```
 
 ### Options
