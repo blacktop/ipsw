@@ -24,6 +24,7 @@ package cmd
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
@@ -107,7 +108,7 @@ var deviceTreeCmd = &cobra.Command{
 						return nil
 					}
 				}
-				dtrees, err = extractDeviceTreeFromRemoteOTA(args[0])
+				dtrees, err = extractDeviceTreeFromRemoteOTA(cmd.Context(), args[0])
 				if err != nil {
 					return fmt.Errorf("failed to extract DeviceTree from remote OTA: %v", err)
 				}
@@ -259,7 +260,7 @@ func extractDeviceTreeFromOTA(fPath string) (map[string]*devicetree.DeviceTree, 
 	return parseDeviceTreesFromOTA(o)
 }
 
-func extractDeviceTreeFromRemoteOTA(remoteURL string) (map[string]*devicetree.DeviceTree, error) {
+func extractDeviceTreeFromRemoteOTA(ctx context.Context, remoteURL string) (map[string]*devicetree.DeviceTree, error) {
 	tmpFile, err := os.CreateTemp("", "ipsw-dtree-ota-*.aea")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %v", err)
@@ -268,17 +269,19 @@ func extractDeviceTreeFromRemoteOTA(remoteURL string) (map[string]*devicetree.De
 	tmpFile.Close()
 	os.Remove(tmpPath) // remove placeholder so downloader can rename into it
 	defer os.Remove(tmpPath)
-	defer os.Remove(tmpPath + ".download") // cleanup partial download
+	defer os.Remove(tmpPath + download.PartSuffix)  // cleanup partial download
+	defer os.Remove(tmpPath + download.StateSuffix) // cleanup resume sidecar
 
 	log.Info("Downloading OTA...")
 	downloader := download.NewDownload(
 		viper.GetString("dtree.proxy"),
 		viper.GetBool("dtree.insecure"),
-		false, false, false, true /* ignoreSha1 */, Verbose,
+		false, false, true, /* ignoreSha1 */
 	)
+	defer downloader.Close()
 	downloader.URL = remoteURL
 	downloader.DestName = tmpPath
-	if err := downloader.Do(); err != nil {
+	if _, err := downloader.DoContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to download OTA: %v", err)
 	}
 

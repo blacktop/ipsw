@@ -46,6 +46,7 @@ ipsw download appledb [flags]
       --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
   -f, --flat                  Do NOT preserve directory structure when downloading with --pattern
   -h, --help                  help for appledb
+      --ignore-sha1           skip SHA-1 verification
       --insecure              do not verify ssl certs
   -j, --json                  Dump DB query results as JSON
       --kernel                Extract kernelcache from remote IPSW
@@ -59,9 +60,8 @@ ipsw download appledb [flags]
       --release               Download release IPSWs
   -_, --remove-commas         replace commas in IPSW filename with underscores
       --restart-all           always restart resumable IPSWs
-      --resume-all            always resume resumable IPSWs
       --show-latest           Show latest version/build
-      --skip-all              always skip resumable IPSWs
+      --skip-all              continue past files locked by another download process
       --type string           FW type to download (ipsw, ota, rsr) (default "ipsw")
   -u, --urls                  Dump URLs only
       --usb                   Download IPSWs for USB attached iDevices

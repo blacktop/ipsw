@@ -62,8 +62,7 @@ ipsw download pcc [INDEX] [flags]
   -o, --output string     Output directory to save files to
       --proxy string      HTTP/HTTPS proxy
       --restart-all       always restart resumable IPSWs
-      --resume-all        always resume resumable IPSWs
-      --skip-all          always skip resumable IPSWs
+      --skip-all          continue past files locked by another download process
       --train string      Filter by cloudOS build train substring (e.g. LuckE)
   -u, --urls              Show compact release summaries and asset URLs without saving assets
       --version string    Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached

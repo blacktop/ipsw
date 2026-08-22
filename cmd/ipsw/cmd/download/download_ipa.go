@@ -106,6 +106,7 @@ var downloadIpaCmd = &cobra.Command{
 		}
 
 		as := download.NewAppStore(&download.AppStoreConfig{
+			Context:       cmd.Context(),
 			Proxy:         proxy,
 			Insecure:      insecure,
 			PreferSMS:     sms,
@@ -114,7 +115,6 @@ var downloadIpaCmd = &cobra.Command{
 			StoreFront:    viper.GetString("download.ipa.store-front"),
 			// KeybagPlist:   viper.GetString("download.ipa.keybag-plist"),
 			KeybagPlist: "",
-			Verbose:     viper.GetBool("verbose"),
 		})
 
 		if err := as.Init(); err != nil {

@@ -436,8 +436,8 @@ func extractFromMountedDscDMGs(i *info.Info, dmgs []mountedDscDMG, destPath stri
 func ExtractFromDMGs(i *info.Info, dmgs []DscExtractionDMG, destPath, pemDB string, requestedArches []string, driverkit, all bool) ([]string, error) {
 	mounted := make([]mountedDscDMG, 0, len(dmgs))
 	defer func() {
-		for idx := len(mounted) - 1; idx >= 0; idx-- {
-			mounted[idx].close()
+		for _, m := range slices.Backward(mounted) {
+			m.close()
 		}
 	}()
 
@@ -476,8 +476,8 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 	dmgs := make([]DscExtractionDMG, 0, len(steps))
 	var cleanups []func()
 	defer func() {
-		for idx := len(cleanups) - 1; idx >= 0; idx-- {
-			cleanups[idx]()
+		for _, cleanup := range slices.Backward(cleanups) {
+			cleanup()
 		}
 	}()
 

@@ -101,7 +101,7 @@ var (
 type Client struct {
 	mu        *sync.RWMutex
 	c         *usb.Client
-	packetNum uint64
+	packetNum atomic.Uint64
 }
 
 type Header struct {
@@ -220,7 +220,7 @@ func (c *Client) sendHeader(operation int, args []byte, payload []byte) error {
 	hdr := &Header{
 		EntireLength: headerSize + uint64(len(args)) + uint64(len(payload)),
 		ThisLength:   headerSize + uint64(len(args)),
-		PacketNum:    atomic.AddUint64(&c.packetNum, 1),
+		PacketNum:    c.packetNum.Add(1),
 		Operation:    uint64(operation),
 	}
 	copy(hdr.Magic[:8], []byte(afcMagic))

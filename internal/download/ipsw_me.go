@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -157,27 +158,11 @@ func GetVersion(buildID string) (string, error) {
 		return "", fmt.Errorf("failed to get all devices from ipsw.me API: %v", err)
 	}
 
-	for i := len(devices) - 1; i >= 0; i-- {
-		var dev Device
-		res, err := http.Get(ipswMeAPI + "device/" + devices[i].Identifier)
+	for _, device := range slices.Backward(devices) {
+		dev, err := getDeviceFirmwares(device.Identifier)
 		if err != nil {
 			return "", err
 		}
-		if res.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("api returned status: %s", res.Status)
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return "", err
-		}
-		res.Body.Close()
-
-		err = json.Unmarshal(body, &dev)
-		if err != nil {
-			return "", err
-		}
-
 		for _, ipsw := range dev.Firmwares {
 			if ipsw.BuildID == buildID {
 				return ipsw.Version, nil
@@ -186,6 +171,26 @@ func GetVersion(buildID string) (string, error) {
 	}
 
 	return "", fmt.Errorf("build did not match a version in the ipsw.me API")
+}
+
+func getDeviceFirmwares(identifier string) (Device, error) {
+	var dev Device
+	res, err := http.Get(ipswMeAPI + "device/" + identifier)
+	if err != nil {
+		return dev, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return dev, fmt.Errorf("api returned status: %s", res.Status)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return dev, err
+	}
+	if err := json.Unmarshal(body, &dev); err != nil {
+		return dev, err
+	}
+	return dev, nil
 }
 
 // GetBuildID returns the BuildID for a given version and identifier

@@ -54,10 +54,9 @@ ipsw download ipsw [flags]
       --proxy string             HTTP/HTTPS proxy
   -_, --remove-commas            replace commas in IPSW filename with underscores
       --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
       --show-latest-build        Show latest iOS build
       --show-latest-version      Show latest iOS version
-      --skip-all                 always skip resumable IPSWs
+      --skip-all                 continue past files locked by another download process
   -u, --urls                     Dump URLs only
       --usb                      Download IPSWs for USB attached iDevices
   -v, --version string           iOS Version (i.e. 12.3.1)

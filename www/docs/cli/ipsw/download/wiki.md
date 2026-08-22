@@ -41,6 +41,7 @@ ipsw download wiki [flags]
   -d, --device string    iOS Device (i.e. iPhone11,2)
   -f, --flat             Do NOT preserve directory structure when downloading with --pattern
   -h, --help             help for wiki
+      --ignore-sha1      skip SHA-1 verification
       --insecure         do not verify ssl certs
       --ipsw             Download IPSWs
       --json             Parse URLs and store metadata in local JSON database
@@ -53,8 +54,7 @@ ipsw download wiki [flags]
       --pv string        OTA prerequisite version
   -_, --remove-commas    replace commas in IPSW filename with underscores
       --restart-all      always restart resumable IPSWs
-      --resume-all       always resume resumable IPSWs
-      --skip-all         always skip resumable IPSWs
+      --skip-all         continue past files locked by another download process
   -v, --version string   iOS Version (i.e. 12.3.1)
 ```
 

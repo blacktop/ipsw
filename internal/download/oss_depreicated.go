@@ -34,7 +34,8 @@ type Oss struct {
 func (p *project) Download() error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, false, false, false, false, false)
+	downloader := NewDownload("", false, false, false, false)
+	defer downloader.Close()
 
 	destName := getDestName(p.URL, false)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -47,7 +48,7 @@ func (p *project) Download() error {
 		downloader.URL = p.URL
 		downloader.DestName = destName
 
-		err = downloader.Do()
+		_, err = downloader.Do()
 		if err != nil {
 			return fmt.Errorf("failed to download file: %v", err)
 		}

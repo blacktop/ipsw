@@ -43,8 +43,7 @@ func init() {
 	downloadMacosCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadMacosCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadMacosCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	downloadMacosCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadMacosCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadMacosCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadMacosCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Filter flags
 	downloadMacosCmd.Flags().StringP("version", "v", "", "iOS Version (i.e. 12.3.1)")
@@ -60,7 +59,6 @@ func init() {
 	viper.BindPFlag("download.macos.insecure", downloadMacosCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.macos.confirm", downloadMacosCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.macos.skip-all", downloadMacosCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.macos.resume-all", downloadMacosCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.macos.restart-all", downloadMacosCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.macos.version", downloadMacosCmd.Flags().Lookup("version"))
 	viper.BindPFlag("download.macos.build", downloadMacosCmd.Flags().Lookup("build"))
@@ -98,7 +96,6 @@ var downloadMacosCmd = &cobra.Command{
 		insecure := viper.GetBool("download.macos.insecure")
 		confirm := viper.GetBool("download.macos.confirm")
 		skipAll := viper.GetBool("download.macos.skip-all")
-		resumeAll := viper.GetBool("download.macos.resume-all")
 		restartAll := viper.GetBool("download.macos.restart-all")
 		// filters
 		version := viper.GetString("download.macos.version")
@@ -224,7 +221,7 @@ var downloadMacosCmd = &cobra.Command{
 
 		if cont {
 			for _, prod := range prods {
-				if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll, assistantOnly); err != nil {
+				if err := prod.DownloadInstallerContext(cmd.Context(), workDir, proxy, insecure, skipAll, restartAll, assistantOnly); err != nil {
 					return err
 				}
 			}

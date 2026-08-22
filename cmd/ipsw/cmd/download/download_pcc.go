@@ -48,8 +48,7 @@ func init() {
 	// Download behavior flags
 	downloadPccCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadPccCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	downloadPccCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadPccCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadPccCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadPccCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
 	downloadPccCmd.Flags().BoolP("info", "i", false, "Show PCC Release info")
@@ -68,7 +67,6 @@ func init() {
 	viper.BindPFlag("download.pcc.proxy", downloadPccCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.pcc.insecure", downloadPccCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.pcc.skip-all", downloadPccCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.pcc.resume-all", downloadPccCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.pcc.restart-all", downloadPccCmd.Flags().Lookup("restart-all"))
 	// Bind command-specific flags
 	viper.BindPFlag("download.pcc.info", downloadPccCmd.Flags().Lookup("info"))
@@ -126,9 +124,8 @@ var downloadPccCmd = &cobra.Command{
 		// settings
 		proxy := viper.GetString("download.pcc.proxy")
 		insecure := viper.GetBool("download.pcc.insecure")
-		// skipAll := viper.GetBool("download.pcc.skip-all")
-		// resumeAll := viper.GetBool("download.pcc.resume-all")
-		// restartAll := viper.GetBool("download.pcc.restart-all")
+		skipAll := viper.GetBool("download.pcc.skip-all")
+		restartAll := viper.GetBool("download.pcc.restart-all")
 		versionFilter := viper.GetString("download.pcc.version")
 		osBuildFilter := viper.GetString("download.pcc.os-build")
 		buildFilter := viper.GetString("download.pcc.build")
@@ -317,7 +314,7 @@ var downloadPccCmd = &cobra.Command{
 				out = fmt.Sprintf("PCC_%d_%s", r.Index, build)
 			}
 			log.Infof("Downloading PCC Release %d to %s", r.Index, out)
-			return r.Download(out, proxy, insecure)
+			return r.DownloadContext(cmd.Context(), out, proxy, insecure, skipAll, restartAll)
 		}
 
 		return nil

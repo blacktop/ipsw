@@ -101,7 +101,7 @@ To download an IPSW when the SHA-1 reported by ipsw.me is known to be incorrect
 :::warning
 Only skip SHA-1 verification after independently validating the download. Downloads made with `--ignore-sha1` are not added to `checksums.txt.sha1`.
 
-If a previous attempt retained a complete `.download` file, add `--resume-all` to finalize it without downloading it again.
+Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` resume sidecar) and resume automatically on the next run — no flag needed. `--skip-all` skips only files actively locked by another downloader; an inactive `.part` resumes normally. Partial `.download` files from older ipsw versions cannot be resumed by the new engine and are left in place with a warning; if such a file is actually complete, rename it into place (`mv file.ipsw.download file.ipsw`) — otherwise delete it.
 :::
 
 ### download `ipsw` config
@@ -120,11 +120,10 @@ download:
     - iPhone16,1    # iPhone 15 Pro
     - iPhone16,2    # iPhone 15 Pro Max
     - iPad14,1      # iPad Pro 11-inch (M4)
-  resume-all: true
   output: /SHARE/IPSWs
 ```
 
-> This will download the `latest` IPSWs for _only_ the iPhone 15 Pro models and iPad Pro M4 without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
+> This will download the `latest` IPSWs for _only_ the iPhone 15 Pro models and iPad Pro M4 without requesting user confirmation to download and will download everything to the `/SHARE/IPSWs` folder. Interrupted downloads always resume automatically.
 
 You can also use environment variables to set `ipsw` config
 

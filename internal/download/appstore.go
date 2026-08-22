@@ -5,6 +5,9 @@ package download
 import (
 	"archive/zip"
 	"bytes"
+	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -67,17 +70,16 @@ var (
 )
 
 type AppStoreConfig struct {
+	Context context.Context
 	// download config
 	Proxy    string
 	Insecure bool
 	// behavior config
 	SkipAll      bool
-	ResumeAll    bool
 	RestartAll   bool
 	RemoveCommas bool
 	PreferSMS    bool
 	PageSize     int
-	Verbose      bool
 	// extra config
 	StoreFront    string
 	VaultPassword string
@@ -360,7 +362,7 @@ func extractDictBody(body []byte) []byte {
 }
 
 func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
-	req, err := http.NewRequest("GET", appStoreBagURL, nil)
+	req, err := http.NewRequestWithContext(as.config.Context, "GET", appStoreBagURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create bag request: %w", err)
 	}
@@ -462,6 +464,9 @@ func (as *AppStore) appStoreSessionCookies() []*http.Cookie {
 
 // NewAppStore returns a AppStore instance
 func NewAppStore(config *AppStoreConfig) *AppStore {
+	if config.Context == nil {
+		config.Context = context.Background()
+	}
 	jar, _ := cookiejar.New(nil)
 
 	as := AppStore{
@@ -632,7 +637,7 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 		return err
 	}
 
-	req, err := http.NewRequest("POST", endpoint, &buf)
+	req, err := http.NewRequestWithContext(as.config.Context, "POST", endpoint, &buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -845,7 +850,7 @@ func (as *AppStore) loadSession() error {
 }
 
 func (as *AppStore) Search(searchTerm string, limit int) (Apps, error) {
-	req, err := http.NewRequest("GET", appStoreSearchURL, nil)
+	req, err := http.NewRequestWithContext(as.config.Context, "GET", appStoreSearchURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -892,7 +897,7 @@ func (as *AppStore) Search(searchTerm string, limit int) (Apps, error) {
 }
 
 func (as *AppStore) Lookup(bundleID string) (*App, error) {
-	req, err := http.NewRequest("GET", appStoreLookupURL, nil)
+	req, err := http.NewRequestWithContext(as.config.Context, "GET", appStoreLookupURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -989,7 +994,7 @@ func (as *AppStore) purchaseWithPricing(app *App, guid, pricing string, allowRea
 		return false, fmt.Errorf("failed to encode purchase request: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", appStoreURL(appStoreHostForPod(as.pod), appStorePurchasePath), buf)
+	req, err := http.NewRequestWithContext(as.config.Context, "POST", appStoreURL(appStoreHostForPod(as.pod), appStorePurchasePath), buf)
 	if err != nil {
 		return false, fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -1118,7 +1123,7 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 		return fmt.Errorf("failed to encode download request: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", appStoreURL(appStoreHostForPod(as.pod), appStoreDownloadPath), buf)
+	req, err := http.NewRequestWithContext(as.config.Context, "POST", appStoreURL(appStoreHostForPod(as.pod), appStoreDownloadPath), buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -1201,7 +1206,9 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 				"retry_backoff": backoff.String(),
 				"failure_type":  dl.FailureType,
 			}).Warn("Retrying transient App Store unknown error")
-			time.Sleep(backoff)
+			if err := waitForContext(as.config.Context, backoff); err != nil {
+				return err
+			}
 			return as.downloadWithAuthRetry(bundleID, output, false, false, unknownRetryBudget-1, recoveryRetryBudget)
 		}
 		if recoveryRetryBudget > 0 {
@@ -1235,16 +1242,61 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 		return fmt.Errorf("no items found in download response")
 	}
 
-	src, err := as.download(dl.Apps[0].URL)
-	if err != nil {
-		return fmt.Errorf("failed to download app: %v", err)
-	}
-	defer os.Remove(src)
-
 	dst := filepath.Join(output, fmt.Sprintf("%s_%d.v%s.ipa", app.BundleID, app.ID, app.Version))
+	dstExisted := fileExists(dst)
+	// The hidden lock file intentionally persists so every process locks the
+	// same inode; unlinking it on release could split concurrent waiters.
+	unlock, err := acquireAppStorePatchLock(
+		as.config.Context,
+		filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".lock"),
+		!as.config.SkipAll,
+	)
+	if errors.Is(err, errAppStorePatchLocked) {
+		log.Warnf("Skipping IPA creation while %s is locked by another process", dst)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to lock IPA creation for %s: %w", dst, err)
+	}
+	defer unlock()
+	if !as.config.RestartAll && !dstExisted && fileExists(dst) {
+		log.Warnf("IPA already created by another process: %s", dst)
+		return nil
+	}
 
-	if err := as.applyPatches(src, dst, &dl.Apps[0]); err != nil {
-		return fmt.Errorf("failed to apply app patches: %v", err)
+	// stage next to the output under a stable name so an interrupted
+	// download resumes instead of orphaning a fresh .part per attempt
+	staging := dst + ".unpatched"
+	var staged *os.File
+	if !as.config.RestartAll {
+		staged = openMatchingStaging(staging, dl.Apps[0].HashMD5)
+	}
+	if staged != nil {
+		// a previous failed patch retained the completed download and it
+		// still matches the App Store response: patch it directly instead
+		// of re-downloading the multi-GB payload
+		log.Warnf("reusing staged download %s retained by a previous failed patch", staging)
+	} else {
+		status, err := as.download(dl.Apps[0].URL, staging)
+		if err != nil {
+			return fmt.Errorf("failed to download app: %v", err)
+		}
+		if status != Downloaded {
+			log.Warnf("Skipping IPA creation while %s is being downloaded by another process", staging)
+			return nil
+		}
+		staged, err = os.Open(staging)
+		if err != nil {
+			if os.IsNotExist(err) && fileExists(dst) {
+				log.Warnf("IPA already created by another process: %s", dst)
+				return nil
+			}
+			return fmt.Errorf("failed to open staged download %s: %w", staging, err)
+		}
+	}
+
+	if err := as.patchIPA(staged, dst, &dl.Apps[0]); err != nil {
+		return err
 	}
 
 	log.Infof("Created %s", dst)
@@ -1252,56 +1304,125 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 	return nil
 }
 
-func (as *AppStore) download(url string) (string, error) {
+// openMatchingStaging returns the exact staged file whose contents match the
+// App Store response. Keeping the descriptor open pins those validated bytes
+// through patching even if another process removes the shared pathname.
+func openMatchingStaging(staging, wantMD5 string) *os.File {
+	if wantMD5 == "" {
+		return nil
+	}
+	f, err := os.Open(staging)
+	if err != nil {
+		return nil
+	}
+	h := md5.New() // #nosec G401 -- integrity check against Apple's published md5
+	if _, err := io.Copy(h, f); err != nil {
+		f.Close()
+		return nil
+	}
+	if !strings.EqualFold(hex.EncodeToString(h.Sum(nil)), wantMD5) {
+		f.Close()
+		log.Warnf("staged download %s no longer matches the App Store response: re-downloading", staging)
+		return nil
+	}
+	return f
+}
 
-	// proxy, insecure are null because we override the client below
+// patchIPA transactionally produces dst from the staged download: it patches
+// from an already-open source into a unique temporary sibling directory. The
+// open descriptor pins the validated source for concurrent readers, while
+// ordinary 0644 file creation preserves the caller's umask.
+func (as *AppStore) patchIPA(staging *os.File, dst string, info *downloadAppResult) error {
+	stagingPath := staging.Name()
+	stagingInfo, err := staging.Stat()
+	if err != nil {
+		staging.Close()
+		return fmt.Errorf("failed to stat staged download %s: %w", stagingPath, err)
+	}
+	stagingClosed := false
+	defer func() {
+		if !stagingClosed {
+			staging.Close()
+		}
+	}()
+
+	patchDir, err := os.MkdirTemp(filepath.Dir(dst), filepath.Base(dst)+".patching-*")
+	if err != nil {
+		return fmt.Errorf("failed to create patch staging directory: %w", err)
+	}
+	defer os.RemoveAll(patchDir)
+	patching := filepath.Join(patchDir, filepath.Base(dst))
+	if err := as.applyPatches(staging, stagingInfo.Size(), patching, info); err != nil {
+		return fmt.Errorf("failed to apply app patches (staged download retained at %s): %w", stagingPath, err)
+	}
+	if err := os.Rename(patching, dst); err != nil {
+		return fmt.Errorf("failed to finalize patched IPA (staged download retained at %s): %w", stagingPath, err)
+	}
+	if err := staging.Close(); err != nil {
+		log.WithError(err).Warnf("failed to close staged download %s", stagingPath)
+		return nil
+	}
+	stagingClosed = true
+	currentInfo, err := os.Stat(stagingPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		log.WithError(err).Warnf("failed to inspect staged download %s before cleanup", stagingPath)
+		return nil
+	}
+	if !os.SameFile(stagingInfo, currentInfo) {
+		log.Warnf("not removing staged download %s because another process replaced it", stagingPath)
+		return nil
+	}
+	if err := os.Remove(stagingPath); err != nil && !os.IsNotExist(err) {
+		log.WithError(err).Warnf("failed to remove staged download %s", stagingPath)
+	}
+	return nil
+}
+
+func (as *AppStore) download(url, dest string) (Status, error) {
+
+	// the authenticated session client's transport and cookie jar are reused
 	downloader := NewDownload(
 		as.config.Proxy,
 		as.config.Insecure,
 		as.config.SkipAll,
-		as.config.ResumeAll,
 		as.config.RestartAll,
 		false,
-		as.config.Verbose,
 	)
 	// use authenticated client
 	downloader.client = as.Client
-
-	dest, err := os.CreateTemp("", "appstore.ipa")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %v", err)
-	}
+	defer downloader.Close()
 
 	log.WithFields(log.Fields{
-		"file": dest.Name(),
+		"file": dest,
 	}).Info("Downloading")
 
-	// download file
 	downloader.URL = url
-	downloader.DestName = dest.Name()
+	downloader.DestName = dest
 
-	err = downloader.Do()
+	status, err := downloader.DoContext(as.config.Context)
 	if err != nil {
-		return "", fmt.Errorf("failed to download file: %v", err)
+		return status, fmt.Errorf("failed to download file: %w", err)
 	}
 
-	return dest.Name(), nil
+	return status, nil
 }
 
-func (as *AppStore) applyPatches(src, dst string, info *downloadAppResult) (err error) {
-	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+func (as *AppStore) applyPatches(src *os.File, srcSize int64, dst string, info *downloadAppResult) (err error) {
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open destination patch file: %v", err)
 	}
+	defer dstFile.Close() // no-op on the success path's explicit Close
 
-	srcZip, err := zip.OpenReader(src)
+	srcZip, err := zip.NewReader(src, srcSize)
 	if err != nil {
 		return fmt.Errorf("failed to open source patch file: %v", err)
 	}
-	defer srcZip.Close()
 
 	dstZip := zip.NewWriter(dstFile)
-	defer dstZip.Close()
 
 	manifestData := new(bytes.Buffer)
 	infoData := new(bytes.Buffer)
@@ -1323,6 +1444,13 @@ func (as *AppStore) applyPatches(src, dst string, info *downloadAppResult) (err 
 		if err := as.applyLegacySinfPatches(dstZip, infoData.Bytes(), appBundle, info); err != nil {
 			return fmt.Errorf("failed to apply legacy sinf patches: %v", err)
 		}
+	}
+
+	if err := dstZip.Close(); err != nil {
+		return fmt.Errorf("failed to finalize patched zip: %w", err)
+	}
+	if err := dstFile.Close(); err != nil {
+		return fmt.Errorf("failed to close patched file: %w", err)
 	}
 
 	return nil
@@ -1349,7 +1477,7 @@ func (as *AppStore) writeMetadata(metadata map[string]any, zip *zip.Writer) erro
 	return nil
 }
 
-func (as *AppStore) replicateZip(src *zip.ReadCloser, dst *zip.Writer, info *bytes.Buffer, manifest *bytes.Buffer) (appBundle string, err error) {
+func (as *AppStore) replicateZip(src *zip.Reader, dst *zip.Writer, info *bytes.Buffer, manifest *bytes.Buffer) (appBundle string, err error) {
 	for _, file := range src.File {
 		srcFile, err := file.OpenRaw()
 		if err != nil {

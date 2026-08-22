@@ -54,8 +54,7 @@ func RetryWithResult[T any](attempts int, sleep time.Duration, f func() (T, erro
 			return result, nil
 		}
 		// If StopRetryingError is returned, unwrap and return immediately
-		var stopErr *StopRetryingError
-		if errors.As(err, &stopErr) {
+		if stopErr, ok := errors.AsType[*StopRetryingError](err); ok {
 			return result, stopErr.Err
 		}
 	}
@@ -158,31 +157,6 @@ func ReverseBytes(a []byte) []byte {
 		a[i], a[opp] = a[opp], a[i]
 	}
 	return a
-}
-
-// Verify verifies the downloaded against it's hash
-func Verify(sha1sum, name string) (bool, error) {
-	f, err := os.Open(name)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	h := sha1.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return false, err
-	}
-
-	match := strings.EqualFold(sha1sum, fmt.Sprintf("%x", h.Sum(nil)))
-
-	if !match {
-		Indent(log.WithFields(log.Fields{
-			"expected": sha1sum,
-			"actual":   fmt.Sprintf("%x", h.Sum(nil)),
-		}).Error, 3)("BAD CHECKSUM")
-	}
-
-	return match, nil
 }
 
 // SanitizeArchivePath joins an untrusted archive entry name to a destination

@@ -43,8 +43,7 @@ func init() {
 	// Download behavior flags
 	downloadKdkCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadKdkCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	downloadKdkCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadKdkCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadKdkCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadKdkCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
 	downloadKdkCmd.Flags().Bool("host", false, "Download KDK for current host OS")
@@ -59,7 +58,6 @@ func init() {
 	viper.BindPFlag("download.kdk.proxy", downloadKdkCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.kdk.insecure", downloadKdkCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.kdk.skip-all", downloadKdkCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.kdk.resume-all", downloadKdkCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.kdk.restart-all", downloadKdkCmd.Flags().Lookup("restart-all"))
 	// Bind command-specific flags
 	viper.BindPFlag("download.kdk.host", downloadKdkCmd.Flags().Lookup("host"))
@@ -94,7 +92,6 @@ var downloadKdkCmd = &cobra.Command{
 		proxy := viper.GetString("download.kdk.proxy")
 		insecure := viper.GetBool("download.kdk.insecure")
 		skipAll := viper.GetBool("download.kdk.skip-all")
-		resumeAll := viper.GetBool("download.kdk.resume-all")
 		restartAll := viper.GetBool("download.kdk.restart-all")
 		// flags
 		forHost := viper.GetBool("download.kdk.host")
@@ -174,6 +171,8 @@ var downloadKdkCmd = &cobra.Command{
 			log.Warn("Installing multiple KDKs")
 		}
 
+		downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, false)
+		defer downloader.Close()
 		for _, kdk := range dlKDKs {
 			destName := path.Base(kdk.URL)
 			if len(output) > 0 {
@@ -183,19 +182,25 @@ var downloadKdkCmd = &cobra.Command{
 				return fmt.Errorf("failed to create directory: %v", err)
 			}
 
+			skippedLocked := false
 			if _, err := os.Stat(destName); os.IsNotExist(err) {
 				log.Infof("Downloading to %s...", destName)
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 				downloader.URL = kdk.URL
 				downloader.DestName = destName
-				if err := downloader.Do(); err != nil {
+				status, err := downloader.DoContext(cmd.Context())
+				if err != nil {
 					return err
 				}
+				skippedLocked = status != download.Downloaded
 			} else {
 				log.Warnf("File already exists: %s", destName)
 			}
 
 			if install {
+				if skippedLocked {
+					log.Warnf("Skipping installation while %s is being downloaded by another process", destName)
+					continue
+				}
 				log.Infof("Installing %s...", destName)
 				if err := utils.InstallKDK(destName); err != nil {
 					return err

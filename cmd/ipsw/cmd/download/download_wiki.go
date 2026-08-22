@@ -49,8 +49,8 @@ func init() {
 	downloadWikiCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadWikiCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadWikiCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	downloadWikiCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadWikiCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadWikiCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
+	downloadWikiCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
 	downloadWikiCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadWikiCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags
@@ -77,7 +77,7 @@ func init() {
 	viper.BindPFlag("download.wiki.insecure", downloadWikiCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.wiki.confirm", downloadWikiCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.wiki.skip-all", downloadWikiCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.wiki.resume-all", downloadWikiCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.wiki.ignore-sha1", downloadWikiCmd.Flags().Lookup("ignore-sha1"))
 	viper.BindPFlag("download.wiki.restart-all", downloadWikiCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.wiki.remove-commas", downloadWikiCmd.Flags().Lookup("remove-commas"))
 	viper.BindPFlag("download.wiki.device", downloadWikiCmd.Flags().Lookup("device"))
@@ -124,7 +124,7 @@ var downloadWikiCmd = &cobra.Command{
 		insecure := viper.GetBool("download.wiki.insecure")
 		confirm := viper.GetBool("download.wiki.confirm")
 		skipAll := viper.GetBool("download.wiki.skip-all")
-		resumeAll := viper.GetBool("download.wiki.resume-all")
+		ignoreSha1 := viper.GetBool("download.wiki.ignore-sha1")
 		restartAll := viper.GetBool("download.wiki.restart-all")
 		removeCommas := viper.GetBool("download.wiki.remove-commas")
 		// filters
@@ -325,6 +325,8 @@ var downloadWikiCmd = &cobra.Command{
 							}
 						}
 					} else { // NORMAL MODE
+						downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+						defer downloader.Close()
 						for _, ipsw := range filteredIPSW {
 							destName := getDestName(ipsw.URL, removeCommas)
 							if len(destPath) > 0 {
@@ -340,20 +342,16 @@ var downloadWikiCmd = &cobra.Command{
 									"version": fmt.Sprintf("%s%s", ipsw.Version, ipsw.VersionExtra),
 								}).Info("Getting IPSW")
 
-								downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 								downloader.URL = ipsw.URL
 								downloader.Sha1 = ipsw.Sha1Hash
 								downloader.DestName = destName
 
-								// append sha1 and filename to checksums file
-								f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+								created, err := runIPSWDownload(cmd.Context(), downloader, ipsw.Sha1Hash, destName, !ignoreSha1)
 								if err != nil {
-									return fmt.Errorf("failed to open checksums.txt.sha1: %v", err)
+									return err
 								}
-								defer f.Close()
-
-								if _, err = f.WriteString(ipsw.Sha1Hash + "  " + destName + "\n"); err != nil {
-									return fmt.Errorf("failed to write to checksums.txt.sha1: %v", err)
+								if !created {
+									continue
 								}
 							} else {
 								log.Warnf("IPSW already exists: %s", destName)
@@ -574,7 +572,8 @@ var downloadWikiCmd = &cobra.Command{
 							}
 						}
 					} else { // NORMAL MODE
-						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+						downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+						defer downloader.Close()
 						for _, o := range filteredOTAs {
 							folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.Version, o.VersionExtra))
 							if err := os.MkdirAll(folder, 0750); err != nil {
@@ -597,10 +596,9 @@ var downloadWikiCmd = &cobra.Command{
 									"model":  o.BoardID,
 									"build":  o.Build,
 								}).Info(fmt.Sprintf("Getting %s%s OTA", o.Version, o.VersionExtra))
-								// download file
 								downloader.URL = url
 								downloader.DestName = destName
-								if err := downloader.Do(); err != nil {
+								if _, err := downloader.DoContext(cmd.Context()); err != nil {
 									return fmt.Errorf("failed to download file: %v", err)
 								}
 							} else if err != nil {

@@ -24,8 +24,6 @@ THE SOFTWARE.
 package download
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,7 +34,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
-	"github.com/caarlos0/ctrlc"
 
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cobra"
@@ -48,8 +45,7 @@ func init() {
 	// Download behavior flags
 	downloadDevCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadDevCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	downloadDevCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadDevCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadDevCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadDevCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadDevCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Auth flags
@@ -78,7 +74,6 @@ func init() {
 	viper.BindPFlag("download.dev.proxy", downloadDevCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.dev.insecure", downloadDevCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.dev.skip-all", downloadDevCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.dev.resume-all", downloadDevCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.dev.restart-all", downloadDevCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.dev.remove-commas", downloadDevCmd.Flags().Lookup("remove-commas"))
 	// Auth flags
@@ -128,7 +123,6 @@ var downloadDevCmd = &cobra.Command{
 		proxy := viper.GetString("download.dev.proxy")
 		insecure := viper.GetBool("download.dev.insecure")
 		skipAll := viper.GetBool("download.dev.skip-all")
-		resumeAll := viper.GetBool("download.dev.resume-all")
 		restartAll := viper.GetBool("download.dev.restart-all")
 		removeCommas := viper.GetBool("download.dev.remove-commas")
 		// flags
@@ -148,10 +142,10 @@ var downloadDevCmd = &cobra.Command{
 		}
 
 		app := download.NewDevPortal(&download.DevConfig{
+			Context:       cmd.Context(),
 			Proxy:         proxy,
 			Insecure:      insecure,
 			SkipAll:       skipAll,
-			ResumeAll:     resumeAll,
 			RestartAll:    restartAll,
 			RemoveCommas:  removeCommas,
 			PreferSMS:     sms,
@@ -159,7 +153,6 @@ var downloadDevCmd = &cobra.Command{
 			WatchList:     watchList,
 			ConfigDir:     filepath.Join(home, ".ipsw"),
 			VaultPassword: viper.GetString("download.dev.vault-password"),
-			Verbose:       viper.GetBool("verbose"),
 		})
 
 		if err := app.Init(); err != nil {
@@ -203,22 +196,14 @@ var downloadDevCmd = &cobra.Command{
 		}
 
 		if len(watchList) > 0 {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			if err := ctrlc.Default.Run(ctx, func() error {
-				if err := app.Watch(ctx, dlType, output, viper.GetDuration("download.dev.timeout")); err != nil {
-					return fmt.Errorf("failed to watch: %v", err)
-				}
-				return nil
-			}); err != nil {
-				if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+			if err := app.Watch(cmd.Context(), dlType, output, viper.GetDuration("download.dev.timeout")); err != nil {
+				if cmd.Context().Err() != nil {
 					log.Warn("Exiting...")
 					return nil
-				} else {
-					return fmt.Errorf("failed while watching: %v", err)
 				}
+				return fmt.Errorf("failed to watch: %v", err)
 			}
+			return nil
 		}
 
 		if asJSON {

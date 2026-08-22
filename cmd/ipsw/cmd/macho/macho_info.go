@@ -31,6 +31,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	slices0 "slices"
 	"strings"
 	"text/tabwriter"
 
@@ -294,8 +295,8 @@ var machoInfoCmd = &cobra.Command{
 			reverse := func(arr []string) []string {
 				reversed := make([]string, len(arr))
 				j := 0
-				for i := len(arr) - 1; i >= 0; i-- {
-					reversed[j] = arr[i]
+				for _, a := range slices0.Backward(arr) {
+					reversed[j] = a
 					j++
 				}
 				return reversed

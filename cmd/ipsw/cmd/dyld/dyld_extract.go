@@ -332,8 +332,7 @@ var dyldExtractCmd = &cobra.Command{
 				}
 
 				if err := m.Export(fname, dcf, m.GetBaseAddress(), syms); err != nil {
-					var perr *fs.PathError
-					if errors.As(err, &perr) {
+					if _, ok := errors.AsType[*fs.PathError](err); ok {
 						return fmt.Errorf("failed to extract dylib %s: %v (try again with the '--output' flag to write dylib to a writable folder)", image.Name, err)
 					}
 					return fmt.Errorf("failed to extract dylib %s: %v", image.Name, err)

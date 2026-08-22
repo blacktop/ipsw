@@ -1044,8 +1044,8 @@ func DSC(c *Config) ([]string, error) {
 		dmgs := make([]dyld.DscExtractionDMG, 0, len(steps))
 		var cleanups []func()
 		defer func() {
-			for idx := len(cleanups) - 1; idx >= 0; idx-- {
-				cleanups[idx]()
+			for _, cleanup := range slices.Backward(cleanups) {
+				cleanup()
 			}
 		}()
 

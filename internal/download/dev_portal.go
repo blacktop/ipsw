@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"math/bits"
@@ -23,7 +24,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
 	"time"
 
 	"github.com/99designs/keyring"
@@ -31,6 +31,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
+	godl "github.com/blacktop/go-download"
 	"github.com/blacktop/ipsw/internal/srp"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dustin/go-humanize"
@@ -90,6 +91,7 @@ const (
 )
 
 type DevConfig struct {
+	Context context.Context
 	// Login session
 	SessionID string
 	SCNT      string
@@ -105,12 +107,10 @@ type DevConfig struct {
 	WatchList []string
 	// behavior config
 	SkipAll       bool
-	ResumeAll     bool
 	RestartAll    bool
 	RemoveCommas  bool
 	PreferSMS     bool
 	PageSize      int
-	Verbose       bool
 	VaultPassword string
 	ConfigDir     string
 }
@@ -377,6 +377,9 @@ type MoreDownload struct {
 
 // NewDevPortal returns a new DevPortal instance
 func NewDevPortal(config *DevConfig) *DevPortal {
+	if config.Context == nil {
+		config.Context = context.Background()
+	}
 	jar, _ := cookiejar.New(nil)
 
 	dp := DevPortal{
@@ -642,7 +645,7 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 		return nil, fmt.Errorf("failed to encode auth request: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", initURL, buf)
+	req, err := http.NewRequestWithContext(dp.config.Context, "POST", initURL, buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -702,7 +705,7 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 		RememberMe:  false,
 	})
 
-	req, err = http.NewRequest("POST", completeURL, buf)
+	req, err = http.NewRequestWithContext(dp.config.Context, "POST", completeURL, buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -753,7 +756,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 		RememberMe:  true,
 	})
 
-	req, err := http.NewRequest("POST", loginURL, buf)
+	req, err := http.NewRequestWithContext(dp.config.Context, "POST", loginURL, buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -897,7 +900,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 
 func (dp *DevPortal) getAuthOptions() error {
 
-	req, err := http.NewRequest("GET", "https://idmsa.apple.com/appleauth/auth", nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", "https://idmsa.apple.com/appleauth/auth", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -937,7 +940,7 @@ func (dp *DevPortal) requestCode(phoneID int) error {
 		Mode: "sms",
 	})
 
-	req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
+	req, err := http.NewRequestWithContext(dp.config.Context, "PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http PUT request: %v", err)
 	}
@@ -1001,7 +1004,7 @@ func (dp *DevPortal) verifyCode(codeType, code string, phoneID int) error {
 		})
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://idmsa.apple.com/appleauth/auth/verify/%s/securitycode", codeType), buf)
+	req, err := http.NewRequestWithContext(dp.config.Context, "POST", fmt.Sprintf("https://idmsa.apple.com/appleauth/auth/verify/%s/securitycode", codeType), buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -1044,7 +1047,7 @@ func (dp *DevPortal) verifyCode(codeType, code string, phoneID int) error {
 // trustSession tells Apple to trust computer for 2FA
 func (dp *DevPortal) trustSession() error {
 
-	req, err := http.NewRequest("GET", trustURL, nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", trustURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -1094,7 +1097,7 @@ func (dp *DevPortal) refreshSession() error {
 
 func (dp *DevPortal) getOlympusSession() error {
 
-	req, err := http.NewRequest("GET", olympusSessionURL, nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", olympusSessionURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -1214,7 +1217,9 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 
 			// check for NEW downloads
 			if reflect.DeepEqual(prevDownloads, dloads.Downloads) { // "8b42055e-8d9d-4bbb-800b-6a44c45c7b48"
-				time.Sleep(duration)
+				if err := waitForContext(ctx, duration); err != nil {
+					return err
+				}
 
 				if err := dp.refreshSession(); err != nil {
 					return err
@@ -1234,7 +1239,12 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 					}
 					if re.MatchString(dl.Name) {
 						for _, f := range dl.Files {
-							dp.Download(f.URL(), folder)
+							if _, err := dp.Download(f.URL(), folder); err != nil {
+								if ctx.Err() != nil {
+									return ctx.Err()
+								}
+								log.WithError(err).Error("failed to download watched Developer Portal file")
+							}
 						}
 					}
 				}
@@ -1247,7 +1257,9 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 
 			// check for NEW downloads
 			if reflect.DeepEqual(prevIPSWs, ipsws) {
-				time.Sleep(5 * time.Minute)
+				if err := waitForContext(ctx, 5*time.Minute); err != nil {
+					return err
+				}
 
 				if err := dp.refreshSession(); err != nil {
 					return err
@@ -1267,8 +1279,11 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 					}
 					if re.MatchString(version) {
 						for _, ipsw := range ipsws[version] {
-							if err := dp.Download(ipsw.URL, folder); err != nil {
-								log.Errorf("failed to download %s: %v", ipsw.URL, err)
+							if _, err := dp.Download(ipsw.URL, folder); err != nil {
+								if ctx.Err() != nil {
+									return ctx.Err()
+								}
+								log.WithError(err).Error("failed to download watched Developer Portal IPSW")
 							}
 						}
 					}
@@ -1282,7 +1297,9 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 
 			// check for NEW downloads
 			if reflect.DeepEqual(prevProfiles, profiles) {
-				time.Sleep(5 * time.Minute)
+				if err := waitForContext(ctx, 5*time.Minute); err != nil {
+					return err
+				}
 
 				if err := dp.refreshSession(); err != nil {
 					return err
@@ -1305,7 +1322,12 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 						if err := os.MkdirAll(output, 0750); err != nil {
 							return fmt.Errorf("failed to create folder '%s': %v", output, err)
 						}
-						dp.Download(url, output)
+						if _, err := dp.Download(url, output); err != nil {
+							if ctx.Err() != nil {
+								return ctx.Err()
+							}
+							log.WithError(err).Error("failed to download watched Developer Portal profile")
+						}
 					}
 				}
 			}
@@ -1313,8 +1335,20 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 	}
 }
 
+func waitForContext(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
 func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
+	batch := &downloadBatch{ctx: dp.config.Context}
 	switch downloadType {
 	case "more":
 		dloads, err := dp.getDownloads()
@@ -1366,17 +1400,17 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 				// Download only selected files
 				for _, fileIdx := range selectedFiles {
 					f := download.Files[fileIdx]
-					log.Debugf("Downloading: %s", f.URL())
-					if err := dp.Download(f.URL(), folder); err != nil {
-						log.Errorf("failed to download %s: %v", f.URL(), err)
+					log.Debugf("Downloading: %s", godl.RedactURL(f.URL()))
+					if _, derr := dp.Download(f.URL(), folder); batch.fail(f.URL(), derr) {
+						return batch.err()
 					}
 				}
 			} else {
 				// Single file, download directly
 				for _, f := range download.Files {
-					log.Debugf("Downloading: %s", f.URL())
-					if err := dp.Download(f.URL(), folder); err != nil {
-						log.Errorf("failed to download %s: %v", f.URL(), err)
+					log.Debugf("Downloading: %s", godl.RedactURL(f.URL()))
+					if _, derr := dp.Download(f.URL(), folder); batch.fail(f.URL(), derr) {
+						return batch.err()
 					}
 				}
 			}
@@ -1428,12 +1462,16 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 			}
 
 			for _, df := range dfiles {
-				log.Debugf("Downloading: %s", ipsws[version][df].URL)
-				dp.Download(ipsws[version][df].URL, folder)
+				log.Debugf("Downloading: %s", godl.RedactURL(ipsws[version][df].URL))
+				if _, derr := dp.Download(ipsws[version][df].URL, folder); batch.fail(ipsws[version][df].URL, derr) {
+					return batch.err()
+				}
 			}
 		} else {
-			log.Debugf("Downloading: %s", ipsws[version][0].URL)
-			dp.Download(ipsws[version][0].URL, folder)
+			log.Debugf("Downloading: %s", godl.RedactURL(ipsws[version][0].URL))
+			if _, derr := dp.Download(ipsws[version][0].URL, folder); batch.fail(ipsws[version][0].URL, derr) {
+				return batch.err()
+			}
 		}
 	case "profile":
 		profiles, err := dp.getDevLoggingProfiles()
@@ -1467,115 +1505,160 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 			if err := os.MkdirAll(output, 0750); err != nil {
 				return fmt.Errorf("failed to create folder '%s': %v", output, err)
 			}
-			dp.Download(profiles[df], output)
+			if _, derr := dp.Download(profiles[df], output); batch.fail(profiles[df], derr) {
+				return batch.err()
+			}
 		}
 	}
 
-	return nil
+	return batch.err()
 }
 
 func devProfileOutputName(name string) string {
 	return strings.NewReplacer(" ", "_", "/", "_", `\`, "_").Replace(name)
 }
 
-// Download downloads a file that requires a valid dev portal session
-func (dp *DevPortal) Download(url, folder string) error {
+// downloadBatch collects per-item failures so one rotted URL cannot abort the
+// rest of an interactively selected batch, while cancellation still aborts
+// immediately.
+type downloadBatch struct {
+	ctx  context.Context
+	errs []error
+}
 
-	// proxy, insecure are null because we override the client below
+// fail records err for url and reports whether the batch must abort
+// (cancellation). A nil err is a no-op.
+func (b *downloadBatch) fail(url string, err error) bool {
+	if err == nil {
+		return false
+	}
+	if stderrors.Is(err, context.Canceled) || (b.ctx != nil && b.ctx.Err() != nil) {
+		b.errs = append(b.errs, err)
+		return true
+	}
+	log.WithError(err).Errorf("failed to download %s", godl.RedactURL(url))
+	b.errs = append(b.errs, fmt.Errorf("%s: %w", godl.RedactURL(url), err))
+	return false
+}
+
+func (b *downloadBatch) err() error {
+	return stderrors.Join(b.errs...)
+}
+
+// Download downloads a file that requires a valid dev portal session.
+// A Skipped status means the staging file is locked by another download
+// process and nothing was produced.
+func (dp *DevPortal) Download(url, folder string) (Status, error) {
+	// the authenticated session client's transport and cookie jar are reused
 	downloader := NewDownload(
 		dp.config.Proxy,
 		dp.config.Insecure,
 		dp.config.SkipAll,
-		dp.config.ResumeAll,
 		dp.config.RestartAll,
 		false,
-		dp.config.Verbose,
 	)
 	// use authenticated client
 	downloader.client = dp.Client
+	defer downloader.Close()
 
 	destName := getDestName(url, dp.config.RemoveCommas)
 	destName = filepath.Join(filepath.Clean(folder), filepath.Base(destName))
 
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
-
 		log.WithFields(log.Fields{
 			"file": destName,
 		}).Info("Downloading")
 
-		// download file
 		downloader.URL = url
 		downloader.DestName = destName
 
-		err = downloader.Do()
+		status, err := downloader.DoContext(dp.config.Context)
 		if err != nil {
-			return fmt.Errorf("failed to download file: %v", err)
+			return status, fmt.Errorf("failed to download file: %w", err)
 		}
-
-	} else {
-		log.Warnf("file already exists: %s", destName)
+		return status, nil
 	}
 
-	return nil
+	log.Warnf("file already exists: %s", destName)
+	return Downloaded, nil
 }
 
-// DownloadADC downloads an ADC file that requires a valid ADCDownloadAuth cookie, but not full dev portal session auth
-func (dp *DevPortal) DownloadADC(adcURL string) error {
-	var adcDownloadAuth string
-
-	u, err := url.Parse(adcURL)
+// DownloadADC downloads an ADC file that requires a valid ADCDownloadAuth cookie, but not full dev portal session auth.
+// A Skipped status means the staging file is locked by another download process and nothing was produced.
+func (dp *DevPortal) DownloadADC(adcURL string) (Status, error) {
+	adcDownloadAuth, err := dp.getADCDownloadAuth(adcURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse url '%s': %v", adcURL, err)
+		return Skipped, err
 	}
 
-	req, err := http.NewRequest("GET", adcDownloadURL+u.Path, nil)
+	// the authenticated session client's transport and cookie jar are reused
+	downloader := NewDownload(
+		dp.config.Proxy,
+		dp.config.Insecure,
+		dp.config.SkipAll,
+		dp.config.RestartAll,
+		false,
+	)
+	// use authenticated client
+	downloader.client = dp.Client
+	defer downloader.Close()
+	downloader.Headers = map[string]string{"Cookie": "ADCDownloadAuth=" + adcDownloadAuth}
+
+	destName := getDestName(adcURL, dp.config.RemoveCommas)
+	if _, err := os.Stat(destName); os.IsNotExist(err) {
+		log.WithFields(log.Fields{
+			"file": destName,
+		}).Info("Downloading")
+
+		downloader.URL = adcURL
+		downloader.DestName = destName
+
+		return downloader.DoContext(dp.config.Context)
+	}
+
+	log.Warnf("file already exists: %s", destName)
+	return Downloaded, nil
+}
+
+func (dp *DevPortal) getADCDownloadAuth(adcURL string) (string, error) {
+	u, err := url.Parse(adcURL)
 	if err != nil {
-		return fmt.Errorf("failed to create http GET request: %v", err)
+		return "", fmt.Errorf("failed to parse URL %s", godl.RedactURL(adcURL))
+	}
+
+	req, err := http.NewRequestWithContext(dp.config.Context, http.MethodGet, adcDownloadURL+u.Path, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create http GET request: %v", err)
 	}
 	req.Header.Set("Content-Type", "*/*")
 
 	response, err := dp.Client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	if response.Header.Get("Set-Cookie") != "" {
-		_, adcDownloadAuth, _ = strings.Cut(response.Header.Get("Set-Cookie"), "ADCDownloadAuth=")
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return "", fmt.Errorf("ADC authentication request for %s returned status %s (session may be expired: try again or re-authenticate)",
+			godl.RedactURL(adcURL), response.Status)
 	}
-
-	// proxy, insecure are null because we override the client below
-	downloader := NewDownload(
-		dp.config.Proxy,
-		dp.config.Insecure,
-		dp.config.SkipAll,
-		dp.config.ResumeAll,
-		dp.config.RestartAll,
-		false,
-		dp.config.Verbose,
-	)
-	downloader.Headers = make(map[string]string)
-	// use authenticated client
-	downloader.client = dp.Client
-	// set auth cookie (for authless downloads)
-	downloader.Headers["Cookie"] = "ADCDownloadAuth=" + adcDownloadAuth
-
-	// destName := getDestName(adcDownloadURL+path, dp.config.RemoveCommas)
-	destName := getDestName(adcURL, dp.config.RemoveCommas)
-	if _, err := os.Stat(destName); os.IsNotExist(err) {
-
-		log.WithFields(log.Fields{
-			"file": destName,
-		}).Info("Downloading")
-
-		// download file
-		downloader.URL = adcURL
-		downloader.DestName = destName
-
-		return downloader.Do()
+	for _, cookie := range response.Cookies() {
+		if cookie.Name == "ADCDownloadAuth" && cookie.Value != "" {
+			return cookie.Value, nil
+		}
 	}
-
-	log.Warnf("file already exists: %s", destName)
-	return nil
+	// the cookie may have been set on an intermediate redirect hop, which
+	// only the session jar observed
+	if dp.Client.Jar != nil {
+		if jarURL, err := url.Parse(adcDownloadURL); err == nil {
+			for _, cookie := range dp.Client.Jar.Cookies(jarURL) {
+				if cookie.Name == "ADCDownloadAuth" && cookie.Value != "" {
+					return cookie.Value, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("ADC authentication response for %s did not set an ADCDownloadAuth cookie (session may be expired)",
+		godl.RedactURL(adcURL))
 }
 
 func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
@@ -1601,8 +1684,16 @@ func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
 
 	for _, url := range urls {
 		log.WithField("url", url).Info("Downloading KDK")
-		if err = dp.Download(url, folder); err == nil {
+		status, derr := dp.Download(url, folder)
+		if derr == nil {
+			if status != Downloaded {
+				log.Warnf("KDK download skipped: staging locked by another download process (no file was produced)")
+			}
 			return nil
+		}
+		err = derr
+		if dp.config.Context.Err() != nil {
+			return dp.config.Context.Err()
 		}
 		utils.Indent(log.Warn, 2)(fmt.Sprintf("%v: Retrying...", err))
 	}
@@ -1647,7 +1738,7 @@ func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byt
 func (dp *DevPortal) getDownloads() (*Downloads, error) {
 	var downloads Downloads
 
-	req, err := http.NewRequest("POST", listDownloadsActionURL, nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "POST", listDownloadsActionURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -1692,7 +1783,7 @@ func (dp *DevPortal) getDownloads() (*Downloads, error) {
 func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	ipsws := make(map[string][]DevDownload)
 
-	req, err := http.NewRequest("GET", downloadOSesURL, nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", downloadOSesURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -1763,7 +1854,7 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 
 // getDevLoggingProfiles scrapes Apple's Profiles and Logs page for profile links.
 func (dp *DevPortal) getDevLoggingProfiles() (map[string]string, error) {
-	req, err := http.NewRequest("GET", downloadProfilesURL, nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", downloadProfilesURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}

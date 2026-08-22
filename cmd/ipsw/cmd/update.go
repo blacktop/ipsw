@@ -187,7 +187,8 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		downloader := download.NewDownload(proxy, insecure, false, false, false, false, Verbose)
+		downloader := download.NewDownload(proxy, insecure, false, false, false)
+		defer downloader.Close()
 		fname := strings.Replace(path.Base(asset.DownloadURL), ",", "_", -1)
 		fname = filepath.Join(destPath, fname)
 		if _, err := os.Stat(fname); os.IsNotExist(err) {
@@ -197,11 +198,9 @@ var updateCmd = &cobra.Command{
 				"size":           humanize.Bytes(uint64(asset.Size)),
 				"download_count": asset.DownloadCount,
 			}).Info("Getting Update")
-			// download file
 			downloader.URL = asset.DownloadURL
 			downloader.DestName = fname
-			err = downloader.Do()
-			if err != nil {
+			if _, err := downloader.DoContext(cmd.Context()); err != nil {
 				return fmt.Errorf("failed to download file: %v", err)
 			}
 			fmt.Println()

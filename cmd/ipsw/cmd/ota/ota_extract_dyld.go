@@ -165,8 +165,7 @@ func (r *dscReport) addFile(root, dst, source string) {
 func (r *dscReport) addErrors(defaultPhase ota.Phase, source string, err error) {
 	for _, e := range flattenErrors(err) {
 		entry := dscErrorEntry{Phase: defaultPhase, Source: source, Message: e.Error(), err: e}
-		var pe *ota.PhaseError
-		if errors.As(e, &pe) {
+		if pe, ok := errors.AsType[*ota.PhaseError](e); ok {
 			entry.Phase = pe.Phase
 			if pe.Source != "" {
 				entry.Source = pe.Source

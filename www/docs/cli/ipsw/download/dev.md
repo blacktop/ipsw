@@ -48,8 +48,7 @@ ipsw download dev [flags]
       --proxy string            HTTP/HTTPS proxy
   -_, --remove-commas           replace commas in IPSW filename with underscores
       --restart-all             always restart resumable IPSWs
-      --resume-all              always resume resumable IPSWs
-      --skip-all                always skip resumable IPSWs
+      --skip-all                continue past files locked by another download process
       --sms                     Prefer SMS Two-factor authentication
   -t, --timeout duration        Timeout for watch attempts in minutes (default 5m0s)
   -u, --username string         Apple Developer Portal username

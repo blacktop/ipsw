@@ -52,8 +52,8 @@ func init() {
 	downloadAppledbCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadAppledbCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadAppledbCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	downloadAppledbCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadAppledbCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadAppledbCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
+	downloadAppledbCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
 	downloadAppledbCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadAppledbCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags
@@ -96,7 +96,7 @@ func init() {
 	viper.BindPFlag("download.appledb.insecure", downloadAppledbCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.appledb.confirm", downloadAppledbCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.appledb.skip-all", downloadAppledbCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.appledb.resume-all", downloadAppledbCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.appledb.ignore-sha1", downloadAppledbCmd.Flags().Lookup("ignore-sha1"))
 	viper.BindPFlag("download.appledb.restart-all", downloadAppledbCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.appledb.remove-commas", downloadAppledbCmd.Flags().Lookup("remove-commas"))
 	viper.BindPFlag("download.appledb.device", downloadAppledbCmd.Flags().Lookup("device"))
@@ -153,7 +153,7 @@ var downloadAppledbCmd = &cobra.Command{
 		insecure := viper.GetBool("download.appledb.insecure")
 		confirm := viper.GetBool("download.appledb.confirm")
 		skipAll := viper.GetBool("download.appledb.skip-all")
-		resumeAll := viper.GetBool("download.appledb.resume-all")
+		ignoreSha1 := viper.GetBool("download.appledb.ignore-sha1")
 		restartAll := viper.GetBool("download.appledb.restart-all")
 		removeCommas := viper.GetBool("download.appledb.remove-commas")
 		// filters
@@ -493,7 +493,8 @@ var downloadAppledbCmd = &cobra.Command{
 					}
 				}
 			} else { // NORMAL MODE
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+				defer downloader.Close()
 				for idx, result := range results {
 					var url string
 					for _, link := range result.Links {
@@ -534,13 +535,11 @@ var downloadAppledbCmd = &cobra.Command{
 						} else {
 							log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
 						}
-						// download file
 						downloader.URL = url
 						downloader.DestName = fname
 						downloader.Sha1 = result.Hashes.Sha1
 
-						err = downloader.Do()
-						if err != nil {
+						if _, err := downloader.DoContext(cmd.Context()); err != nil {
 							return fmt.Errorf("failed to download IPSW: %v", err)
 						}
 					} else {

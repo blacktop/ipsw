@@ -142,7 +142,7 @@ func GetFunctionChanges(repo *git.Repository, funcName, filePath string) ([]GitF
 		isChange := i < len(funcVersions)-1 && previousContent != current.content && current.content != ""
 
 		if isChange {
-			headline := strings.SplitN(current.commit.Message, "\n", 2)[0]
+			headline, _, _ := strings.Cut(current.commit.Message, "\n")
 			body := ""
 			if strings.Contains(current.commit.Message, "\n") {
 				body = strings.SplitN(current.commit.Message, "\n", 2)[1]

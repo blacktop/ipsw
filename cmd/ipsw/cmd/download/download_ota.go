@@ -63,8 +63,7 @@ func init() {
 	downloadOtaCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadOtaCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadOtaCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	downloadOtaCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadOtaCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadOtaCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadOtaCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadOtaCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags
@@ -107,7 +106,6 @@ func init() {
 	viper.BindPFlag("download.ota.insecure", downloadOtaCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.ota.confirm", downloadOtaCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.ota.skip-all", downloadOtaCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.ota.resume-all", downloadOtaCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.ota.restart-all", downloadOtaCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.ota.remove-commas", downloadOtaCmd.Flags().Lookup("remove-commas"))
 	// Bind filter flags
@@ -171,7 +169,6 @@ var downloadOtaCmd = &cobra.Command{
 		insecure := viper.GetBool("download.ota.insecure")
 		confirm := viper.GetBool("download.ota.confirm")
 		skipAll := viper.GetBool("download.ota.skip-all")
-		resumeAll := viper.GetBool("download.ota.resume-all")
 		restartAll := viper.GetBool("download.ota.restart-all")
 		removeCommas := viper.GetBool("download.ota.remove-commas")
 		// filters
@@ -572,7 +569,8 @@ var downloadOtaCmd = &cobra.Command{
 					}
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, false)
+				defer downloader.Close()
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
 					if getSim {
@@ -629,10 +627,9 @@ var downloadOtaCmd = &cobra.Command{
 							fields["key"] = o.ArchiveDecryptionKey
 						}
 						log.WithFields(fields).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
-						// download file
 						downloader.URL = url
 						downloader.DestName = destName
-						if err := downloader.Do(); err != nil {
+						if _, err := downloader.DoContext(cmd.Context()); err != nil {
 							return fmt.Errorf("failed to download file: %v", err)
 						}
 					} else if err != nil {

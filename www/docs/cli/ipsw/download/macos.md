@@ -43,8 +43,7 @@ ipsw download macos [flags]
   -l, --list              Show latest macOS installers
       --proxy string      HTTP/HTTPS proxy
       --restart-all       always restart resumable IPSWs
-      --resume-all        always resume resumable IPSWs
-      --skip-all          always skip resumable IPSWs
+      --skip-all          continue past files locked by another download process
   -v, --version string    iOS Version (i.e. 12.3.1)
   -w, --work-dir string   macOS installer creator working directory
 ```

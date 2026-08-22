@@ -90,8 +90,7 @@ func wrapPhase(p Phase, source string, err error) error {
 		}
 		return errors.Join(wrapped...)
 	}
-	var pe *PhaseError
-	if errors.As(err, &pe) {
+	if _, ok := errors.AsType[*PhaseError](err); ok {
 		return err
 	}
 	return &PhaseError{Phase: p, Source: source, Err: err}

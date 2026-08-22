@@ -49,8 +49,7 @@ func init() {
 	downloadIpswCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadIpswCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadIpswCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
-	downloadIpswCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadIpswCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadIpswCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadIpswCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadIpswCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
 	downloadIpswCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
@@ -88,7 +87,6 @@ func init() {
 	viper.BindPFlag("download.ipsw.insecure", downloadIpswCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.ipsw.confirm", downloadIpswCmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.ipsw.skip-all", downloadIpswCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.ipsw.resume-all", downloadIpswCmd.Flags().Lookup("resume-all"))
 	viper.BindPFlag("download.ipsw.restart-all", downloadIpswCmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.ipsw.ignore-sha1", downloadIpswCmd.Flags().Lookup("ignore-sha1"))
 	viper.BindPFlag("download.ipsw.remove-commas", downloadIpswCmd.Flags().Lookup("remove-commas"))
@@ -224,7 +222,6 @@ var downloadIpswCmd = &cobra.Command{
 		insecure := viper.GetBool("download.ipsw.insecure")
 		confirm := viper.GetBool("download.ipsw.confirm")
 		skipAll := viper.GetBool("download.ipsw.skip-all")
-		resumeAll := viper.GetBool("download.ipsw.resume-all")
 		restartAll := viper.GetBool("download.ipsw.restart-all")
 		ignoreSha1 := viper.GetBool("download.ipsw.ignore-sha1")
 		removeCommas := viper.GetBool("download.ipsw.remove-commas")
@@ -617,6 +614,8 @@ var downloadIpswCmd = &cobra.Command{
 					}
 				}
 			} else { // NORMAL MODE
+				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+				defer downloader.Close()
 				for _, i := range ipsws {
 					destName := getDestName(i.URL, removeCommas)
 					if len(output) > 0 {
@@ -633,29 +632,19 @@ var downloadIpswCmd = &cobra.Command{
 							"signed":  i.Signed,
 						}).Info("Getting IPSW")
 
-						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, viper.GetBool("verbose"))
 						downloader.URL = i.URL
 						downloader.Sha1 = i.SHA1
 						downloader.DestName = destName
 
-						if err := downloader.Do(); err != nil {
-							return fmt.Errorf("failed to download file: %v", err)
+						created, err := runIPSWDownload(cmd.Context(), downloader, i.SHA1, destName, !ignoreSha1)
+						if err != nil {
+							return err
+						}
+						if !created {
+							continue
 						}
 
 						log.Info("Created: " + destName)
-
-						if !ignoreSha1 {
-							// append sha1 and filename to checksums file
-							f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-							if err != nil {
-								return fmt.Errorf("failed to open checksums.txt.sha1: %v", err)
-							}
-							defer f.Close()
-
-							if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
-								return fmt.Errorf("failed to write to checksums.txt.sha1: %v", err)
-							}
-						}
 					} else {
 						log.Warnf("IPSW already exists: %s", destName)
 					}

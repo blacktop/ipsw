@@ -43,8 +43,8 @@ func init() {
 	// Download behavior flags
 	downloadXcodeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadXcodeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	downloadXcodeCmd.Flags().Bool("skip-all", false, "always skip resumable IPSWs")
-	downloadXcodeCmd.Flags().Bool("resume-all", false, "always resume resumable IPSWs")
+	downloadXcodeCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
+	downloadXcodeCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
 	downloadXcodeCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
 	downloadXcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")
@@ -54,7 +54,7 @@ func init() {
 	viper.BindPFlag("download.xcode.proxy", downloadXcodeCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.xcode.insecure", downloadXcodeCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("download.xcode.skip-all", downloadXcodeCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.xcode.resume-all", downloadXcodeCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.xcode.ignore-sha1", downloadXcodeCmd.Flags().Lookup("ignore-sha1"))
 	viper.BindPFlag("download.xcode.restart-all", downloadXcodeCmd.Flags().Lookup("restart-all"))
 	// Bind command-specific flags
 	viper.BindPFlag("download.xcode.latest", downloadXcodeCmd.Flags().Lookup("latest"))
@@ -86,7 +86,7 @@ var downloadXcodeCmd = &cobra.Command{
 		proxy := viper.GetString("download.xcode.proxy")
 		insecure := viper.GetBool("download.xcode.insecure")
 		skipAll := viper.GetBool("download.xcode.skip-all")
-		resumeAll := viper.GetBool("download.xcode.resume-all")
+		ignoreSha1 := viper.GetBool("download.xcode.ignore-sha1")
 		restartAll := viper.GetBool("download.xcode.restart-all")
 		// flags
 		latest := viper.GetBool("download.xcode.latest")
@@ -108,10 +108,8 @@ var downloadXcodeCmd = &cobra.Command{
 			if runtime != "" {
 				for _, d := range dvt.Downloadables {
 					if d.Name == runtime {
-						if d.Source == "" {
-							dl = d
-							break
-						}
+						dl = d
+						break
 					}
 				}
 			} else {
@@ -136,27 +134,33 @@ var downloadXcodeCmd = &cobra.Command{
 				dl.Source = fmt.Sprintf("https://download.developer.apple.com/Developer_Tools/%s/%s.dmg", strings.ReplaceAll(dl.Name, " ", "_"), strings.ReplaceAll(dl.Name, " ", "_"))
 				dl.Authentication = "virtual"
 			}
+			destName := path.Base(dl.Source)
 
+			var status download.Status
 			if dl.Authentication == "" {
 				log.Infof("Downloading %s...", dl.Name)
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+				defer downloader.Close()
 				downloader.URL = dl.Source
-				downloader.DestName = path.Base(dl.Source)
-				if err := downloader.Do(); err != nil {
+				downloader.DestName = destName
+				if status, err = downloader.DoContext(cmd.Context()); err != nil {
 					return err
 				}
 			} else {
 				app := download.NewDevPortal(&download.DevConfig{
+					Context:    cmd.Context(),
 					Proxy:      proxy,
 					Insecure:   insecure,
 					SkipAll:    skipAll,
-					ResumeAll:  resumeAll,
 					RestartAll: restartAll,
-					Verbose:    viper.GetBool("verbose"),
 				})
-				if err := app.DownloadADC(dl.Source); err != nil {
+				if status, err = app.DownloadADC(dl.Source); err != nil {
 					return err
 				}
+			}
+			if status != download.Downloaded {
+				log.Warnf("Skipping installation while %s is being downloaded by another process", destName)
+				return nil
 			}
 
 			install := false
@@ -169,7 +173,7 @@ var downloadXcodeCmd = &cobra.Command{
 			}
 
 			if install {
-				return utils.InstallXCodeSimRuntime(path.Base(dl.Source))
+				return utils.InstallXCodeSimRuntime(destName)
 			}
 
 			return nil
@@ -205,10 +209,12 @@ var downloadXcodeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+		downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+		defer downloader.Close()
 		downloader.URL = download.XcodeDlURL + "/" + choice
 		downloader.Sha1 = sha1
 		downloader.DestName = choice
-		return downloader.Do()
+		_, err = downloader.DoContext(cmd.Context())
+		return err
 	},
 }

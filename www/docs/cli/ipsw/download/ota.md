@@ -61,12 +61,11 @@ ipsw download ota [options] [flags]
       --proxy string             HTTP/HTTPS proxy
   -_, --remove-commas            replace commas in IPSW filename with underscores
       --restart-all              always restart resumable IPSWs
-      --resume-all               always resume resumable IPSWs
       --rsr                      Download Rapid Security Response OTAs
       --show-latest-build        Show latest iOS build
       --show-latest-version      Show latest iOS version
       --sim                      Download Simulator OTAs
-      --skip-all                 always skip resumable IPSWs
+      --skip-all                 continue past files locked by another download process
   -u, --urls                     Dump URLs only
   -v, --version string           iOS Version (i.e. 12.3.1)
       --white-list stringArray   iOS device white list

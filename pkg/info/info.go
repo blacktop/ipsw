@@ -774,7 +774,7 @@ func getAbbreviatedDevList(devices []string) string {
 	}
 
 	currentDev := devices[0]
-	devPrefix := strings.Split(currentDev, ",")[0]
+	devPrefix, _, _ := strings.Cut(currentDev, ",")
 	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {
@@ -802,7 +802,7 @@ func getAbbreviatedDevListFolder(devices []string) string {
 	}
 
 	currentDev := devices[0]
-	devPrefix := strings.Split(currentDev, ",")[0]
+	devPrefix, _, _ := strings.Cut(currentDev, ",")
 	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {

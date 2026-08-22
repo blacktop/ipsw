@@ -22,10 +22,14 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
@@ -75,10 +79,43 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	ctx, cancel := interruptContext()
+	defer cancel()
+
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
+}
+
+// interruptContext returns a context cancelled by the first SIGINT/SIGTERM.
+// The first signal also restores the default signal disposition, so a second
+// interrupt kills the process even when a command ignores its context.
+func interruptContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-sigs:
+			// restore the default disposition BEFORE publishing the
+			// cancellation: a caller observing ctx.Done() may send the
+			// second interrupt immediately, and it must kill the process
+			// rather than land in the still-registered channel
+			signal.Stop(sigs)
+			fmt.Fprintln(os.Stderr, "interrupted: finishing up (press Ctrl-C again to force quit)")
+			cancel()
+			// most commands never read their context: force-exit if the
+			// process is still alive well after cancellation
+			time.AfterFunc(10*time.Second, func() {
+				fmt.Fprintln(os.Stderr, "interrupted: forcing exit")
+				os.Exit(130)
+			})
+		case <-ctx.Done():
+			signal.Stop(sigs)
+		}
+	}()
+	return ctx, cancel
 }
 
 func init() {

@@ -1,6 +1,9 @@
 package symbols
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Symbol enrichment prefixes added by ipsw when annotating symbols.
 const (
@@ -46,8 +49,8 @@ trimLoop:
 // StripEnrichmentPrefixes) to base symbol text.
 func ApplyEnrichmentPrefixes(prefixes []string, base string) string {
 	out := base
-	for i := len(prefixes) - 1; i >= 0; i-- {
-		out = prefixes[i] + out
+	for _, prefixe := range slices.Backward(prefixes) {
+		out = prefixe + out
 	}
 	return out
 }

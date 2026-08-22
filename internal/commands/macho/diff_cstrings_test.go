@@ -1274,12 +1274,12 @@ func TestFormatUpdatedDiffReportsTailChangesAfterXBSNormalization(t *testing.T) 
 
 func TestNormalizeSymbolForDiff(t *testing.T) {
 	cases := map[string]string{
-		"___28-[BTSDevicesController init]_block_invoke.323":             "___28-[BTSDevicesController init]_block_invoke",
-		"___28-[BTSDevicesController init]_block_invoke.317":             "___28-[BTSDevicesController init]_block_invoke",
-		"___52-[C migrateHKPairedHealthDevices]_block_invoke.870.cold.1": "___52-[C migrateHKPairedHealthDevices]_block_invoke",
-		"___50-[C startOutgoingCarPlaySetup:]_block_invoke_2.857":        "___50-[C startOutgoingCarPlaySetup:]_block_invoke_2",
-		"___block_literal_global.686":                                    "___block_literal_global",
-		"_OBJC_CLASS_$_NSMutableDictionary":                              "_OBJC_CLASS_$_NSMutableDictionary",
+		"___28-[BTSDevicesController init]_block_invoke.323":                                                                  "___28-[BTSDevicesController init]_block_invoke",
+		"___28-[BTSDevicesController init]_block_invoke.317":                                                                  "___28-[BTSDevicesController init]_block_invoke",
+		"___52-[C migrateHKPairedHealthDevices]_block_invoke.870.cold.1":                                                      "___52-[C migrateHKPairedHealthDevices]_block_invoke",
+		"___50-[C startOutgoingCarPlaySetup:]_block_invoke_2.857":                                                             "___50-[C startOutgoingCarPlaySetup:]_block_invoke_2",
+		"___block_literal_global.686":                                                                                         "___block_literal_global",
+		"_OBJC_CLASS_$_NSMutableDictionary":                                                                                   "_OBJC_CLASS_$_NSMutableDictionary",
 		"/Library/Caches/com.apple.xbs/20022CBB-7987-4277-B5C3-995958015464/TemporaryDirectory.VvPQcD/Binaries/x.a(sha256.o)": "/Library/Caches/com.apple.xbs/<UUID>/TemporaryDirectory.<TMP>/Binaries/x.a(sha256.o)",
 		"/AppleInternal/Library/BuildRoots/4~CReaugCYOfRv/SDKs/iPhoneOS.Internal.sdk/x.a(y.o)":                                "/AppleInternal/Library/BuildRoots/<BUILDROOT>/SDKs/iPhoneOS.Internal.sdk/x.a(y.o)",
 	}

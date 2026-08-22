@@ -609,7 +609,8 @@ func (r *PCCRelease) String() string {
 	return out.String()
 }
 
-func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
+// DownloadContext downloads a PCC release and cancels its requests when ctx is done.
+func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, insecure, skipAll, restartAll bool) error {
 	// Preflight: HEAD every asset before downloading anything. The newest
 	// releases sometimes 403 on the OS IPSW before CDN sync — fail now
 	// rather than after pulling several GB of other assets.
@@ -620,8 +621,9 @@ func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 	}
+	defer client.CloseIdleConnections()
 	for _, asset := range r.GetAssets() {
-		req, err := http.NewRequest(http.MethodHead, asset.GetUrl(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, asset.GetUrl(), nil)
 		if err != nil {
 			return err
 		}
@@ -654,6 +656,9 @@ func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
 		Name:      releaseName,
 		ReleaseID: releaseID,
 	}
+	skipped := false
+	downloader := NewDownload(proxy, insecure, skipAll, restartAll, false)
+	defer downloader.Close()
 	for _, asset := range r.GetAssets() {
 		assetURL := asset.GetUrl()
 		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")+assetExt(asset))
@@ -670,12 +675,19 @@ func (r *PCCRelease) Download(output, proxy string, insecure bool) error {
 			"digest":  hex.EncodeToString(asset.Digest.GetValue()),
 			"variant": asset.GetVariant(),
 		}).Info("Downloading Asset")
-		downloader := NewDownload(proxy, insecure, false, false, false, false, false)
 		downloader.URL = assetURL
 		downloader.DestName = filePath
-		if err := downloader.Do(); err != nil {
+		status, err := downloader.DoContext(ctx)
+		if err != nil {
 			return err
 		}
+		if status != Downloaded {
+			skipped = true
+		}
+	}
+	if skipped {
+		log.Warn("Skipping PCC metadata creation while one or more assets are being downloaded by another process")
+		return nil
 	}
 	if di := r.GetDarwinInit(); di != nil {
 		dat, err := json.MarshalIndent(di.AsMap(), "", "  ")

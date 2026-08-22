@@ -6,6 +6,7 @@ package demangle
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -1172,8 +1173,8 @@ func (ft *FunctionType) printInner(ps *printState) {
 func (ft *FunctionType) printArgs(ps *printState) {
 	paren := false
 	space := false
-	for i := len(ps.inner) - 1; i >= 0; i-- {
-		switch ps.inner[i].(type) {
+	for _, v := range slices.Backward(ps.inner) {
+		switch v.(type) {
 		case *PointerType, *ReferenceType, *RvalueReferenceType:
 			paren = true
 		case *TypeWithQualifiers, *ComplexType, *ImaginaryType, *PtrMem:

@@ -38,8 +38,7 @@ func hostKeyCallback(path string) ssh.HostKeyCallback {
 		}
 
 		if err := callback(hostname, remote, key); err != nil {
-			var kerr *knownhosts.KeyError
-			if errors.As(err, &kerr) {
+			if kerr, ok := errors.AsType[*knownhosts.KeyError](err); ok {
 				if len(kerr.Want) > 0 {
 					return fmt.Errorf("possible man-in-the-middle attack: %w", err)
 				}

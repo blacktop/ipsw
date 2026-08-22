@@ -3,7 +3,9 @@ package download
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/xml"
 	"fmt"
@@ -16,6 +18,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	godl "github.com/blacktop/go-download"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -424,9 +428,10 @@ func GetProductInfo(latest bool) (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll, assistantOnly bool) error {
-
-	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true, true)
+// DownloadInstallerContext downloads an installer and cancels its requests when ctx is done.
+func (i *ProductInfo) DownloadInstallerContext(ctx context.Context, workDir, proxy string, insecure, skipAll, restartAll, assistantOnly bool) error {
+	downloader := NewDownload(proxy, insecure, skipAll, restartAll, true)
+	defer downloader.Close()
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
@@ -434,7 +439,18 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 		return fmt.Errorf("failed to create directory %s: %v", folder, err)
 	}
 
+	// the integrity chunklist must honor the same proxy/TLS settings as the
+	// packages themselves
+	integrityTransport := &http.Transport{
+		Proxy:           GetProxy(proxy),
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, // #nosec G402 -- user opted in via --insecure
+		IdleConnTimeout: 90 * time.Second,
+	}
+	defer integrityTransport.CloseIdleConnections()
+	integrityClient := &http.Client{Transport: integrityTransport}
+
 	log.Info("Downloading packages")
+	skipped := false
 	for _, pkg := range i.Product.Packages {
 		if len(pkg.URL) > 0 {
 			if assistantOnly && !strings.HasSuffix(pkg.URL, "InstallAssistant.pkg") {
@@ -446,23 +462,22 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 					"size":     humanize.Bytes(uint64(pkg.Size)),
 					"destName": destName,
 				}).Info("Getting Package")
-				// download file
 				downloader.URL = pkg.URL
 				downloader.DestName = filepath.Join(folder, destName)
-				if err = downloader.Do(); err != nil {
+				status, err := downloader.DoContext(ctx)
+				if err != nil {
 					return errors.Wrap(err, "failed to download file")
+				}
+				if status != Downloaded {
+					skipped = true
+					continue
 				}
 				if len(pkg.IntegrityDataURL) > 0 {
 					utils.Indent(log.Info, 2)("Verifying Package")
-					resp, err := http.Get(pkg.IntegrityDataURL)
+					integrityData, err := fetchIntegrityData(ctx, integrityClient, pkg.IntegrityDataURL)
 					if err != nil {
-						return fmt.Errorf("failed to download the integrity data %s: %v", pkg.IntegrityDataURL, err)
+						return err
 					}
-					integrityData, err := io.ReadAll(resp.Body)
-					if err != nil {
-						return fmt.Errorf("failed to read integrity data: %v", err)
-					}
-					resp.Body.Close()
 					r := bytes.NewReader(integrityData)
 					var chklist Chunklist
 					if err := binary.Read(r, binary.LittleEndian, &chklist); err != nil {
@@ -481,20 +496,22 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 						if err != nil {
 							return fmt.Errorf("failed to open package: %v", err)
 						}
-						defer f.Close()
 						// verify integrity
 						for idx, chunk := range chunks {
 							chunkData := make([]byte, chunk.Size)
-							if _, err := f.Read(chunkData); err != nil {
+							if _, err := io.ReadFull(f, chunkData); err != nil {
+								f.Close()
 								return fmt.Errorf("failed to read chunk data: %v", err)
 							}
 							// verify chunk
 							sha256 := sha256.New()
 							sha256.Write(chunkData)
 							if !bytes.Equal(sha256.Sum(nil), chunk.Hash[:]) {
+								f.Close()
 								return fmt.Errorf("failed to validate %s: chunk #%d integrity check failed", destName, idx)
 							}
 						}
+						f.Close()
 					}
 				}
 			} else {
@@ -510,13 +527,15 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 					"size":     humanize.Bytes(uint64(pkg.Size)),
 					"destName": destName,
 				}).Info("Getting Package")
-				// download file
-				downloader.URL = pkg.URL
-				downloader.Sha1 = pkg.Digest
+				downloader.URL = pkg.MetadataURL
 				downloader.DestName = filepath.Join(folder, destName)
 
-				if err := downloader.Do(); err != nil {
+				status, err := downloader.DoContext(ctx)
+				if err != nil {
 					return errors.Wrap(err, "failed to download metadata file")
+				}
+				if status != Downloaded {
+					skipped = true
 				}
 			} else {
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
@@ -525,6 +544,10 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 	}
 
 	if assistantOnly {
+		return nil
+	}
+	if skipped {
+		log.Warn("Skipping installer creation while one or more packages are being downloaded by another process")
 		return nil
 	}
 
@@ -622,4 +645,27 @@ type Chunklist struct {
 	SignatureOffset uint64
 	// Chunks          []Chunk
 	// Signature       []byte
+}
+
+// fetchIntegrityData downloads a package's integrity chunklist through the
+// same proxy/TLS configuration as the package download itself.
+func fetchIntegrityData(ctx context.Context, client *http.Client, integrityURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, integrityURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create integrity data request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download the integrity data %s: %v", godl.RedactURL(integrityURL), err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("integrity data request %s returned status %s", godl.RedactURL(integrityURL), resp.Status)
+	}
+	// chunklists are small; bound the read so an error page cannot balloon
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read integrity data: %v", err)
+	}
+	return data, nil
 }
