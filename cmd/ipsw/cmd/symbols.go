@@ -68,7 +68,10 @@ which its dylib images reference via dsc_uuid.
 
 Kernel and KEXT symbol addresses are bit-63-cleared exactly as the ipswd symbol
 database stores them, so a server backed by this output returns byte-identical
-results to the daemon.`,
+results to the daemon. Kernels found on the file system
+(/System/Library/Kernels/kernel*, /System/Library/KernelCollections/*.kc) are
+emitted the same way: kind "kernel", canonical /System/Library/... path, and
+bit-63-cleared text and symbol ranges.`,
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	Hidden:        true,

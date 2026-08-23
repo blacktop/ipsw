@@ -93,13 +93,21 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 			SharedRegionStart: img.SharedRegionStart,
 		})
 	}
+	kind, imgPath, mask := img.Kind, img.Macho.GetPath(), ^uint64(0)
+	if img.KernelPath != "" {
+		// The daemon model keeps file-system kernels as raw "macho" entries;
+		// the stream presents them as the kernel images they are, at their
+		// canonical path and bit-63-cleared like scanKernels stores kernelcache
+		// kernels and KEXTs, so one address convention covers every kind=kernel.
+		kind, imgPath, mask = "kernel", img.KernelPath, highestBitMask
+	}
 	if err := e.emit(&imageLine{
 		Type:          "image",
 		UUID:          img.Macho.UUID,
-		Kind:          img.Kind,
-		Path:          img.Macho.GetPath(),
-		TextStart:     img.Macho.TextStart,
-		TextEnd:       img.Macho.TextEnd,
+		Kind:          kind,
+		Path:          imgPath,
+		TextStart:     img.Macho.TextStart & mask,
+		TextEnd:       img.Macho.TextEnd & mask,
 		CPU:           img.CPU,
 		Arch:          img.Arch,
 		DSCUUID:       img.DSCUUID,
@@ -112,8 +120,8 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 			Type:      "symbol",
 			ImageUUID: img.Macho.UUID,
 			Name:      sym.GetName(),
-			Start:     sym.Start,
-			End:       sym.End,
+			Start:     sym.Start & mask,
+			End:       sym.End & mask,
 		}); err != nil {
 			return err
 		}
@@ -129,7 +137,11 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 // is never held in memory.
 //
 // The emitted addresses use the same normalization as the daemon database, so a
-// server backed by this output returns byte-identical results to ipswd.
+// server backed by this output returns byte-identical results to ipswd. The one
+// deliberate divergence is the kernel image class found on the file system
+// (scanImage.KernelPath): the daemon keeps those as raw "macho" entries under
+// their mount-relative path, the stream emits them as bit-63-cleared "kernel"
+// images at their canonical /System/Library/... path.
 func ScanJSONL(cfg *JSONLConfig, w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	// Flush buffered lines on every return path, including early errors, so an

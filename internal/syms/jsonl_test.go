@@ -12,25 +12,34 @@ import (
 	"github.com/blacktop/ipsw/pkg/plist"
 )
 
+// rawLines splits a JSONL buffer into its non-blank lines.
+func rawLines(t *testing.T, b []byte) [][]byte {
+	t.Helper()
+	var lines [][]byte
+	sc := bufio.NewScanner(bytes.NewReader(b))
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		if len(bytes.TrimSpace(sc.Bytes())) == 0 {
+			continue
+		}
+		lines = append(lines, bytes.Clone(sc.Bytes()))
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatalf("scan error: %v", err)
+	}
+	return lines
+}
+
 // decodeLines splits a JSONL buffer into a slice of generic maps, one per line.
 func decodeLines(t *testing.T, b []byte) []map[string]any {
 	t.Helper()
 	var lines []map[string]any
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for sc.Scan() {
-		raw := sc.Bytes()
-		if len(strings.TrimSpace(string(raw))) == 0 {
-			continue
-		}
+	for _, raw := range rawLines(t, b) {
 		var m map[string]any
 		if err := json.Unmarshal(raw, &m); err != nil {
 			t.Fatalf("invalid JSON line %q: %v", string(raw), err)
 		}
 		lines = append(lines, m)
-	}
-	if err := sc.Err(); err != nil {
-		t.Fatalf("scan error: %v", err)
 	}
 	return lines
 }
@@ -326,5 +335,133 @@ func TestPlatformFromInfo(t *testing.T) {
 		if got := platformFromInfo(inf); got != tc.want {
 			t.Errorf("platformFromInfo(%s) = %v, want %v", tc.device, got, tc.want)
 		}
+	}
+}
+
+// TestEmitterFileSystemKernelIsKernelClass is the regression for the darwin-db
+// ingest failure on the arm64e macOS file-system kernel (the image record is the
+// one captured from the failing run; the symbol is synthetic and inside its text
+// range). Images are built the way scanMachosInMount builds them, so the test
+// covers both the classification and the stream rendering.
+func TestEmitterFileSystemKernelIsKernelClass(t *testing.T) {
+	cases := []struct {
+		name                     string
+		path                     string
+		arch                     string
+		textStart, textEnd       uint64
+		symStart, symEnd         uint64
+		wantKind, wantPath       string
+		wantStart, wantEnd       uint64
+		wantSymStart, wantSymEnd uint64
+	}{
+		{
+			name:      "arm64e file-system kernel",
+			path:      "/root/System/Library/Kernels/kernel.release.t6000",
+			arch:      "arm64e",
+			textStart: 0xfffffe0007004000, textEnd: 0xfffffe000711c000,
+			symStart: 0xfffffe0007005980, symEnd: 0xfffffe0007005a00,
+			wantKind: "kernel", wantPath: "/System/Library/Kernels/kernel.release.t6000",
+			wantStart: 0x7ffffe0007004000, wantEnd: 0x7ffffe000711c000,
+			wantSymStart: 0x7ffffe0007005980, wantSymEnd: 0x7ffffe0007005a00,
+		},
+		{
+			name:      "x86_64 file-system kernel",
+			path:      "/root/System/Library/Kernels/kernel",
+			arch:      "x86_64",
+			textStart: 0xffffff8000200000, textEnd: 0xffffff8000bfc000,
+			symStart: 0xffffff8000202000, symEnd: 0xffffff8000202080,
+			wantKind: "kernel", wantPath: "/System/Library/Kernels/kernel",
+			wantStart: 0x7fffff8000200000, wantEnd: 0x7fffff8000bfc000,
+			wantSymStart: 0x7fffff8000202000, wantSymEnd: 0x7fffff8000202080,
+		},
+		{
+			name:      "x86_64 kernel collection",
+			path:      "/root/System/Library/KernelCollections/BootKernelExtensions.kc",
+			arch:      "x86_64",
+			textStart: 0xffffff8000200000, textEnd: 0xffffff8000bfc000,
+			symStart: 0xffffff8000202000, symEnd: 0xffffff8000202080,
+			wantKind: "kernel", wantPath: "/System/Library/KernelCollections/BootKernelExtensions.kc",
+			wantStart: 0x7fffff8000200000, wantEnd: 0x7fffff8000bfc000,
+			wantSymStart: 0x7fffff8000202000, wantSymEnd: 0x7fffff8000202080,
+		},
+		{
+			name:      "kernel-space macho outside the kernel paths is untouched",
+			path:      "/root/System/Library/Extensions/Synthetic.kext/Contents/MacOS/Synthetic",
+			arch:      "arm64e",
+			textStart: 0xfffffe0007004000, textEnd: 0xfffffe000711c000,
+			symStart: 0xfffffe0007005980, symEnd: 0xfffffe0007005a00,
+			wantKind: "macho", wantPath: "/root/System/Library/Extensions/Synthetic.kext/Contents/MacOS/Synthetic",
+			wantStart: 0xfffffe0007004000, wantEnd: 0xfffffe000711c000,
+			wantSymStart: 0xfffffe0007005980, wantSymEnd: 0xfffffe0007005a00,
+		},
+		{
+			name:      "kernel path without kernel-space text is untouched",
+			path:      "/root/System/Library/Kernels/kernel",
+			arch:      "x86_64",
+			textStart: 0x100000000, textEnd: 0x100004000,
+			symStart: 0x100001000, symEnd: 0x100001040,
+			wantKind: "macho", wantPath: "/root/System/Library/Kernels/kernel",
+			wantStart: 0x100000000, wantEnd: 0x100004000,
+			wantSymStart: 0x100001000, wantSymEnd: 0x100001040,
+		},
+		{
+			name:      "user-space macho is untouched",
+			path:      "/root/usr/bin/sh",
+			arch:      "arm64e",
+			textStart: 0x100000000, textEnd: 0x100004000,
+			symStart: 0x100001000, symEnd: 0x100001040,
+			wantKind: "macho", wantPath: "/root/usr/bin/sh",
+			wantStart: 0x100000000, wantEnd: 0x100004000,
+			wantSymStart: 0x100001000, wantSymEnd: 0x100001040,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			em := newJSONLEmitter(&buf)
+			if err := em.image(&scanImage{
+				Kind:       "macho",
+				CPU:        tc.arch,
+				Arch:       tc.arch,
+				KernelPath: fileSystemKernelPath(tc.path, tc.textStart),
+				Macho: &model.Macho{
+					UUID:      "12A0D395-DBB9-3050-B357-F0F9F3185660",
+					Path:      model.Path{Path: tc.path},
+					TextStart: tc.textStart,
+					TextEnd:   tc.textEnd,
+					Symbols: []*model.Symbol{
+						{Name: model.Name{Name: "_synthetic_entry"}, Start: tc.symStart, End: tc.symEnd},
+					},
+				},
+			}); err != nil {
+				t.Fatalf("emit: %v", err)
+			}
+
+			lines := rawLines(t, buf.Bytes())
+			if len(lines) != 2 {
+				t.Fatalf("expected image + symbol line, got %d: %s", len(lines), buf.String())
+			}
+			// Typed decode: uint64 addresses above 2^53 would not survive float64.
+			var img imageLine
+			var sym symbolLine
+			if err := json.Unmarshal(lines[0], &img); err != nil {
+				t.Fatalf("decode image line: %v", err)
+			}
+			if err := json.Unmarshal(lines[1], &sym); err != nil {
+				t.Fatalf("decode symbol line: %v", err)
+			}
+			if img.Type != "image" || img.Kind != tc.wantKind || img.Path != tc.wantPath || img.Arch != tc.arch {
+				t.Fatalf("image = %+v, want kind=%s path=%s arch=%s", img, tc.wantKind, tc.wantPath, tc.arch)
+			}
+			if img.TextStart != tc.wantStart || img.TextEnd != tc.wantEnd {
+				t.Fatalf("image text range = [%#x,%#x), want [%#x,%#x)", img.TextStart, img.TextEnd, tc.wantStart, tc.wantEnd)
+			}
+			if sym.Type != "symbol" || sym.ImageUUID != img.UUID {
+				t.Fatalf("symbol = %+v, want symbol for image %s", sym, img.UUID)
+			}
+			if sym.Start != tc.wantSymStart || sym.End != tc.wantSymEnd {
+				t.Fatalf("symbol range = [%#x,%#x), want [%#x,%#x)", sym.Start, sym.End, tc.wantSymStart, tc.wantSymEnd)
+			}
+		})
 	}
 }

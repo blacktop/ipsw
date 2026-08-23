@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -24,7 +25,10 @@ import (
 )
 
 const (
-	highestBitMask uint64 = ^uint64(1 << 63)
+	// kernelSpaceBit is set on every kernel virtual address (0xfffffe... on
+	// arm64, 0xffffff8... on x86_64) and never on a user-space one.
+	kernelSpaceBit uint64 = 1 << 63
+	highestBitMask uint64 = ^kernelSpaceBit
 	isKernelMask   uint64 = 1 << 62
 )
 
@@ -54,6 +58,7 @@ type scanImage struct {
 	IsFileset         bool         // kernel image is a fileset container, not a loadable kernel Mach-O
 	KernelUUID        string       // parent kernelcache UUID ("kext")
 	KernelVersion     string       // kernelcache version ("kernel")
+	KernelPath        string       // canonical path of a file-system kernel ("macho"), see fileSystemKernelPath
 }
 
 // scanVisitor is invoked once per image (and once per DSC container) as an IPSW
@@ -399,9 +404,40 @@ func scanDSC(f *dyld.File, visit scanVisitor) error {
 	return nil
 }
 
+// fileSystemKernelPath classifies a file-system Mach-O as a member of the kernel
+// image class and returns its canonical /System/Library/... path, or "" for any
+// other image. It must sit at /System/Library/Kernels/kernel (or kernel.<variant>)
+// or /System/Library/KernelCollections/<name>.kc and be linked into kernel space
+// (kernelSpaceBit set on its __TEXT address). The mount-relative prefix the
+// walker reports (e.g. /root) is dropped from the canonical path.
+func fileSystemKernelPath(raw string, textStart uint64) string {
+	if textStart&kernelSpaceBit == 0 {
+		return ""
+	}
+	idx := strings.Index(raw, "/System/Library/")
+	if idx < 0 {
+		return ""
+	}
+	canonical := raw[idx:]
+	dir, base := path.Split(canonical)
+	switch dir {
+	case "/System/Library/Kernels/":
+		if base == "kernel" || strings.HasPrefix(base, "kernel.") {
+			return canonical
+		}
+	case "/System/Library/KernelCollections/":
+		if strings.HasSuffix(base, ".kc") {
+			return canonical
+		}
+	}
+	return ""
+}
+
 // scanMachosInMount walks every Mach-O in an already-mounted volume and visits
 // it as a "macho" image. The path is reported relative to the mount point so it
-// matches the path the daemon database stores.
+// matches the path the daemon database stores. Addresses are raw: file-system
+// kernels keep kernelSpaceBit here, and are flagged via KernelPath so the JSONL
+// stream can present them as kernel images.
 func scanMachosInMount(mountPoint string, visit scanVisitor) error {
 	return search.ForEachMacho(mountPoint, func(path string, m *macho.File) error {
 		if m.UUID() == nil {
@@ -439,10 +475,11 @@ func scanMachosInMount(mountPoint string, visit scanVisitor) error {
 			mm.Symbols = append(mm.Symbols, msym)
 		}
 		return visit(&scanImage{
-			Macho: mm,
-			Kind:  "macho",
-			CPU:   machoArch(m),
-			Arch:  machoArch(m),
+			Macho:      mm,
+			Kind:       "macho",
+			CPU:        machoArch(m),
+			Arch:       machoArch(m),
+			KernelPath: fileSystemKernelPath(path, mm.TextStart),
 		})
 	})
 }
