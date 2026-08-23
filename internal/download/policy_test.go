@@ -96,10 +96,7 @@ func TestURLProfileClassification(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := ResolvePolicy(test.url, test.fallback)
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := ResolvePolicy(test.url, test.fallback)
 			if got != test.want {
 				t.Fatalf("ResolvePolicy(%q) = %+v, want %+v", test.url, got, test.want)
 			}
@@ -113,10 +110,7 @@ func TestPolicyOverrideResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, fallback := range []Profile{GenericProfile, AppleCDNProfile} {
-		got, err := ResolvePolicy("::", fallback)
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := ResolvePolicy("::", fallback)
 		if got.Parts != 3 || got.MinParts != 3 {
 			t.Fatalf("profile %d reduced-parts policy = %+v, want 3/3", fallback, got)
 		}
@@ -129,12 +123,13 @@ func TestPolicyOverrideResolution(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ResolvePolicy("https://updates.cdn-apple.com/file", GenericProfile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.MinPartSize != 2<<20 || !got.EnableNodeSelection {
+	got := ResolvePolicy("https://updates.cdn-apple.com/file", GenericProfile)
+	if got.MinPartSize != 2<<20 {
 		t.Fatalf("explicit policy overrides = %+v", got)
+	}
+	// placement is not part of the tuple: it rides PolicyOverrides
+	if !GetPolicyOverrides().EnableNodeSelection {
+		t.Fatal("EnableNodeSelection override was not retained")
 	}
 }
 
@@ -150,10 +145,7 @@ func TestSingleStreamOverrideResolvesToOneOfOne(t *testing.T) {
 		"https://updates.cdn-apple.com/file",
 		"https://example.net/file",
 	} {
-		policy, err := ResolvePolicy(rawURL, GenericProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
+		policy := ResolvePolicy(rawURL, GenericProfile)
 		if policy.Parts != 1 || policy.MinParts != 1 ||
 			policy.MinPartSize != selectedMinPartSize {
 			t.Fatalf("single-stream policy for %q = %+v", rawURL, policy)
@@ -170,11 +162,8 @@ func TestResolvedPolicyReachesEngineOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := NewDownload("", false, false, false, false)
-	policy, err := ResolvePolicy("https://example.net/file", GenericProfile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	opts := d.options(policy)
+	policy := ResolvePolicy("https://example.net/file", GenericProfile)
+	opts := d.options()
 	if opts.Parts != policy.Parts || opts.MinParts != policy.MinParts ||
 		opts.MinPartSize != policy.MinPartSize || !opts.EnableNodeSelection {
 		t.Fatalf("engine options = %d/%d/%d, resolved policy = %+v",
@@ -182,56 +171,47 @@ func TestResolvedPolicyReachesEngineOptions(t *testing.T) {
 	}
 }
 
-func TestEngineCacheUsesOneEnginePerResolvedTuple(t *testing.T) {
+func TestDownloaderUsesOneLongLivedEngine(t *testing.T) {
 	preservePolicyOverrides(t)
 	d := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
-	d.resolveFinalURL = func(_ context.Context, u string) (string, error) { return u, nil }
-	d.URL = "https://updates.cdn-apple.com/first"
-	appleFirst, err := d.engineForURL(t.Context())
+	first, err := d.downloadEngine()
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.URL = "https://example.net/generic"
-	generic, err := d.engineForURL(t.Context())
+	second, err := d.downloadEngine()
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.URL = "https://apple.com/second"
-	appleSecond, err := d.engineForURL(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if appleFirst != appleSecond || appleFirst == generic || len(d.engines) != 2 {
-		t.Fatalf("engine cache: apple reused=%v distinct generic=%v count=%d",
-			appleFirst == appleSecond, appleFirst != generic, len(d.engines))
-	}
-	if err := SetPolicyOverrides(PolicyOverrides{EnableNodeSelection: true}); err != nil {
-		t.Fatal(err)
-	}
-	d.URL = "https://apple.com/placed"
-	applePlaced, err := d.engineForURL(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if applePlaced == appleFirst || len(d.engines) != 3 {
-		t.Fatalf("engine cache did not separate placement tuple: distinct=%v count=%d",
-			applePlaced != appleFirst, len(d.engines))
-	}
-	if err := SetPolicyOverrides(PolicyOverrides{}); err != nil {
-		t.Fatal(err)
-	}
-	d.URL = "https://apple.com/unplaced"
-	appleThird, err := d.engineForURL(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if appleThird != appleFirst || len(d.engines) != 3 {
-		t.Fatalf("engine cache did not reuse original tuple: reused=%v count=%d",
-			appleThird == appleFirst, len(d.engines))
+	if first != second {
+		t.Fatal("downloadEngine did not reuse the long-lived engine")
 	}
 	d.Close()
-	if d.engines != nil {
-		t.Fatalf("Close left cached engines: %v", d.engines)
+	if d.engine != nil {
+		t.Fatal("Close left the engine cached")
+	}
+	third, err := d.downloadEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third == first {
+		t.Fatal("a closed Download did not build a fresh engine")
+	}
+
+	d.Close()
+}
+
+func TestPolicyForPinsProfileTuples(t *testing.T) {
+	// classification breadth lives in TestURLProfileClassification; this
+	// pins the documented tuple each profile resolves to
+	preservePolicyOverrides(t)
+	d := NewDownload("", false, false, false, false)
+	apple := EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20}
+	generic := EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20}
+	if got := d.policyFor("https://updates.cdn-apple.com/file.ipsw"); got != apple {
+		t.Errorf("Apple CDN tuple = %+v, want %+v", got, apple)
+	}
+	if got := d.policyFor("https://example.net/file.ipsw"); got != generic {
+		t.Errorf("Generic tuple = %+v, want %+v", got, generic)
 	}
 }
 
@@ -245,16 +225,15 @@ func TestAuthenticatedTransportOwnershipPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
-	d.client = &http.Client{Transport: standard, Jar: jar}
-	policy, err := ResolvePolicy("https://updates.cdn-apple.com/file", d.fallbackProfile)
-	if err != nil {
+	if err := SetPolicyOverrides(PolicyOverrides{EnableNodeSelection: true}); err != nil {
 		t.Fatal(err)
 	}
-	policy.EnableNodeSelection = true
-	opts := d.options(policy)
-	// Proxy must stay nil without an explicit --proxy: go-download treats a
-	// non-nil caller callback as opaque and disables node placement.
+	// construction captures the placement override
+	d := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
+	d.client = &http.Client{Transport: standard, Jar: jar}
+	opts := d.options()
+	// Proxy stays nil without an explicit --proxy so go-download owns the
+	// environment lookup and judges placement from the actual election route.
 	if opts.Transport != nil || opts.Proxy != nil || opts.Jar != jar ||
 		opts.TLSConfig == standard.TLSClientConfig ||
 		!opts.EnableNodeSelection {
@@ -265,7 +244,7 @@ func TestAuthenticatedTransportOwnershipPolicy(t *testing.T) {
 		return nil, errors.New("unused")
 	}
 	d.client = &http.Client{Transport: &http.Transport{DialContext: customDial}}
-	opts = d.options(policy)
+	opts = d.options()
 	// go-download keeps placement off whenever Options.Transport is set;
 	// ipsw no longer mirrors that invariant into EnableNodeSelection
 	if opts.Transport == nil {
@@ -274,14 +253,14 @@ func TestAuthenticatedTransportOwnershipPolicy(t *testing.T) {
 	clone, ok := opts.Transport.(*http.Transport)
 	if !ok || clone == d.client.Transport || clone.Protocols == nil ||
 		!clone.Protocols.HTTP1() || clone.Protocols.HTTP2() ||
-		clone.MaxIdleConnsPerHost != policy.Parts+1 {
+		clone.MaxIdleConnsPerHost != MaxParts+1 {
 		t.Fatalf("opaque standard transport clone not HTTP/1 tuned: %+v", opts.Transport)
 	}
 
 	customTimeout := 7 * time.Second
 	original := &http.Transport{ResponseHeaderTimeout: customTimeout, ReadBufferSize: 32 << 10}
 	d.client = &http.Client{Transport: original}
-	opts = d.options(policy)
+	opts = d.options()
 	clone, ok = opts.Transport.(*http.Transport)
 	if !ok || clone == original || clone.ResponseHeaderTimeout != customTimeout ||
 		clone.ReadBufferSize != original.ReadBufferSize {
@@ -289,7 +268,7 @@ func TestAuthenticatedTransportOwnershipPolicy(t *testing.T) {
 	}
 
 	d.client = &http.Client{Transport: failingTransport{}}
-	opts = d.options(policy)
+	opts = d.options()
 	// placement stays engine-disabled via Options.Transport != nil
 	if _, ok := opts.Transport.(borrowedRoundTripper); !ok {
 		t.Fatalf("non-http transport was not borrowed: %+v", opts)

@@ -7,14 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 	godl "github.com/blacktop/go-download"
@@ -42,7 +40,7 @@ type Download struct {
 	Headers  map[string]string
 
 	proxyFn    func(*http.Request) (*url.URL, error)
-	userAgent  string // chosen once so preflight and transfer follow one redirect chain
+	userAgent  string // chosen once so every request follows one redirect chain
 	insecure   bool
 	skipAll    bool
 	restartAll bool
@@ -51,11 +49,26 @@ type Download struct {
 	client *http.Client
 
 	fallbackProfile Profile
-	engines         map[EnginePolicy]*godl.Downloader // lazily built and reused by resolved tuple
-	preflight       *http.Client                      // lazy redirect resolver; closed by Close
-	// resolveFinalURL overrides redirect resolution in tests; nil uses the
-	// ranged-request preflight.
-	resolveFinalURL func(context.Context, string) (string, error)
+	// nodeSelection is the placement setting captured at construction:
+	// EnableNodeSelection is fixed at engine construction (the tuple stays
+	// live via Options.Policy), and the CLI installs overrides exactly once
+	// before any Download exists.
+	nodeSelection bool
+	// engine is one long-lived go-download instance per transport/auth
+	// context; per-resource tuples are applied by Options.Policy after the
+	// engine's own election resolves the byte-serving URL.
+	engine *godl.Downloader
+}
+
+// FileRequest is one artifact handled by a long-lived Download session.
+// Headers and ResumeID are per file; transport, cookie jar, proxy, TLS, and
+// concurrency policy stay on the Download.
+type FileRequest struct {
+	URL      string
+	SHA1     string
+	DestName string
+	Headers  http.Header
+	ResumeID string
 }
 
 // NewDownload creates a new downloader. Interrupted downloads always resume
@@ -75,11 +88,12 @@ func NewDownloadWithProfile(
 		restartAll:      restartAll,
 		ignoreSha1:      ignoreSha1,
 		fallbackProfile: profile,
+		nodeSelection:   GetPolicyOverrides().EnableNodeSelection,
 	}
-	// Only an explicit --proxy becomes a caller-supplied proxy function:
-	// go-download treats every non-nil callback as opaque and disables node
-	// placement, while a nil Proxy keeps its own per-URL environment-proxy
-	// evaluation (and placement eligibility) intact.
+	// Only an explicit --proxy becomes a caller-supplied proxy function.
+	// go-download v0.2.4 decides placement from the actual election route
+	// (a proxied election disables it); a nil Proxy keeps the engine's own
+	// per-URL environment-proxy evaluation.
 	if proxy != "" {
 		d.proxyFn = GetProxy(proxy)
 	} else {
@@ -138,80 +152,104 @@ func (d *Download) Do() (Status, error) {
 }
 
 // DoContext downloads d.URL to d.DestName and stops when ctx is cancelled.
+// It is the compatibility adapter for callers that still populate Download's
+// public per-file fields.
 func (d *Download) DoContext(ctx context.Context) (Status, error) {
+	headers := make(http.Header, len(d.Headers))
+	for key, value := range d.Headers {
+		headers.Set(key, value)
+	}
+	return d.DoRequestContext(ctx, &FileRequest{
+		URL: d.URL, SHA1: d.Sha1, DestName: d.DestName, Headers: headers,
+	})
+}
+
+// DoRequest downloads one typed file request through the session.
+func (d *Download) DoRequest(req *FileRequest) (Status, error) {
+	return d.DoRequestContext(context.Background(), req)
+}
+
+// DoRequestContext downloads one typed file request and stops when ctx is
+// cancelled. The engine snapshots Headers at its Do boundary.
+func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Status, error) {
 	if ctx == nil {
 		return Skipped, errors.New("download context is nil")
 	}
-	if d.skipAll && fileExists(d.DestName+PartSuffix) && !stagingLockSupported(filepath.Dir(d.DestName)) {
+	if req == nil {
+		return Skipped, errors.New("download request is nil")
+	}
+	request := *req
+	request.Headers = req.Headers.Clone()
+	if d.skipAll && fileExists(request.DestName+PartSuffix) && !stagingLockSupported(filepath.Dir(request.DestName)) {
 		// fail closed: this platform or filesystem cannot enforce the
 		// staging lock, so any existing stage may be another process's
 		// active download. Never let --restart-all discard an unprotected
 		// stage because its ownership cannot be established.
-		log.Infof("%s - SKIPPED", d.DestName)
+		log.Infof("%s - SKIPPED", request.DestName)
 		return Skipped, nil
 	}
-	if err := d.prepareStage(ctx); err != nil {
-		if d.skipLocked(err) {
+	if err := d.prepareStage(ctx, request.DestName); err != nil {
+		if d.skipLocked(err, request.DestName) {
 			return Skipped, nil
 		}
 		return Skipped, err
 	}
 
-	engine, err := d.engineForURL(ctx)
+	engine, err := d.downloadEngine()
 	if err != nil {
-		return Skipped, fmt.Errorf("failed to create downloader for %s: %w", godl.RedactURL(d.URL), err)
+		return Skipped, fmt.Errorf("failed to create downloader for %s: %w", godl.RedactURL(request.URL), err)
 	}
 
-	req := &godl.Request{
-		URL:          d.URL,
-		Dest:         d.DestName,
+	engineReq := &godl.Request{
+		URL:          request.URL,
+		Dest:         request.DestName,
 		Reporter:     newProgressReporter(),
-		ExpectedSHA1: d.expectedSHA1(),
+		ExpectedSHA1: d.expectedSHA1(request.SHA1, request.DestName),
+		Headers:      request.Headers,
+		ResumeID:     request.ResumeID,
 	}
-	res, err := engine.Do(ctx, req)
+	if engineReq.ResumeID == "" {
+		engineReq.ResumeID = defaultResumeID(request.URL)
+	}
+	res, err := engine.Do(ctx, engineReq)
 	if err != nil {
-		if d.skipLocked(err) {
+		if d.skipLocked(err, request.DestName) {
 			return Skipped, nil
 		}
-		return Skipped, d.wrapError(err)
+		return Skipped, d.wrapError(err, request.URL, request.DestName)
 	}
 	if res.Resumed {
-		utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Resumed a previous download")
+		utils.Indent(log.WithField("file", request.DestName).Debug, 2)("Resumed a previous download")
 	}
-	if req.ExpectedSHA1 != "" {
+	if engineReq.ExpectedSHA1 != "" {
 		utils.Indent(log.Debug, 2)("sha1sum verified ✅")
 	}
 	return Downloaded, nil
 }
 
-// Close releases every cached engine's idle connections. Call it once after a
-// batch of Do calls; a closed Download can still be reused.
+// Close releases the engine's idle connections. Call it once after a batch
+// of Do calls; a closed Download can still be reused (the next Do rebuilds
+// the engine).
 func (d *Download) Close() {
-	for _, engine := range d.engines {
-		engine.CloseIdleConnections()
-	}
-	d.engines = nil
-	if d.preflight != nil {
-		if transport, ok := d.preflight.Transport.(*http.Transport); ok {
-			transport.CloseIdleConnections()
-		}
-		d.preflight = nil
+	if d.engine != nil {
+		d.engine.CloseIdleConnections()
+		d.engine = nil
 	}
 }
 
-func (d *Download) prepareStage(ctx context.Context) error {
-	legacyPath := d.DestName + legacySuffix
+func (d *Download) prepareStage(ctx context.Context, destName string) error {
+	legacyPath := destName + legacySuffix
 	if fileExists(legacyPath) {
 		log.Warnf("found legacy partial download %s: the new engine cannot resume it and it may be incomplete; "+
-			"if it is actually complete, rename it into place (mv '%s' '%s') — otherwise delete it", legacyPath, legacyPath, d.DestName)
+			"if it is actually complete, rename it into place (mv '%s' '%s') — otherwise delete it", legacyPath, legacyPath, destName)
 	}
 	if !d.restartAll {
 		return nil
 	}
-	if fileExists(d.DestName + PartSuffix) {
-		log.Infof("Downloading %s - RESTARTED", d.DestName)
+	if fileExists(destName + PartSuffix) {
+		log.Infof("Downloading %s - RESTARTED", destName)
 	}
-	if err := godl.Discard(ctx, d.DestName); err != nil {
+	if err := godl.Discard(ctx, destName); err != nil {
 		return fmt.Errorf("failed to restart download: %w", err)
 	}
 	if fileExists(legacyPath) {
@@ -223,54 +261,42 @@ func (d *Download) prepareStage(ctx context.Context) error {
 	return nil
 }
 
-func (d *Download) engineForURL(ctx context.Context) (*godl.Downloader, error) {
-	target := d.URL
-	// The profile contract classifies the byte-serving hostname, so resolve
-	// redirects before choosing the tuple regardless of the source hostname —
-	// unless the overrides pin both profiles to one tuple, in which case the
-	// answer cannot matter and the extra request is skipped.
-	resolve := d.resolveFinalURL
-	if resolve == nil {
-		resolve = d.resolveByteServingURL
+// downloadEngine lazily builds the Download's single engine. Per-resource
+// concurrency is chosen by policyFor once the engine's election has followed
+// redirects — no ipsw-side preflight request exists.
+func (d *Download) downloadEngine() (*godl.Downloader, error) {
+	if d.engine != nil {
+		return d.engine, nil
 	}
-	if profilesConverge() {
-		resolve = nil
-	}
-	if resolve != nil {
-		if final, err := resolve(ctx, target); err == nil {
-			target = final
-		} else {
-			log.Debugf("could not resolve byte-serving URL for %s: %s",
-				godl.RedactURL(target), redactedError(err))
-		}
-	}
-	policy, err := ResolvePolicy(target, d.fallbackProfile)
+	engine, err := godl.New(d.options())
 	if err != nil {
 		return nil, err
 	}
-	if engine := d.engines[policy]; engine != nil {
-		return engine, nil
-	}
-	opts := d.options(policy)
-	engine, err := godl.New(opts)
-	if err != nil {
-		return nil, err
-	}
-	if d.engines == nil {
-		d.engines = make(map[EnginePolicy]*godl.Downloader)
-	}
-	d.engines[policy] = engine
+	d.engine = engine
 	return engine, nil
 }
 
-func (d *Download) options(policy EnginePolicy) *godl.Options {
+// policyFor classifies the byte-serving (post-redirect) URL and returns the
+// per-resource tuple. The fallback profile is only reachable if the engine
+// reports an unparseable final URL.
+func (d *Download) policyFor(finalURL string) godl.Concurrency {
+	return ResolvePolicy(finalURL, d.fallbackProfile)
+}
+
+func (d *Download) options() *godl.Options {
+	// Policy owns the effective tuple per resource; the Generic base gives
+	// godl.New a valid tuple before the final URL is known.
+	base := resolveProfile(GenericProfile, GetPolicyOverrides())
 	opts := &godl.Options{
-		Parts:       policy.Parts,
-		MinParts:    policy.MinParts,
-		MinPartSize: policy.MinPartSize,
+		Parts:       base.Parts,
+		MinParts:    base.MinParts,
+		MinPartSize: base.MinPartSize,
+		// Policy re-tunes the tuple per resource once the election has
+		// resolved the byte-serving URL
+		Policy: d.policyFor,
 		// go-download itself keeps placement off for borrowed transports
 		// (Options.Transport != nil): no ipsw-side mirror of that invariant
-		EnableNodeSelection: policy.EnableNodeSelection,
+		EnableNodeSelection: d.nodeSelection,
 		Headers:             d.requestHeaders(),
 		RejectContentTypes:  []string{"text/html"},
 		Overwrite:           true,
@@ -282,8 +308,8 @@ func (d *Download) options(policy EnginePolicy) *godl.Options {
 	return opts
 }
 
-func (d *Download) expectedSHA1() string {
-	sha := strings.ToLower(strings.TrimSpace(d.Sha1))
+func (d *Download) expectedSHA1(rawSHA1, destName string) string {
+	sha := strings.ToLower(strings.TrimSpace(rawSHA1))
 	if sha == "" {
 		return ""
 	}
@@ -293,31 +319,31 @@ func (d *Download) expectedSHA1() string {
 	}
 	if !ValidSHA1(sha) {
 		// Scraped sources sometimes publish placeholders instead of hashes.
-		log.Warnf("ignoring invalid published SHA-1 %q for %s: downloading without verification", d.Sha1, d.DestName)
+		log.Warnf("ignoring invalid published SHA-1 %q for %s: downloading without verification", rawSHA1, destName)
 		return ""
 	}
 	return sha
 }
 
-func (d *Download) wrapError(err error) error {
+func (d *Download) wrapError(err error, rawURL, destName string) error {
 	if contentTypeErr, ok := errors.AsType[*godl.ContentTypeError](err); ok {
 		return fmt.Errorf("failed to download %s to %s: server returned %q instead of the requested file: %w",
-			godl.RedactURL(d.URL), d.DestName, contentTypeErr.ContentType, err)
+			godl.RedactURL(rawURL), destName, contentTypeErr.ContentType, err)
 	}
 	if checksumErr, ok := errors.AsType[*godl.ChecksumError](err); ok {
 		return fmt.Errorf("checksum mismatch for %s (downloaded bytes retained at %s): "+
 			"rerun with --restart-all to re-download, or — only after independently validating the file — "+
 			"with --ignore-sha1 to accept it (a complete resumable stage finalizes without re-downloading): %w",
-			d.DestName, checksumErr.Path, err)
+			destName, checksumErr.Path, err)
 	}
-	return fmt.Errorf("failed to download %s: %w", godl.RedactURL(d.URL), err)
+	return fmt.Errorf("failed to download %s: %w", godl.RedactURL(rawURL), err)
 }
 
-func (d *Download) skipLocked(err error) bool {
+func (d *Download) skipLocked(err error, destName string) bool {
 	if !d.skipAll || !errors.Is(err, godl.ErrLocked) {
 		return false
 	}
-	log.Infof("%s - SKIPPED", d.DestName)
+	log.Infof("%s - SKIPPED", destName)
 	return true
 }
 
@@ -336,83 +362,48 @@ func ValidSHA1(s string) bool {
 // its optional CloseIdleConnections method.
 type borrowedRoundTripper struct{ http.RoundTripper }
 
-// requestHeaders builds the header set shared by the engine options and the
-// redirect preflight, so both follow the same redirect chain (hosts can gate
-// on User-Agent).
+// requestHeaders builds the engine's session-level header set. Per-file
+// headers are carried by FileRequest.
 func (d *Download) requestHeaders() http.Header {
 	headers := make(http.Header)
-	for key, value := range d.Headers {
-		headers.Set(key, value)
+	// Origins can route or redirect on User-Agent: pick one agent per Download
+	// so every request presents a single identity. A FileRequest may explicitly
+	// replace it through go-download's canonical merge.
+	if d.userAgent == "" {
+		d.userAgent = utils.RandomAgent()
 	}
-	if headers.Get("User-Agent") == "" {
-		// origins can route or redirect on User-Agent: pick one agent per
-		// Download so classification and transfer see the same chain
-		if d.userAgent == "" {
-			d.userAgent = utils.RandomAgent()
-		}
-		headers.Set("User-Agent", d.userAgent)
-	}
+	headers.Set("User-Agent", d.userAgent)
 	return headers
 }
 
-// resolveByteServingURL follows redirects with a one-byte ranged request and
-// returns the final URL that will actually serve the download's bytes.
-func (d *Download) resolveByteServingURL(ctx context.Context, rawURL string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	client := d.client
-	if client == nil {
-		if d.preflight == nil {
-			proxy := d.proxyFn
-			if proxy == nil {
-				proxy = http.ProxyFromEnvironment
-			}
-			transport := &http.Transport{Proxy: proxy}
-			if d.insecure {
-				transport.TLSClientConfig = insecureTLS(nil)
-			}
-			d.preflight = &http.Client{Transport: transport}
-		}
-		client = d.preflight
+// defaultResumeID derives a stable signed-URL identity without credentials.
+// Query and fragment are excluded; an explicit default port is normalized
+// away while a non-default port remains part of the origin.
+func defaultResumeID(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Opaque != "" {
+		return ""
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return "", err
+	scheme := strings.ToLower(u.Scheme)
+	host := godl.NormalizeHost(u.Hostname())
+	if scheme == "" || host == "" {
+		return ""
 	}
-	for key, values := range d.requestHeaders() {
-		req.Header[key] = values
+	port := u.Port()
+	if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+		port = ""
 	}
-	req.Header.Set("Range", "bytes=0-0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
+	authority := host
+	if port != "" {
+		authority = net.JoinHostPort(host, port)
+	} else if strings.Contains(host, ":") {
+		authority = "[" + host + "]"
 	}
-	// drain the single byte of a 206 so the connection is reusable; a
-	// Range-ignoring 200 is closed with its body unread (no reuse)
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2))
-	resp.Body.Close()
-	// an error page's final URL must not classify the download: fail the
-	// preflight so the caller falls back to the source hostname
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("preflight for %s returned %s", godl.RedactURL(rawURL), resp.Status)
+	path := u.EscapedPath()
+	if path == "" {
+		path = "/"
 	}
-	return resp.Request.URL.String(), nil
-}
-
-// redactedError renders err for logging with any embedded request URL
-// redacted (url.Error strings carry the full signed query).
-// urlPattern matches URL text embedded in error strings (nested url.Errors,
-// redirect messages) so signed query credentials never reach logs.
-var urlPattern = regexp.MustCompile(`https?://[^\s"']+`)
-
-func redactedError(err error) string {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		return fmt.Sprintf("%s %s: %s", urlErr.Op, godl.RedactURL(urlErr.URL), redactedError(urlErr.Err))
-	}
-	return urlPattern.ReplaceAllStringFunc(err.Error(), godl.RedactURL)
+	return scheme + "://" + authority + path
 }
 
 // insecureTLS returns a clone of c (or a fresh config) with certificate
@@ -446,7 +437,8 @@ func (d *Download) applyTransport(opts *godl.Options) {
 	if decomposableTransport(transport) {
 		// the session transport's Proxy came from the same proxy setting
 		// this Download was constructed with; hand the engine the explicit
-		// form (nil when unset) so placement stays eligible on direct routes
+		// form (nil when unset) and let it judge placement from the actual
+		// election route
 		opts.Proxy = d.proxyFn
 		if transport.TLSClientConfig != nil {
 			opts.TLSConfig = transport.TLSClientConfig.Clone()
@@ -464,7 +456,9 @@ func (d *Download) applyTransport(opts *godl.Options) {
 	protocols.SetHTTP1(true)
 	clone.Protocols = &protocols
 	clone.ForceAttemptHTTP2 = false
-	clone.MaxIdleConnsPerHost = opts.Parts + 1
+	// Policy can retune Parts per resource after the election: size the idle
+	// pool from the cap so a larger tuple does not evict useful connections.
+	clone.MaxIdleConnsPerHost = MaxParts + 1
 	if d.insecure {
 		clone.TLSClientConfig = insecureTLS(clone.TLSClientConfig)
 	}

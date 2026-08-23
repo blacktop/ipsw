@@ -5,15 +5,20 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	godl "github.com/blacktop/go-download"
 )
 
 const (
-	// DefaultParts is the Generic and Apple CDN connection cap.
-	DefaultParts = 8
-	// DefaultMinParts is the Generic eager connection floor.
+	// DefaultParts is the Generic and Apple CDN connection cap (the
+	// engine's own default).
+	DefaultParts = godl.DefaultParts
+	// DefaultMinParts is the Generic eager connection floor. This is an
+	// ipsw profile choice: the engine's own floor default is 1.
 	DefaultMinParts = 4
-	// DefaultMinPartSize is the Generic scheduler split floor.
-	DefaultMinPartSize int64 = 16 << 20
+	// DefaultMinPartSize is the Generic scheduler split floor (the
+	// engine's own default).
+	DefaultMinPartSize = godl.DefaultMinPartSize
 	// AppleCDNMinParts disables aggregate ramping for known per-flow-limited
 	// Apple CDN workloads.
 	AppleCDNMinParts = 8
@@ -31,13 +36,10 @@ const (
 	AppleCDNProfile
 )
 
-// EnginePolicy is one fully resolved go-download engine tuple.
-type EnginePolicy struct {
-	Parts               int
-	MinParts            int
-	MinPartSize         int64
-	EnableNodeSelection bool
-}
+// EnginePolicy is one fully resolved go-download engine tuple. It is the
+// engine's own Concurrency type: EnableNodeSelection is not part of it —
+// placement is a construction-time engine setting kept on PolicyOverrides.
+type EnginePolicy = godl.Concurrency
 
 // PolicyOverrides contains process-wide CLI/config overrides. Integer zero
 // means use the selected URL profile's value. Parts=1 resolves to the
@@ -68,9 +70,14 @@ func SetPolicyOverrides(overrides PolicyOverrides) error {
 	if overrides.MinPartSize < 0 {
 		return fmt.Errorf("min-part-size must be >= 0, got %d", overrides.MinPartSize)
 	}
-	for _, profile := range []Profile{GenericProfile, AppleCDNProfile} {
-		if _, err := resolveProfile(profile, overrides); err != nil {
-			return err
+	if overrides.MinParts != 0 {
+		parts := overrides.Parts
+		if parts == 0 {
+			parts = DefaultParts
+		}
+		if overrides.MinParts > parts {
+			return fmt.Errorf("min-parts must satisfy 1 <= min-parts <= parts (%d), got %d",
+				parts, overrides.MinParts)
 		}
 	}
 	policyMu.Lock()
@@ -87,17 +94,14 @@ func GetPolicyOverrides() PolicyOverrides {
 }
 
 // ResolvePolicy classifies rawURL and applies the current overrides.
-func ResolvePolicy(rawURL string, fallback Profile) (EnginePolicy, error) {
-	policyMu.RLock()
-	overrides := policyOverrides
-	policyMu.RUnlock()
-	return resolveProfile(profileForURL(rawURL, fallback), overrides)
+// Overrides are validated by SetPolicyOverrides, so resolution is infallible.
+func ResolvePolicy(rawURL string, fallback Profile) EnginePolicy {
+	return resolveProfile(profileForURL(rawURL, fallback), GetPolicyOverrides())
 }
 
-func resolveProfile(profile Profile, overrides PolicyOverrides) (EnginePolicy, error) {
+func resolveProfile(profile Profile, overrides PolicyOverrides) EnginePolicy {
 	policy := EnginePolicy{
 		Parts: DefaultParts, MinParts: DefaultMinParts, MinPartSize: DefaultMinPartSize,
-		EnableNodeSelection: overrides.EnableNodeSelection,
 	}
 	if profile == AppleCDNProfile {
 		policy.MinParts = AppleCDNMinParts
@@ -114,22 +118,7 @@ func resolveProfile(profile Profile, overrides PolicyOverrides) (EnginePolicy, e
 	if overrides.MinPartSize != 0 {
 		policy.MinPartSize = overrides.MinPartSize
 	}
-	if policy.MinParts < 1 || policy.MinParts > policy.Parts {
-		return EnginePolicy{}, fmt.Errorf(
-			"min-parts must satisfy 1 <= min-parts <= parts (%d), got %d",
-			policy.Parts, policy.MinParts)
-	}
-	return policy, nil
-}
-
-// profilesConverge reports whether the current overrides pin every profile
-// to one identical tuple, making URL classification (and therefore redirect
-// resolution) unnecessary.
-func profilesConverge() bool {
-	overrides := GetPolicyOverrides()
-	generic, gerr := resolveProfile(GenericProfile, overrides)
-	apple, aerr := resolveProfile(AppleCDNProfile, overrides)
-	return gerr == nil && aerr == nil && generic == apple
+	return policy
 }
 
 func profileForURL(rawURL string, fallback Profile) Profile {
@@ -140,7 +129,7 @@ func profileForURL(rawURL string, fallback Profile) Profile {
 	if err != nil || u.Opaque != "" {
 		return fallback
 	}
-	host := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(u.Hostname()), "."))
+	host := godl.NormalizeHost(u.Hostname())
 	if host == "" {
 		return fallback
 	}

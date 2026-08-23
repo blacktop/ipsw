@@ -116,6 +116,7 @@ var downloadIpaCmd = &cobra.Command{
 			// KeybagPlist:   viper.GetString("download.ipa.keybag-plist"),
 			KeybagPlist: "",
 		})
+		defer as.Close()
 
 		if err := as.Init(); err != nil {
 			return fmt.Errorf("failed to initialize App Store: %v", err)

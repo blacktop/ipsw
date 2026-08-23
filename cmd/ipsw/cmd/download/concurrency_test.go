@@ -86,10 +86,7 @@ func TestDownloadPolicyClampsInheritedMinParts(t *testing.T) {
 	for _, profile := range []internaldownload.Profile{
 		internaldownload.GenericProfile, internaldownload.AppleCDNProfile,
 	} {
-		policy, err := internaldownload.ResolvePolicy("::", profile)
-		if err != nil {
-			t.Fatal(err)
-		}
+		policy := internaldownload.ResolvePolicy("::", profile)
 		if policy.Parts != 2 || policy.MinParts != 2 {
 			t.Fatalf("profile %d policy = %+v, want parts/min-parts 2/2", profile, policy)
 		}

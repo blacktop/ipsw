@@ -155,6 +155,7 @@ var downloadXcodeCmd = &cobra.Command{
 					SkipAll:    skipAll,
 					RestartAll: restartAll,
 				})
+				defer app.Close()
 				if status, err = app.DownloadADC(dl.Source); err != nil {
 					return err
 				}

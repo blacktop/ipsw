@@ -726,7 +726,10 @@ func (e remoteCryptexExtraction) extractMember(zf *zip.File, arches []string) ([
 		),
 	)
 	// create proxy reader
-	proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
+	proxyReader, err := bar.ProxyReader(io.LimitReader(rc, total))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create progress reader for %s: %w", zf.Name, err)
+	}
 	defer proxyReader.Close()
 
 	in, err := os.CreateTemp("", "cryptex-system")

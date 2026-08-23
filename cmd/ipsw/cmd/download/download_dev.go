@@ -154,6 +154,7 @@ var downloadDevCmd = &cobra.Command{
 			ConfigDir:     filepath.Join(home, ".ipsw"),
 			VaultPassword: viper.GetString("download.dev.vault-password"),
 		})
+		defer app.Close()
 
 		if err := app.Init(); err != nil {
 			return fmt.Errorf("failed to initialize app: %v", err)

@@ -245,7 +245,10 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 						),
 					)
 					// create proxy reader
-					r = bar.ProxyReader(io.LimitReader(rc, total))
+					r, err = bar.ProxyReader(io.LimitReader(rc, total))
+					if err != nil {
+						return nil, fmt.Errorf("failed to create progress reader for %s: %w", f.Name, err)
+					}
 					defer r.Close()
 				} else {
 					r = rc
@@ -338,7 +341,10 @@ func SearchPartialZip(files []*zip.File, pattern *regexp.Regexp, folder string, 
 						),
 					)
 					// create proxy reader
-					r = bar.ProxyReader(io.LimitReader(rc, total))
+					r, err = bar.ProxyReader(io.LimitReader(rc, total))
+					if err != nil {
+						return nil, fmt.Errorf("failed to create progress reader for %s: %w", f.Name, err)
+					}
 					defer r.Close()
 				} else {
 					r = rc

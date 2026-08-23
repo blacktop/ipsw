@@ -22,7 +22,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
 	github.com/blacktop/go-apfs v1.0.27
-	github.com/blacktop/go-download v0.2.3
+	github.com/blacktop/go-download v0.2.4
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.282
 	github.com/blacktop/go-plist v1.0.2
@@ -75,7 +75,7 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 	github.com/ulikunitz/xz v0.5.16
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
-	github.com/vbauerster/mpb/v8 v8.15.2
+	github.com/vbauerster/mpb/v8 v8.16.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.55.0
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e
@@ -188,7 +188,7 @@ require (
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/makeworld-the-better-one/dither/v2 v2.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-runewidth v0.0.27 // indirect
+	github.com/mattn/go-runewidth v0.0.28 // indirect
 	github.com/mattn/go-sixel v0.0.8 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect

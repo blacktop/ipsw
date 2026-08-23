@@ -106,7 +106,7 @@ Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` res
 
 ### download concurrency
 
-Every `ipsw download` command selects concurrency from the final download URL. Apple CDN hosts (`apple.com`, `cdn-apple.com`, `aaplimg.com`, `mzstatic.com`, and their subdomains) use 8 parts, 8 eager parts, and an 8 MiB minimum range. Other hosts use 8 parts, 4 eager parts, and a 16 MiB minimum range. `--parts`, `--min-parts`, and `--min-part-size` (MiB) override those values; zero keeps the URL profile. `--parts 1` selects single-stream `1/1` operation, and an explicitly selected minimum part size is retained. Direct-CDN address placement is off by default; `--enable-node-selection` opts into it for eligible direct transports. The equivalent config keys are `download.parts`, `download.min-parts`, `download.min-part-size`, and `download.enable-node-selection`.
+Every `ipsw download` command selects concurrency from the final byte-serving URL after redirects. Apple CDN hosts (`apple.com`, `cdn-apple.com`, `aaplimg.com`, `mzstatic.com`, and their subdomains) use 8 parts, 8 eager parts, and an 8 MiB minimum range. Other hosts use 8 parts, 4 eager parts, and a 16 MiB minimum range. `--parts`, `--min-parts`, and `--min-part-size` (MiB) override those values; zero keeps the URL profile. `--parts 1` selects single-stream `1/1` operation, and an explicitly selected minimum part size is retained. Direct-CDN address placement is off by default; `--enable-node-selection` opts into it for eligible direct transports. The equivalent config keys are `download.parts`, `download.min-parts`, `download.min-part-size`, and `download.enable-node-selection`.
 
 ### download `ipsw` config
 

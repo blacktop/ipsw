@@ -99,7 +99,8 @@ type AppStore struct {
 	dsid         string
 	token        string
 
-	config *AppStoreConfig
+	config          *AppStoreConfig
+	downloadSession *Download
 }
 
 type QueryResults struct {
@@ -490,6 +491,29 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 	}
 
 	return &as
+}
+
+// Close releases idle connections held by the App Store download session.
+func (as *AppStore) Close() {
+	if as.downloadSession != nil {
+		as.downloadSession.Close()
+		as.downloadSession = nil
+	}
+}
+
+func (as *AppStore) downloader() *Download {
+	if as.downloadSession == nil {
+		as.downloadSession = NewDownloadWithProfile(
+			AppleCDNProfile,
+			as.config.Proxy,
+			as.config.Insecure,
+			as.config.SkipAll,
+			as.config.RestartAll,
+			false,
+		)
+		as.downloadSession.client = as.Client
+	}
+	return as.downloadSession
 }
 
 // Init AppStore
@@ -1382,28 +1406,15 @@ func (as *AppStore) patchIPA(staging *os.File, dst string, info *downloadAppResu
 }
 
 func (as *AppStore) download(url, dest string) (Status, error) {
-
-	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownloadWithProfile(
-		AppleCDNProfile,
-		as.config.Proxy,
-		as.config.Insecure,
-		as.config.SkipAll,
-		as.config.RestartAll,
-		false,
-	)
-	// use authenticated client
-	downloader.client = as.Client
-	defer downloader.Close()
+	downloader := as.downloader()
 
 	log.WithFields(log.Fields{
 		"file": dest,
 	}).Info("Downloading")
 
-	downloader.URL = url
-	downloader.DestName = dest
-
-	status, err := downloader.DoContext(as.config.Context)
+	status, err := downloader.DoRequestContext(as.config.Context, &FileRequest{
+		URL: url, DestName: dest,
+	})
 	if err != nil {
 		return status, fmt.Errorf("failed to download file: %w", err)
 	}

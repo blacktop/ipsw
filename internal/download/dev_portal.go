@@ -121,7 +121,8 @@ type DevPortal struct {
 
 	Vault keyring.Keyring
 
-	config *DevConfig
+	config          *DevConfig
+	downloadSession *Download
 
 	authService    authService
 	authOptions    authOptions
@@ -391,6 +392,30 @@ func NewDevPortal(config *DevConfig) *DevPortal {
 	}
 
 	return &dp
+}
+
+// Close releases idle connections held by the Developer Portal download
+// session.
+func (dp *DevPortal) Close() {
+	if dp.downloadSession != nil {
+		dp.downloadSession.Close()
+		dp.downloadSession = nil
+	}
+}
+
+func (dp *DevPortal) downloader() *Download {
+	if dp.downloadSession == nil {
+		dp.downloadSession = NewDownloadWithProfile(
+			AppleCDNProfile,
+			dp.config.Proxy,
+			dp.config.Insecure,
+			dp.config.SkipAll,
+			dp.config.RestartAll,
+			false,
+		)
+		dp.downloadSession.client = dp.Client
+	}
+	return dp.downloadSession
 }
 
 // Init DevPortal sets up the DevPortal vault
@@ -1549,18 +1574,7 @@ func (b *downloadBatch) err() error {
 // A Skipped status means the staging file is locked by another download
 // process and nothing was produced.
 func (dp *DevPortal) Download(url, folder string) (Status, error) {
-	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownloadWithProfile(
-		AppleCDNProfile,
-		dp.config.Proxy,
-		dp.config.Insecure,
-		dp.config.SkipAll,
-		dp.config.RestartAll,
-		false,
-	)
-	// use authenticated client
-	downloader.client = dp.Client
-	defer downloader.Close()
+	downloader := dp.downloader()
 
 	destName := getDestName(url, dp.config.RemoveCommas)
 	destName = filepath.Join(filepath.Clean(folder), filepath.Base(destName))
@@ -1570,10 +1584,9 @@ func (dp *DevPortal) Download(url, folder string) (Status, error) {
 			"file": destName,
 		}).Info("Downloading")
 
-		downloader.URL = url
-		downloader.DestName = destName
-
-		status, err := downloader.DoContext(dp.config.Context)
+		status, err := downloader.DoRequestContext(dp.config.Context, &FileRequest{
+			URL: url, DestName: destName,
+		})
 		if err != nil {
 			return status, fmt.Errorf("failed to download file: %w", err)
 		}
@@ -1592,19 +1605,7 @@ func (dp *DevPortal) DownloadADC(adcURL string) (Status, error) {
 		return Skipped, err
 	}
 
-	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownloadWithProfile(
-		AppleCDNProfile,
-		dp.config.Proxy,
-		dp.config.Insecure,
-		dp.config.SkipAll,
-		dp.config.RestartAll,
-		false,
-	)
-	// use authenticated client
-	downloader.client = dp.Client
-	defer downloader.Close()
-	downloader.Headers = map[string]string{"Cookie": "ADCDownloadAuth=" + adcDownloadAuth}
+	downloader := dp.downloader()
 
 	destName := getDestName(adcURL, dp.config.RemoveCommas)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -1612,10 +1613,10 @@ func (dp *DevPortal) DownloadADC(adcURL string) (Status, error) {
 			"file": destName,
 		}).Info("Downloading")
 
-		downloader.URL = adcURL
-		downloader.DestName = destName
-
-		return downloader.DoContext(dp.config.Context)
+		return downloader.DoRequestContext(dp.config.Context, &FileRequest{
+			URL: adcURL, DestName: destName,
+			Headers: http.Header{"Cookie": {"ADCDownloadAuth=" + adcDownloadAuth}},
+		})
 	}
 
 	log.Warnf("file already exists: %s", destName)

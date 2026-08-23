@@ -171,6 +171,132 @@ func TestValidSHA1(t *testing.T) {
 	}
 }
 
+func TestDefaultResumeID(t *testing.T) {
+	for _, test := range []struct {
+		rawURL string
+		want   string
+	}{
+		{
+			rawURL: "https://EXAMPLE.com.:443/a%2Fb?accessKey=secret#fragment",
+			want:   "https://example.com/a%2Fb",
+		},
+		{
+			rawURL: "http://example.com:8080/file?token=one",
+			want:   "http://example.com:8080/file",
+		},
+		{
+			rawURL: "https://[2001:db8::1]:8443/file?token=two",
+			want:   "https://[2001:db8::1]:8443/file",
+		},
+		{rawURL: "https://example.com?token=three", want: "https://example.com/"},
+		{rawURL: "::", want: ""},
+	} {
+		if got := defaultResumeID(test.rawURL); got != test.want {
+			t.Errorf("defaultResumeID(%q) = %q, want %q", test.rawURL, got, test.want)
+		}
+	}
+}
+
+func TestTypedRequestsReuseEngineAndIsolateHeaders(t *testing.T) {
+	payload := bytes.Repeat([]byte("typed request payload"), 1024)
+	var mu sync.Mutex
+	received := make(map[string][]http.Header)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		received[r.URL.Path] = append(received[r.URL.Path], r.Header.Clone())
+		mu.Unlock()
+		w.Header().Set("ETag", `"v1"`)
+		http.ServeContent(w, r, filepath.Base(r.URL.Path), time.Time{}, bytes.NewReader(payload))
+	}))
+	t.Cleanup(server.Close)
+
+	d := NewDownload("", false, false, false, false)
+	t.Cleanup(d.Close)
+	dir := t.TempDir()
+	requests := []*FileRequest{
+		{
+			URL: server.URL + "/a.ipa?accessKey=one", DestName: filepath.Join(dir, "a.ipa"),
+			Headers: http.Header{"Authorization": {"Bearer a"}, "Cookie": {"asset=a"}},
+		},
+		{
+			URL: server.URL + "/b.ipa?accessKey=two", DestName: filepath.Join(dir, "b.ipa"),
+			Headers: http.Header{"Authorization": {"Bearer b"}, "Cookie": {"asset=b"}},
+		},
+	}
+	var firstEngine *godl.Downloader
+	for i, request := range requests {
+		if _, err := d.DoRequestContext(t.Context(), request); err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+		if i == 0 {
+			firstEngine = d.engine
+		} else if d.engine != firstEngine {
+			t.Fatal("typed requests did not reuse the session engine")
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	var defaultAgent string
+	for i, request := range requests {
+		path := "/" + filepath.Base(request.DestName)
+		headers := received[path]
+		if len(headers) == 0 {
+			t.Errorf("request %d produced no server observations", i)
+			continue
+		}
+		wantAuth := fmt.Sprintf("Bearer %c", 'a'+rune(i))
+		wantCookie := fmt.Sprintf("asset=%c", 'a'+rune(i))
+		for _, header := range headers {
+			if got := header.Values("Authorization"); len(got) != 1 || got[0] != wantAuth {
+				t.Errorf("%s Authorization = %q, want [%q]", path, got, wantAuth)
+			}
+			if got := header.Values("Cookie"); len(got) != 1 || got[0] != wantCookie {
+				t.Errorf("%s Cookie = %q, want [%q]", path, got, wantCookie)
+			}
+			agents := header.Values("User-Agent")
+			if len(agents) != 1 || agents[0] == "" {
+				t.Errorf("%s User-Agent = %q, want exactly one", path, agents)
+				continue
+			}
+			if defaultAgent == "" {
+				defaultAgent = agents[0]
+			} else if agents[0] != defaultAgent {
+				t.Errorf("%s User-Agent = %q, want session agent %q", path, agents[0], defaultAgent)
+			}
+		}
+	}
+}
+
+func TestAuthenticatedOwnersReuseDownloadSession(t *testing.T) {
+	client := &http.Client{Transport: http.DefaultTransport}
+	appStore := &AppStore{
+		Client: client,
+		config: &AppStoreConfig{Context: t.Context()},
+	}
+	firstAppStore := appStore.downloader()
+	if got := appStore.downloader(); got != firstAppStore || got.client != client {
+		t.Fatal("App Store did not reuse its authenticated download session")
+	}
+	appStore.Close()
+	if appStore.downloadSession != nil {
+		t.Fatal("App Store Close retained its download session")
+	}
+
+	devPortal := &DevPortal{
+		Client: client,
+		config: &DevConfig{Context: t.Context()},
+	}
+	firstDevPortal := devPortal.downloader()
+	if got := devPortal.downloader(); got != firstDevPortal || got.client != client {
+		t.Fatal("Developer Portal did not reuse its authenticated download session")
+	}
+	devPortal.Close()
+	if devPortal.downloadSession != nil {
+		t.Fatal("Developer Portal Close retained its download session")
+	}
+}
+
 func TestDownloadChecksumMismatchFinalizesWithoutRefetch(t *testing.T) {
 	payload := bytes.Repeat([]byte{0xa5}, 3<<20)
 	goodSha1 := fmt.Sprintf("%x", sha1.Sum(payload))
@@ -200,8 +326,6 @@ func TestDownloadChecksumMismatchFinalizesWithoutRefetch(t *testing.T) {
 
 	destName := filepath.Join(t.TempDir(), "test.ipsw")
 	d := &Download{URL: server.URL + "/test.ipsw", Sha1: badSha1, DestName: destName}
-	// keep the request count deterministic: skip the redirect preflight
-	d.resolveFinalURL = func(_ context.Context, u string) (string, error) { return u, nil }
 	_, err := d.Do()
 	var checksumErr *godl.ChecksumError
 	if !errors.As(err, &checksumErr) {
@@ -351,7 +475,7 @@ func TestDownloadBatchDoesNotRetainIdleConnections(t *testing.T) {
 				}
 			}
 
-			d.Close() // releases cached engine and preflight pools
+			d.Close() // releases the engine's idle connections
 
 			// the server observes client-side closes asynchronously
 			deadline := time.Now().Add(5 * time.Second)
