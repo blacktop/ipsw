@@ -325,7 +325,8 @@ var downloadWikiCmd = &cobra.Command{
 							}
 						}
 					} else { // NORMAL MODE
-						downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+						downloader := download.NewDownloadWithProfile(
+							download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 						defer downloader.Close()
 						for _, ipsw := range filteredIPSW {
 							destName := getDestName(ipsw.URL, removeCommas)
@@ -572,7 +573,8 @@ var downloadWikiCmd = &cobra.Command{
 							}
 						}
 					} else { // NORMAL MODE
-						downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+						downloader := download.NewDownloadWithProfile(
+							download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 						defer downloader.Close()
 						for _, o := range filteredOTAs {
 							folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.Version, o.VersionExtra))

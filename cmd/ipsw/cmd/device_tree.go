@@ -273,7 +273,8 @@ func extractDeviceTreeFromRemoteOTA(ctx context.Context, remoteURL string) (map[
 	defer os.Remove(tmpPath + download.StateSuffix) // cleanup resume sidecar
 
 	log.Info("Downloading OTA...")
-	downloader := download.NewDownload(
+	downloader := download.NewDownloadWithProfile(
+		download.AppleCDNProfile,
 		viper.GetString("dtree.proxy"),
 		viper.GetBool("dtree.insecure"),
 		false, false, true, /* ignoreSha1 */

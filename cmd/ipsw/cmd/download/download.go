@@ -23,6 +23,7 @@ package download
 
 import (
 	"fmt"
+	"math"
 	"path"
 	"strings"
 
@@ -33,20 +34,26 @@ import (
 )
 
 func init() {
-	DownloadCmd.PersistentFlags().Int("parts", download.DefaultParts,
-		"maximum parallel connections per download")
-	DownloadCmd.PersistentFlags().Int("min-parts", download.DefaultMinParts,
-		"connections opened immediately and never retired by throughput measurement "+
-			"(equal to --parts disables ramping)")
+	DownloadCmd.PersistentFlags().Int("parts", 0,
+		"maximum parallel connections per download (0 uses the URL profile)")
+	DownloadCmd.PersistentFlags().Int("min-parts", 0,
+		"connections opened immediately and never retired (0 uses the URL profile)")
+	DownloadCmd.PersistentFlags().Int("min-part-size", 0,
+		"minimum scheduler range size in MiB (0 uses the URL profile)")
+	DownloadCmd.PersistentFlags().Bool("enable-node-selection", false,
+		"enable direct-CDN address placement")
 	viper.BindPFlag("download.parts", DownloadCmd.PersistentFlags().Lookup("parts"))
 	viper.BindPFlag("download.min-parts", DownloadCmd.PersistentFlags().Lookup("min-parts"))
+	viper.BindPFlag("download.min-part-size",
+		DownloadCmd.PersistentFlags().Lookup("min-part-size"))
+	viper.BindPFlag("download.enable-node-selection",
+		DownloadCmd.PersistentFlags().Lookup("enable-node-selection"))
 }
 
-// ApplyConcurrency resolves the download.parts/download.min-parts config keys
-// (flags, config file, or defaults) and installs the engine policy. The root
-// hook calls it so engine consumers outside this command group (ipsw update,
-// ipsw dtree --remote) honor the keys too.
-func ApplyConcurrency() error {
+// ApplyDownloadPolicy resolves the download policy overrides (flags, config, or
+// environment) and installs them process-wide. Integer zero retains the
+// profile chosen from each URL.
+func ApplyDownloadPolicy() error {
 	parts, err := configInt("download.parts")
 	if err != nil {
 		return err
@@ -55,31 +62,57 @@ func ApplyConcurrency() error {
 	if err != nil {
 		return err
 	}
-	// lowering --parts alone must not conflict with the untouched
-	// min-parts default: clamp unless the user set min-parts explicitly
-	if minParts > parts && !minPartsExplicit() {
-		minParts = parts
+	minPartSizeMiB, err := configInt("download.min-part-size")
+	if err != nil {
+		return err
 	}
-	return download.SetConcurrency(download.Concurrency{
-		Parts:    parts,
-		MinParts: minParts,
+	// bound before shifting: a negative value with |v| > 2^43 would wrap to
+	// a huge positive byte count and dodge the engine's >= 0 validation
+	if minPartSizeMiB < 0 {
+		return fmt.Errorf("config key %q: must be >= 0 MiB, got %d",
+			"download.min-part-size", minPartSizeMiB)
+	}
+	if int64(minPartSizeMiB) > math.MaxInt64>>20 {
+		return fmt.Errorf("config key %q: value is too large", "download.min-part-size")
+	}
+	return download.SetPolicyOverrides(download.PolicyOverrides{
+		Parts:               parts,
+		MinParts:            minParts,
+		MinPartSize:         int64(minPartSizeMiB) << 20,
+		EnableNodeSelection: configBool("download.enable-node-selection"),
 	})
 }
 
-func minPartsExplicit() bool {
-	if f := DownloadCmd.PersistentFlags().Lookup("min-parts"); f != nil && f.Changed {
-		return true
+// configValue reads a download.* config key, falling back to the compiled
+// flag default when viper was reset (tests) or the binding is gone.
+func configValue(key string) any {
+	value := viper.Get(key)
+	if value == nil {
+		if f := DownloadCmd.PersistentFlags().Lookup(strings.TrimPrefix(key, "download.")); f != nil {
+			value = f.Value.String()
+		}
 	}
-	return viper.InConfig("download.min-parts")
+	return value
+}
+
+func configBool(key string) bool {
+	return cast.ToBool(configValue(key))
 }
 
 func configInt(key string) (int, error) {
-	value := viper.Get(key)
-	if value == nil {
-		// viper was reset (tests) or the binding is gone: the flag still
-		// carries the compiled default
-		if f := DownloadCmd.PersistentFlags().Lookup(strings.TrimPrefix(key, "download.")); f != nil {
-			value = f.Value.String()
+	value := configValue(key)
+	// cast.ToIntE silently truncates floats and converts bools: reject both
+	// so a config typo cannot become a different-but-valid policy value
+	switch v := value.(type) {
+	case bool:
+		return 0, fmt.Errorf("config key %q: cannot parse %v as an integer", key, v)
+	case float64:
+		if v != math.Trunc(v) {
+			return 0, fmt.Errorf("config key %q: cannot parse %v as an integer", key, v)
+		}
+	case float32:
+		if float64(v) != math.Trunc(float64(v)) {
+			return 0, fmt.Errorf("config key %q: cannot parse %v as an integer", key, v)
 		}
 	}
 	parsed, err := cast.ToIntE(value)

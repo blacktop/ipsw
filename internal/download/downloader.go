@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/apex/log"
 	godl "github.com/blacktop/go-download"
@@ -27,72 +29,12 @@ const (
 	StateSuffix = ".part.json"
 	// legacySuffix is the partial-download suffix of the pre-go-download engine.
 	legacySuffix = ".download"
-
-	// DefaultParts is go-download's parallel-connection cap.
-	DefaultParts = 8
-	// DefaultMinParts equals DefaultParts so go-download's ramp governor
-	// stays off by default: Apple's hosts are per-flow limited, and the
-	// governor's small measurement windows can permanently demote a
-	// multi-GB download to half throughput on one noisy sample or a
-	// high-RTT first byte. Ramping is opt-in via --min-parts < --parts;
-	// an explicit HTTP 429 still sheds eager flows either way.
-	DefaultMinParts = DefaultParts
-	// MaxParts bounds --parts so a typo cannot open thousands of eager
-	// sockets against a CDN (go-download only clamps by available ranges).
-	MaxParts = 64
-	// engineMinPartSize is the smallest range the scheduler will split out;
-	// eager concurrency is clamped when an object cannot supply enough ranges.
-	engineMinPartSize = 1 << 20
 )
-
-// Concurrency is the engine's connection policy: Parts caps parallel
-// connections and MinParts is the floor opened eagerly and never retired by
-// throughput measurement (MinParts == Parts is fixed parallelism).
-type Concurrency struct {
-	Parts    int
-	MinParts int
-}
-
-// Validate reports whether the policy satisfies
-// 1 <= MinParts <= Parts <= MaxParts.
-func (c Concurrency) Validate() error {
-	if c.Parts < 1 || c.Parts > MaxParts {
-		return fmt.Errorf("parts must satisfy 1 <= parts <= %d, got %d", MaxParts, c.Parts)
-	}
-	if c.MinParts < 1 || c.MinParts > c.Parts {
-		return fmt.Errorf("min-parts must satisfy 1 <= min-parts <= parts (%d), got %d",
-			c.Parts, c.MinParts)
-	}
-	return nil
-}
-
-var (
-	concurrencyMu sync.RWMutex
-	concurrency   = Concurrency{Parts: DefaultParts, MinParts: DefaultMinParts}
-)
-
-// SetConcurrency sets the connection policy for every Download created
-// afterwards in this process. The CLI calls it once from --parts/--min-parts
-// before any download starts.
-func SetConcurrency(c Concurrency) error {
-	if err := c.Validate(); err != nil {
-		return err
-	}
-	concurrencyMu.Lock()
-	defer concurrencyMu.Unlock()
-	concurrency = c
-	return nil
-}
-
-// GetConcurrency returns the current connection policy.
-func GetConcurrency() Concurrency {
-	concurrencyMu.RLock()
-	defer concurrencyMu.RUnlock()
-	return concurrency
-}
 
 // Download drives github.com/blacktop/go-download (parallel parts, HTTP 429
-// shedding, and automatic resume) with ipsw's CLI semantics.
+// shedding, and automatic resume) with ipsw's CLI semantics. A Download is
+// intended for sequential use by one goroutine; create one per concurrent
+// batch.
 type Download struct {
 	URL      string
 	Sha1     string
@@ -100,24 +42,62 @@ type Download struct {
 	Headers  map[string]string
 
 	proxyFn    func(*http.Request) (*url.URL, error)
+	userAgent  string // chosen once so preflight and transfer follow one redirect chain
 	insecure   bool
 	skipAll    bool
 	restartAll bool
 	ignoreSha1 bool
 
 	client *http.Client
-	engine *godl.Downloader // lazily built on first Do; reused across a batch
+
+	fallbackProfile Profile
+	engines         map[EnginePolicy]*godl.Downloader // lazily built and reused by resolved tuple
+	preflight       *http.Client                      // lazy redirect resolver; closed by Close
+	// resolveFinalURL overrides redirect resolution in tests; nil uses the
+	// ranged-request preflight.
+	resolveFinalURL func(context.Context, string) (string, error)
 }
 
 // NewDownload creates a new downloader. Interrupted downloads always resume
 // automatically, validated against the server's ETag/Last-Modified.
 func NewDownload(proxy string, insecure, skipAll, restartAll, ignoreSha1 bool) *Download {
-	return &Download{
-		proxyFn:    GetProxy(proxy),
-		insecure:   insecure,
-		skipAll:    skipAll,
-		restartAll: restartAll,
-		ignoreSha1: ignoreSha1,
+	return NewDownloadWithProfile(GenericProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
+}
+
+// NewDownloadWithProfile creates a downloader with an explicit fallback for
+// URLs that cannot be classified. A valid URL always selects by hostname.
+func NewDownloadWithProfile(
+	profile Profile, proxy string, insecure, skipAll, restartAll, ignoreSha1 bool,
+) *Download {
+	d := &Download{
+		insecure:        insecure,
+		skipAll:         skipAll,
+		restartAll:      restartAll,
+		ignoreSha1:      ignoreSha1,
+		fallbackProfile: profile,
+	}
+	// Only an explicit --proxy becomes a caller-supplied proxy function:
+	// go-download treats every non-nil callback as opaque and disables node
+	// placement, while a nil Proxy keeps its own per-URL environment-proxy
+	// evaluation (and placement eligibility) intact.
+	if proxy != "" {
+		d.proxyFn = GetProxy(proxy)
+	} else {
+		logEnvProxy()
+	}
+	return d
+}
+
+// logEnvProxy surfaces environment proxy settings at debug level; the engine
+// evaluates them per URL without logging.
+func logEnvProxy() {
+	conf := httpproxy.FromEnvironment()
+	if len(conf.HTTPProxy) > 0 || len(conf.HTTPSProxy) > 0 {
+		log.WithFields(log.Fields{
+			"http_proxy":  conf.HTTPProxy,
+			"https_proxy": conf.HTTPSProxy,
+			"no_proxy":    conf.NoProxy,
+		}).Debugf("proxy info from environment")
 	}
 }
 
@@ -133,14 +113,7 @@ func GetProxy(proxy string) func(*http.Request) (*url.URL, error) {
 		return http.ProxyURL(proxyURL)
 	}
 
-	conf := httpproxy.FromEnvironment()
-	if len(conf.HTTPProxy) > 0 || len(conf.HTTPSProxy) > 0 {
-		log.WithFields(log.Fields{
-			"http_proxy":  conf.HTTPProxy,
-			"https_proxy": conf.HTTPSProxy,
-			"no_proxy":    conf.NoProxy,
-		}).Debugf("proxy info from environment")
-	}
+	logEnvProxy()
 
 	return http.ProxyFromEnvironment
 }
@@ -184,12 +157,9 @@ func (d *Download) DoContext(ctx context.Context) (Status, error) {
 		return Skipped, err
 	}
 
-	if d.engine == nil {
-		dl, err := godl.New(d.options())
-		if err != nil {
-			return Skipped, fmt.Errorf("failed to create downloader for %s: %w", godl.RedactURL(d.URL), err)
-		}
-		d.engine = dl
+	engine, err := d.engineForURL(ctx)
+	if err != nil {
+		return Skipped, fmt.Errorf("failed to create downloader for %s: %w", godl.RedactURL(d.URL), err)
 	}
 
 	req := &godl.Request{
@@ -198,7 +168,7 @@ func (d *Download) DoContext(ctx context.Context) (Status, error) {
 		Reporter:     newProgressReporter(),
 		ExpectedSHA1: d.expectedSHA1(),
 	}
-	res, err := d.engine.Do(ctx, req)
+	res, err := engine.Do(ctx, req)
 	if err != nil {
 		if d.skipLocked(err) {
 			return Skipped, nil
@@ -214,13 +184,18 @@ func (d *Download) DoContext(ctx context.Context) (Status, error) {
 	return Downloaded, nil
 }
 
-// Close releases the cached engine's idle connections. Call it once after a
-// batch of Do calls; a closed Download can still be reused (the next Do
-// rebuilds the engine).
+// Close releases every cached engine's idle connections. Call it once after a
+// batch of Do calls; a closed Download can still be reused.
 func (d *Download) Close() {
-	if d.engine != nil {
-		d.engine.CloseIdleConnections()
-		d.engine = nil
+	for _, engine := range d.engines {
+		engine.CloseIdleConnections()
+	}
+	d.engines = nil
+	if d.preflight != nil {
+		if transport, ok := d.preflight.Transport.(*http.Transport); ok {
+			transport.CloseIdleConnections()
+		}
+		d.preflight = nil
 	}
 }
 
@@ -248,35 +223,62 @@ func (d *Download) prepareStage(ctx context.Context) error {
 	return nil
 }
 
-func (d *Download) options() *godl.Options {
-	headers := make(http.Header)
-	for key, value := range d.Headers {
-		headers.Set(key, value)
+func (d *Download) engineForURL(ctx context.Context) (*godl.Downloader, error) {
+	target := d.URL
+	// The profile contract classifies the byte-serving hostname, so resolve
+	// redirects before choosing the tuple regardless of the source hostname —
+	// unless the overrides pin both profiles to one tuple, in which case the
+	// answer cannot matter and the extra request is skipped.
+	resolve := d.resolveFinalURL
+	if resolve == nil {
+		resolve = d.resolveByteServingURL
 	}
-	if headers.Get("User-Agent") == "" {
-		headers.Set("User-Agent", utils.RandomAgent())
+	if profilesConverge() {
+		resolve = nil
 	}
+	if resolve != nil {
+		if final, err := resolve(ctx, target); err == nil {
+			target = final
+		} else {
+			log.Debugf("could not resolve byte-serving URL for %s: %s",
+				godl.RedactURL(target), redactedError(err))
+		}
+	}
+	policy, err := ResolvePolicy(target, d.fallbackProfile)
+	if err != nil {
+		return nil, err
+	}
+	if engine := d.engines[policy]; engine != nil {
+		return engine, nil
+	}
+	opts := d.options(policy)
+	engine, err := godl.New(opts)
+	if err != nil {
+		return nil, err
+	}
+	if d.engines == nil {
+		d.engines = make(map[EnginePolicy]*godl.Downloader)
+	}
+	d.engines[policy] = engine
+	return engine, nil
+}
 
-	conc := GetConcurrency()
+func (d *Download) options(policy EnginePolicy) *godl.Options {
 	opts := &godl.Options{
-		Parts:              conc.Parts,
-		MinParts:           conc.MinParts,
-		MinPartSize:        engineMinPartSize,
-		Headers:            headers,
-		RejectContentTypes: []string{"text/html"},
-		Overwrite:          true,
-	}
-	if d.insecure {
-		opts.TLSConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- user opted in via --insecure
-	}
-	if transport := d.downloadTransport(); transport != nil {
-		opts.Transport = transport
-	} else {
-		opts.Proxy = d.proxy()
+		Parts:       policy.Parts,
+		MinParts:    policy.MinParts,
+		MinPartSize: policy.MinPartSize,
+		// go-download itself keeps placement off for borrowed transports
+		// (Options.Transport != nil): no ipsw-side mirror of that invariant
+		EnableNodeSelection: policy.EnableNodeSelection,
+		Headers:             d.requestHeaders(),
+		RejectContentTypes:  []string{"text/html"},
+		Overwrite:           true,
 	}
 	if d.client != nil {
 		opts.Jar = d.client.Jar
 	}
+	d.applyTransport(opts)
 	return opts
 }
 
@@ -329,36 +331,159 @@ func ValidSHA1(s string) bool {
 	return err == nil
 }
 
-// proxy returns d's proxy function, defaulting to the environment for
-// zero-value Downloads that skipped NewDownload.
-func (d *Download) proxy() func(*http.Request) (*url.URL, error) {
-	if d.proxyFn != nil {
-		return d.proxyFn
-	}
-	return http.ProxyFromEnvironment
-}
-
 // borrowedRoundTripper deliberately exposes only RoundTrip. That prevents
-// go-download from closing a caller-owned custom transport through its
-// optional CloseIdleConnections method.
+// go-download from closing a caller-owned non-http custom transport through
+// its optional CloseIdleConnections method.
 type borrowedRoundTripper struct{ http.RoundTripper }
 
-// downloadTransport clones standard authenticated transports so go-download
-// can tune and close the clone. Opaque transports stay caller-owned.
-func (d *Download) downloadTransport() http.RoundTripper {
+// requestHeaders builds the header set shared by the engine options and the
+// redirect preflight, so both follow the same redirect chain (hosts can gate
+// on User-Agent).
+func (d *Download) requestHeaders() http.Header {
+	headers := make(http.Header)
+	for key, value := range d.Headers {
+		headers.Set(key, value)
+	}
+	if headers.Get("User-Agent") == "" {
+		// origins can route or redirect on User-Agent: pick one agent per
+		// Download so classification and transfer see the same chain
+		if d.userAgent == "" {
+			d.userAgent = utils.RandomAgent()
+		}
+		headers.Set("User-Agent", d.userAgent)
+	}
+	return headers
+}
+
+// resolveByteServingURL follows redirects with a one-byte ranged request and
+// returns the final URL that will actually serve the download's bytes.
+func (d *Download) resolveByteServingURL(ctx context.Context, rawURL string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	client := d.client
+	if client == nil {
+		if d.preflight == nil {
+			proxy := d.proxyFn
+			if proxy == nil {
+				proxy = http.ProxyFromEnvironment
+			}
+			transport := &http.Transport{Proxy: proxy}
+			if d.insecure {
+				transport.TLSClientConfig = insecureTLS(nil)
+			}
+			d.preflight = &http.Client{Transport: transport}
+		}
+		client = d.preflight
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	for key, values := range d.requestHeaders() {
+		req.Header[key] = values
+	}
+	req.Header.Set("Range", "bytes=0-0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	// drain the single byte of a 206 so the connection is reusable; a
+	// Range-ignoring 200 is closed with its body unread (no reuse)
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2))
+	resp.Body.Close()
+	// an error page's final URL must not classify the download: fail the
+	// preflight so the caller falls back to the source hostname
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("preflight for %s returned %s", godl.RedactURL(rawURL), resp.Status)
+	}
+	return resp.Request.URL.String(), nil
+}
+
+// redactedError renders err for logging with any embedded request URL
+// redacted (url.Error strings carry the full signed query).
+// urlPattern matches URL text embedded in error strings (nested url.Errors,
+// redirect messages) so signed query credentials never reach logs.
+var urlPattern = regexp.MustCompile(`https?://[^\s"']+`)
+
+func redactedError(err error) string {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Sprintf("%s %s: %s", urlErr.Op, godl.RedactURL(urlErr.URL), redactedError(urlErr.Err))
+	}
+	return urlPattern.ReplaceAllStringFunc(err.Error(), godl.RedactURL)
+}
+
+// insecureTLS returns a clone of c (or a fresh config) with certificate
+// verification disabled.
+func insecureTLS(c *tls.Config) *tls.Config {
+	if c == nil {
+		c = &tls.Config{}
+	} else {
+		c = c.Clone()
+	}
+	c.InsecureSkipVerify = true // #nosec G402 -- user opted in via --insecure
+	return c
+}
+
+// applyTransport hands recognized standard Apple transport configuration to
+// go-download so it owns dialing and can place connections. Opaque transports
+// remain borrowed and affirmatively disable placement.
+func (d *Download) applyTransport(opts *godl.Options) {
 	if d.client == nil || d.client.Transport == nil {
-		return nil
+		opts.Proxy = d.proxyFn // nil: engine evaluates env proxy per URL
+		if d.insecure {
+			opts.TLSConfig = insecureTLS(nil)
+		}
+		return
 	}
-	if t, ok := d.client.Transport.(*http.Transport); ok {
-		t = t.Clone()
-		// HTTP/2 would multiplex every range onto a single TCP connection.
-		var protocols http.Protocols
-		protocols.SetHTTP1(true)
-		t.Protocols = &protocols
-		t.MaxIdleConnsPerHost = GetConcurrency().Parts + 1
-		return t
+	transport, ok := d.client.Transport.(*http.Transport)
+	if !ok {
+		opts.Transport = borrowedRoundTripper{RoundTripper: d.client.Transport}
+		return
 	}
-	return borrowedRoundTripper{RoundTripper: d.client.Transport}
+	if decomposableTransport(transport) {
+		// the session transport's Proxy came from the same proxy setting
+		// this Download was constructed with; hand the engine the explicit
+		// form (nil when unset) so placement stays eligible on direct routes
+		opts.Proxy = d.proxyFn
+		if transport.TLSClientConfig != nil {
+			opts.TLSConfig = transport.TLSClientConfig.Clone()
+		}
+		if d.insecure {
+			opts.TLSConfig = insecureTLS(opts.TLSConfig)
+		}
+		return
+	}
+	clone := transport.Clone()
+	// HTTP/2 would multiplex every range onto one TCP connection. Preserve
+	// the prior ipsw behavior for opaque standard transports while keeping
+	// their custom dialing, timeout, and buffer policy intact.
+	var protocols http.Protocols
+	protocols.SetHTTP1(true)
+	clone.Protocols = &protocols
+	clone.ForceAttemptHTTP2 = false
+	clone.MaxIdleConnsPerHost = opts.Parts + 1
+	if d.insecure {
+		clone.TLSClientConfig = insecureTLS(clone.TLSClientConfig)
+	}
+	opts.Transport = clone
+}
+
+func decomposableTransport(transport *http.Transport) bool {
+	return transport != nil && transport.Dial == nil && transport.DialContext == nil &&
+		transport.DialTLS == nil && transport.DialTLSContext == nil &&
+		transport.ProxyConnectHeader == nil && transport.GetProxyConnectHeader == nil &&
+		transport.OnProxyConnectResponse == nil &&
+		transport.TLSHandshakeTimeout == 0 && !transport.DisableKeepAlives &&
+		!transport.DisableCompression && transport.MaxIdleConns == 0 &&
+		transport.MaxIdleConnsPerHost == 0 && transport.MaxConnsPerHost == 0 &&
+		transport.IdleConnTimeout == 0 && transport.ResponseHeaderTimeout == 0 &&
+		transport.ExpectContinueTimeout == 0 && transport.TLSNextProto == nil &&
+		transport.MaxResponseHeaderBytes == 0 && transport.WriteBufferSize == 0 &&
+		transport.ReadBufferSize == 0 && !transport.ForceAttemptHTTP2 &&
+		transport.HTTP2 == nil && transport.Protocols == nil
 }
 
 func fileExists(path string) bool {

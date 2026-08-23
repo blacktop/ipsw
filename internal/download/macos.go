@@ -430,7 +430,7 @@ func GetProductInfo(latest bool) (ProductInfos, error) {
 
 // DownloadInstallerContext downloads an installer and cancels its requests when ctx is done.
 func (i *ProductInfo) DownloadInstallerContext(ctx context.Context, workDir, proxy string, insecure, skipAll, restartAll, assistantOnly bool) error {
-	downloader := NewDownload(proxy, insecure, skipAll, restartAll, true)
+	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, true)
 	defer downloader.Close()
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))

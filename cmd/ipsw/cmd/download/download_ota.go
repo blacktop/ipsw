@@ -569,7 +569,8 @@ var downloadOtaCmd = &cobra.Command{
 					}
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, false)
+				downloader := download.NewDownloadWithProfile(
+					download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
 				defer downloader.Close()
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))

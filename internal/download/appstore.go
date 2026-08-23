@@ -1384,7 +1384,8 @@ func (as *AppStore) patchIPA(staging *os.File, dst string, info *downloadAppResu
 func (as *AppStore) download(url, dest string) (Status, error) {
 
 	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownload(
+	downloader := NewDownloadWithProfile(
+		AppleCDNProfile,
 		as.config.Proxy,
 		as.config.Insecure,
 		as.config.SkipAll,

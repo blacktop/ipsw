@@ -200,6 +200,8 @@ func TestDownloadChecksumMismatchFinalizesWithoutRefetch(t *testing.T) {
 
 	destName := filepath.Join(t.TempDir(), "test.ipsw")
 	d := &Download{URL: server.URL + "/test.ipsw", Sha1: badSha1, DestName: destName}
+	// keep the request count deterministic: skip the redirect preflight
+	d.resolveFinalURL = func(_ context.Context, u string) (string, error) { return u, nil }
 	_, err := d.Do()
 	var checksumErr *godl.ChecksumError
 	if !errors.As(err, &checksumErr) {
@@ -349,9 +351,20 @@ func TestDownloadBatchDoesNotRetainIdleConnections(t *testing.T) {
 				}
 			}
 
-			mu.Lock()
-			openConnections := len(connections)
-			mu.Unlock()
+			d.Close() // releases cached engine and preflight pools
+
+			// the server observes client-side closes asynchronously
+			deadline := time.Now().Add(5 * time.Second)
+			openConnections := 0
+			for {
+				mu.Lock()
+				openConnections = len(connections)
+				mu.Unlock()
+				if openConnections <= 2 || time.Now().After(deadline) {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
 			if openConnections > 2 {
 				t.Fatalf("open connections after batch = %d, want at most 2", openConnections)
 			}

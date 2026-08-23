@@ -1550,7 +1550,8 @@ func (b *downloadBatch) err() error {
 // process and nothing was produced.
 func (dp *DevPortal) Download(url, folder string) (Status, error) {
 	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownload(
+	downloader := NewDownloadWithProfile(
+		AppleCDNProfile,
 		dp.config.Proxy,
 		dp.config.Insecure,
 		dp.config.SkipAll,
@@ -1592,7 +1593,8 @@ func (dp *DevPortal) DownloadADC(adcURL string) (Status, error) {
 	}
 
 	// the authenticated session client's transport and cookie jar are reused
-	downloader := NewDownload(
+	downloader := NewDownloadWithProfile(
+		AppleCDNProfile,
 		dp.config.Proxy,
 		dp.config.Insecure,
 		dp.config.SkipAll,

@@ -22,7 +22,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.71
 	github.com/blacktop/go-apfs v1.0.27
-	github.com/blacktop/go-download v0.2.1
+	github.com/blacktop/go-download v0.2.3
 	github.com/blacktop/go-dwarf v1.0.14
 	github.com/blacktop/go-macho v1.1.282
 	github.com/blacktop/go-plist v1.0.2

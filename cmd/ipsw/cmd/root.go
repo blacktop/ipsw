@@ -73,7 +73,7 @@ var rootCmd = &cobra.Command{
 		if viper.GetBool("no-color") {
 			color.NoColor = true
 		}
-		return download.ApplyConcurrency()
+		return download.ApplyDownloadPolicy()
 	},
 }
 

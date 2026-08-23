@@ -33,8 +33,7 @@ type Oss struct {
 // Download downloads a file from product URL
 func (p *project) Download() error {
 
-	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, false, false, false)
+	downloader := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
 	defer downloader.Close()
 
 	destName := getDestName(p.URL, false)

@@ -657,7 +657,7 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 		ReleaseID: releaseID,
 	}
 	skipped := false
-	downloader := NewDownload(proxy, insecure, skipAll, restartAll, false)
+	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
 	defer downloader.Close()
 	for _, asset := range r.GetAssets() {
 		assetURL := asset.GetUrl()

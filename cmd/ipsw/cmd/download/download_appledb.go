@@ -493,7 +493,8 @@ var downloadAppledbCmd = &cobra.Command{
 					}
 				}
 			} else { // NORMAL MODE
-				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+				downloader := download.NewDownloadWithProfile(
+					download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 				defer downloader.Close()
 				for idx, result := range results {
 					var url string

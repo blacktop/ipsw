@@ -106,7 +106,7 @@ Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` res
 
 ### download concurrency
 
-Every `ipsw download` command takes `--parts` (the maximum parallel connections per file, default 8) and `--min-parts` (connections opened immediately and never retired by throughput measurement, default 4). With the defaults the engine starts four connections and adds more only while aggregate throughput keeps improving, so a link with a shared cap (most home cable/DSL, congested Wi-Fi) settles at four while a per-connection-limited CDN path reaches eight. Set `--min-parts` equal to `--parts` for fixed parallelism, or `--parts 4 --min-parts 4` on a link where extra connections never help. An HTTP 429 from the server sheds eager connections regardless. Both are available as `download.parts` / `download.min-parts` in the config file.
+Every `ipsw download` command selects concurrency from the final download URL. Apple CDN hosts (`apple.com`, `cdn-apple.com`, `aaplimg.com`, `mzstatic.com`, and their subdomains) use 8 parts, 8 eager parts, and an 8 MiB minimum range. Other hosts use 8 parts, 4 eager parts, and a 16 MiB minimum range. `--parts`, `--min-parts`, and `--min-part-size` (MiB) override those values; zero keeps the URL profile. `--parts 1` selects single-stream `1/1` operation, and an explicitly selected minimum part size is retained. Direct-CDN address placement is off by default; `--enable-node-selection` opts into it for eligible direct transports. The equivalent config keys are `download.parts`, `download.min-parts`, `download.min-part-size`, and `download.enable-node-selection`.
 
 ### download `ipsw` config
 
@@ -120,8 +120,10 @@ You can also use a config file with `ipsw` so you don't have to use the flags
 download:
   latest: true
   confirm: true
-  parts: 8         # max parallel connections per file
-  min-parts: 4     # opened immediately; 8 = fixed parallelism
+  parts: 0         # use the URL profile; 1 selects single-stream mode
+  min-parts: 0     # use the URL profile (or clamp to --parts when reduced)
+  min-part-size: 0 # MiB; use the URL profile
+  enable-node-selection: false
   white-list:
     - iPhone16,1    # iPhone 15 Pro
     - iPhone16,2    # iPhone 15 Pro Max

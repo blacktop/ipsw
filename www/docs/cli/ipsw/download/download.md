@@ -17,9 +17,11 @@ ipsw download [flags]
 ### Options
 
 ```
-  -h, --help            help for download
-      --min-parts int   connections opened immediately and never retired by throughput measurement (equal to --parts disables ramping) (default 8)
-      --parts int       maximum parallel connections per download (default 8)
+      --enable-node-selection   enable direct-CDN address placement
+  -h, --help                    help for download
+      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
+      --parts int               maximum parallel connections per download (0 uses the URL profile)
 ```
 
 ### Options inherited from parent commands

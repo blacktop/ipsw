@@ -139,7 +139,8 @@ var downloadXcodeCmd = &cobra.Command{
 			var status download.Status
 			if dl.Authentication == "" {
 				log.Infof("Downloading %s...", dl.Name)
-				downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+				downloader := download.NewDownloadWithProfile(
+					download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 				defer downloader.Close()
 				downloader.URL = dl.Source
 				downloader.DestName = destName
@@ -209,7 +210,8 @@ var downloadXcodeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, ignoreSha1)
+		downloader := download.NewDownloadWithProfile(
+			download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 		defer downloader.Close()
 		downloader.URL = download.XcodeDlURL + "/" + choice
 		downloader.Sha1 = sha1

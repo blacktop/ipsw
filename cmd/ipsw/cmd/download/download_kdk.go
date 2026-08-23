@@ -171,7 +171,8 @@ var downloadKdkCmd = &cobra.Command{
 			log.Warn("Installing multiple KDKs")
 		}
 
-		downloader := download.NewDownload(proxy, insecure, skipAll, restartAll, false)
+		downloader := download.NewDownloadWithProfile(
+			download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
 		defer downloader.Close()
 		for _, kdk := range dlKDKs {
 			destName := path.Base(kdk.URL)
