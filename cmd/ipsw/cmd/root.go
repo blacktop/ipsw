@@ -66,13 +66,14 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "ipsw",
 	Short: "Download and Parse IPSWs (and SO much more)",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 		if viper.GetBool("no-color") {
 			color.NoColor = true
 		}
+		return download.ApplyConcurrency()
 	},
 }
 
@@ -120,6 +121,10 @@ func interruptContext() (context.Context, context.CancelFunc) {
 
 func init() {
 	log.SetHandler(clihander.Default)
+
+	// run every ancestor's persistent hook (a subcommand defining its own
+	// must not silently shadow the root's)
+	cobra.EnableTraverseRunHooks = true
 
 	cobra.OnInitialize(initConfig)
 

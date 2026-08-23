@@ -74,7 +74,9 @@ ipsw download pcc [INDEX] [flags]
 ```
       --color           colorize output
       --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --min-parts int   connections opened immediately and never retired by throughput measurement (equal to --parts disables ramping) (default 8)
       --no-color        disable colorize output
+      --parts int       maximum parallel connections per download (default 8)
   -V, --verbose         verbose output
 ```
 

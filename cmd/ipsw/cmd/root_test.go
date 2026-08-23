@@ -18,7 +18,9 @@ func TestRootPreservesAutoDetectedNoColor(t *testing.T) {
 	color.NoColor = true
 	viper.Set("no-color", false)
 
-	rootCmd.PersistentPreRun(rootCmd, nil)
+	if err := rootCmd.PersistentPreRunE(rootCmd, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	if !color.NoColor {
 		t.Fatal("root command enabled color after stdout was detected as non-terminal")

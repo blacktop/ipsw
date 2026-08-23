@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/apex/log"
 	godl "github.com/blacktop/go-download"
@@ -27,15 +28,68 @@ const (
 	// legacySuffix is the partial-download suffix of the pre-go-download engine.
 	legacySuffix = ".download"
 
-	// engineParts is go-download's maximum parallel-connection count.
-	engineParts = 8
-	// engineMinParts deliberately equals the cap for Apple's per-flow-limited
-	// hosts. go-download still sheds eager flows when a server returns HTTP 429.
-	engineMinParts = engineParts
+	// DefaultParts is go-download's parallel-connection cap.
+	DefaultParts = 8
+	// DefaultMinParts equals DefaultParts so go-download's ramp governor
+	// stays off by default: Apple's hosts are per-flow limited, and the
+	// governor's small measurement windows can permanently demote a
+	// multi-GB download to half throughput on one noisy sample or a
+	// high-RTT first byte. Ramping is opt-in via --min-parts < --parts;
+	// an explicit HTTP 429 still sheds eager flows either way.
+	DefaultMinParts = DefaultParts
+	// MaxParts bounds --parts so a typo cannot open thousands of eager
+	// sockets against a CDN (go-download only clamps by available ranges).
+	MaxParts = 64
 	// engineMinPartSize is the smallest range the scheduler will split out;
 	// eager concurrency is clamped when an object cannot supply enough ranges.
 	engineMinPartSize = 1 << 20
 )
+
+// Concurrency is the engine's connection policy: Parts caps parallel
+// connections and MinParts is the floor opened eagerly and never retired by
+// throughput measurement (MinParts == Parts is fixed parallelism).
+type Concurrency struct {
+	Parts    int
+	MinParts int
+}
+
+// Validate reports whether the policy satisfies
+// 1 <= MinParts <= Parts <= MaxParts.
+func (c Concurrency) Validate() error {
+	if c.Parts < 1 || c.Parts > MaxParts {
+		return fmt.Errorf("parts must satisfy 1 <= parts <= %d, got %d", MaxParts, c.Parts)
+	}
+	if c.MinParts < 1 || c.MinParts > c.Parts {
+		return fmt.Errorf("min-parts must satisfy 1 <= min-parts <= parts (%d), got %d",
+			c.Parts, c.MinParts)
+	}
+	return nil
+}
+
+var (
+	concurrencyMu sync.RWMutex
+	concurrency   = Concurrency{Parts: DefaultParts, MinParts: DefaultMinParts}
+)
+
+// SetConcurrency sets the connection policy for every Download created
+// afterwards in this process. The CLI calls it once from --parts/--min-parts
+// before any download starts.
+func SetConcurrency(c Concurrency) error {
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	concurrencyMu.Lock()
+	defer concurrencyMu.Unlock()
+	concurrency = c
+	return nil
+}
+
+// GetConcurrency returns the current connection policy.
+func GetConcurrency() Concurrency {
+	concurrencyMu.RLock()
+	defer concurrencyMu.RUnlock()
+	return concurrency
+}
 
 // Download drives github.com/blacktop/go-download (parallel parts, HTTP 429
 // shedding, and automatic resume) with ipsw's CLI semantics.
@@ -203,9 +257,10 @@ func (d *Download) options() *godl.Options {
 		headers.Set("User-Agent", utils.RandomAgent())
 	}
 
+	conc := GetConcurrency()
 	opts := &godl.Options{
-		Parts:              engineParts,
-		MinParts:           engineMinParts,
+		Parts:              conc.Parts,
+		MinParts:           conc.MinParts,
 		MinPartSize:        engineMinPartSize,
 		Headers:            headers,
 		RejectContentTypes: []string{"text/html"},
@@ -300,7 +355,7 @@ func (d *Download) downloadTransport() http.RoundTripper {
 		var protocols http.Protocols
 		protocols.SetHTTP1(true)
 		t.Protocols = &protocols
-		t.MaxIdleConnsPerHost = engineParts + 1
+		t.MaxIdleConnsPerHost = GetConcurrency().Parts + 1
 		return t
 	}
 	return borrowedRoundTripper{RoundTripper: d.client.Transport}

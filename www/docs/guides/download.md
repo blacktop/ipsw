@@ -104,6 +104,10 @@ Only skip SHA-1 verification after independently validating the download. Downlo
 Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` resume sidecar) and resume automatically on the next run — no flag needed. `--skip-all` skips only files actively locked by another downloader; an inactive `.part` resumes normally. Partial `.download` files from older ipsw versions cannot be resumed by the new engine and are left in place with a warning; if such a file is actually complete, rename it into place (`mv file.ipsw.download file.ipsw`) — otherwise delete it.
 :::
 
+### download concurrency
+
+Every `ipsw download` command takes `--parts` (the maximum parallel connections per file, default 8) and `--min-parts` (connections opened immediately and never retired by throughput measurement, default 4). With the defaults the engine starts four connections and adds more only while aggregate throughput keeps improving, so a link with a shared cap (most home cable/DSL, congested Wi-Fi) settles at four while a per-connection-limited CDN path reaches eight. Set `--min-parts` equal to `--parts` for fixed parallelism, or `--parts 4 --min-parts 4` on a link where extra connections never help. An HTTP 429 from the server sheds eager connections regardless. Both are available as `download.parts` / `download.min-parts` in the config file.
+
 ### download `ipsw` config
 
 You can also use a config file with `ipsw` so you don't have to use the flags
@@ -116,6 +120,8 @@ You can also use a config file with `ipsw` so you don't have to use the flags
 download:
   latest: true
   confirm: true
+  parts: 8         # max parallel connections per file
+  min-parts: 4     # opened immediately; 8 = fixed parallelism
   white-list:
     - iPhone16,1    # iPhone 15 Pro
     - iPhone16,2    # iPhone 15 Pro Max

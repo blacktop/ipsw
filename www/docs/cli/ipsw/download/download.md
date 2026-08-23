@@ -17,7 +17,9 @@ ipsw download [flags]
 ### Options
 
 ```
-  -h, --help   help for download
+  -h, --help            help for download
+      --min-parts int   connections opened immediately and never retired by throughput measurement (equal to --parts disables ramping) (default 8)
+      --parts int       maximum parallel connections per download (default 8)
 ```
 
 ### Options inherited from parent commands
