@@ -3,6 +3,7 @@ package download
 import (
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
@@ -31,8 +32,8 @@ const (
 
 // Download drives github.com/blacktop/go-download (parallel parts, HTTP 429
 // shedding, and automatic resume) with ipsw's CLI semantics. A Download is
-// intended for sequential use by one goroutine; create one per concurrent
-// batch.
+// intended for sequential use by one goroutine; create one for each batch
+// that may run concurrently.
 type Download struct {
 	URL      string
 	Sha1     string
@@ -66,10 +67,11 @@ type Download struct {
 type FileRequest struct {
 	URL      string
 	SHA1     string
+	SHA256   string
 	DestName string
 	Headers  http.Header
-	// ResumeID overrides the URL-derived identity when the caller has a more
-	// stable artifact identity. Empty uses defaultResumeID.
+	// ResumeID overrides the wrapper's default origin/path identity.
+	// Empty derives that identity with defaultResumeID.
 	ResumeID string
 }
 
@@ -198,12 +200,13 @@ func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Stat
 	}
 
 	engineReq := &godl.Request{
-		URL:          request.URL,
-		Dest:         request.DestName,
-		Reporter:     newProgressReporter(),
-		ExpectedSHA1: d.expectedSHA1(request.SHA1, request.DestName),
-		Headers:      request.Headers,
-		ResumeID:     request.ResumeID,
+		URL:            request.URL,
+		Dest:           request.DestName,
+		Reporter:       newProgressReporter(),
+		ExpectedSHA1:   d.expectedSHA1(request.SHA1, request.DestName),
+		ExpectedSHA256: d.expectedSHA256(request.SHA256, request.DestName),
+		Headers:        request.Headers,
+		ResumeID:       request.ResumeID,
 	}
 	if engineReq.ResumeID == "" {
 		engineReq.ResumeID = defaultResumeID(request.URL)
@@ -220,6 +223,9 @@ func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Stat
 	}
 	if engineReq.ExpectedSHA1 != "" {
 		utils.Indent(log.Debug, 2)("sha1sum verified ✅")
+	}
+	if engineReq.ExpectedSHA256 != "" {
+		utils.Indent(log.Debug, 2)("sha256sum verified ✅")
 	}
 	return Downloaded, nil
 }
@@ -297,6 +303,9 @@ func (d *Download) options() *godl.Options {
 		Headers:             d.requestHeaders(),
 		RejectContentTypes:  []string{"text/html"},
 		Overwrite:           true,
+		// surface the engine's structured measurements (election, tuple,
+		// retries, 429 shedding, placement, resume, integrity) at --verbose
+		Logger: engineLogger(),
 	}
 	if d.client != nil {
 		opts.Jar = d.client.Jar
@@ -317,6 +326,24 @@ func (d *Download) expectedSHA1(rawSHA1, destName string) string {
 	if !ValidSHA1(sha) {
 		// Scraped sources sometimes publish placeholders instead of hashes.
 		log.Warnf("ignoring invalid published SHA-1 %q for %s: downloading without verification", rawSHA1, destName)
+		return ""
+	}
+	return sha
+}
+
+// expectedSHA256 mirrors expectedSHA1 for SHA-256 manifests (KDK). The
+// --ignore-sha1 flag disables all published-checksum verification.
+func (d *Download) expectedSHA256(rawSHA256, destName string) string {
+	sha := strings.ToLower(strings.TrimSpace(rawSHA256))
+	if sha == "" {
+		return ""
+	}
+	if d.ignoreSha1 {
+		utils.Indent(log.Warn, 2)("SHA-256 verification disabled")
+		return ""
+	}
+	if !ValidSHA256(sha) {
+		log.Warnf("ignoring invalid published SHA-256 %q for %s: downloading without verification", rawSHA256, destName)
 		return ""
 	}
 	return sha
@@ -354,6 +381,16 @@ func ValidSHA1(s string) bool {
 	return err == nil
 }
 
+// ValidSHA256 reports whether s is a well-formed hex SHA-256 digest.
+func ValidSHA256(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
+}
+
 // borrowedRoundTripper deliberately exposes only RoundTrip. That prevents
 // go-download from closing a caller-owned non-http custom transport through
 // its optional CloseIdleConnections method.
@@ -373,11 +410,11 @@ func (d *Download) requestHeaders() http.Header {
 	return headers
 }
 
-// defaultResumeID derives the default stable identity for every typed request.
-// Query and fragment are excluded so rotating URL credentials do not change
-// identity; validators, expected size, and the per-destination sidecar still
-// gate partial-data reuse. An explicit default port is normalized away while a
-// non-default port remains part of the origin.
+// defaultResumeID derives the fallback identity used when FileRequest.ResumeID
+// is empty. Query and fragment are excluded so rotating URL credentials do not
+// change identity; validators, expected size, and the per-destination sidecar
+// still gate partial-data reuse. An explicit default port is normalized away
+// while a non-default port remains part of the origin.
 func defaultResumeID(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Opaque != "" {

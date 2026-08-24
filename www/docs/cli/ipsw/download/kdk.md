@@ -38,6 +38,7 @@ ipsw download kdk [flags]
   -b, --build string    Download KDK for build
   -h, --help            help for kdk
       --host            Download KDK for current host OS
+      --ignore-sha1     skip checksum verification
       --insecure        do not verify ssl certs
   -i, --install         Install KDK after download
   -l, --latest          Download latest KDK
