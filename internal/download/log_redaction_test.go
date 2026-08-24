@@ -4,6 +4,8 @@ package download
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -44,5 +46,32 @@ func TestAuthenticatedClientDebugLogsDoNotStringifyResponseBodies(t *testing.T) 
 				}
 			}
 		})
+	}
+}
+
+func TestGetOlympusSessionDecodeErrorOmitsResponseBody(t *testing.T) {
+	handler := captureApexLog(t, log.InfoLevel)
+	body := `{"user":{"emailAddress":"synthetic-private@example.invalid","prsId":"synthetic-private-prs-id"},"provider":{"providerId":"not-an-integer"}}`
+	dp := &DevPortal{
+		Client: &http.Client{Transport: adcRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}, nil
+		})},
+		config: &DevConfig{Context: t.Context()},
+	}
+
+	err := dp.getOlympusSession()
+	if err == nil || !strings.Contains(err.Error(), "failed to deserialize response body JSON") {
+		t.Fatalf("getOlympusSession() error = %v, want JSON decode failure", err)
+	}
+	for _, entry := range handler.Entries {
+		logged := entry.Message + fmt.Sprint(entry.Fields)
+		for _, secret := range []string{"synthetic-private@example.invalid", "synthetic-private-prs-id"} {
+			if strings.Contains(logged, secret) {
+				t.Fatalf("getOlympusSession() log leaks response body value %q: %s", secret, logged)
+			}
+		}
 	}
 }

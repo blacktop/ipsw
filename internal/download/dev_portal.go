@@ -1147,9 +1147,6 @@ func (dp *DevPortal) getOlympusSession() error {
 	}
 
 	if err := json.Unmarshal(body, &dp.olympusSession); err != nil {
-		var wat any
-		json.Unmarshal(body, &wat)
-		log.Errorf("%#v", wat)
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
