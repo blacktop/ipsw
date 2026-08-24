@@ -230,8 +230,7 @@ func TestGetApImg4TicketTLSVerification(t *testing.T) {
 	defer server.Close()
 
 	_, err := getApImg4TicketFromURL(strings.NewReader("<plist></plist>"), "", false, server.URL)
-	var verificationErr *tls.CertificateVerificationError
-	if !errors.As(err, &verificationErr) {
+	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); !ok {
 		t.Fatalf("verified TLS error = %v, want certificate verification failure", err)
 	}
 

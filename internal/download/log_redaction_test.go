@@ -40,7 +40,7 @@ func TestAuthenticatedClientDebugLogsDoNotStringifyResponseBodies(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, line := range strings.Split(string(source), "\n") {
+			for line := range strings.SplitSeq(string(source), "\n") {
 				if strings.Contains(line, "string(body)") {
 					t.Fatalf("authenticated debug log emits a raw response body: %s", strings.TrimSpace(line))
 				}
