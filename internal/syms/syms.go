@@ -209,6 +209,23 @@ func machoArch(m *macho.File) string {
 	return strings.ToLower(m.SubCPU.String(m.CPU))
 }
 
+// segmentLookup is the subset of *macho.File needed to pick a KEXT text range.
+type segmentLookup interface {
+	Segment(name string) *macho.Segment
+}
+
+// kextTextSegment returns the segment carrying a fileset KEXT's emitted text
+// range. Fileset entries keep a stale pre-relocation address in their __TEXT
+// header while the kernelcache places (and symbolicates) their code in the
+// relocated __TEXT_EXEC segment, so prefer __TEXT_EXEC and fall back to __TEXT
+// only when it is absent.
+func kextTextSegment(m segmentLookup) *macho.Segment {
+	if text := m.Segment("__TEXT_EXEC"); text != nil {
+		return text
+	}
+	return m.Segment("__TEXT")
+}
+
 // scanKernels extracts every kernelcache from the IPSW and visits the cache
 // container plus each of its KEXTs. Kernel and KEXT symbol addresses are
 // bit-63-cleared (highestBitMask) exactly as the daemon database stores them.
@@ -283,7 +300,7 @@ func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
 					Path: model.Path{Path: fe.EntryID},
 					UUID: mfe.UUID().String(),
 				}
-				if text := mfe.Segment("__TEXT"); text != nil {
+				if text := kextTextSegment(mfe); text != nil {
 					kext.TextStart = text.Addr & highestBitMask
 					kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 				}
