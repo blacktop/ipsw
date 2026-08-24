@@ -37,6 +37,7 @@ func TestURLProfileSelection(t *testing.T) {
 		{name: "authenticated Apple", url: "https://iosapps-ssl.mzstatic.com/file", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
 		{name: "authenticated GCS redirect", url: "https://storage.googleapis.com/bucket/file", workload: AuthenticatedAppleProfile, want: GenericProfile},
 		{name: "authenticated GitHub redirect", url: "https://github.com/apple/repo", workload: AuthenticatedAppleProfile, want: GenericProfile},
+		{name: "public Apple workload GCS redirect", url: "https://storage.googleapis.com/bucket/file", workload: AppleCDNProfile, want: GenericProfile},
 		{name: "malformed authenticated fallback", url: "::", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
 		{name: "opaque authenticated fallback", url: "download:asset", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
 		{name: "hostless authenticated fallback", url: "file:///tmp/asset", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
@@ -251,9 +252,8 @@ func TestDownloaderUsesOneLongLivedEngine(t *testing.T) {
 }
 
 func TestPolicyForPinsProfileTuples(t *testing.T) {
-	// These are the v3.1.711 defaults. Pinning each outcome independently
-	// ensures future authenticated tuning cannot silently alter public Apple or
-	// Generic resolution.
+	// Pinning each outcome independently ensures future authenticated tuning
+	// cannot silently alter public Apple or Generic resolution.
 	preservePolicyOverrides(t)
 	apple := EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20}
 	generic := EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20}

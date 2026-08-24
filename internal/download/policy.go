@@ -35,7 +35,9 @@ const (
 )
 
 // Profile identifies the workload defaults selected before final-host
-// classification. A recognized final host may refine that identity.
+// classification. A parseable non-Apple final hostname demotes the workload to
+// GenericProfile; a URL without a parseable hostname retains the normalized
+// workload.
 type Profile uint8
 
 const (

@@ -82,8 +82,9 @@ func NewDownload(proxy string, insecure, skipAll, restartAll, ignoreSha1 bool) *
 }
 
 // NewDownloadWithProfile creates a downloader for an explicit workload. The
-// engine's final byte-serving hostname remains authoritative: non-Apple hosts
-// always select GenericProfile.
+// engine's final byte-serving hostname remains authoritative: a parseable
+// non-Apple final hostname selects GenericProfile, while a URL without a
+// parseable hostname retains the normalized workload.
 func NewDownloadWithProfile(
 	profile Profile, proxy string, insecure, skipAll, restartAll, ignoreSha1 bool,
 ) *Download {
@@ -92,7 +93,7 @@ func NewDownloadWithProfile(
 		skipAll:         skipAll,
 		restartAll:      restartAll,
 		ignoreSha1:      ignoreSha1,
-		workloadProfile: normalizedProfile(profile),
+		workloadProfile: profile,
 		nodeSelection:   GetPolicyOverrides().EnableNodeSelection,
 	}
 	// Only an explicit --proxy becomes a caller-supplied proxy function.
