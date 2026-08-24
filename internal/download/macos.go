@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
-	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -457,13 +455,15 @@ func (i *ProductInfo) DownloadInstallerContext(ctx context.Context, workDir, pro
 				continue
 			}
 			destName := getDestName(pkg.URL, false)
-			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
+			destPath := filepath.Join(folder, destName)
+			_, statErr := os.Stat(destPath)
+			if os.IsNotExist(statErr) {
 				log.WithFields(log.Fields{
 					"size":     humanize.Bytes(uint64(pkg.Size)),
 					"destName": destName,
 				}).Info("Getting Package")
 				downloader.URL = pkg.URL
-				downloader.DestName = filepath.Join(folder, destName)
+				downloader.DestName = destPath
 				status, err := downloader.DoContext(ctx)
 				if err != nil {
 					return errors.Wrap(err, "failed to download file")
@@ -472,50 +472,29 @@ func (i *ProductInfo) DownloadInstallerContext(ctx context.Context, workDir, pro
 					skipped = true
 					continue
 				}
-				if len(pkg.IntegrityDataURL) > 0 {
-					utils.Indent(log.Info, 2)("Verifying Package")
-					integrityData, err := fetchIntegrityData(ctx, integrityClient, pkg.IntegrityDataURL)
-					if err != nil {
-						return err
-					}
-					r := bytes.NewReader(integrityData)
-					var chklist Chunklist
-					if err := binary.Read(r, binary.LittleEndian, &chklist); err != nil {
-						return fmt.Errorf("failed to read integrity chunklist: %v", err)
-					}
-					if chklist.SignatureMethod == ChunkSignatureMethodSHA256 {
-						chunks := make([]Chunk, chklist.ChunkCount)
-						if err := binary.Read(r, binary.LittleEndian, chunks); err != nil {
-							return fmt.Errorf("failed to read integrity chunks: %v", err)
-						}
-						signature := make([]byte, len(integrityData)-int(chklist.SignatureOffset))
-						if err := binary.Read(r, binary.BigEndian, &signature); err != nil {
-							return fmt.Errorf("failed to read signature: %v", err)
-						}
-						f, err := os.Open(filepath.Join(folder, destName))
-						if err != nil {
-							return fmt.Errorf("failed to open package: %v", err)
-						}
-						// verify integrity
-						for idx, chunk := range chunks {
-							chunkData := make([]byte, chunk.Size)
-							if _, err := io.ReadFull(f, chunkData); err != nil {
-								f.Close()
-								return fmt.Errorf("failed to read chunk data: %v", err)
-							}
-							// verify chunk
-							sha256 := sha256.New()
-							sha256.Write(chunkData)
-							if !bytes.Equal(sha256.Sum(nil), chunk.Hash[:]) {
-								f.Close()
-								return fmt.Errorf("failed to validate %s: chunk #%d integrity check failed", destName, idx)
-							}
-						}
-						f.Close()
-					}
-				}
+			} else if statErr != nil {
+				return fmt.Errorf("failed to inspect package %s: %w", destName, statErr)
 			} else {
-				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
+				log.Warnf("pkg already exists: %s", destPath)
+			}
+			if len(pkg.IntegrityDataURL) > 0 {
+				utils.Indent(log.Info, 2)("Verifying Package")
+				integrityData, err := fetchIntegrityData(ctx, integrityClient, pkg.IntegrityDataURL)
+				if err != nil {
+					return err
+				}
+				chunks, err := parseChunklist(integrityData)
+				if err != nil {
+					return fmt.Errorf("failed to validate %s chunklist: %w", destName, err)
+				}
+				if err := verifyPackageChunks(destPath, chunks); err != nil {
+					if errors.Is(err, errPackageIntegrityMismatch) {
+						if removeErr := os.Remove(destPath); removeErr != nil && !os.IsNotExist(removeErr) {
+							return fmt.Errorf("failed to validate %s: %v; failed to remove invalid package: %v", destName, err, removeErr)
+						}
+					}
+					return fmt.Errorf("failed to validate %s: %w", destName, err)
+				}
 			}
 		} else if len(pkg.MetadataURL) > 0 {
 			if assistantOnly && !strings.HasSuffix(pkg.MetadataURL, "InstallAssistant.pkg") {
@@ -616,35 +595,6 @@ func (i *ProductInfo) DownloadInstallerContext(ctx context.Context, workDir, pro
 	}
 
 	return nil
-}
-
-const ChunklistMagic = 0x4C4B4E43 // 'CNKL'
-
-type Chunk struct {
-	Size uint32
-	Hash [32]byte
-}
-
-type ChunkSignatureMethod uint8
-
-const (
-	ChunkSignatureMethodNone ChunkSignatureMethod = iota
-	ChunkSignatureMethodSHA1
-	ChunkSignatureMethodSHA256
-)
-
-type Chunklist struct {
-	Magic           uint32
-	HdrSize         uint32
-	Version         uint8
-	ChunkMethod     uint8
-	SignatureMethod ChunkSignatureMethod
-	Padding         uint8
-	ChunkCount      uint64
-	ChunkOffset     uint64
-	SignatureOffset uint64
-	// Chunks          []Chunk
-	// Signature       []byte
 }
 
 // fetchIntegrityData downloads a package's integrity chunklist through the
