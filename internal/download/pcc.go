@@ -660,8 +660,11 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
 	defer downloader.Close()
 	for _, asset := range r.GetAssets() {
-		assetURL := asset.GetUrl()
 		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")+assetExt(asset))
+		request, err := pccAssetRequest(asset, filePath)
+		if err != nil {
+			return err
+		}
 		pinst.ReleaseAssets = append(pinst.ReleaseAssets, struct {
 			File    string `plist:"file,omitempty"`
 			Type    string `plist:"type,omitempty"`
@@ -672,12 +675,10 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 			Variant: asset.GetVariant(),
 		})
 		log.WithFields(log.Fields{
-			"digest":  hex.EncodeToString(asset.Digest.GetValue()),
+			"digest":  request.SHA256,
 			"variant": asset.GetVariant(),
 		}).Info("Downloading Asset")
-		downloader.URL = assetURL
-		downloader.DestName = filePath
-		status, err := downloader.DoContext(ctx)
+		status, err := downloader.DoRequestContext(ctx, request)
 		if err != nil {
 			return err
 		}
@@ -708,6 +709,28 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 		return fmt.Errorf("failed to write instance.plist: %v", err)
 	}
 	return nil
+}
+
+func pccAssetRequest(asset *pcc.ReleaseMetadata_Asset, destName string) (*FileRequest, error) {
+	request := &FileRequest{URL: asset.GetUrl(), DestName: destName}
+	digest := asset.GetDigest()
+	if digest == nil {
+		return request, nil
+	}
+	value := digest.GetValue()
+	if len(value) == 0 {
+		return request, nil
+	}
+	if digest.GetDigestAlg() != pcc.ReleaseMetadata_DIGEST_ALG_SHA256 {
+		return nil, fmt.Errorf("asset %s uses unsupported digest algorithm %s",
+			strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), digest.GetDigestAlg())
+	}
+	if len(value) != sha256.Size {
+		return nil, fmt.Errorf("asset %s has invalid SHA-256 digest length %d",
+			strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), len(value))
+	}
+	request.SHA256 = hex.EncodeToString(value)
+	return request, nil
 }
 
 func assetTypeExt(typ pcc.ReleaseMetadata_AssetType) string {

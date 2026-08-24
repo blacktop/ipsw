@@ -55,8 +55,8 @@ type OsFileSource struct {
 		Active bool   `json:"active"`
 	} `json:"links"`
 	Hashes struct {
-		Sha2256 string `json:"sha2-256"`
-		Sha1    string `json:"sha1"`
+		SHA256 string `json:"sha2-256"`
+		SHA1   string `json:"sha1"`
 	} `json:"hashes"`
 	Size int64 `json:"size"`
 }

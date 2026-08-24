@@ -545,11 +545,7 @@ var downloadAppledbCmd = &cobra.Command{
 						} else {
 							log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
 						}
-						downloader.URL = url
-						downloader.DestName = fname
-						downloader.Sha1 = result.Hashes.Sha1
-
-						if _, err := downloader.DoContext(cmd.Context()); err != nil {
+						if _, err := downloader.DoRequestContext(cmd.Context(), appleDBRequest(result, url, fname)); err != nil {
 							return fmt.Errorf("failed to download IPSW: %v", err)
 						}
 					} else {
@@ -561,4 +557,13 @@ var downloadAppledbCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func appleDBRequest(source download.OsFileSource, rawURL, destName string) *download.FileRequest {
+	return &download.FileRequest{
+		URL:      rawURL,
+		SHA1:     source.Hashes.SHA1,
+		SHA256:   source.Hashes.SHA256,
+		DestName: destName,
+	}
 }

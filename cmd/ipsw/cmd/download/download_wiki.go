@@ -598,9 +598,7 @@ var downloadWikiCmd = &cobra.Command{
 									"model":  o.BoardID,
 									"build":  o.Build,
 								}).Info(fmt.Sprintf("Getting %s%s OTA", o.Version, o.VersionExtra))
-								downloader.URL = url
-								downloader.DestName = destName
-								if _, err := downloader.DoContext(cmd.Context()); err != nil {
+								if _, err := downloader.DoRequestContext(cmd.Context(), wikiOTARequest(o, destName)); err != nil {
 									return fmt.Errorf("failed to download file: %v", err)
 								}
 							} else if err != nil {
@@ -616,4 +614,12 @@ var downloadWikiCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func wikiOTARequest(firmware download.WikiFirmware, destName string) *download.FileRequest {
+	return &download.FileRequest{
+		URL:      firmware.URL,
+		SHA1:     firmware.Sha1Hash,
+		DestName: destName,
+	}
 }
