@@ -251,7 +251,7 @@ int main(int argc, char *argv[]) {
 
 ## Requirements
 
-- **Go**: 1.24+ (for building from source)
+- **Go**: 1.26+ (for building from source)
 - **Platform**: macOS, Linux, Windows
 - **USB**: libusb for device interaction
 - **Optional**: AI API keys for enhanced analysis
