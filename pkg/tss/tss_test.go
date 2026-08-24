@@ -1,7 +1,9 @@
 package tss
 
 import (
+	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -203,22 +205,39 @@ func TestGetApImg4Ticket(t *testing.T) {
 					t.Errorf("Expected content type 'text/xml; charset=\"utf-8\"', got %s", r.Header.Get("Content-type"))
 				}
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.response))
+				_, _ = w.Write([]byte(tt.response))
 			}))
 			defer server.Close()
 
-			// Temporarily replace the TSS URL for testing
-			originalURL := tssControllerActionURL
-			defer func() {
-				// This is a bit of a hack since tssControllerActionURL is a const
-				// In a real scenario, we'd make this configurable
-			}()
-
-			// We can't easily test getApImg4Ticket directly due to the const URL
-			// This test mainly validates the logic structure
-			_ = originalURL
-			_ = server.URL
+			blob, err := getApImg4TicketFromURL(strings.NewReader(tt.payload), "", false, server.URL)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("getApImg4TicketFromURL() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil && tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+				t.Fatalf("getApImg4TicketFromURL() error = %v, want error containing %q", err, tt.errContains)
+			}
+			if err == nil && len(blob.ApImg4Ticket) == 0 {
+				t.Fatal("getApImg4TicketFromURL() returned an empty ApImg4Ticket")
+			}
 		})
+	}
+}
+
+func TestGetApImg4TicketTLSVerification(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("STATUS=94&MESSAGE=not signed"))
+	}))
+	defer server.Close()
+
+	_, err := getApImg4TicketFromURL(strings.NewReader("<plist></plist>"), "", false, server.URL)
+	var verificationErr *tls.CertificateVerificationError
+	if !errors.As(err, &verificationErr) {
+		t.Fatalf("verified TLS error = %v, want certificate verification failure", err)
+	}
+
+	_, err = getApImg4TicketFromURL(strings.NewReader("<plist></plist>"), "", true, server.URL)
+	if !errors.Is(err, ErrNotSigned) {
+		t.Fatalf("insecure TLS did not reach the TSS response: %v", err)
 	}
 }
 

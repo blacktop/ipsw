@@ -178,9 +178,13 @@ func applyRestoreRequestRules(entry map[string]any, parameters map[string]any, r
 }
 
 func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, error) {
-	req, err := http.NewRequest("POST", tssControllerActionURL, payload)
+	return getApImg4TicketFromURL(payload, proxy, insecure, tssControllerActionURL)
+}
+
+func getApImg4TicketFromURL(payload io.Reader, proxy string, insecure bool, endpoint string) (*Blob, error) {
+	req, err := http.NewRequest("POST", endpoint, payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create https request: %v", err)
+		return nil, fmt.Errorf("failed to create TSS request: %v", err)
 	}
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Content-type", "text/xml; charset=\"utf-8\"")
@@ -189,7 +193,7 @@ func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, err
 	client := &http.Client{
 		Transport: &http.Transport{
 			Proxy:           download.GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 	}
 
