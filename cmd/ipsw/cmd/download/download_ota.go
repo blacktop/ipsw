@@ -57,6 +57,13 @@ var otaDlCmdPlatforms = []string{
 	"visionos\tvisionOS",
 }
 
+// otaWantsBetaAudiences reports whether Pallas should be queried with the beta
+// seed audiences. Apple seeds release candidates to those same audiences, so
+// --rc resolves to the identical request --beta builds.
+func otaWantsBetaAudiences() bool {
+	return viper.GetBool("download.ota.beta") || viper.GetBool("download.ota.rc")
+}
+
 func init() {
 	DownloadCmd.AddCommand(downloadOtaCmd)
 	// Download behavior flags
@@ -79,7 +86,7 @@ func init() {
 		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
 	})
 	downloadOtaCmd.Flags().Bool("beta", false, "Download Beta OTAs")
-	downloadOtaCmd.Flags().Bool("rc", false, "Download Release Candidate OTAs (same seed audiences as --beta)")
+	downloadOtaCmd.Flags().Bool("rc", false, "Download RC OTAs (queries the beta seed audiences, so betas may also match)")
 	downloadOtaCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	downloadOtaCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	downloadOtaCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
@@ -101,9 +108,7 @@ func init() {
 	downloadOtaCmd.MarkFlagDirname("output")
 	downloadOtaCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	downloadOtaCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
-	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
-	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "rc", "latest")
-	downloadOtaCmd.MarkFlagsMutuallyExclusive("beta", "rc")
+	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "beta", "rc", "latest")
 	// Bind download behavior flags
 	viper.BindPFlag("download.ota.proxy", downloadOtaCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.ota.insecure", downloadOtaCmd.Flags().Lookup("insecure"))
@@ -153,7 +158,7 @@ var downloadOtaCmd = &cobra.Command{
 		# Get all the latest BETA iOS OTAs URLs as JSON
 		❯ ipsw download ota --platform ios --beta --urls --json
 
-		# Get the macOS 26.7 RC OTA URL for the Mac17,6
+		# Get the macOS 26.7 seeded OTA URLs (RC included) for the Mac17,6
 		❯ ipsw download ota --platform macos --version 26.7 --device Mac17,6 --rc --urls
 
 		# Download latest tvOS OTA and extract kernelcache
@@ -187,8 +192,7 @@ var downloadOtaCmd = &cobra.Command{
 		doNotDownload := viper.GetStringSlice("download.ota.black-list")
 		// flags
 		platform := viper.GetString("download.ota.platform")
-		// RCs are seeded to the same beta asset audiences as betas, so --rc is an alias for --beta
-		getBeta := viper.GetBool("download.ota.beta") || viper.GetBool("download.ota.rc")
+		getBeta := otaWantsBetaAudiences()
 		getLatest := viper.GetBool("download.ota.latest")
 		getRSR := viper.GetBool("download.ota.rsr")
 		getSim := viper.GetBool("download.ota.sim")
