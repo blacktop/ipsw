@@ -307,25 +307,45 @@ type ADBQuery struct {
 	Insecure          bool
 	APIToken          string
 	ConfigDir         string
+	NoUpdate          bool
+}
+
+// ensureLocalAppleDB returns the path of the local AppleDB checkout under
+// configDir, cloning or refreshing it as needed. With noUpdate it runs no Git:
+// a missing or empty checkout is an error, never stale or empty results.
+func ensureLocalAppleDB(configDir string, noUpdate bool) (string, error) {
+	repo := filepath.Join(configDir, "appledb")
+	if noUpdate {
+		if !fileExists(filepath.Join(repo, "osFiles")) {
+			return "", fmt.Errorf("no usable local AppleDB checkout at %s: rerun without --no-update to clone it", repo)
+		}
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Skipping update of 'appledb' repo %s (--no-update)", repo))
+		return repo, nil
+	}
+	if _, err := os.Stat(repo); os.IsNotExist(err) {
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Git cloning local 'appledb' to %s", repo))
+		if _, err := utils.GitClone(AppleDBGitURL, repo); err != nil {
+			return "", fmt.Errorf("failed to create local copy of 'appledb' repo: %v", err)
+		}
+		return repo, nil
+	}
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Updating 'appledb' repo %s", repo))
+	if _, err := utils.GitRefresh(repo); err != nil {
+		return "", fmt.Errorf("failed to update local copy of 'appledb' repo: %v", err)
+	}
+	return repo, nil
 }
 
 func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 	var osfiles OsFiles
 
-	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Git cloning local 'appledb' to %s", filepath.Join(q.ConfigDir, "appledb")))
-		if _, err := utils.GitClone(AppleDBGitURL, filepath.Join(q.ConfigDir, "appledb")); err != nil {
-			return nil, fmt.Errorf("failed to create local copy of 'appledb' repo: %v", err)
-		}
-	} else {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Updating 'appledb' repo %s", filepath.Join(q.ConfigDir, "appledb")))
-		if _, err := utils.GitRefresh(filepath.Join(q.ConfigDir, "appledb")); err != nil {
-			return nil, fmt.Errorf("failed to update local copy of 'appledb' repo: %v", err)
-		}
+	repo, err := ensureLocalAppleDB(q.ConfigDir, q.NoUpdate)
+	if err != nil {
+		return nil, err
 	}
 
 	var folders []string
-	if err := walkLocalAppleDB(filepath.Join(q.ConfigDir, "appledb"), func(path string, f os.FileInfo) error {
+	if err := walkLocalAppleDB(repo, func(path string, f os.FileInfo) error {
 		if f.IsDir() {
 			for _, os := range q.OSes {
 				if strings.Contains(path, filepath.Join("osFiles", os)) {

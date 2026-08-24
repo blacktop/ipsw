@@ -85,12 +85,14 @@ func init() {
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().BoolP("json", "j", false, "Dump DB query results as JSON")
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
+	downloadAppledbCmd.Flags().Bool("no-update", false, "Do NOT git clone/pull local AppleDB (query existing checkout)")
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.MarkFlagDirname("output")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT preserve directory structure when downloading with --pattern")
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 	downloadAppledbCmd.MarkFlagsMutuallyExclusive("release", "beta", "rc")
+	downloadAppledbCmd.MarkFlagsMutuallyExclusive("api", "no-update")
 	// Bind persistent flags
 	viper.BindPFlag("download.appledb.proxy", downloadAppledbCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.appledb.insecure", downloadAppledbCmd.Flags().Lookup("insecure"))
@@ -120,6 +122,7 @@ func init() {
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.json", downloadAppledbCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
+	viper.BindPFlag("download.appledb.no-update", downloadAppledbCmd.Flags().Lookup("no-update"))
 	viper.BindPFlag("download.appledb.api-token", downloadAppledbCmd.Flags().Lookup("api-token"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
@@ -179,6 +182,7 @@ var downloadAppledbCmd = &cobra.Command{
 		otaDeltas := viper.GetBool("download.appledb.deltas")
 		output := viper.GetString("download.appledb.output")
 		useAPI := viper.GetBool("download.appledb.api")
+		noUpdate := viper.GetBool("download.appledb.no-update")
 		apiToken := viper.GetString("download.appledb.api-token")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
@@ -207,6 +211,9 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 		if otaDeltas && fwType != "ota" && fwType != "rsr" {
 			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
+		}
+		if useAPI && noUpdate {
+			return fmt.Errorf("cannot use --no-update with --api (there is no local checkout in API mode)")
 		}
 		if viper.GetBool("download.appledb.show-latest") && (asURLs || asJSON || kernel || len(pattern) > 0 || fcsKeys || fcsKeysJson) {
 			return fmt.Errorf("cannot use --show-latest with --urls, --json, --kernel, --pattern, --fcs-keys or --fcs-keys-json")
@@ -299,6 +306,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Insecure:          insecure,
 					APIToken:          apiToken,
 					ConfigDir:         configDir,
+					NoUpdate:          noUpdate,
 				})
 				if err != nil {
 					return err
@@ -348,6 +356,7 @@ var downloadAppledbCmd = &cobra.Command{
 					Insecure:          insecure,
 					APIToken:          apiToken,
 					ConfigDir:         configDir,
+					NoUpdate:          noUpdate,
 				})
 				if err != nil {
 					return err

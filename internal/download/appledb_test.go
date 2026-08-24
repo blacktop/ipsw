@@ -245,3 +245,32 @@ func mustReleasedDate(t *testing.T, value string) ReleasedDate {
 	}
 	return released
 }
+
+func TestEnsureLocalAppleDBNoUpdate(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	repo := filepath.Join(configDir, "appledb")
+
+	if _, err := ensureLocalAppleDB(configDir, true); err == nil {
+		t.Fatal("missing checkout: expected error, not a clone or empty results")
+	}
+
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ensureLocalAppleDB(configDir, true); err == nil {
+		t.Fatal("empty checkout (no osFiles): expected error, not empty results")
+	}
+
+	if err := os.MkdirAll(filepath.Join(repo, "osFiles"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ensureLocalAppleDB(configDir, true)
+	if err != nil {
+		t.Fatalf("valid checkout with no-update: %v", err)
+	}
+	if got != repo {
+		t.Fatalf("repo path = %s, want %s", got, repo)
+	}
+}
