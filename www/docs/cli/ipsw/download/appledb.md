@@ -51,6 +51,7 @@ ipsw download appledb [flags]
   -j, --json                  Dump DB query results as JSON
       --kernel                Extract kernelcache from remote IPSW
       --latest                Download latest IPSWs
+      --no-update             Do NOT git clone/pull local AppleDB (query existing checkout)
       --os stringArray        Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS, visionOS)
   -o, --output string         Folder to download files to
       --pattern string        Download remote files that match regex
