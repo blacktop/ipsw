@@ -710,7 +710,7 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 		return err
 	}
 
-	log.Debugf("POST Login: (%d):\n%s\n", res.StatusCode, string(body))
+	logHTTPResponseMetadata("POST Login", res.StatusCode, len(body))
 
 	// os.WriteFile("login.xml", body, 0644)
 
@@ -902,7 +902,7 @@ func (as *AppStore) Search(searchTerm string, limit int) (Apps, error) {
 		return nil, err
 	}
 
-	log.Debugf("GET appstore Search (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET appstore Search", response.StatusCode, len(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		return nil, fmt.Errorf("failed to search appstore: response received %s", response.Status)
@@ -949,7 +949,7 @@ func (as *AppStore) Lookup(bundleID string) (*App, error) {
 		return nil, err
 	}
 
-	log.Debugf("GET appstore Lookup (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET appstore Lookup", response.StatusCode, len(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		return nil, fmt.Errorf("failed to lookup bundleID in appstore: response received %s", response.Status)
@@ -1051,7 +1051,7 @@ func (as *AppStore) purchaseWithPricing(app *App, guid, pricing string, allowRea
 		return false, err
 	}
 
-	log.Debugf("POST Purchase (%s): (%d):\n%s\n", pricing, response.StatusCode, string(body))
+	logHTTPResponseMetadata(fmt.Sprintf("POST Purchase (%s)", pricing), response.StatusCode, len(body))
 
 	// os.WriteFile("purchase.xml", body, 0644)
 
@@ -1180,7 +1180,7 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 		return err
 	}
 
-	log.Debugf("POST Download: (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("POST Download", response.StatusCode, len(body))
 
 	// os.WriteFile("download.xml", body, 0644)
 

@@ -600,7 +600,7 @@ func (dp *DevPortal) getITCServiceKey() error {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
-	log.Debugf("GET iTC Service Key: (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET iTC Service Key", response.StatusCode, len(body))
 
 	if response.StatusCode != 200 {
 		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
@@ -694,7 +694,7 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 		return nil, err
 	}
 
-	log.Debugf("SRP INIT: (%d):\n%s\n", initResponse.StatusCode, string(body))
+	logHTTPResponseMetadata("SRP INIT", initResponse.StatusCode, len(body))
 
 	var srpInit srpInitResponse
 	if err := json.Unmarshal(body, &srpInit); err != nil {
@@ -754,7 +754,7 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 		return nil, err
 	}
 
-	log.Debugf("SRP COMPLETE: (%d):\n%s\n", completeResponse.StatusCode, string(body))
+	logHTTPResponseMetadata("SRP COMPLETE", completeResponse.StatusCode, len(body))
 
 	var srpComp srpCompleteResponse
 	if err := json.Unmarshal(body, &srpComp); err != nil {
@@ -805,7 +805,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 		return err
 	}
 
-	log.Debugf("POST Login: (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("POST Login", response.StatusCode, len(body))
 
 	if response.StatusCode == 503 { // try NEW SRP login
 		response, err = dp.generateSRP(username, password)
@@ -943,7 +943,7 @@ func (dp *DevPortal) getAuthOptions() error {
 		return err
 	}
 
-	log.Debugf("GET getAuthOptions (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET getAuthOptions", response.StatusCode, len(body))
 
 	if err := json.Unmarshal(body, &dp.authOptions); err != nil {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
@@ -983,7 +983,7 @@ func (dp *DevPortal) requestCode(phoneID int) error {
 		return err
 	}
 
-	log.Debugf("PUT requestCode (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("PUT requestCode", response.StatusCode, len(body))
 
 	if err := json.Unmarshal(body, &dp.codeRequest); err != nil {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
@@ -1047,7 +1047,7 @@ func (dp *DevPortal) verifyCode(codeType, code string, phoneID int) error {
 		return err
 	}
 
-	log.Debugf("POST verifyCode (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("POST verifyCode", response.StatusCode, len(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		if len(body) > 0 {
@@ -1090,7 +1090,7 @@ func (dp *DevPortal) trustSession() error {
 		return err
 	}
 
-	log.Debugf("GET trustSession: (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET trustSession", response.StatusCode, len(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		if len(body) > 0 {
@@ -1140,7 +1140,7 @@ func (dp *DevPortal) getOlympusSession() error {
 		return err
 	}
 
-	log.Debugf("GET getOlympusSession (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("GET getOlympusSession", response.StatusCode, len(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
@@ -1765,7 +1765,7 @@ func (dp *DevPortal) getDownloads() (*Downloads, error) {
 		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
-	log.Debugf("Get Downloads: (%d):\n%s\n", response.StatusCode, string(body))
+	logHTTPResponseMetadata("Get Downloads", response.StatusCode, len(body))
 
 	// sort by file name
 	// sort.Slice(downloads.Downloads, func(i, j int) bool {
