@@ -25,12 +25,42 @@ func preservePolicyOverrides(t *testing.T) {
 	}
 }
 
+func TestURLProfileSelection(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		workload Profile
+		want     Profile
+	}{
+		{name: "public Apple", url: "https://updates.cdn-apple.com/file", workload: GenericProfile, want: AppleCDNProfile},
+		{name: "explicit public Apple", url: "https://updates.cdn-apple.com/file", workload: AppleCDNProfile, want: AppleCDNProfile},
+		{name: "authenticated Apple", url: "https://iosapps-ssl.mzstatic.com/file", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
+		{name: "authenticated GCS redirect", url: "https://storage.googleapis.com/bucket/file", workload: AuthenticatedAppleProfile, want: GenericProfile},
+		{name: "authenticated GitHub redirect", url: "https://github.com/apple/repo", workload: AuthenticatedAppleProfile, want: GenericProfile},
+		{name: "malformed authenticated fallback", url: "::", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
+		{name: "opaque authenticated fallback", url: "download:asset", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
+		{name: "hostless authenticated fallback", url: "file:///tmp/asset", workload: AuthenticatedAppleProfile, want: AuthenticatedAppleProfile},
+		{name: "malformed public fallback", url: "::", workload: AppleCDNProfile, want: AppleCDNProfile},
+		{name: "malformed Generic fallback", url: "::", workload: GenericProfile, want: GenericProfile},
+		{name: "unknown workload on Apple", url: "https://apple.com/file", workload: Profile(255), want: AppleCDNProfile},
+		{name: "unknown workload on non-Apple", url: "https://example.net/file", workload: Profile(255), want: GenericProfile},
+		{name: "unknown workload fallback", url: "::", workload: Profile(255), want: GenericProfile},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := profileForURL(test.url, test.workload); got != test.want {
+				t.Fatalf("profileForURL(%q, %d) = %d, want %d", test.url, test.workload, got, test.want)
+			}
+		})
+	}
+}
+
 func TestURLProfileClassification(t *testing.T) {
 	preservePolicyOverrides(t)
 	tests := []struct {
 		name     string
 		url      string
-		fallback Profile
+		workload Profile
 		want     EnginePolicy
 	}{
 		{
@@ -86,17 +116,37 @@ func TestURLProfileClassification(t *testing.T) {
 			want: EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20},
 		},
 		{
-			name: "malformed apple fallback", url: "::", fallback: AppleCDNProfile,
+			name: "authenticated Apple", url: "https://iosapps-ssl.mzstatic.com/file", workload: AuthenticatedAppleProfile,
 			want: EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20},
 		},
 		{
-			name: "malformed generic fallback", url: "::", fallback: GenericProfile,
+			name: "authenticated non-Apple redirect", url: "https://storage.googleapis.com/file", workload: AuthenticatedAppleProfile,
+			want: EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20},
+		},
+		{
+			name: "malformed apple fallback", url: "::", workload: AppleCDNProfile,
+			want: EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20},
+		},
+		{
+			name: "malformed authenticated fallback", url: "::", workload: AuthenticatedAppleProfile,
+			want: EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20},
+		},
+		{
+			name: "opaque authenticated fallback", url: "download:asset", workload: AuthenticatedAppleProfile,
+			want: EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20},
+		},
+		{
+			name: "malformed generic fallback", url: "::", workload: GenericProfile,
+			want: EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20},
+		},
+		{
+			name: "unknown profile fallback", url: "::", workload: Profile(255),
 			want: EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := ResolvePolicy(test.url, test.fallback)
+			got := ResolvePolicy(test.url, test.workload)
 			if got != test.want {
 				t.Fatalf("ResolvePolicy(%q) = %+v, want %+v", test.url, got, test.want)
 			}
@@ -109,10 +159,10 @@ func TestPolicyOverrideResolution(t *testing.T) {
 	if err := SetPolicyOverrides(PolicyOverrides{Parts: 3}); err != nil {
 		t.Fatal(err)
 	}
-	for _, fallback := range []Profile{GenericProfile, AppleCDNProfile} {
-		got := ResolvePolicy("::", fallback)
+	for _, workload := range []Profile{GenericProfile, AppleCDNProfile, AuthenticatedAppleProfile, Profile(255)} {
+		got := ResolvePolicy("::", workload)
 		if got.Parts != 3 || got.MinParts != 3 {
-			t.Fatalf("profile %d reduced-parts policy = %+v, want 3/3", fallback, got)
+			t.Fatalf("profile %d reduced-parts policy = %+v, want 3/3", workload, got)
 		}
 	}
 	if err := SetPolicyOverrides(PolicyOverrides{Parts: 3, MinParts: 4}); err == nil {
@@ -201,17 +251,25 @@ func TestDownloaderUsesOneLongLivedEngine(t *testing.T) {
 }
 
 func TestPolicyForPinsProfileTuples(t *testing.T) {
-	// classification breadth lives in TestURLProfileClassification; this
-	// pins the documented tuple each profile resolves to
+	// These are the v3.1.711 defaults. Pinning each outcome independently
+	// ensures future authenticated tuning cannot silently alter public Apple or
+	// Generic resolution.
 	preservePolicyOverrides(t)
-	d := NewDownload("", false, false, false, false)
 	apple := EnginePolicy{Parts: 8, MinParts: 8, MinPartSize: 8 << 20}
 	generic := EnginePolicy{Parts: 8, MinParts: 4, MinPartSize: 16 << 20}
-	if got := d.policyFor("https://updates.cdn-apple.com/file.ipsw"); got != apple {
+	public := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
+	authenticated := NewDownloadWithProfile(AuthenticatedAppleProfile, "", false, false, false, false)
+	if got := public.policyFor("https://updates.cdn-apple.com/file.ipsw"); got != apple {
 		t.Errorf("Apple CDN tuple = %+v, want %+v", got, apple)
 	}
-	if got := d.policyFor("https://example.net/file.ipsw"); got != generic {
+	if got := authenticated.policyFor("https://iosapps-ssl.mzstatic.com/file.ipa"); got != apple {
+		t.Errorf("authenticated Apple tuple = %+v, want %+v", got, apple)
+	}
+	if got := authenticated.policyFor("https://storage.googleapis.com/file.ipa"); got != generic {
 		t.Errorf("Generic tuple = %+v, want %+v", got, generic)
+	}
+	if got := resolveProfile(Profile(255), PolicyOverrides{}); got != generic {
+		t.Errorf("unknown profile tuple = %+v, want Generic %+v", got, generic)
 	}
 }
 
@@ -229,7 +287,7 @@ func TestAuthenticatedTransportOwnershipPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	// construction captures the placement override
-	d := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
+	d := NewDownloadWithProfile(AuthenticatedAppleProfile, "", false, false, false, false)
 	d.client = &http.Client{Transport: standard, Jar: jar}
 	opts := d.options()
 	// Proxy stays nil without an explicit --proxy so go-download owns the

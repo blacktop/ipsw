@@ -506,7 +506,7 @@ func (as *AppStore) Close() {
 func (as *AppStore) downloader() *Download {
 	if as.downloadSession == nil {
 		as.downloadSession = NewDownloadWithProfile(
-			AppleCDNProfile,
+			AuthenticatedAppleProfile,
 			as.config.Proxy,
 			as.config.Insecure,
 			as.config.SkipAll,

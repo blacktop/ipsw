@@ -407,7 +407,7 @@ func (dp *DevPortal) Close() {
 func (dp *DevPortal) downloader() *Download {
 	if dp.downloadSession == nil {
 		dp.downloadSession = NewDownloadWithProfile(
-			AppleCDNProfile,
+			AuthenticatedAppleProfile,
 			dp.config.Proxy,
 			dp.config.Insecure,
 			dp.config.SkipAll,

@@ -24,16 +24,26 @@ const (
 	AppleCDNMinParts = 8
 	// AppleCDNMinPartSize is the Apple CDN scheduler split floor.
 	AppleCDNMinPartSize int64 = 8 << 20
+	// AuthenticatedAppleMinParts intentionally matches AppleCDNMinParts until
+	// paired benchmark evidence supports changing the authenticated default.
+	AuthenticatedAppleMinParts = AppleCDNMinParts
+	// AuthenticatedAppleMinPartSize intentionally matches AppleCDNMinPartSize
+	// under the same evidence requirement.
+	AuthenticatedAppleMinPartSize = AppleCDNMinPartSize
 	// MaxParts bounds overrides so a typo cannot open thousands of sockets.
 	MaxParts = 64
 )
 
-// Profile selects workload defaults when a URL cannot classify itself.
+// Profile identifies the workload defaults selected before final-host
+// classification. A recognized final host may refine that identity.
 type Profile uint8
 
 const (
 	GenericProfile Profile = iota
 	AppleCDNProfile
+	// AuthenticatedAppleProfile identifies Developer Portal, ADC, and App Store
+	// workloads.
+	AuthenticatedAppleProfile
 )
 
 // EnginePolicy is one fully resolved go-download engine tuple. It is the
@@ -93,19 +103,28 @@ func GetPolicyOverrides() PolicyOverrides {
 	return policyOverrides
 }
 
-// ResolvePolicy classifies rawURL and applies the current overrides.
+// ResolvePolicy classifies rawURL within the selected workload and applies the
+// current overrides.
 // Overrides are validated by SetPolicyOverrides, so resolution is infallible.
-func ResolvePolicy(rawURL string, fallback Profile) EnginePolicy {
-	return resolveProfile(profileForURL(rawURL, fallback), GetPolicyOverrides())
+func ResolvePolicy(rawURL string, workload Profile) EnginePolicy {
+	return resolveProfile(profileForURL(rawURL, workload), GetPolicyOverrides())
 }
 
 func resolveProfile(profile Profile, overrides PolicyOverrides) EnginePolicy {
 	policy := EnginePolicy{
 		Parts: DefaultParts, MinParts: DefaultMinParts, MinPartSize: DefaultMinPartSize,
 	}
-	if profile == AppleCDNProfile {
+	switch profile {
+	case AppleCDNProfile:
 		policy.MinParts = AppleCDNMinParts
 		policy.MinPartSize = AppleCDNMinPartSize
+	case AuthenticatedAppleProfile:
+		policy.MinParts = AuthenticatedAppleMinParts
+		policy.MinPartSize = AuthenticatedAppleMinPartSize
+	case GenericProfile:
+		// Keep the Generic defaults above.
+	default:
+		// Unknown profiles fail closed to the Generic tuple.
 	}
 	if overrides.Parts != 0 {
 		policy.Parts = overrides.Parts
@@ -121,22 +140,39 @@ func resolveProfile(profile Profile, overrides PolicyOverrides) EnginePolicy {
 	return policy
 }
 
-func profileForURL(rawURL string, fallback Profile) Profile {
-	if fallback != AppleCDNProfile {
-		fallback = GenericProfile
-	}
+func profileForURL(rawURL string, workload Profile) Profile {
+	workload = normalizedProfile(workload)
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Opaque != "" {
-		return fallback
+		return workload
 	}
 	host := godl.NormalizeHost(u.Hostname())
 	if host == "" {
-		return fallback
+		return workload
 	}
+	if !isAppleDownloadHost(host) {
+		return GenericProfile
+	}
+	if workload == AuthenticatedAppleProfile {
+		return AuthenticatedAppleProfile
+	}
+	return AppleCDNProfile
+}
+
+func normalizedProfile(profile Profile) Profile {
+	switch profile {
+	case GenericProfile, AppleCDNProfile, AuthenticatedAppleProfile:
+		return profile
+	default:
+		return GenericProfile
+	}
+}
+
+func isAppleDownloadHost(host string) bool {
 	for _, domain := range []string{"cdn-apple.com", "apple.com", "aaplimg.com", "mzstatic.com"} {
 		if host == domain || strings.HasSuffix(host, "."+domain) {
-			return AppleCDNProfile
+			return true
 		}
 	}
-	return GenericProfile
+	return false
 }

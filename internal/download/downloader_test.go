@@ -324,6 +324,9 @@ func TestAuthenticatedOwnersReuseDownloadSession(t *testing.T) {
 	if got := appStore.downloader(); got != firstAppStore || got.client != client {
 		t.Fatal("App Store did not reuse its authenticated download session")
 	}
+	if firstAppStore.workloadProfile != AuthenticatedAppleProfile {
+		t.Fatalf("App Store workload profile = %d, want authenticated Apple", firstAppStore.workloadProfile)
+	}
 	appStore.Close()
 	if appStore.downloadSession != nil {
 		t.Fatal("App Store Close retained its download session")
@@ -336,6 +339,9 @@ func TestAuthenticatedOwnersReuseDownloadSession(t *testing.T) {
 	firstDevPortal := devPortal.downloader()
 	if got := devPortal.downloader(); got != firstDevPortal || got.client != client {
 		t.Fatal("Developer Portal did not reuse its authenticated download session")
+	}
+	if firstDevPortal.workloadProfile != AuthenticatedAppleProfile {
+		t.Fatalf("Developer Portal workload profile = %d, want authenticated Apple", firstDevPortal.workloadProfile)
 	}
 	devPortal.Close()
 	if devPortal.downloadSession != nil {

@@ -49,7 +49,7 @@ type Download struct {
 
 	client *http.Client
 
-	fallbackProfile Profile
+	workloadProfile Profile
 	// nodeSelection is the placement setting captured at construction:
 	// EnableNodeSelection is fixed at engine construction (the tuple stays
 	// live via Options.Policy), and the CLI installs overrides exactly once
@@ -81,8 +81,9 @@ func NewDownload(proxy string, insecure, skipAll, restartAll, ignoreSha1 bool) *
 	return NewDownloadWithProfile(GenericProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 }
 
-// NewDownloadWithProfile creates a downloader with an explicit fallback for
-// URLs that cannot be classified. A valid URL always selects by hostname.
+// NewDownloadWithProfile creates a downloader for an explicit workload. The
+// engine's final byte-serving hostname remains authoritative: non-Apple hosts
+// always select GenericProfile.
 func NewDownloadWithProfile(
 	profile Profile, proxy string, insecure, skipAll, restartAll, ignoreSha1 bool,
 ) *Download {
@@ -91,7 +92,7 @@ func NewDownloadWithProfile(
 		skipAll:         skipAll,
 		restartAll:      restartAll,
 		ignoreSha1:      ignoreSha1,
-		fallbackProfile: profile,
+		workloadProfile: normalizedProfile(profile),
 		nodeSelection:   GetPolicyOverrides().EnableNodeSelection,
 	}
 	// Only an explicit --proxy becomes a caller-supplied proxy function.
@@ -279,11 +280,10 @@ func (d *Download) downloadEngine() (*godl.Downloader, error) {
 	return engine, nil
 }
 
-// policyFor classifies the byte-serving (post-redirect) URL and returns the
-// per-resource tuple. The fallback profile is only reachable if the engine
-// reports an unparseable final URL.
+// policyFor classifies the byte-serving (post-redirect) URL within the
+// session's workload and returns the per-resource tuple.
 func (d *Download) policyFor(finalURL string) godl.Concurrency {
-	return ResolvePolicy(finalURL, d.fallbackProfile)
+	return ResolvePolicy(finalURL, d.workloadProfile)
 }
 
 func (d *Download) options() *godl.Options {
