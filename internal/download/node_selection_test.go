@@ -14,8 +14,8 @@ import (
 
 // TestOptionsProxyNilWithoutExplicitProxy pins the proxy contract: only an
 // explicit --proxy reaches Options.Proxy; nil keeps the engine's own per-URL
-// environment-proxy evaluation, and v0.2.4 judges placement from the actual
-// election route.
+// environment-proxy evaluation, and go-download judges placement from the
+// actual election route.
 func TestOptionsProxyNilWithoutExplicitProxy(t *testing.T) {
 	preservePolicyOverrides(t)
 

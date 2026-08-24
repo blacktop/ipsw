@@ -115,7 +115,8 @@ type DevConfig struct {
 	ConfigDir     string
 }
 
-// DevPortal is the dev portal object
+// DevPortal owns one reusable download session and is intended for sequential
+// use. Its methods, including Close, must not be called concurrently.
 type DevPortal struct {
 	Client *http.Client
 

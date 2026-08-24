@@ -68,6 +68,8 @@ type FileRequest struct {
 	SHA1     string
 	DestName string
 	Headers  http.Header
+	// ResumeID overrides the URL-derived identity when the caller has a more
+	// stable artifact identity. Empty uses defaultResumeID.
 	ResumeID string
 }
 
@@ -91,7 +93,7 @@ func NewDownloadWithProfile(
 		nodeSelection:   GetPolicyOverrides().EnableNodeSelection,
 	}
 	// Only an explicit --proxy becomes a caller-supplied proxy function.
-	// go-download v0.2.4 decides placement from the actual election route
+	// go-download decides placement from the actual election route
 	// (a proxied election disables it); a nil Proxy keeps the engine's own
 	// per-URL environment-proxy evaluation.
 	if proxy != "" {
@@ -162,11 +164,6 @@ func (d *Download) DoContext(ctx context.Context) (Status, error) {
 	return d.DoRequestContext(ctx, &FileRequest{
 		URL: d.URL, SHA1: d.Sha1, DestName: d.DestName, Headers: headers,
 	})
-}
-
-// DoRequest downloads one typed file request through the session.
-func (d *Download) DoRequest(req *FileRequest) (Status, error) {
-	return d.DoRequestContext(context.Background(), req)
 }
 
 // DoRequestContext downloads one typed file request and stops when ctx is
@@ -376,9 +373,11 @@ func (d *Download) requestHeaders() http.Header {
 	return headers
 }
 
-// defaultResumeID derives a stable signed-URL identity without credentials.
-// Query and fragment are excluded; an explicit default port is normalized
-// away while a non-default port remains part of the origin.
+// defaultResumeID derives the default stable identity for every typed request.
+// Query and fragment are excluded so rotating URL credentials do not change
+// identity; validators, expected size, and the per-destination sidecar still
+// gate partial-data reuse. An explicit default port is normalized away while a
+// non-default port remains part of the origin.
 func defaultResumeID(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Opaque != "" {

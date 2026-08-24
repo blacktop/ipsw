@@ -87,6 +87,8 @@ type AppStoreConfig struct {
 	KeybagPlist   string
 }
 
+// AppStore owns one reusable download session and is intended for sequential
+// use. Its methods, including Close, must not be called concurrently.
 type AppStore struct {
 	Client *http.Client
 
