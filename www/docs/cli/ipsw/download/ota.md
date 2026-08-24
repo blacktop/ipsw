@@ -23,6 +23,9 @@ ipsw download ota [options] [flags]
 # Get all the latest BETA iOS OTAs URLs as JSON
 ❯ ipsw download ota --platform ios --beta --urls --json
 
+# Get the macOS 26.7 RC OTA URL for the Mac17,6
+❯ ipsw download ota --platform macos --version 26.7 --device Mac17,6 --rc --urls
+
 # Download latest tvOS OTA and extract kernelcache
 ❯ ipsw download ota --platform tvos --latest --kernel
 
@@ -59,6 +62,7 @@ ipsw download ota [options] [flags]
       --pattern string           Download remote files that match regex
       --platform string          Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)
       --proxy string             HTTP/HTTPS proxy
+      --rc                       Download Release Candidate OTAs (same seed audiences as --beta)
   -_, --remove-commas            replace commas in IPSW filename with underscores
       --restart-all              always restart resumable IPSWs
       --rsr                      Download Rapid Security Response OTAs

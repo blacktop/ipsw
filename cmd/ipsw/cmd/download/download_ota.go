@@ -79,6 +79,7 @@ func init() {
 		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
 	})
 	downloadOtaCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	downloadOtaCmd.Flags().Bool("rc", false, "Download Release Candidate OTAs (same seed audiences as --beta)")
 	downloadOtaCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	downloadOtaCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	downloadOtaCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
@@ -101,6 +102,8 @@ func init() {
 	downloadOtaCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	downloadOtaCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "beta", "latest")
+	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "rc", "latest")
+	downloadOtaCmd.MarkFlagsMutuallyExclusive("beta", "rc")
 	// Bind download behavior flags
 	viper.BindPFlag("download.ota.proxy", downloadOtaCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.ota.insecure", downloadOtaCmd.Flags().Lookup("insecure"))
@@ -118,6 +121,7 @@ func init() {
 	// Bind OTA-specific flags
 	viper.BindPFlag("download.ota.platform", downloadOtaCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", downloadOtaCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.rc", downloadOtaCmd.Flags().Lookup("rc"))
 	viper.BindPFlag("download.ota.latest", downloadOtaCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ota.delta", downloadOtaCmd.Flags().Lookup("delta"))
 	viper.BindPFlag("download.ota.rsr", downloadOtaCmd.Flags().Lookup("rsr"))
@@ -148,6 +152,9 @@ var downloadOtaCmd = &cobra.Command{
 
 		# Get all the latest BETA iOS OTAs URLs as JSON
 		❯ ipsw download ota --platform ios --beta --urls --json
+
+		# Get the macOS 26.7 RC OTA URL for the Mac17,6
+		❯ ipsw download ota --platform macos --version 26.7 --device Mac17,6 --rc --urls
 
 		# Download latest tvOS OTA and extract kernelcache
 		❯ ipsw download ota --platform tvos --latest --kernel
@@ -180,7 +187,8 @@ var downloadOtaCmd = &cobra.Command{
 		doNotDownload := viper.GetStringSlice("download.ota.black-list")
 		// flags
 		platform := viper.GetString("download.ota.platform")
-		getBeta := viper.GetBool("download.ota.beta")
+		// RCs are seeded to the same beta asset audiences as betas, so --rc is an alias for --beta
+		getBeta := viper.GetBool("download.ota.beta") || viper.GetBool("download.ota.rc")
 		getLatest := viper.GetBool("download.ota.latest")
 		getRSR := viper.GetBool("download.ota.rsr")
 		getSim := viper.GetBool("download.ota.sim")
