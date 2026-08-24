@@ -2,6 +2,7 @@ package download
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -12,6 +13,78 @@ import (
 )
 
 const totalBarPriority = 1 << 20
+
+const (
+	// rateWindow bounds the smoothing window for the aggregate speed.
+	rateWindow = 5 * time.Second
+	// rateSampleEvery throttles sample retention under concurrent parts.
+	rateSampleEvery = 100 * time.Millisecond
+	// rateMinSpan is the shortest window that yields a meaningful rate.
+	rateMinSpan = 250 * time.Millisecond
+)
+
+type rateSample struct {
+	at    time.Time
+	bytes int64
+}
+
+// aggregateRate measures session bandwidth from fresh durable bytes over wall
+// clock. Resumed bytes seed the visual bars but never this tracker, so a
+// resumed download cannot inflate the reported rate or shrink the ETA.
+type aggregateRate struct {
+	mu      sync.Mutex
+	now     func() time.Time
+	bytes   int64
+	samples []rateSample
+}
+
+func (a *aggregateRate) add(n int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.bytes += n
+	now := a.now()
+	// snapshots keep their timestamps: appending only after the interval
+	// elapses is what rolls the baseline forward under high-frequency events
+	if count := len(a.samples); count == 0 || now.Sub(a.samples[count-1].at) >= rateSampleEvery {
+		a.samples = append(a.samples, rateSample{at: now, bytes: a.bytes})
+	}
+	a.prune(now)
+}
+
+// prune drops samples that no longer bound the window, always retaining one
+// sample older than the window as the rate baseline. Must be called with a.mu
+// held.
+func (a *aggregateRate) prune(now time.Time) {
+	for len(a.samples) >= 2 && now.Sub(a.samples[1].at) >= rateWindow {
+		a.samples = a.samples[1:]
+	}
+}
+
+// reset clears the sampling baseline after durable progress was rolled back,
+// so discarded bytes cannot inflate the next window's rate.
+func (a *aggregateRate) reset() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.samples = a.samples[:0]
+}
+
+// perSecond returns the smoothed fresh-bytes rate, or 0 before the window
+// holds a meaningful span. A stalled transfer decays toward 0.
+func (a *aggregateRate) perSecond() float64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.samples) == 0 {
+		return 0
+	}
+	now := a.now()
+	a.prune(now)
+	base := a.samples[0]
+	span := now.Sub(base.at)
+	if span < rateMinSpan {
+		return 0
+	}
+	return float64(a.bytes-base.bytes) / span.Seconds()
+}
 
 type chunkBar struct {
 	bar    *mpb.Bar
@@ -30,12 +103,14 @@ type progressReporter struct {
 	counted map[int]int64
 	sum     int64
 	total   *mpb.Bar
+	rate    aggregateRate
 }
 
 func newProgressReporter() *progressReporter {
 	return &progressReporter{
 		bars:    make(map[int]*chunkBar),
 		counted: make(map[int]int64),
+		rate:    aggregateRate{now: time.Now},
 	}
 }
 
@@ -75,9 +150,9 @@ func (r *progressReporter) Start(info godl.Info) {
 			decor.CountersKibiByte("\t% .2f / % .2f"),
 		),
 		mpb.AppendDecorators(
-			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+			decor.OnComplete(decor.Any(r.aggregateETA), "✅ "),
 			decor.Name(" ] "),
-			decor.AverageSpeed(decor.SizeB1024(0), "% .2f", decor.WCSyncWidth),
+			decor.Any(r.aggregateSpeed, decor.WCSyncWidth),
 		),
 	)
 	if info.Resumed > 0 {
@@ -146,10 +221,32 @@ func (r *progressReporter) ChunkRestart(id int) {
 		r.sum = 0
 	}
 	r.counted[id] = 0
+	r.rate.reset()
 	chunk.bar.SetCurrent(0)
 	if r.total != nil {
 		r.total.SetCurrent(r.sum)
 	}
+}
+
+// aggregateSpeed renders the fresh-bytes windowed rate. Resumed bytes count
+// toward the bar position but never toward this rate.
+func (r *progressReporter) aggregateSpeed(_ decor.Statistics) string {
+	return fmt.Sprintf("% .2f", decor.FmtAsSpeed(decor.SizeB1024(math.Round(r.rate.perSecond()))))
+}
+
+// aggregateETA divides remaining bytes by the fresh aggregate rate; without a
+// meaningful rate, or when the result cannot fit in time.Duration, it reports
+// an honest unavailable state.
+func (r *progressReporter) aggregateETA(s decor.Statistics) string {
+	rate := r.rate.perSecond()
+	if rate <= 0 {
+		return "--"
+	}
+	seconds := float64(max(s.Total-s.Current, 0)) / rate
+	if seconds >= float64(math.MaxInt64/time.Second) {
+		return "--" // beyond time.Duration: no representable ETA
+	}
+	return time.Duration(seconds * float64(time.Second)).Truncate(time.Second).String()
 }
 
 func (r *progressReporter) Connected(id int, addr string) {
@@ -166,6 +263,7 @@ func (r *progressReporter) ChunkProgress(id int, n int, d time.Duration) {
 	if n > 0 {
 		r.counted[id] += int64(n)
 		r.sum += int64(n)
+		r.rate.add(int64(n))
 		if r.total != nil {
 			r.total.SetCurrent(r.sum)
 		}

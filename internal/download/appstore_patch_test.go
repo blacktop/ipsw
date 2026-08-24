@@ -4,13 +4,20 @@ package download
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/md5"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	godl "github.com/blacktop/go-download"
 )
 
 const syntheticIPAInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
@@ -113,6 +120,38 @@ func TestOpenMatchingStaging(t *testing.T) {
 	}
 	if openMatchingStaging(filepath.Join(dir, "missing.unpatched"), goodMD5) != nil {
 		t.Error("missing stage must not be reused")
+	}
+}
+
+func TestAppStoreDownloadVerifiesPublishedMD5(t *testing.T) {
+	payload := []byte("synthetic App Store archive")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"v1"`)
+		http.ServeContent(w, r, "app.ipa", time.Time{}, bytes.NewReader(payload))
+	}))
+	t.Cleanup(server.Close)
+
+	as := &AppStore{
+		Client: server.Client(),
+		config: &AppStoreConfig{Context: t.Context()},
+	}
+	t.Cleanup(as.Close)
+	dest := filepath.Join(t.TempDir(), "app.ipa.unpatched")
+	want := strings.Repeat("0", md5.Size*2)
+
+	_, err := as.download(server.URL+"/app.ipa", dest, want)
+	var checksumErr *godl.ChecksumError
+	if !errors.As(err, &checksumErr) {
+		t.Fatalf("download error = %v, want ChecksumError", err)
+	}
+	if checksumErr.Algo != "md5" || checksumErr.Expected != want {
+		t.Fatalf("ChecksumError = %#v", checksumErr)
+	}
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Fatalf("destination stat error = %v, want no installed file", err)
+	}
+	if _, err := os.Stat(dest + PartSuffix); err != nil {
+		t.Fatalf("retained stage stat error = %v", err)
 	}
 }
 

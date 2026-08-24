@@ -1303,7 +1303,7 @@ func (as *AppStore) downloadWithAuthRetry(bundleID, output string, allowAuthRetr
 		// of re-downloading the multi-GB payload
 		log.Warnf("reusing staged download %s retained by a previous failed patch", staging)
 	} else {
-		status, err := as.download(dl.Apps[0].URL, staging)
+		status, err := as.download(dl.Apps[0].URL, staging, dl.Apps[0].HashMD5)
 		if err != nil {
 			return fmt.Errorf("failed to download app: %v", err)
 		}
@@ -1407,7 +1407,7 @@ func (as *AppStore) patchIPA(staging *os.File, dst string, info *downloadAppResu
 	return nil
 }
 
-func (as *AppStore) download(url, dest string) (Status, error) {
+func (as *AppStore) download(url, dest, expectedMD5 string) (Status, error) {
 	downloader := as.downloader()
 
 	log.WithFields(log.Fields{
@@ -1415,7 +1415,7 @@ func (as *AppStore) download(url, dest string) (Status, error) {
 	}).Info("Downloading")
 
 	status, err := downloader.DoRequestContext(as.config.Context, &FileRequest{
-		URL: url, DestName: dest,
+		URL: url, MD5: expectedMD5, DestName: dest,
 	})
 	if err != nil {
 		return status, fmt.Errorf("failed to download file: %w", err)

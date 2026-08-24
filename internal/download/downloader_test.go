@@ -3,6 +3,7 @@ package download
 import (
 	"bytes"
 	"context"
+	"crypto/md5" // #nosec G501 -- App Store test fixtures use published MD5 values
 	"crypto/sha1"
 	"crypto/sha256"
 	"errors"
@@ -30,6 +31,7 @@ func TestDownload(t *testing.T) {
 	tests := []struct {
 		name       string
 		cfg        Download // flag fields only; URL/Sha1/DestName are filled in
+		md5        string
 		sha1       string
 		sha256     string
 		partial    string // suffix of a pre-existing partial file ("" = none)
@@ -37,6 +39,28 @@ func TestDownload(t *testing.T) {
 		wantErr    []string
 		wantPart   bool
 	}{
+		{
+			name: "good md5 renames file",
+			cfg:  Download{},
+			md5:  fmt.Sprintf("%x", md5.Sum(payload)),
+		},
+		{
+			name:     "md5 mismatch retains file",
+			cfg:      Download{},
+			md5:      strings.Repeat("0", md5.Size*2),
+			wantErr:  []string{strings.Repeat("0", md5.Size*2)},
+			wantPart: true,
+		},
+		{
+			name: "invalid published md5 downloads unverified",
+			cfg:  Download{},
+			md5:  "{{n/a}}",
+		},
+		{
+			name: "ignore flag disables md5 verification",
+			cfg:  Download{ignoreSha1: true},
+			md5:  strings.Repeat("0", md5.Size*2),
+		},
 		{
 			name: "good checksum renames file",
 			cfg:  Download{},
@@ -132,10 +156,10 @@ func TestDownload(t *testing.T) {
 			t.Cleanup(d.Close)
 
 			var err error
-			if tt.sha256 != "" {
-				// SHA-256 rides only the typed request path
+			if tt.md5 != "" || tt.sha256 != "" {
+				// MD5 and SHA-256 ride only the typed request path.
 				_, err = d.DoRequestContext(t.Context(), &FileRequest{
-					URL: d.URL, SHA256: tt.sha256, DestName: destName,
+					URL: d.URL, MD5: tt.md5, SHA256: tt.sha256, DestName: destName,
 				})
 			} else {
 				_, err = d.Do()

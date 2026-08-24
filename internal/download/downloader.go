@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"crypto/md5" // #nosec G501 -- App Store integrity checks use published MD5 values
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/tls"
@@ -66,6 +67,7 @@ type Download struct {
 // concurrency policy stay on the Download.
 type FileRequest struct {
 	URL      string
+	MD5      string
 	SHA1     string
 	SHA256   string
 	DestName string
@@ -205,6 +207,7 @@ func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Stat
 		URL:            request.URL,
 		Dest:           request.DestName,
 		Reporter:       newProgressReporter(),
+		ExpectedMD5:    d.expectedDigest(request.MD5, request.DestName, "MD5", md5.Size),
 		ExpectedSHA1:   d.expectedDigest(request.SHA1, request.DestName, "SHA-1", sha1.Size),
 		ExpectedSHA256: d.expectedDigest(request.SHA256, request.DestName, "SHA-256", sha256.Size),
 		Headers:        request.Headers,
@@ -228,6 +231,9 @@ func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Stat
 	}
 	if engineReq.ExpectedSHA256 != "" {
 		utils.Indent(log.Debug, 2)("sha256sum verified ✅")
+	}
+	if engineReq.ExpectedMD5 != "" {
+		utils.Indent(log.Debug, 2)("md5sum verified ✅")
 	}
 	return Downloaded, nil
 }
