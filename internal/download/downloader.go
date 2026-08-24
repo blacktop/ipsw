@@ -203,8 +203,8 @@ func (d *Download) DoRequestContext(ctx context.Context, req *FileRequest) (Stat
 		URL:            request.URL,
 		Dest:           request.DestName,
 		Reporter:       newProgressReporter(),
-		ExpectedSHA1:   d.expectedSHA1(request.SHA1, request.DestName),
-		ExpectedSHA256: d.expectedSHA256(request.SHA256, request.DestName),
+		ExpectedSHA1:   d.expectedDigest(request.SHA1, request.DestName, "SHA-1", sha1.Size),
+		ExpectedSHA256: d.expectedDigest(request.SHA256, request.DestName, "SHA-256", sha256.Size),
 		Headers:        request.Headers,
 		ResumeID:       request.ResumeID,
 	}
@@ -305,7 +305,7 @@ func (d *Download) options() *godl.Options {
 		Overwrite:           true,
 		// surface the engine's structured measurements (election, tuple,
 		// retries, 429 shedding, placement, resume, integrity) at --verbose
-		Logger: engineLogger(),
+		Logger: engineLog,
 	}
 	if d.client != nil {
 		opts.Jar = d.client.Jar
@@ -314,36 +314,21 @@ func (d *Download) options() *godl.Options {
 	return opts
 }
 
-func (d *Download) expectedSHA1(rawSHA1, destName string) string {
-	sha := strings.ToLower(strings.TrimSpace(rawSHA1))
+// expectedDigest normalizes a published hex digest for the engine. Empty
+// digests, --ignore-sha1 (which disables all published-checksum
+// verification), and malformed digests download unverified — scraped
+// sources sometimes publish placeholders instead of hashes.
+func (d *Download) expectedDigest(raw, destName, algo string, size int) string {
+	sha := strings.ToLower(strings.TrimSpace(raw))
 	if sha == "" {
 		return ""
 	}
 	if d.ignoreSha1 {
-		utils.Indent(log.Warn, 2)("SHA-1 verification disabled")
+		utils.Indent(log.Warn, 2)(algo + " verification disabled")
 		return ""
 	}
-	if !ValidSHA1(sha) {
-		// Scraped sources sometimes publish placeholders instead of hashes.
-		log.Warnf("ignoring invalid published SHA-1 %q for %s: downloading without verification", rawSHA1, destName)
-		return ""
-	}
-	return sha
-}
-
-// expectedSHA256 mirrors expectedSHA1 for SHA-256 manifests (KDK). The
-// --ignore-sha1 flag disables all published-checksum verification.
-func (d *Download) expectedSHA256(rawSHA256, destName string) string {
-	sha := strings.ToLower(strings.TrimSpace(rawSHA256))
-	if sha == "" {
-		return ""
-	}
-	if d.ignoreSha1 {
-		utils.Indent(log.Warn, 2)("SHA-256 verification disabled")
-		return ""
-	}
-	if !ValidSHA256(sha) {
-		log.Warnf("ignoring invalid published SHA-256 %q for %s: downloading without verification", rawSHA256, destName)
+	if !validHexDigest(sha, size) {
+		log.Warnf("ignoring invalid published %s %q for %s: downloading without verification", algo, raw, destName)
 		return ""
 	}
 	return sha
@@ -373,18 +358,12 @@ func (d *Download) skipLocked(err error, destName string) bool {
 
 // ValidSHA1 reports whether s is a well-formed hex SHA-1 digest.
 func ValidSHA1(s string) bool {
-	s = strings.TrimSpace(s)
-	if len(s) != sha1.Size*2 {
-		return false
-	}
-	_, err := hex.DecodeString(s)
-	return err == nil
+	return validHexDigest(strings.TrimSpace(s), sha1.Size)
 }
 
-// ValidSHA256 reports whether s is a well-formed hex SHA-256 digest.
-func ValidSHA256(s string) bool {
-	s = strings.TrimSpace(s)
-	if len(s) != sha256.Size*2 {
+// validHexDigest reports whether s is exactly size bytes of hex.
+func validHexDigest(s string, size int) bool {
+	if len(s) != size*2 {
 		return false
 	}
 	_, err := hex.DecodeString(s)

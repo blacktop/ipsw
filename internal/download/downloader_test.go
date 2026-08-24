@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net"
@@ -30,6 +31,7 @@ func TestDownload(t *testing.T) {
 		name       string
 		cfg        Download // flag fields only; URL/Sha1/DestName are filled in
 		sha1       string
+		sha256     string
 		partial    string // suffix of a pre-existing partial file ("" = none)
 		authClient bool   // exercise the authenticated-session transport branch
 		wantErr    []string
@@ -78,6 +80,28 @@ func TestDownload(t *testing.T) {
 			sha1: "{{n/a}}",
 		},
 		{
+			name:   "good sha256 renames file",
+			cfg:    Download{},
+			sha256: fmt.Sprintf("%x", sha256.Sum256([]byte("synthetic firmware payload"))),
+		},
+		{
+			name:     "sha256 mismatch retains file",
+			cfg:      Download{},
+			sha256:   strings.Repeat("0", sha256.Size*2),
+			wantErr:  []string{strings.Repeat("0", sha256.Size*2)},
+			wantPart: true,
+		},
+		{
+			name:   "invalid published sha256 downloads unverified",
+			cfg:    Download{},
+			sha256: "{{n/a}}",
+		},
+		{
+			name:   "ignore flag disables sha256 verification",
+			cfg:    Download{ignoreSha1: true},
+			sha256: strings.Repeat("0", sha256.Size*2),
+		},
+		{
 			name:       "authenticated client transport is used",
 			cfg:        Download{},
 			authClient: true,
@@ -105,8 +129,17 @@ func TestDownload(t *testing.T) {
 			if tt.authClient {
 				d.client = server.Client()
 			}
+			t.Cleanup(d.Close)
 
-			_, err := d.Do()
+			var err error
+			if tt.sha256 != "" {
+				// SHA-256 rides only the typed request path
+				_, err = d.DoRequestContext(t.Context(), &FileRequest{
+					URL: d.URL, SHA256: tt.sha256, DestName: destName,
+				})
+			} else {
+				_, err = d.Do()
+			}
 			for _, want := range tt.wantErr {
 				if err == nil || !strings.Contains(err.Error(), want) {
 					t.Fatalf("Do() error = %v, want it to contain %q", err, want)
@@ -153,21 +186,34 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func TestValidSHA1(t *testing.T) {
-	valid := strings.Repeat("aB", sha1.Size)
-	for _, test := range []struct {
-		value string
-		want  bool
+func TestValidHexDigests(t *testing.T) {
+	for _, algo := range []struct {
+		name string
+		size int
 	}{
-		{value: valid, want: true},
-		{value: "  " + valid + "  ", want: true},
-		{value: "{{n/a}}", want: false},
-		{value: strings.Repeat("g", sha1.Size*2), want: false},
-		{value: strings.Repeat("0", sha1.Size*2-1), want: false},
+		{"SHA1", sha1.Size},
+		{"SHA256", sha256.Size},
 	} {
-		if got := ValidSHA1(test.value); got != test.want {
-			t.Errorf("ValidSHA1(%q) = %v, want %v", test.value, got, test.want)
-		}
+		t.Run(algo.name, func(t *testing.T) {
+			valid := strings.Repeat("aB", algo.size)
+			for _, test := range []struct {
+				value string
+				want  bool
+			}{
+				{value: valid, want: true},
+				{value: "{{n/a}}", want: false},
+				{value: strings.Repeat("0", algo.size*2-1), want: false},
+				{value: strings.Repeat("g", algo.size*2), want: false},
+			} {
+				if got := validHexDigest(strings.ToLower(test.value), algo.size); got != test.want {
+					t.Errorf("validHexDigest(%q, %d) = %v, want %v", test.value, algo.size, got, test.want)
+				}
+			}
+		})
+	}
+	// the exported wrapper trims for callers with raw scraped values
+	if !ValidSHA1("  " + strings.Repeat("ab", sha1.Size) + "  ") {
+		t.Error("ValidSHA1 must trim surrounding whitespace")
 	}
 }
 

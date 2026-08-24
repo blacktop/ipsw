@@ -53,7 +53,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadAppledbCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
 	downloadAppledbCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
-	downloadAppledbCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
+	downloadAppledbCmd.Flags().Bool("ignore-sha1", false, "skip checksum verification")
 	downloadAppledbCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadAppledbCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags

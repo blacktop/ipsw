@@ -44,7 +44,7 @@ func init() {
 	downloadXcodeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadXcodeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadXcodeCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
-	downloadXcodeCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
+	downloadXcodeCmd.Flags().Bool("ignore-sha1", false, "skip checksum verification")
 	downloadXcodeCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	// Command-specific flags
 	downloadXcodeCmd.Flags().BoolP("latest", "l", false, "Download newest Xcode")

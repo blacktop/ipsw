@@ -51,7 +51,7 @@ func init() {
 	downloadIpswCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
 	downloadIpswCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
 	downloadIpswCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
-	downloadIpswCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
+	downloadIpswCmd.Flags().Bool("ignore-sha1", false, "skip checksum verification")
 	downloadIpswCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags
 	downloadIpswCmd.Flags().StringArray("white-list", []string{}, "iOS device white list")

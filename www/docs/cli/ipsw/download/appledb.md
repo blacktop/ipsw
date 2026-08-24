@@ -46,7 +46,7 @@ ipsw download appledb [flags]
       --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
   -f, --flat                  Do NOT preserve directory structure when downloading with --pattern
   -h, --help                  help for appledb
-      --ignore-sha1           skip SHA-1 verification
+      --ignore-sha1           skip checksum verification
       --insecure              do not verify ssl certs
   -j, --json                  Dump DB query results as JSON
       --kernel                Extract kernelcache from remote IPSW

@@ -10,21 +10,24 @@ import (
 	godl "github.com/blacktop/go-download"
 )
 
-// engineLogger bridges go-download's structured internals (election, effective
+// engineLog bridges go-download's structured internals (election, effective
 // tuple, protocol, retries, 429 shedding, connected addresses, placement,
 // resume, integrity) into apex/log so --verbose surfaces the engine's
 // measurements instead of silently discarding them.
-func engineLogger() *slog.Logger {
-	return slog.New(slogBridge{})
-}
+var engineLog = slog.New(slogBridge{})
 
-// slogBridge is a slog.Handler that forwards records to apex/log at debug
-// level, redacting URL-shaped attribute values (signed query credentials).
+// slogBridge is a slog.Handler forwarding records to apex/log. The engine
+// documents Logger as "debug-level internals", so records normally land at
+// apex debug — but warnings and errors keep their severity and are never
+// dropped by the debug gate.
 type slogBridge struct {
 	attrs []slog.Attr
 }
 
-func (b slogBridge) Enabled(context.Context, slog.Level) bool {
+func (b slogBridge) Enabled(_ context.Context, level slog.Level) bool {
+	if level >= slog.LevelWarn {
+		return true
+	}
 	logger, ok := log.Log.(*log.Logger)
 	return ok && logger.Level <= log.DebugLevel
 }
@@ -39,7 +42,16 @@ func (b slogBridge) Handle(_ context.Context, record slog.Record) error {
 		add(attr)
 	}
 	record.Attrs(add)
-	log.WithFields(fields).Debug("godl: " + record.Message)
+	entry := log.WithFields(fields)
+	message := "godl: " + record.Message
+	switch {
+	case record.Level >= slog.LevelError:
+		entry.Error(message)
+	case record.Level >= slog.LevelWarn:
+		entry.Warn(message)
+	default:
+		entry.Debug(message)
+	}
 	return nil
 }
 
@@ -50,6 +62,8 @@ func (b slogBridge) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (b slogBridge) WithGroup(string) slog.Handler { return b } // the engine emits no groups
 
 // redactAttrValue strips signed query credentials from URL-shaped values.
+// The engine already redacts URLs at its emit sites; this is defense in
+// depth against a future engine regression, not a leak being papered over.
 func redactAttrValue(value slog.Value) any {
 	resolved := value.Resolve().Any()
 	if s, ok := resolved.(string); ok &&

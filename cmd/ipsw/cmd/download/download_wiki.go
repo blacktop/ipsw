@@ -50,7 +50,7 @@ func init() {
 	downloadWikiCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	downloadWikiCmd.Flags().BoolP("confirm", "y", false, "do not prompt user for confirmation")
 	downloadWikiCmd.Flags().Bool("skip-all", false, "continue past files locked by another download process")
-	downloadWikiCmd.Flags().Bool("ignore-sha1", false, "skip SHA-1 verification")
+	downloadWikiCmd.Flags().Bool("ignore-sha1", false, "skip checksum verification")
 	downloadWikiCmd.Flags().Bool("restart-all", false, "always restart resumable IPSWs")
 	downloadWikiCmd.Flags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	// Filter flags

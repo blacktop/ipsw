@@ -41,7 +41,7 @@ ipsw download wiki [flags]
   -d, --device string    iOS Device (i.e. iPhone11,2)
   -f, --flat             Do NOT preserve directory structure when downloading with --pattern
   -h, --help             help for wiki
-      --ignore-sha1      skip SHA-1 verification
+      --ignore-sha1      skip checksum verification
       --insecure         do not verify ssl certs
       --ipsw             Download IPSWs
       --json             Parse URLs and store metadata in local JSON database
