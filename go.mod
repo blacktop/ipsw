@@ -52,7 +52,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/gomarkdown/markdown v0.0.0-20260824124553-113a3a2bcce7
+	github.com/gomarkdown/markdown v0.0.0-20260824154242-13c5cf49db8d
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
@@ -78,7 +78,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.16.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.55.0
-	golang.org/x/exp v0.0.0-20260820142414-ca536658362e
+	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0

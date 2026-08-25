@@ -1,6 +1,7 @@
 package download
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -8,6 +9,18 @@ import (
 
 	internaldownload "github.com/blacktop/ipsw/internal/download"
 )
+
+func TestDownloadHelpAdvertisesNodeSelection(t *testing.T) {
+	var output bytes.Buffer
+	DownloadCmd.SetOut(&output)
+	t.Cleanup(func() { DownloadCmd.SetOut(nil) })
+	if err := DownloadCmd.Help(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "--enable-node-selection") {
+		t.Errorf("download help does not advertise --enable-node-selection:\n%s", output.String())
+	}
+}
 
 func resetConcurrencyState(t *testing.T) {
 	t.Helper()

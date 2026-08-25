@@ -106,7 +106,26 @@ Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` res
 
 ### download concurrency
 
-Every `ipsw download` command selects concurrency from the final byte-serving URL after redirects. Apple CDN hosts (`apple.com`, `cdn-apple.com`, `aaplimg.com`, `mzstatic.com`, and their subdomains) use 8 parts, 8 eager parts, and an 8 MiB minimum range. Other hosts use 8 parts, 4 eager parts, and a 16 MiB minimum range. `--parts`, `--min-parts`, and `--min-part-size` (MiB) override those values; zero keeps the URL profile. `--parts 1` selects single-stream `1/1` operation, and an explicitly selected minimum part size is retained. Direct-CDN address placement is off by default; `--enable-node-selection` opts into it for eligible direct transports. The equivalent config keys are `download.parts`, `download.min-parts`, `download.min-part-size`, and `download.enable-node-selection`.
+Every `ipsw download` command selects concurrency from the final byte-serving URL after redirects. Apple CDN hosts (`apple.com`, `cdn-apple.com`, `aaplimg.com`, `mzstatic.com`, and their subdomains) use 8 parts, 8 eager parts, and an 8 MiB minimum range. Other hosts use 8 parts, 4 eager parts, and a 16 MiB minimum range. `--parts`, `--min-parts`, and `--min-part-size` (MiB) override those values; zero keeps the URL profile. `--parts 1` selects single-stream `1/1` operation, and an explicitly selected minimum part size is retained. Direct-CDN address placement (`--enable-node-selection`) is described below. The equivalent config keys are `download.parts`, `download.min-parts`, `download.min-part-size`, and `download.enable-node-selection`.
+
+### node selection (opt-in)
+
+Some Apple CDN hosts resolve to several addresses, and they are not all
+equally fast. `--enable-node-selection` spreads a multipart download's
+streams across those addresses, measures each one with real file bytes, and
+moves unfinished ranges off the slow ones. No extra transfer traffic is
+generated, and the `--parts` connection limit still applies.
+
+```bash
+❯ ipsw download ipsw --device iPhone16,1 --latest --enable-node-selection
+```
+
+Placement needs a multipart download (more than one part), a direct
+connection, and at least two resolved addresses. Anything else (a proxy, an
+IP-literal host, a single-address host, a single-stream transfer) quietly
+takes the ordinary path with no log line. It's off by default because some
+routes are simply faster without it. Run with `--verbose` to see whether
+placement kicked in and which addresses it connected to.
 
 ### download `ipsw` config
 

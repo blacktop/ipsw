@@ -27,6 +27,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func init() {
 	DownloadCmd.PersistentFlags().Int("min-part-size", 0,
 		"minimum scheduler range size in MiB (0 uses the URL profile)")
 	DownloadCmd.PersistentFlags().Bool("enable-node-selection", false,
-		"enable direct-CDN address placement")
+		"spread streams across CDN addresses by measured throughput")
 	viper.BindPFlag("download.parts", DownloadCmd.PersistentFlags().Lookup("parts"))
 	viper.BindPFlag("download.min-parts", DownloadCmd.PersistentFlags().Lookup("min-parts"))
 	viper.BindPFlag("download.min-part-size",
@@ -134,7 +135,19 @@ var DownloadCmd = &cobra.Command{
 	Use:     "download",
 	Aliases: []string{"dl"},
 	Short:   "Download Apple Firmware files (and more)",
-	Args:    cobra.NoArgs,
+	Long: `Download Apple firmware files, Developer Portal artifacts, App Store
+packages, and other supported resources.
+
+On an eligible direct CDN, --enable-node-selection spreads a multipart
+download's range requests across the host's resolved addresses, measures
+their throughput with real file bytes, and moves unfinished work away from
+consistently slow addresses. It stays opt-in because some CDN routes are
+faster without placement. Use --verbose to see whether placement activated
+and which addresses were connected.`,
+	Example: heredoc.Doc(`
+		# Opt into measured multi-address placement for an Apple CDN download
+		❯ ipsw download ipsw --device iPhone16,1 --latest --enable-node-selection`),
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

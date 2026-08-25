@@ -62,7 +62,7 @@ ipsw download dev [flags]
 ```
       --color                   colorize output
       --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   enable direct-CDN address placement
+      --enable-node-selection   spread streams across CDN addresses by measured throughput
       --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
       --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
       --no-color                disable colorize output

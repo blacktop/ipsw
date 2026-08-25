@@ -9,6 +9,11 @@ daemon:
 database:
   # driver: sqlite3
   # dsn: /var/lib/ipswd/ipswd.db
+download:
+  # parts: 0         # max parallel connections; 0 uses the URL profile
+  # min-parts: 0     # eager connections; 0 uses the URL profile
+  # min-part-size: 0 # MiB; 0 uses the URL profile
+  # enable-node-selection: true
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
 # yaml-language-server: $schema=https://blacktop.github.io/ipsw/static/schema.json

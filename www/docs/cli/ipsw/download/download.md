@@ -10,14 +10,33 @@ description: Download Apple Firmware files (and more)
 
 Download Apple Firmware files (and more)
 
+### Synopsis
+
+Download Apple firmware files, Developer Portal artifacts, App Store
+packages, and other supported resources.
+
+On an eligible direct CDN, --enable-node-selection spreads a multipart
+download's range requests across the host's resolved addresses, measures
+their throughput with real file bytes, and moves unfinished work away from
+consistently slow addresses. It stays opt-in because some CDN routes are
+faster without placement. Use --verbose to see whether placement activated
+and which addresses were connected.
+
 ```
 ipsw download [flags]
+```
+
+### Examples
+
+```bash
+# Opt into measured multi-address placement for an Apple CDN download
+❯ ipsw download ipsw --device iPhone16,1 --latest --enable-node-selection
 ```
 
 ### Options
 
 ```
-      --enable-node-selection   enable direct-CDN address placement
+      --enable-node-selection   spread streams across CDN addresses by measured throughput
   -h, --help                    help for download
       --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
       --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
