@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -463,5 +464,84 @@ func TestEmitterFileSystemKernelIsKernelClass(t *testing.T) {
 				t.Fatalf("symbol range = [%#x,%#x), want [%#x,%#x)", sym.Start, sym.End, tc.wantSymStart, tc.wantSymEnd)
 			}
 		})
+	}
+}
+
+// TestEmitterEmitsEachOccurrenceOnce pins that an image occurrence (UUID, kind,
+// path, text range, arch, DSC) and a DSC container are written once per scan:
+// a release and a research kernelcache in one IPSW embed the same kexts, and
+// a second emission with a different symbol set would leave consumers keyed by
+// occurrence with two conflicting streams.
+func TestEmitterEmitsEachOccurrenceOnce(t *testing.T) {
+	var buf bytes.Buffer
+	em := newJSONLEmitter(&buf)
+
+	kext := func(kernelUUID, symbol string) *scanImage {
+		return &scanImage{
+			Kind:       "kext",
+			CPU:        "arm64e",
+			Arch:       "arm64e",
+			KernelUUID: kernelUUID,
+			Macho: &model.Macho{
+				UUID:      "KEXT-UUID",
+				Path:      model.Path{Path: "com.apple.kernel"},
+				TextStart: 0xFFFFFFF007004000,
+				TextEnd:   0xFFFFFFF007804000,
+				Symbols: []*model.Symbol{
+					{Name: model.Name{Name: symbol}, Start: 0x7004000, End: 0x7004100},
+				},
+			},
+		}
+	}
+	kernel := func(uuid, path string) *scanImage {
+		return &scanImage{
+			Kind:          "kernel",
+			CPU:           "arm64e",
+			Arch:          "arm64e",
+			IsFileset:     true,
+			KernelVersion: "Darwin Kernel Version 25.6.0",
+			Macho: &model.Macho{
+				UUID:      uuid,
+				Path:      model.Path{Path: path},
+				TextStart: 0xFFFFFFF007000000,
+				TextEnd:   0xFFFFFFF007004000,
+			},
+		}
+	}
+
+	for _, img := range []*scanImage{
+		{Kind: "dsc", DSCUUID: "DSC-UUID", SharedRegionStart: 0x180000000},
+		{Kind: "dsc", DSCUUID: "DSC-UUID", SharedRegionStart: 0x180000000},
+		kernel("RELEASE-KC", "kernelcache.release.iphone17"),
+		kext("RELEASE-KC", "ipc_port_free"),
+		kernel("RESEARCH-KC", "kernelcache.research.iphone17"),
+		kext("RESEARCH-KC", "func_fffffff007004000"),
+	} {
+		if err := em.image(img); err != nil {
+			t.Fatalf("emit %s: %v", img.Kind, err)
+		}
+	}
+
+	lines := decodeLines(t, buf.Bytes())
+	var got []string
+	for _, line := range lines {
+		switch line["type"] {
+		case "dsc":
+			got = append(got, "dsc:"+line["uuid"].(string))
+		case "image":
+			got = append(got, line["kind"].(string)+":"+line["uuid"].(string))
+		case "symbol":
+			got = append(got, "symbol:"+line["name"].(string))
+		}
+	}
+	want := []string{
+		"dsc:DSC-UUID",
+		"kernel:RELEASE-KC",
+		"kext:KEXT-UUID",
+		"symbol:ipc_port_free",
+		"kernel:RESEARCH-KC",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("emitted lines = %v, want %v", got, want)
 	}
 }

@@ -150,6 +150,22 @@ type Triage struct {
 	Function  *types.Function
 	Addresses map[uint64]uint64
 	Locations map[uint64][]uint64
+	// refs indexes Addresses by target: target -> lowest instruction address
+	// referencing it. Filled by indexReferences once Addresses is complete.
+	refs map[uint64]uint64
+}
+
+// indexReferences builds refs from Addresses. Go randomizes map iteration, so
+// answering Contains by scanning Addresses for the first hit made the result
+// vary between runs whenever a target has several references; the lowest
+// referencing instruction is a deterministic choice.
+func (t *Triage) indexReferences() {
+	t.refs = make(map[uint64]uint64, len(t.Addresses))
+	for loc, target := range t.Addresses {
+		if prev, ok := t.refs[target]; !ok || loc < prev {
+			t.refs[target] = loc
+		}
+	}
 }
 
 // IsBranchOp returns true if the operation is a branch with a PC-relative target

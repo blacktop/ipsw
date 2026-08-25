@@ -141,6 +141,7 @@ func (d *MachoDisass) Triage() error {
 		hasPrev = true
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
+	d.tr.indexReferences()
 
 	if !d.Quite() {
 		d.tr.Details = make(map[uint64]AddrDetails)
@@ -358,14 +359,14 @@ func (d MachoDisass) FindSwiftString(addr uint64) (string, bool) {
 	return "", false
 }
 
-// Contains returns true if Triage immediates contains a given address and will return the instruction address
+// Contains reports whether any triaged instruction references address and
+// returns the lowest such instruction address.
 func (d MachoDisass) Contains(address uint64) (bool, uint64) {
-	for loc, addr := range d.tr.Addresses {
-		if addr == address {
-			return true, loc
-		}
+	if d.tr == nil {
+		return false, 0
 	}
-	return false, 0
+	loc, ok := d.tr.refs[address]
+	return ok, loc
 }
 
 func (d MachoDisass) GetCString(addr uint64) (string, error) {

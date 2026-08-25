@@ -301,3 +301,28 @@ func TestDisassembleJSONPreservesDisassemblyString(t *testing.T) {
 		t.Fatalf("expected JSON disassembly to contain nop, got %q", disassText)
 	}
 }
+
+func TestMachoDisassContainsReturnsLowestReferenceDeterministically(t *testing.T) {
+	tr := &Triage{Addresses: map[uint64]uint64{
+		0x3000: 0x9000,
+		0x1000: 0x9000,
+		0x2000: 0x9000,
+		0x4000: 0x8000,
+	}}
+	tr.indexReferences()
+	d := MachoDisass{tr: tr}
+	for range 64 {
+		if ok, loc := d.Contains(0x9000); !ok || loc != 0x1000 {
+			t.Fatalf("Contains(0x9000) = (%v, %#x), want (true, 0x1000)", ok, loc)
+		}
+	}
+	if ok, loc := d.Contains(0x8000); !ok || loc != 0x4000 {
+		t.Fatalf("Contains(0x8000) = (%v, %#x), want (true, 0x4000)", ok, loc)
+	}
+	if ok, loc := d.Contains(0x7000); ok || loc != 0 {
+		t.Fatalf("Contains(0x7000) = (%v, %#x), want (false, 0)", ok, loc)
+	}
+	if ok, _ := (MachoDisass{}).Contains(0x9000); ok {
+		t.Fatal("Contains on an untriaged disassembler must report false")
+	}
+}

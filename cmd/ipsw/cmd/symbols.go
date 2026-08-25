@@ -66,6 +66,10 @@ The stream is emitted in this order: one "ipsw" line, then for each image an
 dyld_shared_cache also emits a one-time "dsc" line carrying shared_region_start,
 which its dylib images reference via dsc_uuid.
 
+Each image occurrence (UUID, kind, path, text range, arch, DSC) is emitted once
+per scan, even when the IPSW carries it in several containers (for example a
+KEXT shared by a release and a research kernelcache).
+
 Kernel and KEXT symbol addresses are bit-63-cleared exactly as the ipswd symbol
 database stores them, so a server backed by this output returns byte-identical
 results to the daemon. Kernels found on the file system

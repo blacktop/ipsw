@@ -66,9 +66,23 @@ type symbolLine struct {
 	End       uint64 `json:"end"`
 }
 
-// jsonlEmitter writes scan results as newline-delimited JSON.
+// jsonlEmitter writes scan results as newline-delimited JSON. Every image
+// occurrence (and every DSC container) is written once per scan: an IPSW can
+// carry the same Mach-O in several places — a release and a research
+// kernelcache embed the same kexts — and consumers key symbols by the image
+// occurrence, not by the container it was found in.
 type jsonlEmitter struct {
-	enc *json.Encoder
+	enc  *json.Encoder
+	seen map[occurrence]struct{}
+}
+
+// occurrence identifies an emitted image the way a symbol consumer does: by
+// UUID, kind, path, text range, architecture and parent DSC. A DSC container
+// is keyed by its UUID and kind "dsc".
+type occurrence struct {
+	uuid, kind, path   string
+	textStart, textEnd uint64
+	cpu, arch, dscUUID string
 }
 
 func newJSONLEmitter(w io.Writer) *jsonlEmitter {
@@ -76,7 +90,16 @@ func newJSONLEmitter(w io.Writer) *jsonlEmitter {
 	// Symbol names and paths are emitted verbatim; HTML escaping would alter
 	// names containing <, > or & and break byte-identical name matching.
 	enc.SetEscapeHTML(false)
-	return &jsonlEmitter{enc: enc}
+	return &jsonlEmitter{enc: enc, seen: make(map[occurrence]struct{})}
+}
+
+// first records key and reports whether this is its first appearance.
+func (e *jsonlEmitter) first(key occurrence) bool {
+	if _, ok := e.seen[key]; ok {
+		return false
+	}
+	e.seen[key] = struct{}{}
+	return true
 }
 
 func (e *jsonlEmitter) emit(v any) error {
@@ -87,6 +110,9 @@ func (e *jsonlEmitter) emit(v any) error {
 // immediately followed by that image's symbol lines.
 func (e *jsonlEmitter) image(img *scanImage) error {
 	if img.Kind == "dsc" {
+		if !e.first(occurrence{uuid: img.DSCUUID, kind: "dsc"}) {
+			return nil
+		}
 		return e.emit(&dscLine{
 			Type:              "dsc",
 			UUID:              img.DSCUUID,
@@ -101,7 +127,7 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 		// kernels and KEXTs, so one address convention covers every kind=kernel.
 		kind, imgPath, mask = "kernel", img.KernelPath, highestBitMask
 	}
-	if err := e.emit(&imageLine{
+	line := &imageLine{
 		Type:          "image",
 		UUID:          img.Macho.UUID,
 		Kind:          kind,
@@ -112,7 +138,15 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 		Arch:          img.Arch,
 		DSCUUID:       img.DSCUUID,
 		KernelVersion: img.KernelVersion,
-	}); err != nil {
+	}
+	if !e.first(occurrence{
+		uuid: line.UUID, kind: line.Kind, path: line.Path,
+		textStart: line.TextStart, textEnd: line.TextEnd,
+		cpu: line.CPU, arch: line.Arch, dscUUID: line.DSCUUID,
+	}) {
+		return nil
+	}
+	if err := e.emit(line); err != nil {
 		return err
 	}
 	for _, sym := range img.Macho.Symbols {
@@ -134,7 +168,9 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 // immediately followed by that image's "symbol" lines (and a one-time "dsc" line
 // per shared cache, carrying shared_region_start, which each dylib references via
 // dsc_uuid). Symbols are written as they are discovered, so the full symbol set
-// is never held in memory.
+// is never held in memory. An image occurrence (UUID, kind, path, text range,
+// arch, DSC) is written once per scan even when the IPSW carries it in several
+// containers, such as a kext shared by a release and a research kernelcache.
 //
 // The emitted addresses use the same normalization as the daemon database, so a
 // server backed by this output returns byte-identical results to ipswd. The one

@@ -3,6 +3,7 @@ package syms
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -245,7 +246,9 @@ func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
 			os.Remove(k)
 		}
 	}()
-	for k := range out {
+	// Walk kernelcaches in path order so the first emission of a kext shared
+	// between them (e.g. release and research caches) is the same every run.
+	for _, k := range slices.Sorted(maps.Keys(out)) {
 		smap := signature.NewSymbolMap()
 		if err := smap.Symbolicate(k, sigs, true); err != nil {
 			return fmt.Errorf("failed to symbolicate kernelcache: %v", err)
