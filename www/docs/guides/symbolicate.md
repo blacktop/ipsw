@@ -184,7 +184,7 @@ The `symbolicate` command now supports the NEW panic/crash JSON format
 ❯ ipsw symbolicate --help
 ```
 ```bash
-Symbolicate ARM 64-bit crash logs (similar to Apples symbolicatecrash)
+Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
 
 Usage:
   ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
@@ -193,30 +193,33 @@ Aliases:
   symbolicate, sym
 
 Flags:
-  -a, --all             Show all threads in crashlog
-  -d, --demangle        Demangle symbol names
-  -h, --help            help for symbolicate
-      --pem-db string   AEA pem DB JSON file
-  -p, --proc string     Filter crashlog by process name
-  -r, --running         Show all running (TH_RUN) threads in crashlog
-  -s, --server string   Symbol Server DB URL
-  -u, --unslide         Unslide the crashlog for easier static analysis
+  -a, --all                 Show all threads in crashlog
+  -t, --api-token string    Symbol Server API bearer token
+  -d, --demangle            Demangle symbol names
+      --dsc-slide string    Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)
+  -x, --extra string        Path to folder with extra files for symbolication
+      --force               Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)
+  -h, --help                help for symbolicate
+      --hex                 Display function offsets in hexadecimal
+      --ida                 Generate IDAPython script to mark panic frames in IDA Pro
+      --kc-slide string     Apply custom KASLR slide to kernelcache frames for live debugging (hex, e.g. 0x14f74000)
+      --peek                Show disassembly instructions around each panicked frame
+      --peek-count int      Number of instructions to show with --peek (centered on frame, respects function boundaries) (default 5)
+      --pem-db string       AEA pem DB JSON file
+  -p, --proc string         Filter crashlog by process name
+  -r, --running             Show all running (TH_RUN) threads in crashlog
+  -s, --server string       Symbol Server DB URL
+      --signatures string   Path to signatures folder
+  -u, --unslide             Unslide user-space addresses for static analysis (kernel frames are always unslid)
 
 Global Flags:
       --color           colorize output
       --config string   config file (default is $HOME/.config/ipsw/config.yaml)
       --no-color        disable colorize output
   -V, --verbose         verbose output
-
-Examples:
-  # Symbolicate a panic crashlog (BugType=210) with an IPSW
-  ❯ ipsw symbolicate panic-full-2024-03-21-004704.000.ips iPad_Pro_HFR_17.4_21E219_Restore.ipsw
-  # Pretty print a crashlog (BugType=309) these are usually symbolicated by the OS
-  ❯ ipsw symbolicate --color Delta-2024-04-20-135807.ips
-  # Symbolicate a (old stype) crashlog (BugType=109) requiring a dyld_shared_cache to symbolicate
-  ❯ ipsw symbolicate Delta-2024-04-20-135807.ips
-	  ⨯ please supply a dyld_shared_cache for iPhone13,3 running 14.5 (18E5154f)
 ```
+
+> The full example list lives on the [CLI reference](/docs/cli/ipsw/symbolicate) page.
 
 :::info  
 Swagger Docs for the symbol server API are here [Syms API](https://blacktop.github.io/ipsw/api#tag/Syms)  
@@ -233,3 +236,31 @@ Symbolicate a 210 panic using the symbol server
 ![syms-panic](../../static/img/guides/syms-panic.webp)
 
 > NOTE: panic is from [here](https://discord.com/channels/779134930265309195/782323285294841896/1137089549324005416)
+
+### Authenticated symbol server
+
+`ipswd` itself does no auth. If your symbol server sits behind a reverse proxy or API gateway that wants a bearer token, give the token to `ipsw` and it is sent as `Authorization: Bearer <token>` on every request.
+
+Three ways to set it, highest priority first:
+
+```bash
+# 1. flag (lands in your shell history, so prefer one of the other two)
+❯ ipsw symbolicate --server https://syms.example.com --api-token "$TOKEN" panic-full-2023-08-04-191003.000.ips
+
+# 2. environment variable
+❯ env IPSW_SYMBOLICATE_API_TOKEN="$TOKEN" ipsw symbolicate --server https://syms.example.com panic-full-2023-08-04-191003.000.ips
+```
+
+```yaml
+# 3. ~/.config/ipsw/config.yml
+symbolicate:
+  server: https://syms.example.com
+  api-token: <token>
+```
+
+A few rules apply once a token is set:
+
+- The server URL has to be `https://`. Plain `http://` only works for `localhost` and loopback addresses, so a token never crosses the network in the clear.
+- Redirects are refused, so the token can't be replayed to some other host the server points at.
+- The token is not path-expanded like other config values, is never logged, and is scrubbed from error messages if a server echoes it back.
+- Whitespace, control characters and commas are rejected before any request goes out.

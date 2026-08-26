@@ -110,6 +110,14 @@ var symbolicateCmd = &cobra.Command{
 	  # Uses ~/Library/Developer/Xcode/<Platform> DeviceSupport/<device> (<build>)/Symbols
 	  # (userspace frames only for panics; kernel frames still need an IPSW)
 
+	# Symbolicate a panic against a symbol server (see 'ipswd start' and the symbolicate guide)
+	❯ ipsw symbolicate --server http://localhost:3993 panic-full-2024-03-21-004704.000.ips
+
+	# Symbol server behind auth: send a bearer token (HTTPS only, except loopback)
+	❯ ipsw symbolicate --server https://syms.example.com --api-token "$TOKEN" panic.ips
+	  # Prefer IPSW_SYMBOLICATE_API_TOKEN or 'symbolicate: {api-token: ...}' in config.yml
+	  # over the flag so the token stays out of your shell history
+
 	# Show disassembly around panic frames with --peek (default 5 instructions)
 	❯ ipsw symbolicate panic.ips firmware.ipsw --peek
 
