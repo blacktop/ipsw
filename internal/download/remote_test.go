@@ -3,6 +3,7 @@ package download
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -198,4 +199,57 @@ func parseRangeSpan(value string, length int64) (int64, int64, error) {
 		return 0, 0, fmt.Errorf("invalid range %q", value)
 	}
 	return start, end, nil
+}
+
+func TestNewRemoteZipReaderReportsAppleIDSignInRedirect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://idmsa.apple.com/IDMSWebAuth/signin?appIdKey=abc&path=%2Fservices-account%2Fdownload", http.StatusFound)
+	}))
+	defer server.Close()
+
+	zipURL := server.URL + "/services-account/download?path=/WWDC_2020/iOS_14_beta/Restore.ipsw"
+	_, err := NewRemoteZipReader(zipURL, nil)
+	if !errors.Is(err, ErrDevPortalAuthRequired) {
+		t.Fatalf("err = %v, want ErrDevPortalAuthRequired", err)
+	}
+	if got := err.Error(); got != ErrDevPortalAuthRequired.Error() {
+		t.Fatalf("err = %q, want the bare sign-in error without range-request noise", got)
+	}
+}
+
+func TestNewRemoteHTTPClientFollowsOrdinaryRedirects(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/final", http.StatusFound)
+	})
+	mux.HandleFunc("/final", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "ok")
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := NewRemoteHTTPClient("", false).Get(server.URL + "/start")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if string(body) != "ok" {
+		t.Fatalf("body = %q, want %q", body, "ok")
+	}
+}
+
+func TestNewRemoteHTTPClientStopsRedirectLoops(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/loop", http.StatusFound)
+	}))
+	defer server.Close()
+
+	_, err := NewRemoteHTTPClient("", false).Get(server.URL + "/loop")
+	if err == nil || !strings.Contains(err.Error(), "stopped after 10 redirects") {
+		t.Fatalf("err = %v, want redirect loop to be stopped", err)
+	}
 }

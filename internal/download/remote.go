@@ -3,13 +3,22 @@ package download
 import (
 	"archive/zip"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ranger"
-	"github.com/pkg/errors"
 )
+
+// ErrDevPortalAuthRequired is returned when a request is redirected to the
+// Apple ID sign-in page: the URL is served by the Apple Developer Portal and
+// cannot be fetched without a signed-in developer account.
+var ErrDevPortalAuthRequired = errors.New(
+	"requires a signed-in Apple Developer account (redirected to the Apple ID sign-in page)")
+
+const appleIDSignInHost = "idmsa.apple.com"
 
 // RemoteConfig is the remote reader config
 type RemoteConfig struct {
@@ -57,7 +66,21 @@ func NewRemoteHTTPClient(proxy string, insecure bool) *http.Client {
 			Proxy:           GetProxy(proxy),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
+		CheckRedirect: rejectAppleIDSignInRedirect,
 	}
+}
+
+// rejectAppleIDSignInRedirect keeps net/http's default redirect limit but fails
+// fast when an anonymous request is bounced to the Apple ID sign-in page, which
+// would otherwise be followed and served as an HTML login form.
+func rejectAppleIDSignInRedirect(req *http.Request, via []*http.Request) error {
+	if req.URL.Host == appleIDSignInHost {
+		return ErrDevPortalAuthRequired
+	}
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	return nil
 }
 
 // RemoteZipBlockSizeForMemberSize picks a range-request block size for the
@@ -95,7 +118,7 @@ func NewRemoteZipReader(zipURL string, config *RemoteConfig) (*zip.Reader, error
 
 	url, err := url.Parse(zipURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse url")
+		return nil, fmt.Errorf("failed to parse url: %w", err)
 	}
 
 	client := config.Client
@@ -114,12 +137,15 @@ func NewRemoteZipReader(zipURL string, config *RemoteConfig) (*zip.Reader, error
 
 	length, err := reader.Length()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get reader length")
+		if errors.Is(err, ErrDevPortalAuthRequired) {
+			return nil, ErrDevPortalAuthRequired
+		}
+		return nil, fmt.Errorf("failed to get reader length: %w", err)
 	}
 
 	zr, err := zip.NewReader(reader, length)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create zip reader")
+		return nil, fmt.Errorf("failed to create zip reader: %w", err)
 	}
 
 	return zr, nil

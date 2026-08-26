@@ -272,7 +272,7 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 func getRemoteFolderWithBlockSize(c *Config, blockSize int) (*info.Info, *zip.Reader, string, error) {
 	zr, err := c.remoteZipReader(blockSize)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("unable to download remote zip: %v", err)
+		return nil, nil, "", fmt.Errorf("unable to download remote zip: %w", err)
 	}
 	if c.info == nil {
 		if c.Lookup {
