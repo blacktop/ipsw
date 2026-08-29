@@ -10,13 +10,29 @@ description: Download IPSWs from appledb
 
 Download IPSWs from appledb
 
+### Synopsis
+
+Download Apple firmware metadata and artifacts from AppleDB.
+
+With --json, output is always a schema-versioned envelope. Schema version 1
+contains a releases array; a query with no matches emits exactly
+{"schema_version":1,"releases":[]}. Each release contains the canonical
+AppleDB OS family, version, build, nullable ISO 8601 release_date, channel,
+and artifacts. Each artifact contains source_type (ipsw, ota, or rsr),
+delivery (full or delta), prerequisite_builds, devices, nullable active_url,
+nullable sha256, nullable sha1, and nullable byte size. A null active_url
+means the artifact is not downloadable. Historical osStr marketing aliases
+are normalized to the selected AppleDB OS family. JSON output is uncolored
+and machine-readable regardless of terminal color settings.
+
+
 ```
 ipsw download appledb [flags]
 ```
 
 ### Examples
 
-```bash
+```
 # Download the iOS 16.5 beta 4 kernelcache from remote IPSW
 ❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
 
@@ -30,48 +46,6 @@ ipsw download appledb [flags]
 ❯ ipsw download appledb --os iOS --type ota --deltas --prereq-build 20G75
 
 ```
-
-### JSON output
-
-`--json` emits a versioned release envelope. Release identity is kept with the
-matched AppleDB artifacts so consumers do not need to infer versions or builds
-from filenames. Records and their device and prerequisite lists are emitted in
-deterministic order for identical AppleDB inputs.
-
-```json
-{
-  "schema_version": 1,
-  "releases": [
-    {
-      "os": "iOS",
-      "version": "26.0 beta",
-      "build": "23A501",
-      "release_date": "2026-08-20",
-      "channel": "beta",
-      "artifacts": [
-        {
-          "source_type": "ota",
-          "delivery": "full",
-          "prerequisite_builds": [],
-          "devices": ["iPhone15,4"],
-          "links": [
-            {
-              "url": "https://example.invalid/ota.zip",
-              "active": true
-            }
-          ],
-          "sha256": "...",
-          "sha1": "...",
-          "size": 123456
-        }
-      ]
-    }
-  ]
-}
-```
-
-`channel` is `release`, `beta`, or `rc`. `delivery` is `full`, `delta`, or
-`rsr`; delta artifacts list their required builds in `prerequisite_builds`.
 
 ### Options
 

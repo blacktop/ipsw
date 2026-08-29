@@ -1,6 +1,7 @@
 package download
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,7 +34,17 @@ func appleDBSource(t *testing.T, linksJSON string) download.OsFileSource {
 
 func appleDBRecord(t *testing.T, linksJSON string) download.AppleDBRecord {
 	t.Helper()
-	return download.AppleDBRecord{OsFileSource: appleDBSource(t, linksJSON)}
+	source := appleDBSource(t, linksJSON)
+	records := download.OsFiles{{
+		OS:      "iOS",
+		Version: "26.0",
+		Build:   "23A500",
+		Sources: []download.OsFileSource{source},
+	}}.Query(&download.ADBQuery{OSes: []string{"iOS"}, Type: source.Type})
+	if len(records) != 1 {
+		t.Fatalf("construct AppleDB record: got %d matches, want 1", len(records))
+	}
+	return records[0]
 }
 
 func appleDBReleasedDate(t *testing.T, value string) download.ReleasedDate {
@@ -58,25 +69,111 @@ func TestNewAppleDBJSONEnvelopeUsesExplicitReleaseAndArtifactSchema(t *testing.T
 		t.Fatalf("unmarshal source: %v", err)
 	}
 
-	records := []download.AppleDBRecord{{
-		OS:           "iOS",
-		Version:      "26.0 beta",
-		Build:        "23A501",
-		Released:     appleDBReleasedDate(t, "2026-08-20"),
-		Channel:      "beta",
-		OsFileSource: source,
-	}}
+	records := download.OsFiles{{
+		OS:       "iOS",
+		Version:  "26.0 beta",
+		Build:    "23A501",
+		Released: appleDBReleasedDate(t, "2026-08-20"),
+		Beta:     true,
+		Sources:  []download.OsFileSource{source},
+	}}.Query(&download.ADBQuery{OSes: []string{"iOS"}, Type: "ota"})
 	got, err := json.Marshal(newAppleDBJSONEnvelope(records))
 	if err != nil {
 		t.Fatalf("marshal envelope: %v", err)
 	}
-	const want = `{"schema_version":1,"releases":[{"os":"iOS","version":"26.0 beta","build":"23A501","release_date":"2026-08-20","channel":"beta","artifacts":[{"source_type":"ota","delivery":"full","prerequisite_builds":[],"devices":["iPhone15,4"],"links":[{"url":"https://example.com/full.zip","active":true}],"sha256":"sha256-value","sha1":"sha1-value","size":123456}]}]}`
+	const want = `{"schema_version":1,"releases":[{"os":"iOS","version":"26.0 beta","build":"23A501","release_date":"2026-08-20","channel":"beta","artifacts":[{"source_type":"ota","delivery":"full","prerequisite_builds":[],"devices":["iPhone15,4"],"active_url":"https://example.com/full.zip","sha256":"sha256-value","sha1":"sha1-value","size":123456}]}]}`
 	if string(got) != want {
 		t.Fatalf("envelope JSON mismatch:\n got: %s\nwant: %s", got, want)
 	}
 }
 
-func TestAppleDBDeliveryClassifiesFullDeltaAndRSR(t *testing.T) {
+func TestNewAppleDBJSONEnvelopeIsMachineCompleteForEmptyQuery(t *testing.T) {
+	got, err := json.Marshal(newAppleDBJSONEnvelope(nil))
+	if err != nil {
+		t.Fatalf("marshal empty envelope: %v", err)
+	}
+	const want = `{"schema_version":1,"releases":[]}`
+	if string(got) != want {
+		t.Fatalf("empty envelope = %s, want %s", got, want)
+	}
+}
+
+func TestWriteAppleDBJSONEmitsExactUncoloredEmptyEnvelope(t *testing.T) {
+	var output bytes.Buffer
+	if err := writeAppleDBJSON(&output, nil); err != nil {
+		t.Fatalf("write empty envelope: %v", err)
+	}
+	const want = "{\n  \"schema_version\": 1,\n  \"releases\": []\n}\n"
+	if output.String() != want {
+		t.Fatalf("empty JSON output = %q, want %q", output.String(), want)
+	}
+	var decoded appleDBJSONEnvelope
+	if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+		t.Fatalf("empty JSON output is not valid JSON: %v", err)
+	}
+}
+
+func TestNewAppleDBJSONEnvelopeUsesNullForUnknownMetadata(t *testing.T) {
+	var source download.OsFileSource
+	if err := json.Unmarshal([]byte(`{
+		"type":"ipsw",
+		"deviceMap":["iPhone15,4"],
+		"links":[{"url":"https://example.com/dead.ipsw","active":false}]
+	}`), &source); err != nil {
+		t.Fatalf("unmarshal source: %v", err)
+	}
+	records := download.OsFiles{{
+		OS:      "iOS",
+		Version: "26.0",
+		Build:   "23A500",
+		Sources: []download.OsFileSource{source},
+	}}.Query(&download.ADBQuery{OSes: []string{"iOS"}, Type: "ipsw"})
+	got, err := json.Marshal(newAppleDBJSONEnvelope(records))
+	if err != nil {
+		t.Fatalf("marshal envelope: %v", err)
+	}
+	const want = `{"schema_version":1,"releases":[{"os":"iOS","version":"26.0","build":"23A500","release_date":null,"channel":"release","artifacts":[{"source_type":"ipsw","delivery":"full","prerequisite_builds":[],"devices":["iPhone15,4"],"active_url":null,"sha256":null,"sha1":null,"size":null}]}]}`
+	if string(got) != want {
+		t.Fatalf("unknown metadata envelope mismatch:\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestNewAppleDBJSONEnvelopeGroupsDefensivelyAndOrdersNewestVersion(t *testing.T) {
+	date := appleDBReleasedDate(t, "2026-08-20")
+	files := download.OsFiles{
+		{
+			OS:       "iOS",
+			Version:  "26.0",
+			Build:    "23A500",
+			Released: date,
+			Sources: []download.OsFileSource{
+				{Type: "ota", DeviceMap: []string{"iPhone15,4"}},
+				{Type: "ota", DeviceMap: []string{"iPhone16,2"}, PrerequisiteBuild: download.PrerequisiteBuilds{Builds: []string{"23A499"}}},
+			},
+		},
+		{
+			OS:       "iOS",
+			Version:  "26.1",
+			Build:    "23B500",
+			Released: date,
+			Sources:  []download.OsFileSource{{Type: "ota", DeviceMap: []string{"iPhone17,1"}}},
+		},
+	}
+	records := files.Query(&download.ADBQuery{OSes: []string{"iOS"}, Type: "ota", Deltas: true})
+	records[0], records[1], records[2] = records[1], records[2], records[0]
+	envelope := newAppleDBJSONEnvelope(records)
+	if len(envelope.Releases) != 2 {
+		t.Fatalf("release count = %d, want 2", len(envelope.Releases))
+	}
+	if envelope.Releases[0].Version != "26.1" || envelope.Releases[1].Version != "26.0" {
+		t.Fatalf("release order = %s, %s; want newest version first on equal date", envelope.Releases[0].Version, envelope.Releases[1].Version)
+	}
+	if len(envelope.Releases[1].Artifacts) != 2 {
+		t.Fatalf("26.0 artifact count = %d, want 2 grouped from non-adjacent input", len(envelope.Releases[1].Artifacts))
+	}
+}
+
+func TestAppleDBDeliveryClassifiesFullAndDeltaIndependentlyOfSourceType(t *testing.T) {
 	tests := []struct {
 		name   string
 		record download.AppleDBRecord
@@ -92,12 +189,12 @@ func TestAppleDBDeliveryClassifiesFullDeltaAndRSR(t *testing.T) {
 			want: "delta",
 		},
 		{
-			name: "rsr",
+			name: "rsr delta",
 			record: download.AppleDBRecord{OsFileSource: download.OsFileSource{
 				Type:              "rsr",
 				PrerequisiteBuild: download.PrerequisiteBuilds{Builds: []string{"23A500"}},
 			}},
-			want: "rsr",
+			want: "delta",
 		},
 	}
 	for _, tt := range tests {
@@ -228,15 +325,36 @@ func TestForEachAppleDBResultSkipsSourceWithoutActiveLink(t *testing.T) {
 	}
 }
 
-func TestActiveAppleDBLinkPrefersActiveLink(t *testing.T) {
-	source := appleDBSource(t, `[
+func TestForEachAppleDBResultUsesAuthoritativeFirstActiveURL(t *testing.T) {
+	record := appleDBRecord(t, `[
 		{"url":"https://example.com/dead.ipsw","active":false},
-		{"url":"https://example.com/live.ipsw","active":true}
+		{"url":"https://example.com/first.ipsw","active":true},
+		{"url":"https://example.com/second.ipsw","active":true}
 	]`)
-	if got := activeAppleDBLink(source); got != "https://example.com/live.ipsw" {
-		t.Fatalf("activeAppleDBLink = %q, want the active link", got)
+	var got string
+	if err := forEachAppleDBResult(context.Background(), []download.AppleDBRecord{record}, func(_ int, _ download.AppleDBRecord, url string) error {
+		got = url
+		return nil
+	}); err != nil {
+		t.Fatalf("forEachAppleDBResult: %v", err)
 	}
-	if got := activeAppleDBLink(download.OsFileSource{}); got != "" {
-		t.Fatalf("activeAppleDBLink(empty) = %q, want empty", got)
+	if got != "https://example.com/first.ipsw" {
+		t.Fatalf("active URL = %q, want first active URL", got)
+	}
+}
+
+func TestAppleDBJSONSchemaDocumentationLivesInCobraSource(t *testing.T) {
+	for _, phrase := range []string{
+		"schema-versioned envelope",
+		`{"schema_version":1,"releases":[]}`,
+		"nullable ISO 8601 release_date",
+		"nullable active_url",
+		"delivery (full or delta)",
+		"Historical osStr marketing aliases",
+		"uncolored",
+	} {
+		if !strings.Contains(downloadAppledbCmd.Long, phrase) {
+			t.Fatalf("Cobra long description is missing %q", phrase)
+		}
 	}
 }

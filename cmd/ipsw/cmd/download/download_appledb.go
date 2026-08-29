@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -61,25 +62,20 @@ type appleDBJSONRelease struct {
 	OS          string                `json:"os"`
 	Version     string                `json:"version"`
 	Build       string                `json:"build"`
-	ReleaseDate string                `json:"release_date"`
+	ReleaseDate *string               `json:"release_date"`
 	Channel     string                `json:"channel"`
 	Artifacts   []appleDBJSONArtifact `json:"artifacts"`
 }
 
 type appleDBJSONArtifact struct {
-	SourceType         string            `json:"source_type"`
-	Delivery           string            `json:"delivery"`
-	PrerequisiteBuilds []string          `json:"prerequisite_builds"`
-	Devices            []string          `json:"devices"`
-	Links              []appleDBJSONLink `json:"links"`
-	SHA256             string            `json:"sha256"`
-	SHA1               string            `json:"sha1"`
-	Size               int64             `json:"size"`
-}
-
-type appleDBJSONLink struct {
-	URL    string `json:"url"`
-	Active bool   `json:"active"`
+	SourceType         string   `json:"source_type"`
+	Delivery           string   `json:"delivery"`
+	PrerequisiteBuilds []string `json:"prerequisite_builds"`
+	Devices            []string `json:"devices"`
+	ActiveURL          *string  `json:"active_url"`
+	SHA256             *string  `json:"sha256"`
+	SHA1               *string  `json:"sha1"`
+	Size               *int64   `json:"size"`
 }
 
 func init() {
@@ -170,6 +166,20 @@ var downloadAppledbCmd = &cobra.Command{
 	Use:     "appledb",
 	Aliases: []string{"db"},
 	Short:   "Download IPSWs from appledb",
+	Long: heredoc.Doc(`
+		Download Apple firmware metadata and artifacts from AppleDB.
+
+		With --json, output is always a schema-versioned envelope. Schema version 1
+		contains a releases array; a query with no matches emits exactly
+		{"schema_version":1,"releases":[]}. Each release contains the canonical
+		AppleDB OS family, version, build, nullable ISO 8601 release_date, channel,
+		and artifacts. Each artifact contains source_type (ipsw, ota, or rsr),
+		delivery (full or delta), prerequisite_builds, devices, nullable active_url,
+		nullable sha256, nullable sha1, and nullable byte size. A null active_url
+		means the artifact is not downloadable. Historical osStr marketing aliases
+		are normalized to the selected AppleDB OS family. JSON output is uncolored
+		and machine-readable regardless of terminal color settings.
+	`),
 	Example: heredoc.Doc(`
 		# Download the iOS 16.5 beta 4 kernelcache from remote IPSW
 		❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
@@ -270,10 +280,8 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		if fwType == "rsr" {
-			for idx, osType := range osTypes {
-				if slices.Contains(supportedRsrOSes, osType) {
-					osTypes[idx] = filepath.Join("Rapid Security Responses", osType)
-				} else {
+			for _, osType := range osTypes {
+				if !slices.Contains(supportedRsrOSes, osType) {
 					return fmt.Errorf("for --type 'rsr', the valid --os choices are: %v", supportedRsrOSes)
 				}
 			}
@@ -404,37 +412,22 @@ var downloadAppledbCmd = &cobra.Command{
 			}
 		}
 
+		log.Debug("URLs to download:")
+		if asJSON {
+			return writeAppleDBJSON(os.Stdout, results)
+		}
 		if len(results) == 0 {
 			log.Warn("no results found for query")
 			return nil
 		}
-
-		log.Debug("URLs to download:")
-		if asJSON {
-			jsonData, err := json.MarshalIndent(newAppleDBJSONEnvelope(results), "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to marshal json: %v", err)
-			}
-
-			if utils.ColorEnabled() {
-				if err := quick.Highlight(os.Stdout, string(jsonData)+"\n", "json", "terminal256", "nord"); err != nil {
-					return fmt.Errorf("failed to highlight json: %v", err)
-				}
-			} else {
-				fmt.Println(string(jsonData))
-			}
-			return nil
-		}
 		for _, result := range results {
-			for _, link := range result.Links {
-				if link.Active {
-					if asURLs {
-						fmt.Println(link.URL)
-					} else {
-						utils.Indent(log.Debug, 2)(link.URL)
-					}
-					break
-				}
+			if result.ActiveURL == nil {
+				continue
+			}
+			if asURLs {
+				fmt.Println(*result.ActiveURL)
+			} else {
+				utils.Indent(log.Debug, 2)(*result.ActiveURL)
 			}
 		}
 		if asURLs {
@@ -584,52 +577,68 @@ func newAppleDBJSONEnvelope(records []download.AppleDBRecord) appleDBJSONEnvelop
 		Releases:      make([]appleDBJSONRelease, 0),
 	}
 
-	for _, record := range records {
-		releaseDate := record.Released.Format("2006-01-02")
-		if len(envelope.Releases) == 0 || !sameAppleDBJSONRelease(envelope.Releases[len(envelope.Releases)-1], record, releaseDate) {
+	sortedRecords := append([]download.AppleDBRecord(nil), records...)
+	download.SortAppleDBRecords(sortedRecords)
+	type releaseKey struct {
+		OS             string
+		Version        string
+		Build          string
+		ReleaseDate    string
+		HasReleaseDate bool
+		Channel        string
+	}
+	releaseIndexes := make(map[releaseKey]int)
+	for _, record := range sortedRecords {
+		key := releaseKey{
+			OS:             record.OS,
+			Version:        record.Version,
+			Build:          record.Build,
+			HasReleaseDate: record.ReleaseDate != nil,
+			Channel:        record.Channel,
+		}
+		if record.ReleaseDate != nil {
+			key.ReleaseDate = *record.ReleaseDate
+		}
+		releaseIndex, exists := releaseIndexes[key]
+		if !exists {
+			releaseIndex = len(envelope.Releases)
+			releaseIndexes[key] = releaseIndex
 			envelope.Releases = append(envelope.Releases, appleDBJSONRelease{
 				OS:          record.OS,
 				Version:     record.Version,
 				Build:       record.Build,
-				ReleaseDate: releaseDate,
+				ReleaseDate: record.ReleaseDate,
 				Channel:     record.Channel,
 				Artifacts:   make([]appleDBJSONArtifact, 0),
 			})
 		}
 
-		links := make([]appleDBJSONLink, 0, len(record.Links))
-		for _, link := range record.Links {
-			links = append(links, appleDBJSONLink{URL: link.URL, Active: link.Active})
-		}
 		artifact := appleDBJSONArtifact{
 			SourceType:         record.Type,
 			Delivery:           appleDBDelivery(record),
 			PrerequisiteBuilds: append([]string{}, record.PrerequisiteBuild.Builds...),
 			Devices:            append([]string{}, record.DeviceMap...),
-			Links:              links,
-			SHA256:             record.Hashes.SHA256,
-			SHA1:               record.Hashes.SHA1,
+			ActiveURL:          record.ActiveURL,
+			SHA256:             record.SHA256,
+			SHA1:               record.SHA1,
 			Size:               record.Size,
 		}
-		last := len(envelope.Releases) - 1
-		envelope.Releases[last].Artifacts = append(envelope.Releases[last].Artifacts, artifact)
+		envelope.Releases[releaseIndex].Artifacts = append(envelope.Releases[releaseIndex].Artifacts, artifact)
 	}
 
 	return envelope
 }
 
-func sameAppleDBJSONRelease(release appleDBJSONRelease, record download.AppleDBRecord, releaseDate string) bool {
-	return release.OS == record.OS &&
-		release.Version == record.Version &&
-		release.Build == record.Build &&
-		release.ReleaseDate == releaseDate &&
-		release.Channel == record.Channel
+func writeAppleDBJSON(w io.Writer, records []download.AppleDBRecord) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(newAppleDBJSONEnvelope(records)); err != nil {
+		return fmt.Errorf("failed to marshal json: %v", err)
+	}
+	return nil
 }
 
 func appleDBDelivery(record download.AppleDBRecord) string {
-	if record.Type == "rsr" {
-		return "rsr"
-	}
 	if len(record.PrerequisiteBuild.Builds) > 0 {
 		return "delta"
 	}
@@ -656,12 +665,12 @@ func forEachAppleDBResult(
 ) error {
 	var failed []string
 	for idx, result := range results {
-		url := activeAppleDBLink(result.OsFileSource)
-		if url == "" {
+		if result.ActiveURL == nil {
 			log.WithFields(log.Fields{"devices": result.DeviceMap}).Error("skipping: no active download link")
 			failed = append(failed, strings.Join(result.DeviceMap, ",")+" (no active link)")
 			continue
 		}
+		url := *result.ActiveURL
 		if err := fn(idx, result, url); err != nil {
 			if ctx.Err() != nil {
 				return err
@@ -696,16 +705,4 @@ func appleDBFailureLabel(rawURL string) string {
 		return "unknown AppleDB item"
 	}
 	return label
-}
-
-// activeAppleDBLink returns the last active link of an AppleDB source, or ""
-// when none is active.
-func activeAppleDBLink(result download.OsFileSource) string {
-	var url string
-	for _, link := range result.Links {
-		if link.Active {
-			url = link.URL
-		}
-	}
-	return url
 }

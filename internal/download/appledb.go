@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -50,15 +49,67 @@ type OsFileSource struct {
 	Type              string             `json:"type"`
 	PrerequisiteBuild PrerequisiteBuilds `json:"prerequisiteBuild"`
 	DeviceMap         []string           `json:"deviceMap"`
-	Links             []struct {
-		URL    string `json:"url"`
-		Active bool   `json:"active"`
-	} `json:"links"`
-	Hashes struct {
-		SHA256 string `json:"sha2-256"`
-		SHA1   string `json:"sha1"`
-	} `json:"hashes"`
-	Size int64 `json:"size"`
+	Links             []AppleDBLink      `json:"links"`
+	Hashes            AppleDBHashes      `json:"hashes"`
+	Size              int64              `json:"size"`
+	sizeKnown         bool
+}
+
+type AppleDBLink struct {
+	URL    string `json:"url"`
+	Active bool   `json:"active"`
+}
+
+type AppleDBHashes struct {
+	SHA256      string `json:"sha2-256"`
+	SHA1        string `json:"sha1"`
+	sha256Known bool
+	sha1Known   bool
+}
+
+func (h *AppleDBHashes) UnmarshalJSON(data []byte) error {
+	*h = AppleDBHashes{}
+	var decoded struct {
+		SHA256 *string `json:"sha2-256"`
+		SHA1   *string `json:"sha1"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if decoded.SHA256 != nil {
+		h.SHA256 = *decoded.SHA256
+		h.sha256Known = true
+	}
+	if decoded.SHA1 != nil {
+		h.SHA1 = *decoded.SHA1
+		h.sha1Known = true
+	}
+	return nil
+}
+
+func (s *OsFileSource) UnmarshalJSON(data []byte) error {
+	*s = OsFileSource{}
+	var decoded struct {
+		Type              string             `json:"type"`
+		PrerequisiteBuild PrerequisiteBuilds `json:"prerequisiteBuild"`
+		DeviceMap         []string           `json:"deviceMap"`
+		Links             []AppleDBLink      `json:"links"`
+		Hashes            AppleDBHashes      `json:"hashes"`
+		Size              *int64             `json:"size"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	s.Type = decoded.Type
+	s.PrerequisiteBuild = decoded.PrerequisiteBuild
+	s.DeviceMap = decoded.DeviceMap
+	s.Links = decoded.Links
+	s.Hashes = decoded.Hashes
+	if decoded.Size != nil {
+		s.Size = *decoded.Size
+		s.sizeKnown = true
+	}
+	return nil
 }
 
 type ReleasedDate time.Time
@@ -113,17 +164,23 @@ type AppleDbOsFile struct {
 	HideFromLatestVersions bool           `json:"hideFromLatestVersions"`
 	DeviceMap              []string       `json:"deviceMap"`
 	Sources                []OsFileSource `json:"sources"`
+	canonicalOS            string
 }
 
 // AppleDBRecord retains the release identity associated with one source that
 // matched an ADBQuery. Query consumers use this as the authoritative result so
 // a source never has to recover its version or build from a download URL.
 type AppleDBRecord struct {
-	OS       string
-	Version  string
-	Build    string
-	Released ReleasedDate
-	Channel  string
+	OS          string
+	Version     string
+	Build       string
+	Released    ReleasedDate
+	ReleaseDate *string
+	Channel     string
+	ActiveURL   *string
+	SHA256      *string
+	SHA1        *string
+	Size        *int64
 	OsFileSource
 }
 
@@ -134,18 +191,7 @@ func (fs OsFiles) Len() int {
 }
 
 func (fs OsFiles) Less(i, j int) bool {
-	iReleased := time.Time(fs[i].Released)
-	jReleased := time.Time(fs[j].Released)
-	if !iReleased.Equal(jReleased) {
-		return iReleased.After(jReleased)
-	}
-	if fs[i].OS != fs[j].OS {
-		return fs[i].OS < fs[j].OS
-	}
-	if fs[i].Version != fs[j].Version {
-		return fs[i].Version < fs[j].Version
-	}
-	return fs[i].Build < fs[j].Build
+	return appleDBReleaseLess(fs[i], fs[j])
 }
 
 func (fs OsFiles) Swap(i, j int) {
@@ -190,12 +236,8 @@ func (f AppleDbOsFile) hasDownloadableSource(query *ADBQuery) bool {
 func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 	var tmpFS OsFiles
 	for _, f := range fs {
-		if len(query.OSes) > 0 {
-			for _, os := range query.OSes {
-				if f.OS == os {
-					continue
-				}
-			}
+		if len(query.OSes) > 0 && !slices.Contains(query.OSes, appleDBOSFamily(f)) {
+			continue
 		}
 		if query.IsBeta && !f.Beta {
 			continue
@@ -228,12 +270,8 @@ func (fs OsFiles) Query(query *ADBQuery) []AppleDBRecord {
 	var records []AppleDBRecord
 
 	for _, f := range fs {
-		if len(query.OSes) > 0 {
-			for _, os := range query.OSes {
-				if f.OS == os {
-					continue
-				}
-			}
+		if len(query.OSes) > 0 && !slices.Contains(query.OSes, appleDBOSFamily(f)) {
+			continue
 		}
 		if query.IsBeta && !f.Beta {
 			continue
@@ -276,19 +314,22 @@ func (fs OsFiles) Query(query *ADBQuery) []AppleDBRecord {
 				continue
 			}
 			records = append(records, AppleDBRecord{
-				OS:           f.OS,
+				OS:           appleDBOSFamily(f),
 				Version:      f.Version,
 				Build:        f.Build,
 				Released:     f.Released,
+				ReleaseDate:  appleDBReleaseDate(f.Released),
 				Channel:      appleDBChannel(f),
+				ActiveURL:    activeAppleDBURL(source),
+				SHA256:       source.Hashes.sha256Value(),
+				SHA1:         source.Hashes.sha1Value(),
+				Size:         source.sizeValue(),
 				OsFileSource: canonicalAppleDBSource(source),
 			})
 		}
 	}
 
-	sort.Slice(records, func(i, j int) bool {
-		return appleDBRecordLess(records[i], records[j])
-	})
+	SortAppleDBRecords(records)
 	return records
 }
 
@@ -298,6 +339,9 @@ func sourceMatchesQuery(source OsFileSource, query *ADBQuery) bool {
 	}
 	if len(query.Device) > 0 && !slices.Contains(source.DeviceMap, query.Device) {
 		return false
+	}
+	if query.Type == "rsr" {
+		return len(query.PrerequisiteBuild) == 0 || slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild)
 	}
 	if query.Type != "ota" {
 		return true
@@ -327,55 +371,160 @@ func canonicalAppleDBSource(source OsFileSource) OsFileSource {
 	return source
 }
 
+func appleDBOSFamily(f AppleDbOsFile) string {
+	if f.canonicalOS != "" {
+		return f.canonicalOS
+	}
+	return f.OS
+}
+
+func appleDBReleaseDate(released ReleasedDate) *string {
+	if time.Time(released).IsZero() {
+		return nil
+	}
+	value := released.Format("2006-01-02")
+	return &value
+}
+
+func activeAppleDBURL(source OsFileSource) *string {
+	for _, link := range source.Links {
+		if link.Active && link.URL != "" {
+			value := link.URL
+			return &value
+		}
+	}
+	return nil
+}
+
+func (h AppleDBHashes) sha256Value() *string {
+	if !h.sha256Known && h.SHA256 == "" {
+		return nil
+	}
+	value := h.SHA256
+	return &value
+}
+
+func (h AppleDBHashes) sha1Value() *string {
+	if !h.sha1Known && h.SHA1 == "" {
+		return nil
+	}
+	value := h.SHA1
+	return &value
+}
+
+func (s OsFileSource) sizeValue() *int64 {
+	if !s.sizeKnown && s.Size == 0 {
+		return nil
+	}
+	value := s.Size
+	return &value
+}
+
+func appleDBReleaseLess(a, b AppleDbOsFile) bool {
+	aReleased := time.Time(a.Released)
+	bReleased := time.Time(b.Released)
+	if !aReleased.Equal(bReleased) {
+		return aReleased.After(bReleased)
+	}
+	if cmp := utils.Compare(a.Version, b.Version); cmp != 0 {
+		return cmp > 0
+	}
+	if a.Version != b.Version {
+		return a.Version > b.Version
+	}
+	if appleDBOSFamily(a) != appleDBOSFamily(b) {
+		return appleDBOSFamily(a) < appleDBOSFamily(b)
+	}
+	return a.Build > b.Build
+}
+
+// SortAppleDBRecords puts matched records into the schema's deterministic
+// release/artifact order. Callers may safely sort a cloned slice defensively.
+func SortAppleDBRecords(records []AppleDBRecord) {
+	sort.Slice(records, func(i, j int) bool {
+		return appleDBRecordLess(records[i], records[j])
+	})
+}
+
 func appleDBRecordLess(a, b AppleDBRecord) bool {
 	aReleased := time.Time(a.Released)
 	bReleased := time.Time(b.Released)
 	if !aReleased.Equal(bReleased) {
 		return aReleased.After(bReleased)
 	}
+	if cmp := utils.Compare(a.Version, b.Version); cmp != 0 {
+		return cmp > 0
+	}
+	if a.Version != b.Version {
+		return a.Version > b.Version
+	}
 	if a.OS != b.OS {
 		return a.OS < b.OS
 	}
-	if a.Version != b.Version {
-		return a.Version < b.Version
-	}
 	if a.Build != b.Build {
-		return a.Build < b.Build
+		return a.Build > b.Build
 	}
 	if a.Channel != b.Channel {
 		return a.Channel < b.Channel
 	}
-	return appleDBSourceLess(a.OsFileSource, b.OsFileSource)
+	if cmp := appleDBSourceCompare(a.OsFileSource, b.OsFileSource); cmp != 0 {
+		return cmp < 0
+	}
+	if cmp := compareOptionalString(a.ActiveURL, b.ActiveURL); cmp != 0 {
+		return cmp < 0
+	}
+	if cmp := compareOptionalString(a.SHA256, b.SHA256); cmp != 0 {
+		return cmp < 0
+	}
+	if cmp := compareOptionalString(a.SHA1, b.SHA1); cmp != 0 {
+		return cmp < 0
+	}
+	return compareOptionalInt64(a.Size, b.Size) < 0
 }
 
-func appleDBSourceLess(a, b OsFileSource) bool {
+func appleDBSourceCompare(a, b OsFileSource) int {
 	if a.Type != b.Type {
-		return a.Type < b.Type
+		return strings.Compare(a.Type, b.Type)
 	}
 	if cmp := slices.Compare(a.PrerequisiteBuild.Builds, b.PrerequisiteBuild.Builds); cmp != 0 {
-		return cmp < 0
+		return cmp
 	}
 	if cmp := slices.Compare(a.DeviceMap, b.DeviceMap); cmp != 0 {
-		return cmp < 0
+		return cmp
 	}
-	for idx := 0; idx < min(len(a.Links), len(b.Links)); idx++ {
-		if a.Links[idx].URL != b.Links[idx].URL {
-			return a.Links[idx].URL < b.Links[idx].URL
-		}
-		if a.Links[idx].Active != b.Links[idx].Active {
-			return !a.Links[idx].Active
-		}
+	return 0
+}
+
+func compareOptionalString(a, b *string) int {
+	if a == nil && b == nil {
+		return 0
 	}
-	if len(a.Links) != len(b.Links) {
-		return len(a.Links) < len(b.Links)
+	if a == nil {
+		return 1
 	}
-	if a.Hashes.SHA256 != b.Hashes.SHA256 {
-		return a.Hashes.SHA256 < b.Hashes.SHA256
+	if b == nil {
+		return -1
 	}
-	if a.Hashes.SHA1 != b.Hashes.SHA1 {
-		return a.Hashes.SHA1 < b.Hashes.SHA1
+	return strings.Compare(*a, *b)
+}
+
+func compareOptionalInt64(a, b *int64) int {
+	if a == nil && b == nil {
+		return 0
 	}
-	return a.Size < b.Size
+	if a == nil {
+		return 1
+	}
+	if b == nil {
+		return -1
+	}
+	if *a < *b {
+		return -1
+	}
+	if *a > *b {
+		return 1
+	}
+	return 0
 }
 
 type ADBQuery struct {
@@ -431,54 +580,25 @@ func getLocalOsfiles(q *ADBQuery) (OsFiles, error) {
 		return nil, err
 	}
 
-	var folders []string
-	if err := walkLocalAppleDB(repo, func(path string, f os.FileInfo) error {
-		if f.IsDir() {
-			for _, os := range q.OSes {
-				if strings.Contains(path, filepath.Join("osFiles", os)) {
-					folders = append(folders, path)
-				}
+	for _, osFamily := range q.OSes {
+		root := localAppleDBOSRoot(repo, osFamily, q.Type)
+		if err := walkLocalAppleDB(root, func(filePath string, info os.FileInfo) error {
+			if info.IsDir() || filepath.Ext(filePath) != ".json" {
+				return nil
 			}
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	for _, folder := range folders {
-		if !strings.Contains(folder, "Rapid Security Responses") {
-			build, version, found := strings.Cut(filepath.Base(folder), " - ")
-			if !found {
-				continue
+			if !appleDBReleaseFolderMatches(filepath.Base(filepath.Dir(filePath)), q) {
+				return nil
 			}
-			if len(q.Version) > 0 && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
-				continue
+			dat, err := os.ReadFile(filePath)
+			if err != nil {
+				return err
 			}
-			if len(q.Build) > 0 && !strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x")) {
-				continue
-			}
-		}
-		if err := walkLocalAppleDB(folder, func(path string, f os.FileInfo) error {
 			var osfile AppleDbOsFile
-			if !f.IsDir() {
-				dat, err := os.ReadFile(path)
-				if err != nil {
-					return err
-				}
-				if err := json.Unmarshal(dat, &osfile); err != nil {
-					log.Errorf("failed to unmarshal osfile for version %s (%s): %v", osfile.Version, osfile.Build, err)
-					return nil
-				}
-
-				if strings.Contains(path, "Rapid Security Responses") {
-					for i := range osfile.Sources {
-						osfile.Sources[i].Type = "rsr"
-					}
-				}
-				if osfile.Internal {
-					return nil // skip internal metadata
-				}
-
+			if err := json.Unmarshal(dat, &osfile); err != nil {
+				log.Errorf("failed to unmarshal osfile for version %s (%s): %v", osfile.Version, osfile.Build, err)
+				return nil
+			}
+			if prepareAppleDBOSFile(&osfile, osFamily, q.Type) {
 				osfiles = append(osfiles, osfile)
 			}
 			return nil
@@ -516,76 +636,91 @@ func LocalAppleDBQuery(q *ADBQuery) ([]AppleDBRecord, error) {
 }
 
 func AppleDBQuery(q *ADBQuery) ([]AppleDBRecord, error) {
+	return queryAppleDBAPI(
+		q,
+		func(apiPath string) ([]GithubContentsResponse, error) {
+			return queryGithubAPI(apiPath, q.Proxy, q.APIToken, q.Insecure)
+		},
+		func(filePath string) (*AppleDbOsFile, error) {
+			return getOsFiles(filePath, q.Proxy, q.APIToken, q.Insecure)
+		},
+	)
+}
+
+func queryAppleDBAPI(
+	q *ADBQuery,
+	list func(string) ([]GithubContentsResponse, error),
+	read func(string) (*AppleDbOsFile, error),
+) ([]AppleDBRecord, error) {
 	var osfiles OsFiles
-
-	for _, os := range q.OSes {
-		qurl, err := url.JoinPath("osFiles", os)
+	for _, osFamily := range q.OSes {
+		root := apiAppleDBOSRoot(osFamily, q.Type)
+		folders, err := list(root)
 		if err != nil {
 			return nil, err
 		}
-
-		folders, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
-		if err != nil {
-			return nil, err
-		}
-
 		for _, folder := range folders {
-			if strings.Contains(folder.Path, "Rapid Security Responses") {
-				for _, file := range folders {
-					of, err := getOsFiles(file.Path, q.Proxy, q.APIToken, q.Insecure)
-					if err != nil {
-						log.WithError(err).Errorf("failed to download %s", path.Base(file.DownloadURL))
-						continue
-					}
-					if strings.Contains(file.Path, "Rapid Security Responses") {
-						for i := range of.Sources {
-							of.Sources[i].Type = "rsr"
-						}
-					}
-					osfiles = append(osfiles, *of)
-				}
-
-				return osfiles.Query(q), nil
-			}
-
-			build, version, found := strings.Cut(folder.Name, " - ")
-			if !found {
+			if folder.Type != "dir" || !appleDBReleaseFolderMatches(folder.Name, q) {
 				continue
 			}
-			if len(q.Version) > 0 && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
-				continue
-			}
-			if len(q.Build) > 0 && !strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x")) {
-				continue
-			}
-
-			qurl, err = url.JoinPath("osFiles", os, folder.Name)
+			files, err := list(folder.Path)
 			if err != nil {
 				return nil, err
 			}
-
-			files, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
-			if err != nil {
-				return nil, err
-			}
-
 			for _, file := range files {
-				of, err := getOsFiles(file.Path, q.Proxy, q.APIToken, q.Insecure)
-				if err != nil {
-					log.WithError(err).Errorf("failed to download %s", path.Base(file.DownloadURL))
+				if file.Type != "file" || path.Ext(file.Path) != ".json" {
 					continue
 				}
-				if strings.Contains(file.Path, "Rapid Security Responses") {
-					for i := range of.Sources {
-						of.Sources[i].Type = "rsr"
-					}
+				osfile, err := read(file.Path)
+				if err != nil {
+					log.WithError(err).Errorf("failed to download %s", path.Base(file.Path))
+					continue
 				}
-				osfiles = append(osfiles, *of)
+				if prepareAppleDBOSFile(osfile, osFamily, q.Type) {
+					osfiles = append(osfiles, *osfile)
+				}
 			}
 		}
 	}
-
 	return osfiles.Query(q), nil
+}
+
+func localAppleDBOSRoot(repo, osFamily, sourceType string) string {
+	if sourceType == "rsr" {
+		return filepath.Join(repo, "osFiles", "Rapid Security Responses", osFamily)
+	}
+	return filepath.Join(repo, "osFiles", osFamily)
+}
+
+func apiAppleDBOSRoot(osFamily, sourceType string) string {
+	if sourceType == "rsr" {
+		return path.Join("osFiles", "Rapid Security Responses", osFamily)
+	}
+	return path.Join("osFiles", osFamily)
+}
+
+func appleDBReleaseFolderMatches(folder string, q *ADBQuery) bool {
+	build, version, found := strings.Cut(folder, " - ")
+	if !found {
+		return false
+	}
+	if q.Version != "" && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
+		return false
+	}
+	return q.Build == "" || strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x"))
+}
+
+func prepareAppleDBOSFile(osfile *AppleDbOsFile, osFamily, sourceType string) bool {
+	if osfile.Internal {
+		return false
+	}
+	osfile.canonicalOS = osFamily
+	if sourceType == "rsr" {
+		for idx := range osfile.Sources {
+			osfile.Sources[idx].Type = "rsr"
+		}
+	}
+	return true
 }
 
 func queryGithubAPI(path, proxy, api string, insecure bool) ([]GithubContentsResponse, error) {
