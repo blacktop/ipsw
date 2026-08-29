@@ -115,6 +115,18 @@ type AppleDbOsFile struct {
 	Sources                []OsFileSource `json:"sources"`
 }
 
+// AppleDBRecord retains the release identity associated with one source that
+// matched an ADBQuery. Query consumers use this as the authoritative result so
+// a source never has to recover its version or build from a download URL.
+type AppleDBRecord struct {
+	OS       string
+	Version  string
+	Build    string
+	Released ReleasedDate
+	Channel  string
+	OsFileSource
+}
+
 type OsFiles []AppleDbOsFile
 
 func (fs OsFiles) Len() int {
@@ -122,7 +134,18 @@ func (fs OsFiles) Len() int {
 }
 
 func (fs OsFiles) Less(i, j int) bool {
-	return time.Time(fs[i].Released).After(time.Time((fs[j].Released)))
+	iReleased := time.Time(fs[i].Released)
+	jReleased := time.Time(fs[j].Released)
+	if !iReleased.Equal(jReleased) {
+		return iReleased.After(jReleased)
+	}
+	if fs[i].OS != fs[j].OS {
+		return fs[i].OS < fs[j].OS
+	}
+	if fs[i].Version != fs[j].Version {
+		return fs[i].Version < fs[j].Version
+	}
+	return fs[i].Build < fs[j].Build
 }
 
 func (fs OsFiles) Swap(i, j int) {
@@ -199,10 +222,10 @@ func (fs OsFiles) Latest(query *ADBQuery) *AppleDbOsFile {
 	return &tmpFS[0]
 }
 
-// Query returns a list of OsFileSource objects that match the query
-func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
+// Query returns release/source records that match the query.
+func (fs OsFiles) Query(query *ADBQuery) []AppleDBRecord {
 	var tmpFS OsFiles
-	var sources []OsFileSource
+	var records []AppleDBRecord
 
 	for _, f := range fs {
 		if len(query.OSes) > 0 {
@@ -248,47 +271,111 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 	}
 
 	for _, f := range tmpFS {
-		if len(query.Device) > 0 {
-			for _, source := range f.Sources {
-				if slices.Contains(source.DeviceMap, query.Device) {
-					if len(query.Type) > 0 && source.Type == query.Type {
-						sources = append(sources, source)
-					}
-				}
+		for _, source := range f.Sources {
+			if !sourceMatchesQuery(source, query) {
+				continue
 			}
-		} else {
-			for _, source := range f.Sources {
-				if len(query.Type) > 0 && source.Type == query.Type {
-					sources = append(sources, source)
-				}
-			}
+			records = append(records, AppleDBRecord{
+				OS:           f.OS,
+				Version:      f.Version,
+				Build:        f.Build,
+				Released:     f.Released,
+				Channel:      appleDBChannel(f),
+				OsFileSource: canonicalAppleDBSource(source),
+			})
 		}
 	}
 
-	if query.Type == "ota" {
-		if len(query.PrerequisiteBuild) > 0 {
-			var tmpSources []OsFileSource
-			for _, source := range sources {
-				if slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild) {
-					tmpSources = append(tmpSources, source)
-				}
-			}
-			sources = tmpSources
-		} else {
-			// if deltas are NOT requested, filter out sources that have prerequisite builds (only take full OTAs)
-			if !query.Deltas {
-				var tmpSources []OsFileSource
-				for _, source := range sources {
-					if len(source.PrerequisiteBuild.Builds) == 0 {
-						tmpSources = append(tmpSources, source)
-					}
-				}
-				sources = tmpSources
-			}
+	sort.Slice(records, func(i, j int) bool {
+		return appleDBRecordLess(records[i], records[j])
+	})
+	return records
+}
+
+func sourceMatchesQuery(source OsFileSource, query *ADBQuery) bool {
+	if len(query.Type) == 0 || source.Type != query.Type {
+		return false
+	}
+	if len(query.Device) > 0 && !slices.Contains(source.DeviceMap, query.Device) {
+		return false
+	}
+	if query.Type != "ota" {
+		return true
+	}
+	if len(query.PrerequisiteBuild) > 0 {
+		return slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild)
+	}
+	return query.Deltas || len(source.PrerequisiteBuild.Builds) == 0
+}
+
+func appleDBChannel(f AppleDbOsFile) string {
+	if f.RC {
+		return "rc"
+	}
+	if f.Beta {
+		return "beta"
+	}
+	return "release"
+}
+
+func canonicalAppleDBSource(source OsFileSource) OsFileSource {
+	source.PrerequisiteBuild.Builds = slices.Clone(source.PrerequisiteBuild.Builds)
+	sort.Strings(source.PrerequisiteBuild.Builds)
+	source.DeviceMap = slices.Clone(source.DeviceMap)
+	sort.Strings(source.DeviceMap)
+	source.Links = slices.Clone(source.Links)
+	return source
+}
+
+func appleDBRecordLess(a, b AppleDBRecord) bool {
+	aReleased := time.Time(a.Released)
+	bReleased := time.Time(b.Released)
+	if !aReleased.Equal(bReleased) {
+		return aReleased.After(bReleased)
+	}
+	if a.OS != b.OS {
+		return a.OS < b.OS
+	}
+	if a.Version != b.Version {
+		return a.Version < b.Version
+	}
+	if a.Build != b.Build {
+		return a.Build < b.Build
+	}
+	if a.Channel != b.Channel {
+		return a.Channel < b.Channel
+	}
+	return appleDBSourceLess(a.OsFileSource, b.OsFileSource)
+}
+
+func appleDBSourceLess(a, b OsFileSource) bool {
+	if a.Type != b.Type {
+		return a.Type < b.Type
+	}
+	if cmp := slices.Compare(a.PrerequisiteBuild.Builds, b.PrerequisiteBuild.Builds); cmp != 0 {
+		return cmp < 0
+	}
+	if cmp := slices.Compare(a.DeviceMap, b.DeviceMap); cmp != 0 {
+		return cmp < 0
+	}
+	for idx := 0; idx < min(len(a.Links), len(b.Links)); idx++ {
+		if a.Links[idx].URL != b.Links[idx].URL {
+			return a.Links[idx].URL < b.Links[idx].URL
+		}
+		if a.Links[idx].Active != b.Links[idx].Active {
+			return !a.Links[idx].Active
 		}
 	}
-
-	return sources
+	if len(a.Links) != len(b.Links) {
+		return len(a.Links) < len(b.Links)
+	}
+	if a.Hashes.SHA256 != b.Hashes.SHA256 {
+		return a.Hashes.SHA256 < b.Hashes.SHA256
+	}
+	if a.Hashes.SHA1 != b.Hashes.SHA1 {
+		return a.Hashes.SHA1 < b.Hashes.SHA1
+	}
+	return a.Size < b.Size
 }
 
 type ADBQuery struct {
@@ -420,7 +507,7 @@ func LocalAppleDBLatest(q *ADBQuery) (*AppleDbOsFile, error) {
 	return osfiles.Latest(q), nil
 }
 
-func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+func LocalAppleDBQuery(q *ADBQuery) ([]AppleDBRecord, error) {
 	osfiles, err := getLocalOsfiles(q)
 	if err != nil {
 		return nil, err
@@ -428,7 +515,7 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 	return osfiles.Query(q), nil
 }
 
-func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+func AppleDBQuery(q *ADBQuery) ([]AppleDBRecord, error) {
 	var osfiles OsFiles
 
 	for _, os := range q.OSes {

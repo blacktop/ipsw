@@ -31,14 +31,92 @@ func appleDBSource(t *testing.T, linksJSON string) download.OsFileSource {
 	return source
 }
 
+func appleDBRecord(t *testing.T, linksJSON string) download.AppleDBRecord {
+	t.Helper()
+	return download.AppleDBRecord{OsFileSource: appleDBSource(t, linksJSON)}
+}
+
+func appleDBReleasedDate(t *testing.T, value string) download.ReleasedDate {
+	t.Helper()
+	var released download.ReleasedDate
+	if err := json.Unmarshal([]byte(`"`+value+`"`), &released); err != nil {
+		t.Fatalf("unmarshal release date: %v", err)
+	}
+	return released
+}
+
+func TestNewAppleDBJSONEnvelopeUsesExplicitReleaseAndArtifactSchema(t *testing.T) {
+	var source download.OsFileSource
+	if err := json.Unmarshal([]byte(`{
+		"type":"ota",
+		"prerequisiteBuild":[],
+		"deviceMap":["iPhone15,4"],
+		"links":[{"url":"https://example.com/full.zip","active":true}],
+		"hashes":{"sha2-256":"sha256-value","sha1":"sha1-value"},
+		"size":123456
+	}`), &source); err != nil {
+		t.Fatalf("unmarshal source: %v", err)
+	}
+
+	records := []download.AppleDBRecord{{
+		OS:           "iOS",
+		Version:      "26.0 beta",
+		Build:        "23A501",
+		Released:     appleDBReleasedDate(t, "2026-08-20"),
+		Channel:      "beta",
+		OsFileSource: source,
+	}}
+	got, err := json.Marshal(newAppleDBJSONEnvelope(records))
+	if err != nil {
+		t.Fatalf("marshal envelope: %v", err)
+	}
+	const want = `{"schema_version":1,"releases":[{"os":"iOS","version":"26.0 beta","build":"23A501","release_date":"2026-08-20","channel":"beta","artifacts":[{"source_type":"ota","delivery":"full","prerequisite_builds":[],"devices":["iPhone15,4"],"links":[{"url":"https://example.com/full.zip","active":true}],"sha256":"sha256-value","sha1":"sha1-value","size":123456}]}]}`
+	if string(got) != want {
+		t.Fatalf("envelope JSON mismatch:\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestAppleDBDeliveryClassifiesFullDeltaAndRSR(t *testing.T) {
+	tests := []struct {
+		name   string
+		record download.AppleDBRecord
+		want   string
+	}{
+		{name: "full", record: download.AppleDBRecord{OsFileSource: download.OsFileSource{Type: "ota"}}, want: "full"},
+		{
+			name: "delta",
+			record: download.AppleDBRecord{OsFileSource: download.OsFileSource{
+				Type:              "ota",
+				PrerequisiteBuild: download.PrerequisiteBuilds{Builds: []string{"23A500"}},
+			}},
+			want: "delta",
+		},
+		{
+			name: "rsr",
+			record: download.AppleDBRecord{OsFileSource: download.OsFileSource{
+				Type:              "rsr",
+				PrerequisiteBuild: download.PrerequisiteBuilds{Builds: []string{"23A500"}},
+			}},
+			want: "rsr",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := appleDBDelivery(tt.record); got != tt.want {
+				t.Fatalf("delivery = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestForEachAppleDBResultSkipsFailedResultAndSummarizes(t *testing.T) {
-	results := []download.OsFileSource{
-		appleDBSource(t, `[{"url":"https://example.com/a/one.ipsw","active":true}]`),
-		appleDBSource(t, `[{"url":"https://developer.apple.com/services-account/download?path=/beta/two.ipsw","active":true}]`),
-		appleDBSource(t, `[{"url":"https://example.com/c/three.ipsw","active":true}]`),
+	results := []download.AppleDBRecord{
+		appleDBRecord(t, `[{"url":"https://example.com/a/one.ipsw","active":true}]`),
+		appleDBRecord(t, `[{"url":"https://developer.apple.com/services-account/download?path=/beta/two.ipsw","active":true}]`),
+		appleDBRecord(t, `[{"url":"https://example.com/c/three.ipsw","active":true}]`),
 	}
 	var seen []string
-	err := forEachAppleDBResult(context.Background(), results, func(idx int, _ download.OsFileSource, url string) error {
+	err := forEachAppleDBResult(context.Background(), results, func(idx int, _ download.AppleDBRecord, url string) error {
 		seen = append(seen, url)
 		if idx == 1 {
 			return errors.New("boom")
@@ -66,10 +144,10 @@ func TestForEachAppleDBResultRedactsFailedURLCredentials(t *testing.T) {
 	log.Log = &log.Logger{Handler: handler, Level: log.InfoLevel}
 	t.Cleanup(func() { log.Log = previousLogger })
 
-	results := []download.OsFileSource{
-		appleDBSource(t, `[{"url":"`+rawURL+`","active":true}]`),
+	results := []download.AppleDBRecord{
+		appleDBRecord(t, `[{"url":"`+rawURL+`","active":true}]`),
 	}
-	err := forEachAppleDBResult(context.Background(), results, func(int, download.OsFileSource, string) error {
+	err := forEachAppleDBResult(context.Background(), results, func(int, download.AppleDBRecord, string) error {
 		return errors.New("synthetic download failure")
 	})
 	if err == nil {
@@ -94,12 +172,12 @@ func TestForEachAppleDBResultRedactsFailedURLCredentials(t *testing.T) {
 }
 
 func TestForEachAppleDBResultReturnsNilWhenAllSucceed(t *testing.T) {
-	results := []download.OsFileSource{
-		appleDBSource(t, `[{"url":"https://example.com/one.ipsw","active":true}]`),
-		appleDBSource(t, `[{"url":"https://example.com/two.ipsw","active":true}]`),
+	results := []download.AppleDBRecord{
+		appleDBRecord(t, `[{"url":"https://example.com/one.ipsw","active":true}]`),
+		appleDBRecord(t, `[{"url":"https://example.com/two.ipsw","active":true}]`),
 	}
 	calls := 0
-	err := forEachAppleDBResult(context.Background(), results, func(int, download.OsFileSource, string) error {
+	err := forEachAppleDBResult(context.Background(), results, func(int, download.AppleDBRecord, string) error {
 		calls++
 		return nil
 	})
@@ -114,12 +192,12 @@ func TestForEachAppleDBResultReturnsNilWhenAllSucceed(t *testing.T) {
 func TestForEachAppleDBResultStopsOnCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	results := []download.OsFileSource{
-		appleDBSource(t, `[{"url":"https://example.com/one.ipsw","active":true}]`),
-		appleDBSource(t, `[{"url":"https://example.com/two.ipsw","active":true}]`),
+	results := []download.AppleDBRecord{
+		appleDBRecord(t, `[{"url":"https://example.com/one.ipsw","active":true}]`),
+		appleDBRecord(t, `[{"url":"https://example.com/two.ipsw","active":true}]`),
 	}
 	calls := 0
-	err := forEachAppleDBResult(ctx, results, func(int, download.OsFileSource, string) error {
+	err := forEachAppleDBResult(ctx, results, func(int, download.AppleDBRecord, string) error {
 		calls++
 		cancel()
 		return ctx.Err()
@@ -133,12 +211,12 @@ func TestForEachAppleDBResultStopsOnCancelledContext(t *testing.T) {
 }
 
 func TestForEachAppleDBResultSkipsSourceWithoutActiveLink(t *testing.T) {
-	results := []download.OsFileSource{
-		appleDBSource(t, `[{"url":"https://example.com/dead.ipsw","active":false}]`),
-		appleDBSource(t, `[{"url":"https://example.com/live.ipsw","active":true}]`),
+	results := []download.AppleDBRecord{
+		appleDBRecord(t, `[{"url":"https://example.com/dead.ipsw","active":false}]`),
+		appleDBRecord(t, `[{"url":"https://example.com/live.ipsw","active":true}]`),
 	}
 	var seen []string
-	err := forEachAppleDBResult(context.Background(), results, func(_ int, _ download.OsFileSource, url string) error {
+	err := forEachAppleDBResult(context.Background(), results, func(_ int, _ download.AppleDBRecord, url string) error {
 		seen = append(seen, url)
 		return nil
 	})

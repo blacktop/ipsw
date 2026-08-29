@@ -23,13 +23,55 @@ ipsw download appledb [flags]
 # Download latest release iOS IPSWs for multiple devices
 ❯ ipsw download appledb --os iOS --latest --release
 
-# Get URLs only for beta macOS IPSWs
-❯ ipsw download appledb --os macOS --beta --urls --json
+# Get a versioned JSON envelope for beta macOS IPSWs
+❯ ipsw download appledb --os macOS --beta --json
 
 # Download OTA deltas for specific build
 ❯ ipsw download appledb --os iOS --type ota --deltas --prereq-build 20G75
 
 ```
+
+### JSON output
+
+`--json` emits a versioned release envelope. Release identity is kept with the
+matched AppleDB artifacts so consumers do not need to infer versions or builds
+from filenames. Records and their device and prerequisite lists are emitted in
+deterministic order for identical AppleDB inputs.
+
+```json
+{
+  "schema_version": 1,
+  "releases": [
+    {
+      "os": "iOS",
+      "version": "26.0 beta",
+      "build": "23A501",
+      "release_date": "2026-08-20",
+      "channel": "beta",
+      "artifacts": [
+        {
+          "source_type": "ota",
+          "delivery": "full",
+          "prerequisite_builds": [],
+          "devices": ["iPhone15,4"],
+          "links": [
+            {
+              "url": "https://example.invalid/ota.zip",
+              "active": true
+            }
+          ],
+          "sha256": "...",
+          "sha1": "...",
+          "size": 123456
+        }
+      ]
+    }
+  ]
+}
+```
+
+`channel` is `release`, `beta`, or `rc`. `delivery` is `full`, `delta`, or
+`rsr`; delta artifacts list their required builds in `prerequisite_builds`.
 
 ### Options
 
@@ -48,7 +90,7 @@ ipsw download appledb [flags]
   -h, --help                  help for appledb
       --ignore-sha1           skip checksum verification
       --insecure              do not verify ssl certs
-  -j, --json                  Dump DB query results as JSON
+  -j, --json                  Dump a versioned release envelope as JSON
       --kernel                Extract kernelcache from remote IPSW
       --latest                Download latest IPSWs
       --no-update             Do NOT git clone/pull local AppleDB (query existing checkout)
@@ -85,4 +127,3 @@ ipsw download appledb [flags]
 ### SEE ALSO
 
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
-

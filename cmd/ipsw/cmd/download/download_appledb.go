@@ -50,6 +50,38 @@ var supportedOSes = []string{"audioOS", "bridgeOS", "iOS", "iPadOS", "iPodOS", "
 var supportedRsrOSes = []string{"iOS", "iPadOS", "macOS"}
 var supportedFWs = []string{"ipsw", "ota", "rsr"}
 
+const appleDBJSONSchemaVersion = 1
+
+type appleDBJSONEnvelope struct {
+	SchemaVersion int                  `json:"schema_version"`
+	Releases      []appleDBJSONRelease `json:"releases"`
+}
+
+type appleDBJSONRelease struct {
+	OS          string                `json:"os"`
+	Version     string                `json:"version"`
+	Build       string                `json:"build"`
+	ReleaseDate string                `json:"release_date"`
+	Channel     string                `json:"channel"`
+	Artifacts   []appleDBJSONArtifact `json:"artifacts"`
+}
+
+type appleDBJSONArtifact struct {
+	SourceType         string            `json:"source_type"`
+	Delivery           string            `json:"delivery"`
+	PrerequisiteBuilds []string          `json:"prerequisite_builds"`
+	Devices            []string          `json:"devices"`
+	Links              []appleDBJSONLink `json:"links"`
+	SHA256             string            `json:"sha256"`
+	SHA1               string            `json:"sha1"`
+	Size               int64             `json:"size"`
+}
+
+type appleDBJSONLink struct {
+	URL    string `json:"url"`
+	Active bool   `json:"active"`
+}
+
 func init() {
 	DownloadCmd.AddCommand(downloadAppledbCmd)
 	// Download behavior flags
@@ -87,7 +119,7 @@ func init() {
 	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
 	downloadAppledbCmd.Flags().Bool("deltas", false, "Download all OTA deltas")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
-	downloadAppledbCmd.Flags().BoolP("json", "j", false, "Dump DB query results as JSON")
+	downloadAppledbCmd.Flags().BoolP("json", "j", false, "Dump a versioned release envelope as JSON")
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
 	downloadAppledbCmd.Flags().Bool("no-update", false, "Do NOT git clone/pull local AppleDB (query existing checkout)")
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
@@ -145,8 +177,8 @@ var downloadAppledbCmd = &cobra.Command{
 		# Download latest release iOS IPSWs for multiple devices
 		❯ ipsw download appledb --os iOS --latest --release
 
-		# Get URLs only for beta macOS IPSWs
-		❯ ipsw download appledb --os macOS --beta --urls --json
+		# Get a versioned JSON envelope for beta macOS IPSWs
+		❯ ipsw download appledb --os macOS --beta --json
 
 		# Download OTA deltas for specific build
 		❯ ipsw download appledb --os iOS --type ota --deltas --prereq-build 20G75
@@ -262,7 +294,7 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		log.Info("Querying AppleDB...")
-		var results []download.OsFileSource
+		var results []download.AppleDBRecord
 		if useAPI {
 			results, err = download.AppleDBQuery(&download.ADBQuery{
 				OSes:              osTypes,
@@ -379,7 +411,7 @@ var downloadAppledbCmd = &cobra.Command{
 
 		log.Debug("URLs to download:")
 		if asJSON {
-			jsonData, err := json.MarshalIndent(results, "", "  ")
+			jsonData, err := json.MarshalIndent(newAppleDBJSONEnvelope(results), "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal json: %v", err)
 			}
@@ -425,7 +457,7 @@ var downloadAppledbCmd = &cobra.Command{
 
 		if cont {
 			if kernel || dyld || len(pattern) > 0 || fcsKeys || fcsKeysJson {
-				return forEachAppleDBResult(cmd.Context(), results, func(_ int, _ download.OsFileSource, url string) error {
+				return forEachAppleDBResult(cmd.Context(), results, func(_ int, _ download.AppleDBRecord, url string) error {
 					switch fwType {
 					case "ipsw":
 						d, v, b := download.ParseIpswURLString(url)
@@ -500,7 +532,7 @@ var downloadAppledbCmd = &cobra.Command{
 			downloader := download.NewDownloadWithProfile(
 				download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
 			defer downloader.Close()
-			return forEachAppleDBResult(cmd.Context(), results, func(idx int, result download.OsFileSource, url string) error {
+			return forEachAppleDBResult(cmd.Context(), results, func(idx int, result download.AppleDBRecord, url string) error {
 				var fname string
 				switch fwType {
 				case "ipsw":
@@ -537,13 +569,71 @@ var downloadAppledbCmd = &cobra.Command{
 				} else {
 					log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
 				}
-				_, err := downloader.DoRequestContext(cmd.Context(), appleDBRequest(result, url, fname))
+				_, err := downloader.DoRequestContext(cmd.Context(), appleDBRequest(result.OsFileSource, url, fname))
 				return err
 			})
 		}
 
 		return nil
 	},
+}
+
+func newAppleDBJSONEnvelope(records []download.AppleDBRecord) appleDBJSONEnvelope {
+	envelope := appleDBJSONEnvelope{
+		SchemaVersion: appleDBJSONSchemaVersion,
+		Releases:      make([]appleDBJSONRelease, 0),
+	}
+
+	for _, record := range records {
+		releaseDate := record.Released.Format("2006-01-02")
+		if len(envelope.Releases) == 0 || !sameAppleDBJSONRelease(envelope.Releases[len(envelope.Releases)-1], record, releaseDate) {
+			envelope.Releases = append(envelope.Releases, appleDBJSONRelease{
+				OS:          record.OS,
+				Version:     record.Version,
+				Build:       record.Build,
+				ReleaseDate: releaseDate,
+				Channel:     record.Channel,
+				Artifacts:   make([]appleDBJSONArtifact, 0),
+			})
+		}
+
+		links := make([]appleDBJSONLink, 0, len(record.Links))
+		for _, link := range record.Links {
+			links = append(links, appleDBJSONLink{URL: link.URL, Active: link.Active})
+		}
+		artifact := appleDBJSONArtifact{
+			SourceType:         record.Type,
+			Delivery:           appleDBDelivery(record),
+			PrerequisiteBuilds: append([]string{}, record.PrerequisiteBuild.Builds...),
+			Devices:            append([]string{}, record.DeviceMap...),
+			Links:              links,
+			SHA256:             record.Hashes.SHA256,
+			SHA1:               record.Hashes.SHA1,
+			Size:               record.Size,
+		}
+		last := len(envelope.Releases) - 1
+		envelope.Releases[last].Artifacts = append(envelope.Releases[last].Artifacts, artifact)
+	}
+
+	return envelope
+}
+
+func sameAppleDBJSONRelease(release appleDBJSONRelease, record download.AppleDBRecord, releaseDate string) bool {
+	return release.OS == record.OS &&
+		release.Version == record.Version &&
+		release.Build == record.Build &&
+		release.ReleaseDate == releaseDate &&
+		release.Channel == record.Channel
+}
+
+func appleDBDelivery(record download.AppleDBRecord) string {
+	if record.Type == "rsr" {
+		return "rsr"
+	}
+	if len(record.PrerequisiteBuild.Builds) > 0 {
+		return "delta"
+	}
+	return "full"
 }
 
 func appleDBRequest(source download.OsFileSource, rawURL, destName string) *download.FileRequest {
@@ -561,12 +651,12 @@ func appleDBRequest(source download.OsFileSource, rawURL, destName string) *down
 // finishes. It stops immediately once ctx is cancelled.
 func forEachAppleDBResult(
 	ctx context.Context,
-	results []download.OsFileSource,
-	fn func(idx int, result download.OsFileSource, url string) error,
+	results []download.AppleDBRecord,
+	fn func(idx int, result download.AppleDBRecord, url string) error,
 ) error {
 	var failed []string
 	for idx, result := range results {
-		url := activeAppleDBLink(result)
+		url := activeAppleDBLink(result.OsFileSource)
 		if url == "" {
 			log.WithFields(log.Fields{"devices": result.DeviceMap}).Error("skipping: no active download link")
 			failed = append(failed, strings.Join(result.DeviceMap, ",")+" (no active link)")
