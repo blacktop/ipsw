@@ -110,7 +110,7 @@ func UniqueAppend[T comparable](slice []T, i T) []T {
 func UniqueConcat[T comparable](slice []T, in []T) []T {
 	for _, i := range in {
 		if slices.Contains(slice, i) {
-			return slice
+			continue
 		}
 		slice = append(slice, i)
 	}

@@ -41,6 +41,43 @@ type restoreVersionInfo struct {
 	RestoreBuildGroup  any    `json:"RestoreBuildGroup,omitempty"`
 	RestoreLongVersion string `json:"RestoreLongVersion,omitempty"`
 	RestoreVersion     string `json:"RestoreVersion,omitempty"`
+	isSeedPresent      bool
+}
+
+func (r *restoreVersionInfo) UnmarshalJSON(data []byte) error {
+	type rawRestoreVersionInfo restoreVersionInfo
+	var decoded rawRestoreVersionInfo
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = restoreVersionInfo(decoded)
+	isSeed, present := fields["IsSeed"]
+	r.isSeedPresent = present && string(isSeed) != "null"
+	return nil
+}
+
+func (r *restoreVersionInfo) UnmarshalPlist(unmarshal func(any) error) error {
+	type rawRestoreVersionInfo restoreVersionInfo
+	var decoded rawRestoreVersionInfo
+	if err := unmarshal(&decoded); err != nil {
+		return err
+	}
+	var fields map[string]any
+	if err := unmarshal(&fields); err != nil {
+		return err
+	}
+	*r = restoreVersionInfo(decoded)
+	_, r.isSeedPresent = fields["IsSeed"]
+	return nil
+}
+
+// IsSeedPresent reports whether Apple supplied RestoreVersionInfo.IsSeed.
+func (r restoreVersionInfo) IsSeedPresent() bool {
+	return r.isSeedPresent
 }
 
 type assetReceipt struct {

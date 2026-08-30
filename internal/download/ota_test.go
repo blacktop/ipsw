@@ -3,7 +3,127 @@ package download
 import (
 	"slices"
 	"testing"
+
+	"github.com/blacktop/ipsw/pkg/ota/types"
+	version "github.com/hashicorp/go-version"
 )
+
+func TestQueryPublicXMLRecordsMESUEvidenceBeforeDedup(t *testing.T) {
+	wantedVersion, err := version.NewVersion("26.6.1")
+	if err != nil {
+		t.Fatalf("parse test version: %v", err)
+	}
+	release := testOTAAsset("23G83", "shared.aea", nil, nil)
+	beta := release
+	beta.Build = "23G84"
+	beta.DocumentationID = "iOS2661Beta"
+	beta.ReleaseType = "Beta"
+
+	o := &Ota{
+		ota:    ota{Assets: []types.Asset{release, beta}},
+		Config: OtaConf{Platform: "ios", Version: wantedVersion, Build: "0"},
+	}
+	assets := o.QueryPublicXML()
+	if len(assets) != 1 {
+		t.Fatalf("QueryPublicXML() returned %d assets, want one URL-deduplicated asset", len(assets))
+	}
+	records, err := o.Records(assets)
+	if err != nil {
+		t.Fatalf("Records() failed: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("Records() returned %d records, want 1", len(records))
+	}
+	if len(records[0].Sightings) != 2 {
+		t.Fatalf("record has %d sightings, want 2", len(records[0].Sightings))
+	}
+	if got := ClassifyOTAChannel(records[0]); got != OTAChannelUnknown {
+		t.Fatalf("channel = %q, want unknown for conflicting MESU evidence", got)
+	}
+}
+
+func TestSelectRequestedOTAsFiltersBeforeURLDedup(t *testing.T) {
+	version27, err := version.NewVersion("27.0")
+	if err != nil {
+		t.Fatalf("parse test version: %v", err)
+	}
+	release := testOTAAsset("23G83", "shared.aea", []string{"iPhone16,1"}, []string{"D83AP"})
+	requested := release
+	requested.Build = "24A1"
+	requested.OSVersion = "9.9.27.0"
+	requested.PrerequisiteBuild = "23G81"
+
+	for _, test := range []struct {
+		name   string
+		config OtaConf
+		first  types.Asset
+		match  types.Asset
+	}{
+		{name: "target build", config: OtaConf{Platform: "ios", Build: requested.Build}, first: release, match: requested},
+		{name: "version", config: OtaConf{Platform: "ios", Version: version27, Build: "0"}, first: release, match: requested},
+		{
+			name:   "delta prerequisite",
+			config: OtaConf{Platform: "ios", Build: requested.PrerequisiteBuild, Delta: true},
+			first:  func() types.Asset { asset := release; asset.PrerequisiteBuild = "23G80"; return asset }(),
+			match:  requested,
+		},
+		{
+			name:   "simulator target build",
+			config: OtaConf{Platform: "ios", Build: requested.Build, Simulator: true},
+			first:  func() types.Asset { asset := release; asset.AssetType = string(iOsSimulatorUpdate); return asset }(),
+			match:  func() types.Asset { asset := requested; asset.AssetType = string(iOsSimulatorUpdate); return asset }(),
+		},
+	} {
+		for _, ordering := range []struct {
+			name   string
+			assets []types.Asset
+		}{
+			{name: "nonmatching first", assets: []types.Asset{test.first, test.match}},
+			{name: "matching first", assets: []types.Asset{test.match, test.first}},
+		} {
+			t.Run(test.name+"/"+ordering.name, func(t *testing.T) {
+				o := &Ota{Config: test.config}
+				got := o.selectRequestedOTAs(ordering.assets)
+				if len(got) != 1 || got[0].Build != test.match.Build ||
+					got[0].OSVersion != test.match.OSVersion || got[0].PrerequisiteBuild != test.match.PrerequisiteBuild {
+					t.Fatalf("selected assets = %+v, want matching observation %+v", got, test.match)
+				}
+			})
+		}
+	}
+}
+
+func TestSelectRequestedOTAsDeduplicatesEarlyReturnModes(t *testing.T) {
+	first := testOTAAsset("24A1", "shared.aea", []string{"iPhone16,1"}, []string{"D83AP"})
+	second := first
+	second.SupportedDevices = []string{"iPhone16,1", "iPhone16,2"}
+	second.SupportedDeviceModels = []string{"D83AP", "D84AP"}
+
+	for _, test := range []struct {
+		name      string
+		config    OtaConf
+		assetType assetType
+	}{
+		{name: "macOS", config: OtaConf{Platform: "macos", Build: "0"}, assetType: macSoftwareUpdate},
+		{name: "simulator", config: OtaConf{Platform: "ios", Build: first.Build, Simulator: true}, assetType: iOsSimulatorUpdate},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assets := []types.Asset{first, second}
+			for idx := range assets {
+				assets[idx].AssetType = string(test.assetType)
+			}
+			o := &Ota{Config: test.config}
+			got := o.selectRequestedOTAs(assets)
+			if len(got) != 1 {
+				t.Fatalf("selected %d assets, want one URL-deduplicated asset", len(got))
+			}
+			if !slices.Equal(got[0].SupportedDevices, []string{"iPhone16,1", "iPhone16,2"}) ||
+				!slices.Equal(got[0].SupportedDeviceModels, []string{"D83AP", "D84AP"}) {
+				t.Fatalf("merged coverage = %v/%v", got[0].SupportedDevices, got[0].SupportedDeviceModels)
+			}
+		})
+	}
+}
 
 func TestGetRequestAssetTypesDeltaSelection(t *testing.T) {
 	tests := []struct {

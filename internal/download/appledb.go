@@ -354,12 +354,12 @@ func sourceMatchesQuery(source OsFileSource, query *ADBQuery) bool {
 
 func appleDBChannel(f AppleDbOsFile) string {
 	if f.RC {
-		return "rc"
+		return OTAChannelRC
 	}
 	if f.Beta {
-		return "beta"
+		return OTAChannelBeta
 	}
-	return "release"
+	return OTAChannelRelease
 }
 
 func canonicalAppleDBSource(source OsFileSource) OsFileSource {

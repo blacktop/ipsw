@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -57,11 +58,53 @@ var otaDlCmdPlatforms = []string{
 	"visionos\tvisionOS",
 }
 
-// otaWantsBetaAudiences reports whether Pallas should be queried with the beta
-// seed audiences. Apple seeds release candidates to those same audiences, so
-// --rc resolves to the identical request --beta builds.
-func otaWantsBetaAudiences() bool {
-	return viper.GetBool("download.ota.beta") || viper.GetBool("download.ota.rc")
+type otaOutputModes struct {
+	info          bool
+	latestVersion bool
+	latestBuild   bool
+	fcsKeys       bool
+	urls          bool
+	json          bool
+}
+
+func (m otaOutputModes) validate() error {
+	modes := []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "--info", enabled: m.info},
+		{name: "--show-latest-version", enabled: m.latestVersion},
+		{name: "--show-latest-build", enabled: m.latestBuild},
+		{name: "--fcs-keys", enabled: m.fcsKeys},
+		{name: "--urls", enabled: m.urls},
+		{name: "--json", enabled: m.json},
+	}
+	var enabled []string
+	for _, mode := range modes {
+		if mode.enabled {
+			enabled = append(enabled, mode.name)
+		}
+	}
+	if len(enabled) > 1 {
+		return fmt.Errorf("cannot combine OTA output modes: %s", strings.Join(enabled, ", "))
+	}
+	return nil
+}
+
+func selectOTARecordsByChannel(records []download.OTARecord, channel string) ([]download.OTARecord, []types.Asset) {
+	selectedRecords := make([]download.OTARecord, 0, len(records))
+	selectedAssets := make([]types.Asset, 0, len(records))
+	for _, record := range records {
+		if download.ClassifyOTAChannel(record) != channel {
+			continue
+		}
+		asset := record.Asset
+		asset.SupportedDevices = slices.Clone(record.Devices)
+		asset.SupportedDeviceModels = slices.Clone(record.Models)
+		selectedRecords = append(selectedRecords, record)
+		selectedAssets = append(selectedAssets, asset)
+	}
+	return selectedRecords, selectedAssets
 }
 
 func init() {
@@ -86,7 +129,7 @@ func init() {
 		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
 	})
 	downloadOtaCmd.Flags().Bool("beta", false, "Download Beta OTAs")
-	downloadOtaCmd.Flags().Bool("rc", false, "Download RC OTAs (queries the beta seed audiences, so betas may also match)")
+	downloadOtaCmd.Flags().Bool("rc", false, "Download confirmed RC OTAs (queried from the beta seed audiences)")
 	downloadOtaCmd.Flags().Bool("latest", false, "Download latest OTAs")
 	downloadOtaCmd.Flags().Bool("delta", false, "Download Delta OTAs")
 	downloadOtaCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
@@ -94,7 +137,7 @@ func init() {
 	downloadOtaCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	downloadOtaCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
 	downloadOtaCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
-	downloadOtaCmd.Flags().BoolP("json", "j", false, "Dump URLs as JSON only")
+	downloadOtaCmd.Flags().BoolP("json", "j", false, "Dump a versioned OTA envelope as JSON (never includes decryption keys)")
 	downloadOtaCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	downloadOtaCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return dyld.DscArches, cobra.ShellCompDirectiveDefault
@@ -109,6 +152,7 @@ func init() {
 	downloadOtaCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
 	downloadOtaCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "beta", "rc", "latest")
+	downloadOtaCmd.MarkFlagsMutuallyExclusive("info", "show-latest-version", "show-latest-build", "fcs-keys", "urls", "json")
 	// Bind download behavior flags
 	viper.BindPFlag("download.ota.proxy", downloadOtaCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.ota.insecure", downloadOtaCmd.Flags().Lookup("insecure"))
@@ -151,14 +195,39 @@ var downloadOtaCmd = &cobra.Command{
 	Use:     "ota [options]",
 	Aliases: []string{"o"},
 	Short:   "Download OTAs",
+	Long: heredoc.Doc(`
+		Download OTA updates resolved live from Apple's Pallas
+		(gdmf.apple.com/v2/assets) and asset-set (gdmf.apple.com/v2/pmv) services.
+
+		With --json, output is always an indented, schema-versioned envelope. Schema
+		version 1 contains an otas array, which is empty when no OTA matches. Entries
+		are unique per URL and sorted by os, newest version, newest build, delivery,
+		prerequisite build, then URL.
+		Each entry carries os, version, version_extra (RSR suffix), build, channel,
+		posting_date, delivery (full, delta, or rsr), prerequisite, supported_devices,
+		supported_models, url, download_size, unarchived_size, sha1, sha256,
+		encryption, and provenance. Anything Apple did not supply is null; sha256,
+		posting_date, and RC status are never inferred. channel.kind is release,
+		beta, rc, or unknown. Every sighting and the asset's own markers are
+		classified from Apple markers only (rc when the documentation ID ends in
+		RC, beta when Apple's ReleaseType is Beta or the documentation ID contains
+		Beta, release when a release audience or the public mesu feed served the
+		asset with no seed marker) and the kind is emitted only when all decided
+		evidence agrees; conflicting or undecided evidence yields unknown.
+		channel.audiences and provenance.sightings list every Pallas audience and
+		asset set that advertised the URL, each with its own nullable is_seed.
+		provenance.asset_sets lists matching gdmf pmv entries. posting_date is set
+		only when dates from Pallas and PublicAssetSets agree.
+		Decryption keys are never included; use --fcs-keys for those.
+	`),
 	Example: heredoc.Doc(`
 		# Download the iOS 14.8.1 OTA for the iPhone10,1
 		❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
 
-		# Get all the latest BETA iOS OTAs URLs as JSON
-		❯ ipsw download ota --platform ios --beta --urls --json
+		# Get all the latest BETA iOS OTAs as JSON
+		❯ ipsw download ota --platform ios --beta --json
 
-		# Get the macOS 26.7 seeded OTA URLs (RC included) for the Mac17,6
+		# Get the macOS 26.7 RC OTA URLs for the Mac17,6
 		❯ ipsw download ota --platform macos --version 26.7 --device Mac17,6 --rc --urls
 
 		# Download latest tvOS OTA and extract kernelcache
@@ -192,7 +261,8 @@ var downloadOtaCmd = &cobra.Command{
 		doNotDownload := viper.GetStringSlice("download.ota.black-list")
 		// flags
 		platform := viper.GetString("download.ota.platform")
-		getBeta := otaWantsBetaAudiences()
+		getBeta := viper.GetBool("download.ota.beta")
+		getRC := viper.GetBool("download.ota.rc")
 		getLatest := viper.GetBool("download.ota.latest")
 		getRSR := viper.GetBool("download.ota.rsr")
 		getSim := viper.GetBool("download.ota.sim")
@@ -204,10 +274,25 @@ var downloadOtaCmd = &cobra.Command{
 		flat := viper.GetBool("download.ota.flat")
 		fcsKeys := viper.GetBool("download.ota.fcs-keys")
 		otaInfo := viper.GetBool("download.ota.info")
+		asURLs := viper.GetBool("download.ota.urls")
+		asJSON := viper.GetBool("download.ota.json")
 		output := viper.GetString("download.ota.output")
 		showLatestVersion := viper.GetBool("download.ota.show-latest-version")
 		showLatestBuild := viper.GetBool("download.ota.show-latest-build")
 		// verify args
+		if getBeta && getRC {
+			return errors.New("cannot combine --beta and --rc")
+		}
+		if err := (otaOutputModes{
+			info:          otaInfo,
+			latestVersion: showLatestVersion,
+			latestBuild:   showLatestBuild,
+			fcsKeys:       fcsKeys,
+			urls:          asURLs,
+			json:          asJSON,
+		}).validate(); err != nil {
+			return err
+		}
 		if len(dyldArches) > 0 && !remoteDyld {
 			return errors.New("--dyld-arch || -a can only be used with --dyld || -d")
 		}
@@ -284,7 +369,7 @@ var downloadOtaCmd = &cobra.Command{
 				} else if utils.StrSliceHas([]string{"macos", "recovery"}, platform) {
 					otaInfoType = "macOS"
 				} else if utils.StrSliceHas([]string{"visionos"}, platform) {
-					otaInfoType = "xrOS"
+					otaInfoType = "visionOS"
 				} else {
 					log.Errorf("--info flag does not support platform '%s'", platform)
 				}
@@ -319,7 +404,7 @@ var downloadOtaCmd = &cobra.Command{
 
 		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform:        strings.ToLower(platform),
-			Beta:            getBeta,
+			Beta:            getBeta || getRC,
 			Latest:          getLatest,
 			Delta:           viper.GetBool("download.ota.delta"),
 			RSR:             getRSR,
@@ -341,6 +426,21 @@ var downloadOtaCmd = &cobra.Command{
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return fmt.Errorf("failed to get Pallas OTAs: %v", err)
+		}
+
+		var otaRecords []download.OTARecord
+		if getRC || asJSON {
+			otaRecords, err = otaXML.Records(otas)
+			if err != nil {
+				return fmt.Errorf("failed to build OTA records: %v", err)
+			}
+		}
+		if getRC {
+			seeded := len(otas)
+			otaRecords, otas = selectOTARecordsByChannel(otaRecords, download.OTAChannelRC)
+			if len(otas) == 0 && seeded > 0 {
+				log.Warnf("no RC OTAs among %d seeded OTAs (RC status comes from Apple's markers only)", seeded)
+			}
 		}
 
 		if showLatestVersion {
@@ -449,17 +549,12 @@ var downloadOtaCmd = &cobra.Command{
 			return nil
 		}
 
-		if viper.GetBool("download.ota.urls") || viper.GetBool("download.ota.json") {
-			if viper.GetBool("download.ota.json") {
-				dat, err := json.Marshal(otas)
-				if err != nil {
-					return fmt.Errorf("failed to marshal OTA URLs in JSON: %v", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, o := range otas {
-					fmt.Println(o.BaseURL + o.RelativePath)
-				}
+		if asJSON {
+			return writeOTAJSON(os.Stdout, otaRecords)
+		}
+		if asURLs {
+			for _, o := range otas {
+				fmt.Println(o.BaseURL + o.RelativePath)
 			}
 			return nil
 		}

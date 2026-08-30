@@ -17,16 +17,19 @@ import (
 const assetSetListURL = "https://gdmf.apple.com/v2/pmv"
 
 type AssetSet struct {
-	ProductVersion   string   `json:"ProductVersion,omitempty"`
-	Build            string   `json:"Build,omitempty"`
-	PostingDate      string   `json:"PostingDate,omitempty"`
-	ExpirationDate   string   `json:"ExpirationDate,omitempty"`
-	SupportedDevices []string `json:"SupportedDevices,omitempty"`
+	ProductVersion      string   `json:"ProductVersion,omitempty"`
+	ProductVersionExtra string   `json:"ProductVersionExtra,omitempty"`
+	Build               string   `json:"Build,omitempty"`
+	PrerequisiteBuild   string   `json:"PrerequisiteBuild,omitempty"`
+	PostingDate         string   `json:"PostingDate,omitempty"`
+	ExpirationDate      string   `json:"ExpirationDate,omitempty"`
+	SupportedDevices    []string `json:"SupportedDevices,omitempty"`
 }
 
 type AssetSets struct {
-	PublicAssetSets map[string][]AssetSet `json:"PublicAssetSets,omitempty"`
-	AssetSets       map[string][]AssetSet `json:"AssetSets,omitempty"`
+	PublicAssetSets                      map[string][]AssetSet `json:"PublicAssetSets,omitempty"`
+	AssetSets                            map[string][]AssetSet `json:"AssetSets,omitempty"`
+	PublicBackgroundSecurityImprovements map[string][]AssetSet `json:"PublicBackgroundSecurityImprovements,omitempty"`
 }
 
 // GetAssetSets queries and returns the asset sets
@@ -131,7 +134,7 @@ func (a *AssetSets) latest(platform string) (string, string) {
 	case "accessory", "ios", "watchos", "audioos", "tvos":
 		typ = "iOS"
 	case "visionos":
-		typ = "xrOS"
+		typ = "visionOS"
 	case "recovery", "macos":
 		typ = "macOS"
 	}

@@ -78,9 +78,10 @@ const (
 // Ota is an OTA object
 type Ota struct {
 	ota
-	as     *AssetSets
-	db     *info.Devices
-	Config OtaConf
+	as       *AssetSets
+	db       *info.Devices
+	evidence map[string]*otaEvidence
+	Config   OtaConf
 }
 
 // OtaConf is an OTA download configuration
@@ -306,6 +307,7 @@ func (o *Ota) QueryPublicXML() []types.Asset {
 			}
 		}
 		filtered = append(filtered, asset)
+		o.noteSighting(asset, OTASighting{Source: OTASourceMesu})
 	}
 	return uniqueOTAs(filtered)
 }
@@ -696,55 +698,19 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}()
 
 	for resp := range c {
-
-		if resp.StatusCode >= 500 {
-			log.Debugf("[ERROR]\n%s", resp.Status)
+		res, ok := decodePallasResponse(resp)
+		if !ok || len(res.Assets) == 0 {
 			continue
 		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Errorf("failed to read response body: %v", err)
-			continue
+		for _, asset := range res.Assets {
+			o.noteSighting(asset, OTASighting{
+				Source:      OTASourcePallas,
+				AudienceID:  res.AssetAudience,
+				AssetSetID:  res.AssetSetID,
+				PostingDate: res.PostingDate,
+			})
 		}
-
-		// repair/parse base64 response data
-		parts := strings.Split(string(body), ".")
-		if len(parts) < 2 {
-			log.Errorf("failed to base64 decode pallas response: cannot split response body \"%s\" ", string(body))
-			continue
-		}
-		b64Str := parts[1]
-		b64Str = strings.ReplaceAll(b64Str, "-", "+")
-		b64Str = strings.ReplaceAll(b64Str, "_", "/")
-
-		// bas64 decode the results
-		b64data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(b64Str)
-		if err != nil {
-			log.Errorf("failed to base64 decode pallas response: %v", err)
-			continue
-		}
-
-		if resp.StatusCode != 200 {
-			log.Debugf("[ERROR]\n%s", string(b64data))
-			continue
-		}
-
-		// os.WriteFile("pallas.json", b64data, 0644)
-
-		res := ota{}
-		if err := json.Unmarshal(b64data, &res); err != nil {
-			log.Errorf("failed to unmarshall JSON: %v", err)
-			continue
-		}
-
-		if len(res.Assets) == 0 {
-			continue
-		}
-
 		oassets = append(oassets, res.Assets...)
-
-		resp.Body.Close()
 	}
 
 	if err := g.Wait(); err != nil {
@@ -769,13 +735,60 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 		}
 	}
 
-	oassets = uniqueOTAs(oassets)
+	oassets = o.selectRequestedOTAs(oassets)
 
 	for _, oa := range oassets {
 		log.Debug(oa.String())
 	}
 
-	return o.filterOTADevices(oassets), nil
+	return oassets, nil
+}
+
+// decodePallasResponse unwraps one Pallas JWS envelope. Failed or non-200
+// responses are logged and reported as not ok so the caller skips them, which
+// keeps the tolerant per-response handling this resolver has always used.
+func decodePallasResponse(resp *http.Response) (*ota, bool) {
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 500 {
+		log.Debugf("[ERROR]\n%s", resp.Status)
+		return nil, false
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorf("failed to read response body: %v", err)
+		return nil, false
+	}
+
+	// repair/parse base64 response data
+	parts := strings.Split(string(body), ".")
+	if len(parts) < 2 {
+		log.Errorf("failed to base64 decode pallas response: cannot split response body \"%s\" ", string(body))
+		return nil, false
+	}
+	b64Str := parts[1]
+	b64Str = strings.ReplaceAll(b64Str, "-", "+")
+	b64Str = strings.ReplaceAll(b64Str, "_", "/")
+
+	b64data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(b64Str)
+	if err != nil {
+		log.Errorf("failed to base64 decode pallas response: %v", err)
+		return nil, false
+	}
+
+	if resp.StatusCode != 200 {
+		log.Debugf("[ERROR]\n%s", string(b64data))
+		return nil, false
+	}
+
+	res := &ota{}
+	if err := json.Unmarshal(b64data, res); err != nil {
+		log.Errorf("failed to unmarshall JSON: %v", err)
+		return nil, false
+	}
+
+	return res, true
 }
 
 func uniqueOTAs(otas []types.Asset) []types.Asset {
@@ -808,30 +821,32 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 	return os
 }
 
+func (o *Ota) selectRequestedOTAs(otas []types.Asset) []types.Asset {
+	return uniqueOTAs(o.filterOTADevices(otas))
+}
+
 func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: this is too strict and loses some OTAs (i.e. macOS)
 	var devices []string
 	var filteredDevices []string
 	var filteredOtas []types.Asset
 
 	if o.Config.Simulator {
+		var simulatorOtas []types.Asset
 		for _, ota := range otas {
 			switch assetType(ota.AssetType) {
 			case iOsSimulatorUpdate, watchOsSimulatorUpdate, tvOsSimulatorUpdate, visionOaSimulatorUpdate:
-				filteredOtas = append(filteredOtas, ota)
+				simulatorOtas = append(simulatorOtas, ota)
 			}
 		}
-		return filteredOtas
+		otas = simulatorOtas
 	}
 
 	// Apply version filtering for all platforms when version is specified
 	if o.Config.Version != nil && o.Config.Version.Original() != "0" {
 		var versionFiltered []types.Asset
 		for _, ota := range otas {
-			otaVersion := strings.TrimPrefix(ota.OSVersion, "9.9.")
-			if ver, err := semver.NewVersion(otaVersion); err == nil {
-				if o.Config.Version.Equal(ver) {
-					versionFiltered = append(versionFiltered, ota)
-				}
+			if o.matchesRequestedOTAVersion(ota) {
+				versionFiltered = append(versionFiltered, ota)
 			}
 		}
 		otas = versionFiltered
@@ -844,23 +859,14 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	if o.Config.Build != "0" && !o.Config.RSR {
 		var buildFiltered []types.Asset
 		for _, ota := range otas {
-			if o.Config.Delta {
-				if strings.EqualFold(ota.PrerequisiteBuild, o.Config.Build) {
-					buildFiltered = append(buildFiltered, ota)
-				}
-			} else {
-				if strings.EqualFold(ota.Build, o.Config.Build) {
-					buildFiltered = append(buildFiltered, ota)
-				}
+			if o.matchesRequestedOTABuild(ota) {
+				buildFiltered = append(buildFiltered, ota)
 			}
 		}
 		otas = buildFiltered
+	}
 
-		// For macOS, return immediately after build filtering
-		if o.Config.Platform == "macos" {
-			return otas
-		}
-	} else if o.Config.Platform == "macos" {
+	if o.Config.Simulator || o.Config.Platform == "macos" {
 		return otas
 	}
 
@@ -892,5 +898,5 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 		}
 	}
 
-	return uniqueOTAs(filteredOtas)
+	return filteredOtas
 }
