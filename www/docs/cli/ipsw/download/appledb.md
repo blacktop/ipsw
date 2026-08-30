@@ -32,7 +32,7 @@ ipsw download appledb [flags]
 
 ### Examples
 
-```
+```bash
 # Download the iOS 16.5 beta 4 kernelcache from remote IPSW
 ❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
 
@@ -101,3 +101,4 @@ ipsw download appledb [flags]
 ### SEE ALSO
 
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
+
