@@ -2,7 +2,9 @@ package download
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
@@ -28,8 +30,7 @@ func (b slogBridge) Enabled(_ context.Context, level slog.Level) bool {
 	if level >= slog.LevelWarn {
 		return true
 	}
-	logger, ok := log.Log.(*log.Logger)
-	return ok && logger.Level <= log.DebugLevel
+	return apexDebugEnabled()
 }
 
 func (b slogBridge) Handle(_ context.Context, record slog.Record) error {
@@ -42,8 +43,14 @@ func (b slogBridge) Handle(_ context.Context, record slog.Record) error {
 		add(attr)
 	}
 	record.Attrs(add)
-	entry := log.WithFields(fields)
 	message := "godl: " + record.Message
+	// Bars own the terminal: interleaving through the live container keeps
+	// the in-place redraw intact. A failed writer is retried against older
+	// live containers; apex takes the line only when none remains.
+	if writeThroughProgressSink(formatProgressLogLine(record.Level, message, fields) + "\n") {
+		return nil
+	}
+	entry := log.WithFields(fields)
 	switch {
 	case record.Level >= slog.LevelError:
 		entry.Error(message)
@@ -60,6 +67,32 @@ func (b slogBridge) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 func (b slogBridge) WithGroup(string) slog.Handler { return b } // the engine emits no groups
+
+// apexDebugEnabled reports whether the process-wide apex logger surfaces
+// debug records (--verbose).
+func apexDebugEnabled() bool {
+	logger, ok := log.Log.(*log.Logger)
+	return ok && logger.Level <= log.DebugLevel
+}
+
+// formatProgressLogLine renders one engine record as a single plain line for
+// the progress container: apex-style bullet, message, then fields in sorted
+// key order so the output is deterministic.
+func formatProgressLogLine(level slog.Level, message string, fields log.Fields) string {
+	symbol := "•"
+	switch {
+	case level >= slog.LevelError:
+		symbol = "⨯"
+	case level >= slog.LevelWarn:
+		symbol = "⚠"
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "   %s %s", symbol, message)
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		fmt.Fprintf(&sb, " %s=%v", key, fields[key])
+	}
+	return sb.String()
+}
 
 // redactAttrValue strips signed query credentials from URL-shaped values.
 // The engine already redacts URLs at its emit sites; this is defense in
