@@ -284,4 +284,15 @@ jobs:
           # Commit all changes at once
           git add pkg/aea/data/fcs-keys.json pkg/aea/data/fcs-keys.gz hack/.watch_cache
           git commit -m "$COMMIT_MSG"
-          git push
+
+          # The scrape takes minutes, so master can move under us. Rebase onto
+          # whatever landed and retry instead of losing the keys until tomorrow.
+          git push || {
+            echo "push rejected, rebasing onto origin/master and retrying"
+            git pull --rebase origin master || {
+              git rebase --abort || true
+              echo "::error::rebase onto origin/master failed" >&2
+              exit 1
+            }
+            git push || { echo "::error::push failed after rebase" >&2; exit 1; }
+          }
