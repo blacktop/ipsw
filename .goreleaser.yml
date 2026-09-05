@@ -531,8 +531,6 @@ homebrew_casks:
       bash: "completions/ipsw/_bash"
       zsh: "completions/ipsw/_zsh"
       fish: "completions/ipsw/_fish"
-    url:
-      verified: github.com/blacktop/ipsw/releases/download
 
 checksum:
   name_template: "checksums.txt"
