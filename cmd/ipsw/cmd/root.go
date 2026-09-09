@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -47,6 +48,7 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ota"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/sb"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ssh"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -83,10 +85,25 @@ func Execute() {
 	ctx, cancel := interruptContext()
 	defer cancel()
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	cmd, err := rootCmd.ExecuteContextC(ctx)
+	if err != nil {
+		// Library errors stay flag-agnostic (they also surface through the
+		// API); name the selector only for commands that actually define it.
+		err = withDeviceSelectionHint(cmd, err)
 		log.Error(err.Error())
 		os.Exit(1)
 	}
+}
+
+func withDeviceSelectionHint(cmd *cobra.Command, err error) error {
+	if errors.Is(err, info.ErrAmbiguousSystemOS) && cmd != nil {
+		for _, flag := range []string{"extract-device", "device"} {
+			if cmd.Flags().Lookup(flag) != nil {
+				return fmt.Errorf("%w (use --%s)", err, flag)
+			}
+		}
+	}
+	return err
 }
 
 // interruptContext returns a context cancelled by the first SIGINT/SIGTERM.

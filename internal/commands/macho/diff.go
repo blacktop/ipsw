@@ -473,6 +473,7 @@ func FormatUpdatedDiff(oldInfo, newInfo *DiffInfo, conf *DiffConfig) (string, er
 }
 
 type DiffConfig struct {
+	Device                string
 	Markdown              bool
 	Color                 bool
 	DiffTool              string
@@ -1267,14 +1268,14 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 
 	prevKeys := make(map[string]bool) // value==true => already matched
 
-	if err := search.ForEachMachoInIPSW(oldIPSW, conf.PemDB, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSWForDevice(oldIPSW, conf.PemDB, conf.Device, func(path string, m *macho.File) error {
 		prevKeys[path] = false
 		return WriteCachedDiffInfo(cacheDir, path, GenerateDiffInfo(m, conf))
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %w", err)
 	}
 
-	if err := search.ForEachMachoInIPSW(newIPSW, conf.PemDB, func(path string, m *macho.File) error {
+	if err := search.ForEachMachoInIPSWForDevice(newIPSW, conf.PemDB, conf.Device, func(path string, m *macho.File) error {
 		matched, ok := prevKeys[path]
 		if !ok {
 			diff.New = append(diff.New, path)
@@ -1306,7 +1307,7 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
 		prevKeys[path] = true
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to parse machos in 'New' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse machos in 'New' IPSW: %w", err)
 	}
 
 	for path, matched := range prevKeys {

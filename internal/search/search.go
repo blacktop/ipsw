@@ -35,14 +35,17 @@ type DmgInfo struct {
 	Path string
 }
 
-// ListDMGs returns known DMGs in a stable order.
-// Why: call sites often need the same enumeration.
-func ListDMGs(ipswPath string) ([]DmgInfo, error) {
+// ListDMGsForDevice selects the product type or board before scanning IPSW volumes.
+func ListDMGsForDevice(ipswPath, device string) ([]DmgInfo, error) {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
 	}
 	var dmgs []DmgInfo
+	i, err = i.SelectDevice(device)
+	if err != nil {
+		return nil, err
+	}
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		dmgs = append(dmgs, DmgInfo{"FileSystem", fsOS})
 	}
@@ -58,10 +61,9 @@ func ListDMGs(ipswPath string) ([]DmgInfo, error) {
 	return dmgs, nil
 }
 
-// ScanAllDMGs runs handlers across files in every DMG.
-// If betweenHandlers != nil, fire it after each handler (per DMG) for TUIs.
-func ScanAllDMGs(ipswPath, pemDB string, betweenHandlers func(int), handlers ...func(string, string) error) error {
-	dmgs, err := ListDMGs(ipswPath)
+// ScanAllDMGsForDevice selects a product type or board before scanning volumes.
+func ScanAllDMGsForDevice(ipswPath, pemDB, device string, betweenHandlers func(int), handlers ...func(string, string) error) error {
+	dmgs, err := ListDMGsForDevice(ipswPath, device)
 	if err != nil {
 		return err
 	}
@@ -517,15 +519,29 @@ func ForEachFileInZip(ipswPath, dmgLabel, directory string, handler func(string,
 
 // ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
 func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
-	scanMacho := func(mountPoint, machoPath string) error {
-		return handleMachoInMount(mountPoint, machoPath, handler)
-	}
+	return ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, "", handler)
+}
 
+// ForEachMachoInIPSWForDevice selects the product type or board before scanning IPSW volumes.
+func ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, device string, handler func(string, *macho.File) error) error {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
 	}
+	i, err = i.SelectDevice(device)
+	if err != nil {
+		return err
+	}
+	return ForEachMachoInIPSWWithInfo(i, ipswPath, pemDbPath, handler)
+}
 
+// ForEachMachoInIPSWWithInfo scans the volumes of an IPSW whose metadata the
+// caller already parsed and narrowed with SelectDevice, so a command that
+// validated its selection up front does not decode the IPSW a second time.
+func ForEachMachoInIPSWWithInfo(i *info.Info, ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
+	scanMacho := func(mountPoint, machoPath string) error {
+		return handleMachoInMount(mountPoint, machoPath, handler)
+	}
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning FileSystem")
 		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDbPath, scanMacho); err != nil {
@@ -738,7 +754,8 @@ func extractZipMember(f *zip.File, path string) error {
 	return of.Close()
 }
 
-func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, string) error) error {
+// ForEachPlistInIPSWForDevice selects the product type or board before scanning IPSW volumes.
+func ForEachPlistInIPSWForDevice(ipswPath, directory, pemDB, device string, handler func(string, string) error) error {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
@@ -748,6 +765,10 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 		return handlePlistInMount(mountPoint, directory, plistPath, handler)
 	}
 
+	i, err = i.SelectDevice(device)
+	if err != nil {
+		return err
+	}
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning FileSystem")
 		if err := scanDmg(ipswPath, fsOS, "filesystem", pemDB, scanPlist); err != nil {
@@ -776,10 +797,16 @@ func ForEachPlistInIPSW(ipswPath, directory, pemDB string, handler func(string, 
 	return nil
 }
 
-func ForEachFileInIPSW(ipswPath, directory, pemDB string, handler func(string, string) error) error {
+// ForEachFileInIPSWForDevice selects the product type or board before scanning IPSW volumes.
+func ForEachFileInIPSWForDevice(ipswPath, directory, pemDB, device string, handler func(string, string) error) error {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+
+	i, err = i.SelectDevice(device)
+	if err != nil {
+		return err
 	}
 
 	var dmg string

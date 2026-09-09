@@ -42,6 +42,7 @@ func init() {
 	DyldCmd.AddCommand(dyldImportsCmd)
 	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
 	dyldImportsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	dyldImportsCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
 	dyldImportsCmd.Flags().String("image", "", "List imported bind symbols for this image instead of reverse importers")
 	dyldImportsCmd.Flags().String("filter", "", "Regex filter for printed import/importer rows")
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -49,6 +50,7 @@ func init() {
 	})
 	viper.BindPFlag("dyld.imports.ipsw", dyldImportsCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("dyld.imports.pem-db", dyldImportsCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("dyld.imports.device", dyldImportsCmd.Flags().Lookup("device"))
 	viper.BindPFlag("dyld.imports.image", dyldImportsCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.imports.filter", dyldImportsCmd.Flags().Lookup("filter"))
 }
@@ -76,6 +78,9 @@ var dyldImportsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if viper.GetString("dyld.imports.device") != "" && ipswPath == "" {
+			return errors.New("--device requires --ipsw")
+		}
 		// validate args
 		if imageName != "" && ipswPath != "" {
 			return errors.New("--image cannot be used with --ipsw")
@@ -89,7 +94,7 @@ var dyldImportsCmd = &cobra.Command{
 
 		if ipswPath != "" {
 			found := false
-			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), pemDB, func(path string, m *macho.File) error {
+			if err := search.ForEachMachoInIPSWForDevice(filepath.Clean(ipswPath), pemDB, viper.GetString("dyld.imports.device"), func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
 					if strings.EqualFold(imp, args[0]) && importFilterMatch(rowFilter, path) {
 						fmt.Printf("%s\n", path)
@@ -98,7 +103,7 @@ var dyldImportsCmd = &cobra.Command{
 				}
 				return nil
 			}); err != nil {
-				return fmt.Errorf("failed to scan files in IPSW: %v", err)
+				return fmt.Errorf("failed to scan files in IPSW: %w", err)
 			}
 			if !found {
 				log.Warn("No MachOs found containing import; NOTE: '--ipsw' imports searching requires the exact FULL path to the dylib (example:  /usr/lib/libobjc.A.dylib)")

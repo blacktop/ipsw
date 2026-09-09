@@ -48,6 +48,7 @@ func init() {
 	SbCmd.AddCommand(sbDiffCmd)
 
 	sbDiffCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	sbDiffCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
 	sbDiffCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	sbDiffCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	sbDiffCmd.Flags().String("profile", "", "Regex filter for sandbox profile path/name")
@@ -58,6 +59,7 @@ func init() {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
 	viper.BindPFlag("sb.diff.pem-db", sbDiffCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("sb.diff.device", sbDiffCmd.Flags().Lookup("device"))
 	viper.BindPFlag("sb.diff.proxy", sbDiffCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("sb.diff.insecure", sbDiffCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("sb.diff.profile", sbDiffCmd.Flags().Lookup("profile"))
@@ -93,6 +95,11 @@ var sbDiffCmd = &cobra.Command{
 			i, err := info.Parse(ipswPath)
 			if err != nil {
 				return fmt.Errorf("failed to parse IPSW %s: %v", ipswPath, err)
+			}
+
+			i, err = i.SelectDevice(viper.GetString("sb.diff.device"))
+			if err != nil {
+				return err
 			}
 
 			var dmgs []string

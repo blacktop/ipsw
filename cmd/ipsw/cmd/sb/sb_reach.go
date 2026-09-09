@@ -21,6 +21,7 @@ import (
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernel/iokit"
 	"github.com/blacktop/ipsw/pkg/launchd"
 	sbgraph "github.com/blacktop/ipsw/pkg/sandbox/graph"
@@ -41,6 +42,7 @@ func init() {
 	flags.String("launchd-jsonl", "", "Path to ipsw launchd JSONL output")
 	flags.String("ipsw", "", "IPSW to scan for launchd metadata when --join-launchd is set")
 	flags.String("pem-db", "", "AEA PEM DB JSON file path when --ipsw is used")
+	flags.String("device", "", "Device product type or board when --ipsw is used")
 	flags.Bool("join-ent", false, "Join daemon Mach-O entitlements from --fs-root")
 	flags.String("fs-root", "", "Mounted or extracted OS filesystem root for daemon entitlement lookup")
 	flags.Bool("join-sb", false, "Include daemon sandbox profile from launchd metadata")
@@ -78,6 +80,10 @@ var sbReachCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ipswInfo, err := loadReachIPSWInfo(cmd)
+		if err != nil {
+			return err
+		}
 		graph, err := loadGraphForReachCommand(cmd, args[1:])
 		if err != nil {
 			return err
@@ -114,7 +120,7 @@ var sbReachCmd = &cobra.Command{
 
 		var launchdRows []launchd.Record
 		if joinLaunchd {
-			launchdRows, err = loadLaunchdJoinRecords(cmd)
+			launchdRows, err = loadLaunchdJoinRecords(cmd, ipswInfo)
 			if err != nil {
 				return err
 			}
@@ -122,7 +128,7 @@ var sbReachCmd = &cobra.Command{
 
 		var entitlements *entitlementJoiner
 		if joinEnt {
-			entitlements, err = loadEntitlementJoiner(cmd, matches, launchdRows)
+			entitlements, err = loadEntitlementJoiner(cmd, ipswInfo, matches, launchdRows)
 			if err != nil {
 				return err
 			}
@@ -657,7 +663,30 @@ func walkGuard(guard *sbgraph.GuardExpr, visit func(*sbgraph.GuardExpr)) {
 	}
 }
 
-func loadLaunchdJoinRecords(cmd *cobra.Command) ([]launchd.Record, error) {
+// loadReachIPSWInfo parses the --ipsw source once when --join-launchd or
+// --join-ent will read from it, validating --device before the graph loads.
+// Both joins reuse the metadata, so BuildManifest and DeviceTrees are decoded
+// a single time. It returns nil when no join reads the IPSW.
+func loadReachIPSWInfo(cmd *cobra.Command) (*info.Info, error) {
+	joinLaunchd, _ := cmd.Flags().GetBool("join-launchd")
+	joinEnt, _ := cmd.Flags().GetBool("join-ent")
+	usesIPSW := (joinLaunchd && mustFlagString(cmd, "launchd-jsonl") == "") || (joinEnt && mustFlagString(cmd, "fs-root") == "")
+	ipswPath := mustFlagString(cmd, "ipsw")
+	device := mustFlagString(cmd, "device")
+	if ipswPath == "" || !usesIPSW {
+		if device != "" {
+			return nil, fmt.Errorf("--device requires an active --ipsw source for --join-launchd or --join-ent")
+		}
+		return nil, nil
+	}
+	ipswInfo, err := info.Parse(expandUserPath(ipswPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IPSW: %w", err)
+	}
+	return ipswInfo.SelectDevice(device)
+}
+
+func loadLaunchdJoinRecords(cmd *cobra.Command, ipswInfo *info.Info) ([]launchd.Record, error) {
 	jsonlPath, _ := cmd.Flags().GetString("launchd-jsonl")
 	ipswPath, _ := cmd.Flags().GetString("ipsw")
 	switch {
@@ -665,7 +694,9 @@ func loadLaunchdJoinRecords(cmd *cobra.Command) ([]launchd.Record, error) {
 		return readLaunchdJSONL(expandUserPath(jsonlPath))
 	case strings.TrimSpace(ipswPath) != "":
 		records, skipped, err := launchd.WalkIPSW(expandUserPath(ipswPath), &launchd.IPSWConfig{
-			PemDB: mustFlagString(cmd, "pem-db"),
+			PemDB:  mustFlagString(cmd, "pem-db"),
+			Device: mustFlagString(cmd, "device"),
+			Info:   ipswInfo,
 		})
 		for _, skip := range skipped {
 			log.Warnf("skipped %s volume: %v", skip.Volume, skip.Err)
@@ -1038,7 +1069,7 @@ func newEntitlementJoiner(root string) *entitlementJoiner {
 	}
 }
 
-func loadEntitlementJoiner(cmd *cobra.Command, matches []reachMatch, launchdRows []launchd.Record) (*entitlementJoiner, error) {
+func loadEntitlementJoiner(cmd *cobra.Command, ipswInfo *info.Info, matches []reachMatch, launchdRows []launchd.Record) (*entitlementJoiner, error) {
 	fsRoot, _ := cmd.Flags().GetString("fs-root")
 	if strings.TrimSpace(fsRoot) != "" {
 		return newEntitlementJoiner(fsRoot), nil
@@ -1050,7 +1081,7 @@ func loadEntitlementJoiner(cmd *cobra.Command, matches []reachMatch, launchdRows
 	}
 
 	wanted := daemonPathsForReach(matches, launchdRows)
-	cache, err := entitlementResultsFromIPSW(expandUserPath(ipswPath), mustFlagString(cmd, "pem-db"), wanted)
+	cache, err := entitlementResultsFromIPSW(ipswInfo, expandUserPath(ipswPath), mustFlagString(cmd, "pem-db"), wanted)
 	if err != nil {
 		return nil, err
 	}
@@ -1089,7 +1120,10 @@ func (e *entitlementJoiner) read(daemonPath string) entitlementResult {
 	return entitlementResultFromMap(doc)
 }
 
-func entitlementResultsFromIPSW(ipswPath, pemDB string, wanted []string) (map[string]entitlementResult, error) {
+// entitlementResultsFromIPSW reads the wanted daemons' entitlements from the
+// IPSW volumes. ipswInfo is the metadata loadReachIPSWInfo parsed and
+// device-selected.
+func entitlementResultsFromIPSW(ipswInfo *info.Info, ipswPath, pemDB string, wanted []string) (map[string]entitlementResult, error) {
 	wantedSet := make(map[string]struct{}, len(wanted))
 	for _, path := range wanted {
 		if strings.TrimSpace(path) != "" {
@@ -1101,7 +1135,7 @@ func entitlementResultsFromIPSW(ipswPath, pemDB string, wanted []string) (map[st
 		return results, nil
 	}
 
-	err := search.ForEachMachoInIPSW(ipswPath, pemDB, func(path string, m *macho.File) error {
+	err := search.ForEachMachoInIPSWWithInfo(ipswInfo, ipswPath, pemDB, func(path string, m *macho.File) error {
 		normalized := filepath.ToSlash(filepath.Clean(path))
 		if _, ok := wantedSet[normalized]; !ok {
 			return nil

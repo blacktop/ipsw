@@ -35,6 +35,8 @@ const (
 
 // scanConfig selects which sources of an IPSW a scan walks.
 type scanConfig struct {
+	Device     string
+	Info       *info.Info // pre-parsed IPSW metadata; nil parses IPSW
 	IPSW       string
 	PemDB      string
 	SigsDir    string
@@ -223,7 +225,7 @@ func kextTextSegment(m *macho.File) *macho.Segment {
 // scanKernels extracts every kernelcache from the IPSW and visits the cache
 // container plus each of its KEXTs. Kernel and KEXT symbol addresses are
 // bit-63-cleared (highestBitMask) exactly as the daemon database stores them.
-func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
+func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
 	var sigs []signature.Symbolicator
 
 	if sigDir != "" {
@@ -235,8 +237,9 @@ func scanKernels(ipswPath, sigDir string, visit scanVisitor) error {
 	}
 
 	out, err := extract.Kernelcache(&extract.Config{
-		IPSW:   ipswPath,
-		Output: os.TempDir(),
+		IPSW:         ipswPath,
+		KernelDevice: device,
+		Output:       os.TempDir(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to extract kernelcache: %w", err)
@@ -543,8 +546,24 @@ func rescanTarget(existing *model.Ipsw) *model.Ipsw {
 // each. Each distinct volume is therefore extracted/decrypted/mounted a single
 // time per scan.
 func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
+	var inf *info.Info
+	if cfg.DSC || cfg.FileSystem {
+		var err error
+		inf = cfg.Info
+		if inf == nil {
+			inf, err = info.Parse(cfg.IPSW)
+			if err != nil {
+				return fmt.Errorf("failed to parse IPSW info: %w", err)
+			}
+		}
+		inf, err = inf.SelectDevice(cfg.Device)
+		if err != nil {
+			return err
+		}
+	}
+
 	if cfg.Kernel {
-		if err := scanKernels(cfg.IPSW, cfg.SigsDir, visit); err != nil {
+		if err := scanKernels(cfg.IPSW, cfg.SigsDir, cfg.Device, visit); err != nil {
 			return fmt.Errorf("failed to scan kernels: %w", err)
 		}
 	}
@@ -552,16 +571,7 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 		return nil
 	}
 
-	var inf *info.Info
-	if cfg.FileSystem {
-		var err error
-		inf, err = info.Parse(cfg.IPSW)
-		if err != nil {
-			return fmt.Errorf("failed to parse IPSW info: %w", err)
-		}
-	}
-
-	session := mount.NewSession(cfg.IPSW, &mount.Config{PemDB: cfg.PemDB})
+	session := mount.NewSession(cfg.IPSW, &mount.Config{PemDB: cfg.PemDB, Device: cfg.Device, Info: inf})
 	defer func() {
 		if err := session.Close(); err != nil {
 			log.WithError(err).Debug("failed to unmount IPSW DMGs")
@@ -613,8 +623,15 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 	return nil
 }
 
-// Scan scans the IPSW file and extracts information about the kernels, DSCs, and file system.
-func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
+// ErrDeviceScopedDatabaseScan reports that the database cannot isolate device graphs.
+var ErrDeviceScopedDatabaseScan = errors.New("device-scoped database ingestion is not supported; use device-scoped JSONL export instead")
+
+// ScanForDevice preserves the scan entry point but rejects nonempty selectors
+// until the database can store device-scoped graphs separately.
+func ScanForDevice(ipswPath, pemDB, sigsDir, device string, db db.Database) (err error) {
+	if device != "" {
+		return ErrDeviceScopedDatabaseScan
+	}
 	/* IPSW */
 	sha1, err := utils.Sha1(ipswPath)
 	if err != nil {
@@ -623,6 +640,12 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	inf, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW info: %w", err)
+	}
+	// Reject invalid or ambiguous selectors before creating a database record,
+	// so a corrected request can retry the same IPSW without a duplicate error.
+	inf, err = inf.SelectDevice(device)
+	if err != nil {
+		return err
 	}
 	ipsw := &model.Ipsw{
 		ID:      sha1,
@@ -645,8 +668,10 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	acc := newDBAccumulator(ipsw)
 	if err := scanIPSW(&scanConfig{
 		IPSW:       ipswPath,
+		Info:       inf,
 		PemDB:      pemDB,
 		SigsDir:    sigsDir,
+		Device:     device,
 		Kernel:     true,
 		DSC:        true,
 		FileSystem: true,
@@ -658,8 +683,12 @@ func Scan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 	return db.Save(ipsw)
 }
 
-// Rescan re-scans the IPSW file and extracts information about the kernels, DSCs, and file system.
-func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
+// RescanForDevice rejects nonempty selectors to avoid replacing a firmware-wide
+// graph with a single device's symbols.
+func RescanForDevice(ipswPath, pemDB, sigsDir, device string, db db.Database) (err error) {
+	if device != "" {
+		return ErrDeviceScopedDatabaseScan
+	}
 	/* IPSW */
 	sha1, err := utils.Sha1(ipswPath)
 	if err != nil {
@@ -678,6 +707,7 @@ func Rescan(ipswPath, pemDB, sigsDir string, db db.Database) (err error) {
 		IPSW:       ipswPath,
 		PemDB:      pemDB,
 		SigsDir:    sigsDir,
+		Device:     device,
 		Kernel:     true,
 		DSC:        true,
 		FileSystem: true,

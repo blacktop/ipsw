@@ -17,6 +17,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 )
 
 const (
@@ -86,7 +87,10 @@ type Record struct {
 }
 
 type IPSWConfig struct {
-	PemDB string
+	Device string
+	PemDB  string
+	// Info is pre-parsed IPSW metadata; when set the IPSW is not parsed again.
+	Info *info.Info
 }
 
 type SkippedVolume struct {
@@ -107,13 +111,26 @@ func WalkIPSW(path string, cfg *IPSWConfig) ([]Record, []SkippedVolume, error) {
 		cfg = &IPSWConfig{}
 	}
 
+	inf := cfg.Info
+	if inf == nil {
+		var err error
+		inf, err = info.Parse(path)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	inf, err := inf.SelectDevice(cfg.Device)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var records []Record
 	var skipped []SkippedVolume
 	mounted := 0
 	seenDMGs := make(map[string]struct{})
 
 	for _, vol := range ipswFilesystemVolumes {
-		ctx, err := mount.DmgInIPSW(path, vol.typ, &mount.Config{PemDB: cfg.PemDB})
+		ctx, err := mount.DmgInIPSW(path, vol.typ, &mount.Config{PemDB: cfg.PemDB, Device: cfg.Device, Info: inf})
 		if err != nil {
 			skipped = append(skipped, SkippedVolume{Volume: vol.name, Type: vol.typ, Err: err})
 			continue

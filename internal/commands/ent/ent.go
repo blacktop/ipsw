@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -38,6 +39,8 @@ type mountedEntitlementFile struct {
 
 // Config is the configuration for the entitlements command
 type Config struct {
+	Device            string
+	AllDevices        bool // Firmware-wide database ingestion scans every SystemOS variant.
 	IPSW              string
 	Folder            string
 	Database          string
@@ -55,10 +58,12 @@ type Config struct {
 
 // GetDatabase returns the entitlement database for the given IPSW
 func GetDatabase(conf *Config) (map[string]string, error) {
+	database := deviceScopedDatabase(conf.Database, conf.Device)
+
 	entDB := make(map[string]string)
 
 	// create or load entitlement database
-	if _, err := os.Stat(conf.Database); os.IsNotExist(err) {
+	if _, err := os.Stat(database); os.IsNotExist(err) {
 		if len(conf.IPSW) > 0 {
 			utils.Indent(log.Info, 2)("Generating entitlement database file...")
 
@@ -67,6 +72,14 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 				return nil, fmt.Errorf("failed to parse IPSW: %v", err)
 			}
 
+			if conf.AllDevices {
+				i, err = i.ForDevice(conf.Device)
+			} else {
+				i, err = i.SelectDevice(conf.Device)
+			}
+			if err != nil {
+				return nil, err
+			}
 			if appOS, err := i.GetAppOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning AppOS")
 				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS", conf); err != nil {
@@ -75,13 +88,22 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 					maps.Copy(entDB, ents)
 				}
 			}
-			if systemOS, err := i.GetSystemOsDmg(); err == nil {
+			if systems, err := i.GetSystemOsDmgs(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning SystemOS")
-				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS", conf); err != nil {
-					return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
-				} else {
-					maps.Copy(entDB, ents)
+				for _, system := range systems {
+					ents, err := scanEnts(conf.IPSW, system.Path, "SystemOS", conf)
+					if err != nil {
+						return nil, fmt.Errorf("failed to scan files in SystemOS %s: %w", system.Path, err)
+					}
+					for path, value := range ents {
+						if len(systems) > 1 {
+							path = filepath.Join("SystemOS", system.Path, path)
+						}
+						entDB[path] = value
+					}
 				}
+			} else if !errors.Is(err, info.ErrorCryptexNotFound) {
+				return nil, err
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 				utils.Indent(log.Info, 3)("Scanning FileSystem")
@@ -185,7 +207,7 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 		}
 
-		if len(conf.Database) > 0 {
+		if len(database) > 0 {
 			buff := new(bytes.Buffer)
 
 			e := gob.NewEncoder(buff)
@@ -196,9 +218,9 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 				return nil, fmt.Errorf("failed to encode entitlement db to binary: %v", err)
 			}
 
-			of, err := os.Create(conf.Database)
+			of, err := os.Create(database)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create file %s: %v", conf.Database, err)
+				return nil, fmt.Errorf("failed to create file %s: %v", database, err)
 			}
 			defer of.Close()
 
@@ -210,11 +232,11 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 		}
 	} else {
-		log.WithField("database", filepath.Base(conf.Database)).Info("Loading Entitlement DB")
+		log.WithField("database", filepath.Base(database)).Info("Loading Entitlement DB")
 
-		edbFile, err := os.Open(conf.Database)
+		edbFile, err := os.Open(database)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open entitlement database file %s; %v", conf.Database, err)
+			return nil, fmt.Errorf("failed to open entitlement database file %s; %v", database, err)
 		}
 		defer edbFile.Close()
 
@@ -231,6 +253,17 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 	}
 
 	return entDB, nil
+}
+
+// deviceScopedDatabase keeps a device selection's blob cache apart from the
+// unscoped one (ents.gob -> ents.Mac18,5.gob): the scan covers only that
+// device's images, and existing caches do not record which device they hold.
+func deviceScopedDatabase(database, device string) string {
+	if database == "" || device == "" {
+		return database
+	}
+	ext := filepath.Ext(database)
+	return strings.TrimSuffix(database, ext) + "." + device + ext
 }
 
 // DiffDatabases compares two entitlement databases and returns a diff

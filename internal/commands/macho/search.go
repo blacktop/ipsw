@@ -227,8 +227,17 @@ func (m mteScanModel) View() tea.View {
 	return tea.NewView(s.String())
 }
 
-// RunMTEScanIPSW mounts each DMG once, counts Mach-Os, then scans cached paths.
-func RunMTEScanIPSW(ipswPath, pemDB string) error {
+// RunMTEScanIPSWForDevice restricts the MTE scan to a product type or board.
+func RunMTEScanIPSWForDevice(ipswPath, pemDB, device string) error {
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse IPSW: %w", err)
+	}
+	i, err = i.SelectDevice(device)
+	if err != nil {
+		return err
+	}
+
 	oldLevel := log.Log.(*log.Logger).Level
 	log.SetLevel(log.WarnLevel)
 	defer log.SetLevel(oldLevel)
@@ -237,20 +246,14 @@ func RunMTEScanIPSW(ipswPath, pemDB string) error {
 	p := tea.NewProgram(model)
 
 	go func() {
-		i, err := info.Parse(ipswPath)
-		if err != nil {
-			log.Errorf("failed to parse IPSW: %v", err)
-			p.Send(scanCompleteMsg{})
-			return
-		}
 
 		type dmgInfo struct{ name, path string }
 		var dmgs []dmgInfo
 		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 			dmgs = append(dmgs, dmgInfo{"FileSystem", fsOS})
 		}
-		if systemOS, err := i.GetSystemOsDmg(); err == nil {
-			dmgs = append(dmgs, dmgInfo{"SystemOS", systemOS})
+		if system, err := i.GetSystemOsDmg(); err == nil {
+			dmgs = append(dmgs, dmgInfo{"SystemOS", system})
 		}
 		if appOS, err := i.GetAppOsDmg(); err == nil {
 			dmgs = append(dmgs, dmgInfo{"AppOS", appOS})

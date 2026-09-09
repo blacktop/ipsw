@@ -74,6 +74,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("ivar", "r", "", "Search for specific ObjC instance variable regex")
 	machoSearchCmd.Flags().Bool("mte", false, "Search for binaries with MTE (Memory Tagging Extension) instructions")
 	machoSearchCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	machoSearchCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -91,6 +92,7 @@ func init() {
 	viper.BindPFlag("macho.search.ivar", machoSearchCmd.Flags().Lookup("ivar"))
 	viper.BindPFlag("macho.search.mte", machoSearchCmd.Flags().Lookup("mte"))
 	viper.BindPFlag("macho.search.pem-db", machoSearchCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("macho.search.device", machoSearchCmd.Flags().Lookup("device"))
 }
 
 // machoSearchCmd represents the search command
@@ -134,15 +136,21 @@ var machoSearchCmd = &cobra.Command{
 		input := filepath.Clean(args[0])
 		pemDB := viper.GetString("macho.search.pem-db")
 
+		if viper.GetString("macho.search.device") != "" {
+			if st, err := os.Stat(input); err == nil && st.IsDir() {
+				return fmt.Errorf("--device requires an IPSW input")
+			}
+		}
+
 		if searchMTE {
-			return mcmd.RunMTEScanIPSW(input, pemDB)
+			return mcmd.RunMTEScanIPSWForDevice(input, pemDB, viper.GetString("macho.search.device"))
 		}
 
 		scanMachos := func(handler func(string, *macho.File) error) error {
 			if info, err := os.Stat(input); err == nil && info.IsDir() {
 				return search.ForEachMachoInMount(input, handler)
 			}
-			return search.ForEachMachoInIPSW(input, pemDB, handler)
+			return search.ForEachMachoInIPSWForDevice(input, pemDB, viper.GetString("macho.search.device"), handler)
 		}
 
 		if err := scanMachos(func(path string, m *macho.File) error {
@@ -525,7 +533,7 @@ var machoSearchCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			return fmt.Errorf("failed to scan Mach-Os: %v", err)
+			return fmt.Errorf("failed to scan Mach-Os: %w", err)
 		}
 
 		return nil

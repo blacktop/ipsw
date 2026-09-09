@@ -15,6 +15,9 @@ import (
 
 // JSONLConfig configures a streaming JSONL symbol scan.
 type JSONLConfig struct {
+	Device string
+	// Info is pre-parsed IPSW metadata; when set the IPSW is not parsed again.
+	Info       *info.Info
 	IPSW       string
 	PemDB      string
 	SigsDir    string
@@ -25,6 +28,7 @@ type JSONLConfig struct {
 
 // ipswLine is the single leading record describing the scanned IPSW.
 type ipswLine struct {
+	Device   string   `json:"device,omitempty"`
 	Type     string   `json:"type"`
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
@@ -189,27 +193,48 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to calculate sha1: %w", err)
 	}
-	inf, err := info.Parse(cfg.IPSW)
-	if err != nil {
-		return fmt.Errorf("failed to parse IPSW info: %w", err)
+	inf := cfg.Info
+	if inf == nil {
+		inf, err = info.Parse(cfg.IPSW)
+		if err != nil {
+			return fmt.Errorf("failed to parse IPSW info: %w", err)
+		}
 	}
 	if inf.Plists == nil || inf.Plists.BuildManifest == nil {
 		return fmt.Errorf("missing BuildManifest in %s (not a valid IPSW?)", cfg.IPSW)
 	}
+	if cfg.DSC || cfg.FileSystem {
+		inf, err = inf.SelectDevice(cfg.Device)
+	} else {
+		inf, err = inf.ForDevice(cfg.Device)
+	}
+	if err != nil {
+		return err
+	}
+	// A device selection scans only that device's images; list it alone so a
+	// consumer matching product types against "devices" sees what the stream
+	// covers instead of every product the universal IPSW supports.
+	devices := inf.Plists.BuildManifest.SupportedProductTypes
+	if cfg.Device != "" {
+		devices = []string{inf.ProductType(cfg.Device)}
+	}
 	if err := em.emit(&ipswLine{
+		Device:   cfg.Device,
 		Type:     "ipsw",
 		ID:       sha1,
 		Name:     filepath.Base(cfg.IPSW),
 		Version:  inf.Plists.BuildManifest.ProductVersion,
 		Build:    inf.Plists.BuildManifest.ProductBuildVersion,
 		Platform: string(platformFromInfo(inf)),
-		Devices:  inf.Plists.BuildManifest.SupportedProductTypes,
+		Devices:  devices,
 	}); err != nil {
 		return err
 	}
 
 	if err := scanIPSW(&scanConfig{
+		Info:       inf,
 		IPSW:       cfg.IPSW,
+		Device:     cfg.Device,
 		PemDB:      cfg.PemDB,
 		SigsDir:    cfg.SigsDir,
 		Kernel:     cfg.Kernel,

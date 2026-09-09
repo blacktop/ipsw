@@ -44,8 +44,9 @@ func CreateSQLiteDatabase(dbPath string, ipsws, inputs []string) error {
 
 		// Extract entitlements from IPSW
 		entDB, err := GetDatabase(&Config{
-			IPSW:     ipswPath,
-			Database: "", // Don't create blob file
+			IPSW:       ipswPath,
+			AllDevices: true,
+			Database:   "", // Don't create blob file
 		})
 		if err != nil {
 			return fmt.Errorf("failed to extract entitlements from %s: %v", ipswPath, err)
@@ -103,8 +104,9 @@ func CreatePostgreSQLDatabase(host, port, user, password, database, sslMode, poo
 
 		// Extract entitlements from IPSW
 		entDB, err := GetDatabase(&Config{
-			IPSW:     ipswPath,
-			Database: "", // Don't create blob file
+			IPSW:       ipswPath,
+			AllDevices: true,
+			Database:   "", // Don't create blob file
 		})
 		if err != nil {
 			return fmt.Errorf("failed to extract entitlements from %s: %v", ipswPath, err)
@@ -446,8 +448,9 @@ func processIPSWsWithReplacement(strategy ReplacementStrategy, ipsws, inputs []s
 		if !config.DryRun {
 			// Extract entitlements from IPSW
 			entDB, err := GetDatabase(&Config{
-				IPSW:     ipswPath,
-				Database: "", // Don't create blob file
+				IPSW:       ipswPath,
+				AllDevices: true,
+				Database:   "", // Don't create blob file
 			})
 			if err != nil {
 				return fmt.Errorf("failed to extract entitlements from %s: %v", ipswPath, err)

@@ -68,6 +68,11 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: device
+	//         in: query
+	//         description: reserved device selector; nonempty values are rejected because database graphs are firmware-wide
+	//         required: false
+	//         type: string
 	//       + name: sig_dir
 	//         in: query
 	//         description: path to symbolication signatures directory
@@ -75,6 +80,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         type: string
 	//     Responses:
 	//       200: successResponse
+	//       400: genericError
 	//       409: genericError
 	//       500: genericError
 	rg.POST("/syms/scan", func(c *gin.Context) {
@@ -101,7 +107,11 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 				signaturesDir = filepath.Clean(sigsDir)
 			}
 		}
-		if err := syms.Scan(ipswPath, pemDbPath, signaturesDir, db); err != nil {
+		if err := syms.ScanForDevice(ipswPath, pemDbPath, signaturesDir, c.Query("device"), db); err != nil {
+			if errors.Is(err, syms.ErrDeviceScopedDatabaseScan) {
+				c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+				return
+			}
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				c.AbortWithStatusJSON(http.StatusConflict, types.GenericError{Error: err.Error()})
 				return
@@ -131,6 +141,11 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: device
+	//         in: query
+	//         description: reserved device selector; nonempty values are rejected because database graphs are firmware-wide
+	//         required: false
+	//         type: string
 	//       + name: sig_dir
 	//         in: query
 	//         description: path to symbolication signatures directory
@@ -138,6 +153,7 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 	//         type: string
 	//     Responses:
 	//       201: createdResponse
+	//       400: genericError
 	//       500: genericError
 	rg.PUT("/syms/rescan", func(c *gin.Context) {
 		ipswPath, ok := c.GetQuery("path")
@@ -163,7 +179,11 @@ func AddRoutes(rg *gin.RouterGroup, db db.Database, pemDB, sigsDir string) {
 				signaturesDir = filepath.Clean(sigsDir)
 			}
 		}
-		if err := syms.Rescan(ipswPath, pemDbPath, signaturesDir, db); err != nil {
+		if err := syms.RescanForDevice(ipswPath, pemDbPath, signaturesDir, c.Query("device"), db); err != nil {
+			if errors.Is(err, syms.ErrDeviceScopedDatabaseScan) {
+				c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}

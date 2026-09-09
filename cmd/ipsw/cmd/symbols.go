@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/syms"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,6 +42,7 @@ func init() {
 	symbolsCmd.Flags().Bool("filesystem", false, "Include file system Mach-O symbols")
 	symbolsCmd.Flags().String("signatures", "", "Path to kernel symbolication signatures directory")
 	symbolsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	symbolsCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
 	symbolsCmd.Flags().StringP("output", "o", "", "Output file path (\"-\" or unset for stdout)")
 
 	viper.BindPFlag("symbols.json", symbolsCmd.Flags().Lookup("json"))
@@ -49,6 +51,7 @@ func init() {
 	viper.BindPFlag("symbols.filesystem", symbolsCmd.Flags().Lookup("filesystem"))
 	viper.BindPFlag("symbols.signatures", symbolsCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbols.pem-db", symbolsCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("symbols.device", symbolsCmd.Flags().Lookup("device"))
 	viper.BindPFlag("symbols.output", symbolsCmd.Flags().Lookup("output"))
 
 	symbolsCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
@@ -97,6 +100,21 @@ bit-63-cleared text and symbol ranges.`,
 			return fmt.Errorf("file %s does not exist: %w", ipswPath, err)
 		}
 
+		// Validate the selection before creating or truncating the output file.
+		inf, err := info.Parse(ipswPath)
+		if err != nil {
+			return err
+		}
+		device := viper.GetString("symbols.device")
+		if dyld || filesystem {
+			_, err = inf.SelectDevice(device)
+		} else {
+			_, err = inf.ForDevice(device)
+		}
+		if err != nil {
+			return err
+		}
+
 		out := os.Stdout
 		if output := viper.GetString("symbols.output"); output != "" && output != "-" {
 			f, err := os.Create(output)
@@ -108,6 +126,8 @@ bit-63-cleared text and symbol ranges.`,
 		}
 
 		return syms.ScanJSONL(&syms.JSONLConfig{
+			Device:     device,
+			Info:       inf,
 			IPSW:       ipswPath,
 			PemDB:      viper.GetString("symbols.pem-db"),
 			SigsDir:    viper.GetString("symbols.signatures"),

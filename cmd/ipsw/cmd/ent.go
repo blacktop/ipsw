@@ -42,6 +42,7 @@ func init() {
 	entCmd.MarkFlagDirname("input")
 	entCmd.Flags().Bool("fs", false, "Search IPSW filesystem Mach-Os directly instead of a database")
 	entCmd.Flags().String("pem-db", "", "AEA PEM DB JSON file path")
+	entCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
 
 	// Database flags
 	entCmd.Flags().String("sqlite", "", "Path to SQLite database")
@@ -79,6 +80,7 @@ func init() {
 	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
 	viper.BindPFlag("ent.fs", entCmd.Flags().Lookup("fs"))
 	viper.BindPFlag("ent.pem-db", entCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("ent.device", entCmd.Flags().Lookup("device"))
 	viper.BindPFlag("ent.sqlite", entCmd.Flags().Lookup("sqlite"))
 	viper.BindPFlag("ent.pg-host", entCmd.Flags().Lookup("pg-host"))
 	viper.BindPFlag("ent.pg-port", entCmd.Flags().Lookup("pg-port"))
@@ -194,6 +196,13 @@ var entCmd = &cobra.Command{
 			ipsws = []string{args[0]}
 		}
 
+		if viper.GetString("ent.device") != "" && !fsMode {
+			return fmt.Errorf("--device currently requires --fs; database ingestion stores one result per firmware")
+		}
+
+		if viper.GetString("ent.device") != "" && len(ipsws) == 0 {
+			return fmt.Errorf("--device requires an IPSW argument or --ipsw")
+		}
 		if fsMode {
 			if showStats || replace || dryRun {
 				return fmt.Errorf("--fs cannot be combined with --stats, --replace, or --dry-run")
@@ -208,6 +217,7 @@ var entCmd = &cobra.Command{
 				color.NoColor = true
 			}
 			return ent.SearchFilesystemEntitlements(ipsws, inputs, ent.FilesystemQuery{
+				Device:       viper.GetString("ent.device"),
 				PemDB:        pemDB,
 				KeyPattern:   keyPattern,
 				ValuePattern: valuePattern,

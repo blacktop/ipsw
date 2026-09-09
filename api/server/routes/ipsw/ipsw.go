@@ -177,7 +177,7 @@ func getFsEntitlements(pemDB string) gin.HandlerFunc {
 			}
 		}
 
-		ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath})
+		ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, PemDB: pemDbPath, Device: c.Query("device")})
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return

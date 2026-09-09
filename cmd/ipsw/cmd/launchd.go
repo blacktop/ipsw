@@ -38,6 +38,8 @@ func init() {
 
 	launchdCmd.Flags().String("format", "jsonl", "Output format (only jsonl is supported)")
 	launchdCmd.Flags().String("pem-db", "", "AEA PEM DB JSON file path")
+	launchdCmd.Flags().String("device", "", "Device product type or board for IPSW selection")
+	viper.BindPFlag("launchd.device", launchdCmd.Flags().Lookup("device"))
 
 	viper.BindPFlag("launchd.format", launchdCmd.Flags().Lookup("format"))
 	viper.BindPFlag("launchd.pem-db", launchdCmd.Flags().Lookup("pem-db"))
@@ -62,7 +64,8 @@ var launchdCmd = &cobra.Command{
 		}
 
 		records, skipped, err := launchd.WalkIPSW(expandPath(args[0]), &launchd.IPSWConfig{
-			PemDB: viper.GetString("launchd.pem-db"),
+			PemDB:  viper.GetString("launchd.pem-db"),
+			Device: viper.GetString("launchd.device"),
 		})
 		for _, skip := range skipped {
 			log.Warnf("skipped %s volume: %v", skip.Volume, skip.Err)

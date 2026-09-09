@@ -52,6 +52,11 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: device
+	//         in: query
+	//         description: device product type or board selecting the filesystem images
+	//         required: false
+	//         type: string
 	//
 	//     Responses:
 	//       200: getFsEntitlementsResponse

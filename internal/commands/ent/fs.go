@@ -20,6 +20,7 @@ import (
 
 // FilesystemQuery configures direct filesystem entitlement searches.
 type FilesystemQuery struct {
+	Device       string
 	PemDB        string
 	KeyPattern   string
 	ValuePattern string
@@ -65,7 +66,7 @@ func SearchFilesystemEntitlements(ipsws, inputs []string, query FilesystemQuery)
 	}
 
 	for idx, ipswPath := range ipsws {
-		if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), query.PemDB, func(path string, m *macho.File) error {
+		if err := search.ForEachMachoInIPSWForDevice(filepath.Clean(ipswPath), query.PemDB, query.Device, func(path string, m *macho.File) error {
 			return addRecord(path, m, idx)
 		}); err != nil {
 			return err

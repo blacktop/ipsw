@@ -66,3 +66,36 @@ func pathUnder(root string, parts ...string) string {
 func rootedPath(parts ...string) string {
 	return string(filepath.Separator) + filepath.Join(parts...)
 }
+
+func TestDeviceScopedDatabase(t *testing.T) {
+	for _, tc := range []struct{ database, device, want string }{
+		{"", "Mac18,5", ""},
+		{"ents.gob", "", "ents.gob"},
+		{"ents.gob", "Mac18,5", "ents.Mac18,5.gob"},
+		{"/cache/ents", "j873gap", "/cache/ents.j873gap"},
+	} {
+		if got := deviceScopedDatabase(tc.database, tc.device); got != tc.want {
+			t.Errorf("deviceScopedDatabase(%q, %q) = %q, want %q", tc.database, tc.device, got, tc.want)
+		}
+	}
+}
+
+func TestGetDatabaseWritesDeviceScopedBlob(t *testing.T) {
+	dir := t.TempDir()
+	conf := &Config{Folder: filepath.Join(dir, "root"), Database: filepath.Join(dir, "ents.gob"), Device: "Mac99,2"}
+	if err := os.MkdirAll(conf.Folder, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetDatabase(conf); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(conf.Database); !os.IsNotExist(err) {
+		t.Fatalf("unscoped cache written for a device selection: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ents.Mac99,2.gob")); err != nil {
+		t.Fatalf("device-scoped cache missing: %v", err)
+	}
+	if _, err := GetDatabase(conf); err != nil {
+		t.Fatalf("reload from device-scoped cache: %v", err)
+	}
+}
