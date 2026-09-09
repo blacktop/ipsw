@@ -27,3 +27,15 @@ func TestRsrSystemCryptexREDefaultCoversArm64_32(t *testing.T) {
 		t.Error("rsrSystemCryptexRE([arm64_32]) does not match its own arch")
 	}
 }
+
+func TestRsrCryptexTypeArm64eX1(t *testing.T) {
+	for _, arches := range [][]string{nil, {"arm64e_x1"}} {
+		typ, arch := rsrCryptexType("AssetData/payloadv2/image_patches/cryptex-system-arm64e_x1", rsrSystemCryptexRE(arches))
+		if typ != "system" || arch != "arm64e_x1" {
+			t.Errorf("arches %v: type = %q, arch = %q", arches, typ, arch)
+		}
+	}
+	if typ, _ := rsrCryptexType("cryptex-system-arm64e_x1", rsrSystemCryptexRE([]string{"arm64e"})); typ != "" {
+		t.Error("arm64e selector also selected arm64e_x1")
+	}
+}

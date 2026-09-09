@@ -37,6 +37,11 @@ var knownMagic = []string{
 	"dyld_v1   arm64",
 	"dyld_v1arm64_32",
 	"dyld_v1  arm64e",
+	// arm64e_x1 caches shorten the arch to fit the 15-byte magic; read from
+	// dyld_shared_cache_arm64e_x1 in the macOS 27.0 (26A428) Mac18,5 SystemOS
+	// (cache UUID 6604B460-0217-3363-BDA7-E3F51BFF874A, header cputype
+	// 0x0100000c / cpusubtype 0x8000000c).
+	"dyld_v1arm64ex1",
 }
 
 type localSymbolInfo struct {

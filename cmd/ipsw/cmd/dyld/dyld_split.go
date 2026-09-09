@@ -89,8 +89,13 @@ and stub island symbols, works cross-platform, and produces IDA/Ghidra-ready Mac
 				return fmt.Errorf("failed to open %s: %w", dscPath, err)
 			}
 
+			// arm64e_x1 caches carry the "arm64ex1" magic; keep them apart from the
+			// generic arm64e cache so both can be split for the same build.
 			var arm64e string
-			if strings.Contains(f.Headers[f.UUID].Magic.String(), "arm64e") {
+			switch magic := f.Headers[f.UUID].Magic.String(); {
+			case strings.Contains(magic, "arm64ex1"):
+				arm64e = " arm64e_x1"
+			case strings.Contains(magic, "arm64e"):
 				arm64e = " arm64e"
 			}
 			f.Close()

@@ -49,6 +49,10 @@ func TestValidateOTAExtractArgs(t *testing.T) {
 			flags: otaExtractFlags{args: []string{"OTA.zip"}, dyld: true, json: true, dyldArches: []string{"arm64_32"}},
 		},
 		{
+			name:  "dyld accepts arm64e_x1",
+			flags: otaExtractFlags{args: []string{"OTA.zip"}, dyld: true, dyldArches: []string{"arm64e_x1"}},
+		},
+		{
 			name:    "dyld architecture without dyld is rejected",
 			flags:   otaExtractFlags{args: []string{"OTA.zip"}, dyldArches: []string{"arm64e"}},
 			wantErr: "--dyld-arch or -a can only be used with --dyld or -d",

@@ -32,7 +32,7 @@ var ErrNoDscFound = errors.New("failed to find dyld_shared_cache(s)")
 var ErrNoDscForArch = errors.New("no dyld_shared_cache files found matching the specified archs")
 
 var DscArches = []string{
-	"arm64", "arm64e", "arm64_32", "x86_64", "x86_64h", "aot",
+	"arm64", "arm64e", "arm64e_x1", "arm64_32", "x86_64", "x86_64h", "aot",
 }
 
 // DscDMGKind identifies which IPSW DMG a dyld_shared_cache extraction step
@@ -456,9 +456,15 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath, pemDB string, arches []stri
 	return ExtractFromDMGs(i, []DscExtractionDMG{{Path: dmgPath, Arches: arches}}, destPath, pemDB, arches, driverkit, all)
 }
 
-// Extract extracts dyld_shared_cache from IPSW
+// Extract extracts dyld_shared_cache(s) from an IPSW without a device selector.
 func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool) ([]string, error) {
+	return ExtractForDevice(ipsw, destPath, pemDB, arches, driverkit, all, "")
+}
 
+// ExtractForDevice extracts dyld_shared_cache(s) from an IPSW. device selects the
+// SystemOS image by product type or board; empty means the IPSW must contain
+// exactly one.
+func ExtractForDevice(ipsw, destPath, pemDB string, arches []string, driverkit, all bool, device string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return nil, fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
 	}
@@ -466,6 +472,11 @@ func Extract(ipsw, destPath, pemDB string, arches []string, driverkit, all bool)
 	i, err := info.Parse(ipsw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+
+	i, err = i.ForDevice(device)
+	if err != nil {
+		return nil, err
 	}
 
 	steps, err := DscExtractionPlan(i, arches, driverkit)
@@ -513,13 +524,13 @@ func dmgPathForDscStep(i *info.Info, kind DscDMGKind) (string, error) {
 		return dmgPath, nil
 	case SystemOSDscDMG:
 		dmgPath, err := i.GetSystemOsDmg()
-		if err != nil {
+		if errors.Is(err, info.ErrorCryptexNotFound) {
 			dmgPath, err = i.GetFileSystemOsDmg()
 			if err != nil {
-				return "", fmt.Errorf("failed to get DMG containing the dyld_shared_caches: %v", err)
+				return "", fmt.Errorf("failed to get DMG containing the dyld_shared_caches: %w", err)
 			}
 		}
-		return dmgPath, nil
+		return dmgPath, err
 	default:
 		return "", fmt.Errorf("unsupported dyld_shared_cache DMG kind: %s", kind)
 	}
@@ -559,7 +570,7 @@ func RemoteCryptexPattern(arches []string) *regexp.Regexp {
 		// arm64_32 must be here: `arm64e?` cannot match it, and a watchOS OTA
 		// whose only system cryptex is cryptex-system-arm64_32 would otherwise
 		// be skipped unless the caller named the arch explicitly.
-		return regexp.MustCompile(`cryptex-system-(arm64(_32|e)?|x86_64h?)$`)
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?)$`)
 	}
 	parts := remoteCryptexArchPatterns(arches)
 	if len(parts) == 0 {
@@ -572,7 +583,7 @@ func remoteCryptexArchPatterns(arches []string) []string {
 	parts := make([]string, 0, len(arches))
 	for _, arch := range arches {
 		switch arch {
-		case "arm64", "arm64e", "arm64_32", "x86_64", "x86_64h":
+		case "arm64", "arm64e", "arm64e_x1", "arm64_32", "x86_64", "x86_64h":
 			parts = append(parts, regexp.QuoteMeta(arch))
 		case "aot":
 			parts = append(parts, "x86_64h?")
@@ -591,6 +602,7 @@ func RemoteCryptexFiles(files []*zip.File, arches []string) []*zip.File {
 		}
 		matches = append(matches, file)
 	}
+	slices.SortFunc(matches, func(a, b *zip.File) int { return strings.Compare(a.Name, b.Name) })
 	return matches
 }
 
@@ -680,7 +692,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []s
 				delete(missing, arch)
 			}
 		}
-		if len(missing) == 0 {
+		if len(arches) > 0 && len(missing) == 0 {
 			return artifacts, nil
 		}
 	}

@@ -67,7 +67,7 @@ func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
 	if len(dyldArches) == 0 {
 		// arm64_32 must be here: `arm64e?` cannot match it, so an unfiltered RSR
 		// patch would skip a watchOS system cryptex it was asked to handle.
-		return regexp.MustCompile(`cryptex-system-(arm64(_32|e)?|x86_64h?)$`)
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?)$`)
 	}
 
 	patterns := make([]string, 0, len(dyldArches))
@@ -142,6 +142,8 @@ func patchRSRCryptex(o *otapkg.AA, name, out, inDMG string, patchVerbose uint32)
 
 func init() {
 	otaPatchCmd.AddCommand(otaPatchRsrCmd)
+	otaPatchRsrCmd.Flags().String("device", "", "Device product type or board for manifest DMG selection")
+	viper.BindPFlag("ota.patch.device", otaPatchRsrCmd.Flags().Lookup("device"))
 
 	otaPatchRsrCmd.Flags().StringP("cryptex", "c", "", "Patch a local cryptex RIDIFF file directly (no OTA argument)")
 	otaPatchRsrCmd.Flags().StringP("input", "i", "", "Input folder containing base DMGs to patch against")
@@ -150,6 +152,7 @@ func init() {
 	otaPatchRsrCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return dyld.DscArches, cobra.ShellCompDirectiveDefault
 	})
+	otaPatchRsrCmd.MarkFlagsMutuallyExclusive("device", "cryptex")
 	otaPatchRsrCmd.MarkFlagDirname("input")
 	otaPatchRsrCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.patch.cryptex", otaPatchRsrCmd.Flags().Lookup("cryptex"))
@@ -231,6 +234,10 @@ var otaPatchRsrCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to get OTA info: %w", err)
 		}
+		i, err = i.SelectDevice(viper.GetString("ota.patch.device"))
+		if err != nil {
+			return err
+		}
 		infoFolder, err := i.GetFolder()
 		if err != nil {
 			return fmt.Errorf("failed to get OTA folder: %v", err)
@@ -274,7 +281,7 @@ var otaPatchRsrCmd = &cobra.Command{
 			case "system":
 				systemDMG, err := i.GetSystemOsDmg()
 				if err != nil {
-					return fmt.Errorf("failed to get system DMG: %v", err)
+					return fmt.Errorf("failed to get system DMG: %w", err)
 				}
 
 				// Use arch-specific subdirectory so that arm64e and x86_64h

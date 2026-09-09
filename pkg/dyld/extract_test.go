@@ -236,6 +236,7 @@ func testMacOSDscInfo() *info.Info {
 
 func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 	files := []*zip.File{
+		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e_x1"}},
 		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64"}},
 		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e"}},
 		{FileHeader: zip.FileHeader{Name: "cryptex-system-x86_64"}},
@@ -257,10 +258,11 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 			arches: nil,
 			want: []string{
 				"cryptex-system-arm64",
+				"cryptex-system-arm64_32",
 				"cryptex-system-arm64e",
+				"cryptex-system-arm64e_x1",
 				"cryptex-system-x86_64",
 				"cryptex-system-x86_64h",
-				"cryptex-system-arm64_32",
 			},
 		},
 		{
@@ -268,6 +270,8 @@ func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 			arches: []string{"arm64"},
 			want:   []string{"cryptex-system-arm64"},
 		},
+		{name: "arm64e stays exact", arches: []string{"arm64e"}, want: []string{"cryptex-system-arm64e"}},
+		{name: "x1 stays exact", arches: []string{"arm64e_x1"}, want: []string{"cryptex-system-arm64e_x1"}},
 		{
 			name:   "x86_64 stays exact",
 			arches: []string{"x86_64"},
