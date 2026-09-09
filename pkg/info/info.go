@@ -122,8 +122,14 @@ func (i *Info) String() string {
 			foundFS = true
 			iStr.WriteString(fmt.Sprintf("FileSystem     = %s\n", fsDMG))
 		}
-		if fsDMG, err := i.GetSystemOsDmg(); err == nil {
-			iStr.WriteString(fmt.Sprintf("SystemOS       = %s\n", fsDMG))
+		if dmgs, err := i.GetSystemOsDmgs(); err == nil {
+			for _, dmg := range dmgs {
+				label := dmg.Path
+				if len(dmgs) > 1 {
+					label = dmg.String()
+				}
+				iStr.WriteString(fmt.Sprintf("SystemOS       = %s\n", label))
+			}
 		}
 		if fsDMG, err := i.GetAppOsDmg(); err == nil {
 			iStr.WriteString(fmt.Sprintf("AppOS          = %s\n", fsDMG))
@@ -288,27 +294,6 @@ func (i *Info) GetAppOsDmg() (string, error) {
 // GetRosettaOsDmg returns the name of the RosettaOS dmg (macOS 27+ cryptex)
 func (i *Info) GetRosettaOsDmg() (string, error) {
 	return i.getCryptexDmg("Cryptex1,RosettaOS", "RosettaOS")
-}
-
-// GetSystemOsDmg returns the name of the SystemOS dmg (the one with the dyld_shared_cache(s))
-func (i *Info) GetSystemOsDmg() (string, error) {
-	var dmgs []string
-	if i.Plists != nil && i.Plists.BuildManifest != nil {
-		for _, bi := range i.Plists.BuildIdentities {
-			if sysOS, ok := bi.Manifest["Cryptex1,SystemOS"]; ok {
-				return sysOS.Info["Path"].(string), nil
-			}
-		}
-		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 0 {
-			return "", fmt.Errorf("no SystemOS DMG found: %w", ErrorCryptexNotFound)
-		} else if len(dmgs) == 1 {
-			return dmgs[0], nil
-		} else {
-			return "", fmt.Errorf("multiple SystemOS DMGs found")
-		}
-	}
-	return "", fmt.Errorf("no BuildManifest.plist found")
 }
 
 // GetFileSystemOsDmg returns the name of the file system dmg
@@ -718,10 +703,8 @@ func (i *Info) getDevicesForBuildIdentityKernelCache(kc, deviceClass string) []s
 		if !ok || filepath.Base(path) != filepath.Base(kc) {
 			continue
 		}
-		if len(ident.ApProductType) > 0 {
-			devices = append(devices, ident.ApProductType)
-		} else if len(i.Plists.BuildManifest.SupportedProductTypes) == 1 {
-			devices = append(devices, i.Plists.BuildManifest.SupportedProductTypes[0])
+		if product := i.identityProduct(ident); product != "" {
+			devices = append(devices, product)
 		}
 	}
 

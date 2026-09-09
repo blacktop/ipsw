@@ -372,7 +372,7 @@ func extractKernelcaches(i *info.Info, ipsw, destPath string, targetKCs []string
 		// If we have specific targets, only extract those
 		if len(targetKCs) > 0 {
 			for _, target := range targetKCs {
-				if strings.HasSuffix(f.Name, target) || filepath.Base(f.Name) == filepath.Base(target) {
+				if f.Name == target {
 					return true
 				}
 			}

@@ -40,6 +40,12 @@ func TestExtractWithInfoTargetsOnlyNamedKernelcache(t *testing.T) {
 	if len(out) != 0 {
 		t.Fatalf("ExtractWithInfo(nonmatching target) extracted %d members, want 0", len(out))
 	}
+	// A sibling board can use the same basename in another directory. A
+	// manifest path must not fall back to matching that sibling by basename.
+	out, err = ExtractWithInfo(&info.Info{}, ipswPath, t.TempDir(), "OtherBoard/kernelcache.release.other")
+	if err != nil || len(out) != 0 {
+		t.Fatalf("ExtractWithInfo(sibling path) = %v, %v; want no matches", out, err)
+	}
 
 	_, err = ExtractWithInfo(&info.Info{}, ipswPath, t.TempDir(), "Firmware/kernelcache.release.other")
 	if err == nil || !strings.Contains(err.Error(), "failed to parse im4p kernelcache data") {
