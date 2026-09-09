@@ -25,10 +25,18 @@ var DmgTypes = []string{"app", "sys", "fs", "exc", "rdisk", "rosetta"}
 
 // Config contains optional options for mounting a DMG from an IPSW
 type Config struct {
-	PemDB      string // AEA PEM DB JSON file path (for .aea decryption)
-	Keys       any    // Either string (DMG key) or download.WikiFWKeys (auto-lookup)
-	MountPoint string // Custom mount point
-	Ident      string // BuildManifest identity selector (used for rdisk)
+	Device string // Product type or device class to select DMGs for
+	// Info is pre-parsed IPSW metadata (BuildManifest, DeviceTrees). When set
+	// the IPSW is not parsed again, so callers mounting several volumes of one
+	// IPSW decode it once. Device is still applied to it.
+	Info *info.Info
+	// SelectSystemOS optionally chooses an image by index when no Device is set
+	// and the manifest contains multiple SystemOS images. Nil rejects ambiguity.
+	SelectSystemOS func([]info.SystemOSDMG) (int, error)
+	PemDB          string // AEA PEM DB JSON file path (for .aea decryption)
+	Keys           any    // Either string (DMG key) or download.WikiFWKeys (auto-lookup)
+	MountPoint     string // Custom mount point
+	Ident          string // BuildManifest identity selector (used for rdisk)
 	// ExtractDir is where DMGs are extracted/decrypted (default: os.TempDir()).
 	// Callers that also mount the same volumes via internal/search.scanDmg (which
 	// extracts to the cwd) set this to the cwd so both share one backing file and
@@ -41,12 +49,14 @@ type Context struct {
 	MountPoint     string `json:"mount_point" binding:"required"`
 	DmgPath        string `json:"dmg_path,omitempty"` // FIXME: required on linux
 	AlreadyMounted bool   `json:"already_mounted,omitempty"`
-	retainDmg      bool   // The backing image existed before this acquisition.
+	// RetainDmg is set when the backing image existed before this acquisition.
+	// It is serialized so an unmount driven by the /mount API response keeps
+	// the same ownership decision.
+	RetainDmg bool `json:"retain_dmg,omitempty"`
 }
 
 // Unmount detaches a DMG and removes its backing file unless acquisition reused
-// a pre-existing file. Manually constructed contexts retain the legacy removal
-// behavior used by explicit unmount operations.
+// a pre-existing file. A zero-value Context always removes the file.
 func (c Context) Unmount() error {
 	if info, err := utils.MountInfo(); err == nil { // darwin only
 		if image := info.Mount(c.MountPoint); image != nil {
@@ -63,7 +73,7 @@ func (c Context) Unmount() error {
 
 // removeBackingFile runs only after the image has been detached successfully.
 func (c Context) removeBackingFile() error {
-	if c.retainDmg {
+	if c.RetainDmg {
 		return nil
 	}
 	cleanDmgPath := filepath.Clean(c.DmgPath)
@@ -104,7 +114,9 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 	ipswPath := filepath.Clean(path)
 
 	var i *info.Info
-	if wkeys, ok := cfg.Keys.(download.WikiFWKeys); ok {
+	if cfg.Info != nil {
+		i = cfg.Info
+	} else if wkeys, ok := cfg.Keys.(download.WikiFWKeys); ok {
 		dtkey, err := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get DeviceTree key: %v", err)
@@ -120,6 +132,11 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 		}
 	}
 
+	i, err = i.ForDevice(cfg.Device)
+	if err != nil {
+		return nil, err
+	}
+
 	var dmgPath string
 
 	switch typ {
@@ -129,7 +146,7 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 			return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
 		}
 	case "sys":
-		dmgPath, err = i.GetSystemOsDmg()
+		dmgPath, err = systemOSPath(i, cfg)
 		if err != nil {
 			if errors.Is(err, info.ErrorCryptexNotFound) {
 				log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
@@ -138,7 +155,7 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 					return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
 				}
 			} else {
-				return nil, fmt.Errorf("failed to get SystemOS DMG: %v", err)
+				return nil, fmt.Errorf("failed to get SystemOS DMG: %w", err)
 			}
 		}
 	case "app":
@@ -171,9 +188,7 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 	}
 	extractedDMG := filepath.Join(extractDir, dmgPath)
 
-	var extracted bool
 	if _, err := os.Stat(extractedDMG); os.IsNotExist(err) {
-		extracted = true
 		created = append(created, extractedDMG)
 		dmgs, err := utils.Unzip(ipswPath, extractDir, func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
@@ -202,7 +217,7 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
-		if extracted {
+		if slices.Contains(created, encryptedDMG) {
 			_ = os.Remove(encryptedDMG)
 		}
 	}
@@ -257,6 +272,27 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 		DmgPath:        extractedDMG,
 		MountPoint:     mp,
 		AlreadyMounted: am,
-		retainDmg:      !slices.Contains(created, extractedDMG),
+		RetainDmg:      !slices.Contains(created, extractedDMG),
 	}, nil
+}
+
+func systemOSPath(i *info.Info, cfg *Config) (string, error) {
+	if cfg.Device != "" || cfg.SelectSystemOS == nil {
+		return i.GetSystemOsDmg()
+	}
+	dmgs, err := i.GetSystemOsDmgs()
+	if err != nil {
+		return "", err
+	}
+	if len(dmgs) == 1 {
+		return dmgs[0].Path, nil
+	}
+	selected, err := cfg.SelectSystemOS(dmgs)
+	if err != nil {
+		return "", err
+	}
+	if selected < 0 || selected >= len(dmgs) {
+		return "", fmt.Errorf("invalid SystemOS image selection: %d", selected)
+	}
+	return dmgs[selected].Path, nil
 }

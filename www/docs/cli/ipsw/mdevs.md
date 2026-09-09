@@ -11,7 +11,7 @@ description: List all MobileDevices in IPSW
 List all MobileDevices in IPSW
 
 ```
-ipsw mdevs [flags]
+ipsw mdevs <IPSW> [flags]
 ```
 
 ### Options

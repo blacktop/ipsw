@@ -3,6 +3,7 @@ package mount
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -142,4 +143,29 @@ func writeMountTestIPSW(t *testing.T, imageName string, data []byte) (string, st
 		t.Fatal(err)
 	}
 	return ipsw, extractDir
+}
+
+func TestContextRetainDmgSurvivesJSONRoundTrip(t *testing.T) {
+	data, err := json.Marshal(Context{MountPoint: "/synthetic/mount", DmgPath: "/synthetic/image.dmg", RetainDmg: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded Context
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !decoded.RetainDmg {
+		t.Fatalf("retain flag lost across the API boundary: %s", data)
+	}
+	backing := filepath.Join(t.TempDir(), "preexisting.dmg")
+	if err := os.WriteFile(backing, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	decoded.DmgPath = backing
+	if err := decoded.removeBackingFile(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(backing); err != nil {
+		t.Fatalf("preexisting backing image removed after round trip: %v", err)
+	}
 }

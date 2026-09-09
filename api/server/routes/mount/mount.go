@@ -17,7 +17,8 @@ import (
 
 // swagger:response
 type mountReponse struct {
-	mount.Context
+	// in: body
+	Body mount.Context
 }
 
 // swagger:response
@@ -57,6 +58,11 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//         description: custom mount point path
 	//         required: false
 	//         type: string
+	//       + name: device
+	//         in: query
+	//         description: device product type or board (e.g. Mac18,5 or j873gap)
+	//         required: false
+	//         type: string
 	//       + name: ident
 	//         in: query
 	//         description: identity variant for rdisk (e.g. 'Erase', 'Update', or 'Recovery')
@@ -94,6 +100,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 			return
 		}
 		ctx, err := mount.DmgInIPSW(ipswPath, dmgType, &mount.Config{
+			Device:     c.Query("device"),
 			PemDB:      pemDbPath,
 			MountPoint: mountPointParam,
 			Ident:      ident,
@@ -104,10 +111,9 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 				return
 			}
 			c.AbortWithError(http.StatusInternalServerError, err)
+			return
 		}
-		c.JSON(http.StatusOK, mountReponse{
-			*ctx,
-		})
+		c.JSON(http.StatusOK, ctx)
 	})
 	// swagger:operation POST /unmount Mount postUnmount
 	//
@@ -133,6 +139,8 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//           type: string
 	//         dmg_path:
 	//           type: string
+	//         retain_dmg:
+	//           type: boolean
 	// responses:
 	//   '200':
 	//     description: successful response

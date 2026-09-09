@@ -10,6 +10,10 @@ description: Mount DMG from IPSW
 
 Mount DMG from IPSW
 
+### Synopsis
+
+Mount DMG from IPSW. When multiple SystemOS images are present, choose one interactively or select a target with --device.
+
 ```
 ipsw mount [app|sys|fs|exc|rdisk|rosetta] IPSW [flags]
 ```
@@ -22,6 +26,9 @@ $ ipsw mount fs iPhone15,2_16.5_20F66_Restore.ipsw
 
 # Mount the system DMG with a specific decryption key
 $ ipsw mount sys iPhone.ipsw --key "a1b2c3d4e5f6..."
+
+# Select a device-specific SystemOS image
+$ ipsw mount sys UniversalMac.ipsw --device Mac18,5
 
 # Mount fs DMG and lookup keys from theapplewiki.com
 $ ipsw mount fs iPod5,1_7.1.2_11D257_Restore.ipsw --lookup
@@ -47,6 +54,7 @@ $ ipsw mount fs iPhone.ipsw --detach
 
 ```
   -d, --detach               Mount without blocking (leave mounted in background)
+      --device string        Device product type or board to mount (e.g. Mac18,5 or j873gap)
   -h, --help                 help for mount
       --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
   -k, --key string           DMG key

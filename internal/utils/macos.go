@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -855,7 +856,10 @@ func InstallKDK(path string) (err error) {
 	}
 	if !alreadyMounted {
 		defer func() {
-			if closeErr := Unmount(mountPoint, false); closeErr != nil {
+			closeErr := Retry(3, 2*time.Second, func() error {
+				return Unmount(mountPoint, false)
+			})
+			if closeErr != nil {
 				err = errors.Join(err, fmt.Errorf("failed to unmount KDK: %w", closeErr))
 			}
 		}()
