@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -40,9 +41,12 @@ type Context struct {
 	MountPoint     string `json:"mount_point" binding:"required"`
 	DmgPath        string `json:"dmg_path,omitempty"` // FIXME: required on linux
 	AlreadyMounted bool   `json:"already_mounted,omitempty"`
+	retainDmg      bool   // The backing image existed before this acquisition.
 }
 
-// Unmount will unmount a DMG and remove the DMG source file
+// Unmount detaches a DMG and removes its backing file unless acquisition reused
+// a pre-existing file. Manually constructed contexts retain the legacy removal
+// behavior used by explicit unmount operations.
 func (c Context) Unmount() error {
 	if info, err := utils.MountInfo(); err == nil { // darwin only
 		if image := info.Mount(c.MountPoint); image != nil {
@@ -53,6 +57,14 @@ func (c Context) Unmount() error {
 		return utils.Unmount(c.MountPoint, true)
 	}); err != nil {
 		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
+	}
+	return c.removeBackingFile()
+}
+
+// removeBackingFile runs only after the image has been detached successfully.
+func (c Context) removeBackingFile() error {
+	if c.retainDmg {
+		return nil
 	}
 	cleanDmgPath := filepath.Clean(c.DmgPath)
 	if cleanDmgPath == "." || cleanDmgPath == "" {
@@ -71,7 +83,23 @@ func (c Context) Unmount() error {
 
 // DmgInIPSW will mount a DMG from an IPSW
 func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
-	var err error
+	return dmgInIPSW(path, typ, cfg, utils.MountDMG, aea.Decrypt)
+}
+
+func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (string, bool, error), decrypt func(*aea.DecryptConfig) (string, error)) (ctx *Context, err error) {
+	// A session can own cleanup only after acquisition succeeds. Until then,
+	// remove files created by this attempt without deleting pre-existing files.
+	var created []string
+	defer func() {
+		if ctx != nil {
+			return
+		}
+		for _, path := range created {
+			if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				err = errors.Join(err, fmt.Errorf("failed to remove extracted image %s: %w", path, removeErr))
+			}
+		}
+	}()
 
 	ipswPath := filepath.Clean(path)
 
@@ -143,7 +171,10 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 	}
 	extractedDMG := filepath.Join(extractDir, dmgPath)
 
+	var extracted bool
 	if _, err := os.Stat(extractedDMG); os.IsNotExist(err) {
+		extracted = true
+		created = append(created, extractedDMG)
 		dmgs, err := utils.Unzip(ipswPath, extractDir, func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
@@ -157,7 +188,11 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 
 	if filepath.Ext(extractedDMG) == ".aea" {
 		encryptedDMG := extractedDMG
-		extractedDMG, err = aea.Decrypt(&aea.DecryptConfig{
+		decryptedDMG := strings.TrimSuffix(encryptedDMG, filepath.Ext(encryptedDMG))
+		if _, statErr := os.Stat(decryptedDMG); os.IsNotExist(statErr) {
+			created = append(created, decryptedDMG)
+		}
+		extractedDMG, err = decrypt(&aea.DecryptConfig{
 			Input:    encryptedDMG,
 			Output:   filepath.Dir(encryptedDMG),
 			PemDB:    cfg.PemDB,
@@ -167,7 +202,9 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 		}
-		_ = os.Remove(encryptedDMG)
+		if extracted {
+			_ = os.Remove(encryptedDMG)
+		}
 	}
 	if isEncrypted, err := magic.IsEncryptedDMG(extractedDMG); err != nil {
 		return nil, fmt.Errorf("failed to check if DMG is encrypted: %v", err)
@@ -211,7 +248,7 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		}
 	}
 
-	mp, am, err := utils.MountDMG(extractedDMG, cfg.MountPoint)
+	mp, am, err := attach(extractedDMG, cfg.MountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}
@@ -220,5 +257,6 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 		DmgPath:        extractedDMG,
 		MountPoint:     mp,
 		AlreadyMounted: am,
+		retainDmg:      !slices.Contains(created, extractedDMG),
 	}, nil
 }

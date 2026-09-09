@@ -505,22 +505,13 @@ func runCommandWithFileOutput(cmd *exec.Cmd) ([]byte, error) {
 	return out, runErr
 }
 
-// Mount mounts a DMG with hdiutil
+// Mount mounts a disk image using the host's supported attachment tool.
 func Mount(image, mountPoint string) error {
 	if runtime.GOOS == "darwin" {
-		out, err := runCommandWithFileOutput(exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image))
-		if err != nil {
-			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
-				return ErrMountResourceBusy
-			}
-			return fmt.Errorf("%v: %s", err, out)
-		}
-	} else {
-		// On Linux, detect filesystem type and use appropriate FUSE tool
-		return mountLinux(image, mountPoint)
+		return attachDarwinImage(image, mountPoint, nil, runCommandWithFileOutput)
 	}
-
-	return nil
+	// On Linux, detect filesystem type and use appropriate FUSE tool
+	return mountLinux(image, mountPoint)
 }
 
 // MountedFilesystemRoot returns the root directory of a mounted filesystem.
@@ -648,16 +639,7 @@ func mountWithHFSPlus(image, mountPoint string) error {
 
 func MountEncrypted(image, mountPoint, password string) error {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, "-stdinpass", image)
-		cmd.Stdin = strings.NewReader(password)
-		out, err := runCommandWithFileOutput(cmd)
-		if err != nil {
-			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
-				return ErrMountResourceBusy
-			}
-			return fmt.Errorf("%v: %s", err, out)
-		}
-		return nil
+		return attachDarwinImage(image, mountPoint, strings.NewReader(password), runCommandWithFileOutput)
 	}
 	return fmt.Errorf("only supported on macOS")
 }
@@ -800,9 +782,19 @@ type HdiUtilInfo struct {
 }
 
 func (i HdiUtilInfo) Mount(mount string) *image {
+	if mount == "" {
+		return nil
+	}
+	canonical := func(path string) string {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return resolved
+		}
+		return filepath.Clean(path)
+	}
+	mount = canonical(mount)
 	for _, img := range i.Images {
 		for _, entry := range img.SystemEntities {
-			if strings.Contains(entry.MountPoint, mount) {
+			if entry.MountPoint != "" && canonical(entry.MountPoint) == mount {
 				return &img
 			}
 		}
@@ -852,26 +844,28 @@ func InstallXCodeSimRuntime(path string) error {
 	return fmt.Errorf("only supported on macOS")
 }
 
-func InstallKDK(path string) error {
-	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("hdiutil", "attach", path)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%v: %s", err, out)
-		}
-		cmd = exec.Command("sudo", "installer", "-pkg", "/Volumes/Kernel Debug Kit/KernelDebugKit.pkg", "-target", "/")
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%v: %s", err, out)
-		}
-		cmd = exec.Command("hdiutil", "detach", "/Volumes/Kernel Debug Kit")
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%v: %s", err, out)
-		}
-		return nil
+func InstallKDK(path string) (err error) {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("only supported on macOS")
 	}
-	return fmt.Errorf("only supported on macOS")
+
+	mountPoint, alreadyMounted, err := MountDMG(path, "")
+	if err != nil {
+		return err
+	}
+	if !alreadyMounted {
+		defer func() {
+			if closeErr := Unmount(mountPoint, false); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("failed to unmount KDK: %w", closeErr))
+			}
+		}()
+	}
+	cmd := exec.Command("sudo", "installer", "-pkg", filepath.Join(mountPoint, "KernelDebugKit.pkg"), "-target", "/")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+	return nil
 }
 
 type KMUConfig struct {
