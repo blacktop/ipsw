@@ -46,7 +46,7 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
 ### Options
 
 ```
-      --device string           Device to extract kernel for (e.g. iPhone10,6)
+      --device string           Device to select kernel/DMGs/caches for (product type or DMG board, e.g. Mac18,5)
       --dmg string              Extract DMG file (app, sys, fs, exc, rdisk, rosetta)
       --driverkit               Extract DriverKit dyld_shared_cache
       --dtree                   Extract DeviceTree

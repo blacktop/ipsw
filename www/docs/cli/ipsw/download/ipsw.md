@@ -23,6 +23,9 @@ ipsw download ipsw [flags]
 # Download specific iOS build with kernelcache extraction
 ❯ ipsw download ipsw --device iPhone14,2 --build 20G75 --kernel
 
+# Extract a device-specific macOS cache without filtering the feed by device
+❯ ipsw download ipsw --macos --version 27.0 --dyld --extract-device Mac18,5
+
 # Get URLs only without downloading
 ❯ ipsw download ipsw --device iPhone15,2 --version 17.0 --urls
 
@@ -38,6 +41,7 @@ ipsw download ipsw [flags]
   -d, --device string            iOS Device (i.e. iPhone11,2)
       --dyld                     Extract dyld_shared_cache(s) from remote IPSW
   -a, --dyld-arch stringArray    dyld_shared_cache architecture(s) to remote extract
+      --extract-device string    Product type or board for partial extraction (does not filter the download feed)
       --fcs-keys                 Download AEA1 DMG fcs-key pem files
       --fcs-keys-json            Download AEA1 DMG fcs-keys as JSON
   -f, --flat                     Do NOT preserve directory structure when downloading with --pattern

@@ -258,7 +258,7 @@ func getFolder(c *Config) (*info.Info, string, error) {
 			}
 		}
 	}
-	folder, err := c.info.GetFolder(c.KernelDevice)
+	folder, err := extractionFolder(c.info, c.KernelDevice)
 	if err != nil {
 		return c.info, folder, fmt.Errorf("failed to get folder from IPSW metadata: %v", err)
 	}
@@ -301,7 +301,7 @@ func getRemoteFolderWithBlockSize(c *Config, blockSize int) (*info.Info, *zip.Re
 		}
 	}
 	if !c.remote.folderSet || c.remote.folderDevice != c.KernelDevice {
-		folder, err := c.info.GetFolder(c.KernelDevice)
+		folder, err := extractionFolder(c.info, c.KernelDevice)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("failed to get folder from remote zip metadata: %v", err)
 		}
@@ -620,11 +620,15 @@ func IsAEA(c *Config) (bool, error) {
 // Kernelcache extracts the kernelcache from an IPSW
 func Kernelcache(c *Config) (map[string][]string, error) {
 	if len(c.IPSW) > 0 {
-		_, folder, err := getFolder(c)
+		i, folder, err := getFolder(c)
 		if err != nil {
 			return nil, err
 		}
-		return kernelcache.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.KernelDevice)
+		targets, err := selectedKernelcachePaths(i, c.KernelDevice)
+		if err != nil {
+			return nil, err
+		}
+		return kernelcache.ExtractWithInfo(i, c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), targets...)
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
@@ -633,21 +637,69 @@ func Kernelcache(c *Config) (map[string][]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		destPath := filepath.Join(filepath.Clean(c.Output), folder)
-		zr, err = tuneRemoteZipReader(c, zr, remoteKernelcacheCandidates(i, zr.File, destPath, c.KernelDevice))
+		targets, err := selectedKernelcachePaths(i, c.KernelDevice)
 		if err != nil {
 			return nil, err
 		}
+		destPath := filepath.Join(filepath.Clean(c.Output), folder)
+		zr, err = tuneRemoteZipReader(c, zr, remoteKernelcacheCandidates(i, kernelcacheFilesForPaths(zr.File, targets), destPath, ""))
+		if err != nil {
+			return nil, err
+		}
+		// Tuning may reopen the archive. Filter the resulting reader without
+		// mutating the cached reader reused by other extraction modes.
+		selectedReader := &zip.Reader{File: kernelcacheFilesForPaths(zr.File, targets)}
 		keys := c.FirmwareKeys
 		if len(keys) == 0 {
 			keys = c.wikiKeys
 		}
 		if len(keys) > 0 {
-			return remoteKernelcacheWithKeys(i, zr, destPath, c.KernelDevice, keys, c.Progress)
+			return remoteKernelcacheWithKeys(i, selectedReader, destPath, "", keys, c.Progress)
 		}
-		return kernelcache.RemoteParseWithInfo(i, zr, destPath, c.KernelDevice)
+		return kernelcache.RemoteParseWithInfo(i, selectedReader, destPath, "")
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
+}
+
+// selectedKernelcachePaths keeps board selection in manifest space, rather than
+// broadening it back to a product type shared by several boards.
+func selectedKernelcachePaths(i *info.Info, device string) ([]string, error) {
+	if device == "" {
+		return nil, nil
+	}
+	selected, err := i.ForDevice(device)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, identity := range selected.Plists.BuildIdentities {
+		if component, ok := identity.Manifest["KernelCache"]; ok {
+			path, ok := component.Info["Path"].(string)
+			if !ok || path == "" {
+				return nil, fmt.Errorf("invalid kernelcache path for device %s", device)
+			}
+			if !slices.Contains(paths, path) {
+				paths = append(paths, path)
+			}
+		}
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no kernelcache found for device %s in IPSW", device)
+	}
+	return paths, nil
+}
+
+func kernelcacheFilesForPaths(files []*zip.File, paths []string) []*zip.File {
+	if len(paths) == 0 {
+		return files
+	}
+	var selected []*zip.File
+	for _, file := range files {
+		if slices.Contains(paths, file.Name) {
+			selected = append(selected, file)
+		}
+	}
+	return selected
 }
 
 func remoteKernelcacheWithKeys(i *info.Info, zr *zip.Reader, destPath, device string, wikiKeys download.WikiFWKeys, progress bool) (map[string][]string, error) {
@@ -978,7 +1030,8 @@ func DSC(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return dyld.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
+		destPath := filepath.Join(filepath.Clean(c.Output), folder)
+		return dyld.ExtractForDevice(c.IPSW, destPath, c.PemDB, c.Arches, c.DriverKit, c.AllDSCs, c.KernelDevice)
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
@@ -1037,6 +1090,10 @@ func DSC(c *Config) ([]string, error) {
 			}
 			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
+		i, err = i.ForDevice(c.KernelDevice)
+		if err != nil {
+			return nil, err
+		}
 		steps, err := dyld.DscExtractionPlan(i, c.Arches, c.DriverKit)
 		if err != nil {
 			return nil, err
@@ -1089,7 +1146,7 @@ func remoteDmgPathForDscStep(i *info.Info, kind dyld.DscDMGKind) (string, error)
 func remoteSystemDscDMG(i *info.Info) (string, error) {
 	sysDMG, err := i.GetSystemOsDmg()
 	if err != nil {
-		return "", fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+		return "", fmt.Errorf("only iOS16.x/macOS13.x+ supported: failed to get SystemOS DMG from remote zip metadata: %w", err)
 	}
 	if len(sysDMG) == 0 {
 		return "", fmt.Errorf("only iOS16.x/macOS13.x+ supported: no SystemOS DMG found in remote zip metadata")
@@ -1159,6 +1216,11 @@ func DMG(c *Config) ([]string, error) {
 		}
 	}
 
+	i, err = i.ForDevice(c.KernelDevice)
+	if err != nil {
+		return nil, err
+	}
+
 	var dmgPath string
 	switch c.DmgType {
 	case "app":
@@ -1169,7 +1231,7 @@ func DMG(c *Config) ([]string, error) {
 	case "sys":
 		dmgPath, err = i.GetSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %v", err)
+			return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %w", err)
 		}
 	case "fs":
 		dmgPath, err = i.GetFileSystemOsDmg()
@@ -1356,6 +1418,11 @@ func FcsKeys(c *Config) ([]string, error) {
 		}
 	}
 
+	i, err = i.ForDevice(c.KernelDevice)
+	if err != nil {
+		return nil, err
+	}
+
 	dmgPath, err := i.GetSystemOsDmg()
 	if err != nil {
 		if errors.Is(err, info.ErrorCryptexNotFound) {
@@ -1365,7 +1432,7 @@ func FcsKeys(c *Config) ([]string, error) {
 				return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
 			}
 		} else {
-			return nil, fmt.Errorf("failed to get SystemOS DMG: %v", err)
+			return nil, fmt.Errorf("failed to get SystemOS DMG: %w", err)
 		}
 	}
 
@@ -1459,6 +1526,10 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		i, err = selectDmgInfo(i, c.KernelDevice, c.DMGs)
+		if err != nil {
+			return nil, err
+		}
 		destPath := filepath.Join(filepath.Clean(c.Output), folder)
 		if len(tempDirectory) > 0 {
 			destPath = tempDirectory[0]
@@ -1522,6 +1593,10 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
 		}
 		i, zr, folder, err := getRemoteFolder(c)
+		if err != nil {
+			return nil, err
+		}
+		i, err = selectDmgInfo(i, c.KernelDevice, c.DMGs)
 		if err != nil {
 			return nil, err
 		}
@@ -1664,4 +1739,21 @@ func SystemVersion(path, pemDB string) (*plist.SystemVersion, error) {
 	}
 
 	return plist.ParseSystemVersion(dat)
+}
+
+// selectDmgInfo validates SystemOS selection before file-search outputs are written.
+func selectDmgInfo(i *info.Info, device string, scanDMGs bool) (*info.Info, error) {
+	if !scanDMGs {
+		return i, nil
+	}
+	return i.SelectDevice(device)
+}
+
+// extractionFolder resolves a board selector to its product type so the output
+// folder keeps the existing product-type naming. An unknown selector is passed
+// through: --kernel resolves devices via DeviceTrees on IPSWs whose identities
+// lack Ap,ProductType, and the DMG/DSC paths run ForDevice and report the
+// error themselves.
+func extractionFolder(i *info.Info, device string) (string, error) {
+	return i.GetFolder(i.ProductType(device))
 }

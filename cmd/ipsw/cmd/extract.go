@@ -66,7 +66,7 @@ func init() {
 		return dyld.DscArches, cobra.ShellCompDirectiveDefault
 	})
 	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
-	extractCmd.Flags().String("device", "", "Device to extract kernel for (e.g. iPhone10,6)")
+	extractCmd.Flags().String("device", "", "Device to select kernel/DMGs/caches for (product type or DMG board, e.g. Mac18,5)")
 	extractCmd.Flags().String("ident", "", "Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{
@@ -148,6 +148,17 @@ var extractCmd = &cobra.Command{
 		}
 
 		// validate args
+		if viper.GetString("extract.device") != "" {
+			supported := viper.GetBool("extract.kernel") || viper.GetBool("extract.dyld") ||
+				viper.GetString("extract.dmg") != "" || viper.GetBool("extract.files") || viper.GetBool("extract.fcs-key")
+			unfiltered := viper.GetBool("extract.dtree") || viper.GetBool("extract.iboot") ||
+				viper.GetBool("extract.sep") || viper.GetBool("extract.sptm") || viper.GetBool("extract.kbag") ||
+				viper.GetBool("extract.sys-ver") || viper.GetBool("extract.exclave") ||
+				(viper.GetString("extract.pattern") != "" && !viper.GetBool("extract.files"))
+			if !supported || unfiltered {
+				return fmt.Errorf("--device can only be used with --kernel, --dyld, --dmg, --files, or --fcs-key")
+			}
+		}
 		if !viper.GetBool("extract.kernel") && !viper.GetBool("extract.dyld") && viper.GetString("extract.dmg") == "" &&
 			!viper.GetBool("extract.dtree") && !viper.GetBool("extract.iboot") && !viper.GetBool("extract.sep") &&
 			!viper.GetBool("extract.sptm") && !viper.GetBool("extract.kbag") && !viper.GetBool("extract.sys-ver") &&
@@ -171,8 +182,6 @@ var extractCmd = &cobra.Command{
 			return fmt.Errorf("--pattern or -p must be used with --files or -f")
 		} else if viper.GetBool("extract.driverkit") && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--driverkit can only be used with --dyld or -d")
-		} else if viper.GetString("extract.device") != "" && !viper.GetBool("extract.kernel") {
-			return fmt.Errorf("--device can only be used with --kernel or -k")
 		} else if viper.GetBool("extract.sys-ver") && viper.GetBool("extract.remote") {
 			return fmt.Errorf("--sys-ver can NOT be used with a --remote IPSW/OTA")
 		}

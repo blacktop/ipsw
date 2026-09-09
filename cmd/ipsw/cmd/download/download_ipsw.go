@@ -45,6 +45,8 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(downloadIpswCmd)
+	downloadIpswCmd.Flags().String("extract-device", "", "Product type or board for partial extraction (does not filter the download feed)")
+	viper.BindPFlag("download.ipsw.extract-device", downloadIpswCmd.Flags().Lookup("extract-device"))
 	// Download behavior flags
 	downloadIpswCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadIpswCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
@@ -204,6 +206,9 @@ var downloadIpswCmd = &cobra.Command{
 		# Download specific iOS build with kernelcache extraction
 		❯ ipsw download ipsw --device iPhone14,2 --build 20G75 --kernel
 
+		# Extract a device-specific macOS cache without filtering the feed by device
+		❯ ipsw download ipsw --macos --version 27.0 --dyld --extract-device Mac18,5
+
 		# Get URLs only without downloading
 		❯ ipsw download ipsw --device iPhone15,2 --version 17.0 --urls
 	`),
@@ -244,6 +249,13 @@ var downloadIpswCmd = &cobra.Command{
 		remotePattern := viper.GetString("download.ipsw.pattern")
 		fcsKeys := viper.GetBool("download.ipsw.fcs-keys")
 		fcsKeysJson := viper.GetBool("download.ipsw.fcs-keys-json")
+		extractDevice := viper.GetString("download.ipsw.extract-device")
+		if extractDevice != "" && !remoteKernel && !remoteDSC && !fcsKeys && !fcsKeysJson {
+			return fmt.Errorf("--extract-device requires --kernel, --dyld, --fcs-keys, or --fcs-keys-json")
+		}
+		if extractDevice == "" {
+			extractDevice = device
+		}
 		decrypt := viper.GetBool("download.ipsw.decrypt")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
@@ -537,7 +549,7 @@ var downloadIpswCmd = &cobra.Command{
 						URL:          ipsw.URL,
 						Pattern:      remotePattern,
 						Arches:       dyldArches,
-						KernelDevice: device,
+						KernelDevice: extractDevice,
 						Proxy:        proxy,
 						Insecure:     insecure,
 						DMGs:         false,
