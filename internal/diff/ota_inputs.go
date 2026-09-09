@@ -455,19 +455,19 @@ func mountOTACryptexes(ctx *Context) error {
 	return nil
 }
 
-// extractOTASystemCryptex extracts the system cryptex DMG. For
-// macOS OTAs containing both arm64e and x86_64h variants, the
-// arm64e variant is selected to match parseDSC's arch filter.
+// extractOTASystemCryptex extracts the system cryptex DMG. On macOS it
+// prefers arm64e, then arm64e_x1, before falling back to other architectures.
 func extractOTASystemCryptex(ctx *Context, tmpDir string) (string, error) {
 	if ctx.IsMacOS {
-		dmg, err := ctx.otaFile.ExtractCryptex("system-arm64e", tmpDir)
-		if err == nil {
-			return dmg, nil
+		for _, arch := range []string{"arm64e", "arm64e_x1"} {
+			dmg, err := ctx.otaFile.ExtractCryptex("system-"+arch, tmpDir)
+			if err == nil {
+				return dmg, nil
+			}
+			if !errors.Is(err, otapkg.ErrCryptexNotFound) {
+				return "", fmt.Errorf("failed to extract %s system cryptex: %w", arch, err)
+			}
 		}
-		if !errors.Is(err, otapkg.ErrCryptexNotFound) {
-			return "", fmt.Errorf("failed to extract arm64e system cryptex: %w", err)
-		}
-		// No arm64e variant — fall through to generic.
 	}
 	dmg, err := ctx.otaFile.ExtractCryptex("system", tmpDir)
 	if err == nil {
@@ -556,8 +556,7 @@ func selectOTAKernelcachePair(
 	return selectKernelcacheViaBasename(oldCtx, newCtx)
 }
 
-// macOSKernelcacheDevice mirrors the fixed device selector used
-// by IPSW mode for macOS kernelcache extraction.
+// macOSKernelcacheDevice is the preferred baseline for macOS OTA kernel pairing.
 const macOSKernelcacheDevice = "Macmini9,1"
 
 func selectKernelcacheViaManifest(

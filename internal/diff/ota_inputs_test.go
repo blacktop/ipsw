@@ -1,6 +1,8 @@
 package diff
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,9 +11,55 @@ import (
 
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/info"
+	otapkg "github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestExtractOTASystemCryptexPreference(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		arches []string
+		want   string
+	}{
+		{"generic arm64e first", []string{"arm64", "arm64e_x1", "arm64e"}, "arm64e"},
+		{"x1 before arm64", []string{"arm64", "arm64e_x1"}, "arm64e_x1"},
+		{"other architecture fallback", []string{"arm64"}, "arm64"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var data bytes.Buffer
+			zw := zip.NewWriter(&data)
+			for _, arch := range tc.arches {
+				w, err := zw.Create("AssetData/payloadv2/cryptex-system-" + arch)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := w.Write([]byte("synthetic cryptex")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := zw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			ota, err := otapkg.NewOTA(bytes.NewReader(data.Bytes()), int64(data.Len()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Block all output files with directories. Extraction reports which
+			// source it selected, before patching or mounting the synthetic data.
+			output := t.TempDir()
+			for _, arch := range tc.arches {
+				if err := os.Mkdir(filepath.Join(output, "cryptex-system-"+arch+".dmg"), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err = extractOTASystemCryptex(&Context{IsMacOS: true, otaFile: ota}, output)
+			if err == nil || !strings.Contains(err.Error(), "cryptex-system-"+tc.want+".dmg") {
+				t.Fatalf("expected extraction of %s to reach blocked output, got %v", tc.want, err)
+			}
+		})
+	}
+}
 
 func writeDiffTestFile(t *testing.T, path, content string) {
 	t.Helper()

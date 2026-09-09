@@ -65,6 +65,7 @@ type IBootDiff struct {
 }
 
 type Config struct {
+	Device                string // Product type or board for IPSW build identity selection
 	Title                 string
 	IpswOld               string
 	IpswNew               string
@@ -281,6 +282,9 @@ func (d *Diff) getInfo() (err error) {
 	d.New.PemDB = d.conf.PemDB
 
 	if mode == inputModeDirectory {
+		if d.conf.Device != "" {
+			return fmt.Errorf("--device selects IPSW build identities and cannot be used with directories")
+		}
 		d.Old.InputMode = inputModeDirectory
 		d.New.InputMode = inputModeDirectory
 		configureDirectoryContext(&d.Old)
@@ -314,6 +318,11 @@ func (d *Diff) getInfo() (err error) {
 	// Classify symmetrically.
 	switch {
 	case oldOTA != nil && newOTA != nil:
+		if d.conf.Device != "" {
+			oldOTA.Close()
+			newOTA.Close()
+			return fmt.Errorf("--device selects IPSW build identities and cannot be used with OTA diffs")
+		}
 		// Both are OTAs — validate scope (Phase 1: full OTAs only).
 		if err := validateOTAScope(oldInfo); err != nil {
 			oldOTA.Close()
@@ -375,6 +384,15 @@ func (d *Diff) getInfo() (err error) {
 		return fmt.Errorf("failed to parse 'New' IPSW: %v", err)
 	}
 
+	d.Old.Info, err = selectDiffDevice(d.Old.Info, d.conf.Device)
+	if err != nil {
+		return fmt.Errorf("Old IPSW: %w", err)
+	}
+	d.New.Info, err = selectDiffDevice(d.New.Info, d.conf.Device)
+	if err != nil {
+		return fmt.Errorf("New IPSW: %w", err)
+	}
+
 	d.Old.Version = d.Old.Info.Plists.BuildManifest.ProductVersion
 	d.Old.Build = d.Old.Info.Plists.BuildManifest.ProductBuildVersion
 	d.Old.Folder, err = d.Old.Info.GetFolder()
@@ -393,6 +411,9 @@ func (d *Diff) getInfo() (err error) {
 
 	if d.Title == "" {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
+		if d.conf.Device != "" {
+			d.Title += fmt.Sprintf(" (%s)", d.conf.Device)
+		}
 	}
 
 	if d.Old.Info.IsMacOS() || d.New.Info.IsMacOS() {
@@ -504,10 +525,12 @@ func (d *Diff) Diff() (err error) {
 		// filenames across builds, and DmgInIPSW treats an existing extraction as
 		// a cache hit.
 		d.oldSession = mountcmd.NewSession(d.Old.IPSWPath, &mountcmd.Config{
+			Info:       d.Old.Info,
 			PemDB:      d.conf.PemDB,
 			ExtractDir: ipswSessionExtractDir(d.tmpDir, "old"),
 		})
 		d.newSession = mountcmd.NewSession(d.New.IPSWPath, &mountcmd.Config{
+			Info:       d.New.Info,
 			PemDB:      d.conf.PemDB,
 			ExtractDir: ipswSessionExtractDir(d.tmpDir, "new"),
 		})
@@ -746,42 +769,16 @@ func (d *Diff) extractKernelcaches() error {
 		return nil
 	}
 
-	// IPSW mode.
-	if d.Old.IsMacOS || d.New.IsMacOS {
-		if out, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, macOSKernelcacheDevice); err != nil {
-			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
-		} else {
-			d.Old.Kernel.Path = maps.Keys(out)[0]
-		}
-		if out, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, macOSKernelcacheDevice); err != nil {
-			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
-		} else {
-			d.New.Kernel.Path = maps.Keys(out)[0]
-		}
-	} else {
-		if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder, ""); err != nil {
-			return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
-		}
-		if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder, ""); err != nil {
-			return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
-		}
-		for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
-			if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-			} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-				return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
-			}
-			if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
-				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
-			} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
-				return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
-			}
-			kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
-			kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
-			d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
-			d.New.Kernel.Path = filepath.Join(d.New.Folder, d.New.Info.GetKernelCacheFileName(kcache2))
-			break // just use first kernelcache for now
-		}
+	// Both explicit and implicit selection use manifest order. This avoids
+	// map iteration picking a different kernel for the same selected metadata.
+	var err error
+	d.Old.Kernel.Path, err = extractSelectedKernelcache(d.Old.Info, d.Old.IPSWPath, d.Old.Folder)
+	if err != nil {
+		return fmt.Errorf("Old IPSW: %w", err)
+	}
+	d.New.Kernel.Path, err = extractSelectedKernelcache(d.New.Info, d.New.IPSWPath, d.New.Folder)
+	if err != nil {
+		return fmt.Errorf("New IPSW: %w", err)
 	}
 	return nil
 }
@@ -1026,7 +1023,7 @@ func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
 }
 
 // openDSCFromMount finds the dyld_shared_cache under mountRoot (filtered to
-// arm64e for macOS IPSWs when applicable) and opens the first match.
+// the arm64e family for macOS IPSWs when applicable) and opens the first match.
 func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side string) (*dyld.File, error) {
 	dscs, err := dyld.GetDscPathsInMount(mountRoot, false, false)
 	if err != nil {
@@ -1037,24 +1034,46 @@ func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side strin
 	}
 	if isMacOS {
 		var filtered []string
-		r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, "arm64e", dyld.CacheRegexEnding))
+		r := regexp.MustCompile(dyld.CacheRegex + "(arm64e(_x1)?)" + dyld.CacheRegexEnding)
 		for _, match := range dscs {
 			if r.MatchString(match) {
 				filtered = append(filtered, match)
 			}
 		}
 		if len(filtered) == 0 && mode != inputModeOTA {
-			return nil, fmt.Errorf("no dyld_shared_cache files found matching the specified archs 'arm64e'")
+			return nil, fmt.Errorf("no dyld_shared_cache files found matching arm64e or arm64e_x1")
 		}
 		if len(filtered) > 0 {
 			dscs = filtered
 		}
 	}
-	dsc, err := dyld.Open(dscs[0])
+	// A device-specific SystemOS ships one cache (the 26A428 Mac18,5 image
+	// carries only dyld_shared_cache_arm64e_x1), so a selected device resolves
+	// unambiguously. A shared image may carry sibling variants; prefer the
+	// generic cache explicitly rather than by walk order, and say so.
+	chosen := preferGenericDSC(dscs)
+	if len(dscs) > 1 {
+		utils.Indent(log.Warn, 2)(fmt.Sprintf("multiple dyld_shared_caches in '%s' mount; using %s", side, chosen))
+	}
+	dsc, err := dyld.Open(chosen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DSC: %v", err)
 	}
 	return dsc, nil
+}
+
+// preferGenericDSC picks dyld_shared_cache_arm64e (then arm64) over ISA
+// variants such as arm64e_x1 when a mount carries several caches; otherwise
+// the first candidate.
+func preferGenericDSC(dscs []string) string {
+	for _, name := range []string{"dyld_shared_cache_arm64e", "dyld_shared_cache_arm64"} {
+		for _, p := range dscs {
+			if filepath.Base(p) == name {
+				return p
+			}
+		}
+	}
+	return dscs[0]
 }
 
 func (d *Diff) ensureOTAPayloadFilesystems() error {

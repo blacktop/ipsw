@@ -52,6 +52,22 @@ func TestMatchingIPSWKernelcacheManifestMemberReturnsComparedPath(t *testing.T) 
 	}
 }
 
+func TestKernelFastPathUsesManifestOrder(t *testing.T) {
+	z := kernelcacheManifestTestEntry{"zboard", "kernelcache.z", 0xaa}
+	a := kernelcacheManifestTestEntry{"aboard", "kernelcache.a", 0xbb}
+	oldInfo := kernelcacheManifestInfo(z, a)
+	if kernelcacheDMGInputHash(oldInfo, oldInfo) == kernelcacheDMGInputHash(oldInfo, kernelcacheManifestInfo(a, z)) {
+		t.Fatal("cache key ignored a different manifest-first kernel")
+	}
+	member, ok := matchingIPSWKernelcacheManifestMember(oldInfo, kernelcacheManifestInfo(z, a))
+	if !ok || member != z.path {
+		t.Fatalf("selected %q, %t; want manifest-first %q", member, ok, z.path)
+	}
+	if _, ok := matchingIPSWKernelcacheManifestMember(oldInfo, kernelcacheManifestInfo(a, z)); ok {
+		t.Fatal("fast path equated different manifest-first kernels")
+	}
+}
+
 // TestKernelKeySegmentsEqualMatchesRebuiltKernel exercises the kernelcache
 // short-circuit against two real extracted kernelcaches. The files are
 // expected at /tmp/kc-diff/{23F77,23F81}/<build>__iPhone18,1/kernelcache...

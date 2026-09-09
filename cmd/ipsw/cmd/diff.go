@@ -66,6 +66,8 @@ func buildDiffCacheConfig() (diff.CacheConfig, error) {
 
 func init() {
 	rootCmd.AddCommand(diffCmd)
+	diffCmd.Flags().String("device", "", "IPSW device product type or board to compare")
+	viper.BindPFlag("diff.device", diffCmd.Flags().Lookup("device"))
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
 	diffCmd.Flags().BoolP("markdown", "m", false, "Output diff as Markdown")
 	diffCmd.Flags().Bool("json", false, "Output diff as JSON")
@@ -200,6 +202,7 @@ var diffCmd = &cobra.Command{
 		}
 
 		d := diff.New(&diff.Config{
+			Device:                viper.GetString("diff.device"),
 			Title:                 viper.GetString("diff.title"),
 			IpswOld:               filepath.Clean(args[0]),
 			IpswNew:               filepath.Clean(args[1]),

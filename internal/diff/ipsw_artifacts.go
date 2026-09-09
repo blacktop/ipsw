@@ -100,7 +100,6 @@ func matchingIPSWKernelcacheManifestMember(oldInfo, newInfo *info.Info) (string,
 	}
 	slices.Sort(models)
 
-	var member string
 	for _, model := range models {
 		oldPaths := oldKCs[model]
 		newPaths, ok := newKCs[model]
@@ -119,11 +118,20 @@ func matchingIPSWKernelcacheManifestMember(oldInfo, newInfo *info.Info) (string,
 		if !bytes.Equal(oldDigest, newDigest) {
 			return "", false
 		}
-		if member == "" {
-			member = oldPaths[0]
-		}
 	}
-	return member, member != ""
+	// The fast path must reuse the same manifest-order kernel that extraction
+	// selects, even when the two manifests list their boards in different orders.
+	oldMember, err := selectedKernelcachePath(oldInfo)
+	if err != nil {
+		return "", false
+	}
+	newMember, err := selectedKernelcachePath(newInfo)
+	if err != nil {
+		return "", false
+	}
+	oldDigest, oldOK := uniqueManifestDigestForPath(oldInfo, "KernelCache", oldMember)
+	newDigest, newOK := uniqueManifestDigestForPath(newInfo, "KernelCache", newMember)
+	return oldMember, oldOK && newOK && bytes.Equal(oldDigest, newDigest)
 }
 
 func ipswVolumeManifestDigestsEqual(oldInfo, newInfo *info.Info, typ string) bool {
@@ -162,7 +170,8 @@ func ipswVolumeManifestDigest(inf *info.Info, typ string) ([]byte, bool) {
 
 // kernelcacheDMGInputHash digests the task-scope inputs for the kernelcache
 // diff: the old and new BuildManifest KernelCache digests for every model,
-// folded over sorted models, old then new. It reuses the exact digest source
+// including the selected kernel followed by sorted models, old then new.
+// It reuses the exact digest source
 // (GetKernelCaches + uniqueManifestDigestForPath under the "KernelCache" key)
 // that ipswKernelcacheManifestDigestsEqual uses to decide the kernelcache is
 // unchanged, so a task's cache identity tracks the same artifact bytes that
@@ -183,6 +192,15 @@ func writeKernelcacheDigests(h io.Writer, side string, inf *info.Info) {
 		_, _ = h.Write([]byte{0x00}) // absent marker
 		return
 	}
+	// Identity ordering selects the kernel actually compared. Keep it in the
+	// cache key even when every board's digest is otherwise unchanged.
+	member, err := selectedKernelcachePath(inf)
+	if err == nil {
+		if digest, ok := uniqueManifestDigestForPath(inf, "KernelCache", member); ok {
+			_, _ = h.Write(digest)
+		}
+	}
+	_, _ = h.Write([]byte{0})
 	kcs := inf.Plists.BuildManifest.GetKernelCaches()
 	models := make([]string, 0, len(kcs))
 	for model := range kcs {
