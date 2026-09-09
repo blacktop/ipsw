@@ -211,16 +211,21 @@ var symbolicateCmd = &cobra.Command{
 
 		/* sysdiagnose archive or directory: browse every crash report inside */
 		if isSysdiagnoseInput(args[0]) {
+			files, cleanup, err := collectCrashlogs(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to read sysdiagnose %s: %v", filepath.Base(args[0]), err)
+			}
+			defer cleanup()
 			var dscFile *dyld.File
 			if len(args) > 1 { // an IPSW/DSC was supplied: symbolicate stacks against it
-				f, cleanup, err := openDSCArg(filepath.Clean(args[1]), pemDB)
+				f, cleanup, err := openDSCArg(filepath.Clean(args[1]), pemDB, sysdiagnoseHardwareModel(files))
 				if err != nil {
 					return fmt.Errorf("failed to open %s: %v", filepath.Base(args[1]), err)
 				}
 				defer cleanup()
 				dscFile = f
 			}
-			return browseSysdiagnose(args[0], &crashlog.Config{
+			return browseSysdiagnose(args[0], files, &crashlog.Config{
 				All:         all || Verbose,
 				Running:     running,
 				Process:     proc,
@@ -581,15 +586,10 @@ func isSysdiagnoseInput(path string) bool {
 	return strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") || strings.HasSuffix(lower, ".tar")
 }
 
-// browseSysdiagnose collects every .ips crash report in a sysdiagnose archive or
-// directory, renders each (symbolicating microstackshot stacks when dscFile is
-// supplied), and presents them in an interactive browser.
-func browseSysdiagnose(path string, conf *crashlog.Config, dscFile *dyld.File) error {
-	files, cleanup, err := collectCrashlogs(path)
-	if err != nil {
-		return fmt.Errorf("failed to read sysdiagnose %s: %v", filepath.Base(path), err)
-	}
-	defer cleanup()
+// browseSysdiagnose renders every .ips crash report collected from the
+// sysdiagnose archive or directory at path (symbolicating microstackshot stacks
+// when dscFile is supplied) and presents them in an interactive browser.
+func browseSysdiagnose(path string, files []string, conf *crashlog.Config, dscFile *dyld.File) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no .ips crash reports found in %s", filepath.Base(path))
 	}
@@ -782,16 +782,41 @@ func renderCrashlog(path string, conf *crashlog.Config, dscFile *dyld.File) stri
 	}
 }
 
+// sysdiagnoseHardwareModel returns the hardware model recorded by the first
+// microstackshot report (the only reports a DSC symbolicates here), so a
+// universal IPSW resolves to that device's SystemOS image.
+func sysdiagnoseHardwareModel(files []string) string {
+	for _, fp := range files {
+		hdr, err := crashlog.ParseHeader(fp)
+		if err != nil || (hdr.BugType != "145" && hdr.BugType != "202") {
+			continue
+		}
+		if ms, err := crashlog.OpenMicrostackshot(fp, &crashlog.Config{}); err == nil && ms.HardwareModel != "" {
+			return ms.HardwareModel
+		}
+	}
+	return ""
+}
+
 // openDSCArg opens a supplied dyld_shared_cache file, or an IPSW (extracting its
-// DSC), into a *dyld.File with a cleanup func.
-func openDSCArg(path, pemDB string) (*dyld.File, func(), error) {
+// DSC), into a *dyld.File with a cleanup func. device selects the SystemOS
+// image of a universal IPSW; empty leaves the selection to the manifest.
+func openDSCArg(path, pemDB, device string) (*dyld.File, func(), error) {
 	if f, err := dyld.Open(path); err == nil { // a dyld_shared_cache file
 		return f, func() { f.Close() }, nil
 	}
-	if _, err := info.Parse(path); err != nil { // not an IPSW either
+	ipswInfo, err := info.Parse(path)
+	if err != nil { // not an IPSW either
 		return nil, nil, fmt.Errorf("could not open %s as a dyld_shared_cache or IPSW: %v", path, err)
 	}
-	ctx, fs, err := dsc.OpenFromIPSW(path, pemDB, false, true)
+	if _, err := ipswInfo.ForDevice(device); err != nil {
+		if _, err := ipswInfo.SelectDeviceOrSharedSystem(device); err != nil {
+			return nil, nil, err
+		}
+		log.Warnf("device %s is absent from the IPSW; using its shared SystemOS", device)
+		device = ""
+	}
+	ctx, fs, err := dsc.OpenFromIPSWForDevice(path, pemDB, device, false, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -815,7 +840,7 @@ func openMicrostackshotDSC(args []string, ms *crashlog.Microstackshot, pemDB str
 	want := microstackshotCacheUUID(ms) // report's "Shared Cache:" UUID, if any
 
 	if len(args) > 1 {
-		f, cleanup, err := openDSCArg(filepath.Clean(args[1]), pemDB)
+		f, cleanup, err := openDSCArg(filepath.Clean(args[1]), pemDB, ms.HardwareModel)
 		if err != nil {
 			return nil, nil, err
 		}

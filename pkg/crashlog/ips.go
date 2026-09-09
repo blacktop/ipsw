@@ -1261,9 +1261,9 @@ func (i *Ips) fmtSymbolLocation(loc uint64) string {
 // an IPSW it mounts and opens the IPSW's caches; otherwise it opens the supplied
 // paths (e.g. an Xcode DeviceSupport dump). The returned func releases the
 // caches (and unmounts the IPSW when applicable).
-func (i *Ips) openDSCs(ipswPath string, dscPaths []string) ([]*dyld.File, func(), error) {
+func (i *Ips) openDSCs(ipswPath string, dscPaths []string, device string) ([]*dyld.File, func(), error) {
 	if ipswPath != "" {
-		ctx, fs, err := dsc.OpenFromIPSW(ipswPath, i.Config.PemDB, false, true)
+		ctx, fs, err := dsc.OpenFromIPSWForDevice(ipswPath, i.Config.PemDB, device, false, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to open DSC from IPSW: %w", err)
 		}
@@ -1369,6 +1369,7 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	}
 
 	/* SYMBOLICATE KERNELCACHE */
+	device := i.Payload.Product
 	var kc *macho.File
 	if ipswPath != "" {
 		var kcPaths []string
@@ -1380,7 +1381,6 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 			kcPaths = []string{ipswPath}
 		} else {
 			// If crashlog has no device identifier, prompt user to select from available devices
-			device := i.Payload.Product
 			log.WithField("device", device).Debug("Looking for kernelcache matching crashlog device")
 			if device == "" {
 				ipswInfo, err := info.Parse(ipswPath)
@@ -1641,7 +1641,7 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 
 	/* SYMBOLICATE FILESYSTEM MACHOS */
 	if ipswPath != "" && !bareKC {
-		if err := search.ForEachMachoInIPSW(ipswPath, i.Config.PemDB, func(path string, m *macho.File) error {
+		if err := search.ForEachMachoInIPSWForDevice(ipswPath, i.Config.PemDB, device, func(path string, m *macho.File) error {
 			if total == 0 {
 				return ErrDone // break
 			}
@@ -1725,7 +1725,7 @@ func (i *Ips) Symbolicate210(ipswPath string, dscPaths []string, looseDir string
 	if bareKC {
 		dscIPSW = "" // a bare kernelcache has no DSC; userspace frames stay raw
 	}
-	fs, closeDSCs, err := i.openDSCs(dscIPSW, dscPaths)
+	fs, closeDSCs, err := i.openDSCs(dscIPSW, dscPaths, device)
 	if err != nil {
 		return err
 	}

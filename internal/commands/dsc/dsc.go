@@ -949,10 +949,6 @@ func GetUserAgent(f *dyld.File, sysVer *plist.SystemVersion) (string, error) {
 	return "", nil
 }
 
-func OpenFromIPSW(ipswPath, pemDB string, driverKit, all bool) (*mount.Context, []*dyld.File, error) {
-	return OpenFromIPSWForDevice(ipswPath, pemDB, "", driverKit, all)
-}
-
 // OpenFromIPSWForDevice opens the caches from the selected product type or board's SystemOS image.
 func OpenFromIPSWForDevice(ipswPath, pemDB, device string, driverKit, all bool) (*mount.Context, []*dyld.File, error) {
 	ctx, err := mount.DmgInIPSW(ipswPath, "sys", &mount.Config{PemDB: pemDB, Device: device})

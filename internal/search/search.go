@@ -517,11 +517,6 @@ func ForEachFileInZip(ipswPath, dmgLabel, directory string, handler func(string,
 	return nil
 }
 
-// ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
-func ForEachMachoInIPSW(ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
-	return ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, "", handler)
-}
-
 // ForEachMachoInIPSWForDevice selects the product type or board before scanning IPSW volumes.
 func ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, device string, handler func(string, *macho.File) error) error {
 	i, err := info.Parse(ipswPath)
