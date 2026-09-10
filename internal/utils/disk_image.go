@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -66,6 +67,13 @@ func attachDarwinImage(
 
 	var flags []string
 	if mountPoint != "" {
+		// Prepare explicit destinations for every Darwin caller, including
+		// Mount and MountEncrypted. Backend directory creation differs by OS
+		// version. Keep these directories caller-owned: detach must not remove
+		// a preexisting user directory or recursively clean a mounted path.
+		if err := os.MkdirAll(mountPoint, 0750); err != nil {
+			return fmt.Errorf("failed to create mount point %s: %w", mountPoint, err)
+		}
 		flags = append(flags, backend.mountFlag, mountPoint)
 	}
 	if password != nil {

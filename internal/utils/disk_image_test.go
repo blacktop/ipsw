@@ -28,10 +28,9 @@ const (
 var exitFailure = errors.New("exit status 1")
 
 func TestAttachDarwinImageBackends(t *testing.T) {
-	const (
-		image      = "/tmp/image with spaces.dmg"
-		mountPoint = "/tmp/mount with spaces"
-	)
+	root := t.TempDir()
+	image := filepath.Join(root, "image with spaces.dmg")
+	mountPoint := filepath.Join(root, "mount with spaces")
 	diskutilAttach := []string{"/usr/sbin/diskutil", "image", "attach", "-mountPoint", mountPoint}
 	hdiutilAttach := []string{"/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint}
 	diskutilEncrypted := slices.Concat(diskutilAttach, []string{"-stdinpassphrase"})
@@ -79,6 +78,14 @@ func TestAttachDarwinImageBackends(t *testing.T) {
 			}
 			want = slices.Concat(want, []string{image})
 			t.Run(name, func(t *testing.T) {
+				if _, err := os.Lstat(mountPoint); !os.IsNotExist(err) {
+					t.Fatalf("mount directory must start absent: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := os.Remove(mountPoint); err != nil && !os.IsNotExist(err) {
+						t.Errorf("remove test mount directory: %v", err)
+					}
+				})
 				calls := 0
 				err := attachDarwinImage(image, mountPoint, password, func(cmd *exec.Cmd) ([]byte, error) {
 					calls++
@@ -102,6 +109,9 @@ func TestAttachDarwinImageBackends(t *testing.T) {
 					}
 					if !reflect.DeepEqual(cmd.Args, want) {
 						t.Fatalf("attach = %q, want %q", cmd.Args, want)
+					}
+					if info, err := os.Stat(mountPoint); err != nil || !info.IsDir() {
+						t.Fatalf("mount directory not ready at attach: %v", err)
 					}
 					return []byte("attached"), nil
 				})
@@ -127,7 +137,7 @@ func TestAttachDarwinImageDoesNotFallbackOnFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			err := attachDarwinImage("/tmp/test.dmg", "/tmp/test.mount", nil, func(cmd *exec.Cmd) ([]byte, error) {
+			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), nil, func(cmd *exec.Cmd) ([]byte, error) {
 				calls++
 				if calls == 1 {
 					return []byte(tc.probe), tc.probeErr
@@ -157,7 +167,7 @@ func TestAttachDarwinImagePreservesMultilinePassword(t *testing.T) {
 	for _, password := range []string{"synthetic-password\n", "synthetic\npassword", "synthetic\rpassword"} {
 		t.Run(fmt.Sprintf("%q", password), func(t *testing.T) {
 			calls := 0
-			err := attachDarwinImage("/tmp/test.dmg", "/tmp/test.mount", strings.NewReader(password), func(cmd *exec.Cmd) ([]byte, error) {
+			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), strings.NewReader(password), func(cmd *exec.Cmd) ([]byte, error) {
 				calls++
 				if calls == 1 {
 					return []byte(doubleHyphenHelp), nil
