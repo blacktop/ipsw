@@ -45,12 +45,13 @@ var (
 	reOTARestorePlist   = regexp.MustCompile(`Restore\.plist$`)
 	reOTABuildManifest  = regexp.MustCompile(`BuildManifest\.plist$`)
 	reOTASystemVersion  = regexp.MustCompile(`SystemVersion\.plist$`)
-	reOTADscCryptex     = regexp.MustCompile(`^cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?|rosetta)$`)
+	// Numbered arm64e variants share the cryptex naming scheme.
+	reOTADscCryptex = regexp.MustCompile(`^cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?|rosetta)$`)
 	// reAnySystemCryptex selects a system cryptex when the caller named no
 	// architecture. arm64_32 must be present: `arm64e?` cannot match it, so a
 	// watchOS OTA carrying only cryptex-system-arm64_32 would otherwise report
 	// "cryptex not found" unless the arch was passed explicitly.
-	reAnySystemCryptex = regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?)$`)
+	reAnySystemCryptex = regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?)$`)
 )
 
 type File struct {
@@ -653,11 +654,11 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 // temp dir means the operation did not finish cleanly.
 func (r *Reader) ExtractCryptex(cryptex, output string) (dmg string, err error) {
 	var re *regexp.Regexp
-	switch cryptex {
-	case "system":
+	switch {
+	case cryptex == "system":
 		re = reAnySystemCryptex
-	case "system-arm64e", "system-arm64e_x1", "system-x86_64h", "app":
-		re = regexp.MustCompile("cryptex-" + cryptex + "$")
+	case cryptex == "app" || reOTADscCryptex.MatchString("cryptex-"+cryptex):
+		re = regexp.MustCompile("^" + regexp.QuoteMeta("cryptex-"+cryptex) + "$")
 	default:
 		return "", fmt.Errorf("unknown cryptex type '%s'", cryptex)
 	}

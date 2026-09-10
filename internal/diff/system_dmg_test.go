@@ -238,6 +238,31 @@ func TestOpenDeviceSpecificDSCFromMount(t *testing.T) {
 	}
 }
 
+func TestOpenNumberedDSCReachesParser(t *testing.T) {
+	for _, variant := range []string{"arm64e_x2", "arm64e_x12", "arm64e_xfoo"} {
+		t.Run(variant, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, "System/Library/dyld/dyld_shared_cache_"+variant)
+			if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+				t.Fatal(err)
+			}
+			// Empty synthetic data proves discovery reaches the parser without
+			// assuming an unverified cache magic or layout for future variants.
+			if err := os.WriteFile(path, nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := openDSCFromMount(root, true, inputModeIPSW, "Old")
+			want := "failed to open DSC"
+			if variant == "arm64e_xfoo" {
+				want = "no dyld_shared_cache files found"
+			}
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("wanted %q, got %v", want, err)
+			}
+		})
+	}
+}
+
 func TestOpenDSCFromMountPrefersGenericCache(t *testing.T) {
 	root := t.TempDir()
 	writeSyntheticDSC(t, root, "arm64e_x1")

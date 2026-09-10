@@ -1041,6 +1041,9 @@ func DSC(c *Config) ([]string, error) {
 			return nil, err
 		}
 		if i.Plists.Type == "OTA" {
+			if c.KernelDevice != "" {
+				return nil, fmt.Errorf("device selection is not supported for dyld_shared_cache extraction from remote OTA; omit the device selector and use --dyld-arch to filter architectures")
+			}
 			if runtime.GOOS == "darwin" {
 				zr, err = tuneRemoteZipReader(c, zr, dyld.RemoteCryptexFiles(zr.File, c.Arches))
 				if err != nil {

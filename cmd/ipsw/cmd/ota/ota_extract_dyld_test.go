@@ -1040,6 +1040,18 @@ func TestDSCPatternForArches(t *testing.T) {
 		rejects []string
 	}{
 		{
+			name:   "numbered arm64e is exact",
+			arches: []string{"arm64e_x2"},
+			matches: []string{
+				"System/Library/dyld/dyld_shared_cache_arm64e_x2",
+				"System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e_x2.01",
+			},
+			rejects: []string{
+				"System/Library/dyld/dyld_shared_cache_arm64e",
+				"System/Library/dyld/dyld_shared_cache_arm64e_x12",
+			},
+		},
+		{
 			name:   "arm64 is exact",
 			arches: []string{"arm64"},
 			matches: []string{
@@ -1097,6 +1109,8 @@ func TestDSCPatternForArches(t *testing.T) {
 
 func TestDSCUberRegexMatchesKnownCachePaths(t *testing.T) {
 	paths := []string{
+		"System/Library/dyld/dyld_shared_cache_arm64e_x2",
+		"System/Library/dyld/dyld_shared_cache_arm64e_x12.01",
 		"System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
 		"System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e",
 		"System/Library/dyld/aot_shared_cache.0",

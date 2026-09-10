@@ -67,7 +67,7 @@ func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
 	if len(dyldArches) == 0 {
 		// arm64_32 must be here: `arm64e?` cannot match it, so an unfiltered RSR
 		// patch would skip a watchOS system cryptex it was asked to handle.
-		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?)$`)
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?)$`)
 	}
 
 	patterns := make([]string, 0, len(dyldArches))

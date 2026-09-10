@@ -29,22 +29,24 @@ func TestSystemOSAmbiguityDoesNotFallBackToFilesystem(t *testing.T) {
 	}
 }
 
-func TestArm64eX1CacheSelection(t *testing.T) {
-	for _, suffix := range []string{"", ".01", ".79.dyldlinkedit", ".symbols"} {
-		path := "System/Library/dyld/dyld_shared_cache_arm64e_x1" + suffix
-		if !dscArchRegex([]string{"arm64e_x1"}, false, false).MatchString(path) {
-			t.Fatalf("missed %s", path)
+func TestNumberedArm64eCacheSelection(t *testing.T) {
+	for _, variant := range []string{"arm64e_x1", "arm64e_x2", "arm64e_x12"} {
+		for _, suffix := range []string{"", ".01", ".79.dyldlinkedit", ".symbols"} {
+			path := "System/Library/dyld/dyld_shared_cache_" + variant + suffix
+			if !dscArchRegex([]string{variant}, false, false).MatchString(path) {
+				t.Fatalf("missed %s", path)
+			}
+			if dscArchRegex([]string{"arm64e"}, false, false).MatchString(path) {
+				t.Fatalf("generic arch selected distinct variant %s", path)
+			}
 		}
-		if dscArchRegex([]string{"arm64e"}, false, false).MatchString(path) {
-			t.Fatalf("generic arch selected distinct variant %s", path)
+		if dscArchRegex([]string{variant}, false, false).MatchString("System/Library/dyld/dyld_shared_cache_arm64e") {
+			t.Fatal("numbered selector matched generic cache")
 		}
-	}
-	if dscArchRegex([]string{"arm64e_x1"}, false, false).MatchString("System/Library/dyld/dyld_shared_cache_arm64e") {
-		t.Fatal("x1 selector matched generic cache")
-	}
-	for _, arches := range [][]string{nil, {"arm64e_x1"}} {
-		if !RemoteCryptexPattern(arches).MatchString("cryptex-system-arm64e_x1") {
-			t.Fatalf("OTA discovery missed x1 for %v", arches)
+		for _, arches := range [][]string{nil, {variant}} {
+			if !RemoteCryptexPattern(arches).MatchString("cryptex-system-" + variant) {
+				t.Fatalf("OTA discovery missed numbered variant for %v", arches)
+			}
 		}
 	}
 }

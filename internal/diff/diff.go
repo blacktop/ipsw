@@ -1034,14 +1034,14 @@ func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side strin
 	}
 	if isMacOS {
 		var filtered []string
-		r := regexp.MustCompile(dyld.CacheRegex + "(arm64e(_x1)?)" + dyld.CacheRegexEnding)
+		r := regexp.MustCompile(dyld.CacheRegex + "(arm64e(_x[0-9]+)?)" + dyld.CacheRegexEnding)
 		for _, match := range dscs {
 			if r.MatchString(match) {
 				filtered = append(filtered, match)
 			}
 		}
 		if len(filtered) == 0 && mode != inputModeOTA {
-			return nil, fmt.Errorf("no dyld_shared_cache files found matching arm64e or arm64e_x1")
+			return nil, fmt.Errorf("no dyld_shared_cache files found matching arm64e or a numbered arm64e variant")
 		}
 		if len(filtered) > 0 {
 			dscs = filtered

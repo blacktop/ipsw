@@ -194,6 +194,8 @@ func decryptPartialFiles(out []string, keys download.WikiFWKeys, cwd string) err
 	return nil
 }
 
+var pickIPSWDevice = utils.PickDevice
+
 // downloadIpswCmd represents the ipsw command
 var downloadIpswCmd = &cobra.Command{
 	Use:     "ipsw",
@@ -253,9 +255,6 @@ var downloadIpswCmd = &cobra.Command{
 		if extractDevice != "" && !remoteKernel && !remoteDSC && !fcsKeys && !fcsKeysJson {
 			return fmt.Errorf("--extract-device requires --kernel, --dyld, --fcs-keys, or --fcs-keys-json")
 		}
-		if extractDevice == "" {
-			extractDevice = device
-		}
 		decrypt := viper.GetBool("download.ipsw.decrypt")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
@@ -280,7 +279,7 @@ var downloadIpswCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("download.ipsw.usb") {
-			dev, err := utils.PickDevice()
+			dev, err := pickIPSWDevice()
 			if err != nil {
 				return err
 			}
@@ -288,6 +287,9 @@ var downloadIpswCmd = &cobra.Command{
 			if !latest {
 				build = dev.BuildVersion
 			}
+		}
+		if extractDevice == "" {
+			extractDevice = device
 		}
 
 		if len(device) > 0 {

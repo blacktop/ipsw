@@ -892,40 +892,58 @@ func TestAnySystemCryptexSelectorCoversArm64_32(t *testing.T) {
 	}
 }
 
-func TestSystemCryptexArm64eX1Discovery(t *testing.T) {
-	const source = "cryptex-system-arm64e_x1"
-	if !reAnySystemCryptex.MatchString(source) {
-		t.Error("unfiltered system selector excludes arm64e_x1")
-	}
-	if !IsDscCryptexBasename(source) {
-		t.Error("DSC discovery excludes arm64e_x1")
-	}
-	for _, name := range []string{"cryptex-system-arm64e_x2", source + ".dmg", source + "-extra"} {
-		if reAnySystemCryptex.MatchString(name) || IsDscCryptexBasename(name) {
-			t.Errorf("accepted invalid cryptex %q", name)
+func TestExtractCryptexNumberedSelectorValidation(t *testing.T) {
+	r := &Reader{}
+	for _, kind := range []string{"system-arm64e_x1", "system-arm64e_x2", "system-arm64e_x12"} {
+		if _, err := r.ExtractCryptex(kind, t.TempDir()); !errors.Is(err, ErrCryptexNotFound) {
+			t.Errorf("%s: expected missing member, got %v", kind, err)
 		}
 	}
-	for _, arches := range [][]string{nil, {"arm64e_x1"}} {
-		var called []string
-		out, err := extractFromDscCryptexFilesForArches(cryptexFiles("cryptex-system-arm64e", source), arches,
-			func(file *File) ([]string, error) {
-				called = append(called, file.Base())
-				arch := strings.TrimPrefix(file.Base(), "cryptex-system-")
-				return []string{"out/System/Library/dyld/dyld_shared_cache_" + arch}, nil
-			})
-		if err != nil {
-			t.Fatal(err)
+	for _, kind := range []string{"system-arm64e_x", "system-arm64e_xfoo", "system-arm64e_x2.dmg", "system-arm64e_x[12]"} {
+		if _, err := r.ExtractCryptex(kind, t.TempDir()); err == nil || !strings.Contains(err.Error(), "unknown cryptex type") {
+			t.Errorf("%s: expected invalid selector, got %v", kind, err)
 		}
-		wantCalled := []string{"cryptex-system-arm64e", source}
-		if len(arches) > 0 {
-			wantCalled = []string{source}
-		}
-		if !slices.Equal(called, wantCalled) {
-			t.Errorf("arches %v staged %v, want %v", arches, called, wantCalled)
-		}
-		want := ExtractedFile{Path: "out/System/Library/dyld/dyld_shared_cache_arm64e_x1", Source: source}
-		if !slices.Contains(out, want) {
-			t.Errorf("arches %v missing x1 extraction: %+v", arches, out)
-		}
+	}
+}
+
+func TestSystemCryptexNumberedArm64eDiscovery(t *testing.T) {
+	for _, variant := range []string{"arm64e_x1", "arm64e_x2", "arm64e_x12"} {
+		t.Run(variant, func(t *testing.T) {
+			source := "cryptex-system-" + variant
+			if !reAnySystemCryptex.MatchString(source) {
+				t.Error("unfiltered system selector excludes numbered arm64e variant")
+			}
+			if !IsDscCryptexBasename(source) {
+				t.Error("DSC discovery excludes numbered arm64e variant")
+			}
+			for _, name := range []string{"cryptex-system-arm64e_x", "cryptex-system-arm64e_xfoo", source + ".dmg", source + "-extra"} {
+				if reAnySystemCryptex.MatchString(name) || IsDscCryptexBasename(name) {
+					t.Errorf("accepted invalid cryptex %q", name)
+				}
+			}
+			for _, arches := range [][]string{nil, {variant}} {
+				var called []string
+				out, err := extractFromDscCryptexFilesForArches(cryptexFiles("cryptex-system-arm64e", source), arches,
+					func(file *File) ([]string, error) {
+						called = append(called, file.Base())
+						arch := strings.TrimPrefix(file.Base(), "cryptex-system-")
+						return []string{"out/System/Library/dyld/dyld_shared_cache_" + arch}, nil
+					})
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantCalled := []string{"cryptex-system-arm64e", source}
+				if len(arches) > 0 {
+					wantCalled = []string{source}
+				}
+				if !slices.Equal(called, wantCalled) {
+					t.Errorf("arches %v staged %v, want %v", arches, called, wantCalled)
+				}
+				want := ExtractedFile{Path: "out/System/Library/dyld/dyld_shared_cache_" + variant, Source: source}
+				if !slices.Contains(out, want) {
+					t.Errorf("arches %v missing numbered variant extraction: %+v", arches, out)
+				}
+			}
+		})
 	}
 }

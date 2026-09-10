@@ -209,3 +209,52 @@ func TestRemoteDscDeviceAndSearchPreflight(t *testing.T) {
 		t.Fatalf("archive-only search blocked: %v", err)
 	}
 }
+
+func TestRemoteOTADSCRejectsDeviceSelection(t *testing.T) {
+	manifest, err := gplist.Marshal(extractionMultiSystemInfo().Plists.BuildManifest, gplist.XMLFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otaInfo, err := gplist.Marshal(&plist.OTAInfo{}, gplist.XMLFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for name, data := range map[string][]byte{"BuildManifest.plist": manifest, "Info.plist": otaInfo} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"synthetic-ota-selection"`)
+		http.ServeContent(w, r, "synthetic.zip", time.Time{}, bytes.NewReader(archive.Bytes()))
+	}))
+	t.Cleanup(server.Close)
+	for _, device := range []string{"Mac99,2", "J992AP", "Mac99,3"} {
+		for _, arches := range [][]string{nil, {"arm64e"}} {
+			t.Run(device+"/"+strings.Join(arches, ","), func(t *testing.T) {
+				c := &Config{URL: server.URL + "/synthetic.zip", KernelDevice: device, Arches: arches, Output: t.TempDir()}
+				t.Cleanup(func() { c.Close() })
+				out, err := DSC(c)
+				if err == nil || !strings.Contains(err.Error(), "device selection is not supported for dyld_shared_cache extraction from remote OTA") || len(out) != 0 {
+					t.Fatalf("expected unsupported device selection, got %v, %v", out, err)
+				}
+				if c.info == nil || c.info.Plists.Type != "OTA" {
+					t.Fatal("fixture did not reach the remote OTA path")
+				}
+				entries, err := os.ReadDir(c.Output)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("wrote files before rejecting device selection: %v, %v", entries, err)
+				}
+			})
+		}
+	}
+}

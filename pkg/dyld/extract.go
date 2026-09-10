@@ -570,7 +570,7 @@ func RemoteCryptexPattern(arches []string) *regexp.Regexp {
 		// arm64_32 must be here: `arm64e?` cannot match it, and a watchOS OTA
 		// whose only system cryptex is cryptex-system-arm64_32 would otherwise
 		// be skipped unless the caller named the arch explicitly.
-		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x1)?)?|x86_64h?)$`)
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?)$`)
 	}
 	parts := remoteCryptexArchPatterns(arches)
 	if len(parts) == 0 {
@@ -583,10 +583,12 @@ func remoteCryptexArchPatterns(arches []string) []string {
 	parts := make([]string, 0, len(arches))
 	for _, arch := range arches {
 		switch arch {
-		case "arm64", "arm64e", "arm64e_x1", "arm64_32", "x86_64", "x86_64h":
-			parts = append(parts, regexp.QuoteMeta(arch))
 		case "aot":
 			parts = append(parts, "x86_64h?")
+		default:
+			if arch != "rosetta" && ota.IsDscCryptexBasename("cryptex-system-"+arch) {
+				parts = append(parts, regexp.QuoteMeta(arch))
+			}
 		}
 	}
 	return parts
