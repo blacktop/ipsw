@@ -700,10 +700,10 @@ func MountDMG(image string, customMountPoint string) (string, bool, error) {
 			}
 			return mountPoint, true, nil
 		}
-	} else {
-		if err := os.MkdirAll(mountPoint, 0750); err != nil {
-			return "", false, fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
-		}
+	}
+
+	if err := os.MkdirAll(mountPoint, 0750); err != nil {
+		return "", false, fmt.Errorf("failed to create temporary mount point %s: %w", mountPoint, err)
 	}
 
 	if err := Mount(image, mountPoint); err != nil {
