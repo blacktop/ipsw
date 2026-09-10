@@ -18,6 +18,7 @@ ipsw ota patch rsr <OTA> | --cryptex <PATCH> [flags]
 
 ```
   -c, --cryptex string          Patch a local cryptex RIDIFF file directly (no OTA argument)
+      --device string           Device product type or board for manifest DMG selection
   -a, --dyld-arch stringArray   Limit OTA system cryptex patching to these dyld_shared_cache architectures
   -h, --help                    help for rsr
   -i, --input string            Input folder containing base DMGs to patch against

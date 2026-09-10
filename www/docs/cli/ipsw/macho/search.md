@@ -19,6 +19,7 @@ ipsw macho search <IPSW|FOLDER> [flags]
 ```
   -g, --category string       Search for specific ObjC category regex
   -c, --class string          Search for specific ObjC class regex
+      --device string         Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
   -h, --help                  help for search
   -i, --import string         Search for specific import regex
   -r, --ivar string           Search for specific ObjC instance variable regex

@@ -1114,6 +1114,12 @@
             "description": "path to AEA pem DB JSON file",
             "name": "pem_db",
             "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "device product type or board selecting the filesystem images",
+            "name": "device",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1476,7 +1482,7 @@
         "parameters": [
           {
             "type": "string",
-            "description": "type of DMG to mount (app|sys|fs)",
+            "description": "type of DMG to mount (app|sys|fs|exc|rdisk|rosetta)",
             "name": "type",
             "in": "path",
             "required": true
@@ -1498,6 +1504,12 @@
             "type": "string",
             "description": "custom mount point path",
             "name": "mount_point",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "device product type or board (e.g. Mac18,5 or j873gap)",
+            "name": "device",
             "in": "query"
           },
           {
@@ -1685,6 +1697,12 @@
           },
           {
             "type": "string",
+            "description": "reserved device selector; nonempty values are rejected because database graphs are firmware-wide",
+            "name": "device",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "description": "path to symbolication signatures directory",
             "name": "sig_dir",
             "in": "query"
@@ -1693,6 +1711,9 @@
         "responses": {
           "201": {
             "$ref": "#/responses/createdResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -1727,6 +1748,12 @@
           },
           {
             "type": "string",
+            "description": "reserved device selector; nonempty values are rejected because database graphs are firmware-wide",
+            "name": "device",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "description": "path to symbolication signatures directory",
             "name": "sig_dir",
             "in": "query"
@@ -1735,6 +1762,9 @@
         "responses": {
           "200": {
             "$ref": "#/responses/successResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
           },
           "409": {
             "$ref": "#/responses/genericError"
@@ -1840,6 +1870,9 @@
                 },
                 "mount_point": {
                   "type": "string"
+                },
+                "retain_dmg": {
+                  "type": "boolean"
                 }
               }
             }
@@ -2481,6 +2514,40 @@
       "format": "uint32",
       "x-go-package": "github.com/blacktop/go-macho/types"
     },
+    "CacheCPU": {
+      "description": "CacheCPU is the Mach-O CPU type/subtype tuple from the dyld_shared_cache header\n(only present in macOS/iOS/etc 27.x+ caches)",
+      "type": "object",
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "x-go-name": "CPU"
+        },
+        "reserved": {
+          "type": "integer",
+          "format": "uint64",
+          "x-go-name": "Reserved"
+        },
+        "subcpu": {
+          "type": "string",
+          "x-go-name": "SubCPU"
+        },
+        "subcpu_caps": {
+          "type": "string",
+          "x-go-name": "SubCPUCaps"
+        },
+        "subtype": {
+          "type": "integer",
+          "format": "uint32",
+          "x-go-name": "Subtype"
+        },
+        "type": {
+          "type": "integer",
+          "format": "uint32",
+          "x-go-name": "Type"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
     "CacheMappingFlag": {
       "type": "integer",
       "format": "uint64",
@@ -2890,6 +2957,30 @@
         }
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
+    },
+    "Context": {
+      "description": "Context is the mount context",
+      "type": "object",
+      "properties": {
+        "already_mounted": {
+          "type": "boolean",
+          "x-go-name": "AlreadyMounted"
+        },
+        "dmg_path": {
+          "type": "string",
+          "x-go-name": "DmgPath"
+        },
+        "mount_point": {
+          "type": "string",
+          "x-go-name": "MountPoint"
+        },
+        "retain_dmg": {
+          "description": "RetainDmg is set when the backing image existed before this acquisition.\nIt is serialized so an unmount driven by the /mount API response keeps\nthe same ownership decision.",
+          "type": "boolean",
+          "x-go-name": "RetainDmg"
+        }
+      },
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/mount"
     },
     "DeletedAt": {
       "$ref": "#/definitions/NullTime"
@@ -5548,16 +5639,8 @@
     },
     "mountReponse": {
       "description": "",
-      "headers": {
-        "already_mounted": {
-          "type": "boolean"
-        },
-        "dmg_path": {
-          "type": "string"
-        },
-        "mount_point": {
-          "type": "string"
-        }
+      "schema": {
+        "$ref": "#/definitions/Context"
       }
     },
     "successResponse": {

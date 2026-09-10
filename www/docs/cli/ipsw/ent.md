@@ -57,6 +57,7 @@ ipsw ent [IPSW] [flags]
 ### Options
 
 ```
+      --device string             Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
       --dry-run                   Show what would be replaced without making changes
   -f, --file string               Search for file path pattern
       --file-only                 Only output file paths

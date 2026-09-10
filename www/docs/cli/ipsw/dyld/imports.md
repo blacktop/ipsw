@@ -17,6 +17,7 @@ ipsw dyld imports <DSC> [DYLIB] [flags]
 ### Options
 
 ```
+      --device string   Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
       --filter string   Regex filter for printed import/importer rows
   -h, --help            help for imports
       --image string    List imported bind symbols for this image instead of reverse importers

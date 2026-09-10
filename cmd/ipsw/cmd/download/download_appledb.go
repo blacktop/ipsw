@@ -171,7 +171,7 @@ var downloadAppledbCmd = &cobra.Command{
 
 		With --json, output is always a schema-versioned envelope. Schema version 1
 		contains a releases array; a query with no matches emits exactly
-		{"schema_version":1,"releases":[]}. Each release contains the canonical
+		` + "`" + `{"schema_version":1,"releases":[]}` + "`" + `. Each release contains the canonical
 		AppleDB OS family, version, build, nullable ISO 8601 release_date, channel,
 		and artifacts. Each artifact contains source_type (ipsw, ota, or rsr),
 		delivery (full or delta), prerequisite_builds, devices, nullable active_url,
