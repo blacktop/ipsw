@@ -168,19 +168,16 @@ var mountCmd = &cobra.Command{
 }
 
 func selectMountSystemOS(dmgs []info.SystemOSDMG) (int, error) {
-	options := make([]string, 0, len(dmgs))
-	for _, dmg := range dmgs {
-		options = append(options, dmg.String())
-	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stderr.Fd())) {
+		options := make([]string, 0, len(dmgs))
+		for _, dmg := range dmgs {
+			options = append(options, dmg.String())
+		}
 		return 0, fmt.Errorf("multiple SystemOS images found; select a target with --device: %s",
 			strings.Join(options, "; "))
 	}
 	var selected int
-	if err := survey.AskOne(&survey.Select{
-		Message: "Select a SystemOS image:",
-		Options: options,
-	}, &selected, survey.WithStdio(os.Stdin, os.Stderr, os.Stderr)); err != nil {
+	if err := survey.AskOne(newMountSystemOSPrompt(dmgs), &selected, survey.WithStdio(os.Stdin, os.Stderr, os.Stderr)); err != nil {
 		return 0, fmt.Errorf("SystemOS image selection canceled: %w", err)
 	}
 	return selected, nil
