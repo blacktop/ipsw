@@ -484,6 +484,16 @@ func ExtractForDevice(ipsw, destPath, pemDB string, arches []string, driverkit, 
 		return nil, err
 	}
 
+	kinds := make([]string, 0, len(steps))
+	for _, step := range steps {
+		kinds = append(kinds, string(step.Kind))
+	}
+	preparing := "Preparing caches"
+	if device != "" {
+		preparing += " for " + device
+	}
+	utils.Indent(log.Info, 2)(preparing + ": " + strings.Join(kinds, " + "))
+
 	dmgs := make([]DscExtractionDMG, 0, len(steps))
 	var cleanups []func()
 	defer func() {
