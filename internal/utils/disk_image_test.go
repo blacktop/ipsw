@@ -8,50 +8,91 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
 
+const (
+	// Captured from macOS 27.0 (26A428).
+	doubleHyphenHelp = "USAGE: diskutil image attach [--verbose] [--stdinpassphrase] [--plist]" +
+		" [--readOnly] [--nobrowse] [--mountPoint <mountPoint>] [--mountOptions <mountOptions>]" +
+		" [--mp <mp>] [--noMount] <image-url> [--shadow <shadow> ...]"
+	// Reported for macOS 13 in https://github.com/blacktop/ipsw/issues/1321; the
+	// report elides the rest of the usage line.
+	singleHyphenHelp = "USAGE: diskutil image attach [-readOnly] [-nobrowse]" +
+		" [-mountPoint <mountPoint>] ..."
+	missingVerbHelp = `diskutil: did not recognize verb "image"; type "diskutil" for a list`
+)
+
+var exitFailure = errors.New("exit status 1")
+
 func TestAttachDarwinImageBackends(t *testing.T) {
-	for _, legacy := range []bool{false, true} {
+	const (
+		image      = "/tmp/image with spaces.dmg"
+		mountPoint = "/tmp/mount with spaces"
+	)
+	diskutilAttach := []string{"/usr/sbin/diskutil", "image", "attach", "-mountPoint", mountPoint}
+	hdiutilAttach := []string{"/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint}
+	diskutilEncrypted := slices.Concat(diskutilAttach, []string{"-stdinpassphrase"})
+	hdiutilEncrypted := slices.Concat(hdiutilAttach, []string{"-stdinpass"})
+	for _, backend := range []struct {
+		name, probe      string
+		probeErr         error
+		plain, encrypted []string
+	}{
+		{
+			name:      "diskutil/double-hyphen",
+			probe:     doubleHyphenHelp,
+			plain:     diskutilAttach,
+			encrypted: diskutilEncrypted,
+		},
+		{
+			name:      "diskutil/single-hyphen",
+			probe:     singleHyphenHelp + " [-stdinpassphrase]",
+			probeErr:  exitFailure,
+			plain:     diskutilAttach,
+			encrypted: diskutilEncrypted,
+		},
+		{
+			name:      "diskutil/no-stdinpassphrase",
+			probe:     singleHyphenHelp,
+			plain:     diskutilAttach,
+			encrypted: hdiutilEncrypted,
+		},
+		{
+			name:      "hdiutil",
+			probe:     missingVerbHelp,
+			probeErr:  exitFailure,
+			plain:     hdiutilAttach,
+			encrypted: hdiutilEncrypted,
+		},
+	} {
 		for _, encrypted := range []bool{false, true} {
-			name := "diskutil"
-			if legacy {
-				name = "hdiutil"
-			}
+			name := backend.name
+			want := backend.plain
+			var password io.Reader
 			if encrypted {
 				name += "/encrypted"
+				want = backend.encrypted
+				password = strings.NewReader("synthetic password")
 			}
+			want = slices.Concat(want, []string{image})
 			t.Run(name, func(t *testing.T) {
-				var password io.Reader
-				if encrypted {
-					password = strings.NewReader("synthetic password")
-				}
 				calls := 0
-				err := attachDarwinImage("/tmp/image with spaces.dmg", "/tmp/mount with spaces", password, func(cmd *exec.Cmd) ([]byte, error) {
+				err := attachDarwinImage(image, mountPoint, password, func(cmd *exec.Cmd) ([]byte, error) {
 					calls++
 					if calls == 1 {
-						if want := []string{"/usr/sbin/diskutil", "image", "attach", "--help"}; !reflect.DeepEqual(cmd.Args, want) {
+						probe := []string{"/usr/sbin/diskutil", "image", "attach", "-help"}
+						if !reflect.DeepEqual(cmd.Args, probe) {
 							t.Fatalf("probe = %q", cmd.Args)
 						}
 						if cmd.Stdin != nil {
 							t.Fatal("probe received password")
 						}
-						if legacy {
-							return []byte(`diskutil: did not recognize verb "image"; type "diskutil" for a list`), errors.New("exit status 1")
-						}
-						return []byte("USAGE: diskutil image attach [--mountPoint <mountPoint>]"), nil
-					}
-					want := []string{"/usr/sbin/diskutil", "image", "attach", "--mountPoint", "/tmp/mount with spaces"}
-					if legacy {
-						want = []string{"/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", "/tmp/mount with spaces"}
+						return []byte(backend.probe), backend.probeErr
 					}
 					if encrypted {
-						flag := "--stdinpassphrase"
-						if legacy {
-							flag = "-stdinpass"
-						}
-						want = append(want, flag)
 						data, err := io.ReadAll(cmd.Stdin)
 						if err != nil || string(data) != "synthetic password" {
 							t.Fatalf("password input = %q, %v", data, err)
@@ -59,7 +100,6 @@ func TestAttachDarwinImageBackends(t *testing.T) {
 					} else if cmd.Stdin != nil {
 						t.Fatal("unexpected stdin")
 					}
-					want = append(want, "/tmp/image with spaces.dmg")
 					if !reflect.DeepEqual(cmd.Args, want) {
 						t.Fatalf("attach = %q, want %q", cmd.Args, want)
 					}
@@ -74,16 +114,15 @@ func TestAttachDarwinImageBackends(t *testing.T) {
 }
 
 func TestAttachDarwinImageDoesNotFallbackOnFailure(t *testing.T) {
-	failure := errors.New("exit status 1")
 	for _, tc := range []struct {
 		name, probe, output string
 		probeErr            error
 		calls               int
 		busy                bool
 	}{
-		{name: "permission", probe: "--mountPoint", output: "Permission denied", calls: 2},
-		{name: "busy", probe: "--mountPoint", output: "Resource busy", calls: 2, busy: true},
-		{name: "framework", probe: "Unable to use the DiskManagement framework", probeErr: failure, calls: 1},
+		{name: "permission", probe: doubleHyphenHelp, output: "Permission denied", calls: 2},
+		{name: "busy", probe: doubleHyphenHelp, output: "Resource busy", calls: 2, busy: true},
+		{name: "framework", probe: "Unable to use the DiskManagement framework", probeErr: exitFailure, calls: 1},
 		{name: "unexpected help", probe: "unknown help output", calls: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -96,7 +135,7 @@ func TestAttachDarwinImageDoesNotFallbackOnFailure(t *testing.T) {
 				if cmd.Path != "/usr/sbin/diskutil" {
 					t.Fatal("fell back after failure")
 				}
-				return []byte(tc.output), failure
+				return []byte(tc.output), exitFailure
 			})
 			if err == nil || calls != tc.calls {
 				t.Fatalf("error = %v, calls = %d, want %d", err, calls, tc.calls)
@@ -107,7 +146,7 @@ func TestAttachDarwinImageDoesNotFallbackOnFailure(t *testing.T) {
 			if errors.Is(err, ErrMountResourceBusy) != tc.busy {
 				t.Fatalf("busy classification = %v", err)
 			}
-			if (tc.name == "permission" || tc.name == "framework") && !errors.Is(err, failure) {
+			if (tc.name == "permission" || tc.name == "framework") && !errors.Is(err, exitFailure) {
 				t.Fatalf("lost underlying error: %v", err)
 			}
 		})
@@ -121,7 +160,7 @@ func TestAttachDarwinImagePreservesMultilinePassword(t *testing.T) {
 			err := attachDarwinImage("/tmp/test.dmg", "/tmp/test.mount", strings.NewReader(password), func(cmd *exec.Cmd) ([]byte, error) {
 				calls++
 				if calls == 1 {
-					return []byte("--mountPoint"), nil
+					return []byte(doubleHyphenHelp), nil
 				}
 				if cmd.Path != "/usr/bin/hdiutil" {
 					t.Fatalf("multiline password sent to %s, which cannot preserve line breaks", cmd.Path)
