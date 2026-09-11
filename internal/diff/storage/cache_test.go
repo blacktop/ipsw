@@ -367,3 +367,69 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+// TestIPSWCacheIdentityIgnoresDeviceSelection proves selecting a device keeps
+// the IPSW's identity: boards of one IPSW pair share a cache, while a manifest
+// that differs in a signed component of any board still gets its own, even for
+// a selection that excludes that board.
+func TestIPSWCacheIdentityIgnoresDeviceSelection(t *testing.T) {
+	whole := multiBoardInfo(t, 0x02)
+	wholeID, err := IPSWCacheIdentity(whole)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, product := range []string{"Mac13,1", "Mac18,5"} {
+		id := selectedIdentity(t, whole, product)
+		if id != wholeID {
+			t.Fatalf("selecting %s changed the identity: %q != %q", product, id, wholeID)
+		}
+	}
+	resigned := multiBoardInfo(t, 0x03)
+	resignedID, err := IPSWCacheIdentity(resigned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resignedID == wholeID {
+		t.Fatal("a changed signed component did not change the identity")
+	}
+	if id := selectedIdentity(t, resigned, "Mac13,1"); id == wholeID {
+		t.Fatal("selecting the unchanged board hid the other board's changed component")
+	}
+}
+
+// multiBoardInfo builds a two-board IPSW whose second board's kernelcache
+// digest is secondKernel, so callers can re-sign one board while the other
+// stays byte-identical.
+func multiBoardInfo(t *testing.T, secondKernel byte) *info.Info {
+	t.Helper()
+	inf := fakeInfo(t, "27.0", "26A428", "Mac13,1", 0x01)
+	inf.Plists.BuildManifest.SupportedProductTypes = []string{"Mac13,1", "Mac18,5"}
+	inf.Plists.BuildIdentities = []plist.BuildIdentity{
+		boardIdentity("Mac13,1", 0x01, 0x10),
+		boardIdentity("Mac18,5", secondKernel, 0x20),
+	}
+	return inf
+}
+
+func boardIdentity(product string, kernel, system byte) plist.BuildIdentity {
+	return plist.BuildIdentity{
+		ApProductType: product,
+		Manifest: map[string]plist.IdentityManifest{
+			"KernelCache":       {Digest: []byte{kernel}},
+			"Cryptex1,SystemOS": {Digest: []byte{system}},
+		},
+	}
+}
+
+func selectedIdentity(t *testing.T, inf *info.Info, product string) string {
+	t.Helper()
+	selected, err := inf.ForDevice(product)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := IPSWCacheIdentity(selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}

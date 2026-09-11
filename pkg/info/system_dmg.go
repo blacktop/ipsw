@@ -114,6 +114,9 @@ func (i *Info) ForDevice(device string) (*Info, error) {
 	copyManifest := *i.Plists.BuildManifest
 	copyManifest.BuildIdentities = identities
 	copyPlists.BuildManifest = &copyManifest
+	if copyPlists.SelectedFrom == nil {
+		copyPlists.SelectedFrom = i.Plists.BuildManifest
+	}
 	copyInfo.Plists = &copyPlists
 	return &copyInfo, nil
 }

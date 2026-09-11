@@ -292,7 +292,7 @@ func TestDiffSystemOSDeviceSelectionAndCacheIdentity(t *testing.T) {
 	if _, err := i.SelectDevice(""); err == nil {
 		t.Fatal("ambiguous SystemOS would be skipped as absent")
 	}
-	var ids []string
+	var ids, volumes []string
 	for _, product := range []string{"Mac99,1", "Mac99,2"} {
 		selected, err := i.SelectDevice(product)
 		if err != nil {
@@ -314,9 +314,16 @@ func TestDiffSystemOSDeviceSelectionAndCacheIdentity(t *testing.T) {
 			t.Fatal(err)
 		}
 		ids = append(ids, id)
+		volumes = append(volumes, volumeDMGInputHashFor(selected, selected, "sys"))
 	}
-	if ids[0] == ids[1] {
-		t.Fatal("different target selections share a diff cache identity")
+	// Selections of one IPSW share its cache identity so a later board hydrates
+	// the walks an earlier board persisted; the tasks that read different
+	// volumes still get distinct scopes through their volume input hashes.
+	if ids[0] != ids[1] {
+		t.Fatalf("target selections of one IPSW got different cache identities: %q != %q", ids[0], ids[1])
+	}
+	if volumes[0] == volumes[1] {
+		t.Fatal("different SystemOS volumes share a task input hash")
 	}
 }
 

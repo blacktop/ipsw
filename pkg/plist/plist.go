@@ -25,6 +25,11 @@ type Plists struct {
 	*AssetDataInfo `json:"asset_data_info,omitempty"`
 	*OTAInfo       `json:"ota_info,omitempty"`
 	*SystemVersion `json:"system_version,omitempty"`
+	// SelectedFrom is the complete BuildManifest when BuildManifest was
+	// narrowed to one device's identities by a device selection; nil when the
+	// manifest is the IPSW's own. It lets identity-level fingerprints describe
+	// the artifact rather than the selection.
+	SelectedFrom *BuildManifest `json:"-"`
 }
 
 // AssetDataInfo AssetData/Info.plist object found in OTAs

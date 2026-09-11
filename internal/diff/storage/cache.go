@@ -81,7 +81,10 @@ func ResolveCachePath(oldIdentity, newIdentity, override string) (string, error)
 // derived from product/build/device + a SHA-256 of the BuildManifest. The
 // digest discriminates between same-version artifacts (e.g. internal builds
 // reusing a build number) so caches never collide across users sharing a
-// build string.
+// build string. A device selection does not change the identity: it names the
+// artifact, and every cacheable task already folds the volumes it reads into
+// its own scope, so comparisons of different boards of one IPSW pair share a
+// cache and hydrate each other's volume walks.
 //
 // Returns an error when the input has no BuildManifest; callers should fall
 // back to a non-persistent store in that case.
@@ -111,12 +114,16 @@ func IPSWCacheIdentity(inf *info.Info) (string, error) {
 	return out, nil
 }
 
-// buildManifestDigest hashes the raw plist data of the BuildManifest when
-// available. The digest captures every identity / manifest entry so two IPSWs
-// that share product+build+device but differ in any signed component still
-// produce distinct cache identities.
+// buildManifestDigest hashes the top-level fields and every identity's
+// manifest digests of the IPSW's complete BuildManifest, so two IPSWs that
+// share product+build+device but differ in any signed component still produce
+// distinct cache identities. When the Info was narrowed to one device, the
+// complete manifest it was narrowed from is hashed, not the selection.
 func buildManifestDigest(inf *info.Info) string {
 	bm := inf.Plists.BuildManifest
+	if inf.Plists.SelectedFrom != nil {
+		bm = inf.Plists.SelectedFrom
+	}
 	h := sha256.New()
 	// Always include the top-level fields so the digest is stable even
 	// when BuildIdentities ordering wiggles across runs.
