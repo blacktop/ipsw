@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -440,16 +439,14 @@ func mountOTACryptexes(ctx *Context) error {
 			utils.Indent(log.Debug, 2)("OTA has no app cryptex")
 			return nil
 		}
-		unmountOTACryptexes(ctx.Build, ctx)
-		return fmt.Errorf("failed to extract app cryptex: %w", err)
+		return errors.Join(fmt.Errorf("failed to extract app cryptex: %w", err), unmountOTACryptexes(ctx.Build, ctx))
 	}
 	appMount := filepath.Join(
 		outDir, filepath.Base(appDMG)+".mount",
 	)
 	appMnt, err := mountCryptexDMG(appDMG, appMount)
 	if err != nil {
-		unmountOTACryptexes(ctx.Build, ctx)
-		return fmt.Errorf("failed to mount app cryptex: %w", err)
+		return errors.Join(fmt.Errorf("failed to mount app cryptex: %w", err), unmountOTACryptexes(ctx.Build, ctx))
 	}
 	ctx.Mount["AppOS"] = appMnt
 	return nil
@@ -497,25 +494,26 @@ func mountCryptexDMG(dmgPath, mountPoint string) (mount, error) {
 	utils.Indent(log.Info, 2)(
 		fmt.Sprintf("Mounting cryptex %s", dmgPath),
 	)
-	attachedMountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, mountPoint)
+	m, err := utils.MountDMG(dmgPath, mountPoint)
 	if err != nil {
 		return mount{}, err
 	}
-	if alreadyMounted {
+	if m.AlreadyMounted {
 		utils.Indent(log.Info, 3)(
 			fmt.Sprintf("%s already mounted", dmgPath),
 		)
 	}
 	return mount{
-		DmgPath:   dmgPath,
-		MountPath: attachedMountPoint,
-		IsMounted: alreadyMounted,
+		DmgPath:       dmgPath,
+		MountPath:     m.MountPoint,
+		IsMounted:     m.AlreadyMounted,
+		OwnsDirectory: m.OwnsDirectory,
 	}, nil
 }
 
 // unmountOTACryptexes unmounts and cleans up cryptex mounts for
 // an OTA diff.
-func unmountOTACryptexes(label string, ctx *Context) {
+func unmountOTACryptexes(label string, ctx *Context) (err error) {
 	for _, name := range sortedMountNames(ctx.Mount) {
 		mnt := ctx.Mount[name]
 		if mnt.IsMounted {
@@ -532,19 +530,13 @@ func unmountOTACryptexes(label string, ctx *Context) {
 				"Unmounting '%s' %s cryptex", label, name,
 			),
 		)
-		if err := utils.Retry(
-			3, 2*time.Second, func() error {
-				return utils.Unmount(mnt.MountPath, true)
-			},
-		); err != nil {
-			utils.Indent(log.Error, 3)(
-				fmt.Sprintf(
-					"failed to unmount '%s' %s cryptex: %v",
-					label, name, err,
-				),
-			)
+		if closeErr := mnt.unmount(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("%w: failed to unmount '%s' %s cryptex %s at %s: %v", utils.ErrMountCleanup, label, name, mnt.DmgPath, mnt.MountPath, closeErr))
+			continue
 		}
+		delete(ctx.Mount, name)
 	}
+	return err
 }
 
 // selectOTAKernelcachePair chooses which kernelcache members to

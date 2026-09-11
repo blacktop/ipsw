@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -227,8 +228,11 @@ var diffCmd = &cobra.Command{
 			AEAInsecure:           viper.GetBool("diff.insecure"),
 			Cache:                 cacheCfg,
 		})
-		if err := d.Diff(); err != nil {
-			return err
+		diffErr := d.Diff()
+		if diffErr != nil {
+			if _, completed := errors.AsType[*diff.CleanupError](diffErr); !completed {
+				return diffErr
+			}
 		}
 
 		markdownOut := viper.GetBool("diff.markdown")
@@ -237,9 +241,9 @@ var diffCmd = &cobra.Command{
 		hasOutput := viper.GetString("diff.output") != ""
 
 		if err := outputDiff(d, hasOutput, markdownOut, jsonOut, htmlOut); err != nil {
-			return err
+			return errors.Join(diffErr, err)
 		}
 
-		return nil
+		return diffErr
 	},
 }

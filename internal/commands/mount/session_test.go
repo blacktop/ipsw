@@ -2,9 +2,45 @@ package mount
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
+
+func TestSessionReleaseEvictsSymlinkAlias(t *testing.T) {
+	root := t.TempDir()
+	realMount := filepath.Join(root, "real", "mount")
+	if err := os.MkdirAll(realMount, 0700); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(filepath.Dir(realMount), link); err != nil {
+		t.Fatal(err)
+	}
+	var unmounted []string
+	s := newTestSession(func(typ string) (*Context, error) {
+		if typ == "sys" {
+			return &Context{MountPoint: filepath.Join(link, "mount")}, nil
+		}
+		return &Context{MountPoint: realMount, AlreadyMounted: true}, nil
+	}, &unmounted)
+	for _, typ := range []string{"sys", "fs"} {
+		if _, err := s.Root(typ); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.unmount = func(ctx *Context) error {
+		unmounted = append(unmounted, ctx.MountPoint)
+		return os.Remove(realMount)
+	}
+	if err := s.Release("sys"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.mounts) != 0 || len(unmounted) != 1 {
+		t.Fatalf("stale aliases: %+v; detaches: %v", s.mounts, unmounted)
+	}
+}
 
 // newTestSession returns a Session whose mount/unmount are backed by fakes so
 // the caching and cleanup logic can be exercised without real DMGs.

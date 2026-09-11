@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"strings"
@@ -17,6 +18,13 @@ func TestSwaggerDeviceAndMountContract(t *testing.T) {
 	data, err := os.ReadFile("swagger.json")
 	if err != nil {
 		t.Fatal(err)
+	}
+	public, err := os.ReadFile("../www/static/api/swagger.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, public) {
+		t.Error("published Swagger schema differs from api/swagger.json")
 	}
 	var spec struct {
 		Paths map[string]map[string]struct {
@@ -50,9 +58,9 @@ func TestSwaggerDeviceAndMountContract(t *testing.T) {
 	if mountSchema.Ref != "" {
 		mountSchema = spec.Definitions[strings.TrimPrefix(mountSchema.Ref, "#/definitions/")]
 	}
-	for _, property := range []string{"mount_point", "dmg_path", "retain_dmg"} {
+	for _, property := range []string{"mount_point", "dmg_path", "retain_dmg", "owns_directory", "already_mounted"} {
 		wantType := "string"
-		if property == "retain_dmg" {
+		if property == "retain_dmg" || property == "owns_directory" || property == "already_mounted" {
 			wantType = "boolean"
 		}
 		if mountSchema.Properties[property].Type != wantType {

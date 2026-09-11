@@ -243,7 +243,7 @@ var extractCmd = &cobra.Command{
 		if viper.GetBool("extract.dyld") {
 			log.Info("Extracting dyld_shared_cache")
 			out, err := extract.DSC(config)
-			if err != nil {
+			if err != nil && len(out) == 0 {
 				return err
 			}
 			if viper.GetBool("extract.json") {
@@ -256,6 +256,9 @@ var extractCmd = &cobra.Command{
 				for _, f := range out {
 					utils.Indent(log.Info, 2)("Created " + f)
 				}
+			}
+			if err != nil {
+				return err
 			}
 		}
 
@@ -426,7 +429,7 @@ var extractCmd = &cobra.Command{
 				config.DMGs = true
 			}
 			out, err := extract.Search(config)
-			if err != nil {
+			if err != nil && len(out) == 0 {
 				return err
 			}
 			if viper.GetBool("extract.json") {
@@ -439,6 +442,9 @@ var extractCmd = &cobra.Command{
 				for _, f := range out {
 					utils.Indent(log.Info, 2)("Created " + f)
 				}
+			}
+			if err != nil {
+				return err
 			}
 		}
 

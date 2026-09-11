@@ -59,7 +59,12 @@ var iaCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(tmpDir)
+		skipCleanup := false
+		defer func() {
+			if !skipCleanup {
+				os.RemoveAll(tmpDir)
+			}
+		}()
 
 		log.Info("Extracting InstallAssistant.pkg...")
 		outDir, err := utils.PkgUtilExpand(filepath.Clean(args[0]), tmpDir)
@@ -70,18 +75,21 @@ var iaCmd = &cobra.Command{
 		dmgPath := filepath.Join(outDir, "SharedSupport.dmg")
 
 		log.Debugf("Mounting %s", dmgPath)
-		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+		m, err := utils.MountDMG(dmgPath, "")
 		if err != nil {
 			return fmt.Errorf("failed to mount DMG: %v", err)
 		}
-		if alreadyMounted {
+		mountPoint := m.MountPoint
+		if m.AlreadyMounted {
+			skipCleanup = true
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("%s already mounted", dmgPath))
 		} else {
 			defer func() {
 				log.Debugf("Unmounting %s", dmgPath)
 				if err := utils.Retry(3, 2*time.Second, func() error {
-					return utils.Unmount(mountPoint, true)
+					return m.Unmount(true)
 				}); err != nil {
+					skipCleanup = true
 					utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err))
 				}
 			}()

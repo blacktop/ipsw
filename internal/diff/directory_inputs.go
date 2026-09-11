@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,8 +126,7 @@ func mountDirectoryDMGs(ctx *Context) error {
 		log.Infof("Mounting %s DMG", name)
 		mnt, err := mountNamedDMG(name, dmgs[name], ctx.PemDB)
 		if err != nil {
-			releaseDirectoryMounts(ctx.Build, ctx.Mount)
-			return err
+			return errors.Join(err, releaseDirectoryMounts(ctx.Build, ctx.Mount))
 		}
 		ctx.Mount[name] = mnt
 		if name == "SystemOS" {
@@ -139,7 +139,7 @@ func mountDirectoryDMGs(ctx *Context) error {
 	return nil
 }
 
-func releaseDirectoryMounts(label string, mounts map[string]mount) {
+func releaseDirectoryMounts(label string, mounts map[string]mount) (err error) {
 	if label == "" {
 		label = "Directory"
 	}
@@ -147,17 +147,17 @@ func releaseDirectoryMounts(label string, mounts map[string]mount) {
 		mnt := mounts[name]
 		if mnt.IsMounted {
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Leaving '%s' %s DMG mounted", label, name))
-			mnt.cleanup()
 			continue
 		}
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting '%s' %s DMG", label, name))
-		if err := utils.Retry(3, 2*time.Second, func() error {
-			return utils.Unmount(mnt.MountPath, true)
-		}); err != nil {
-			utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount '%s' %s DMG: %v", label, name, err))
+		if closeErr := mnt.unmount(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("%w: failed to unmount '%s' %s DMG %s at %s: %v", utils.ErrMountCleanup, label, name, mnt.DmgPath, mnt.MountPath, closeErr))
+			continue // Keep the backing image when detach/cleanup fails.
 		}
 		mnt.cleanup()
+		delete(mounts, name)
 	}
+	return err
 }
 
 func mountNamedDMG(name, path, pemDB string) (mount, error) {
@@ -186,18 +186,26 @@ func mountNamedDMG(name, path, pemDB string) (mount, error) {
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", mnt.DmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(mnt.DmgPath, "")
+	m, err := utils.MountDMG(mnt.DmgPath, "")
 	if err != nil {
 		mnt.cleanup()
 		return mnt, fmt.Errorf("failed to mount %s DMG: %w", name, err)
 	}
-	mnt.MountPath = mountPoint
-	mnt.IsMounted = alreadyMounted
-	if alreadyMounted {
+	mnt.MountPath = m.MountPoint
+	mnt.IsMounted = m.AlreadyMounted
+	mnt.OwnsDirectory = m.OwnsDirectory
+	if m.AlreadyMounted {
 		utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", mnt.DmgPath))
 	}
 
 	return mnt, nil
+}
+
+func (m mount) unmount() error {
+	attached := utils.DMGMount{MountPoint: m.MountPath, OwnsDirectory: m.OwnsDirectory}
+	return utils.Retry(3, 2*time.Second, func() error {
+		return attached.Unmount(true)
+	})
 }
 
 func (m mount) cleanup() {

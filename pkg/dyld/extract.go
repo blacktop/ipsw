@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -22,7 +23,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
-	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
 )
@@ -60,14 +60,16 @@ type DscExtractionDMG struct {
 	Kind       DscDMGKind
 	Arches     []string
 	AllowEmpty bool
+	// Cleanup releases this input's temporary files after detach. A failed
+	// detach or borrowed mount retains only this input, not its siblings.
+	Cleanup func() `json:"-"`
 }
 
 type mountedDscDMG struct {
 	DscExtractionDMG
-	mountPoint     string
-	mountedRoot    string
-	alreadyMounted bool
-	removePath     string
+	mount       utils.DMGMount
+	mountedRoot string
+	removePath  string
 }
 
 type dscCandidate struct {
@@ -283,38 +285,39 @@ func mountDscDMG(dmg DscExtractionDMG, pemDB string) (mountedDscDMG, error) {
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	m, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		if removePath != "" {
 			_ = os.Remove(removePath)
 		}
 		return mountedDscDMG{}, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
-	if alreadyMounted {
+	if m.AlreadyMounted {
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 	}
 
 	return mountedDscDMG{
 		DscExtractionDMG: dmg,
-		mountPoint:       mountPoint,
-		mountedRoot:      utils.MountedFilesystemRoot(mountPoint),
-		alreadyMounted:   alreadyMounted,
+		mount:            m,
+		mountedRoot:      utils.MountedFilesystemRoot(m.MountPoint),
 		removePath:       removePath,
 	}, nil
 }
 
-func (dmg mountedDscDMG) close() {
-	if !dmg.alreadyMounted {
-		utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmg.Path))
-		if err := utils.Retry(3, 2*time.Second, func() error {
-			return utils.Unmount(dmg.mountPoint, true)
-		}); err != nil {
-			log.Errorf("failed to unmount DMG %s at %s: %v", dmg.Path, dmg.mountPoint, err)
-		}
+func (dmg mountedDscDMG) close() error {
+	if dmg.mount.AlreadyMounted {
+		return nil
+	}
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmg.Path))
+	if err := utils.Retry(3, 2*time.Second, func() error {
+		return dmg.mount.Unmount(true)
+	}); err != nil {
+		return fmt.Errorf("%w: failed to unmount DMG %s at %s: %v", utils.ErrMountCleanup, dmg.Path, dmg.mount.MountPoint, err)
 	}
 	if dmg.removePath != "" {
 		_ = os.Remove(dmg.removePath)
 	}
+	return nil
 }
 
 func collectDscCandidates(i *info.Info, dmgs []mountedDscDMG, driverkit, all bool) ([]dscCandidate, error) {
@@ -323,7 +326,7 @@ func collectDscCandidates(i *info.Info, dmgs []mountedDscDMG, driverkit, all boo
 	var emptyErr error
 
 	for _, dmg := range dmgs {
-		matches, err := GetDscPathsInMount(dmg.mountPoint, driverkit, all)
+		matches, err := GetDscPathsInMount(dmg.mount.MountPoint, driverkit, all)
 		if err != nil {
 			return nil, err
 		}
@@ -433,11 +436,20 @@ func extractFromMountedDscDMGs(i *info.Info, dmgs []mountedDscDMG, destPath stri
 
 // ExtractFromDMGs mounts all planned DSC-bearing DMGs, presents one combined
 // macOS cache picker, and extracts the selected caches before unmounting them.
-func ExtractFromDMGs(i *info.Info, dmgs []DscExtractionDMG, destPath, pemDB string, requestedArches []string, driverkit, all bool) ([]string, error) {
+func ExtractFromDMGs(i *info.Info, dmgs []DscExtractionDMG, destPath, pemDB string, requestedArches []string, driverkit, all bool) (out []string, err error) {
 	mounted := make([]mountedDscDMG, 0, len(dmgs))
 	defer func() {
-		for _, m := range slices.Backward(mounted) {
-			m.close()
+		for index, dmg := range slices.Backward(dmgs) {
+			if index < len(mounted) {
+				closeErr := mounted[index].close()
+				err = errors.Join(err, closeErr)
+				if closeErr != nil || mounted[index].mount.AlreadyMounted {
+					continue
+				}
+			}
+			if dmg.Cleanup != nil {
+				dmg.Cleanup()
+			}
 		}
 	}()
 
@@ -518,9 +530,11 @@ func ExtractForDevice(ipsw, destPath, pemDB string, arches []string, driverkit, 
 			Kind:       step.Kind,
 			Arches:     step.Arches,
 			AllowEmpty: step.AllowEmpty,
+			Cleanup:    cleanup,
 		})
 	}
 
+	cleanups = nil // ExtractFromDMGs now owns the per-image cleanup callbacks.
 	return ExtractFromDMGs(i, dmgs, destPath, pemDB, arches, driverkit, all)
 }
 
@@ -686,19 +700,19 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath, pemDB string, arches []s
 			}
 		}
 		found, err := e.extractMember(zf, remaining)
+		artifacts = append(artifacts, found...)
 		if err != nil {
 			// A member without matching caches is not fatal while other system
 			// cryptexes remain: the requested caches can live in one of them.
-			if IsDscNotFound(err) && len(arches) > 0 {
+			if !errors.Is(err, utils.ErrMountCleanup) && IsDscNotFound(err) && len(arches) > 0 {
 				if notFound == nil {
 					notFound = fmt.Errorf("failed to extract 'dyld_shared_cache' from %s: %w", zf.Name, err)
 				}
 				log.Debugf("no matching dyld_shared_cache in %s; trying remaining system cryptexes", zf.Name)
 				continue
 			}
-			return nil, err
+			return artifacts, err
 		}
-		artifacts = append(artifacts, found...)
 		for _, artifact := range found {
 			if arch, primary := ota.DSCFileArch(artifact); primary {
 				delete(missing, arch)
@@ -774,7 +788,12 @@ func (e remoteCryptexExtraction) extractMember(zf *zip.File, arches []string) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file for %s: %v", in.Name(), err)
 	}
-	defer os.Remove(out.Name())
+	retainBacking := false
+	defer func() {
+		if !retainBacking {
+			os.Remove(out.Name())
+		}
+	}()
 	out.Close()
 
 	log.Infof("Patching %s to %s", zf.Name, out.Name())
@@ -785,6 +804,10 @@ func (e remoteCryptexExtraction) extractMember(zf *zip.File, arches []string) ([
 	artifacts, err := ExtractFromDMG(e.info, out.Name(), e.destPath, e.pemDB,
 		arches, e.driverkit, e.all)
 	if err != nil {
+		if errors.Is(err, utils.ErrMountCleanup) {
+			retainBacking = true
+			return artifacts, err
+		}
 		// A no-matching-caches result needs no DMG preserved for debugging;
 		// return it unwrapped so the caller can identify it with IsDscNotFound.
 		if IsDscNotFound(err) {

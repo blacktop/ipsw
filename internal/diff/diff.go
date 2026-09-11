@@ -4,6 +4,7 @@ package diff
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,10 +41,11 @@ type kernel struct {
 }
 
 type mount struct {
-	DmgPath      string
-	MountPath    string
-	IsMounted    bool
-	CleanupPaths []string
+	DmgPath       string
+	MountPath     string
+	IsMounted     bool
+	OwnsDirectory bool
+	CleanupPaths  []string
 }
 
 type PlistDiff struct {
@@ -424,14 +426,34 @@ func (d *Diff) getInfo() (err error) {
 	return nil
 }
 
+// CleanupError means the diff finished but teardown failed. Callers can still
+// publish the report before returning the error to the user.
+type CleanupError struct{ Err error }
+
+func (e *CleanupError) Error() string { return e.Err.Error() }
+func (e *CleanupError) Unwrap() error { return e.Err }
+
 // Diff diffs the diff
 func (d *Diff) Diff() (err error) {
+	completed := false
+	defer func() {
+		if completed && err != nil {
+			err = &CleanupError{Err: err}
+		}
+	}()
 
 	d.tmpDir, err = os.MkdirTemp(os.TempDir(), "ipsw-diff")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(d.tmpDir)
+	defer func() {
+		// Directory inputs mount caller-owned images outside this temporary tree.
+		if d.Old.InputMode == inputModeDirectory || !errors.Is(err, utils.ErrMountCleanup) {
+			os.RemoveAll(d.tmpDir)
+		} else {
+			log.Warnf("Retaining temporary directory %s after failed unmount", d.tmpDir)
+		}
+	}()
 
 	if err := d.getInfo(); err != nil {
 		return err
@@ -476,9 +498,9 @@ func (d *Diff) Diff() (err error) {
 		}
 		log.Info("Mounting patched OTA DMGs")
 		if err := d.mountSystemOsDMGs(); err != nil {
-			return fmt.Errorf("failed to mount DMGs: %v", err)
+			return fmt.Errorf("failed to mount DMGs: %w", err)
 		}
-		defer d.unmountSystemOsDMGs()
+		defer func() { err = errors.Join(err, d.unmountSystemOsDMGs()) }()
 	}
 
 	if otaMode {
@@ -534,16 +556,15 @@ func (d *Diff) Diff() (err error) {
 			PemDB:      d.conf.PemDB,
 			ExtractDir: ipswSessionExtractDir(d.tmpDir, "new"),
 		})
-		defer d.oldSession.Close()
-		defer d.newSession.Close()
+		defer func() { err = errors.Join(err, d.newSession.Close(), d.oldSession.Close()) }()
 		// IPSW mode no longer pre-mounts "sys" here. The volume-major
 		// orchestrator (runIPSWVolumeJobsForMode) lazily mounts each volume
 		// when its phase runs and releases it before moving on.
 	} else if otaMode {
 		if err := d.mountSystemOsDMGs(); err != nil {
-			return fmt.Errorf("failed to mount DMGs: %v", err)
+			return fmt.Errorf("failed to mount DMGs: %w", err)
 		}
-		defer d.unmountSystemOsDMGs()
+		defer func() { err = errors.Join(err, d.unmountSystemOsDMGs()) }()
 	}
 
 	if directoryMode || otaMode {
@@ -612,6 +633,7 @@ func (d *Diff) Diff() (err error) {
 		log.WithError(err).Error("failed to run volume-major jobs")
 	}
 
+	completed = true
 	return nil
 }
 
@@ -720,7 +742,7 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 		}
 		log.Info("Mounting 'New' patched OTA DMGs")
 		if err := mountDirectoryDMGs(&d.New); err != nil {
-			return err
+			return errors.Join(err, releaseDirectoryMounts("Old", d.Old.Mount))
 		}
 		return nil
 	case inputModeOTA:
@@ -730,8 +752,7 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 		}
 		log.Info("Extracting 'New' OTA system cryptex")
 		if err := mountOTACryptexes(&d.New); err != nil {
-			unmountOTACryptexes("Old", &d.Old)
-			return err
+			return errors.Join(err, unmountOTACryptexes("Old", &d.Old))
 		}
 		return nil
 	default:
@@ -741,14 +762,10 @@ func (d *Diff) mountSystemOsDMGs() (err error) {
 
 func (d *Diff) unmountSystemOsDMGs() error {
 	if d.Old.InputMode == inputModeDirectory {
-		releaseDirectoryMounts("Old", d.Old.Mount)
-		releaseDirectoryMounts("New", d.New.Mount)
-		return nil
+		return errors.Join(releaseDirectoryMounts("Old", d.Old.Mount), releaseDirectoryMounts("New", d.New.Mount))
 	}
 	if d.Old.InputMode == inputModeOTA {
-		unmountOTACryptexes("Old", &d.Old)
-		unmountOTACryptexes("New", &d.New)
-		return nil
+		return errors.Join(unmountOTACryptexes("Old", &d.Old), unmountOTACryptexes("New", &d.New))
 	}
 	// IPSW mode unmounts via mount.Session.Close.
 	return nil

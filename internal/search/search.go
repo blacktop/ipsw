@@ -120,7 +120,11 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 			if len(dmgs) == 0 {
 				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
 			}
-			defer os.Remove(dmgs[0])
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgs[0])
 		} else {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 		}
@@ -136,22 +140,29 @@ func scanDmgMulti(ipswPath, dmgPath, dmgType, pemDB string, handlers []func(stri
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}
-			defer os.Remove(dmgPath)
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgPath)
 		}
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	m, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to mount DMG: %v", err)
 	}
-	if alreadyMounted {
+	mountPoint := m.MountPoint
+	if m.AlreadyMounted {
+		skipCleanup = true
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 	} else {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, true)
+				return m.Unmount(true)
 			}); err != nil {
+				skipCleanup = true
 				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 			}
 		}()
@@ -200,7 +211,11 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 			if len(dmgs) == 0 {
 				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
 			}
-			defer os.Remove(dmgs[0])
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgs[0])
 		} else {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 		}
@@ -216,22 +231,29 @@ func scanDmg(ipswPath, dmgPath, dmgType, pemDB string, handler func(string, stri
 			if err != nil {
 				return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}
-			defer os.Remove(dmgPath)
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgPath)
 		}
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	m, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to mount DMG: %v", err)
 	}
-	if alreadyMounted {
+	mountPoint := m.MountPoint
+	if m.AlreadyMounted {
+		skipCleanup = true
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 	} else {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, true)
+				return m.Unmount(true)
 			}); err != nil {
+				skipCleanup = true
 				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 			}
 		}()

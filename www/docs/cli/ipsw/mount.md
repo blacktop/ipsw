@@ -12,7 +12,7 @@ Mount DMG from IPSW
 
 ### Synopsis
 
-Mount DMG from IPSW. When multiple SystemOS images are present, choose one interactively or select a target with --device.
+Mount DMG from IPSW. When multiple SystemOS images are present, choose one interactively or select a target with --device. A custom --mount-point must not be shared by concurrent ipsw runs.
 
 ```
 ipsw mount [app|sys|fs|exc|rdisk|rosetta] IPSW [flags]
@@ -59,7 +59,7 @@ $ ipsw mount fs iPhone.ipsw --detach
       --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
   -k, --key string           DMG key
       --lookup               Lookup DMG keys on theapplewiki.com
-  -m, --mount-point string   Custom mount point (default: /tmp/<dmg>.mount)
+  -m, --mount-point string   Mount point (default: unique dir under /tmp; explicit paths must not be shared concurrently)
       --pem-db string        AEA pem DB JSON file
 ```
 

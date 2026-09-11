@@ -4,12 +4,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 )
 
@@ -26,13 +28,13 @@ func TestDmgInIPSWFailureCleansOnlyCreatedImages(t *testing.T) {
 					}
 				}
 				called := false
-				ctx, err := dmgInIPSW(ipsw, "fs", &Config{ExtractDir: extractDir}, func(path, _ string) (string, bool, error) {
+				ctx, err := dmgInIPSW(ipsw, "fs", &Config{ExtractDir: extractDir}, func(path, _ string) (utils.DMGMount, error) {
 					called = true
 					got, err := os.ReadFile(path)
 					if err != nil || !bytes.Equal(got, data) {
 						t.Fatalf("extracted content = %q, error %v", got, err)
 					}
-					return "", false, fmt.Errorf("synthetic attach: Permission denied")
+					return utils.DMGMount{}, fmt.Errorf("synthetic attach: Permission denied")
 				}, func(cfg *aea.DecryptConfig) (string, error) {
 					if imageName == "malformed.dmg.aea" {
 						return aea.Decrypt(cfg)
@@ -84,14 +86,17 @@ func TestSessionClosePreservesPreexistingBackingImage(t *testing.T) {
 			detached := 0
 			session := NewSession(ipsw, &Config{ExtractDir: extractDir})
 			session.mount = func(typ string) (*Context, error) {
-				return dmgInIPSW(ipsw, typ, &session.cfg, func(path, _ string) (string, bool, error) {
+				return dmgInIPSW(ipsw, typ, &session.cfg, func(path, _ string) (utils.DMGMount, error) {
 					if path != extracted {
 						t.Fatalf("attached unexpected path %q", path)
 					}
-					return "/synthetic/mount", false, nil
+					return utils.DMGMount{MountPoint: "/synthetic/mount", OwnsDirectory: true}, nil
 				}, aea.Decrypt)
 			}
 			session.unmount = func(ctx *Context) error {
+				if !ctx.OwnsDirectory || ctx.AlreadyMounted {
+					t.Fatalf("attachment ownership lost before cleanup: %+v", ctx)
+				}
 				detached++
 				return ctx.removeBackingFile()
 			}
@@ -146,7 +151,7 @@ func writeMountTestIPSW(t *testing.T, imageName string, data []byte) (string, st
 }
 
 func TestContextRetainDmgSurvivesJSONRoundTrip(t *testing.T) {
-	data, err := json.Marshal(Context{MountPoint: "/synthetic/mount", DmgPath: "/synthetic/image.dmg", RetainDmg: true})
+	data, err := json.Marshal(Context{MountPoint: "/synthetic/mount", DmgPath: "/synthetic/image.dmg", RetainDmg: true, OwnsDirectory: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,8 +159,8 @@ func TestContextRetainDmgSurvivesJSONRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if !decoded.RetainDmg {
-		t.Fatalf("retain flag lost across the API boundary: %s", data)
+	if !decoded.RetainDmg || !decoded.OwnsDirectory {
+		t.Fatalf("ownership flags lost across the API boundary: %s", data)
 	}
 	backing := filepath.Join(t.TempDir(), "preexisting.dmg")
 	if err := os.WriteFile(backing, []byte("synthetic"), 0600); err != nil {
@@ -167,5 +172,128 @@ func TestContextRetainDmgSurvivesJSONRoundTrip(t *testing.T) {
 	}
 	if _, err := os.Stat(backing); err != nil {
 		t.Fatalf("preexisting backing image removed after round trip: %v", err)
+	}
+}
+
+func TestContextUnmountFailureOrdering(t *testing.T) {
+	for _, failure := range []string{"", "detach"} {
+		t.Run("failure="+failure, func(t *testing.T) {
+			root := t.TempDir()
+			backing := filepath.Join(root, "image.dmg")
+			mountPoint := filepath.Join(root, "mount")
+			if err := os.WriteFile(backing, []byte("synthetic backing"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(mountPoint, 0700); err != nil {
+				t.Fatal(err)
+			}
+			ctx := Context{DmgPath: backing, MountPoint: mountPoint, OwnsDirectory: true}
+			calls := 0
+			err := ctx.unmount(func() error {
+				calls++
+				if _, err := os.Stat(backing); err != nil {
+					t.Fatalf("backing removed before detach: %v", err)
+				}
+				switch failure {
+				case "detach":
+					return errors.New("synthetic busy mount")
+				default:
+					return os.Remove(mountPoint)
+				}
+			})
+			wantCalls := 1
+			if failure == "detach" {
+				wantCalls = 3
+			}
+			if calls != wantCalls {
+				t.Fatalf("detach calls = %d, want %d", calls, wantCalls)
+			}
+			if failure == "detach" {
+				if !errors.Is(err, utils.ErrMountCleanup) {
+					t.Fatalf("cleanup error not propagated: %v", err)
+				}
+				if data, err := os.ReadFile(backing); err != nil || string(data) != "synthetic backing" {
+					t.Fatalf("backing not retained: %q, %v", data, err)
+				}
+				if _, err := os.Stat(mountPoint); err != nil {
+					t.Fatalf("mount directory not retained: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Stat(backing); !os.IsNotExist(err) {
+					t.Fatalf("owned backing not removed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestSessionReleaseAfterSuccessfulDetach(t *testing.T) {
+	backing := filepath.Join(t.TempDir(), "image.dmg")
+	if err := os.WriteFile(backing, []byte("synthetic backing"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &Context{DmgPath: backing, MountPoint: "/synthetic/mount", OwnsDirectory: true}
+	s := NewSession("synthetic.ipsw", &Config{})
+	s.mount = func(string) (*Context, error) { return ctx, nil }
+	detaches := 0
+	s.unmount = func(ctx *Context) error {
+		return ctx.unmount(func() error {
+			detaches++
+			return nil
+		})
+	}
+	if _, err := s.Root("sys"); err != nil {
+		t.Fatal(err)
+	}
+	s.mounts["fs"] = &Context{MountPoint: ctx.MountPoint, AlreadyMounted: true}
+	if err := s.Release("sys"); err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+	for _, typ := range []string{"sys", "fs"} {
+		if _, cached := s.mounts[typ]; cached {
+			t.Fatalf("detached alias %s was not evicted", typ)
+		}
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	if detaches != 1 {
+		t.Fatalf("Release then Close detached %d times; want one", detaches)
+	}
+	if _, err := os.Stat(backing); !os.IsNotExist(err) {
+		t.Fatalf("detached owned backing was retained: %v", err)
+	}
+}
+
+func TestContextRetriesBackingCleanupWithoutDetaching(t *testing.T) {
+	root := t.TempDir()
+	backing := filepath.Join(root, "nonempty-backing")
+	if err := os.Mkdir(backing, 0700); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(backing, "keep")
+	if err := os.WriteFile(child, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &Context{DmgPath: backing, MountPoint: "/synthetic/mount"}
+	detaches := 0
+	detach := func() error { detaches++; return nil }
+	if err := ctx.unmount(detach); err == nil {
+		t.Fatal("expected nonrecursive backing cleanup to fail")
+	}
+	if err := os.Remove(child); err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.unmount(detach); err != nil {
+		t.Fatalf("could not retry backing cleanup: %v", err)
+	}
+	if detaches != 1 {
+		t.Fatalf("cleanup retry detached %d times; want one", detaches)
+	}
+	if _, err := os.Stat(backing); !os.IsNotExist(err) {
+		t.Fatalf("backing directory not removed: %v", err)
 	}
 }

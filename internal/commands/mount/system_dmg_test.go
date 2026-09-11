@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -73,12 +74,12 @@ func TestMountDeviceSpecificSystemOS(t *testing.T) {
 					return tc.index, nil
 				}
 			}
-			ctx, err := dmgInIPSW(ipsw, "sys", cfg, func(path, _ string) (string, bool, error) {
+			ctx, err := dmgInIPSW(ipsw, "sys", cfg, func(path, _ string) (utils.DMGMount, error) {
 				attached = true
 				if filepath.Base(path) != tc.want+".dmg" {
 					t.Fatalf("wrong attachment %q", path)
 				}
-				return "/synthetic/system", false, nil
+				return utils.DMGMount{MountPoint: "/synthetic/system", OwnsDirectory: true}, nil
 			}, func(cfg *aea.DecryptConfig) (string, error) {
 				decrypted = true
 				if filepath.Base(cfg.Input) != tc.want+".dmg.aea" {
@@ -129,9 +130,9 @@ func TestMountReusesPreParsedInfo(t *testing.T) {
 		Manifest:      map[string]plist.IdentityManifest{"Cryptex1,SystemOS": {Info: map[string]any{"Path": "special.dmg.aea"}}},
 	}}}}}
 	attached := false
-	ctx, err := dmgInIPSW(ipsw, "sys", &Config{Device: "Mac99,2", Info: pre, ExtractDir: filepath.Join(root, "extract")}, func(path, _ string) (string, bool, error) {
+	ctx, err := dmgInIPSW(ipsw, "sys", &Config{Device: "Mac99,2", Info: pre, ExtractDir: filepath.Join(root, "extract")}, func(path, _ string) (utils.DMGMount, error) {
 		attached = filepath.Base(path) == "special.dmg"
-		return "/synthetic/system", false, nil
+		return utils.DMGMount{MountPoint: "/synthetic/system", OwnsDirectory: true}, nil
 	}, func(cfg *aea.DecryptConfig) (string, error) {
 		path := strings.TrimSuffix(cfg.Input, ".aea")
 		return path, os.WriteFile(path, []byte("synthetic decrypted disk image bytes"), 0600)

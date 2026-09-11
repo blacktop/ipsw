@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
@@ -218,9 +219,8 @@ func writeDscFixture(t *testing.T, root, path, contents string) string {
 func testMountedDscDMG(kind DscDMGKind, root string, arches []string) mountedDscDMG {
 	return mountedDscDMG{
 		DscExtractionDMG: DscExtractionDMG{Kind: kind, Arches: arches},
-		mountPoint:       root,
+		mount:            utils.DMGMount{MountPoint: root, AlreadyMounted: true},
 		mountedRoot:      root,
-		alreadyMounted:   true,
 	}
 }
 
@@ -431,6 +431,16 @@ func TestIsDscNotFoundRecognizesWrappedMisses(t *testing.T) {
 			name: "unrelated error",
 			err:  errors.New("mount failed"),
 			want: false,
+		},
+		{
+			name: "missing cache with cleanup failure",
+			err:  errors.Join(ErrNoDscFound, utils.ErrMountCleanup),
+			want: true,
+		},
+		{
+			name: "missing architecture with cleanup failure",
+			err:  errors.Join(ErrNoDscForArch, utils.ErrMountCleanup),
+			want: true,
 		},
 	}
 

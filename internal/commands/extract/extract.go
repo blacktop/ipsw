@@ -412,7 +412,7 @@ func matchingZipFileName(files []*zip.File, name string) []*zip.File {
 	return matches
 }
 
-func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
+func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) (out []string, retErr error) {
 	skipCleanup := false
 	tmpExtractDir := ""
 
@@ -444,7 +444,11 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 				return nil, fmt.Errorf("failed to create temp dir: %v", err)
 			}
 			tmpExtractDir = tmpDIR
-			defer os.RemoveAll(tmpExtractDir)
+			defer func(path string) {
+				if !skipCleanup {
+					os.RemoveAll(path)
+				}
+			}(tmpExtractDir)
 
 			dmgs, err := utils.Unzip(ipswPath, tmpExtractDir, func(f *zip.File) bool {
 				return strings.EqualFold(filepath.Base(f.Name), filepath.Base(dmgPath))
@@ -470,24 +474,33 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}
-			defer os.Remove(dmgPath)
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgPath)
 		}
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+	m, err := utils.MountDMG(dmgPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
-	if alreadyMounted {
+	mountPoint := m.MountPoint
+	if m.AlreadyMounted {
+		skipCleanup = true
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 	} else {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
+				return m.Unmount(false)
 			}); err != nil {
+				skipCleanup = true
 				log.Errorf("failed to unmount DMG %s at %s: %v", dmgPath, mountPoint, err)
+				// Preserve the cleanup failure for callers owning an outer temp dir.
+				retErr = errors.Join(retErr, fmt.Errorf("%w: failed to unmount %s at %s: %v", utils.ErrMountCleanup, dmgPath, mountPoint, err))
 			}
 		}()
 	}
@@ -1086,7 +1099,7 @@ func DSC(c *Config) ([]string, error) {
 							return nil, fmt.Errorf("failed to extract OTA: %v", err)
 						}
 					} else {
-						return nil, fmt.Errorf("failed to extract dyld_shared_cache from remote OTA: %v", err)
+						return out, fmt.Errorf("failed to extract dyld_shared_cache from remote OTA: %w", err)
 					}
 				}
 				return out, nil
@@ -1124,8 +1137,10 @@ func DSC(c *Config) ([]string, error) {
 				Kind:       step.Kind,
 				Arches:     step.Arches,
 				AllowEmpty: step.AllowEmpty,
+				Cleanup:    cleanup,
 			})
 		}
+		cleanups = nil // ExtractFromDMGs now owns the per-image cleanup callbacks.
 		return dyld.ExtractFromDMGs(i, dmgs, filepath.Join(filepath.Clean(c.Output), folder), c.PemDB, c.Arches, c.DriverKit, c.AllDSCs)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
@@ -1270,7 +1285,7 @@ func DMG(c *Config) ([]string, error) {
 	return utils.SearchZip(zr.File, dmgRegex, filepath.Join(filepath.Clean(c.Output), folder), c.Flatten, c.Progress)
 }
 
-func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) ([]string, error) {
+func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) (out []string, retErr error) {
 	if dmgPath == "" {
 		return nil, nil
 	}
@@ -1279,7 +1294,11 @@ func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory to store %s: %v", dmgPath, err)
 	}
-	defer os.RemoveAll(tmpDIR)
+	defer func() {
+		if !errors.Is(retErr, utils.ErrMountCleanup) {
+			os.RemoveAll(tmpDIR)
+		}
+	}()
 
 	dmgRegex := exactZipNamePattern(dmgPath)
 	tuned, err := tuneRemoteZipReader(c, zr, matchingZipFileName(zr.File, dmgPath))
@@ -1294,10 +1313,10 @@ func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string
 	var artifacts []string
 	for _, dmg := range extracted {
 		out, err := ExtractFromDMG(dmg, dmg, destPath, pemDB, pattern)
-		if err != nil {
-			return nil, err
-		}
 		artifacts = append(artifacts, out...)
+		if err != nil {
+			return artifacts, err
+		}
 	}
 
 	return artifacts, nil
@@ -1550,31 +1569,31 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
 				out, err := ExtractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from AppOS %s: %w", appOS, err)
+				}
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
 				out, err := ExtractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from SystemOS %s: %w", systemOS, err)
+				}
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 				out, err := ExtractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from filesystem %s: %w", fsOS, err)
+				}
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
 				out, err := ExtractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from ExclaveOS %s: %w", excOS, err)
+				}
 			}
 		}
 		// Decrypt extracted IM4P files if wiki keys are available
@@ -1619,31 +1638,31 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
 				out, err := extractRemoteDMG(c, zr, appOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from AppOS %s: %w", appOS, err)
+				}
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
 				out, err := extractRemoteDMG(c, zr, systemOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from SystemOS %s: %w", systemOS, err)
+				}
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 				out, err := extractRemoteDMG(c, zr, fsOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from filesystem %s: %w", fsOS, err)
+				}
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
 				out, err := extractRemoteDMG(c, zr, excOS, destPath, c.PemDB, re)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extract files from ExclaveOS %s: %v", excOS, err)
-				}
 				artifacts = append(artifacts, out...)
+				if err != nil {
+					return artifacts, fmt.Errorf("failed to extract files from ExclaveOS %s: %w", excOS, err)
+				}
 			}
 		}
 		// Decrypt extracted IM4P files if wiki keys are available

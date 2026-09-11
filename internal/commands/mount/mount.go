@@ -49,24 +49,42 @@ type Context struct {
 	MountPoint     string `json:"mount_point" binding:"required"`
 	DmgPath        string `json:"dmg_path,omitempty"` // FIXME: required on linux
 	AlreadyMounted bool   `json:"already_mounted,omitempty"`
+	OwnsDirectory  bool   `json:"owns_directory,omitempty"`
 	// RetainDmg is set when the backing image existed before this acquisition.
 	// It is serialized so an unmount driven by the /mount API response keeps
 	// the same ownership decision.
 	RetainDmg bool `json:"retain_dmg,omitempty"`
+	// Remember successful detach independently of later file cleanup failures.
+	// Release and Close may both attempt cleanup on this context.
+	detached bool
 }
 
 // Unmount detaches a DMG and removes its backing file unless acquisition reused
 // a pre-existing file. A zero-value Context always removes the file.
-func (c Context) Unmount() error {
-	if info, err := utils.MountInfo(); err == nil { // darwin only
-		if image := info.Mount(c.MountPoint); image != nil {
-			c.DmgPath = filepath.Clean(image.ImagePath)
+func (c *Context) Unmount() error {
+	if !c.detached {
+		if info, err := utils.MountInfo(); err == nil { // darwin only
+			if image := info.Mount(c.MountPoint); image != nil {
+				c.DmgPath = filepath.Clean(image.ImagePath)
+			}
 		}
 	}
+	m := utils.DMGMount{MountPoint: c.MountPoint, AlreadyMounted: c.AlreadyMounted, OwnsDirectory: c.OwnsDirectory}
+	return c.unmount(func() error { return m.Unmount(true) })
+}
+
+func (c *Context) unmount(detach func() error) error {
+	if c.detached {
+		return c.removeBackingFile()
+	}
 	if err := utils.Retry(3, 2*time.Second, func() error {
-		return utils.Unmount(c.MountPoint, true)
+		err := detach()
+		if err == nil {
+			c.detached = true
+		}
+		return err
 	}); err != nil {
-		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
+		return fmt.Errorf("%w: failed to unmount %s at %s: %v", utils.ErrMountCleanup, c.DmgPath, c.MountPoint, err)
 	}
 	return c.removeBackingFile()
 }
@@ -96,7 +114,7 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 	return dmgInIPSW(path, typ, cfg, utils.MountDMG, aea.Decrypt)
 }
 
-func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (string, bool, error), decrypt func(*aea.DecryptConfig) (string, error)) (ctx *Context, err error) {
+func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (utils.DMGMount, error), decrypt func(*aea.DecryptConfig) (string, error)) (ctx *Context, err error) {
 	// A session can own cleanup only after acquisition succeeds. Until then,
 	// remove files created by this attempt without deleting pre-existing files.
 	var created []string
@@ -263,15 +281,16 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (strin
 		}
 	}
 
-	mp, am, err := attach(extractedDMG, cfg.MountPoint)
+	m, err := attach(extractedDMG, cfg.MountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}
 
 	return &Context{
 		DmgPath:        extractedDMG,
-		MountPoint:     mp,
-		AlreadyMounted: am,
+		MountPoint:     m.MountPoint,
+		AlreadyMounted: m.AlreadyMounted,
+		OwnsDirectory:  m.OwnsDirectory,
 		RetainDmg:      !slices.Contains(created, extractedDMG),
 	}, nil
 }

@@ -2,6 +2,8 @@ package mount
 
 import (
 	"errors"
+	"fmt"
+	"path/filepath"
 	"sync"
 )
 
@@ -52,11 +54,18 @@ func (s *Session) Root(typ string) (string, error) {
 	defer s.mu.Unlock()
 
 	if ctx, ok := s.mounts[typ]; ok {
+		if ctx.detached {
+			return "", fmt.Errorf("mount %s is detached; retry Release to finish backing-file cleanup", ctx.MountPoint)
+		}
 		return ctx.MountPoint, nil
 	}
 	ctx, err := s.mount(typ)
 	if err != nil {
 		return "", err
+	}
+	// Resolve aliases before detach removes the directory needed to resolve them.
+	if canonical, err := filepath.EvalSymlinks(ctx.MountPoint); err == nil {
+		ctx.MountPoint = canonical
 	}
 	s.mounts[typ] = ctx
 	return ctx.MountPoint, nil
@@ -95,6 +104,11 @@ func (s *Session) releaseMountPointLocked(mountPoint string) error {
 	}
 	if owner != nil {
 		if err := s.unmount(owner); err != nil {
+			if owner.detached {
+				for _, typ := range aliases {
+					s.mounts[typ].detached = true
+				}
+			}
 			return err
 		}
 	}

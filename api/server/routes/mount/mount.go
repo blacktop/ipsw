@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/mount"
@@ -28,6 +29,9 @@ type successResponse struct {
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup, pemDB string) {
+	// Keep ownership server-side: older clients only echo mount_point/dmg_path.
+	var mu sync.Mutex
+	mounts := make(map[string]*mount.Context)
 	// swagger:route POST /mount/{type} Mount postMount
 	//
 	// Mount
@@ -113,6 +117,14 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
+		if canonical, err := filepath.EvalSymlinks(ctx.MountPoint); err == nil {
+			ctx.MountPoint = canonical
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if previous := mounts[ctx.MountPoint]; previous == nil || previous.AlreadyMounted {
+			mounts[ctx.MountPoint] = ctx
+		}
 		c.JSON(http.StatusOK, ctx)
 	})
 	// swagger:operation POST /unmount Mount postUnmount
@@ -130,7 +142,7 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//   -
 	//     in: "body"
 	//     name: "body"
-	//     description: "The unmount context (returned from /mount)"
+	//     description: "Echo the full context returned from /mount, including its ownership flags"
 	//     required: true
 	//     schema:
 	//       type: object
@@ -139,6 +151,10 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//           type: string
 	//         dmg_path:
 	//           type: string
+	//         already_mounted:
+	//           type: boolean
+	//         owns_directory:
+	//           type: boolean
 	//         retain_dmg:
 	//           type: boolean
 	// responses:
@@ -156,10 +172,20 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 			c.IndentedJSON(http.StatusBadRequest, err)
 			return
 		}
-		if err := ctx.Unmount(); err != nil {
+		if canonical, err := filepath.EvalSymlinks(ctx.MountPoint); err == nil {
+			ctx.MountPoint = canonical
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		owned := mounts[ctx.MountPoint]
+		if owned == nil {
+			owned = &ctx // Preserve support for mounts acquired outside this daemon.
+		}
+		if err := owned.Unmount(); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		delete(mounts, ctx.MountPoint)
 		c.JSON(http.StatusOK, successResponse{Success: true})
 	})
 }

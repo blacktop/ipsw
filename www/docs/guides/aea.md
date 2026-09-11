@@ -126,7 +126,7 @@ This "Database" is a key-value pair JSON file where the `key` is the unique part
 ```bash
 ❯ ipsw mount fs --pem-db 'fcs-keys.json' iPhone16,2_18.0_22A5282m_Restore.ipsw
    • Mounted fs DMG 090-27454-036.dmg
-      • Press Ctrl+C to unmount '/tmp/090-27454-036.dmg.mount' ...
+      • Press Ctrl+C to unmount '/tmp/090-27454-036.dmg-123456789.mount' ...
 ```
 
 :::info note

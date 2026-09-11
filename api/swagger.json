@@ -1858,18 +1858,24 @@
         "operationId": "postUnmount",
         "parameters": [
           {
-            "description": "The unmount context (returned from /mount)",
+            "description": "Echo the full context returned from /mount, including its ownership flags",
             "name": "body",
             "in": "body",
             "required": true,
             "schema": {
               "type": "object",
               "properties": {
+                "already_mounted": {
+                  "type": "boolean"
+                },
                 "dmg_path": {
                   "type": "string"
                 },
                 "mount_point": {
                   "type": "string"
+                },
+                "owns_directory": {
+                  "type": "boolean"
                 },
                 "retain_dmg": {
                   "type": "boolean"
@@ -2973,6 +2979,10 @@
         "mount_point": {
           "type": "string",
           "x-go-name": "MountPoint"
+        },
+        "owns_directory": {
+          "type": "boolean",
+          "x-go-name": "OwnsDirectory"
         },
         "retain_dmg": {
           "description": "RetainDmg is set when the backing image existed before this acquisition.\nIt is serialized so an unmount driven by the /mount API response keeps\nthe same ownership decision.",

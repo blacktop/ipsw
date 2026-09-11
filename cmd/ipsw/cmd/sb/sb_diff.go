@@ -121,6 +121,7 @@ var sbDiffCmd = &cobra.Command{
 			}
 
 			for _, dmgPath := range dmgs {
+				skipCleanup := false
 				// check if filesystem DMG already exists (due to previous mount command)
 				if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 					dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -132,7 +133,11 @@ var sbDiffCmd = &cobra.Command{
 					if len(dmgs) == 0 {
 						return fmt.Errorf("failed to find %s in IPSW", dmgPath)
 					}
-					defer os.Remove(dmgs[0])
+					defer func(path string) {
+						if !skipCleanup {
+							os.Remove(path)
+						}
+					}(dmgs[0])
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 				}
@@ -148,22 +153,29 @@ var sbDiffCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 					}
-					defer os.Remove(dmgPath)
+					defer func(path string) {
+						if !skipCleanup {
+							os.Remove(path)
+						}
+					}(dmgPath)
 				}
 
 				utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting FS %s", dmgPath))
-				mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, "")
+				m, err := utils.MountDMG(dmgPath, "")
 				if err != nil {
 					return fmt.Errorf("failed to mount DMG: %v", err)
 				}
-				if alreadyMounted {
+				mountPoint := m.MountPoint
+				if m.AlreadyMounted {
+					skipCleanup = true
 					utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 				} else {
 					defer func() {
 						utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 						if err := utils.Retry(3, 2*time.Second, func() error {
-							return utils.Unmount(mountPoint, true)
+							return m.Unmount(true)
 						}); err != nil {
+							skipCleanup = true
 							utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err))
 						}
 					}()

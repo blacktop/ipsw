@@ -41,8 +41,9 @@ type DDIInfo struct {
 	ManifestPath   string
 
 	// DMG mounting info
-	MountPoint   string
-	NeedsUnmount bool
+	MountPoint    string
+	NeedsUnmount  bool
+	OwnsDirectory bool
 
 	// For personalization
 	BuildManifest *plist.BuildManifest
@@ -52,7 +53,7 @@ func (d *DDIInfo) Clean() error {
 	if d.NeedsUnmount {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting from %s", d.MountPoint))
 		if err := utils.Retry(3, 2*time.Second, func() error {
-			return utils.Unmount(d.MountPoint, false)
+			return (utils.DMGMount{MountPoint: d.MountPoint, OwnsDirectory: d.OwnsDirectory}).Unmount(false)
 		}); err != nil {
 			return fmt.Errorf("failed to unmount from %s: %w", d.MountPoint, err)
 		}
@@ -184,15 +185,16 @@ func GetDDIInfo(c *DDIConfig) (info *DDIInfo, err error) {
 	if info.ManifestPath == "" {
 		// At this point we have a DMG path that needs to be mounted to find the BuildManifest.plist
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", c.DDIDmgPath))
-		mountPoint, alreadyMounted, err := utils.MountDMG(c.DDIDmgPath, "")
+		m, err := utils.MountDMG(c.DDIDmgPath, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to mount %s: %w", c.DDIDmgPath, err)
 		}
 
-		info.MountPoint = mountPoint
+		info.MountPoint = m.MountPoint
+		info.OwnsDirectory = m.OwnsDirectory
 		c.DDIFolder = info.MountPoint
 
-		if alreadyMounted {
+		if m.AlreadyMounted {
 			utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", c.DDIDmgPath))
 			info.NeedsUnmount = false
 		} else {

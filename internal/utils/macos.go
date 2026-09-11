@@ -678,37 +678,75 @@ func IsAlreadyMounted(image, mountPoint string) (string, bool, error) {
 	return "", false, nil
 }
 
-func MountDMG(image string, customMountPoint string) (string, bool, error) {
+// DMGMount records mount and directory ownership separately. AlreadyMounted
+// means the attachment was borrowed; OwnsDirectory applies only to a newly
+// allocated default mount directory, never a caller-supplied path.
+type DMGMount struct {
+	MountPoint     string
+	AlreadyMounted bool
+	OwnsDirectory  bool
+}
+
+// ErrMountCleanup tells enclosing workflows to retain temporary backing images.
+// Wrap it when mount cleanup fails after retries have been exhausted.
+var ErrMountCleanup = errors.New("mount cleanup failed; backing image retained")
+
+// Unmount detaches the image, then removes only an owned, empty directory.
+// Callers decide whether to detach borrowed mounts. Directory cleanup is a
+// warning after successful detach, never a reason to retry detaching the image.
+func (m DMGMount) Unmount(force bool) error {
+	return m.unmount(force, Unmount)
+}
+
+func (m DMGMount) unmount(force bool, detach func(string, bool) error) error {
+	if err := detach(m.MountPoint, force); err != nil {
+		return err
+	}
+	if !m.OwnsDirectory || m.AlreadyMounted {
+		return nil
+	}
+	if err := os.Remove(m.MountPoint); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Warnf("detached image but failed to remove mount directory %s: %v", m.MountPoint, err)
+	}
+	return nil
+}
+
+func MountDMG(image string, customMountPoint string) (DMGMount, error) {
 	image = filepath.Clean(image)
 	if abs, err := filepath.Abs(image); err == nil {
 		image = abs
 	}
 
-	var mountPoint string
-	if customMountPoint != "" {
-		mountPoint = customMountPoint
-	} else {
-		base := filepath.Base(image)
-		mountPoint = fmt.Sprintf("/tmp/%s.mount", base)
-	}
-
 	if runtime.GOOS == "darwin" {
-		// check if already mounted
-		if prevMountPoint, mounted, err := IsAlreadyMounted(image, mountPoint); mounted && err == nil {
-			if prevMountPoint != "" {
-				mountPoint = prevMountPoint
-			}
-			return mountPoint, true, nil
+		// Reuse before allocating a directory, even with a custom mount point.
+		if prevMountPoint, mounted, err := IsAlreadyMounted(image, customMountPoint); mounted && err == nil {
+			return DMGMount{MountPoint: prevMountPoint, AlreadyMounted: true}, nil
 		}
-	} else if err := os.MkdirAll(mountPoint, 0750); err != nil {
-		return "", false, fmt.Errorf("failed to create temporary mount point %s: %w", mountPoint, err)
 	}
 
-	if err := Mount(image, mountPoint); err != nil {
-		return "", false, fmt.Errorf("failed to mount %s: %w", image, err)
+	m := DMGMount{MountPoint: customMountPoint}
+	if customMountPoint == "" {
+		var err error
+		m.MountPoint, err = os.MkdirTemp("/tmp", filepath.Base(image)+"-*.mount")
+		if err != nil {
+			return DMGMount{}, fmt.Errorf("failed to create temporary mount directory: %w", err)
+		}
+		m.OwnsDirectory = true
+	} else if runtime.GOOS != "darwin" {
+		if err := os.MkdirAll(m.MountPoint, 0750); err != nil {
+			return DMGMount{}, fmt.Errorf("failed to create mount point %s: %w", m.MountPoint, err)
+		}
 	}
 
-	return mountPoint, false, nil
+	if err := Mount(image, m.MountPoint); err != nil {
+		if m.OwnsDirectory {
+			if removeErr := os.Remove(m.MountPoint); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				err = errors.Join(err, fmt.Errorf("failed to remove mount directory %s: %w", m.MountPoint, removeErr))
+			}
+		}
+		return DMGMount{}, fmt.Errorf("failed to mount %s: %w", image, err)
+	}
+	return m, nil
 }
 
 // Unmount unmounts a DMG with hdiutil
@@ -848,21 +886,21 @@ func InstallKDK(path string) (err error) {
 		return fmt.Errorf("only supported on macOS")
 	}
 
-	mountPoint, alreadyMounted, err := MountDMG(path, "")
+	m, err := MountDMG(path, "")
 	if err != nil {
 		return err
 	}
-	if !alreadyMounted {
+	if !m.AlreadyMounted {
 		defer func() {
 			closeErr := Retry(3, 2*time.Second, func() error {
-				return Unmount(mountPoint, false)
+				return m.Unmount(false)
 			})
 			if closeErr != nil {
 				err = errors.Join(err, fmt.Errorf("failed to unmount KDK: %w", closeErr))
 			}
 		}()
 	}
-	cmd := exec.Command("sudo", "installer", "-pkg", filepath.Join(mountPoint, "KernelDebugKit.pkg"), "-target", "/")
+	cmd := exec.Command("sudo", "installer", "-pkg", filepath.Join(m.MountPoint, "KernelDebugKit.pkg"), "-target", "/")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)

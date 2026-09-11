@@ -13,6 +13,70 @@ import (
 	"testing"
 )
 
+func TestDMGMountUnmountOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		name                                  string
+		owned, borrowed, failDetach, nonempty bool
+		wantCalls                             int
+		wantExists                            bool
+	}{
+		{name: "owned", owned: true, wantCalls: 1},
+		{name: "explicit", wantCalls: 1, wantExists: true},
+		{name: "borrowed", owned: true, borrowed: true, wantCalls: 1, wantExists: true},
+		{name: "detach failure", owned: true, failDetach: true, wantCalls: 3, wantExists: true},
+		{name: "directory failure stops retries", owned: true, nonempty: true, wantCalls: 1, wantExists: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			mountPoint := filepath.Join(root, "mount")
+			if err := os.Mkdir(mountPoint, 0700); err != nil {
+				t.Fatal(err)
+			}
+			backing := filepath.Join(root, "image.dmg")
+			if err := os.WriteFile(backing, []byte("backing"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if tc.nonempty {
+				if err := os.WriteFile(filepath.Join(mountPoint, "keep"), []byte("keep"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			m := DMGMount{MountPoint: mountPoint, OwnsDirectory: tc.owned, AlreadyMounted: tc.borrowed}
+			calls := 0
+			err := Retry(3, 0, func() error {
+				return m.unmount(true, func(path string, force bool) error {
+					calls++
+					if path != mountPoint || !force {
+						t.Fatalf("wrong detach: %q, %t", path, force)
+					}
+					if tc.failDetach {
+						return errors.New("synthetic busy mount")
+					}
+					return nil
+				})
+			})
+			if calls != tc.wantCalls {
+				t.Fatalf("detach calls = %d, want %d", calls, tc.wantCalls)
+			}
+			if (err != nil) != tc.failDetach {
+				t.Fatalf("unexpected cleanup error: %v", err)
+			}
+			_, statErr := os.Stat(mountPoint)
+			if tc.wantExists && statErr != nil || !tc.wantExists && !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("mount directory state: %v", statErr)
+			}
+			if data, err := os.ReadFile(backing); err != nil || string(data) != "backing" {
+				t.Fatalf("backing image changed: %q, %v", data, err)
+			}
+			if tc.nonempty {
+				if data, err := os.ReadFile(filepath.Join(mountPoint, "keep")); err != nil || string(data) != "keep" {
+					t.Fatalf("nonrecursive cleanup removed contents: %q, %v", data, err)
+				}
+			}
+		})
+	}
+}
+
 const (
 	// Captured from macOS 27.0 (26A428).
 	doubleHyphenHelp = "USAGE: diskutil image attach [--verbose] [--stdinpassphrase] [--plist]" +

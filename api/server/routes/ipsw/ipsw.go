@@ -3,7 +3,6 @@ package ipsw
 import (
 	"archive/zip"
 	"bytes"
-	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -73,6 +72,7 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
+		skipCleanup := false
 		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 			// extract filesystem DMG
 			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -80,11 +80,17 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 			})
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to extract %s from IPSW: %v", dmgPath, err)})
+				return
 			}
 			if len(dmgs) == 0 {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to find %s in IPSW", dmgPath)})
+				return
 			}
-			defer os.Remove(filepath.Clean(dmgs[0]))
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(filepath.Clean(dmgs[0]))
 		} else {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 		}
@@ -99,26 +105,33 @@ func getFsFiles(pemDB string) gin.HandlerFunc {
 			})
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to parse AEA encrypted DMG: %v", err)})
+				return
 			}
-			defer os.Remove(dmgPath)
+			defer func(path string) {
+				if !skipCleanup {
+					os.Remove(path)
+				}
+			}(dmgPath)
 		}
 
 		// mount filesystem DMG
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-		mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath, mountPointParam)
+		m, err := utils.MountDMG(dmgPath, mountPointParam)
 		if err != nil {
-			if !errors.Is(err, utils.ErrMountResourceBusy) {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
-			}
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
+			return
 		}
-		if alreadyMounted {
+		mountPoint := m.MountPoint
+		if m.AlreadyMounted {
+			skipCleanup = true
 			utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
 		} else {
 			defer func() {
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 				if err := utils.Retry(3, 2*time.Second, func() error {
-					return utils.Unmount(mountPoint, true)
+					return m.Unmount(true)
 				}); err != nil {
+					skipCleanup = true
 					log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 				}
 			}()

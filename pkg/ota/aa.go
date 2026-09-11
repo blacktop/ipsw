@@ -756,7 +756,11 @@ func (r *Reader) ExtractFromCryptexesWithSourcesForArches(pattern, output string
 	if err != nil {
 		return nil, wrapPhase(PhaseOutputSetup, "", fmt.Errorf("failed to create temp dir: %w", err))
 	}
-	defer func() { err = joinRemoveTempDir(err, "", tmpdir) }()
+	defer func() {
+		if !errors.Is(err, utils.ErrMountCleanup) {
+			err = joinRemoveTempDir(err, "", tmpdir)
+		}
+	}()
 
 	out, err := extractFromDscCryptexFilesForArches(r.Files(), arches, func(file *File) ([]string, error) {
 		return r.extractFromCryptexFile(file, match, tmpdir, output)
@@ -890,25 +894,23 @@ func (r *Reader) extractFromCryptexFile(file *File, match *regexp.Regexp, tmpdir
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmg))
-	mountPoint, alreadyMounted, err := utils.MountDMG(dmg, "")
+	m, err := utils.MountDMG(dmg, "")
 	if err != nil {
 		return nil, wrapPhase(PhaseMount, file.Base(), fmt.Errorf("failed to mount cryptex DMG %s: %w", dmg, err))
 	}
-	// Detach only what this invocation attached. A pre-existing attachment
-	// belongs to another process -- on Linux the mount point is derived from
-	// the DMG basename alone, so a concurrent run shares it and would have its
-	// filesystem yanked out from under an in-progress walk.
-	if alreadyMounted {
+	mountPoint := m.MountPoint
+	// Detach only what this invocation attached, not borrowed mounts.
+	if m.AlreadyMounted {
 		utils.Indent(log.Warn, 2)(fmt.Sprintf(
 			"%s was already mounted at %s; leaving it attached", dmg, mountPoint))
 	} else {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmg))
 			if uerr := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, true)
+				return m.Unmount(true)
 			}); uerr != nil {
 				err = errors.Join(err, wrapPhase(PhaseCleanup, file.Base(),
-					fmt.Errorf("failed to unmount DMG %s at %s: %v", dmg, mountPoint, uerr)))
+					fmt.Errorf("%w: failed to unmount DMG %s at %s: %v", utils.ErrMountCleanup, dmg, mountPoint, uerr)))
 			}
 		}()
 	}
