@@ -316,29 +316,27 @@ func Create(conf *CreateConfig) (*Image, error) {
 			return nil, fmt.Errorf("failed to create IM4P payload from input data: %v", err)
 		}
 	} else if len(conf.PayloadData) > 0 {
-		existingPayload, err := ParsePayload(conf.PayloadData)
+		if conf.PayloadCompression != "" && !strings.EqualFold(conf.PayloadCompression, "none") {
+			return nil, fmt.Errorf("cannot change compression of an existing IM4P payload; extract its data and create from raw input instead")
+		}
+		if len(conf.PayloadExtraData) > 0 {
+			return nil, fmt.Errorf("cannot add extra data to an existing IM4P payload; extract its data and create from raw input instead")
+		}
+		img.Payload, err = ParsePayload(conf.PayloadData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse IM4P payload data: %v", err)
 		}
-
-		// If type override is specified, create new payload with overridden type
-		if conf.PayloadType != "" {
-			payloadData, err := existingPayload.GetData()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get data from existing payload: %v", err)
+		// Retyping splices the new type/version into the original DER so the
+		// payload data, compression, keybags, and properties stay byte-identical.
+		if conf.PayloadType != "" || conf.PayloadVersion != "" {
+			typ := conf.PayloadType
+			if typ == "" {
+				typ = img.Payload.Type
 			}
-			img.Payload, err = CreatePayload(&CreatePayloadConfig{
-				Type:        conf.PayloadType,
-				Version:     conf.PayloadVersion,
-				Data:        payloadData,
-				ExtraData:   existingPayload.GetExtraData(),
-				Compression: conf.PayloadCompression,
-			})
+			img.Payload, err = img.Payload.Retype(typ, conf.PayloadVersion)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create IM4P payload with overridden type: %v", err)
+				return nil, fmt.Errorf("failed to retype IM4P payload: %v", err)
 			}
-		} else {
-			img.Payload = existingPayload
 		}
 	}
 

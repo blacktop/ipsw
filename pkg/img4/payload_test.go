@@ -92,22 +92,16 @@ func TestPayloadCreation(t *testing.T) {
 				t.Errorf("Version = %v, want %v", payload.Version, tt.config.Version)
 			}
 
-			// Verify compression (should NOT be present with extra data)
-			if len(tt.config.ExtraData) > 0 {
-				if payload.Compression.Algorithm != 0 || payload.Compression.UncompressedSize != 0 {
-					t.Errorf("Compression block should not be present when ExtraData is used")
-				}
-			} else if tt.config.Compression != "none" && tt.config.Compression != "" {
-				// Map string compression to enum for comparison
-				var expectedAlgo CompressionAlgorithm
-				switch strings.ToLower(tt.config.Compression) {
-				case "lzss":
-					expectedAlgo = CompressionAlgorithmLZSS
-				case "lzfse", "lzfse_iboot":
-					expectedAlgo = CompressionAlgorithmLZFSE
-				}
-				if payload.Compression.Algorithm != expectedAlgo {
-					t.Errorf("Compression.Algorithm = %v, want %v", payload.Compression.Algorithm, expectedAlgo)
+			// The ASN.1 compression record is only encoded for LZFSE without extra data.
+			hasRecord := payload.Compression.UncompressedSize != 0
+			wantRecord := len(tt.config.ExtraData) == 0 &&
+				(strings.EqualFold(tt.config.Compression, "lzfse") || strings.EqualFold(tt.config.Compression, "lzfse_iboot"))
+			if hasRecord != wantRecord {
+				t.Errorf("compression record present = %t, want %t", hasRecord, wantRecord)
+			}
+			if wantRecord {
+				if payload.Compression.Algorithm != CompressionAlgorithmLZFSE {
+					t.Errorf("Compression.Algorithm = %v, want LZFSE", payload.Compression.Algorithm)
 				}
 				if payload.Compression.UncompressedSize != len(tt.config.Data) {
 					t.Errorf("Compression.UncompressedSize = %v, want %v", payload.Compression.UncompressedSize, len(tt.config.Data))

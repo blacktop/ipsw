@@ -87,7 +87,7 @@ var img4CreateCmd = &cobra.Command{
 		❯ ipsw img4 create --im4p payload.im4p --im4m manifest.im4m --im4r restore.im4r --output kernel.img4
 
 		# Create IMG4 from raw kernel with LZSS compression and manifest
-		❯ ipsw img4 create --input kernelcache --type krnl --description "Kernelcache" --compress lzss --im4m manifest.im4m --output kernel.img4
+		❯ ipsw img4 create --input kernelcache --type krnl --version "Kernelcache" --compress lzss --im4m manifest.im4m --output kernel.img4
 
 		# Create IMG4 with boot nonce (generates IM4R automatically)
 		❯ ipsw img4 create --input sep-firmware.bin --type sepi --boot-nonce 1234567890abcdef --im4m manifest.im4m --output sep.img4
@@ -96,18 +96,18 @@ var img4CreateCmd = &cobra.Command{
 		❯ ipsw img4 create --input payload.bin --type logo --compress lzss --extra extra.bin --im4m manifest.im4m --output logo.img4
 
 		# Create unsigned IMG4 (no manifest) - for testing only
-		❯ ipsw img4 create --input test.bin --type test --description "Test payload" --output test.img4
+		❯ ipsw img4 create --input test.bin --type test --version "Test payload" --output test.img4
 
 		# Create IMG4 from iBoot with specific compression
-		❯ ipsw img4 create --input iboot.raw --type ibot --description "iBoot" --compress lzfse --im4m iboot.im4m --output iboot.img4
+		❯ ipsw img4 create --input iboot.raw --type ibot --version "iBoot" --compress lzfse --im4m iboot.im4m --output iboot.img4
 
 		# Create IMG4 from raw data with common FourCC codes
 		❯ ipsw img4 create --input kernelcache.bin --type krnl --compress lzss --im4m manifest.im4m --output kernel.img4
 		❯ ipsw img4 create --input devicetree.bin --type dtre --compress lzss --im4m manifest.im4m --output devicetree.img4
 		❯ ipsw img4 create --input ramdisk.dmg --type rdsk --compress lzss --im4m manifest.im4m --output ramdisk.img4
 
-		# Re-type existing IM4P file with new type
-		❯ ipsw img4 create --im4p existing.im4p --type newt --im4m manifest.im4m --output retyped.img4`),
+		# Re-type existing IM4P file with new type (payload data and compression are preserved as-is)
+		❯ ipsw img4 create --im4p kernelcache.im4p --type rkrn --im4m manifest.im4m --output retyped.img4`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// flags

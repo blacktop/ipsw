@@ -175,8 +175,20 @@ func (c CompressionAlgorithm) String() string {
 }
 
 type Compression struct {
-	Algorithm        CompressionAlgorithm `asn1:"integer" json:"algorithm,omitempty"`
-	UncompressedSize int                  `asn1:"integer" json:"uncompressed_size,omitempty"`
+	Algorithm        CompressionAlgorithm `asn1:"integer"`
+	UncompressedSize int                  `asn1:"integer"`
+}
+
+// MarshalJSON reports the algorithm by name so LZSS (enum value 0) is not
+// dropped by omitempty.
+func (c Compression) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Algorithm        string `json:"algorithm"`
+		UncompressedSize int    `json:"uncompressed_size"`
+	}{
+		Algorithm:        c.Algorithm.String(),
+		UncompressedSize: c.UncompressedSize,
+	})
 }
 
 type PAYP struct {
@@ -203,8 +215,9 @@ type Payload struct {
 	Keybags    []Keybag
 	Properties map[string]any
 
-	decompressedData []byte
-	extraData        []byte // Any extra data appended after the compressed payload
+	decompressedData    []byte
+	extraData           []byte       // Any extra data appended after the compressed payload
+	detectedCompression *Compression // Compression detected from the data header when no ASN.1 record exists
 }
 
 func OpenPayload(path string) (*Payload, error) {
@@ -274,11 +287,9 @@ func (p *Payload) String() string {
 		sb.WriteString(fmt.Sprintf("  %s:      %s\n", colorField("Version"), p.Version))
 	}
 	sb.WriteString(fmt.Sprintf("  %s:         %s (%d bytes)\n", colorField("Data"), humanize.Bytes(uint64(len(p.Data))), len(p.Data)))
-	if p.Compression.UncompressedSize > 0 {
-		sb.WriteString(fmt.Sprintf("  %s:  %s\n", colorField("Compression"), p.Compression.Algorithm.String()))
-		if p.Compression.UncompressedSize > 0 {
-			sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed"), humanize.Bytes(uint64(p.Compression.UncompressedSize)), p.Compression.UncompressedSize))
-		}
+	if comp, ok := p.CompressionInfo(); ok {
+		sb.WriteString(fmt.Sprintf("  %s:  %s\n", colorField("Compression"), comp.Algorithm.String()))
+		sb.WriteString(fmt.Sprintf("  %s: %s (%d bytes)\n", colorField("Uncompressed"), humanize.Bytes(uint64(comp.UncompressedSize)), comp.UncompressedSize))
 	}
 	if p.HasExtraData() {
 		extraData := p.GetExtraData()
@@ -313,8 +324,11 @@ func (p *Payload) MarshalJSON() ([]byte, error) {
 		"encrypted":   p.Encrypted,
 		"keybags":     p.Keybags,
 		"properties":  p.Properties,
-		"compression": p.Compression,
+		"compression": nil,
 		"hash":        p.Hash,
+	}
+	if comp, ok := p.CompressionInfo(); ok {
+		data["compression"] = comp
 	}
 	if p.HasExtraData() {
 		data["extra_data_size"] = len(p.GetExtraData())
@@ -324,6 +338,85 @@ func (p *Payload) MarshalJSON() ([]byte, error) {
 
 func (p *Payload) Marshal() ([]byte, error) {
 	return asn1.Marshal(p.IM4P)
+}
+
+// CompressionInfo returns the payload's compression metadata. An encoded ASN.1
+// compression record wins; otherwise the algorithm is detected from the data
+// header, which decompresses the payload once. The detected metadata is never
+// written back into the IM4P structure, so inspecting a payload does not change
+// how it marshals.
+func (p *Payload) CompressionInfo() (Compression, bool) {
+	if p.Compression.UncompressedSize > 0 {
+		return p.Compression, true
+	}
+	if p.detectedCompression == nil {
+		if _, err := p.Decompress(); err != nil {
+			if err != ErrNotCompressed {
+				log.Debugf("failed to detect payload compression: %v", err)
+			}
+			return Compression{}, false
+		}
+	}
+	if p.detectedCompression == nil {
+		return Compression{}, false
+	}
+	return *p.detectedCompression, true
+}
+
+// Retype returns a new payload with the given type and, when version is not
+// empty, the given version. Every other DER element of the original IM4P is
+// carried over byte-for-byte, including the compressed data, keybags,
+// properties, and any fields this package does not model.
+func (p *Payload) Retype(typ, version string) (*Payload, error) {
+	raw := []byte(p.Raw)
+	if len(raw) == 0 {
+		var err error
+		if raw, err = p.Marshal(); err != nil {
+			return nil, fmt.Errorf("failed to marshal payload for retyping: %v", err)
+		}
+	}
+	var seq asn1.RawValue
+	if _, err := asn1.Unmarshal(raw, &seq); err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P sequence: %v", err)
+	}
+	var tag, oldType, oldVersion asn1.RawValue
+	rest, err := asn1.Unmarshal(seq.Bytes, &tag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P tag: %v", err)
+	}
+	rest, err = asn1.Unmarshal(rest, &oldType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P type: %v", err)
+	}
+	rest, err = asn1.Unmarshal(rest, &oldVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IM4P version: %v", err)
+	}
+	newType, err := asn1.MarshalWithParams(typ, "ia5")
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode IM4P type %q: %v", typ, err)
+	}
+	newVersion := oldVersion.FullBytes
+	if version != "" {
+		if newVersion, err = asn1.MarshalWithParams(version, "ia5"); err != nil {
+			return nil, fmt.Errorf("failed to encode IM4P version %q: %v", version, err)
+		}
+	}
+	body := make([]byte, 0, len(tag.FullBytes)+len(newType)+len(newVersion)+len(rest))
+	body = append(body, tag.FullBytes...)
+	body = append(body, newType...)
+	body = append(body, newVersion...)
+	body = append(body, rest...)
+	data, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      body,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode retyped IM4P: %v", err)
+	}
+	return ParsePayload(data)
 }
 
 func (p *Payload) Decompress() ([]byte, error) {
@@ -394,8 +487,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 			}
 		}
 		if !hasCompressField {
-			p.Compression.Algorithm = detectedAlgorithm
-			p.Compression.UncompressedSize = len(decompressed)
+			p.detectedCompression = &Compression{Algorithm: detectedAlgorithm, UncompressedSize: len(decompressed)}
 		}
 		return decompressed, nil
 	case CompressionAlgorithmLZFSE:
@@ -434,8 +526,7 @@ func (p *Payload) Decompress() ([]byte, error) {
 			log.Debugf("extracted %d bytes of extra data after LZFSE payload", len(p.extraData))
 		}
 		if !hasCompressField {
-			p.Compression.Algorithm = detectedAlgorithm
-			p.Compression.UncompressedSize = len(decompressed)
+			p.detectedCompression = &Compression{Algorithm: detectedAlgorithm, UncompressedSize: len(decompressed)}
 		}
 		return decompressed, nil
 	}
@@ -733,14 +824,13 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 		},
 	}
 
-	// Add the compression block if a compression algorithm was used and there's no extra data.
-	if len(conf.ExtraData) == 0 {
-		switch compAlgo {
-		case CompressionAlgorithmLZSS, CompressionAlgorithmLZFSE:
-			im4p.Compression = Compression{
-				Algorithm:        compAlgo,
-				UncompressedSize: len(conf.Data),
-			}
+	// Only LZFSE payloads carry the ASN.1 compression record. LZSS payloads are
+	// self-describing via their complzss header, and Apple, img4lib, and PyIMG4
+	// all omit the record for them; adding it produced unbootable images (#1324).
+	if len(conf.ExtraData) == 0 && compAlgo == CompressionAlgorithmLZFSE {
+		im4p.Compression = Compression{
+			Algorithm:        compAlgo,
+			UncompressedSize: len(conf.Data),
 		}
 	}
 
@@ -790,6 +880,7 @@ func DecryptPayload(inputPath, outputPath string, iv, key []byte) error {
 	i.Keybags = nil
 	i.decompressedData = nil
 	i.extraData = nil
+	i.detectedCompression = nil
 
 	payloadData, err := i.GetData()
 	if err != nil {
