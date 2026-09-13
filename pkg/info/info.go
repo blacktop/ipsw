@@ -716,11 +716,17 @@ func (i *Info) kernelCacheDeviceListCollides(kc string, devices []string) bool {
 		return false
 	}
 
+	base := filepath.Base(kc)
+	prefix := strings.TrimSuffix(base, filepath.Ext(base))
 	seen := make(map[string]struct{})
 	for _, kcaches := range i.Plists.BuildManifest.GetKernelCaches() {
 		for _, otherKC := range kcaches {
 			otherBase := filepath.Base(otherKC)
-			if otherBase == filepath.Base(kc) {
+			if otherBase == base {
+				continue
+			}
+			// Different variants retain distinct prefixes after replacing the board suffix.
+			if strings.TrimSuffix(otherBase, filepath.Ext(otherBase)) != prefix {
 				continue
 			}
 			if _, ok := seen[otherBase]; ok {

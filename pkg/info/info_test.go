@@ -65,6 +65,46 @@ func TestKernelCacheBuildManifestFallbackUsesProductType(t *testing.T) {
 	}
 }
 
+func TestKernelCacheFileNameDistinguishesVariants(t *testing.T) {
+	variants := []string{"release", "research", "development"}
+	inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
+		SupportedProductTypes: []string{"iPhone12,1"},
+	}}}
+	for _, variant := range variants {
+		inf.Plists.BuildIdentities = append(inf.Plists.BuildIdentities,
+			testBuildIdentity("iPhone12,1", "n104ap", "kernelcache."+variant+".iphone12b"))
+	}
+	for _, variant := range variants {
+		path := "kernelcache." + variant + ".iphone12b"
+		if got := inf.GetDevicesForKernelCache(path); !slices.Equal(got, []string{"iPhone12,1"}) {
+			t.Fatalf("GetDevicesForKernelCache(%q) = %v, want iPhone12,1", path, got)
+		}
+		want := "kernelcache." + variant + ".iPhone12,1"
+		if got := inf.GetKernelCacheFileName(path); got != want {
+			t.Errorf("GetKernelCacheFileName(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestKernelCacheFileNameOnlyRetainsCollidingVariants(t *testing.T) {
+	inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
+		SupportedProductTypes: []string{"iPhone8,2"},
+		BuildIdentities: []plist.BuildIdentity{
+			testBuildIdentity("", "n66ap", "kernelcache.release.n66"),
+			testBuildIdentity("", "n66map", "kernelcache.release.n66m"),
+			testBuildIdentity("", "n66ap", "kernelcache.research.n66"),
+		},
+	}}}
+	for _, path := range []string{"kernelcache.release.n66", "kernelcache.release.n66m"} {
+		if got := inf.GetKernelCacheFileName(path); got != path {
+			t.Errorf("GetKernelCacheFileName(%q) = %q, want original name", path, got)
+		}
+	}
+	if got := inf.GetKernelCacheFileName("kernelcache.research.n66"); got != "kernelcache.research.iPhone8,2" {
+		t.Errorf("research filename = %q, want kernelcache.research.iPhone8,2", got)
+	}
+}
+
 func testBuildIdentity(productType, deviceClass, kernelPath string) plist.BuildIdentity {
 	return plist.BuildIdentity{
 		ApProductType: productType,

@@ -88,17 +88,26 @@ func TestKernelcacheKeepsBoardSelectionLocalAndRemote(t *testing.T) {
 				if len(out) != len(want) {
 					t.Fatalf("extracted %d kernels, want %d: %v", len(out), len(want), out)
 				}
+				expectedOutputs := make(map[string][]byte, len(want))
+				for _, source := range want {
+					name := source
+					// The release kernels collide; the research variant does not.
+					if source == "kernelcache.research.n66" {
+						name = "kernelcache.research.iPhone8,2"
+					}
+					expectedOutputs[name] = plaintext[source]
+				}
 				for path := range out {
+					wantData, ok := expectedOutputs[filepath.Base(path)]
+					if !ok {
+						t.Fatalf("unexpected kernelcache filename: %s", path)
+					}
 					data, err := os.ReadFile(path)
 					if err != nil {
 						t.Fatal(err)
 					}
-					matched := false
-					for _, source := range want {
-						matched = matched || bytes.Equal(data, plaintext[source])
-					}
-					if !matched {
-						t.Fatalf("extracted a sibling board's kernel: %s", path)
+					if !bytes.Equal(data, wantData) {
+						t.Fatalf("extracted wrong kernel payload: %s", path)
 					}
 				}
 			})
