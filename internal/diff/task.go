@@ -26,8 +26,8 @@ type HTMLFragment struct {
 }
 
 // MachoScanHandler is invoked once per Mach-O encountered during a shared
-// per-volume walk. The same (path, *macho.File) is fed to every registered
-// handler before the next binary is opened.
+// per-volume walk, before the next binary is opened. Tasks may implement
+// MachoSelector() search.MachoSliceSelector to choose their FAT slice.
 //
 // The type is defined in internal/search so that ForEachMachoInMountMulti
 // can fan handlers out without a cyclic dependency on internal/diff. Diff

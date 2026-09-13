@@ -360,10 +360,16 @@ func runVolumeTasks(typ string, roots volumeRoots, jobs []Task) []error {
 			if h == nil {
 				continue
 			}
-			handlers = append(handlers, search.NamedMachoScanHandler{
+			handler := search.NamedMachoScanHandler{
 				Task:   mw.Name(),
 				Handle: h,
-			})
+			}
+			if task, ok := mw.(interface {
+				MachoSelector() search.MachoSliceSelector
+			}); ok {
+				handler.Select = task.MachoSelector()
+			}
+			handlers = append(handlers, handler)
 		}
 		if len(handlers) == 0 {
 			return

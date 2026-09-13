@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -19,9 +18,6 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
-	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
-	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
@@ -133,77 +129,15 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 
 			for _, file := range files {
-				var m *macho.File
-				fat, err := macho.OpenFat(file)
-				if err == nil {
-					m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
-				} else {
-					if err == macho.ErrNotFat {
-						m, err = macho.Open(file)
-						if err != nil {
-							log.WithError(err).Warnf("failed to get entitlements for %s", file)
-							continue // bad macho file (skip)
-						}
-					} else {
-						continue // not a macho file (skip)
-					}
+				output, err := fileEntitlements(file, conf)
+				if errors.Is(err, errNotMacho) {
+					continue
 				}
-				if m.CodeSignature() != nil {
-					var output strings.Builder
-					// Get entitlements (try normal first, fallback to DER)
-					if len(m.CodeSignature().Entitlements) > 0 {
-						output.WriteString(m.CodeSignature().Entitlements)
-					} else if len(m.CodeSignature().EntitlementsDER) > 0 {
-						// Fallback to DER entitlements if normal ones are empty
-						if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
-							output.WriteString(decoded)
-							log.Warnf("using DER entitlements for %s", file)
-						}
-					}
-					// Add launch constraints if requested (for diff, not for database)
-					if conf.LaunchConstraints {
-						if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
-							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
-							if err == nil {
-								if output.Len() > 0 {
-									output.WriteString("\n")
-								}
-								output.WriteString("<!-- Launch Constraints (Self) -->\n")
-								lcdata, _ := json.MarshalIndent(lc, "", "  ")
-								output.WriteString(string(lcdata))
-								output.WriteString("\n")
-							}
-						}
-						if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
-							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
-							if err == nil {
-								if output.Len() > 0 {
-									output.WriteString("\n")
-								}
-								output.WriteString("<!-- Launch Constraints (Parent) -->\n")
-								lcdata, _ := json.MarshalIndent(lc, "", "  ")
-								output.WriteString(string(lcdata))
-								output.WriteString("\n")
-							}
-						}
-						if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
-							lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
-							if err == nil {
-								if output.Len() > 0 {
-									output.WriteString("\n")
-								}
-								output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
-								lcdata, _ := json.MarshalIndent(lc, "", "  ")
-								output.WriteString(string(lcdata))
-								output.WriteString("\n")
-							}
-						}
-					}
-
-					entDB[strings.TrimPrefix(file, conf.Folder)] = output.String()
-				} else {
-					entDB[strings.TrimPrefix(file, conf.Folder)] = ""
+				if err != nil {
+					log.WithError(err).Warnf("failed to get entitlements for %s", file)
+					continue
 				}
+				entDB[strings.TrimPrefix(file, conf.Folder)] = output
 			}
 		}
 
@@ -425,77 +359,15 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 	entDB := make(map[string]string)
 
 	for _, file := range files {
-		var m *macho.File
-		fat, err := macho.OpenFat(file.Path)
-		if err == nil {
-			m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
-		} else {
-			if err == macho.ErrNotFat {
-				m, err = macho.Open(file.Path)
-				if err != nil {
-					log.WithError(err).Warnf("failed to get entitlements for %s", file.Path)
-					continue // bad macho file (skip)
-				}
-			} else {
-				continue // not a macho file (skip)
-			}
+		output, err := fileEntitlements(file.Path, conf)
+		if errors.Is(err, errNotMacho) {
+			continue
 		}
-		if m.CodeSignature() != nil {
-			var output strings.Builder
-			// Get entitlements (try normal first, fallback to DER)
-			if len(m.CodeSignature().Entitlements) > 0 {
-				output.WriteString(m.CodeSignature().Entitlements)
-			} else if len(m.CodeSignature().EntitlementsDER) > 0 {
-				// Fallback to DER entitlements if normal ones are empty
-				if decoded, err := ents.DerDecode(m.CodeSignature().EntitlementsDER); err == nil {
-					output.WriteString(decoded)
-					log.Warnf("using DER entitlements for %s", file.Path)
-				}
-			}
-			// Add launch constraints if requested (for diff, not for database)
-			if conf.LaunchConstraints {
-				if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
-					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
-					if err == nil {
-						if output.Len() > 0 {
-							output.WriteString("\n")
-						}
-						output.WriteString("<!-- Launch Constraints (Self) -->\n")
-						lcdata, _ := json.MarshalIndent(lc, "", "  ")
-						output.WriteString(string(lcdata))
-						output.WriteString("\n")
-					}
-				}
-				if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
-					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
-					if err == nil {
-						if output.Len() > 0 {
-							output.WriteString("\n")
-						}
-						output.WriteString("<!-- Launch Constraints (Parent) -->\n")
-						lcdata, _ := json.MarshalIndent(lc, "", "  ")
-						output.WriteString(string(lcdata))
-						output.WriteString("\n")
-					}
-				}
-				if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
-					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
-					if err == nil {
-						if output.Len() > 0 {
-							output.WriteString("\n")
-						}
-						output.WriteString("<!-- Launch Constraints (Responsible) -->\n")
-						lcdata, _ := json.MarshalIndent(lc, "", "  ")
-						output.WriteString(string(lcdata))
-						output.WriteString("\n")
-					}
-				}
-			}
-
-			entDB[file.DBPath] = output.String()
-		} else {
-			entDB[file.DBPath] = ""
+		if err != nil {
+			log.WithError(err).Warnf("failed to get entitlements for %s", file.Path)
+			continue
 		}
+		entDB[file.DBPath] = output
 	}
 
 	return entDB, nil

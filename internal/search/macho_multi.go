@@ -8,9 +8,19 @@ import (
 )
 
 // MachoScanHandler is invoked once per Mach-O encountered during a shared
-// per-volume walk. The same (path, *macho.File) is fed to every registered
-// handler before the next binary is opened.
+// per-volume walk, before the next binary is opened.
 type MachoScanHandler func(path string, m *macho.File) error
+
+// MachoSliceSelector chooses one of a nonempty list of open Mach-O slices.
+// The returned slice stays open through the handler call and must not be closed.
+type MachoSliceSelector func(path string, slices []*macho.File) *macho.File
+
+func selectMachoSlice(path string, slices []*macho.File, selector ...MachoSliceSelector) *macho.File {
+	if len(selector) > 0 && selector[0] != nil {
+		return selector[0](path, slices)
+	}
+	return slices[len(slices)-1]
+}
 
 // NamedMachoScanHandler binds a [MachoScanHandler] to a stable task name so
 // the orchestrator can attribute per-handler errors back to the registering
@@ -23,6 +33,8 @@ type NamedMachoScanHandler struct {
 	// "this task does not participate in the current walk" and is
 	// silently skipped.
 	Handle MachoScanHandler
+	// Select chooses the slice for Handle; nil keeps the last FAT slice.
+	Select MachoSliceSelector
 }
 
 // ForEachMachoInMountMulti walks root exactly like [ForEachMachoInMount]
@@ -55,16 +67,20 @@ func ForEachMachoInMountMulti(root string, handlers []NamedMachoScanHandler) err
 		disabled[idx] = true
 	}
 
-	walkErr := ForEachMachoInMount(root, func(path string, m *macho.File) error {
+	dispatch := func(path string, slices []*macho.File) error {
 		for i := range handlers {
 			if disabled[i] || handlers[i].Handle == nil {
 				continue
 			}
+			m := selectMachoSlice(path, slices, handlers[i].Select)
 			if err := handlers[i].Handle(path, m); err != nil {
 				recordErr(i, err)
 			}
 		}
 		return nil
+	}
+	walkErr := walkFilesInMount(root, func(path string) error {
+		return handleMachoInMount(root, path, dispatch)
 	})
 	if walkErr != nil {
 		// A walker-level error is fatal for the whole walk; attribute it

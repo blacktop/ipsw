@@ -68,7 +68,7 @@ func SearchFilesystemEntitlements(ipsws, inputs []string, query FilesystemQuery)
 	for idx, ipswPath := range ipsws {
 		if err := search.ForEachMachoInIPSWForDevice(filepath.Clean(ipswPath), query.PemDB, query.Device, func(path string, m *macho.File) error {
 			return addRecord(path, m, idx)
-		}); err != nil {
+		}, PreferredSlice); err != nil {
 			return err
 		}
 	}
@@ -77,7 +77,7 @@ func SearchFilesystemEntitlements(ipsws, inputs []string, query FilesystemQuery)
 		root := absoluteInputRoot(inputPath)
 		if err := search.ForEachMacho(root, func(path string, m *macho.File) error {
 			return addRecord(filepath.Clean(path), m, len(ipsws)+idx)
-		}); err != nil {
+		}, PreferredSlice); err != nil {
 			return err
 		}
 	}

@@ -11,7 +11,9 @@ import (
 	"github.com/blacktop/go-macho"
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/diff/storage"
+	"github.com/blacktop/ipsw/internal/search"
 )
 
 // entsJob diffs entitlement databases per IPSW OS volume. It participates
@@ -48,6 +50,8 @@ func newEntitlementsJob(d *Diff) *entsJob {
 }
 
 func (j *entsJob) Name() string { return "entitlements" }
+
+func (j *entsJob) MachoSelector() search.MachoSliceSelector { return ent.PreferredSlice }
 
 func (j *entsJob) Needs(typ string) bool {
 	switch typ {
@@ -163,7 +167,7 @@ func extractMachoEntitlements(path string, m *macho.File) string {
 // entitlement-diff string), the entitlement extraction (XML / DER fallback /
 // launch constraints), or the rendered Entitlements section semantics change in
 // a way that invalidates rows written by a prior ipsw build.
-const entsCacheVersion = 1
+const entsCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // entsCacheVersion.

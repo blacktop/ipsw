@@ -420,36 +420,44 @@ func pathInRoot(root, path string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// handleMachoInMount opens machoPath as a Mach-O (last arch of a FAT), trims the
+// handleMachoInMount opens every Mach-O slice in machoPath, trims the
 // mount-point prefix off the key, and calls handler. Shared by the *InIPSW and
 // *InMount macho walkers so they produce identical keys.
-func handleMachoInMount(mountPoint, machoPath string, handler func(string, *macho.File) error) error {
+func handleMachoInMount(mountPoint, machoPath string, handler func(string, []*macho.File) error) error {
+	return withMachoSlices(machoPath, func(slices []*macho.File) error {
+		if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
+			machoPath = rest
+		}
+		if err := handler(machoPath, slices); err != nil {
+			return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
+		}
+		return nil
+	})
+}
+
+// withMachoSlices keeps every slice open until handler returns.
+func withMachoSlices(machoPath string, handler func([]*macho.File) error) error {
 	if ok, _ := magic.IsMachO(machoPath); !ok {
 		return nil
 	}
-	var m *macho.File
-	// UNIVERSAL MACHO
-	if fat, err := macho.OpenFat(machoPath); err == nil {
+	fat, err := macho.OpenFat(machoPath)
+	if err == nil {
 		defer fat.Close()
-		m = fat.Arches[len(fat.Arches)-1].File
-	} else { // SINGLE MACHO
-		if errors.Is(err, macho.ErrNotFat) {
-			m, err = macho.Open(machoPath)
-			if err != nil {
-				return nil
-			}
-			defer m.Close()
-		} else { // NOT a macho file
-			return nil
+		var slices []*macho.File
+		for _, arch := range fat.Arches {
+			slices = append(slices, arch.File)
 		}
+		return handler(slices)
 	}
-	if _, rest, ok := strings.Cut(machoPath, mountPoint); ok {
-		machoPath = rest
+	if !errors.Is(err, macho.ErrNotFat) {
+		return nil
 	}
-	if err := handler(machoPath, m); err != nil {
-		return fmt.Errorf("failed to handle macho %s: %w", machoPath, err)
+	m, err := macho.Open(machoPath)
+	if err != nil {
+		return nil
 	}
-	return nil
+	defer m.Close()
+	return handler([]*macho.File{m})
 }
 
 // handlePlistInMount reads a .plist under directory, keyed relative to directory.
@@ -495,9 +503,12 @@ func handleFileInMount(mountPoint, directory, dmg, filePath string, handler func
 
 // ForEachMachoInMount walks an already-mounted root and calls handler for each
 // Mach-O. The IPSW-key-preserving twin of the per-volume ForEachMachoInIPSW pass.
-func ForEachMachoInMount(mountPoint string, handler func(string, *macho.File) error) error {
+// An optional selector chooses the FAT slice; by default the last slice is used.
+func ForEachMachoInMount(mountPoint string, handler func(string, *macho.File) error, selector ...MachoSliceSelector) error {
 	return walkFilesInMount(mountPoint, func(path string) error {
-		return handleMachoInMount(mountPoint, path, handler)
+		return handleMachoInMount(mountPoint, path, func(path string, slices []*macho.File) error {
+			return handler(path, selectMachoSlice(path, slices, selector...))
+		})
 	})
 }
 
@@ -540,7 +551,8 @@ func ForEachFileInZip(ipswPath, dmgLabel, directory string, handler func(string,
 }
 
 // ForEachMachoInIPSWForDevice selects the product type or board before scanning IPSW volumes.
-func ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, device string, handler func(string, *macho.File) error) error {
+// An optional selector chooses the FAT slice; by default the last slice is used.
+func ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, device string, handler func(string, *macho.File) error, selector ...MachoSliceSelector) error {
 	i, err := info.Parse(ipswPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
@@ -549,15 +561,18 @@ func ForEachMachoInIPSWForDevice(ipswPath, pemDbPath, device string, handler fun
 	if err != nil {
 		return err
 	}
-	return ForEachMachoInIPSWWithInfo(i, ipswPath, pemDbPath, handler)
+	return ForEachMachoInIPSWWithInfo(i, ipswPath, pemDbPath, handler, selector...)
 }
 
 // ForEachMachoInIPSWWithInfo scans the volumes of an IPSW whose metadata the
 // caller already parsed and narrowed with SelectDevice, so a command that
 // validated its selection up front does not decode the IPSW a second time.
-func ForEachMachoInIPSWWithInfo(i *info.Info, ipswPath, pemDbPath string, handler func(string, *macho.File) error) error {
+// An optional selector chooses the FAT slice; by default the last slice is used.
+func ForEachMachoInIPSWWithInfo(i *info.Info, ipswPath, pemDbPath string, handler func(string, *macho.File) error, selector ...MachoSliceSelector) error {
 	scanMacho := func(mountPoint, machoPath string) error {
-		return handleMachoInMount(mountPoint, machoPath, handler)
+		return handleMachoInMount(mountPoint, machoPath, func(path string, slices []*macho.File) error {
+			return handler(path, selectMachoSlice(path, slices, selector...))
+		})
 	}
 	if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
 		log.Info("Scanning FileSystem")
@@ -588,30 +603,13 @@ func ForEachMachoInIPSWWithInfo(i *info.Info, ipswPath, pemDbPath string, handle
 }
 
 // ForEachMacho walks the folder and calls the handler for each macho file found
-func ForEachMacho(folder string, handler func(string, *macho.File) error) error {
-	handleMacho := func(file string) error {
-		if ok, _ := magic.IsMachO(file); !ok {
-			return nil
-		}
-		var m *macho.File
-		// UNIVERSAL MACHO
-		if fat, err := macho.OpenFat(file); err == nil {
-			m = fat.Arches[len(fat.Arches)-1].File
-			defer fat.Close()
-		} else if errors.Is(err, macho.ErrNotFat) {
-			var err2 error
-			m, err2 = macho.Open(file)
-			if err2 != nil {
-				return nil
-			}
-			defer m.Close()
-		} else {
-			return nil
-		}
-		return handler(file, m)
-	}
-
-	return WalkFilesInRoot(folder, handleMacho)
+// An optional selector chooses the FAT slice; by default the last slice is used.
+func ForEachMacho(folder string, handler func(string, *macho.File) error, selector ...MachoSliceSelector) error {
+	return WalkFilesInRoot(folder, func(file string) error {
+		return withMachoSlices(file, func(slices []*macho.File) error {
+			return handler(file, selectMachoSlice(file, slices, selector...))
+		})
+	})
 }
 
 // ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p
