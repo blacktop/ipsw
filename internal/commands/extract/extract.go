@@ -1399,7 +1399,8 @@ func Keybags(c *Config) (fname string, err error) {
 	return
 }
 
-// FcsKeys extracts the AEA1 DMG fsc-keys from an IPSW
+// FcsKeys extracts keys from every distinct SystemOS AEA1 DMG in an IPSW,
+// restricted to the selected device when one is specified.
 func FcsKeys(c *Config) ([]string, error) {
 	if len(c.IPSW) == 0 && len(c.URL) == 0 {
 		return nil, fmt.Errorf("no IPSW or URL provided")
@@ -1445,80 +1446,88 @@ func FcsKeys(c *Config) ([]string, error) {
 		return nil, err
 	}
 
-	dmgPath, err := i.GetSystemOsDmg()
+	dmgs, err := i.GetSystemOsDmgs()
 	if err != nil {
-		if errors.Is(err, info.ErrorCryptexNotFound) {
-			log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
-			dmgPath, err = i.GetFileSystemOsDmg()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
-			}
-		} else {
+		if !errors.Is(err, info.ErrorCryptexNotFound) {
 			return nil, fmt.Errorf("failed to get SystemOS DMG: %w", err)
 		}
-	}
-
-	kmap := make(map[string]aea.PrivateKey)
-
-	if filepath.Ext(dmgPath) != ".aea" {
-		return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmgPath))
-	}
-
-	out, err := utils.SearchPartialZip(zr.File, exactZipNamePattern(dmgPath), os.TempDir(), 0x1000, false, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract fcs-keys from DMG: %v", err)
-	}
-	defer func() {
-		for _, f := range out {
-			os.Remove(f)
-		}
-	}()
-
-	for _, f := range out {
-		metadata, err := aea.Info(filepath.Clean(f))
+		log.Warn("could not find SystemOS DMG; trying filesystem DMG (older IPSWs don't have cryptexes)")
+		dmgPath, err := i.GetFileSystemOsDmg()
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA1 metadata: %v", err)
+			return nil, fmt.Errorf("failed to get filesystem DMG: %v", err)
 		}
-		pkmap, err := metadata.GetPrivateKey(nil, c.PemDB, true, c.Proxy, c.Insecure)
-		if err != nil {
-			return nil, err
-		}
+		dmgs = []info.SystemOSDMG{{Path: dmgPath}}
+	}
 
-		if c.JSON {
-			// check if json file exists
-			if _, err := os.Stat(filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")); !os.IsNotExist(err) {
-				existingPath := filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")
-				data, err := os.ReadFile(existingPath)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
-				}
-				existingKeys := make(map[string]aea.PrivateKey)
-				if err := json.Unmarshal(data, &existingKeys); err != nil {
-					log.WithError(err).Warnf("failed to parse existing fcs-keys JSON '%s'; rebuilding file", existingPath)
-				} else {
-					maps.Copy(kmap, existingKeys)
-				}
+	jsonKeys := make(map[string]aea.PrivateKey)
+	if c.JSON {
+		// Load once so later images cannot overwrite freshly fetched keys with old values.
+		existingPath := filepath.Join(filepath.Clean(c.Output), "fcs-keys.json")
+		if _, err := os.Stat(existingPath); !os.IsNotExist(err) {
+			data, err := os.ReadFile(existingPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read fcs-keys.json: %v", err)
 			}
-			maps.Copy(kmap, pkmap)
-		} else {
-			for _, pk := range pkmap {
-				fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmgPath)+".pem")
+			existingKeys := make(map[string]aea.PrivateKey)
+			if err := json.Unmarshal(data, &existingKeys); err != nil {
+				log.WithError(err).Warnf("failed to parse existing fcs-keys JSON '%s'; rebuilding file", existingPath)
+			} else {
+				maps.Copy(jsonKeys, existingKeys)
+			}
+		}
+	}
 
-				if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
-					return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+	tmpDir, err := os.MkdirTemp("", "ipsw-fcs-keys-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	pemKeys := make(map[string]aea.PrivateKey)
+	for _, dmg := range dmgs {
+		if filepath.Ext(dmg.Path) != ".aea" {
+			return nil, fmt.Errorf("fcs-keys are only found in AEA1 DMGs: found '%s'", filepath.Base(dmg.Path))
+		}
+		out, err := utils.SearchPartialZip(zr.File, exactZipNamePattern(dmg.Path), tmpDir, 0x1000, false, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract fcs-keys from DMG %s: %w", dmg.Path, err)
+		}
+		for _, f := range out {
+			metadata, err := aea.Info(filepath.Clean(f))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AEA1 metadata from %s: %w", dmg.Path, err)
+			}
+			keys, err := metadata.GetPrivateKey(nil, c.PemDB, true, c.Proxy, c.Insecure)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get fcs-key for %s: %w", dmg.Path, err)
+			}
+			if c.JSON {
+				maps.Copy(jsonKeys, keys)
+				continue
+			}
+			for _, pk := range keys {
+				fname := filepath.Join(filepath.Clean(c.Output), folder, filepath.Base(dmg.Path)+".pem")
+				if _, exists := pemKeys[fname]; exists {
+					return nil, fmt.Errorf("multiple DMGs map to PEM filename %s; select a device or use JSON output", fname)
 				}
-
-				if err := os.WriteFile(fname, pk, 0o644); err != nil {
-					return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
-				}
-
+				pemKeys[fname] = pk
 				artifacts = append(artifacts, fname)
 			}
 		}
 	}
 
+	// Resolve every key before writing PEMs so a later input failure leaves no partial output.
+	for _, fname := range artifacts {
+		if err := os.MkdirAll(filepath.Dir(fname), 0o750); err != nil {
+			return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+		}
+		if err := os.WriteFile(fname, pemKeys[fname], 0o644); err != nil {
+			return nil, fmt.Errorf("failed to write fcs-key.pem: %v", err)
+		}
+	}
+
 	if c.JSON {
-		out, err := json.Marshal(kmap)
+		out, err := json.Marshal(jsonKeys)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal fcs-keys: %v", err)
 		}
