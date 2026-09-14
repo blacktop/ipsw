@@ -15,7 +15,6 @@ import (
 	"io"
 	"math/bits"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -59,12 +58,17 @@ const (
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
 	adcDownloadURL         = "https://developerservices2.apple.com/services/download?path="
 
-	authURL       = "https://idmsa.apple.com/appleauth/auth"
-	loginURL      = authURL + "/signin"
-	initURL       = loginURL + "/init"
-	completeURL   = loginURL + "/complete?isRememberMeEnabled=false"
-	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
-	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
+	authURL     = "https://idmsa.apple.com/appleauth/auth"
+	loginURL    = authURL + "/signin"
+	initURL     = loginURL + "/init"
+	completeURL = loginURL + "/complete?isRememberMeEnabled=false"
+	trustURL    = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
+
+	// Public application identifier used by Apple's production App Store Connect
+	// login page, not an account credential. The former /olympus/v1/app/config
+	// endpoint returns HTML/404. Source (observed 2026-09-14):
+	// https://unpkg.apple.com/@maison/preauthorization-container@0.2.1/umd/chunks/ASC.BRGDgul9.js
+	appStoreConnectServiceKey = "e0b80c3bf78523bfe80974d320935bfa30add02e1bff88ec2166c6bd5a706c42"
 
 	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
@@ -125,7 +129,6 @@ type DevPortal struct {
 	config          *DevConfig
 	downloadSession *Download
 
-	authService    authService
 	authOptions    authOptions
 	codeRequest    authOptions
 	olympusSession olympusResponse
@@ -142,12 +145,15 @@ type credentials struct {
 	StoreFront    string `json:"store_front,omitempty"`
 }
 
+// CookieRecords preserves scope for Developer Portal cookies.
+// Cookies remains readable for older vault entries and the App Store client.
 type session struct {
-	SessionID string         `json:"session_id,omitempty"`
-	SCNT      string         `json:"scnt,omitempty"`
-	WidgetKey string         `json:"widget_key,omitempty"`
-	HashCash  string         `json:"hashcash,omitempty"`
-	Cookies   []*http.Cookie `json:"cookies,omitempty"`
+	SessionID     string            `json:"session_id,omitempty"`
+	SCNT          string            `json:"scnt,omitempty"`
+	WidgetKey     string            `json:"widget_key,omitempty"`
+	HashCash      string            `json:"hashcash,omitempty"`
+	Cookies       []*http.Cookie    `json:"cookies,omitempty"`
+	CookieRecords []devPortalCookie `json:"cookie_records,omitempty"`
 }
 
 type AppleAccountAuth struct {
@@ -176,11 +182,6 @@ type Downloads struct {
 		SetCookie string `json:"Set-Cookie,omitempty"`
 	} `json:"httpResponseHeaders"`
 	Downloads []MoreDownload
-}
-
-type authService struct {
-	URL string `json:"authServiceUrl,omitempty"`
-	Key string `json:"authServiceKey,omitempty"`
 }
 
 type auth struct {
@@ -382,7 +383,7 @@ func NewDevPortal(config *DevConfig) *DevPortal {
 	if config.Context == nil {
 		config.Context = context.Background()
 	}
-	jar, _ := cookiejar.New(nil)
+	jar, _ := newDevPortalCookieJar()
 
 	dp := DevPortal{
 		Client: &http.Client{
@@ -468,17 +469,31 @@ func (dp *DevPortal) GetHashcash() string {
 	return dp.config.HashCash
 }
 
-// Login to Apple
+var errDevSessionExpired = stderrors.New("developer portal session expired")
+
+// Login to Apple.
 func (dp *DevPortal) Login(username, password string) error {
+	return dp.login(username, password, true)
+}
+
+func (dp *DevPortal) login(username, password string, checkSession bool) error {
+	item, err := dp.Vault.Get(VaultName)
+	if err != nil && !stderrors.Is(err, keyring.ErrKeyNotFound) {
+		return fmt.Errorf("failed to read developer credentials: %w", err)
+	}
+	hasSavedAccount := err == nil
+	var account AppleAccountAuth
+	if hasSavedAccount {
+		if err := json.Unmarshal(item.Data, &account); err != nil {
+			return fmt.Errorf("failed to decode developer credentials: %w", err)
+		}
+	}
 	if len(username) == 0 || len(password) == 0 {
-		creds, err := dp.Vault.Get(VaultName)
-		if err != nil { // failed to get credentials from vault (prompt user for credentials)
-			log.Errorf("failed to get credentials from vault: %v", err)
-			// get username
+		if hasSavedAccount {
+			username, password = account.Credentials.Username, account.Credentials.Password
+		} else {
 			if len(username) == 0 {
-				prompt := &survey.Input{
-					Message: "Please type your username:",
-				}
+				prompt := &survey.Input{Message: "Please type your username:"}
 				if err := survey.AskOne(prompt, &username); err != nil {
 					if err == terminal.InterruptErr {
 						log.Warn("Exiting...")
@@ -487,11 +502,8 @@ func (dp *DevPortal) Login(username, password string) error {
 					return err
 				}
 			}
-			// get password
 			if len(password) == 0 {
-				prompt := &survey.Password{
-					Message: "Please type your password:",
-				}
+				prompt := &survey.Password{Message: "Please type your password:"}
 				if err := survey.AskOne(prompt, &password); err != nil {
 					if err == terminal.InterruptErr {
 						log.Warn("Exiting...")
@@ -500,44 +512,40 @@ func (dp *DevPortal) Login(username, password string) error {
 					return err
 				}
 			}
-			// save credentials to vault
-			dat, err := json.Marshal(&AppleAccountAuth{
-				Credentials: credentials{
-					Username: username,
-					Password: password,
-				},
-			})
-			if err != nil {
-				return fmt.Errorf("failed to marshal keychain credentials: %v", err)
-			}
-			if err := dp.Vault.Set(keyring.Item{
-				Key:         VaultName,
-				Data:        dat,
-				Label:       AppName,
-				Description: "application password",
-			}); err != nil {
-				return fmt.Errorf("failed to save credentials to vault: %v", err)
-			}
-		} else { // credentials found in vault
-			var auth AppleAccountAuth
-			if err := json.Unmarshal(creds.Data, &auth); err != nil {
-				return fmt.Errorf("failed to unmarshal keychain credentials (this can happen if the creds in the vault are somehow incomplete/corrupt; manually removing them and trying again might fix it): %v", err)
-			}
-			username = auth.Credentials.Username
-			password = auth.Credentials.Password
-			auth = AppleAccountAuth{}
 		}
 	}
-
-	if err := dp.loadSession(); err != nil { // load previous session (if error, login)
-		if err := dp.getITCServiceKey(); err != nil {
+	if !hasSavedAccount {
+		account.Credentials = credentials{Username: username, Password: password}
+		data, err := json.Marshal(&account)
+		if err != nil {
+			return fmt.Errorf("failed to marshal keychain credentials: %w", err)
+		}
+		if err := dp.Vault.Set(keyring.Item{Key: VaultName, Data: data, Label: AppName, Description: "application password"}); err != nil {
+			return fmt.Errorf("failed to save credentials to vault: %w", err)
+		}
+	}
+	if checkSession && hasSavedAccount {
+		err := dp.loadSession(account.DevPortalSession)
+		if err == nil {
+			return nil
+		}
+		if !stderrors.Is(err, errDevSessionExpired) {
 			return err
 		}
-
-		return dp.signIn(username, password)
 	}
-
-	return nil
+	// A rejected session must not contribute cookies or challenge state to login.
+	jar, err := newDevPortalCookieJar()
+	if err != nil {
+		return err
+	}
+	dp.Client.Jar = jar
+	dp.config.SessionID, dp.config.SCNT = "", ""
+	dp.config.HashCash, dp.config.HashCashBits, dp.config.HashCashChallenge = "", "", ""
+	dp.config.WidgetKey = appStoreConnectServiceKey
+	dp.authOptions, dp.codeRequest = authOptions{}, authOptions{}
+	dp.olympusSession = olympusResponse{}
+	dp.xAppleIDAccountCountry = ""
+	return dp.signIn(username, password)
 }
 
 func (dp *DevPortal) generateHashCash() (string, error) {
@@ -548,9 +556,15 @@ func (dp *DevPortal) generateHashCash() (string, error) {
 		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCashBits, err)
 	}
 
+	if hcbits < 0 || hcbits > 32 {
+		return "", fmt.Errorf("invalid hashcash bits: %d (expected 0..32)", hcbits)
+	}
 	counter := 0
 
 	for {
+		if err := dp.config.Context.Err(); err != nil {
+			return "", err
+		}
 		hash := sha1.New()
 		hashcash = fmt.Sprintf("%s:%s:%s:%s::%s",
 			strconv.Itoa(hashcashVersion),             // ver
@@ -583,54 +597,36 @@ func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Add("User-Agent", userAgent)
 }
 
-func (dp *DevPortal) getITCServiceKey() error {
-
-	response, err := dp.Client.Get(itcServiceKey)
+func (dp *DevPortal) getHashcachHeaders() error {
+	dp.config.HashCash, dp.config.HashCashBits, dp.config.HashCashChallenge = "", "", ""
+	req, err := http.NewRequestWithContext(dp.config.Context, http.MethodGet, loginURL, nil)
+	if err != nil {
+		return err
+	}
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return err
+	// Consume the unused sign-in page so the connection can be reused.
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		return fmt.Errorf("failed to read hashcash response: %w", err)
 	}
-
-	if err := json.Unmarshal(body, &dp.authService); err != nil {
-		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to get hashcash headers: HTTP %d", response.StatusCode)
 	}
-
-	logHTTPResponseMetadata("GET iTC Service Key", response.StatusCode, len(body))
-
-	if response.StatusCode != 200 {
-		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
-	}
-
-	dp.config.WidgetKey = dp.authService.Key
-
-	return nil
-}
-
-func (dp *DevPortal) getHashcachHeaders() error {
-	response, err := dp.Client.Get(loginURL)
-	if err != nil {
-		return err
-	}
-
-	if response.StatusCode != 200 {
-		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
-	}
-
-	// 🆕 hashcash headers
 	dp.config.HashCashBits = response.Header.Get(hashcashBitsHeader)
 	dp.config.HashCashChallenge = response.Header.Get(hashcashCallengeHeader)
-	if dp.config.HashCashBits != "" || dp.config.HashCashChallenge != "" {
-		dp.config.HashCash, err = dp.generateHashCash()
-		if err != nil {
-			return fmt.Errorf("failed to generate hashcash: %v", err)
-		}
+	if dp.config.HashCashBits == "" && dp.config.HashCashChallenge == "" {
+		return nil
 	}
-
+	if dp.config.HashCashBits == "" || dp.config.HashCashChallenge == "" {
+		return fmt.Errorf("incomplete hashcash challenge: both bits and challenge headers are required")
+	}
+	dp.config.HashCash, err = dp.generateHashCash()
+	if err != nil {
+		return fmt.Errorf("failed to generate hashcash: %w", err)
+	}
 	return nil
 }
 
@@ -696,9 +692,15 @@ func (dp *DevPortal) generateSRP(username, password string) (*http.Response, err
 
 	logHTTPResponseMetadata("SRP INIT", initResponse.StatusCode, len(body))
 
+	if initResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed SRP init: HTTP %d", initResponse.StatusCode)
+	}
 	var srpInit srpInitResponse
 	if err := json.Unmarshal(body, &srpInit); err != nil {
-		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
+		return nil, fmt.Errorf("failed to decode SRP init response: %w", err)
+	}
+	if srpInit.Iteration <= 0 || srpInit.Salt == "" || srpInit.B == "" || srpInit.C == "" {
+		return nil, fmt.Errorf("incomplete SRP init response")
 	}
 
 	saltBytes, err := base64.StdEncoding.DecodeString(srpInit.Salt)
@@ -926,7 +928,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 
 func (dp *DevPortal) getAuthOptions() error {
 
-	req, err := http.NewRequestWithContext(dp.config.Context, "GET", "https://idmsa.apple.com/appleauth/auth", nil)
+	req, err := http.NewRequestWithContext(dp.config.Context, "GET", authURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -966,7 +968,7 @@ func (dp *DevPortal) requestCode(phoneID int) error {
 		Mode: "sms",
 	})
 
-	req, err := http.NewRequestWithContext(dp.config.Context, "PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
+	req, err := http.NewRequestWithContext(dp.config.Context, "PUT", authURL+"/verify/phone", buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http PUT request: %v", err)
 	}
@@ -1113,10 +1115,12 @@ func (dp *DevPortal) trustSession() error {
 }
 
 func (dp *DevPortal) refreshSession() error {
-	// check if olympus session is expired (prevents login rate limiting)
 	if err := dp.getOlympusSession(); err != nil {
-		// if olympus session is expired, we need to login again
-		return dp.Login("", "")
+		if !stderrors.Is(err, errDevSessionExpired) {
+			return err
+		}
+		// The live session was already checked; do not reload and check it again.
+		return dp.login("", "", false)
 	}
 	return nil
 }
@@ -1142,8 +1146,11 @@ func (dp *DevPortal) getOlympusSession() error {
 
 	logHTTPResponseMetadata("GET getOlympusSession", response.StatusCode, len(body))
 
-	if 200 > response.StatusCode || 300 <= response.StatusCode {
-		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
+	if response.StatusCode == http.StatusUnauthorized {
+		return errDevSessionExpired
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("failed to get developer session: HTTP %d", response.StatusCode)
 	}
 
 	if err := json.Unmarshal(body, &dp.olympusSession); err != nil {
@@ -1154,6 +1161,10 @@ func (dp *DevPortal) getOlympusSession() error {
 }
 
 func (dp *DevPortal) storeSession() error {
+	jar, ok := dp.Client.Jar.(*devPortalCookieJar)
+	if !ok {
+		return fmt.Errorf("developer portal cookie jar cannot preserve session scope")
+	}
 	// get dev auth from vault
 	sess, err := dp.Vault.Get(VaultName)
 	if err != nil {
@@ -1166,11 +1177,11 @@ func (dp *DevPortal) storeSession() error {
 	}
 
 	auth.DevPortalSession = session{
-		SessionID: dp.GetSessionID(),
-		SCNT:      dp.GetSCNT(),
-		WidgetKey: dp.GetWidgetKey(),
-		HashCash:  dp.GetHashcash(),
-		Cookies:   dp.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
+		SessionID:     dp.GetSessionID(),
+		SCNT:          dp.GetSCNT(),
+		WidgetKey:     dp.GetWidgetKey(),
+		HashCash:      dp.GetHashcash(),
+		CookieRecords: jar.snapshot(),
 	}
 
 	// save dev auth to vault
@@ -1194,32 +1205,25 @@ func (dp *DevPortal) storeSession() error {
 	return nil
 }
 
-func (dp *DevPortal) loadSession() error {
-	// get dev auth from vault
-	sess, err := dp.Vault.Get(VaultName)
-	if err != nil {
-		return fmt.Errorf("failed to get dev auth from vault: %v", err)
+func (dp *DevPortal) loadSession(saved session) error {
+	dp.config.SessionID = saved.SessionID
+	dp.config.SCNT = saved.SCNT
+	dp.config.WidgetKey = saved.WidgetKey
+	dp.config.HashCash = saved.HashCash
+	if saved.CookieRecords == nil {
+		// Legacy snapshots have no domain metadata. Do not invent cross-host scope;
+		// a rejected legacy session is renewed and saved with original scope.
+		dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, saved.Cookies)
+	} else {
+		for _, record := range saved.CookieRecords {
+			origin, err := url.Parse(record.URL)
+			if err != nil || (origin.Scheme != "https" && origin.Scheme != "http") || origin.Hostname() == "" || origin.User != nil || origin.RawQuery != "" {
+				return fmt.Errorf("invalid developer session cookie origin")
+			}
+			dp.Client.Jar.SetCookies(origin, []*http.Cookie{&record.Cookie})
+		}
 	}
-
-	var auth AppleAccountAuth
-	if err := json.Unmarshal(sess.Data, &auth); err != nil {
-		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
-	}
-
-	dp.config.SessionID = auth.DevPortalSession.SessionID
-	dp.config.SCNT = auth.DevPortalSession.SCNT
-	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
-	dp.config.HashCash = auth.DevPortalSession.HashCash
-	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
-
-	// clear dev auth mem
-	auth = AppleAccountAuth{}
-
-	if err := dp.getOlympusSession(); err != nil {
-		return err
-	}
-
-	return nil
+	return dp.getOlympusSession()
 }
 
 // Watch watches for NEW downloads
