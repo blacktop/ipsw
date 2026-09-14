@@ -1039,8 +1039,8 @@ func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
 	return nil
 }
 
-// openDSCFromMount finds the dyld_shared_cache under mountRoot (filtered to
-// the arm64e family for macOS IPSWs when applicable) and opens the first match.
+// openDSCFromMount finds main dyld_shared_cache files under mountRoot (filtered
+// to the arm64e family for macOS when applicable) and opens the preferred cache.
 func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side string) (*dyld.File, error) {
 	dscs, err := dyld.GetDscPathsInMount(mountRoot, false, false)
 	if err != nil {
@@ -1048,6 +1048,18 @@ func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side strin
 	}
 	if len(dscs) == 0 {
 		return nil, fmt.Errorf("no DSCs found in '%s' IPSW mount %s", side, mountRoot)
+	}
+	// Discovery includes companion files for extraction. Main caches have no
+	// suffix or exactly .development. Companion loading stays with dyld.Open.
+	// Filter before architecture selection so orphan companions cannot prevent
+	// the OTA fallback or be mistaken for an additional cache family.
+	dscs = slices.DeleteFunc(dscs, func(path string) bool {
+		arch, ok := strings.CutPrefix(filepath.Base(path), "dyld_shared_cache_")
+		arch = strings.TrimSuffix(arch, ".development")
+		return !ok || arch == "" || strings.Contains(arch, ".")
+	})
+	if len(dscs) == 0 {
+		return nil, fmt.Errorf("no main dyld shared cache found in '%s' mount %s", side, mountRoot)
 	}
 	if isMacOS {
 		var filtered []string

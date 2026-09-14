@@ -8,7 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unsafe"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/memory"
 	gplist "github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -119,7 +122,11 @@ func TestDeviceSpecificDiffReportNames(t *testing.T) {
 	}
 }
 
-var syntheticDSCMagic = map[string]string{"arm64e": "dyld_v1  arm64e", "arm64e_x1": "dyld_v1arm64ex1"}
+var syntheticDSCMagic = map[string]string{
+	"arm64e":    "dyld_v1  arm64e",
+	"arm64e_x1": "dyld_v1arm64ex1",
+	"x86_64":    "dyld_v1  x86_64",
+}
 
 func TestDiffNewDeviceAgainstSharedBaseline(t *testing.T) {
 	for _, tc := range []struct {
@@ -201,7 +208,7 @@ func writeSyntheticDSC(t *testing.T, root, arch string) {
 		t.Fatal(err)
 	}
 	var header dyld.CacheHeader
-	copy(header.Magic[:], syntheticDSCMagic[arch])
+	copy(header.Magic[:], syntheticDSCMagic[strings.TrimSuffix(arch, ".development")])
 	header.UUID[0] = byte(len(arch))
 	header.MappingOffset = uint32(binary.Size(header))
 	header.CodeSignatureOffset = uint64(binary.Size(header))
@@ -278,6 +285,189 @@ func TestOpenDSCFromMountPrefersGenericCache(t *testing.T) {
 	x1 := filepath.Join(root, "System/Library/dyld/dyld_shared_cache_arm64e_x1")
 	if got := preferGenericDSC([]string{x1}); got != x1 {
 		t.Fatalf("lone variant not selected: %q", got)
+	}
+}
+
+func captureDSCWarnings(t *testing.T) *memory.Handler {
+	t.Helper()
+	handler := memory.New()
+	previousLogger := log.Log
+	log.Log = &log.Logger{Handler: handler, Level: log.WarnLevel}
+	t.Cleanup(func() { log.Log = previousLogger })
+	return handler
+}
+
+func TestOpenDSCFromMountMainCaches(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		arches     []string
+		companions []string
+		aot        bool
+		legacyPath bool
+		isMacOS    bool
+		mode       inputMode
+		wantArch   string
+		wantWarn   bool
+		wantErr    string
+	}{
+		{name: "generic with companions", arches: []string{"arm64e"}, companions: []string{"arm64e"}, isMacOS: true, wantArch: "arm64e"},
+		{name: "legacy cache directory", arches: []string{"arm64e"}, companions: []string{"arm64e"}, legacyPath: true, isMacOS: true, wantArch: "arm64e"},
+		{name: "variant with companions", arches: []string{"arm64e_x1"}, companions: []string{"arm64e_x1"}, isMacOS: true, wantArch: "arm64e_x1"},
+		{name: "siblings with companions", arches: []string{"arm64e_x1", "arm64e"}, companions: []string{"arm64e", "arm64e_x1"}, isMacOS: true, wantArch: "arm64e", wantWarn: true},
+		{name: "orphan generic companions", arches: []string{"arm64e_x1"}, companions: []string{"arm64e"}, isMacOS: true, wantArch: "arm64e_x1"},
+		{name: "companions only", companions: []string{"arm64e"}, isMacOS: true, wantErr: "no main dyld shared cache found"},
+		{name: "iOS split cache", arches: []string{"arm64e"}, companions: []string{"arm64e"}, wantArch: "arm64e"},
+		{name: "iOS companions only", companions: []string{"arm64e"}, wantErr: "no main dyld shared cache found"},
+		{name: "OTA fallback", arches: []string{"x86_64"}, companions: []string{"x86_64"}, isMacOS: true, mode: inputModeOTA, wantArch: "x86_64"},
+		{name: "OTA fallback with orphan arm64e", arches: []string{"x86_64"}, companions: []string{"arm64e"}, isMacOS: true, mode: inputModeOTA, wantArch: "x86_64"},
+		{name: "IPSW rejects x86", arches: []string{"x86_64"}, companions: []string{"x86_64"}, isMacOS: true, wantErr: "no dyld_shared_cache files found matching"},
+		{name: "AOT alongside OTA fallback", arches: []string{"x86_64"}, aot: true, isMacOS: true, mode: inputModeOTA, wantArch: "x86_64"},
+		{name: "AOT only", aot: true, wantErr: "no main dyld shared cache found"},
+		{name: "empty mount", wantErr: "no DSCs found"},
+		{name: "development main", arches: []string{"arm64e.development"}, companions: []string{"arm64e"}, wantArch: "arm64e.development"},
+		{name: "development variant main", arches: []string{"arm64e_x1.development"}, companions: []string{"arm64e_x1"}, isMacOS: true, wantArch: "arm64e_x1.development"},
+		{name: "production and development", arches: []string{"arm64e", "arm64e.development"}, companions: []string{"arm64e"}, wantArch: "arm64e", wantWarn: true},
+		{name: "development OTA fallback", arches: []string{"x86_64.development"}, companions: []string{"arm64e"}, isMacOS: true, mode: inputModeOTA, wantArch: "x86_64.development"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := captureDSCWarnings(t)
+
+			// A dotted mount path must not be mistaken for a companion suffix.
+			root := filepath.Join(t.TempDir(), "synthetic.dmg.mount")
+			for _, arch := range tc.arches {
+				writeSyntheticDSC(t, root, arch)
+			}
+			dir := filepath.Join(root, "System/Library/dyld")
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				t.Fatal(err)
+			}
+			for _, arch := range tc.companions {
+				for _, suffix := range []string{".01", ".79", ".dylddata", ".dyldreadonly", ".atlas", ".symbols", ".01.development", ".development.01", ".development.symbols"} {
+					// Invalid contents ensure a companion cannot be opened as the main cache.
+					if err := os.WriteFile(filepath.Join(dir, "dyld_shared_cache_"+arch+suffix), nil, 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if tc.aot {
+				if err := os.WriteFile(filepath.Join(dir, "aot_shared_cache.0"), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.legacyPath {
+				legacyDir := filepath.Join(root, "System/Library/Caches/com.apple.dyld")
+				if err := os.MkdirAll(filepath.Dir(legacyDir), 0750); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(dir, legacyDir); err != nil {
+					t.Fatal(err)
+				}
+				dir = legacyDir
+			}
+			cache, err := openDSCFromMount(root, tc.isMacOS, tc.mode, "Old")
+			if cache != nil {
+				defer cache.Close()
+			}
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("wanted %q, got %v", tc.wantErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantMagic := syntheticDSCMagic[strings.TrimSuffix(tc.wantArch, ".development")]
+				if got := cache.Headers[cache.UUID].Magic.String(); got != wantMagic {
+					t.Fatalf("opened %q, want %q", got, wantMagic)
+				}
+				// Production and development caches share a magic; the synthetic
+				// UUID distinguishes which actual main file was opened.
+				if cache.UUID[0] != byte(len(tc.wantArch)) {
+					t.Fatalf("opened UUID %s, want identity for %q", cache.UUID, tc.wantArch)
+				}
+			}
+			var warnings []string
+			for _, entry := range handler.Entries {
+				if entry.Level == log.WarnLevel {
+					warnings = append(warnings, entry.Message)
+				}
+			}
+			if tc.wantWarn {
+				chosen := filepath.Join(dir, "dyld_shared_cache_"+tc.wantArch)
+				wantWarning := "multiple dyld_shared_caches in 'Old' mount; using " + chosen
+				if len(warnings) != 1 || strings.TrimSpace(warnings[0]) != wantWarning {
+					t.Fatalf("expected ambiguity warning selecting %q, got %v", chosen, warnings)
+				}
+			} else if len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %v", warnings)
+			}
+		})
+	}
+}
+
+func TestOpenDSCFromMountWithoutCPUFields(t *testing.T) {
+	for _, isMacOS := range []bool{false, true} {
+		name := "iOS"
+		if isMacOS {
+			name = "macOS"
+		}
+		t.Run(name, func(t *testing.T) {
+			handler := captureDSCWarnings(t)
+
+			// Serialize an older header with no CPU extension. Its mapping table
+			// immediately follows the header, as it does in an actual cache.
+			var header dyld.CacheHeader
+			copy(header.Magic[:], syntheticDSCMagic["arm64e"])
+			header.UUID[0] = 1
+			header.MappingOffset = uint32(unsafe.Offsetof(header.CacheCPUType))
+			header.MappingCount = 1
+			header.CodeSignatureOffset = uint64(header.MappingOffset) + uint64(binary.Size(dyld.CacheMappingInfo{}))
+			header.CodeSignatureSize = 12
+			mapping := dyld.CacheMappingInfo{
+				Address: 0x180000000,
+				Size:    header.CodeSignatureOffset + header.CodeSignatureSize,
+			}
+			var data bytes.Buffer
+			if err := binary.Write(&data, binary.LittleEndian, header); err != nil {
+				t.Fatal(err)
+			}
+			data.Truncate(int(header.MappingOffset))
+			if err := binary.Write(&data, binary.LittleEndian, mapping); err != nil {
+				t.Fatal(err)
+			}
+			if err := binary.Write(&data, binary.BigEndian, []uint32{0xfade0cc0, 12, 0}); err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			path := filepath.Join(root, "System/Library/dyld/dyld_shared_cache_arm64e")
+			if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, data.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path+".symbols", nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+
+			cache, err := openDSCFromMount(root, isMacOS, inputModeIPSW, "Old")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cache.Close()
+			if cache.UUID != header.UUID || cache.Headers[cache.UUID].Magic != header.Magic {
+				t.Fatal("opened a different main cache")
+			}
+			if cache.Headers[cache.UUID].HasCacheCPUFields() {
+				t.Fatal("mapping bytes were exposed as CPU header fields")
+			}
+			if mappings := cache.Mappings[cache.UUID]; len(mappings) != 1 || mappings[0].CacheMappingInfo != mapping {
+				t.Fatalf("mapping table was not preserved: %v", mappings)
+			}
+			if len(handler.Entries) != 0 {
+				t.Fatalf("unexpected warnings: %v", handler.Entries)
+			}
+		})
 	}
 }
 
