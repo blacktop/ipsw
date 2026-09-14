@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"strings"
@@ -584,7 +585,7 @@ func decryptKBAGWithKey(data, key []byte) ([]byte, error) {
 
 func (i Img3) String() string {
 	var iStr strings.Builder
-	iStr.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&iStr,
 		"[Img3 Info]\n"+
 			"===========\n"+
 			"Magic        = %s\n"+
@@ -593,31 +594,38 @@ func (i Img3) String() string {
 			"----\n",
 		reverseBytes(i.Magic[:]),
 		reverseBytes(i.Ident[:]),
-	))
+	)
 	for _, tag := range i.Tags {
 		magic := string(reverseBytes(tag.Magic[:]))
 		switch magic {
 		case "TYPE":
-			iStr.WriteString(fmt.Sprintf("%s: %s\n", magic, reverseBytes(tag.Data[:])))
+			fmt.Fprintf(&iStr, "%s: %s\n", magic, reverseBytes(bytes.Clone(tag.Data)))
 		case "DATA":
-			iStr.WriteString(fmt.Sprintf("%s: %v (length: %d)\n", magic, tag.Data[0:15], len(tag.Data)))
+			fmt.Fprintf(&iStr, "%s: %x (length: %d)\n", magic, tag.Data[:min(16, len(tag.Data))], len(tag.Data))
 		case "VERS":
-			iStr.WriteString(fmt.Sprintf("%s: %s\n", magic, tag.Data))
-		case "SEPO":
-			iStr.WriteString(fmt.Sprintf("%s: %d\n", magic, binary.LittleEndian.Uint32(tag.Data)))
-		case "CHIP":
-			iStr.WriteString(fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data)))
-		case "BORD":
-			iStr.WriteString(fmt.Sprintf("%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data)))
+			fmt.Fprintf(&iStr, "%s: %s\n", magic, tag.Data)
+		case "SEPO", "CHIP", "BORD":
+			if len(tag.Data) < 4 {
+				fmt.Fprintf(&iStr, "%s: (length: %d, invalid uint32)\n", magic, len(tag.Data))
+				iStr.WriteString(hex.Dump(tag.Data))
+				continue
+			}
+			if magic == "SEPO" {
+				fmt.Fprintf(&iStr, "%s: %d\n", magic, binary.LittleEndian.Uint32(tag.Data))
+			} else {
+				fmt.Fprintf(&iStr, "%s: 0x%x\n", magic, binary.LittleEndian.Uint32(tag.Data))
+			}
 		case "KBAG":
 			if kbag, err := ParseKBag(tag.Data); err == nil {
-				iStr.WriteString(fmt.Sprintf("%s: CryptState=%d, AESType=0x%x, IV=%x, Key=%x\n",
-					magic, kbag.CryptState, kbag.AESType, kbag.IV, kbag.Key))
+				fmt.Fprintf(&iStr, "%s: CryptState=%d, AESType=0x%x, IV=%x, Key=%x\n",
+					magic, kbag.CryptState, kbag.AESType, kbag.IV, kbag.Key)
 			} else {
-				iStr.WriteString(fmt.Sprintf("%s: %v (parse error: %v)\n", magic, tag.Data, err))
+				fmt.Fprintf(&iStr, "%s: (length: %d, parse error: %v)\n", magic, len(tag.Data), err)
+				iStr.WriteString(hex.Dump(tag.Data))
 			}
 		default:
-			iStr.WriteString(fmt.Sprintf("%s: %v\n", magic, tag.Data))
+			fmt.Fprintf(&iStr, "%s: (length: %d)\n", magic, len(tag.Data))
+			iStr.WriteString(hex.Dump(tag.Data))
 		}
 	}
 	return iStr.String()
