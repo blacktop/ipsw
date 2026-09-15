@@ -1108,7 +1108,7 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 		image.ObjC.Methods, err = m.GetObjCMethodLists()
 		if err != nil {
 			if errors.Is(err, macho.ErrObjcSectionNotFound) {
-				return nil
+				continue
 			}
 			return fmt.Errorf("failed to get objc methods for %s: %v", image.Name, err)
 		}
@@ -1555,7 +1555,10 @@ func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 			return stubs, nil
 		})
 		if err != nil {
-			return err
+			if errors.Is(err, macho.ErrObjcSectionNotFound) {
+				continue
+			}
+			return fmt.Errorf("failed to get objc stubs for %s: %w", image.Name, err)
 		}
 
 		for addr, stub := range image.ObjC.Stubs {
