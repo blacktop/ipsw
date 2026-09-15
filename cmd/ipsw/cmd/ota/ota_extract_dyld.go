@@ -96,11 +96,12 @@ type dscSource interface {
 }
 
 type dscOptions struct {
-	Output       string
-	ReportRoot   string // base for report-relative paths
-	PayloadRange string
-	Arches       []string
-	Prompt       func(question string) bool // nil means non-interactive consent
+	Output         string
+	ReportRoot     string // base for report-relative paths
+	PayloadRange   string
+	Arches         []string
+	Prompt         func(question string) bool // nil means non-interactive consent
+	ValidateFamily func(path string) error    // nil skips validation (tests only)
 
 	pattern *regexp.Regexp
 }
@@ -127,8 +128,73 @@ func extractDSC(src dscSource, opts dscOptions) *dscReport {
 			strings.Join(missing, ", ")))
 	} else if len(rep.Files) == 0 {
 		rep.addErrors(ota.PhaseDSCDiscovery, "", errNoDSCMaterialized)
+	} else {
+		validateDSCFamilies(opts, rep)
 	}
 	return rep.finish()
+}
+
+func validateDSCFamilies(opts dscOptions, rep *dscReport) {
+	if opts.ValidateFamily == nil {
+		return
+	}
+	type familyFailure struct {
+		file dscFileEntry
+		err  error
+	}
+	type archValidation struct {
+		first    dscFileEntry
+		primary  bool
+		valid    bool
+		failures []familyFailure
+	}
+	byArch := make(map[string]*archValidation)
+	var archOrder []string
+	for _, file := range rep.Files {
+		arch, primary := ota.DSCFileArch(file.Path)
+		if arch == "" || arch == "aot" {
+			continue
+		}
+		state, ok := byArch[arch]
+		if !ok {
+			state = &archValidation{first: file}
+			byArch[arch] = state
+			archOrder = append(archOrder, arch)
+		}
+		if !primary {
+			continue
+		}
+		state.primary = true
+		path := filepath.Join(opts.ReportRoot, filepath.FromSlash(file.Path))
+		if err := opts.ValidateFamily(path); err != nil {
+			state.failures = append(state.failures, familyFailure{file: file, err: err})
+			continue
+		}
+		state.valid = true
+	}
+	for _, arch := range archOrder {
+		state := byArch[arch]
+		if state.valid {
+			continue
+		}
+		if !state.primary {
+			rep.addErrors(ota.PhaseDSCValidation, state.first.Source,
+				fmt.Errorf("dyld_shared_cache architecture %s has sidecars but no primary family", arch))
+			continue
+		}
+		for _, failure := range state.failures {
+			rep.addErrors(ota.PhaseDSCValidation, failure.file.Source,
+				fmt.Errorf("dyld_shared_cache family %s is incomplete or invalid: %w", failure.file.Path, failure.err))
+		}
+	}
+}
+
+func validateDSCFamily(path string) error {
+	cache, err := dyld.Open(path)
+	if err != nil {
+		return err
+	}
+	return cache.Close()
 }
 
 func newDSCReport() *dscReport {

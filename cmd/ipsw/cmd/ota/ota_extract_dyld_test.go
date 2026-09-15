@@ -67,6 +67,84 @@ func testOpts() dscOptions {
 	return dscOptions{Output: "out/24G720__MacOS", ReportRoot: "out"}
 }
 
+func TestExtractDSCIncompleteFamilyMarksReportIncomplete(t *testing.T) {
+	primary := "out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e"
+	src := &fakeDSCSource{payload: []string{
+		primary,
+		primary + ".01",
+		"out/24G720__MacOS/System/Library/dyld/aot_shared_cache.0",
+	}}
+	opts := testOpts()
+	var validated []string
+	opts.ValidateFamily = func(path string) error {
+		validated = append(validated, path)
+		return errors.New("missing dyld_shared_cache_arm64e.31")
+	}
+
+	rep := extractDSC(src, opts)
+
+	if rep.Complete {
+		t.Fatal("report.Complete = true for an unusable cache family")
+	}
+	if !slices.Equal(validated, []string{primary}) {
+		t.Fatalf("validated paths = %v, want only primary %q", validated, primary)
+	}
+	if len(rep.Errors) != 1 {
+		t.Fatalf("report.Errors = %+v, want one validation error", rep.Errors)
+	}
+	if got := rep.Errors[0]; got.Phase != ota.PhaseDSCValidation || got.Source != sourcePayloadV2 {
+		t.Fatalf("error = {phase:%q source:%q}, want {%q %q}",
+			got.Phase, got.Source, ota.PhaseDSCValidation, sourcePayloadV2)
+	}
+	if !strings.Contains(rep.Errors[0].Message, "missing dyld_shared_cache_arm64e.31") {
+		t.Fatalf("error message = %q, want missing subcache diagnostic", rep.Errors[0].Message)
+	}
+}
+
+func TestExtractDSCUnfilteredSidecarsWithoutPrimaryAreIncomplete(t *testing.T) {
+	src := &fakeDSCSource{payload: []string{
+		"out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e.01",
+	}}
+	opts := testOpts()
+	opts.ValidateFamily = func(path string) error {
+		t.Fatalf("validator called without a primary: %s", path)
+		return nil
+	}
+
+	rep := extractDSC(src, opts)
+
+	if rep.Complete {
+		t.Fatal("report.Complete = true for sidecars without a primary")
+	}
+	if len(rep.Errors) != 1 || rep.Errors[0].Phase != ota.PhaseDSCValidation {
+		t.Fatalf("report.Errors = %+v, want one dsc-validation error", rep.Errors)
+	}
+}
+
+func TestExtractDSCValidAlternativeFamilySatisfiesArchitecture(t *testing.T) {
+	system := "out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e"
+	driverKit := "out/24G720__MacOS/System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e"
+	src := &fakeDSCSource{payload: []string{system, driverKit}}
+	opts := testOpts()
+	var validated []string
+	opts.ValidateFamily = func(path string) error {
+		validated = append(validated, path)
+		if path == driverKit {
+			return errors.New("missing DriverKit symbols subcache")
+		}
+		return nil
+	}
+
+	rep := extractDSC(src, opts)
+
+	if !rep.Complete || len(rep.Errors) != 0 {
+		t.Fatalf("report = complete:%t errors:%+v, want valid System family to satisfy arm64e", rep.Complete, rep.Errors)
+	}
+	if !slices.Equal(validated, []string{system, driverKit}) {
+		t.Fatalf("validated paths = %v, want both arm64e families", validated)
+	}
+}
+
 func TestExtractDSCCryptexSuccessStopsThere(t *testing.T) {
 	src := &fakeDSCSource{
 		cryptexFiles: []ota.ExtractedFile{
