@@ -105,6 +105,31 @@ func TestKernelCacheFileNameOnlyRetainsCollidingVariants(t *testing.T) {
 	}
 }
 
+// TestKernelCacheFileNameKeepsProductTypeVariant covers the product types Apple
+// suffixes with a variant ("iPad16,4-A"). They reach GetKernelCacheFileName
+// through utils.SortDevices, which rebuilds every name it sorts, so a suffix it
+// cannot parse is dropped and the kernelcache is written as "0,0".
+func TestKernelCacheFileNameKeepsProductTypeVariant(t *testing.T) {
+	inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
+		SupportedProductTypes: []string{"iPad16,3-A", "iPad16,4-A"},
+		BuildIdentities: []plist.BuildIdentity{
+			testBuildIdentity("iPad16,3-A", "j717ap", "kernelcache.release.ipad16p"),
+			testBuildIdentity("iPad16,4-A", "j718ap", "kernelcache.release.ipad16p"),
+		},
+	}}}
+
+	devices := inf.GetDevicesForKernelCache("kernelcache.release.ipad16p")
+	wantDevices := []string{"iPad16,3-A", "iPad16,4-A"}
+	if !slices.Equal(devices, wantDevices) {
+		t.Fatalf("GetDevicesForKernelCache() = %#v, want %#v", devices, wantDevices)
+	}
+
+	want := "kernelcache.release.iPad16,3-A_4-A"
+	if got := inf.GetKernelCacheFileName("kernelcache.release.ipad16p"); got != want {
+		t.Errorf("GetKernelCacheFileName() = %q, want %q", got, want)
+	}
+}
+
 func testBuildIdentity(productType, deviceClass, kernelPath string) plist.BuildIdentity {
 	return plist.BuildIdentity{
 		ApProductType: productType,
