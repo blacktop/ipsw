@@ -114,3 +114,64 @@ func TestSortDevicesUnparsableNamesUnchanged(t *testing.T) {
 		t.Fatalf("SortDevices() = %#v, want %#v", got, want)
 	}
 }
+
+// TestSortDevicesReverseInsertionOrder pins that the order SortDevices returns
+// does not depend on the order it was handed. The Less key gained the variant
+// suffix, and two names differing only in that suffix compared equal before, so
+// their relative order was whatever sort.Sort happened to leave behind.
+func TestSortDevicesReverseInsertionOrder(t *testing.T) {
+	want := []string{"iPad16,4", "iPad16,4-A", "iPad16,4-B", "iPhone12,1"}
+
+	forward := SortDevices([]string{"iPad16,4", "iPad16,4-A", "iPad16,4-B", "iPhone12,1"})
+	if !slices.Equal(forward, want) {
+		t.Fatalf("SortDevices(forward) = %#v, want %#v", forward, want)
+	}
+
+	reverse := SortDevices([]string{"iPhone12,1", "iPad16,4-B", "iPad16,4-A", "iPad16,4"})
+	if !slices.Equal(reverse, want) {
+		t.Fatalf("SortDevices(reverse) = %#v, want %#v", reverse, want)
+	}
+}
+
+// TestDevicesLessIsAStrictOrdering pins that the new sort key is a strict weak
+// ordering over names that differ only in their variant suffix: exactly one of
+// Less(i,j) / Less(j,i) holds, and neither holds for a device against itself.
+// On base both directions were false for every such pair, which is what made
+// the order of two variants of one model arbitrary.
+func TestDevicesLessIsAStrictOrdering(t *testing.T) {
+	a := DeconstructDevice("iPad16,4-A")
+	b := DeconstructDevice("iPad16,4-B")
+	devs := Devices{a, b}
+
+	if !devs.Less(0, 1) {
+		t.Errorf("Less(iPad16,4-A, iPad16,4-B) = false, want true")
+	}
+	if devs.Less(1, 0) {
+		t.Errorf("Less(iPad16,4-B, iPad16,4-A) = true, want false")
+	}
+
+	self := Devices{a, a}
+	if self.Less(0, 1) || self.Less(1, 0) {
+		t.Errorf("Less() reported an ordering between a device and itself")
+	}
+}
+
+// TestDeconstructDeviceRoundTripsEveryRealProductType is the corpus check: every
+// product type Apple ships that DeconstructDevice claims to parse must survive
+// String(), because SortDevices rebuilds every name it is handed from the parsed
+// struct. The variant-suffixed entries here are the ones that came back "0,0".
+func TestDeconstructDeviceRoundTripsEveryRealProductType(t *testing.T) {
+	// A sample of the variant-suffixed product types the embedded Xcode
+	// device_traits DB ships, alongside plain ones for contrast.
+	products := []string{
+		"iPad14,3-A", "iPad14,3-B", "iPad14,6-A", "iPad14,6-B",
+		"iPad16,3-A", "iPad16,4-A", "iPad16,4-B", "iPad17,1-A", "iPad17,2-B",
+		"iPad14,6", "iPhone12,1", "iPhone17,1", "Mac16,8", "AppleTV11,1", "Watch7,1",
+	}
+
+	for _, p := range products {
+		if got := DeconstructDevice(p).String(); got != p {
+			t.Errorf("DeconstructDevice(%q).String() = %q, want %q (name does not round trip)", p, got, p)
+		}
+	}
+}
