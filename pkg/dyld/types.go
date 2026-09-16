@@ -3,6 +3,7 @@ package dyld
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/bits"
 	"path/filepath"
 	"strings"
@@ -349,6 +350,13 @@ type Rebase struct {
 	Symbol          string            `json:"symbol,omitempty"`
 }
 
+// PageRange identifies slide pages [Start, End)
+type PageRange struct {
+	Start, End uint64
+}
+
+var AllPages = PageRange{Start: 0, End: math.MaxUint64}
+
 type slideInfo interface {
 	GetVersion() uint32
 	GetPageSize() uint32
@@ -373,7 +381,8 @@ func (i CacheSlideInfo) GetVersion() uint32 {
 	return i.Version
 }
 func (i CacheSlideInfo) GetPageSize() uint32 {
-	return 0
+	// v1 uses fixed 4 KiB pages; its header has no page-size field
+	return 4096
 }
 func (i CacheSlideInfo) SlidePointer(ptr uint64) uint64 {
 	return ptr // TODO: finish this

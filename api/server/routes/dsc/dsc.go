@@ -310,7 +310,7 @@ func dscSlideInfo(c *gin.Context) {
 				SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
 			}, Name: "__DATA"}
 			if mapping.SlideInfoSize > 0 {
-				rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+				rebases, err := f.GetRebaseInfoForPages(uuid, mapping, dyld.AllPages)
 				if err != nil {
 					c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 					return
@@ -324,7 +324,7 @@ func dscSlideInfo(c *gin.Context) {
 					continue
 				}
 				if mapping.SlideInfoSize > 0 {
-					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, dyld.AllPages)
 					if err != nil {
 						c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 						return

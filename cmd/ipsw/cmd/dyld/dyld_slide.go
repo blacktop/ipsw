@@ -125,7 +125,7 @@ var SlideCmd = &cobra.Command{
 					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
 				}, Name: "__DATA"}
 				if viper.GetBool("dyld.slide.json") {
-					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, dyld.AllPages)
 					if err != nil {
 						return err
 					}
@@ -140,7 +140,7 @@ var SlideCmd = &cobra.Command{
 					}
 					if extMapping.SlideInfoSize > 0 {
 						if viper.GetBool("dyld.slide.json") {
-							rebases, err := f.GetRebaseInfoForPages(uuid, extMapping, 0, 0)
+							rebases, err := f.GetRebaseInfoForPages(uuid, extMapping, dyld.AllPages)
 							if err != nil {
 								return err
 							}
