@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -174,74 +175,22 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
+	// Register the primary before any member can fail so Close releases it
+	// alongside whatever subcaches were mapped up to that point.
+	ff.closers[ff.UUID] = closer
 	ff.size = size
 	ff.path = name
 
 	if ff.IsDyld4 {
-
-		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
-			subCacheName := fmt.Sprintf("%s.%d", name, i)
-			if len(ff.SubCacheInfo[i-1].Extention) > 0 {
-				subCacheName = fmt.Sprintf("%s%s", name, ff.SubCacheInfo[i-1].Extention)
+		if err := ff.openSubCaches(name); err != nil {
+			// When cleanup succeeds the member error is returned as-is, so a
+			// missing file is still a bare *fs.PathError for os.IsNotExist.
+			if cerr := ff.Close(); cerr != nil {
+				return nil, errors.Join(err, cerr)
 			}
-			/* NOTE: removing because it feels too noisy */
-			// log.WithFields(log.Fields{
-			// 	"cache": subCacheName,
-			// }).Debug("Parsing SubCache")
-
-			sr, sc, subSize, err := openCacheFile(subCacheName)
-			if err != nil {
-				return nil, err
-			}
-
-			ff.size += subSize
-
-			uuid, err := getUUID(sr)
-			if err != nil {
-				sc.Close()
-				return nil, err
-			}
-
-			ff.parseCache(sr, uuid)
-
-			ff.closers[uuid] = sc
-
-			if ff.Headers[uuid].UUID != ff.SubCacheInfo[i-1].UUID {
-				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", subCacheName,
-					ff.SubCacheInfo[i-1].UUID.String(),
-					ff.Headers[uuid].UUID.String())
-			}
-		}
-
-		if !ff.Headers[ff.UUID].SymbolFileUUID.IsNull() {
-			// log.WithFields(log.Fields{
-			// 	"cache": name + ".symbols",
-			// }).Debug("Parsing SubCache")
-			sr, sc, _, err := openCacheFile(name + ".symbols")
-			if err != nil {
-				return nil, err
-			}
-
-			uuid, err := getUUID(sr)
-			if err != nil {
-				sc.Close()
-				return nil, err
-			}
-
-			if uuid != ff.Headers[ff.UUID].SymbolFileUUID {
-				sc.Close()
-				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid.String(), ff.Headers[ff.UUID].SymbolFileUUID.String())
-			}
-
-			ff.symUUID = uuid
-
-			ff.parseCache(sr, uuid)
-
-			ff.closers[uuid] = sc
+			return nil, err
 		}
 	}
-
-	ff.closers[ff.UUID] = closer
 
 	// Build sorted image index for O(log N) text address lookups
 	ff.sortedImages = make([]*CacheImage, len(ff.Images))
@@ -253,24 +202,86 @@ func Open(name string) (*File, error) {
 	return ff, nil
 }
 
-// Close closes the File.
-// If the File was created using NewFile directly instead of Open,
-// Close has no effect.
-func (f *File) Close() error {
-	if f.AddressToSymbol != nil {
-		f.AddressToSymbol.Close()
-	}
-	var err error
-	for uuid, closer := range f.closers {
-		if closer != nil {
-			err = closer.Close()
-			f.closers[uuid] = nil
-		}
+// openSubCaches maps every subcache the primary header declares, plus the
+// .symbols file when one is referenced. Any member it maps is registered in
+// f.closers before it can fail, so the caller only has to Close f on error.
+// parseCache guarantees SubCacheInfo holds exactly SubCacheArrayCount entries.
+func (f *File) openSubCaches(name string) error {
+	hdr := f.Headers[f.UUID]
+	for i, info := range f.SubCacheInfo {
+		subSize, err := f.openCacheMember(name+subCacheSuffix(info, i), info.UUID)
 		if err != nil {
 			return err
 		}
+		f.size += subSize
 	}
+	if hdr.SymbolFileUUID.IsNull() {
+		return nil
+	}
+	// Size() reports the mapped runtime cache; .symbols is not part of it.
+	if _, err := f.openCacheMember(name+".symbols", hdr.SymbolFileUUID); err != nil {
+		return err
+	}
+	f.symUUID = hdr.SymbolFileUUID
 	return nil
+}
+
+// subCacheSuffix is the filename suffix of the idx-th subcache entry: the
+// suffix the header records, or the 1-based ".N" that pre-iOS 16 caches used
+// before headers carried one.
+func subCacheSuffix(info SubcacheEntry, idx int) string {
+	if len(info.Extention) > 0 {
+		return info.Extention
+	}
+	return fmt.Sprintf(".%d", idx+1)
+}
+
+// openCacheMember maps one subcache or symbols file, checks that it is the
+// member the primary expects, parses it, and registers its closer under the
+// member's UUID. The UUID check runs before parsing so a stale member from
+// another build fails with the mismatch rather than with whatever parsing it
+// happens to trip over.
+func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
+	r, closer, size, err := openCacheFile(name)
+	if err != nil {
+		return 0, err
+	}
+	// Until the closer is registered in f.closers, every failure releases it here.
+	fail := func(err error) (int64, error) { return 0, errors.Join(err, closer.Close()) }
+	uuid, err := getUUID(r)
+	if err != nil {
+		return fail(fmt.Errorf("%s: %w", name, err))
+	}
+	if uuid != want {
+		return fail(fmt.Errorf("%s UUID %s did NOT match expected UUID %s", name, uuid, want))
+	}
+	if _, loaded := f.closers[uuid]; loaded {
+		return fail(fmt.Errorf("%s: UUID %s is already loaded by another cache member", name, uuid))
+	}
+	f.closers[uuid] = closer
+	if err := f.parseCache(r, uuid); err != nil {
+		return 0, fmt.Errorf("failed to parse cache %s: %w", name, err)
+	}
+	return size, nil
+}
+
+// Close releases every mapping Open created. A File built with NewFile owns
+// no mappings, so Close is a no-op for it.
+func (f *File) Close() error {
+	var errs []error
+	if f.AddressToSymbol != nil {
+		if err := f.AddressToSymbol.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for uuid, closer := range f.closers {
+		delete(f.closers, uuid)
+		delete(f.r, uuid) // a lookup after Close fails as a nil reader, not a fault
+		if err := closer.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // ReadHeader opens a given cache and returns the dyld_cache_header
@@ -322,16 +333,11 @@ func NewFile(r io.ReaderAt) (*File, error) {
 
 	f.ByteOrder = binary.LittleEndian
 
-	var uuidBytes [16]byte
-	if _, err := r.ReadAt(uuidBytes[0:], 0x58); err != nil {
+	uuid, err := getUUID(r)
+	if err != nil {
 		return nil, err
 	}
-
-	f.UUID = mtypes.UUID(uuidBytes)
-
-	if f.UUID.IsNull() {
-		return nil, fmt.Errorf("file's UUID is empty") // FIXME: should this actually stop or continue
-	}
+	f.UUID = uuid
 
 	if err := f.parseCache(r, f.UUID); err != nil {
 		return nil, fmt.Errorf("failed to parse cache %s: %v", f.UUID, err)
@@ -660,6 +666,11 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	// Read dyld text_info entries.
+	if f.Headers[uuid].ImagesTextCount > uint64(len(f.Images)) {
+		return &FormatError{int64(f.Headers[uuid].ImagesTextOffset),
+			fmt.Sprintf("header declares %d text_info entries for %d images",
+				f.Headers[uuid].ImagesTextCount, len(f.Images)), nil}
+	}
 	sr.Seek(int64(f.Headers[uuid].ImagesTextOffset), io.SeekStart)
 	for i := uint64(0); i != f.Headers[uuid].ImagesTextCount; i++ {
 		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
@@ -667,7 +678,17 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}
 	}
 
-	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
+	// The subcache array and TPRO mappings describe the family and are only
+	// meaningful in the primary; dyld zeroes both counts in every member, so a
+	// member that carries them is malformed and must not replace the primary's.
+	if uuid != f.UUID {
+		return nil
+	}
+	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset == 0 {
+		return fmt.Errorf("header declares %d subcaches but no subcache array",
+			f.Headers[uuid].SubCacheArrayCount)
+	}
+	if f.Headers[uuid].SubCacheArrayCount > 0 {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
 		f.SubCacheInfo = make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 		// TODO: gross hack to read the subcache info for pre iOS 16.
@@ -725,13 +746,19 @@ func (f *File) GetSubCacheInfo(uuid mtypes.UUID) *SubcacheEntry {
 		}
 	}
 	if f.symUUID == uuid {
-		mapping, err := f.GetMappingForOffsetForUUID(f.SubCacheInfo[len(f.SubCacheInfo)-1].UUID, 0)
+		// The symbols file follows the last subcache in VM order, or the
+		// primary when the family has no subcaches.
+		last := SubcacheEntry{UUID: f.UUID}
+		if n := len(f.SubCacheInfo); n > 0 {
+			last = f.SubCacheInfo[n-1]
+		}
+		mapping, err := f.GetMappingForOffsetForUUID(last.UUID, 0)
 		if err != nil {
 			return nil
 		}
 		return &SubcacheEntry{
 			UUID:          uuid,
-			CacheVMOffset: f.SubCacheInfo[len(f.SubCacheInfo)-1].CacheVMOffset + mapping.Size,
+			CacheVMOffset: last.CacheVMOffset + mapping.Size,
 			Extention:     ".symbols",
 		}
 	}

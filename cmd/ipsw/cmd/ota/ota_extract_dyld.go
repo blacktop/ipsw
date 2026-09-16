@@ -171,8 +171,8 @@ func validateDSCFamilies(opts dscOptions, rep *dscReport) {
 		var err error
 		if !state.primary {
 			err = fmt.Errorf("dyld_shared_cache family %s has sidecars but no primary", familyPath)
-		} else if validationErr := opts.ValidateFamily(filepath.Join(opts.ReportRoot, filepath.FromSlash(familyPath))); validationErr != nil {
-			err = fmt.Errorf("dyld_shared_cache family %s is incomplete or invalid: %w", familyPath, validationErr)
+		} else {
+			err = opts.validateFamilyOnDisk(familyPath)
 		}
 		if err != nil {
 			rep.Errors = append(rep.Errors, dscErrorEntry{
@@ -183,12 +183,27 @@ func validateDSCFamilies(opts dscOptions, rep *dscReport) {
 	}
 }
 
+// validateFamilyOnDisk runs ValidateFamily against the materialized primary
+// for familyPath (slash separated, report relative).
+func (opts dscOptions) validateFamilyOnDisk(familyPath string) error {
+	if err := opts.ValidateFamily(dscOnDiskPath(opts.ReportRoot, familyPath)); err != nil {
+		return fmt.Errorf("dyld_shared_cache family %s is incomplete or invalid: %w", familyPath, err)
+	}
+	return nil
+}
+
+// validateDSCFamily opens the cache and every member its header declares.
+// A failure to release the mappings afterwards does not make the family
+// unusable, so it is logged rather than reported as a validation error.
 func validateDSCFamily(path string) error {
 	cache, err := dyld.Open(path)
 	if err != nil {
 		return err
 	}
-	return cache.Close()
+	if err := cache.Close(); err != nil {
+		log.WithError(err).Warnf("failed to release %s after validation", path)
+	}
+	return nil
 }
 
 func newDSCReport() *dscReport {
@@ -436,11 +451,17 @@ func writeDSCReport(w io.Writer, rep *dscReport) error {
 // unreadable stack of "..".
 func logDSCReport(root string, rep *dscReport) {
 	for _, f := range rep.Files {
-		utils.Indent(log.Info, 2)(filepath.Join(root, filepath.FromSlash(f.Path)))
+		utils.Indent(log.Info, 2)(dscOnDiskPath(root, f.Path))
 	}
 	for _, e := range rep.Errors {
 		utils.Indent(log.Error, 2)(fmt.Sprintf("[%s] %s", e.Phase, e.Message))
 	}
+}
+
+// dscOnDiskPath is the inverse of dscReportPath: the on-disk location of a
+// report-relative, slash-separated path.
+func dscOnDiskPath(root, rel string) string {
+	return filepath.Join(root, filepath.FromSlash(rel))
 }
 
 func dscReportPath(root, dst string) string {

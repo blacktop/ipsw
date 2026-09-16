@@ -147,6 +147,7 @@ func (t *A2STable) Range(fn func(uint64, string) bool) {
 
 // Close releases mmap'd resources.
 func (t *A2STable) Close() error {
+	t.m = nil
 	if t.data != nil {
 		err := a2sMunmap(t.data)
 		t.data = nil
