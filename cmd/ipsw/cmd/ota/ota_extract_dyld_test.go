@@ -121,7 +121,7 @@ func TestExtractDSCUnfilteredSidecarsWithoutPrimaryAreIncomplete(t *testing.T) {
 	}
 }
 
-func TestExtractDSCValidAlternativeFamilySatisfiesArchitecture(t *testing.T) {
+func TestExtractDSCValidSystemDoesNotHideBrokenDriverKit(t *testing.T) {
 	system := "out/24G720__MacOS/System/Library/dyld/dyld_shared_cache_arm64e"
 	driverKit := "out/24G720__MacOS/System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e"
 	src := &fakeDSCSource{payload: []string{system, driverKit}}
@@ -137,10 +137,11 @@ func TestExtractDSCValidAlternativeFamilySatisfiesArchitecture(t *testing.T) {
 
 	rep := extractDSC(src, opts)
 
-	if !rep.Complete || len(rep.Errors) != 0 {
-		t.Fatalf("report = complete:%t errors:%+v, want valid System family to satisfy arm64e", rep.Complete, rep.Errors)
+	if rep.Complete || len(rep.Errors) != 1 || !strings.Contains(rep.Errors[0].Message, driverKit[len("out/"):]) {
+		t.Fatalf("report = complete:%t errors:%+v, want independent DriverKit failure", rep.Complete, rep.Errors)
 	}
-	if !slices.Equal(validated, []string{system, driverKit}) {
+	slices.Sort(validated)
+	if !slices.Equal(validated, []string{driverKit, system}) {
 		t.Fatalf("validated paths = %v, want both arm64e families", validated)
 	}
 }

@@ -183,6 +183,18 @@ See if `dyld` is in the OTA files
 :new: iOS 16.x/macOS 13.x OTAs now contain a RIDIFF10 cryptex volumes that contain the `dyld_shared_cache` files
 :::
 
+#### Machine-readable dyld extraction
+
+```bash
+❯ ipsw ota extract OTA.zip --dyld --json --output ./out > report.json
+```
+
+The schema-1 report lists all materialized `files` and structured `errors`. `complete` is true only when there are no errors; an incomplete JSON report exits nonzero. Files remain listed even when their cache family is unusable.
+
+Each dyld cache family is validated independently by directory and architecture. A usable System cache does not hide a broken DriverKit cache of the same architecture. A `dsc-validation` error includes an optional `path` field identifying the family's primary, slash-separated and relative to the output root. This path can be absent on disk when only the family's sidecars were materialized. `source` still identifies the OTA source, not the family. Other error phases may omit `path`.
+
+Consumers that intentionally exclude some families can use `phase`, `path` and `source` to apply their own selection policy while retaining the original incomplete report. Do not parse `message`; it is free-form diagnostic text.
+
 #### Extract file(s) from OTA RIDIFF10 cryptex volumes
 
 ```bash

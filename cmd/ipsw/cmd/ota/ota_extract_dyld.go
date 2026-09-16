@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -41,7 +42,7 @@ import (
 
 // dscSchemaVersion is the version of the JSON report contract written by
 // writeDSCReport. Bump for ANY key removal or semantic change; purely
-// additive `phase` values do not require a bump.
+// additive `phase` values and optional diagnostic fields do not require a bump.
 const dscSchemaVersion = 1
 
 // Stable source identifiers for the two non-cryptex sources. Cryptex-sourced
@@ -80,6 +81,9 @@ type dscErrorEntry struct {
 	Phase   ota.Phase `json:"phase"`
 	Source  string    `json:"source"` // "" when not attributable to one member
 	Message string    `json:"message"`
+	// For dsc-validation, the slash-separated, report-relative primary path
+	// identifies the family, even when only its sidecars were materialized.
+	Path string `json:"path,omitempty"`
 
 	err error // not serialized; drives the human-mode exit-code policy
 }
@@ -128,9 +132,8 @@ func extractDSC(src dscSource, opts dscOptions) *dscReport {
 			strings.Join(missing, ", ")))
 	} else if len(rep.Files) == 0 {
 		rep.addErrors(ota.PhaseDSCDiscovery, "", errNoDSCMaterialized)
-	} else {
-		validateDSCFamilies(opts, rep)
 	}
+	validateDSCFamilies(opts, rep)
 	return rep.finish()
 }
 
@@ -138,53 +141,44 @@ func validateDSCFamilies(opts dscOptions, rep *dscReport) {
 	if opts.ValidateFamily == nil {
 		return
 	}
-	type familyFailure struct {
-		file dscFileEntry
-		err  error
+	type familyValidation struct {
+		file    dscFileEntry // primary if present, otherwise the first sidecar
+		primary bool
 	}
-	type archValidation struct {
-		first    dscFileEntry
-		primary  bool
-		valid    bool
-		failures []familyFailure
-	}
-	byArch := make(map[string]*archValidation)
-	var archOrder []string
+	byFamily := make(map[string]*familyValidation)
+	var familyOrder []string
 	for _, file := range rep.Files {
 		arch, primary := ota.DSCFileArch(file.Path)
 		if arch == "" || arch == "aot" {
 			continue
 		}
-		state, ok := byArch[arch]
+		// A family is scoped to both directory and architecture. A usable
+		// System cache cannot stand in for a broken DriverKit cache, or vice versa.
+		familyPath := path.Join(path.Dir(file.Path), "dyld_shared_cache_"+arch)
+		state, ok := byFamily[familyPath]
 		if !ok {
-			state = &archValidation{first: file}
-			byArch[arch] = state
-			archOrder = append(archOrder, arch)
+			state = &familyValidation{file: file}
+			byFamily[familyPath] = state
+			familyOrder = append(familyOrder, familyPath)
 		}
-		if !primary {
-			continue
+		if primary {
+			state.file = file
+			state.primary = true
 		}
-		state.primary = true
-		path := filepath.Join(opts.ReportRoot, filepath.FromSlash(file.Path))
-		if err := opts.ValidateFamily(path); err != nil {
-			state.failures = append(state.failures, familyFailure{file: file, err: err})
-			continue
-		}
-		state.valid = true
 	}
-	for _, arch := range archOrder {
-		state := byArch[arch]
-		if state.valid {
-			continue
-		}
+	for _, familyPath := range familyOrder {
+		state := byFamily[familyPath]
+		var err error
 		if !state.primary {
-			rep.addErrors(ota.PhaseDSCValidation, state.first.Source,
-				fmt.Errorf("dyld_shared_cache architecture %s has sidecars but no primary family", arch))
-			continue
+			err = fmt.Errorf("dyld_shared_cache family %s has sidecars but no primary", familyPath)
+		} else if validationErr := opts.ValidateFamily(filepath.Join(opts.ReportRoot, filepath.FromSlash(familyPath))); validationErr != nil {
+			err = fmt.Errorf("dyld_shared_cache family %s is incomplete or invalid: %w", familyPath, validationErr)
 		}
-		for _, failure := range state.failures {
-			rep.addErrors(ota.PhaseDSCValidation, failure.file.Source,
-				fmt.Errorf("dyld_shared_cache family %s is incomplete or invalid: %w", failure.file.Path, failure.err))
+		if err != nil {
+			rep.Errors = append(rep.Errors, dscErrorEntry{
+				Phase: ota.PhaseDSCValidation, Source: state.file.Source,
+				Path: familyPath, Message: err.Error(), err: err,
+			})
 		}
 	}
 }
