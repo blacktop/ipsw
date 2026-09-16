@@ -318,11 +318,12 @@ func dscPrompt(f otaExtractFlags) func(string) bool {
 
 func runDyldExtract(f otaExtractFlags, o *ota.AA, output string, w io.Writer) error {
 	rep := extractDSC(otaDSCSource{AA: o, decomp: f.decomp}, dscOptions{
-		Output:       output,
-		ReportRoot:   reportRoot(f.output),
-		PayloadRange: f.payloadRange,
-		Arches:       f.dyldArches,
-		Prompt:       dscPrompt(f),
+		Output:         output,
+		ReportRoot:     reportRoot(f.output),
+		PayloadRange:   f.payloadRange,
+		Arches:         f.dyldArches,
+		Prompt:         dscPrompt(f),
+		ValidateFamily: validateDSCFamily,
 	})
 	logDSCReport(reportRoot(f.output), rep)
 	if f.json {
