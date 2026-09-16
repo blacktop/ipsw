@@ -459,28 +459,33 @@ const DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
 
 // CacheSlidePointer3 struct
 //
-//	{
-//	    uint64_t  raw;
-//	    struct {
-//	        uint64_t    pointerValue        : 51,
-//	                    offsetToNextPointer : 11,
-//	                    unused              :  2;
-//	    }         plain;
-//	    struct {
-//	        uint64_t    offsetFromSharedCacheBase : 32,
-//	                    diversityData             : 16,
-//	                    hasAddressDiversity       :  1,
-//	                    key                       :  2,
-//	                    offsetToNextPointer       : 11,
-//	                    unused                    :  1,
-//	                    authenticated             :  1; // = 1;
-//	    }         auth;
+// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/include/mach-o/dyld_cache_format.h#L385-L403))
+//
+//	  union dyld_cache_slide_pointer3
+//	  {
+//	      uint64_t  raw;
+//	      struct {
+//	          uint64_t    pointerValue        : 51,
+//	                      offsetToNextPointer : 11,
+//	                      unused              :  2;
+//	      }         plain;
+//
+//	      struct {
+//	          uint64_t    offsetFromSharedCacheBase : 32,
+//	                      diversityData             : 16,
+//	                      hasAddressDiversity       :  1,
+//	                      key                       :  2,
+//	                      offsetToNextPointer       : 11,
+//	                      unused                    :  1,
+//	                      authenticated             :  1; // = 1;
+//	    }           auth;
 //	};
 type CacheSlidePointer3 uint64
 
 // SignExtend51 returns a regular pointer which needs to fit in 51-bits of value.
 // C++ RTTI uses the top bit, so we'll allow the whole top-byte
 // and the signed-extended bottom 43-bits to be fit in to 51-bits.
+// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/include/mach-o/dyld_cache_format.h#L364-L368
 func (p CacheSlidePointer3) SignExtend51() uint64 {
 	top8Bits := uint64(p & 0x007F80000000000)
 	bottom43Bits := uint64(p & 0x000007FFFFFFFFFF)
@@ -600,7 +605,7 @@ func (i CacheSlideInfo4) GetPageSize() uint32 {
 }
 func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 	// if ptr > i.ValueAdd { FIXME: do I need to add this ?
-	// 	return ptr
+	//  return ptr
 	// }
 	value := ptr & ^i.DeltaMask
 	if (value & 0xFFFF8000) == 0 {
@@ -630,7 +635,7 @@ func (p CacheSlidePointer4) MarshalJSON() ([]byte, error) {
 
 type CacheSlideInfo5 struct {
 	Version         uint32 `json:"slide_version,omitempty"` // currently 5
-	PageSize        uint32 `json:"page_size,omitempty"`     //  currently 4096 (may also be 16384)
+	PageSize        uint32 `json:"page_size,omitempty"`     // currently 4096 (may also be 16384)
 	PageStartsCount uint32 `json:"page_starts_count,omitempty"`
 	_               uint32 // padding for 64bit alignment
 	ValueAdd        uint64 `json:"value_add,omitempty"`
@@ -658,53 +663,35 @@ func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
 
 // CacheSlidePointer5 struct
 //
-// The version 5 of the slide info uses a different compression scheme. Since
-// only interior pointers (pointers that point within the cache) are rebased
-// (slid), we know the possible range of the pointers and thus know there are
-// unused bits in each pointer.  We use those bits to form a linked list of
-// locations needing rebasing in each page.
+// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/include/mach-o/dyld_cache_format.h#L544-L549
+// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/include/mach-o/fixup-chains.h#L276-L295
 //
-// Definitions:
+//	union dyld_cache_slide_pointer5 {
+//	    uint64_t raw;
 //
-//	pageIndex = (pageAddress - startOfAllDataAddress)/info->page_size
-//	pageStarts[] = info + info->page_starts_offset
+//	    struct dyld_chained_ptr_arm64e_shared_cache_rebase {
+//	        uint64_t runtimeOffset : 34,
+//	                 high8         :  8,
+//	                 unused        : 10,
+//	                 next          : 11,
+//	                 auth          :  1; // = 0;
+//	    } regular;
 //
-// There are two cases:
-//
-//  1. pageStarts[pageIndex] == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE
-//     The page contains no values that need rebasing.
-//
-//  2. otherwise...
-//     All rebase locations are in one linked list. The offset of the first
-//     rebase location in the page is pageStarts[pageIndex].
-//
-// A pointer is one of of the variants in dyld_cache_slide_pointer5
-//
-// The code for processing a linked list (chain) is:
-//
-//	uint32_t delta = pageStarts[pageIndex];
-//	dyld_cache_slide_pointer5* loc = pageStart;
-//	do {
-//	    loc += delta;
-//	    delta = loc->offsetToNextPointer;
-//	    newValue = loc->regular.target + value_add + results->slide;
-//	    if ( loc->auth.authenticated ) {
-//	        newValue = sign_using_the_various_bits(newValue);
-//	    }
-//	    else {
-//	        newValue = newValue | (loc->regular.high8 < 56);
-//	    }
-//	    loc->raw = newValue;
-//	} while (delta != 0);
+//	    struct dyld_chained_ptr_arm64e_shared_cache_auth_rebase {
+//	        uint64_t runtimeOffset : 34,
+//	                 diversity     : 16,
+//	                 addrDiv       :  1,
+//	                 keyIsData     :  1,
+//	                 next          : 11,
+//	                 auth          :  1; // = 1;
+//	    } auth;
+//	};
 type CacheSlidePointer5 uint64
 
-// SignExtend51 returns a regular pointer which needs to fit in 51-bits of value.
-// C++ RTTI uses the top bit, so we'll allow the whole top-byte
-// and the signed-extended bottom 43-bits to be fit in to 51-bits.
+// SignExtend51 unpacks the regular v5 pointer's 34-bit cache offset and high byte
+// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/mach_o/ChainedFixups.cpp#L744-L754
 func (p CacheSlidePointer5) SignExtend51() uint64 {
-	top8Bits := uint64(p & 0x007F80000000000)
-	bottom43Bits := uint64(p & 0x000007FFFFFFFFFF)
-	return (top8Bits << 13) | (((uint64)(bottom43Bits<<21) >> 21) & 0x00FFFFFFFFFFFFFF)
+	return p.Value() | (p.High8() << 56)
 }
 
 // Raw returns the chained pointer's raw uint64 value
@@ -728,7 +715,7 @@ func (p CacheSlidePointer5) OffsetToNextPointer() uint64 {
 
 // OffsetFromSharedCacheBase returns the chained pointer's offset from the base
 func (p CacheSlidePointer5) OffsetFromSharedCacheBase() uint64 {
-	return types.ExtractBits(uint64(p), 0, 32)
+	return p.Value()
 }
 
 // DiversityData returns the chained pointer's diversity data
@@ -861,7 +848,7 @@ func (s CacheLocalSymbol64) String(color bool) string {
 			symImageColor(found))
 	}
 	// if s.Nlist64.Desc.GetLibraryOrdinal() != 0 { // TODO: I haven't seen this trigger in the iPhone14,2_D63AP_19D5026g/dyld_shared_cache_arm64e I tested
-	// 	return fmt.Sprintf("%#09x:\t(%s|%s)\t%s%s", s.Value, s.Type.String(sec), s.Macho.LibraryOrdinalName(int(s.Nlist64.Desc.GetLibraryOrdinal())), s.Name, found)
+	//  return fmt.Sprintf("%#09x:\t(%s|%s)\t%s%s", s.Value, s.Type.String(sec), s.Macho.LibraryOrdinalName(int(s.Nlist64.Desc.GetLibraryOrdinal())), s.Name, found)
 	// }
 	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
