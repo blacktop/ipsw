@@ -1311,7 +1311,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						rebases = append(rebases, Rebase{
 							CacheFileOffset: pageContent + uint64(pageOffset),
-							CacheVMAddress:  pageContent + uint64(pageAddress),
+							CacheVMAddress:  pageAddress + uint64(pageOffset),
 							Target:          targetValue,
 							Pointer:         pointer,
 							Symbol:          symName,
