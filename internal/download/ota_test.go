@@ -1,6 +1,12 @@
 package download
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"io"
+	"os"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -196,7 +202,7 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 			platform:        "tvos",
 			developerBetaID: "6ca2978e-e976-48b5-9b85-cba646d5dea8",
 			appleSeedBetaID: "077f811f-5ff5-4162-8bed-2820ffc2538f",
-			publicBetaID:    "976a551-4987-4dc5-aadf-e89d885515f0",
+			publicBetaID:    "e976a551-4987-4dc5-aadf-e89d885515f0",
 		},
 		{
 			platform:        "watchos",
@@ -245,5 +251,53 @@ func TestAssetAudienceIDsIncludes27Betas(t *testing.T) {
 				t.Fatalf("%s latest audience version = %q, want %q", tt.platform, got, version)
 			}
 		})
+	}
+}
+
+var audienceIDPattern = regexp.MustCompile(
+	`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func TestEmbeddedAudienceIDsAreWellFormed(t *testing.T) {
+	t.Parallel()
+
+	zr, err := gzip.NewReader(bytes.NewReader(audienceData))
+	if err != nil {
+		t.Fatalf("open embedded data/audiences.gz: %v", err)
+	}
+	defer zr.Close()
+	embedded, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("read embedded data/audiences.gz: %v", err)
+	}
+
+	var db map[string]any
+	if err := json.Unmarshal(embedded, &db); err != nil {
+		t.Fatalf("decode embedded data/audiences.gz: %v", err)
+	}
+	checkAudienceIDs(t, "", db)
+
+	source, err := os.ReadFile("data/audiences.json")
+	if err != nil {
+		t.Fatalf("read data/audiences.json: %v", err)
+	}
+	if !bytes.Equal(embedded, source) {
+		t.Fatal("data/audiences.gz is stale; regenerate it: gzip -n -c data/audiences.json > data/audiences.gz")
+	}
+}
+
+func checkAudienceIDs(t *testing.T, path string, node any) {
+	t.Helper()
+
+	switch v := node.(type) {
+	case map[string]any:
+		for key, child := range v {
+			checkAudienceIDs(t, path+"/"+key, child)
+		}
+	case string:
+		if !audienceIDPattern.MatchString(v) {
+			t.Errorf("audience ID %s = %q, want an 8-4-4-4-12 hex UUID", path, v)
+		}
+	default:
+		t.Errorf("audience entry %s has unexpected JSON type %T", path, node)
 	}
 }
