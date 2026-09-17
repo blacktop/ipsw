@@ -66,6 +66,10 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 	if err != nil {
 		return err
 	}
+	pointerSize := uint64(8)
+	if !dsc.Is64bit() {
+		pointerSize = 4
+	}
 
 	// Export pads segment sizes; cache headers retain the original extents
 	for _, seg := range src.Segments() {
@@ -107,7 +111,7 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 				continue
 			}
 			rel := rebase.CacheVMAddress - seg.Addr
-			if seg.Filesz-rel < 8 {
+			if seg.Filesz-rel < pointerSize {
 				return fmt.Errorf("rebase at %#x extends beyond segment %s", rebase.CacheVMAddress, seg.Name)
 			}
 			// Padded VM ranges can overlap, so use this segment's output offset directly
@@ -118,7 +122,13 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
 				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
 			}
-			if err := binary.Write(f, dsc.ByteOrder, rebase.Target); err != nil {
+			// Rebase.Target is uint64, but Apple's v4 format requires uint32_t writes:
+			// https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/include/mach-o/dyld_cache_format.h#L451-L469
+			var target any = rebase.Target
+			if pointerSize == 4 {
+				target = uint32(rebase.Target)
+			}
+			if err := binary.Write(f, dsc.ByteOrder, target); err != nil {
 				return fmt.Errorf("failed to write rebase address %#x: %v", rebase.Target, err)
 			}
 		}
