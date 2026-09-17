@@ -186,7 +186,6 @@ type Downloads struct {
 
 type auth struct {
 	AccountName string   `json:"accountName,omitempty"`
-	Password    string   `json:"password,omitempty"`
 	RememberMe  bool     `json:"rememberMe"`
 	TrustTokens []string `json:"trust_tokens,omitempty"`
 	A           string   `json:"a,omitempty"`
@@ -252,10 +251,6 @@ type phone struct {
 }
 type trustedDevice struct {
 	SecurityCode scode `json:"securityCode"`
-}
-
-type signInResponse struct {
-	AuthType string `json:"authType,omitempty"`
 }
 
 type serviceError struct {
@@ -469,7 +464,10 @@ func (dp *DevPortal) GetHashcash() string {
 	return dp.config.HashCash
 }
 
-var errDevSessionExpired = stderrors.New("developer portal session expired")
+var (
+	errDevSessionExpired = stderrors.New("developer portal session expired")
+	errSRPRejected       = stderrors.New("Apple rejected the SRP sign-in")
+)
 
 // Login to Apple.
 func (dp *DevPortal) Login(username, password string) error {
@@ -482,6 +480,7 @@ func (dp *DevPortal) login(username, password string, checkSession bool) error {
 		return fmt.Errorf("failed to read developer credentials: %w", err)
 	}
 	hasSavedAccount := err == nil
+	explicitCredentials := len(username) > 0 && len(password) > 0
 	var account AppleAccountAuth
 	if hasSavedAccount {
 		if err := json.Unmarshal(item.Data, &account); err != nil {
@@ -545,7 +544,25 @@ func (dp *DevPortal) login(username, password string, checkSession bool) error {
 	dp.authOptions, dp.codeRequest = authOptions{}, authOptions{}
 	dp.olympusSession = olympusResponse{}
 	dp.xAppleIDAccountCountry = ""
-	return dp.signIn(username, password)
+	if err := dp.signIn(username, password); err != nil {
+		if !hasSavedAccount {
+			// The entry was written before Apple verified it; a failed sign-in
+			// must not leave it behind for the next run to reuse silently.
+			if rmErr := dp.Vault.Remove(VaultName); rmErr != nil {
+				return fmt.Errorf("%w (also failed to discard the unverified vault entry: %v)", err, rmErr)
+			}
+			return err
+		}
+		if !explicitCredentials && stderrors.Is(err, errSRPRejected) {
+			return fmt.Errorf("%w; the credentials used are stored in the %q entry of the "+
+				"%s credentials vault: if they are wrong, remove the entry and sign in again "+
+				"(macOS keychain: `security delete-generic-password -s %s -a %s`; file vault: %s)",
+				err, VaultName, KeychainServiceName, KeychainServiceName, VaultName,
+				filepath.Join(dp.config.ConfigDir, VaultName))
+		}
+		return err
+	}
+	return nil
 }
 
 func (dp *DevPortal) generateHashCash() (string, error) {
@@ -651,169 +668,145 @@ type srpCompleteResponse struct {
 	ServiceErrors         []serviceError `json:"serviceErrors,omitempty"`
 }
 
+func (dp *DevPortal) newSRPRequest(url string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(dp.config.Context, http.MethodPost, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
+	req.Header.Add("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json, text/javascript")
+	return req, nil
+}
+
+// srpServiceError returns errSRPRejected when an SRP step body carries Apple
+// service errors; a body without them (JSON or not) yields nil.
+func srpServiceError(step string, body []byte) error {
+	var resp srpCompleteResponse
+	if err := json.Unmarshal(body, &resp); err != nil || len(resp.ServiceErrors) == 0 {
+		return nil
+	}
+	se := resp.ServiceErrors[0]
+	return fmt.Errorf("%w at %s (code %s): %s", errSRPRejected, step, se.Code, se.Message)
+}
+
+func (dp *DevPortal) srpInit(s *srp.SRP, username string) (*srpInitResponse, error) {
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(&auth{
+		AccountName: username,
+		A:           base64.StdEncoding.EncodeToString(s.A.Bytes()),
+		Protocols:   []string{string(srp.ProtocolS2K), string(srp.ProtocolS2KFO)},
+	}); err != nil {
+		return nil, fmt.Errorf("failed to encode auth request: %v", err)
+	}
+	req, err := dp.newSRPRequest(initURL, buf)
+	if err != nil {
+		return nil, err
+	}
+	response, err := dp.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("SRP init request failed: %w", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SRP init response: %w", err)
+	}
+	logHTTPResponseMetadata("SRP INIT", response.StatusCode, len(body))
+	if response.StatusCode != http.StatusOK {
+		if err := srpServiceError("init", body); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed SRP init: HTTP %d", response.StatusCode)
+	}
+	var initResp srpInitResponse
+	if err := json.Unmarshal(body, &initResp); err != nil {
+		return nil, fmt.Errorf("failed to decode SRP init response: %w", err)
+	}
+	if initResp.Iteration <= 0 || initResp.Salt == "" || initResp.B == "" || initResp.C == "" {
+		return nil, fmt.Errorf("incomplete SRP init response")
+	}
+	return &initResp, nil
+}
+
 func (dp *DevPortal) generateSRP(username, password string) (*http.Response, error) {
 	s, err := srp.NewWithHash(crypto.SHA256, 2048)
 	if err != nil {
 		return nil, err
 	}
-
-	buf := new(bytes.Buffer)
-
-	if err := json.NewEncoder(buf).Encode(&auth{
-		AccountName: username,
-		A:           base64.StdEncoding.EncodeToString(s.A.Bytes()),
-		Protocols:   []string{"s2k", "s2k_fo"},
-	}); err != nil {
-		return nil, fmt.Errorf("failed to encode auth request: %v", err)
-	}
-
-	req, err := http.NewRequestWithContext(dp.config.Context, "POST", initURL, buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create http POST request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
-	req.Header.Set(hashcashHeader, dp.config.HashCash)
-	req.Header.Add("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json, text/javascript")
-
-	initResponse, err := dp.Client.Do(req)
+	initResp, err := dp.srpInit(s, username)
 	if err != nil {
 		return nil, err
 	}
-	defer initResponse.Body.Close()
-
-	body, err := io.ReadAll(initResponse.Body)
+	saltBytes, err := base64.StdEncoding.DecodeString(initResp.Salt)
 	if err != nil {
 		return nil, err
 	}
-
-	logHTTPResponseMetadata("SRP INIT", initResponse.StatusCode, len(body))
-
-	if initResponse.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed SRP init: HTTP %d", initResponse.StatusCode)
-	}
-	var srpInit srpInitResponse
-	if err := json.Unmarshal(body, &srpInit); err != nil {
-		return nil, fmt.Errorf("failed to decode SRP init response: %w", err)
-	}
-	if srpInit.Iteration <= 0 || srpInit.Salt == "" || srpInit.B == "" || srpInit.C == "" {
-		return nil, fmt.Errorf("incomplete SRP init response")
-	}
-
-	saltBytes, err := base64.StdEncoding.DecodeString(srpInit.Salt)
+	bBytes, err := base64.StdEncoding.DecodeString(initResp.B)
 	if err != nil {
 		return nil, err
 	}
-
-	bBytes, err := base64.StdEncoding.DecodeString(srpInit.B)
-	if err != nil {
-		return nil, err
+	protocol := srp.PasswordProtocol(initResp.Protocol)
+	if protocol == "" {
+		protocol = srp.ProtocolS2K
 	}
-
-	cli, err := s.NewClient([]byte(username), []byte(password), saltBytes, srpInit.Iteration)
+	log.WithField("protocol", protocol).Debug("SRP password protocol")
+	cli, err := s.NewClient(
+		[]byte(username), []byte(password), saltBytes, initResp.Iteration, protocol,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create SRP client: %w", err)
 	}
-
 	m1, m2, err := cli.Generate(saltBytes, bBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	buf.Reset()
-
-	json.NewEncoder(buf).Encode(&auth{
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(&auth{
 		AccountName: username,
-		C:           srpInit.C,
+		C:           initResp.C,
 		M1:          base64.StdEncoding.EncodeToString(m1),
 		M2:          base64.StdEncoding.EncodeToString(m2),
 		RememberMe:  false,
-	})
-
-	req, err = http.NewRequestWithContext(dp.config.Context, "POST", completeURL, buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create http POST request: %v", err)
+	}); err != nil {
+		return nil, fmt.Errorf("failed to encode SRP complete request: %v", err)
 	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
-	req.Header.Set(hashcashHeader, dp.config.HashCash)
-	req.Header.Add("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json, text/javascript")
-
+	req, err := dp.newSRPRequest(completeURL, buf)
+	if err != nil {
+		return nil, err
+	}
 	completeResponse, err := dp.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("SRP complete request failed: %w", err)
 	}
 	defer completeResponse.Body.Close()
-
-	body, err = io.ReadAll(completeResponse.Body)
+	body, err := io.ReadAll(completeResponse.Body)
 	if err != nil {
+		return nil, fmt.Errorf("failed to read SRP complete response: %w", err)
+	}
+	logHTTPResponseMetadata("SRP COMPLETE", completeResponse.StatusCode, len(body))
+	if err := srpServiceError("complete", body); err != nil {
 		return nil, err
 	}
-
-	logHTTPResponseMetadata("SRP COMPLETE", completeResponse.StatusCode, len(body))
-
-	var srpComp srpCompleteResponse
-	if err := json.Unmarshal(body, &srpComp); err != nil {
-		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("unexpected SRP complete response (HTTP %d): body is not JSON",
+			completeResponse.StatusCode)
 	}
-
-	if len(srpComp.ServiceErrors) > 0 {
-		return nil, fmt.Errorf("failed to complete SRP: %s", srpComp.ServiceErrors[0].Message)
-	}
-
 	return completeResponse, nil
 }
 
 func (dp *DevPortal) signIn(username, password string) error {
-
 	if err := dp.getHashcachHeaders(); err != nil {
 		return fmt.Errorf("failed to get hashcash headers: %v", err)
 	}
 
-	buf := new(bytes.Buffer)
-
-	json.NewEncoder(buf).Encode(&auth{
-		AccountName: username,
-		Password:    password,
-		RememberMe:  true,
-	})
-
-	req, err := http.NewRequestWithContext(dp.config.Context, "POST", loginURL, buf)
-	if err != nil {
-		return fmt.Errorf("failed to create http POST request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
-	req.Header.Set(hashcashHeader, dp.config.HashCash)
-	req.Header.Add("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json, text/javascript")
-
-	response, err := dp.Client.Do(req)
+	response, err := dp.generateSRP(username, password)
 	if err != nil {
 		return err
-	}
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
-	logHTTPResponseMetadata("POST Login", response.StatusCode, len(body))
-
-	if response.StatusCode == 503 { // try NEW SRP login
-		response, err = dp.generateSRP(username, password)
-		if err != nil {
-			return err
-		}
 	}
 
 	if response.StatusCode == 409 {
@@ -870,41 +863,16 @@ func (dp *DevPortal) signIn(username, password string) error {
 			}
 		}
 
-		code := ""
-		// USED FOR DEBUGGING
-		// cwd, err := os.Getwd()
-		// if err != nil {
-		// 	log.Error(err.Error())
-		// }
-		// cpath := filepath.Join(cwd, "..", "..", "test-caches", "CODE")
-		// fmt.Printf("Enter code in file (%s): ", cpath)
-		// for {
-		// 	codeSTR, err := os.ReadFile(cpath)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if len(codeSTR) > 0 {
-		// 		code = string(codeSTR)
-		// 		// remove code for next time
-		// 		defer func() {
-		// 			if err := os.WriteFile(cpath, []byte(""), 0660); err != nil {
-		// 				log.Error(err.Error())
-		// 			}
-		// 		}()
-		// 		break
-		// 	}
-		// }
-		if len(code) == 0 {
-			prompt := &survey.Password{
-				Message: "Please type your verification code:",
+		var code string
+		prompt := &survey.Password{
+			Message: "Please type your verification code:",
+		}
+		if err := survey.AskOne(prompt, &code); err != nil {
+			if err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
 			}
-			if err := survey.AskOne(prompt, &code); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					os.Exit(0)
-				}
-				return err
-			}
+			return err
 		}
 
 		if err := dp.verifyCode(codeType, code, phoneID); err != nil {
