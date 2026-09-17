@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -452,8 +453,16 @@ func (i *CacheImage) relativeSelectorBase() (uint64, error) {
 }
 
 func (i *CacheImage) partialRelativeSelectorBase() (uint64, error) {
-	if i.Name == "/usr/lib/libobjc.A.dylib" {
+	// Legacy optimization lookup opens libobjc's Mach-O headers.
+	// Avoid re-entering that lookup.
+	if slices.Contains(libObjCPaths[:], i.Name) {
 		return 0, nil
+	}
+	// Avoid repeating the dylib-trie lookup for unrelated images.
+	if strings.EqualFold(filepath.Base(i.Name), libObjCName) {
+		if image, err := i.cache.libObjCImage(); err == nil && image.Name == i.Name {
+			return 0, nil
+		}
 	}
 
 	return i.relativeSelectorBase()
@@ -461,7 +470,10 @@ func (i *CacheImage) partialRelativeSelectorBase() (uint64, error) {
 
 func (f *File) relativeSelectorBase() (uint64, error) {
 	f.rsBaseOnce.Do(func() {
-		if _, err := f.Image("/usr/lib/libobjc.A.dylib"); err != nil {
+		if _, err := f.libObjCImage(); err != nil {
+			if !errors.Is(err, ErrImageNotFound) {
+				f.rsBaseErr = err
+			}
 			return
 		}
 
@@ -788,7 +800,7 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.MethodsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
 		}
-		if strings.Contains(i.Name, "libobjc.A.dylib") {
+		if strings.Contains(i.Name, libObjCName) {
 			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
 				return fmt.Errorf("failed to parse objc all selectors: %v", err)
 			}

@@ -23,6 +23,13 @@ const (
 	mask uint64 = (1 << 40) - 1 // 40bit mask
 )
 
+const libObjCName = "libobjc.A.dylib"
+
+var libObjCPaths = [...]string{
+	"/usr/lib/" + libObjCName,
+	"/System/ExclaveKit/usr/lib/" + libObjCName,
+}
+
 type optFlags uint32
 
 const (
@@ -192,8 +199,22 @@ func (o *ObjCOptimizationHeader) RelativeMethodListsBaseAddress(base uint64) uin
 	return o.RelativeMethodSelectorBaseAddressOffset
 }
 
+func (f *File) libObjCImage() (*CacheImage, error) {
+	// Known install names take precedence over basename matches
+	for _, path := range libObjCPaths {
+		image, err := cacheImageByName(f, path)
+		if err == nil {
+			return image, nil
+		}
+		if !errors.Is(err, ErrImageNotFound) {
+			return nil, err
+		}
+	}
+	return cacheImageByName(f, libObjCName)
+}
+
 func (f *File) getLibObjC() (*macho.File, error) {
-	image, err := f.Image("/usr/lib/libobjc.A.dylib")
+	image, err := f.libObjCImage()
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +257,7 @@ func (f *File) getOptimizationsOld() (Optimization, error) {
 		return &opt, nil
 	}
 
-	return nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in /usr/lib/libobjc.A.dylib")
+	return nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in " + libObjCName)
 }
 
 func (f *File) GetOptimizations() (Optimization, error) {
@@ -1134,7 +1155,7 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
 
-	image, err := f.Image("/usr/lib/libobjc.A.dylib")
+	image, err := f.libObjCImage()
 	if err != nil {
 		return err
 	}
@@ -1614,7 +1635,7 @@ func (f *File) ParseObjcForImage(imageNames ...string) error {
 				return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(image.Name), err)
 			}
 		}
-		if strings.Contains(image.Name, "libobjc.A.dylib") {
+		if strings.Contains(image.Name, libObjCName) {
 			if _, err := f.GetAllObjCSelectors(false); err != nil {
 				return fmt.Errorf("failed to parse objc all selectors: %v", err)
 			}

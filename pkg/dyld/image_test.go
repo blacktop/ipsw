@@ -2,24 +2,58 @@ package dyld
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	mtypes "github.com/blacktop/go-macho/types"
 )
 
 func TestPartialRelativeSelectorBaseSkipsLibObjC(t *testing.T) {
-	img := &CacheImage{
-		Name:  "/usr/lib/libobjc.A.dylib",
-		cache: &File{IsDyld4: true},
+	for _, name := range []string{"/usr/lib/libobjc.A.dylib", "/System/ExclaveKit/usr/lib/libobjc.A.dylib"} {
+		t.Run(name, func(t *testing.T) {
+			// A nil cache detects attempts to look up selector metadata
+			img := &CacheImage{Name: name}
+			base, err := img.partialRelativeSelectorBase()
+			if err != nil || base != 0 {
+				t.Fatalf("partialRelativeSelectorBase() = %#x, %v; want 0, nil", base, err)
+			}
+		})
 	}
+}
+
+func TestPartialRelativeSelectorBaseDoesNotReadTrie(t *testing.T) {
+	f := libObjCFixture(t, "/usr/lib/libobjc.A.dylib", false)
+	want, err := f.relativeSelectorBase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdr := f.Headers[f.UUID]
+	hdr.MappingOffset = 0x1000
+	hdr.DylibsTrieAddr = 0x180000800
+	hdr.DylibsTrieSize = 16
+	f.Headers[f.UUID] = hdr
+	r := &countingReaderAt{ReaderAt: f.r[f.UUID]}
+	f.r[f.UUID] = r
+	img := &CacheImage{Name: "/usr/lib/libA.dylib", cache: f}
 
 	base, err := img.partialRelativeSelectorBase()
-	if err != nil {
-		t.Fatalf("partialRelativeSelectorBase returned error: %v", err)
+	if err != nil || base != want {
+		t.Fatalf("partialRelativeSelectorBase() = %#x, %v; want %#x, nil", base, err, want)
 	}
-	if base != 0 {
-		t.Fatalf("expected zero relative selector base, got %#x", base)
+	// Reusing the selector base must not reread the image-name trie
+	if r.reads != 0 {
+		t.Fatalf("partialRelativeSelectorBase read the cache %d times", r.reads)
 	}
+}
+
+type countingReaderAt struct {
+	io.ReaderAt
+	reads int
+}
+
+func (r *countingReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	r.reads++
+	return r.ReaderAt.ReadAt(p, off)
 }
 
 func TestRelativeSelectorBaseMissingLibObjC(t *testing.T) {
