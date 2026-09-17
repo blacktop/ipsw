@@ -24,8 +24,8 @@ dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_
 import "C"
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,15 +34,16 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 
-var xcodePaths = []string{
-	"/Applications/Xcode-beta.app",
-	"/Applications/Xcode.app",
-}
+// firstArm64eXExtractorVersion is the LC_SOURCE_VERSION major of the dsc_extractor.bundle in
+// Xcode 27.0, the first release that splits arm64e_x* caches. Xcode 26.x ships dyld-1378, which
+// rejects them with "unrecognized dyld shared cache magic".
+const firstArm64eXExtractorVersion = 27000
 
 // LibHandle represents an open handle to a library
 type LibHandle struct {
@@ -54,9 +55,6 @@ type XCodeInfoPlist struct {
 	ExtractorVersion string    `plist:"DSC Extractor Version,omitempty"`
 	DateCollected    time.Time `plist:"DateCollected,omitempty"`
 	XCodeVersion     string    `plist:"Version,omitempty"`
-}
-type XCodeAppInfoPlist struct {
-	CFBundleShortVersionString string `plist:"CFBundleShortVersionString,omitempty"`
 }
 
 // GetHandle returns a handle to a library
@@ -106,21 +104,17 @@ func (l *LibHandle) Close() error {
 
 // Split extracts all the dyld_shared_cache libraries
 func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bool) error {
-	var xcodeVersion string
-	var xcodePathProvided bool
-
-	if len(xcodePath) == 0 {
+	xcodePathProvided := len(xcodePath) > 0
+	if !xcodePathProvided {
 		var err error
 		xcodePath, err = utils.GetXCodePath()
 		if err != nil {
 			return fmt.Errorf("failed to get Xcode path: %v", err)
 		}
-		xcodePathProvided = false
-	} else {
-		if !strings.HasSuffix(xcodePath, "Contents/Developer") {
-			xcodePath = filepath.Join(xcodePath, "Contents/Developer")
-		}
-		xcodePathProvided = true
+	}
+	xcodePath = filepath.Clean(xcodePath)
+	if !strings.HasSuffix(xcodePath, "/Contents/Developer") {
+		xcodePath = filepath.Join(xcodePath, "Contents/Developer")
 	}
 
 	dscExtractorPath := filepath.Join(xcodePath, "Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
@@ -143,89 +137,15 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		return fmt.Errorf(err_msg, dscExtractorPath)
 	}
 
+	var xcodeVersion string
+	symbolsPath := destinationPath
 	if xcodeCache {
-		// get ExtractorVersion
-		extVer := "1040.2.2.0.0"
-
-		fat, err := macho.OpenFat(dscExtractor.Libname)
-		switch err {
-		case nil:
-			// successfully opened fat mach-o
-			if len(fat.Arches) > 0 {
-				if sv := fat.Arches[0].SourceVersion(); sv != nil {
-					extVer = sv.Version.String()
-				}
-			}
-			fat.Close()
-
-		case macho.ErrNotFat:
-			// fall back on thin mach-o loading
-			m, err := macho.Open(dscExtractor.Libname)
-			if err != nil {
-				return fmt.Errorf("failed to open mach-o %s, %v", dscExtractor.Libname, err)
-			}
-			if sv := m.SourceVersion(); sv != nil {
-				extVer = sv.Version.String()
-			}
-			m.Close()
-
-		default:
-			// failed to load fat mach-o
-			return fmt.Errorf("failed to open fat mach-o %s: %v", dscExtractor.Libname, err)
-		}
-
-		// get XCodeVersion
-		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
-		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")
-		data, err := os.ReadFile(xcodeContentPath)
+		xcodeApp := strings.TrimSuffix(xcodePath, "/Contents/Developer")
+		xcodeVersion, err = utils.GetXCodeVersion(xcodeApp)
 		if err != nil {
-			return fmt.Errorf("failed to read %s: %v", xcodeContentPath, err)
+			return fmt.Errorf("failed to get Xcode version of %s: %v", xcodeApp, err)
 		}
-		appInfo := XCodeAppInfoPlist{}
-		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&appInfo); err != nil {
-			return fmt.Errorf("failed to decode %s: %v", xcodeContentPath, err)
-		}
-		xcodeVersion = "14.0"
-		if len(appInfo.CFBundleShortVersionString) > 0 {
-			xcodeVersion = appInfo.CFBundleShortVersionString
-		}
-		// write Info.plist
-		infoPlistPath := filepath.Join(destinationPath, "Info.plist")
-		data, err = plist.MarshalIndent(XCodeInfoPlist{
-			ExtractorVersion: extVer,
-			DateCollected:    time.Now(),
-			XCodeVersion:     xcodeVersion,
-		}, plist.XMLFormat, "\t")
-		if err != nil {
-			return fmt.Errorf("failed to marshal Xcode cache Info.plist: %v", err)
-		}
-		if err := os.WriteFile(infoPlistPath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write %s: %v", infoPlistPath, err)
-		}
-
-		destinationPath = filepath.Join(destinationPath, "Symbols")
-
-		dscCopyPath := filepath.Join(destinationPath, "private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/")
-
-		matches, err := filepath.Glob(filepath.Join(filepath.Dir(dyldSharedCachePath), "dyld_shared_cache_*"))
-		if err != nil {
-			return fmt.Errorf("failed to glob dyld_shared_cache_*: %v", err)
-		}
-		if err := os.MkdirAll(dscCopyPath, 0750); err != nil {
-			return fmt.Errorf("failed to create output directory %s: %v", dscCopyPath, err)
-		}
-		for _, match := range matches {
-			f, err := os.Create(filepath.Join(dscCopyPath, ".copied_"+filepath.Base(match)))
-			if err != nil {
-				return fmt.Errorf("failed to create .copied_%s: %v", match, err)
-			}
-			if err := f.Close(); err != nil {
-				return fmt.Errorf("failed to close %s: %v", f.Name(), err)
-			}
-			if err := utils.Copy(match, filepath.Join(dscCopyPath, filepath.Base(match))); err != nil {
-				return fmt.Errorf("failed to copy %s to %s: %v", match, dscCopyPath, err)
-			}
-		}
+		symbolsPath = filepath.Join(destinationPath, "Symbols")
 	}
 
 	extractorProc, err := dscExtractor.GetSymbolPointer("dyld_shared_cache_extract_dylibs_progress")
@@ -236,17 +156,143 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 	dscPath := C.CString(dyldSharedCachePath)
 	defer C.free(unsafe.Pointer(dscPath))
 
-	destPath := C.CString(destinationPath)
+	destPath := C.CString(symbolsPath)
 	defer C.free(unsafe.Pointer(destPath))
 
 	result := C.dsc_extract(extractorProc, dscPath, destPath)
 	if result != 0 {
-		return fmt.Errorf("failed to run dsc_extract: returned %d", result)
+		return splitFailure(dyldSharedCachePath, dscExtractor.Libname, int(result))
+	}
+
+	if xcodeCache {
+		extractorVersion, err := extractorSourceVersion(dscExtractor.Libname)
+		if err != nil {
+			return err
+		}
+		info := XCodeInfoPlist{
+			ExtractorVersion: extractorVersion.String(),
+			DateCollected:    time.Now(),
+			XCodeVersion:     xcodeVersion,
+		}
+		err = writeDeviceSupportCache(dyldSharedCachePath, destinationPath, symbolsPath, info)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := dscExtractor.Close(); err != nil {
 		return fmt.Errorf("failed to close dylib %s: %v", dscExtractor.Libname, err)
 	}
 
+	return nil
+}
+
+// splitFailure explains a non-zero dsc_extractor result. Apple's extractor only reports failures
+// on stderr, so the cache magic and bundle version are added to make the cause visible.
+func splitFailure(dscPath, bundlePath string, result int) error {
+	msg := fmt.Sprintf("dsc_extractor.bundle %s failed to split %s: returned %d",
+		bundlePath, dscPath, result)
+	magic, err := readCacheMagic(dscPath)
+	if err != nil {
+		return fmt.Errorf("%s (%v)", msg, err)
+	}
+	version, err := extractorSourceVersion(bundlePath)
+	if err != nil {
+		return fmt.Errorf("%s (magic %q; %v)", msg, magic, err)
+	}
+	return fmt.Errorf("%s (magic %q, bundle version %s)%s",
+		msg, magic, version, splitHint(magic, version))
+}
+
+func splitHint(cacheMagic string, bundleVersion types.SrcVersion) string {
+	bundleMajor := bundleVersion >> 40
+	if bundleMajor >= firstArm64eXExtractorVersion {
+		return ""
+	}
+	if !strings.HasPrefix(cacheMagic, "dyld_v1arm64ex") {
+		return ""
+	}
+	return "; this bundle predates Xcode 27, which added support for arm64e_x* caches" +
+		" (use --xcode to select Xcode 27 or newer)"
+}
+
+// extractorSourceVersion reads the LC_SOURCE_VERSION of the dsc_extractor.bundle at bundlePath.
+func extractorSourceVersion(bundlePath string) (types.SrcVersion, error) {
+	var m *macho.File
+	fat, err := macho.OpenFat(bundlePath)
+	switch err {
+	case nil:
+		defer fat.Close()
+		if len(fat.Arches) == 0 {
+			return 0, fmt.Errorf("fat mach-o %s has no architectures", bundlePath)
+		}
+		m = fat.Arches[0].File
+	case macho.ErrNotFat:
+		m, err = macho.Open(bundlePath)
+		if err != nil {
+			return 0, fmt.Errorf("failed to open mach-o %s: %v", bundlePath, err)
+		}
+		defer m.Close()
+	default:
+		return 0, fmt.Errorf("failed to open fat mach-o %s: %v", bundlePath, err)
+	}
+	sv := m.SourceVersion()
+	if sv == nil {
+		return 0, fmt.Errorf("%s has no LC_SOURCE_VERSION", bundlePath)
+	}
+	return sv.Version, nil
+}
+
+// readCacheMagic reads only the 16-byte magic (not the full header via ReadHeader) so a
+// truncated or garbage cache still yields a useful failure message.
+func readCacheMagic(dscPath string) (string, error) {
+	f, err := os.Open(dscPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open dyld_shared_cache %s: %w", dscPath, err)
+	}
+	defer f.Close()
+
+	var m magic
+	if _, err := io.ReadFull(f, m[:]); err != nil {
+		return "", fmt.Errorf("failed to read dyld_shared_cache magic from %s: %w", dscPath, err)
+	}
+	return m.String(), nil
+}
+
+// writeDeviceSupportCache completes an Xcode "iOS DeviceSupport" layout after a successful split
+// by writing Info.plist and copying the cache files next to the extracted Symbols.
+func writeDeviceSupportCache(
+	dscPath, destinationPath, symbolsPath string, info XCodeInfoPlist,
+) error {
+	dscCopyPath := filepath.Join(symbolsPath, "private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/")
+	if err := os.MkdirAll(dscCopyPath, 0750); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", dscCopyPath, err)
+	}
+
+	data, err := plist.MarshalIndent(info, plist.XMLFormat, "\t")
+	if err != nil {
+		return fmt.Errorf("failed to marshal Xcode cache Info.plist: %v", err)
+	}
+	infoPlistPath := filepath.Join(destinationPath, "Info.plist")
+	if err := os.WriteFile(infoPlistPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %v", infoPlistPath, err)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(filepath.Dir(dscPath), "dyld_shared_cache_*"))
+	if err != nil {
+		return fmt.Errorf("failed to glob dyld_shared_cache_*: %v", err)
+	}
+	for _, match := range matches {
+		f, err := os.Create(filepath.Join(dscCopyPath, ".copied_"+filepath.Base(match)))
+		if err != nil {
+			return fmt.Errorf("failed to create .copied_%s: %v", match, err)
+		}
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("failed to close %s: %v", f.Name(), err)
+		}
+		if err := utils.Copy(match, filepath.Join(dscCopyPath, filepath.Base(match))); err != nil {
+			return fmt.Errorf("failed to copy %s to %s: %v", match, dscCopyPath, err)
+		}
+	}
 	return nil
 }
