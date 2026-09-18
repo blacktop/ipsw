@@ -17,7 +17,7 @@ require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/alecthomas/chroma/v2 v2.27.0
-	github.com/anthropics/anthropic-sdk-go v1.73.0
+	github.com/anthropics/anthropic-sdk-go v1.74.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/blacktop/arm64-cgo v1.0.72
@@ -39,7 +39,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/dominikbraun/graph v0.23.0
-	github.com/dustin/go-humanize v1.0.1
+	github.com/dustin/go-humanize v1.1.0
 	github.com/fatih/color v1.19.0
 	github.com/frida/frida-go v1.1.1-0.20260717193356-5cbe9b60fbd2
 	github.com/fsnotify/fsnotify v1.10.1
@@ -52,7 +52,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/gomarkdown/markdown v0.0.0-20260916113448-ad2c8ed2781a
+	github.com/gomarkdown/markdown v0.0.0-20260917010721-cc30ffac3c05
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
@@ -62,7 +62,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-mastodon v0.0.13
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.34.1
+	github.com/ollama/ollama v0.34.2
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
