@@ -7,11 +7,8 @@ import (
 	"testing"
 )
 
-// TestByProductTypeSortsVariantSuffixedProductTypes covers the second
-// utils.DeconstructDevice caller. ByProductType.Less builds its sort key from
-// the parsed Family/Major/Minor, so before the suffix was parsed every
-// variant-suffixed product type collapsed to the zero Device and sorted as
-// "0000" — ahead of every real device, whatever its family.
+// TestByProductTypeSortsVariantSuffixedProductTypes pins that a variant-suffixed
+// product type sorts by its parsed family and model numbers.
 func TestByProductTypeSortsVariantSuffixedProductTypes(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -24,7 +21,7 @@ func TestByProductTypeSortsVariantSuffixedProductTypes(t *testing.T) {
 			want:     []string{"iPad14,6", "iPad16,4-A", "iPhone12,1"},
 		},
 		{
-			name:     "reverse insertion order gives the same result",
+			name:     "already sorted input gives the same result",
 			products: []string{"iPad14,6", "iPad16,4-A", "iPhone12,1"},
 			want:     []string{"iPad14,6", "iPad16,4-A", "iPhone12,1"},
 		},
@@ -50,11 +47,9 @@ func TestByProductTypeSortsVariantSuffixedProductTypes(t *testing.T) {
 	}
 }
 
-// TestByProductTypeSortsEmbeddedDeviceList runs the real corpus `ipsw
-// device-list` sorts: the embedded Xcode device_traits DB, which ships 24
-// variant-suffixed product types. Before the suffix was parsed all of them
-// deconstructed to the zero Device and sorted as "0000", so every one of them
-// was hoisted to the front of the list ahead of AppleTV.
+// TestByProductTypeSortsEmbeddedDeviceList sorts the corpus `ipsw device-list`
+// sorts, the embedded Xcode device_traits DB, and pins that its
+// variant-suffixed product types sort by family rather than ahead of everything.
 func TestByProductTypeSortsEmbeddedDeviceList(t *testing.T) {
 	devices, err := GetDevices()
 	if err != nil {
@@ -73,8 +68,7 @@ func TestByProductTypeSortsEmbeddedDeviceList(t *testing.T) {
 
 	sort.Sort(ByProductType{Devices: devices})
 
-	// The first device out of the sort must be a real one, not a variant-suffixed
-	// product type that lost its identity on the way through DeconstructDevice.
+	// The first device out of the sort is the first AppleTV, not a variant.
 	var first string
 	for _, d := range devices {
 		if d.ProductType != "" {
@@ -90,13 +84,9 @@ func TestByProductTypeSortsEmbeddedDeviceList(t *testing.T) {
 	}
 }
 
-// TestByProductTypeSameModelVariantsStillTie (control) pins a limitation this
-// change does NOT remove, so it is not mistaken for one that was fixed.
-// ByProductType.Less builds its own key from Family/Major/Minor only — it never
-// reads Device.Variant — so two variants of one model still compare equal and
-// keep their input order. Green on both sides of the fix: the pair enters the
-// widened DeconstructDevice and comes back out with the same ordering. Fixing
-// it means changing xcode.go's key, which is a separate change.
+// TestByProductTypeSameModelVariantsStillTie pins that ByProductType.Less
+// treats two variants of one model as equivalent: it keys on Family/Major/Minor
+// and never reads Device.Variant, so their relative order is unspecified.
 func TestByProductTypeSameModelVariantsStillTie(t *testing.T) {
 	devices := []Device{{ProductType: "iPad16,4-B"}, {ProductType: "iPad16,4-A"}}
 	d := ByProductType{Devices: devices}

@@ -5,10 +5,9 @@ import (
 	"testing"
 )
 
-// TestDeconstructDeviceVariantSuffix pins the variant suffix Apple ships on
-// some product types ("iPad16,4-A"). DeconstructDevice().String() is how
-// SortDevices rebuilds every name it is handed, so a suffix that does not
-// round-trip is silently dropped from kernelcache filenames and IPSW folders.
+// TestDeconstructDeviceVariantSuffix pins that a product type's variant suffix
+// ("iPad16,4-A") parses and round-trips through String(), which is how
+// SortDevices rebuilds every name it is handed.
 func TestDeconstructDeviceVariantSuffix(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -73,9 +72,8 @@ func TestDeconstructDeviceVariantSuffix(t *testing.T) {
 	}
 }
 
-// TestSortDevicesPreservesVariantSuffix is the regression: before the variant
-// suffix was parsed, every "-A"/"-B" product type fell through to the zero
-// Device and came back out of SortDevices as the string "0,0".
+// TestSortDevicesPreservesVariantSuffix pins that variant-suffixed product
+// types survive SortDevices with their suffix.
 func TestSortDevicesPreservesVariantSuffix(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -104,9 +102,8 @@ func TestSortDevicesPreservesVariantSuffix(t *testing.T) {
 	}
 }
 
-// TestSortDevicesUnparsableNamesUnchanged (control) pins the pre-existing
-// behaviour for names the regex never matched: they still collapse to the zero
-// Device. The fix widens what parses, it does not change this fallback.
+// TestSortDevicesUnparsableNamesUnchanged pins that a name that is not a
+// product type collapses to the zero Device.
 func TestSortDevicesUnparsableNamesUnchanged(t *testing.T) {
 	got := SortDevices([]string{"n66ap", "UniversalMac"})
 	want := []string{"0,0", "0,0"}
@@ -116,9 +113,7 @@ func TestSortDevicesUnparsableNamesUnchanged(t *testing.T) {
 }
 
 // TestSortDevicesReverseInsertionOrder pins that the order SortDevices returns
-// does not depend on the order it was handed. The Less key gained the variant
-// suffix, and two names differing only in that suffix compared equal before, so
-// their relative order was whatever sort.Sort happened to leave behind.
+// does not depend on the order it was handed, variant suffixes included.
 func TestSortDevicesReverseInsertionOrder(t *testing.T) {
 	want := []string{"iPad16,4", "iPad16,4-A", "iPad16,4-B", "iPhone12,1"}
 
@@ -133,11 +128,9 @@ func TestSortDevicesReverseInsertionOrder(t *testing.T) {
 	}
 }
 
-// TestDevicesLessIsAStrictOrdering pins that the new sort key is a strict weak
+// TestDevicesLessIsAStrictOrdering pins that the sort key is a strict weak
 // ordering over names that differ only in their variant suffix: exactly one of
 // Less(i,j) / Less(j,i) holds, and neither holds for a device against itself.
-// On base both directions were false for every such pair, which is what made
-// the order of two variants of one model arbitrary.
 func TestDevicesLessIsAStrictOrdering(t *testing.T) {
 	a := DeconstructDevice("iPad16,4-A")
 	b := DeconstructDevice("iPad16,4-B")
@@ -156,13 +149,9 @@ func TestDevicesLessIsAStrictOrdering(t *testing.T) {
 	}
 }
 
-// TestDeconstructDeviceRoundTripsEveryRealProductType is the corpus check: every
-// product type Apple ships that DeconstructDevice claims to parse must survive
-// String(), because SortDevices rebuilds every name it is handed from the parsed
-// struct. The variant-suffixed entries here are the ones that came back "0,0".
-func TestDeconstructDeviceRoundTripsEveryRealProductType(t *testing.T) {
-	// A sample of the variant-suffixed product types the embedded Xcode
-	// device_traits DB ships, alongside plain ones for contrast.
+// TestDeconstructDeviceRoundTripsSampleProductTypes pins that a representative
+// sample of shipped product types, variant-suffixed and plain, survive String().
+func TestDeconstructDeviceRoundTripsSampleProductTypes(t *testing.T) {
 	products := []string{
 		"iPad14,3-A", "iPad14,3-B", "iPad14,6-A", "iPad14,6-B",
 		"iPad16,3-A", "iPad16,4-A", "iPad16,4-B", "iPad17,1-A", "iPad17,2-B",

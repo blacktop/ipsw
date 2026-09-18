@@ -105,10 +105,8 @@ func TestKernelCacheFileNameOnlyRetainsCollidingVariants(t *testing.T) {
 	}
 }
 
-// TestKernelCacheFileNameKeepsProductTypeVariant covers the product types Apple
-// suffixes with a variant ("iPad16,4-A"). They reach GetKernelCacheFileName
-// through utils.SortDevices, which rebuilds every name it sorts, so a suffix it
-// cannot parse is dropped and the kernelcache is written as "0,0".
+// TestKernelCacheFileNameKeepsProductTypeVariant pins that variant-suffixed
+// product types ("iPad16,4-A") keep their suffix in the kernelcache file name.
 func TestKernelCacheFileNameKeepsProductTypeVariant(t *testing.T) {
 	inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
 		SupportedProductTypes: []string{"iPad16,3-A", "iPad16,4-A"},
