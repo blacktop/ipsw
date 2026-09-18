@@ -378,8 +378,8 @@ func dscSplit(c *gin.Context) {
 		return
 	}
 
-	if err := dyld.Split(filepath.Clean(params.Path), filepath.Clean(params.Output), filepath.Clean(params.XCodePath), false); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "dyld_shared_cache splitting only works on macOS with Xcode installed"})
+	if err := dyld.Split(filepath.Clean(params.Path), filepath.Clean(params.Output), params.XCodePath, false); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("failed to split dyld_shared_cache: %v", err)})
 		return
 	}
 

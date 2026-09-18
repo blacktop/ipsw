@@ -190,10 +190,7 @@ func (f *File) ReadPointerAtAddress(address uint64) (uint64, error) {
 func (f *File) GetSubCacheExtensionFromUUID(uuid types.UUID) (string, error) {
 	for idx, sc := range f.SubCacheInfo {
 		if sc.UUID == uuid {
-			if len(sc.Extention) == 0 {
-				return fmt.Sprintf(".%d", idx), nil
-			}
-			return sc.Extention, nil
+			return subCacheSuffix(sc, idx), nil
 		}
 	}
 	return "", fmt.Errorf("failed to find subcache extension for uuid %s", uuid.String())

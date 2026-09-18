@@ -3,6 +3,8 @@
 package download
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,7 +14,25 @@ import (
 	"testing"
 
 	"github.com/99designs/keyring"
+	"github.com/blacktop/ipsw/internal/srp"
 )
+
+// syntheticSRPInit is a well-formed SRP init body; the values are arbitrary
+// but B must be non-zero so the client accepts it.
+func syntheticSRPInit(t *testing.T) string {
+	t.Helper()
+	body, err := json.Marshal(srpInitResponse{
+		Iteration: 1000,
+		Salt:      base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x11}, 32)),
+		Protocol:  string(srp.ProtocolS2K),
+		B:         base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x22}, 256)),
+		C:         "synthetic-c",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
 
 func testDevPortalWithSession(t *testing.T) *DevPortal {
 	t.Helper()
@@ -106,7 +126,7 @@ func TestDevPortalRejectedSessionStartsClean(t *testing.T) {
 		dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, []*http.Cookie{{Name: "stale", Value: "synthetic", Path: "/"}})
 		checks, signins := 0, 0
 		dp.Client.Transport = adcRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-			status := 200
+			status, body := 200, `{}`
 			switch req.Method + " " + req.URL.String() {
 			case "GET " + olympusSessionURL:
 				checks++
@@ -118,15 +138,17 @@ func TestDevPortalRejectedSessionStartsClean(t *testing.T) {
 				if dp.config.SessionID != "" || dp.config.SCNT != "" || dp.config.HashCash != "" || dp.config.HashCashBits != "" || dp.config.HashCashChallenge != "" {
 					t.Error("stale auth state retained")
 				}
-			case "POST " + loginURL:
-				signins++
+			case "POST " + initURL:
 				if req.Header.Get(hashcashHeader) != "" {
 					t.Error("stale hashcash sent")
 				}
+				body = syntheticSRPInit(t)
+			case "POST " + completeURL:
+				signins++
 			default:
 				return nil, errors.New("unexpected request")
 			}
-			return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+			return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 		})
 		var err error
 		if refresh {
@@ -194,16 +216,19 @@ func TestDevPortalVaultReadsAndNewAccount(t *testing.T) {
 			vault := &countingDevVault{Keyring: dp.Vault}
 			dp.Vault = vault
 			dp.Client.Transport = adcRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-				status := 200
-				if req.URL.String() == olympusSessionURL {
+				status, body := 200, `{}`
+				switch req.URL.String() {
+				case olympusSessionURL:
 					if mode == "new" {
 						t.Error("checked nonexistent session")
 					}
 					if mode == "expired" {
 						status = 401
 					}
+				case initURL:
+					body = syntheticSRPInit(t)
 				}
-				return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+				return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 			})
 			if err := dp.Login("synthetic@example.invalid", "synthetic-password"); err != nil {
 				t.Fatal(err)

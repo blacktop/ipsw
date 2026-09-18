@@ -355,21 +355,50 @@ type Client struct {
 	xAMK []byte
 }
 
+// PasswordProtocol selects how Apple's idmsa SRP variant derives the
+// PBKDF2 input from the account password. The server chooses one of the
+// protocols the client advertised in the init request and reports it in
+// the init response; the client must derive the proof the same way.
+type PasswordProtocol string
+
+const (
+	// ProtocolS2K feeds the raw SHA-256 digest of the password into PBKDF2.
+	ProtocolS2K PasswordProtocol = "s2k"
+	// ProtocolS2KFO feeds the lowercase hex encoding of the SHA-256 digest
+	// into PBKDF2 (legacy accounts).
+	ProtocolS2KFO PasswordProtocol = "s2k_fo"
+)
+
+// derivePassword returns the PBKDF2-derived password input for the given
+// Apple SRP password protocol.
+func derivePassword(protocol PasswordProtocol, password, salt []byte, iter int) ([]byte, error) {
+	digest := sha256.Sum256(password)
+	var input []byte
+	switch protocol {
+	case ProtocolS2K:
+		input = digest[:]
+	case ProtocolS2KFO:
+		input = []byte(hex.EncodeToString(digest[:]))
+	default:
+		return nil, fmt.Errorf("srp: unsupported password protocol %q", protocol)
+	}
+	return pbkdf2.Key(input, salt, iter, 32, sha256.New), nil
+}
+
 // NewClient constructs an SRP client instance.
-func (s *SRP) NewClient(I, p, salt []byte, iter int) (*Client, error) {
-	digest := sha256.New() // TODO: should this be s.h.New()?
-	if _, err := digest.Write(p); err != nil {
-		return nil, fmt.Errorf("srp: failed to hash password")
+func (s *SRP) NewClient(I, p, salt []byte, iter int, protocol PasswordProtocol) (*Client, error) {
+	derived, err := derivePassword(protocol, p, salt, iter)
+	if err != nil {
+		return nil, err
 	}
 	c := &Client{
 		s: s,
 		i: s.hashbyte(I),
-		p: pbkdf2.Key(digest.Sum(nil), salt, iter, 32, sha256.New),
+		p: derived,
 		a: s.a,
 		k: s.hashint(s.pf.N.Bytes(), pad(s.pf.g, s.pf.n)),
 	}
 	c.xA = s.A
-	//fmt.Printf("Client %d:\n\tA=%x\n\tk=%x", bits, c.xA, c.k)
 	return c, nil
 }
 

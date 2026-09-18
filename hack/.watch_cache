@@ -135,7 +135,10 @@
       "258b6e614b2af8820d6adacccf3b5f0eb89ed33a",
       "13275db2b50b79f6e4d798e8e5390c9ef3f03d77",
       "86f52ba2f2c1597d4d4c7450c370c8b77c38cd9f",
-      "01f33be1d1f90c41b3fc9863e9d7b481dcd71124"
+      "01f33be1d1f90c41b3fc9863e9d7b481dcd71124",
+      "45a1601fe2128f01e5e5f98002b3cf7dc2114ed4",
+      "66ae5a9db3811cfb088bcc42ebd4a8b20e253cc1",
+      "c6c32eb84a8d47e2a1967bc719db326e3f841b10"
     ],
     "fcs_keys": {
       "beta": {
@@ -218,7 +221,9 @@
       "wpewebkit-2.53.91",
       "webkitgtk-2.53.92",
       "wpewebkit-2.53.92",
-      "WebKit-7625.1.29.18.27"
+      "WebKit-7625.1.29.18.27",
+      "wpewebkit-2.54.0",
+      "webkitgtk-2.54.0"
     ]
   },
   "apple-oss-distributions/distribution-macOS": {
@@ -261,33 +266,39 @@
   "fcs_keys_beta": {
     "fcs_keys": {
       "beta": {
-        "fingerprint": "24A5430a_26A5425a_24M5361a",
-        "ios_build": "24A5430a",
-        "macos_build": "26A5425a",
-        "updated_at": "2026-09-01T03:11:02Z",
-        "visionos_build": "24M5361a"
-      },
-      "rc": {
-        "updated_at": "0001-01-01T00:00:00Z"
-      },
-      "release": {
-        "updated_at": "0001-01-01T00:00:00Z"
+        "fingerprint": "24B5084k_26B5086k_24N5088l",
+        "ios_build": "24B5084k",
+        "macos_build": "26B5086k",
+        "updated_at": "2026-09-16T21:56:17Z",
+        "visionos_build": "24N5088l"
       }
     }
   },
   "fcs_keys_rc": {
     "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
       "rc": {
         "fingerprint": "24A435_25G82_23O244",
         "ios_build": "24A435",
         "macos_build": "25G82",
         "updated_at": "2026-09-14T23:33:40Z",
         "visionos_build": "23O244"
+      },
+      "release": {
+        "updated_at": "0001-01-01T00:00:00Z"
       }
     }
   },
   "fcs_keys_stable": {
     "fcs_keys": {
+      "beta": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "rc": {
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
       "release": {
         "fingerprint": "24A437_26A428_24M362",
         "ios_build": "24A437",

@@ -2,7 +2,6 @@ package dyld
 
 import (
 	"bytes"
-	"encoding/binary"
 	"strings"
 	"testing"
 
@@ -54,20 +53,7 @@ func TestNumberedArm64eCacheSelection(t *testing.T) {
 func TestArm64eX1Magic(t *testing.T) {
 	// A synthetic header with no mappings/images exercises both NewFile's magic
 	// validation and parseCache's validation; it contains no real device data.
-	var header CacheHeader
-	copy(header.Magic[:], "dyld_v1arm64ex1")
-	header.UUID[0] = 1
-	header.MappingOffset = uint32(binary.Size(header))
-	header.CodeSignatureOffset = uint64(binary.Size(header))
-	header.CodeSignatureSize = 12
-	var data bytes.Buffer
-	if err := binary.Write(&data, binary.LittleEndian, header); err != nil {
-		t.Fatal(err)
-	}
-	if err := binary.Write(&data, binary.BigEndian, []uint32{0xfade0cc0, 12, 0}); err != nil {
-		t.Fatal(err)
-	}
-	f, err := NewFile(bytes.NewReader(data.Bytes()))
+	f, err := NewFile(bytes.NewReader(syntheticPrimaryBytes(t, layoutSelfContained)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,6 +20,7 @@ const (
 	PhaseCryptexPatch     Phase = "cryptex-patch"
 	PhaseMount            Phase = "mount"
 	PhaseDSCDiscovery     Phase = "dsc-discovery"
+	PhaseDSCValidation    Phase = "dsc-validation"
 	PhasePayloadExtract   Phase = "payload-extract"
 	PhaseCopy             Phase = "copy"
 	PhaseCleanup          Phase = "cleanup"

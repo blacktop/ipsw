@@ -74,7 +74,8 @@ and stub island symbols, works cross-platform, and produces IDA/Ghidra-ready Mac
 			return fmt.Errorf("failed to resolve path %s: %w", dscPath, err)
 		}
 
-		if viper.GetBool("dyld.split.cache") {
+		xcodeCache := viper.GetBool("dyld.split.cache")
+		if xcodeCache {
 			if len(viper.GetString("dyld.split.build")) == 0 {
 				return fmt.Errorf("--build is required when --cache is used")
 			}
@@ -116,11 +117,7 @@ and stub island symbols, works cross-platform, and produces IDA/Ghidra-ready Mac
 			output = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
 		}
 
-		if err := os.MkdirAll(output, 0750); err != nil {
-			return fmt.Errorf("failed to create output directory %s: %v", output, err)
-		}
-
 		log.Infof("Splitting to %s", output)
-		return dyld.Split(dscPath, output, xcodePath, viper.GetBool("dyld.split.cache"))
+		return dyld.Split(dscPath, output, xcodePath, xcodeCache)
 	},
 }

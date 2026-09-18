@@ -29,9 +29,6 @@ func safePrime(bits int) (*big.Int, error) {
 			return a, nil
 		}
 	}
-
-	// never reached
-	return nil, nil
 }
 
 // Return true if g is a generator for safe prime p

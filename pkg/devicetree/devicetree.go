@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -21,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
@@ -127,17 +125,7 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 
 	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
 		summary.ProductType = model
-		compatible := (*dtree)["device-tree"]["compatible"]
-		switch reflect.TypeOf(compatible).Kind() {
-		case reflect.Slice:
-			s := reflect.ValueOf(compatible)
-			for i := range s.Len() {
-				elem := s.Index(i).String()
-				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
-					summary.BoardConfig = elem
-				}
-			}
-		}
+		summary.BoardConfig = boardConfig((*dtree)["device-tree"]["compatible"], model)
 	} else {
 		return nil, fmt.Errorf("devicetree model is not a string")
 	}
@@ -283,19 +271,25 @@ func (dtree *DeviceTree) GetProductName() (string, error) {
 func (dtree *DeviceTree) GetBoardConfig() (string, error) {
 	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", model))
-		compatible := (*dtree)["device-tree"]["compatible"]
-		switch reflect.TypeOf(compatible).Kind() {
-		case reflect.Slice:
-			s := reflect.ValueOf(compatible)
-			for i := range s.Len() {
-				elem := s.Index(i).String()
-				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
-					return elem, nil
-				}
-			}
+		if board := boardConfig((*dtree)["device-tree"]["compatible"], model); board != "" {
+			return board, nil
 		}
 	}
 	return "", fmt.Errorf("failed to get board-config")
+}
+
+// boardConfig returns the root compatible entry that is neither the model nor "AppleARM" (e.g. "V63AP").
+func boardConfig(compatible any, model string) string {
+	list, ok := compatible.([]string)
+	if !ok {
+		return ""
+	}
+	for _, elem := range list {
+		if elem != "" && !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
+			return elem
+		}
+	}
+	return ""
 }
 
 // GetModel returns the device-trees model
@@ -315,106 +309,94 @@ func isZero(bytes []byte) bool {
 }
 
 func parseInt(value []byte) any {
-	if len(value) == 0 {
-		return nil
-	}
 	switch len(value) {
-	case binary.Size(uint8(0)):
-		return uint8(value[0])
-	case binary.Size(uint16(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int16(binary.LittleEndian.Uint16(value))
-		} else {
-			return uint16(binary.LittleEndian.Uint16(value))
-		}
-	case binary.Size(uint32(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int32(binary.LittleEndian.Uint32(value))
-		} else {
-			return uint32(binary.LittleEndian.Uint32(value))
-		}
-	case binary.Size(uint64(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int64(binary.LittleEndian.Uint64(value))
-		} else {
-			return uint64(binary.LittleEndian.Uint64(value))
-		}
-	default:
-		return parseValue(value)
+	case 0:
+		return nil
+	case 1, 2, 4, 8:
+		return parseNumber(value)
 	}
+	return parseValue(value)
 }
 
+// parseNumber decodes 1, 2, 4 and 8 byte little-endian integers; other sizes are returned as Data.
+func parseNumber(value []byte) any {
+	negative := bytes.HasSuffix(value, []byte("\xff"))
+	switch len(value) {
+	case 1:
+		return uint8(value[0])
+	case 2:
+		if negative {
+			return int16(binary.LittleEndian.Uint16(value))
+		}
+		return binary.LittleEndian.Uint16(value)
+	case 4:
+		if negative {
+			return int32(binary.LittleEndian.Uint32(value))
+		}
+		return binary.LittleEndian.Uint32(value)
+	case 8:
+		if negative {
+			return int64(binary.LittleEndian.Uint64(value))
+		}
+		return binary.LittleEndian.Uint64(value)
+	}
+	return Data(value)
+}
+
+// parseValue decodes a property value without a known format.
+// value must be the exact property length (without alignment padding).
 func parseValue(value []byte) any {
 	if len(value) == 0 {
 		return nil
 	}
-
-	if !bytes.HasPrefix(value, []byte("\x00")) {
-		// remove trailing NULLs
-		str := bytes.TrimRight(value[:], "\x00")
-		// value is a string
-		if utils.IsASCII(string(str)) {
-			if len(str) == 0 && len(value) <= binary.Size(uint64(0)) { // detect 0 (not empty string)
-				if i, err := binary.Uvarint(value); err > 0 {
-					return i
-				}
-			}
-			return string(str)
-		}
-		if len(value) > 4 {
-			size := binary.LittleEndian.Uint32(value[:4])
-			if size <= uint32(len(value)-4) && !bytes.Contains(value[4:4+size], []byte("\x00")) {
-				if utils.IsASCII(string(value[4 : 4+size])) {
-					return string(value[4 : 4+size])
-				}
-			}
-		}
-		parts := bytes.Split(str, []byte("\x00"))
-		if len(parts) > 1 { // value is a string array
-			var values []string
-			for _, part := range parts {
-				if len(string(part)) > 0 {
-					if utils.IsASCII(string(part)) {
-						values = append(values, string(part))
-					} // else {
-					// 	values = append(values, base64.StdEncoding.EncodeToString(value))
-					// }
-				}
-			}
-			if len(values) > 0 {
-				return values
-			}
-		}
-	}
-
 	if isZero(value) {
 		return 0
 	}
-
-	switch len(value) {
-	case binary.Size(uint8(0)):
-		return uint8(value[0])
-	case binary.Size(uint16(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int16(binary.LittleEndian.Uint16(value))
-		} else {
-			return uint16(binary.LittleEndian.Uint16(value))
-		}
-	case binary.Size(uint32(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int32(binary.LittleEndian.Uint32(value))
-		} else {
-			return uint32(binary.LittleEndian.Uint32(value))
-		}
-	case binary.Size(uint64(0)):
-		if bytes.HasSuffix(value, []byte("\xff")) {
-			return int64(binary.LittleEndian.Uint64(value))
-		} else {
-			return uint64(binary.LittleEndian.Uint64(value))
-		}
+	if str, ok := parseString(value); ok {
+		return str
 	}
-	// value is data
-	return base64.StdEncoding.EncodeToString(value)
+	if list, ok := parseStringList(value); ok {
+		return list
+	}
+	return parseNumber(value)
+}
+
+// parseString accepts NUL-terminated text and unterminated printable bytes (e.g. FourCC
+// tags). DeviceTree strings carry exactly one NUL; more trailing NULs mean a small
+// integer or a fixed-width buffer, which must hold at least 4 characters.
+func parseString(value []byte) (string, bool) {
+	str := bytes.TrimRight(value, "\x00")
+	trailing := len(value) - len(str)
+	switch {
+	case trailing == 0:
+		return string(value), isPrintable(value)
+	case len(str) == 0 || !isPrintable(str):
+		return "", false
+	case trailing == 1:
+		return string(str), true
+	default:
+		return string(str), len(value) > 4 && len(str) >= 4
+	}
+}
+
+// parseStringList accepts NUL-separated text with no empty entries, so no bytes are dropped.
+func parseStringList(value []byte) ([]string, bool) {
+	trimmed := bytes.TrimRight(value, "\x00")
+	if len(trimmed) == len(value) {
+		return nil, false
+	}
+	parts := bytes.Split(trimmed, []byte("\x00"))
+	if len(parts) < 2 {
+		return nil, false
+	}
+	list := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if len(part) == 0 || !isPrintable(part) {
+			return nil, false
+		}
+		list = append(list, string(part))
+	}
+	return list, true
 }
 
 func parseOffSz(value []byte) any {
@@ -543,83 +525,62 @@ func parseNode(buffer io.Reader) (Node, error) {
 	return node, nil
 }
 
-func parseNodeProperty(buffer io.Reader, propName string) (string, any, error) {
-	var nProp NodeProperty
-	// Read a NodeProperty from the buffer
-	if err := binary.Read(buffer, binary.LittleEndian, &nProp); err != nil {
-		return "", nil, err
-	}
-	// 4 byte align the length
-	nProp.Length &= math.MaxInt32
-	if (nProp.Length % 4) != 0 {
-		nProp.Length = nProp.Length + (4 - (nProp.Length % 4))
-	}
-	// Read property value from the buffer
-	dat := make([]byte, nProp.Length)
-	if err := binary.Read(buffer, binary.LittleEndian, &dat); err != nil {
-		return "", nil, err
-	}
-
-	key := string(bytes.TrimRight(nProp.Name[:], "\x00"))
-	var value any
-	switch key {
-	case "AAPL,phandle":
-		value = parseInt(dat)
-	case "platform-name":
-		value = string(bytes.TrimRight(dat[:], "\x00"))
-	case "pmap-io-ranges":
-		value = parsePmapIORanges(dat)
-	case "ps-regs":
-		value = parsePmgrMap(dat)
-	case "devices":
-		value = parsePmgrDevices(dat)
-	case "regions":
-		value = parseRegions(dat)
-	case "reg-private":
-		value = parseAddr(dat)
-	case "value":
-		if strings.HasPrefix(propName, "__MACHO") {
-			value = parseOffSz(dat)
-		} else {
-			value = parseValue(dat)
-		}
-	case "reg":
-		value = parseReg(dat)
-	case "uuid":
-		if len(dat) == 16 {
-			value = types.UUID(dat).String()
-		} else {
-			value = parseValue(dat)
-		}
-	default:
-		value = parseValue(dat)
-	}
-
-	return key, value, nil
+// rawProperty is a property value as stored, before decoding.
+type rawProperty struct {
+	key      string
+	template bool
+	value    []byte
 }
 
+func readNodeProperty(buffer io.Reader) (rawProperty, error) {
+	var nProp NodeProperty
+	if err := binary.Read(buffer, binary.LittleEndian, &nProp); err != nil {
+		return rawProperty{}, err
+	}
+	length := nProp.Length & math.MaxInt32
+	// values are padded to a 4 byte boundary; the padding is not part of the value
+	dat := make([]byte, (length+3)&^3)
+	if _, err := io.ReadFull(buffer, dat); err != nil {
+		return rawProperty{}, err
+	}
+	return rawProperty{
+		key:      string(bytes.TrimRight(nProp.Name[:], "\x00")),
+		template: nProp.Length&^math.MaxInt32 != 0,
+		value:    dat[:length],
+	}, nil
+}
+
+func (p rawProperty) parse(nodeName string) any {
+	if p.template {
+		return parseTemplate(p.value)
+	}
+	return parseProperty(p.key, nodeName, p.value)
+}
+
+// getProperties reads every property before decoding, because decoders can depend on the
+// node name and "name" is not necessarily the first property.
 func getProperties(buffer io.Reader, node Node) (string, DeviceTree, error) {
-
 	var nodeName string
-	props := Properties{}
-
+	var raw []rawProperty
 	for range int(node.NumProperties) {
-		key, value, err := parseNodeProperty(buffer, nodeName)
+		prop, err := readNodeProperty(buffer)
 		if err != nil {
 			return "", DeviceTree{}, err
 		}
-		// log.WithFields(log.Fields{"key": key, "value": value}).Debug("extracted property")
-		if strings.EqualFold("name", key) {
-			if str, ok := value.(string); ok {
-				nodeName = str
-			} else {
-				return "", DeviceTree{}, fmt.Errorf("failed to assigned nodeName to: %#v", value)
+		if strings.EqualFold("name", prop.key) {
+			name := bytes.TrimRight(prop.value, "\x00")
+			if len(name) == 0 || !isPrintable(name) {
+				return "", DeviceTree{}, fmt.Errorf("invalid node name: expected non-empty printable text")
 			}
-		} else {
-			props[key] = value
+			nodeName = string(name)
+			continue
 		}
+		raw = append(raw, prop)
 	}
-
+	props := Properties{}
+	for _, prop := range raw {
+		props[prop.key] = prop.parse(nodeName)
+	}
 	return nodeName, DeviceTree{nodeName: props}, nil
 }
 
