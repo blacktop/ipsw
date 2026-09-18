@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Audit pkg/info/data/ipsw_db.json against Apple's own BuildManifests.
+
+For each requested device this partial-zip pulls just BuildManifest.plist from
+the signed IPSW (a few hundred KB, not the whole image) and compares every
+build identity against our device DB:
+
+    ApBoardID  -> boards[<board>].board_id
+    ApChipID   -> boards[<board>].cpuid
+    BbChipID   -> boards[<board>].bbid      (only when we record one)
+    KernelCache-> boards[<board>].kc_type
+
+A manifest is audited in full, so one UniversalMac pull covers every Mac board
+and one iPhone pull covers every board in that family.
+
+Usage:
+    hack/make/device-db-audit                      # every device with a signed IPSW
+    hack/make/device-db-audit iPhone18,1 Mac17,6   # just these
+    hack/make/device-db-audit --json report.json
+"""
+
+import argparse
+import json
+import os
+import pathlib
+import plistlib
+import re
+import subprocess
+import sys
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
+DB_PATH = REPO / "pkg/info/data/ipsw_db.json"
+CACHE = pathlib.Path(os.environ.get("IPSW_AUDIT_CACHE", "/tmp/ipsw-db-audit"))
+
+# Platforms Apple publishes restore images for; the rest (watchOS, audioOS)
+# have no public IPSW to audit against.
+AUDITABLE_TYPES = {"ios", "ipados", "tvos", "macos", "visionos"}
+
+# Build identities that describe a restore component rather than a real board.
+PSEUDO_BOARDS = {"bootabilityap"}
+
+
+def ipsw_cmd() -> list[str]:
+    if os.environ.get("IPSW_BIN"):
+        return [os.environ["IPSW_BIN"]]
+    return ["go", "run", "./cmd/ipsw"]
+
+
+def pull_manifest(device: str, timeout: int) -> pathlib.Path | None:
+    """Partial-zip BuildManifest.plist for device's latest signed IPSW."""
+    out = CACHE / device.replace(",", "_")
+    cached = sorted(out.glob("*/BuildManifest.plist"))
+    if cached:
+        return cached[-1]
+    out.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ipsw_cmd()
+        + [
+            "download", "ipsw",
+            "--device", device,
+            "--latest",
+            "--pattern", "BuildManifest.plist",
+            "--flat",
+            "--output", str(out),
+        ],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    found = sorted(out.glob("*/BuildManifest.plist"))
+    return found[-1] if found else None
+
+
+def as_int(value):
+    try:
+        return int(str(value), 16)
+    except (TypeError, ValueError):
+        return None
+
+
+def identities(manifest: pathlib.Path):
+    """Yield (board, board_id, chip_id, bb_chip_id, kc_type) per build identity."""
+    with manifest.open("rb") as fh:
+        bm = plistlib.load(fh)
+    seen = set()
+    for bi in bm.get("BuildIdentities", []):
+        board = (bi.get("Info", {}).get("DeviceClass") or "").lower()
+        kc = bi.get("Manifest", {}).get("KernelCache", {}).get("Info", {}).get("Path", "")
+        kc_type = ""
+        m = re.search(r"kernelcache\.(?:release|research|development)\.(.+)$", kc)
+        if m:
+            kc_type = m.group(1)
+        row = (board, bi.get("ApBoardID"), bi.get("ApChipID"), bi.get("BbChipID"), kc_type)
+        if board and row not in seen:
+            seen.add(row)
+            yield row
+
+
+def audit(db: dict, manifest: pathlib.Path, source: str) -> list[dict]:
+    # index our boards by lowercased name -> (product, board name, board dict)
+    index = {}
+    for product, dev in db.items():
+        for bname, board in (dev.get("boards") or {}).items():
+            index.setdefault(bname.lower(), []).append((product, bname, board))
+
+    findings = []
+    for board, bdid, cpid, bbid, kc_type in identities(manifest):
+        if board in PSEUDO_BOARDS:
+            continue
+        entries = index.get(board)
+        if not entries:
+            findings.append({"kind": "board-missing", "board": board, "board_id": bdid,
+                             "cpuid": cpid, "source": source})
+            continue
+        for product, bname, ours in entries:
+            def note(kind, field, got, want):
+                findings.append({"kind": kind, "product": product, "board": bname,
+                                 "field": field, "ours": got, "apple": want,
+                                 "source": source})
+
+            if as_int(ours.get("board_id")) != as_int(bdid):
+                note("mismatch", "board_id", ours.get("board_id"), bdid)
+            if as_int(ours.get("cpuid")) != as_int(cpid):
+                note("mismatch", "cpuid", ours.get("cpuid"), cpid)
+            if ours.get("bbid") and as_int(ours.get("bbid")) != as_int(bbid):
+                note("mismatch", "bbid", ours.get("bbid"), bbid)
+            if kc_type and ours.get("kc_type") and ours["kc_type"] != kc_type:
+                note("mismatch", "kc_type", ours.get("kc_type"), kc_type)
+    return findings
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("devices", nargs="*", help="product types to audit (default: all auditable)")
+    ap.add_argument("--json", metavar="PATH", help="write findings as JSON")
+    ap.add_argument("--timeout", type=int, default=300, help="per-device pull timeout (seconds)")
+    args = ap.parse_args()
+
+    db = json.loads(DB_PATH.read_text())
+    if args.devices:
+        targets = args.devices
+    else:
+        targets = sorted(p for p, d in db.items() if (d.get("type") or "") in AUDITABLE_TYPES)
+
+    findings, audited, skipped = [], [], []
+    for device in targets:
+        try:
+            manifest = pull_manifest(device, args.timeout)
+        except subprocess.TimeoutExpired:
+            skipped.append((device, "timeout"))
+            print(f"  ! {device}: timed out", file=sys.stderr)
+            continue
+        if manifest is None:
+            skipped.append((device, "no signed IPSW"))
+            print(f"  - {device}: no signed IPSW", file=sys.stderr)
+            continue
+        found = audit(db, manifest, device)
+        audited.append(device)
+        findings.extend(found)
+        print(f"  {'✗' if found else '✓'} {device}: {len(found)} finding(s)", file=sys.stderr)
+
+    print(f"\naudited {len(audited)} device(s), skipped {len(skipped)}, {len(findings)} finding(s)")
+    for f in findings:
+        if f["kind"] == "board-missing":
+            print(f"  MISSING BOARD {f['board']} (board_id={f['board_id']} cpuid={f['cpuid']})"
+                  f"  [{f['source']}]")
+        else:
+            print(f"  {f['product']:<18} {f['board']:<12} {f['field']:<9}"
+                  f" ours={f['ours']!r} apple={f['apple']!r}  [{f['source']}]")
+
+    if args.json:
+        pathlib.Path(args.json).write_text(json.dumps(
+            {"audited": audited, "skipped": skipped, "findings": findings}, indent=2))
+
+    return 1 if findings else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
