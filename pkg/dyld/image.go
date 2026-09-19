@@ -731,16 +731,27 @@ func (i *CacheImage) SegmentRebases(seg *macho.Segment) ([]Rebase, error) {
 	if mapping.SlideInfoOffset == 0 {
 		return nil, nil
 	}
+	offset := seg.Addr - mapping.Address
+	if seg.Filesz > mapping.Size-offset {
+		return nil, fmt.Errorf("segment %s: file size %#x exceeds the %#x bytes left in its mapping",
+			seg.Name, seg.Filesz, mapping.Size-offset)
+	}
 	pageSize := uint64(i.cache.SlideInfo.GetPageSize())
-	start, end := slidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
+	start, end := slidePagesForRange(offset, seg.Filesz, pageSize)
 	rebases, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
 	if err != nil {
 		return nil, err
 	}
-	// slide pages are shared with neighboring segments
+	// slide pages are shared with neighboring segments, so keep only pointers that
+	// lie entirely inside this segment's file contents
+	pointerSize := uint64(8)
+	if !i.cache.Is64bit() {
+		pointerSize = 4
+	}
+	segEnd := seg.Addr + seg.Filesz
 	var inSegment []Rebase
 	for _, rebase := range rebases {
-		if seg.Addr <= rebase.CacheVMAddress && rebase.CacheVMAddress < seg.Addr+seg.Filesz {
+		if seg.Addr <= rebase.CacheVMAddress && rebase.CacheVMAddress+pointerSize <= segEnd {
 			inSegment = append(inSegment, rebase)
 		}
 	}

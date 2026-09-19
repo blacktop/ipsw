@@ -7,6 +7,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/blacktop/go-macho"
 	mtypes "github.com/blacktop/go-macho/types"
 )
 
@@ -160,6 +161,57 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 				if sym.Name != names[n] || sym.Value != values[n] {
 					t.Errorf("symbol %d = %s %#x, want %s %#x", n, sym.Name, sym.Value, names[n], values[n])
 				}
+			}
+		})
+	}
+}
+
+func TestSegmentRebases(t *testing.T) {
+	// one v5 page with two 8-byte pointers at offsets 0x18 and 0x20
+	hdr := CacheSlideInfo5{Version: 5, PageSize: 0x1000, PageStartsCount: 2, ValueAdd: 0x180000000}
+	var info bytes.Buffer
+	for _, v := range []any{hdr, []uint16{0x18, DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE}} {
+		if err := binary.Write(&info, binary.LittleEndian, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mapping := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
+		Address: hdr.ValueAdd, Size: 0x2000, FileOffset: 0x1000,
+		SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len()),
+	}}
+	data := make([]byte, 0x3000)
+	copy(data[mapping.SlideInfoOffset:], info.Bytes())
+	binary.LittleEndian.PutUint64(data[0x1018:], 0x1234|1<<52)
+	binary.LittleEndian.PutUint64(data[0x1020:], 0x5678)
+	f := fileReading(data)
+	header := CacheHeader{}
+	copy(header.Magic[:], "dyld_v1  arm64e")
+	f.Headers = map[mtypes.UUID]CacheHeader{f.UUID: header}
+	f.MappingsWithSlideInfo = map[mtypes.UUID]cacheMappingsWithSlideInfo{f.UUID: {mapping}}
+	f.SlideInfo = hdr
+	img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
+
+	for _, tt := range []struct {
+		name    string
+		filesz  uint64
+		want    int
+		wantErr bool
+	}{
+		{name: "both pointers fit", filesz: 0x28, want: 2},
+		{name: "pointer straddling the end is dropped", filesz: 0x24, want: 1},
+		{name: "segment past its mapping", filesz: 0x3000, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			seg := &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__DATA", Addr: mapping.Address, Filesz: tt.filesz}}
+			rebases, err := img.SegmentRebases(seg)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("SegmentRebases(filesz %#x) returned %d rebases, want error", tt.filesz, len(rebases))
+				}
+				return
+			}
+			if err != nil || len(rebases) != tt.want {
+				t.Fatalf("SegmentRebases(filesz %#x) = %d rebases, %v; want %d", tt.filesz, len(rebases), err, tt.want)
 			}
 		})
 	}
