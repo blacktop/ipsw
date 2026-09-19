@@ -24,7 +24,7 @@ require (
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-download v0.2.8
 	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.283
+	github.com/blacktop/go-macho v1.1.284
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.26
 	github.com/blacktop/lzfse-cgo v1.2.0
@@ -73,7 +73,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/twmb/murmur3 v1.2.0
-	github.com/ulikunitz/xz v0.5.16
+	github.com/ulikunitz/xz v0.5.17
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
 	github.com/vbauerster/cupwriter v0.0.4
 	github.com/vbauerster/mpb/v8 v8.16.1
