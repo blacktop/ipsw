@@ -53,37 +53,50 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 	}
 	defer f.Close()
 
-	mm, err := macho.NewFile(f)
+	exported, err := macho.NewFile(f)
+	if err != nil {
+		return err
+	}
+	image, err := dsc.GetImageContainingTextAddr(exported.GetBaseAddress())
+	if err != nil {
+		return fmt.Errorf("failed to find cache image for %s: %v", machoPath, err)
+	}
+	// export pads segments to page size, so their VM ranges can overlap; the cache
+	// image carries the true extents
+	cached, err := image.GetPartialMacho()
 	if err != nil {
 		return err
 	}
 
-	for _, seg := range mm.Segments() {
+	pageSize := uint64(dsc.SlideInfo.GetPageSize())
+	for _, seg := range cached.Segments() {
+		if seg.Filesz == 0 {
+			continue
+		}
 		uuid, mapping, err := dsc.GetMappingForVMAddress(seg.Addr)
 		if err != nil {
 			return err
 		}
-
 		if mapping.SlideInfoOffset == 0 {
 			continue
 		}
+		out := exported.Segment(seg.Name)
+		if out == nil || out.Addr != seg.Addr || out.Filesz < seg.Filesz {
+			return fmt.Errorf("exported segment %s does not match the cache layout", seg.Name)
+		}
 
-		startAddr := seg.Addr - mapping.Address
-		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(dsc.SlideInfo.GetPageSize())
-
-		start := startAddr / uint64(dsc.SlideInfo.GetPageSize())
-		end := endAddr / uint64(dsc.SlideInfo.GetPageSize())
-
+		start, end := dyld.SlidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
 		rebases, err := dsc.GetRebaseInfoForPages(uuid, mapping, start, end)
 		if err != nil {
 			return err
 		}
 
 		for _, rebase := range rebases {
-			off, err := mm.GetOffset(rebase.CacheVMAddress)
-			if err != nil {
+			// slide pages are shared with neighboring segments
+			if rebase.CacheVMAddress < seg.Addr || rebase.CacheVMAddress >= seg.Addr+seg.Filesz {
 				continue
 			}
+			off := out.Offset + (rebase.CacheVMAddress - seg.Addr)
 			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
 				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
 			}

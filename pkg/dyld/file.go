@@ -912,6 +912,25 @@ func (f *File) ParseFunctionVariantInfo() error {
 	return fmt.Errorf("no function variant info found in DSC %s", f.UUID)
 }
 
+// SlidePagesForRange returns the half-open slide page range [start, end) that covers
+// size bytes starting at offset within a mapping.
+func SlidePagesForRange(offset, size, pageSize uint64) (start, end uint64) {
+	return offset / pageSize, (offset+size-1)/pageSize + 1
+}
+
+// slidePageRange clamps a half-open page range to the page-starts table; end == 0 selects
+// every page.
+func slidePageRange(start, end uint64, count int) (uint64, uint64, error) {
+	pages := uint64(count)
+	if end == 0 || end > pages {
+		end = pages
+	}
+	if start > end {
+		return 0, 0, fmt.Errorf("slide page range [%d, %d) starts past the last page %d", start, end, pages)
+	}
+	return start, end, nil
+}
+
 // GetSlideInfo returns just the slideinfo header info
 func (f *File) GetSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo) error {
 	_, err := f.parseSlideInfo(uuid, mapping, false, false, 0, 0)
@@ -924,7 +943,7 @@ func (f *File) DumpSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInf
 	return err
 }
 
-// GetRebaseInfoForPages returns an offset to rebase address map for a given page index range
+// GetRebaseInfoForPages returns the rebases in slide pages [start, end); end == 0 selects every page
 func (f *File) GetRebaseInfoForPages(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo, start, end uint64) ([]Rebase, error) {
 	return f.parseSlideInfo(uuid, mapping, false, true, start, end)
 }
@@ -1020,8 +1039,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		if endPage == 0 || endPage > uint64(len(starts)-1) {
-			endPage = uint64(len(starts) - 1) // set end page to MAX
+		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		if err != nil {
+			return nil, err
 		}
 
 		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
@@ -1125,8 +1145,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		if endPage == 0 || endPage > uint64(len(starts)-1) {
-			endPage = uint64(len(starts) - 1) // set end page to MAX
+		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		if err != nil {
+			return nil, err
 		}
 
 		for i, start := range starts[startPage:endPage] {
@@ -1226,8 +1247,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		if endPage == 0 { // set end page to MAX
-			endPage = uint64(len(starts) - 1)
+		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		if err != nil {
+			return nil, err
 		}
 
 		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
@@ -1326,8 +1348,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		if endPage == 0 || endPage > uint64(len(starts)-1) {
-			endPage = uint64(len(starts) - 1) // set end page to MAX
+		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		if err != nil {
+			return nil, err
 		}
 
 		for i, start := range starts[startPage:endPage] {

@@ -728,22 +728,19 @@ func (i *CacheImage) ParseSlideInfo() error {
 		return err
 	}
 
+	pageSize := uint64(i.cache.SlideInfo.GetPageSize())
 	for _, seg := range m.Segments() {
+		if seg.Filesz == 0 {
+			continue
+		}
 		uuid, mapping, err := i.cache.GetMappingForVMAddress(seg.Addr)
 		if err != nil {
 			return err
 		}
-
 		if mapping.SlideInfoOffset == 0 {
 			continue
 		}
-
-		startAddr := seg.Addr - mapping.Address
-		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(i.cache.SlideInfo.GetPageSize())
-
-		start := startAddr / uint64(i.cache.SlideInfo.GetPageSize())
-		end := endAddr / uint64(i.cache.SlideInfo.GetPageSize())
-
+		start, end := SlidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
 		rs, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
 		if err != nil {
 			return err
