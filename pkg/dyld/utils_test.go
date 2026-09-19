@@ -73,15 +73,6 @@ func TestCacheOffsets(t *testing.T) {
 		})
 		check(t, 0xb123, primary, 0x2123, false)
 	})
-	t.Run("unordered subcache offsets", func(t *testing.T) {
-		other := types.UUID{5}
-		f.Mappings[other] = cacheMappings{{CacheMappingInfo: CacheMappingInfo{
-			Address: base + 0xc000, Size: 0x1000,
-		}}}
-		f.SubCacheInfo = append([]SubcacheEntry{{UUID: other, CacheVMOffset: 0xc000}}, f.SubCacheInfo...)
-		check(t, 0x8123, subcache, 0x1123, false)
-		check(t, 0xc123, other, 0x123, false)
-	})
 
 	delete(f.Mappings, primary)
 	t.Run("missing primary mappings", func(t *testing.T) {

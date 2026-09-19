@@ -3,7 +3,6 @@ package dyld
 import (
 	"encoding/binary"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
@@ -111,44 +110,38 @@ func (f *File) GetCacheOffsetFromAddress(addr uint64) (types.UUID, uint64, error
 	return types.UUID{}, 0, fmt.Errorf("address %#x not within any sub cache VM offset range", addr)
 }
 
-// GetCacheVMAddress resolves an offset from the shared cache base to its mapped address
+// GetCacheVMAddress resolves an offset from the shared cache base to its mapped address.
+// Single-file caches have no subcache entries, so ownership is decided by the mappings:
+// the primary cache first, then each subcache in header order. The .symbols file is
+// never mapped and is not consulted.
 func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
-	mappings := f.Mappings[f.UUID]
-	if len(mappings) == 0 {
+	primary := f.Mappings[f.UUID]
+	if len(primary) == 0 {
 		return types.UUID{}, 0, fmt.Errorf("primary cache has no mappings")
 	}
-	base := mappings[0].Address
+	base := primary[0].Address
 	address := base + offset
 	if address < base {
 		return types.UUID{}, 0, fmt.Errorf("cache VM offset %#x overflows base address %#x", offset, base)
 	}
-	// Subcache offsets narrow the search; mappings still determine ownership
-	uuid := f.UUID
-	if len(f.SubCacheInfo) > 0 && offset >= f.SubCacheInfo[0].CacheVMOffset {
-		idx := sort.Search(len(f.SubCacheInfo), func(i int) bool {
-			return f.SubCacheInfo[i].CacheVMOffset > offset
-		})
-		if idx > 0 {
-			uuid = f.SubCacheInfo[idx-1].UUID
-			mappings = f.Mappings[uuid]
+	if mappingsContain(primary, address) {
+		return f.UUID, address, nil
+	}
+	for _, sub := range f.SubCacheInfo {
+		if mappingsContain(f.Mappings[sub.UUID], address) {
+			return sub.UUID, address, nil
 		}
 	}
-	if uuid != f.symUUID {
-		for _, mapping := range mappings {
-			if mapping.Address <= address && address < mapping.Address+mapping.Size {
-				return uuid, address, nil
-			}
+	return types.UUID{}, 0, fmt.Errorf("cache VM offset %#x (address %#x) not within any mapping", offset, address)
+}
+
+func mappingsContain(mappings cacheMappings, address uint64) bool {
+	for _, mapping := range mappings {
+		if mapping.Address <= address && address < mapping.Address+mapping.Size {
+			return true
 		}
 	}
-	uuid, _, err := f.GetOffset(address)
-	if err != nil {
-		return types.UUID{}, 0, fmt.Errorf("failed to resolve cache VM offset %#x: %w", offset, err)
-	}
-	// The .symbols subcache is not mapped into the shared cache
-	if uuid == f.symUUID {
-		return types.UUID{}, 0, fmt.Errorf("cache VM offset %#x refers to the unmapped symbols file", offset)
-	}
-	return uuid, address, nil
+	return false
 }
 
 // GetMappingForOffsetForUUID returns the mapping containing a given file offset for a given cache UUID

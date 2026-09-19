@@ -25,11 +25,6 @@ const (
 
 const libObjCName = "libobjc.A.dylib"
 
-var libObjCPaths = [...]string{
-	"/usr/lib/" + libObjCName,
-	"/System/ExclaveKit/usr/lib/" + libObjCName,
-}
-
 type optFlags uint32
 
 const (
@@ -199,16 +194,11 @@ func (o *ObjCOptimizationHeader) RelativeMethodListsBaseAddress(base uint64) uin
 	return o.RelativeMethodSelectorBaseAddressOffset
 }
 
+// libObjCImage finds libobjc by its usual install name, falling back to a basename
+// search for caches that relocate it (ExclaveKit ships it under /System/ExclaveKit).
 func (f *File) libObjCImage() (*CacheImage, error) {
-	// Known install names take precedence over basename matches
-	for _, path := range libObjCPaths {
-		image, err := cacheImageByName(f, path)
-		if err == nil {
-			return image, nil
-		}
-		if !errors.Is(err, ErrImageNotFound) {
-			return nil, err
-		}
+	if image, err := cacheImageByName(f, "/usr/lib/"+libObjCName); err == nil {
+		return image, nil
 	}
 	return cacheImageByName(f, libObjCName)
 }

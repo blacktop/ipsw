@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -453,18 +452,10 @@ func (i *CacheImage) relativeSelectorBase() (uint64, error) {
 }
 
 func (i *CacheImage) partialRelativeSelectorBase() (uint64, error) {
-	// Legacy optimization lookup opens libobjc's Mach-O headers.
-	// Avoid re-entering that lookup.
-	if slices.Contains(libObjCPaths[:], i.Name) {
+	// resolving the selector base opens libobjc; never re-enter from libobjc itself
+	if filepath.Base(i.Name) == libObjCName {
 		return 0, nil
 	}
-	// Avoid repeating the dylib-trie lookup for unrelated images.
-	if strings.EqualFold(filepath.Base(i.Name), libObjCName) {
-		if image, err := i.cache.libObjCImage(); err == nil && image.Name == i.Name {
-			return 0, nil
-		}
-	}
-
 	return i.relativeSelectorBase()
 }
 
