@@ -236,7 +236,7 @@ var MachoCmd = &cobra.Command{
 							return fmt.Errorf("failed to export entry MachO %s; %v", image.Name, err)
 						}
 
-						if err := rebaseMachO(f, fname); err != nil {
+						if err := rebaseMachO(f, image, fname); err != nil {
 							return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
 						}
 						if !dumpALL {

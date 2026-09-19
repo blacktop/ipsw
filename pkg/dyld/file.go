@@ -908,15 +908,15 @@ func (f *File) ParseFunctionVariantInfo() error {
 	return fmt.Errorf("no function variant info found in DSC %s", f.UUID)
 }
 
-// SlidePagesForRange returns the half-open slide page range [start, end) that covers
+// slidePagesForRange returns the half-open slide page range [start, end) that covers
 // size bytes starting at offset within a mapping.
-func SlidePagesForRange(offset, size, pageSize uint64) (start, end uint64) {
+func slidePagesForRange(offset, size, pageSize uint64) (start, end uint64) {
 	return offset / pageSize, (offset+size-1)/pageSize + 1
 }
 
-// slidePageRange clamps a half-open page range to the page-starts table; end == 0 selects
+// clampSlidePages clamps a half-open page range to the page-starts table; end == 0 selects
 // every page.
-func slidePageRange(start, end uint64, count int) (uint64, uint64, error) {
+func clampSlidePages(start, end uint64, count int) (uint64, uint64, error) {
 	pages := uint64(count)
 	if end == 0 || end > pages {
 		end = pages
@@ -1035,7 +1035,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
@@ -1141,7 +1141,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
@@ -1243,7 +1243,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
@@ -1344,7 +1344,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		startPage, endPage, err := slidePageRange(startPage, endPage, len(starts))
+		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
@@ -1378,7 +1378,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				if pointer.Authenticated() {
 					targetValue = slideInfo.ValueAdd + pointer.Value()
 				} else {
-					targetValue = slideInfo.ValueAdd + pointer.SignExtend51()
+					targetValue = slideInfo.ValueAdd + pointer.RegularTarget()
 				}
 
 				if dump {

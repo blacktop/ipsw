@@ -3,13 +3,10 @@ package dyld
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 	"testing"
-
-	"github.com/blacktop/go-macho/types"
 )
 
-func TestSlidePagesForRange(t *testing.T) {
+func TestSlidePagesForRangeHelper(t *testing.T) {
 	for _, tt := range []struct {
 		name               string
 		offset, size       uint64
@@ -22,16 +19,16 @@ func TestSlidePagesForRange(t *testing.T) {
 		{name: "aligned end excludes the next page", offset: 0x3000, size: 0x2000, wantStart: 3, wantEnd: 5},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			start, end := SlidePagesForRange(tt.offset, tt.size, 0x1000)
+			start, end := slidePagesForRange(tt.offset, tt.size, 0x1000)
 			if start != tt.wantStart || end != tt.wantEnd {
-				t.Fatalf("SlidePagesForRange(%#x, %#x) = [%d, %d), want [%d, %d)",
+				t.Fatalf("slidePagesForRange(%#x, %#x) = [%d, %d), want [%d, %d)",
 					tt.offset, tt.size, start, end, tt.wantStart, tt.wantEnd)
 			}
 		})
 	}
 }
 
-func TestSlidePageRange(t *testing.T) {
+func TestClampSlidePages(t *testing.T) {
 	for _, tt := range []struct {
 		name               string
 		start, end         uint64
@@ -45,15 +42,15 @@ func TestSlidePageRange(t *testing.T) {
 		{name: "start past the table", start: 5, end: 6, count: 4, wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			start, end, err := slidePageRange(tt.start, tt.end, tt.count)
+			start, end, err := clampSlidePages(tt.start, tt.end, tt.count)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("slidePageRange(%d, %d, %d) = [%d, %d), want error", tt.start, tt.end, tt.count, start, end)
+					t.Fatalf("clampSlidePages(%d, %d, %d) = [%d, %d), want error", tt.start, tt.end, tt.count, start, end)
 				}
 				return
 			}
 			if err != nil || start != tt.wantStart || end != tt.wantEnd {
-				t.Fatalf("slidePageRange(%d, %d, %d) = [%d, %d), %v; want [%d, %d)",
+				t.Fatalf("clampSlidePages(%d, %d, %d) = [%d, %d), %v; want [%d, %d)",
 					tt.start, tt.end, tt.count, start, end, err, tt.wantStart, tt.wantEnd)
 			}
 		})
@@ -112,12 +109,8 @@ func TestSlideV4RebaseAddresses(t *testing.T) {
 			for _, p := range pointers {
 				binary.LittleEndian.PutUint32(data[mapping.FileOffset+pageOffset+p.offset:], p.raw)
 			}
-			uuid := types.UUID{1}
-			f := &File{
-				UUID: uuid, ByteOrder: binary.LittleEndian, AddressToSymbol: NewA2STable(0),
-				r: map[types.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},
-			}
-			rebases, err := f.GetRebaseInfoForPages(uuid, mapping, tt.page, tt.page+1)
+			f := fileReading(data)
+			rebases, err := f.GetRebaseInfoForPages(f.UUID, mapping, tt.page, tt.page+1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -169,12 +162,8 @@ func TestSlideV5PointerTargets(t *testing.T) {
 			// Both pointers have the same target; only the first has a next link
 			binary.LittleEndian.PutUint64(data[0x1018:], tt.raw|1<<52)
 			binary.LittleEndian.PutUint64(data[0x1020:], tt.raw)
-			uuid := types.UUID{1}
-			f := &File{
-				UUID: uuid, ByteOrder: binary.LittleEndian, AddressToSymbol: NewA2STable(0),
-				r: map[types.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},
-			}
-			rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 1)
+			f := fileReading(data)
+			rebases, err := f.GetRebaseInfoForPages(f.UUID, mapping, 0, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -192,25 +181,6 @@ func TestSlideV5PointerTargets(t *testing.T) {
 			}
 			if got := hdr.SlidePointer(tt.raw | 0x7ff<<52); got != tt.want {
 				t.Errorf("SlidePointer() = %#x, want %#x", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSlideV5CacheOffsets(t *testing.T) {
-	for _, tt := range []struct {
-		name      string
-		raw, want uint64
-	}{
-		{name: "zero"},
-		{name: "offset bit 32", raw: 1 << 32, want: 1 << 32},
-		{name: "offset bit 33", raw: 1 << 33, want: 1 << 33},
-		{name: "regular", raw: 0x7ff<<52 | 0xa5<<34 | 0x3ffffffff, want: 0x3ffffffff},
-		{name: "authenticated", raw: 1<<63 | 0x7ff<<52 | 3<<50 | 0xbeef<<34 | 0x3ffffffff, want: 0x3ffffffff},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := CacheSlidePointer5(tt.raw).OffsetFromSharedCacheBase(); got != tt.want {
-				t.Errorf("OffsetFromSharedCacheBase() = %#x, want %#x", got, tt.want)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package dyld
 import (
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
@@ -113,9 +114,8 @@ func (f *File) GetCacheOffsetFromAddress(addr uint64) (types.UUID, uint64, error
 }
 
 // GetCacheVMAddress resolves an offset from the shared cache base to its mapped address.
-// Single-file caches have no subcache entries, so ownership is decided by the mappings:
-// the primary cache first, then each subcache in header order. The .symbols file is
-// never mapped and is not consulted.
+// Subcache offsets are ascending in the header, so the last one at or below the offset is
+// the likely owner; the mappings decide, and single-file caches have no subcache entries.
 func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
 	primary := f.Mappings[f.UUID]
 	if len(primary) == 0 {
@@ -126,24 +126,19 @@ func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
 	if address < base {
 		return types.UUID{}, 0, fmt.Errorf("cache VM offset %#x overflows base address %#x", offset, base)
 	}
-	if mappingsContain(primary, address) {
+	n := sort.Search(len(f.SubCacheInfo), func(i int) bool { return f.SubCacheInfo[i].CacheVMOffset > offset })
+	if n > 0 && f.IsAddressInCache(f.SubCacheInfo[n-1].UUID, address) {
+		return f.SubCacheInfo[n-1].UUID, address, nil
+	}
+	if f.IsAddressInCache(f.UUID, address) {
 		return f.UUID, address, nil
 	}
 	for _, sub := range f.SubCacheInfo {
-		if mappingsContain(f.Mappings[sub.UUID], address) {
+		if f.IsAddressInCache(sub.UUID, address) {
 			return sub.UUID, address, nil
 		}
 	}
 	return types.UUID{}, 0, fmt.Errorf("cache VM offset %#x (address %#x) not within any mapping", offset, address)
-}
-
-func mappingsContain(mappings cacheMappings, address uint64) bool {
-	for _, mapping := range mappings {
-		if mapping.Address <= address && address < mapping.Address+mapping.Size {
-			return true
-		}
-	}
-	return false
 }
 
 // GetMappingForOffsetForUUID returns the mapping containing a given file offset for a given cache UUID

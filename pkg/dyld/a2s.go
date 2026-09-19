@@ -261,14 +261,14 @@ func nlistSize(is64bit bool) int {
 	return 12
 }
 
-// parseNlist decodes one little-endian nlist entry of the given serialized size
-func parseNlist(b []byte, size int) types.Nlist64 {
+// parseNlist decodes exactly one little-endian nlist entry; the slice length selects the width
+func parseNlist(b []byte) types.Nlist64 {
 	var n types.Nlist64
 	n.Name = binary.LittleEndian.Uint32(b)
 	n.Type = types.NType(b[4])
 	n.Sect = b[5]
 	n.Desc = types.NDescType(binary.LittleEndian.Uint16(b[6:]))
-	if size == 16 {
+	if len(b) == 16 {
 		n.Value = binary.LittleEndian.Uint64(b[8:])
 	} else {
 		n.Value = uint64(binary.LittleEndian.Uint32(b[8:]))

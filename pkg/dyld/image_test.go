@@ -68,6 +68,17 @@ func TestNewRelativeSelectorBaseAddsSharedRegionStart(t *testing.T) {
 	}
 }
 
+// fileReading returns a one-file cache whose reader serves data
+func fileReading(data []byte) *File {
+	uuid := mtypes.UUID{1}
+	return &File{
+		UUID:            uuid,
+		ByteOrder:       binary.LittleEndian,
+		AddressToSymbol: NewA2STable(0),
+		r:               map[mtypes.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},
+	}
+}
+
 func fileWithSharedRegionStart(sharedRegionStart uint64) *File {
 	uuid := mtypes.UUID{1}
 	return &File{
@@ -125,15 +136,10 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 				strings = append(strings, 0)
 			}
 			copy(data[0x80:], strings)
-			uuid := mtypes.UUID{1}
 			hdr := CacheHeader{LocalSymbolsOffset: 1}
 			copy(hdr.Magic[:], tt.magic)
-			f := &File{
-				UUID:            uuid,
-				Headers:         map[mtypes.UUID]CacheHeader{uuid: hdr},
-				r:               map[mtypes.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},
-				AddressToSymbol: NewA2STable(0),
-			}
+			f := fileReading(data)
+			f.Headers = map[mtypes.UUID]CacheHeader{f.UUID: hdr}
 			f.LocalSymInfo.NListFileOffset = 16
 			f.LocalSymInfo.StringsFileOffset = 0x80
 			f.LocalSymInfo.StringsSize = uint32(len(strings))

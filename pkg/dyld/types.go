@@ -658,7 +658,7 @@ func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
 	if pointer.Authenticated() {
 		return i.ValueAdd + pointer.Value()
 	}
-	return i.ValueAdd + pointer.SignExtend51()
+	return i.ValueAdd + pointer.RegularTarget()
 }
 
 // CacheSlidePointer5 struct
@@ -688,9 +688,10 @@ func (i CacheSlideInfo5) SlidePointer(ptr uint64) uint64 {
 //	};
 type CacheSlidePointer5 uint64
 
-// SignExtend51 unpacks the regular v5 pointer's 34-bit cache offset and high byte
+// RegularTarget unpacks a regular (unauthenticated) v5 pointer: the 34-bit cache offset
+// with its high byte restored
 // https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/mach_o/ChainedFixups.cpp#L744-L754
-func (p CacheSlidePointer5) SignExtend51() uint64 {
+func (p CacheSlidePointer5) RegularTarget() uint64 {
 	return p.Value() | (p.High8() << 56)
 }
 
@@ -711,11 +712,6 @@ func (p CacheSlidePointer5) High8() uint64 {
 // OffsetToNextPointer returns the offset to the next chained pointer
 func (p CacheSlidePointer5) OffsetToNextPointer() uint64 {
 	return types.ExtractBits(uint64(p), 52, 11)
-}
-
-// OffsetFromSharedCacheBase returns the chained pointer's offset from the base
-func (p CacheSlidePointer5) OffsetFromSharedCacheBase() uint64 {
-	return p.Value()
 }
 
 // DiversityData returns the chained pointer's diversity data

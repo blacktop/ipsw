@@ -719,6 +719,34 @@ func (i *CacheImage) Analyze() error {
 }
 
 // ParseSlideInfo parse the shared_cache slide info corresponding to the MachO
+// SegmentRebases returns the cache rebases that land inside seg's file contents
+func (i *CacheImage) SegmentRebases(seg *macho.Segment) ([]Rebase, error) {
+	if seg.Filesz == 0 {
+		return nil, nil
+	}
+	uuid, mapping, err := i.cache.GetMappingForVMAddress(seg.Addr)
+	if err != nil {
+		return nil, err
+	}
+	if mapping.SlideInfoOffset == 0 {
+		return nil, nil
+	}
+	pageSize := uint64(i.cache.SlideInfo.GetPageSize())
+	start, end := slidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
+	rebases, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
+	if err != nil {
+		return nil, err
+	}
+	// slide pages are shared with neighboring segments
+	var inSegment []Rebase
+	for _, rebase := range rebases {
+		if seg.Addr <= rebase.CacheVMAddress && rebase.CacheVMAddress < seg.Addr+seg.Filesz {
+			inSegment = append(inSegment, rebase)
+		}
+	}
+	return inSegment, nil
+}
+
 func (i *CacheImage) ParseSlideInfo() error {
 
 	i.sinfo = make(map[uint64]uint64)
@@ -728,24 +756,11 @@ func (i *CacheImage) ParseSlideInfo() error {
 		return err
 	}
 
-	pageSize := uint64(i.cache.SlideInfo.GetPageSize())
 	for _, seg := range m.Segments() {
-		if seg.Filesz == 0 {
-			continue
-		}
-		uuid, mapping, err := i.cache.GetMappingForVMAddress(seg.Addr)
+		rs, err := i.SegmentRebases(seg)
 		if err != nil {
 			return err
 		}
-		if mapping.SlideInfoOffset == 0 {
-			continue
-		}
-		start, end := SlidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
-		rs, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
-		if err != nil {
-			return err
-		}
-
 		for _, r := range rs {
 			i.sinfo[r.Pointer.Raw()] = r.Target
 		}
@@ -972,31 +987,39 @@ func (i *CacheImage) ParseSwiftStrings() error {
 // FindLocalSymbolAtAddr searches only this image's DSC local symbol nlist entries
 // for a symbol at the given address, without populating the full a2s cache.
 // Returns the symbol name or an error if not found.
-func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
-	var uuid types.UUID
+// localNlistBuffer reads this image's entries from the cache's local-symbol nlist table
+// and returns the cache file holding them and the serialized entry size
+func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
+	uuid := i.cache.UUID
 	if i.cache.IsDyld4 {
 		uuid = i.cache.symUUID
-	} else {
-		uuid = i.cache.UUID
 	}
 	if i.cache.Headers[uuid].LocalSymbolsOffset == 0 {
-		return "", fmt.Errorf("no local symbols")
+		return uuid, nil, 0, ErrNoLocals
 	}
-	nlistCount := int(i.cache.Images[i.Index].NlistCount)
-	if nlistCount == 0 {
-		return "", fmt.Errorf("no local symbols for image")
-	}
+	count := int(i.cache.Images[i.Index].NlistCount)
 	size := nlistSize(i.cache.Is64bit())
-	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
+	offset := int64(i.cache.LocalSymInfo.NListFileOffset) +
 		int64(i.cache.Images[i.Index].NlistStartIndex)*int64(size)
-	nlistBuf := make([]byte, nlistCount*size)
-	if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
-		return "", fmt.Errorf("failed to read nlist entries: %w", err)
+	buf := make([]byte, count*size)
+	if _, err := i.cache.r[uuid].ReadAt(buf, offset); err != nil {
+		return uuid, nil, 0, fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
+	}
+	return uuid, buf, size, nil
+}
+
+func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
+	uuid, nlistBuf, size, err := i.localNlistBuffer()
+	if err != nil {
+		return "", err
+	}
+	if len(nlistBuf) == 0 {
+		return "", fmt.Errorf("no local symbols for image")
 	}
 	strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
 	strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
-	for n := range nlistCount {
-		nlist := parseNlist(nlistBuf[n*size:], size)
+	for off := 0; off < len(nlistBuf); off += size {
+		nlist := parseNlist(nlistBuf[off : off+size])
 		if nlist.Value == addr {
 			s, _, err := readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nlist.Name), nil)
 			if err != nil {
@@ -1013,31 +1036,17 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 
 	if !i.Analysis.State.IsPrivatesDone() {
 
-		var uuid types.UUID
-
-		if i.cache.IsDyld4 {
-			uuid = i.cache.symUUID
-		} else {
-			uuid = i.cache.UUID
-		}
-
-		if i.cache.Headers[uuid].LocalSymbolsOffset == 0 {
+		uuid, nlistBuf, size, err := i.localNlistBuffer()
+		if errors.Is(err, ErrNoLocals) {
 			i.Analysis.State.SetPrivates(true) // TODO: does this have any bad side-effects ?
-			return fmt.Errorf("failed to parse local syms for image %s: %w", filepath.Base(i.Name), ErrNoLocals)
+			return fmt.Errorf("failed to parse local syms for image %s: %w", filepath.Base(i.Name), err)
 		}
-
-		nlistCount := int(i.cache.Images[i.Index].NlistCount)
-		if nlistCount == 0 {
+		if err != nil {
+			return err
+		}
+		if len(nlistBuf) == 0 {
 			i.Analysis.State.SetPrivates(true)
 			return nil
-		}
-
-		size := nlistSize(i.cache.Is64bit())
-		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
-			int64(i.cache.Images[i.Index].NlistStartIndex)*int64(size)
-		nlistBuf := make([]byte, nlistCount*size)
-		if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
-			return fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
 		}
 
 		// Read strings from string pool (reuse buffer across iterations)
@@ -1049,8 +1058,8 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			readErr error
 		)
 
-		for n := range nlistCount {
-			nlist := parseNlist(nlistBuf[n*size:], size)
+		for off := 0; off < len(nlistBuf); off += size {
+			nlist := parseNlist(nlistBuf[off : off+size])
 
 			s, strBuf, readErr = readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nlist.Name), strBuf)
 			if readErr != nil {

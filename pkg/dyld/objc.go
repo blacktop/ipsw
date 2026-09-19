@@ -194,12 +194,9 @@ func (o *ObjCOptimizationHeader) RelativeMethodListsBaseAddress(base uint64) uin
 	return o.RelativeMethodSelectorBaseAddressOffset
 }
 
-// libObjCImage finds libobjc by its usual install name, falling back to a basename
-// search for caches that relocate it (ExclaveKit ships it under /System/ExclaveKit).
+// libObjCImage finds libobjc by basename since caches relocate it (ExclaveKit ships it
+// under /System/ExclaveKit); a cache with several copies is reported as ambiguous
 func (f *File) libObjCImage() (*CacheImage, error) {
-	if image, err := cacheImageByName(f, "/usr/lib/"+libObjCName); err == nil {
-		return image, nil
-	}
 	return cacheImageByName(f, libObjCName)
 }
 

@@ -46,7 +46,7 @@ var dyldExtractProfileFlags profile.ProfilingFlags
 // Keep extract profiling off until these internal perf knobs are ready for the public CLI.
 const enableDyldExtractProfiling = false
 
-func rebaseMachO(dsc *dyld.File, machoPath string) error {
+func rebaseMachO(dsc *dyld.File, image *dyld.CacheImage, machoPath string) error {
 	f, err := os.OpenFile(machoPath, os.O_RDWR, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to open exported MachO %s: %v", machoPath, err)
@@ -57,46 +57,27 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 	if err != nil {
 		return err
 	}
-	image, err := dsc.GetImageContainingTextAddr(exported.GetBaseAddress())
-	if err != nil {
-		return fmt.Errorf("failed to find cache image for %s: %v", machoPath, err)
-	}
-	// export pads segments to page size, so their VM ranges can overlap; the cache
-	// image carries the true extents
+	// Export pads segments to page size and writes those sizes back into the image's
+	// cached Mach-O, so reparse the cache image for the true extents
 	cached, err := image.GetPartialMacho()
 	if err != nil {
 		return err
 	}
 
-	pageSize := uint64(dsc.SlideInfo.GetPageSize())
 	is64bit := dsc.Is64bit()
 	for _, seg := range cached.Segments() {
-		if seg.Filesz == 0 {
-			continue
-		}
-		uuid, mapping, err := dsc.GetMappingForVMAddress(seg.Addr)
+		rebases, err := image.SegmentRebases(seg)
 		if err != nil {
 			return err
 		}
-		if mapping.SlideInfoOffset == 0 {
+		if len(rebases) == 0 {
 			continue
 		}
 		out := exported.Segment(seg.Name)
 		if out == nil || out.Addr != seg.Addr || out.Filesz < seg.Filesz {
 			return fmt.Errorf("exported segment %s does not match the cache layout", seg.Name)
 		}
-
-		start, end := dyld.SlidePagesForRange(seg.Addr-mapping.Address, seg.Filesz, pageSize)
-		rebases, err := dsc.GetRebaseInfoForPages(uuid, mapping, start, end)
-		if err != nil {
-			return err
-		}
-
 		for _, rebase := range rebases {
-			// slide pages are shared with neighboring segments
-			if rebase.CacheVMAddress < seg.Addr || rebase.CacheVMAddress >= seg.Addr+seg.Filesz {
-				continue
-			}
 			off := out.Offset + (rebase.CacheVMAddress - seg.Addr)
 			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
 				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
@@ -357,7 +338,7 @@ var dyldExtractCmd = &cobra.Command{
 				}
 				if slide {
 					log.Info("Applying DSC slide-info")
-					if err := rebaseMachO(f, fname); err != nil {
+					if err := rebaseMachO(f, image, fname); err != nil {
 						return fmt.Errorf("failed to rebase dylib via cache slide info: %v", err)
 					}
 				}
