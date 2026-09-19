@@ -12,7 +12,7 @@ import (
 )
 
 func TestPartialRelativeSelectorBaseSkipsLibObjC(t *testing.T) {
-	for _, name := range []string{"/usr/lib/libobjc.A.dylib", "/System/ExclaveKit/usr/lib/libobjc.A.dylib"} {
+	for _, name := range []string{"/usr/lib/libobjc.A.dylib", "/System/ExclaveKit/usr/lib/libobjc.A.dylib", "/System/NewKit/usr/lib/LIBOBJC.A.DYLIB"} {
 		t.Run(name, func(t *testing.T) {
 			// A nil cache detects attempts to look up selector metadata
 			img := &CacheImage{Name: name}

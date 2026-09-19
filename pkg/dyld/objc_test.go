@@ -171,3 +171,14 @@ func libObjCFixture(t *testing.T, name string) *File {
 	}}
 	return f
 }
+
+func TestLibObjCImagePrefersCanonicalPath(t *testing.T) {
+	f := &File{Images: cacheImages{
+		{Name: "/System/ExclaveKit/usr/lib/libobjc.A.dylib"},
+		{Name: "/usr/lib/libobjc.A.dylib"},
+	}}
+	image, err := f.libObjCImage()
+	if err != nil || image.Name != "/usr/lib/libobjc.A.dylib" {
+		t.Fatalf("libObjCImage() = %v, %v; want /usr/lib/libobjc.A.dylib", image, err)
+	}
+}

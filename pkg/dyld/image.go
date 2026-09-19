@@ -453,7 +453,8 @@ func (i *CacheImage) relativeSelectorBase() (uint64, error) {
 
 func (i *CacheImage) partialRelativeSelectorBase() (uint64, error) {
 	// resolving the selector base opens libobjc; never re-enter from libobjc itself
-	if filepath.Base(i.Name) == libObjCName {
+	// (matched case-insensitively, like cacheImageByName)
+	if strings.EqualFold(filepath.Base(i.Name), libObjCName) {
 		return 0, nil
 	}
 	return i.relativeSelectorBase()
