@@ -748,10 +748,13 @@ func (i *CacheImage) SegmentRebases(seg *macho.Segment) ([]Rebase, error) {
 	if !i.cache.Is64bit() {
 		pointerSize = 4
 	}
-	segEnd := seg.Addr + seg.Filesz
+	if seg.Filesz < pointerSize {
+		return nil, nil
+	}
+	lastPointer := seg.Filesz - pointerSize
 	var inSegment []Rebase
 	for _, rebase := range rebases {
-		if seg.Addr <= rebase.CacheVMAddress && rebase.CacheVMAddress+pointerSize <= segEnd {
+		if rebase.CacheVMAddress >= seg.Addr && rebase.CacheVMAddress-seg.Addr <= lastPointer {
 			inSegment = append(inSegment, rebase)
 		}
 	}
