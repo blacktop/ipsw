@@ -14,9 +14,11 @@ func output(show bool, fmtStr string, args ...any) {
 	}
 }
 
-// Is64bit returns if dyld is 64bit or not
+// Is64bit reports whether the cache uses 8-byte pointers; arm64_32 runs arm64
+// instructions with 4-byte pointers
 func (f *File) Is64bit() bool {
-	return strings.Contains(f.Headers[f.UUID].Magic.String(), "64")
+	magic := f.Headers[f.UUID].Magic.String()
+	return strings.Contains(magic, "64") && !strings.Contains(magic, "arm64_32")
 }
 
 // IsArm64 returns if dyld is arm64 or not (meaning I can disassemble it)

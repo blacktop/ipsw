@@ -69,6 +69,7 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 	}
 
 	pageSize := uint64(dsc.SlideInfo.GetPageSize())
+	is64bit := dsc.Is64bit()
 	for _, seg := range cached.Segments() {
 		if seg.Filesz == 0 {
 			continue
@@ -100,7 +101,11 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
 				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
 			}
-			if err := binary.Write(f, dsc.ByteOrder, rebase.Target); err != nil {
+			var target any = rebase.Target
+			if !is64bit {
+				target = uint32(rebase.Target)
+			}
+			if err := binary.Write(f, dsc.ByteOrder, target); err != nil {
 				return fmt.Errorf("failed to write rebase address %#x: %v", rebase.Target, err)
 			}
 		}

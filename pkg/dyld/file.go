@@ -517,11 +517,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			return err
 		}
 
-		if f.Is64bit() {
-			f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
-		} else {
-			f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
-		}
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * uint32(nlistSize(f.Is64bit()))
 		f.LocalSymInfo.NListFileOffset = uint32(f.Headers[uuid].LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
 		f.LocalSymInfo.StringsFileOffset = uint32(f.Headers[uuid].LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
 

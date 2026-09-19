@@ -833,7 +833,7 @@ func (s CacheLocalSymbol64) String(color bool) string {
 	var sec string
 	var found string
 	if s.Macho != nil {
-		if s.Sect > 0 && s.Macho.Sections != nil {
+		if s.Sect > 0 && int(s.Sect) <= len(s.Macho.Sections) {
 			sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
 		}
 	}

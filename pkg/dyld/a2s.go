@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"sort"
+
+	"github.com/blacktop/go-macho/types"
 )
 
 var a2sMagic = [4]byte{'A', '2', 'S', 2}
@@ -250,14 +252,28 @@ func (t *A2STable) Load(f *os.File, size int64) error {
 	return nil
 }
 
-// nlist64Size is the byte size of a serialized Nlist64 (Name:4 + Type:1 + Sect:1 + Desc:2 + Value:8)
-const nlist64Size = 16
+// nlistSize is the serialized size of one local-symbol nlist entry: a 4-byte string
+// index, type, section, 2-byte desc, then a 4- or 8-byte value
+func nlistSize(is64bit bool) int {
+	if is64bit {
+		return 16
+	}
+	return 12
+}
 
-// parseNlist64 parses an Nlist64 name index and value from raw little-endian bytes.
-func parseNlist64(b []byte) (name uint32, value uint64) {
-	name = binary.LittleEndian.Uint32(b)
-	value = binary.LittleEndian.Uint64(b[8:])
-	return
+// parseNlist decodes one little-endian nlist entry of the given serialized size
+func parseNlist(b []byte, size int) types.Nlist64 {
+	var n types.Nlist64
+	n.Name = binary.LittleEndian.Uint32(b)
+	n.Type = types.NType(b[4])
+	n.Sect = b[5]
+	n.Desc = types.NDescType(binary.LittleEndian.Uint16(b[6:]))
+	if size == 16 {
+		n.Value = binary.LittleEndian.Uint64(b[8:])
+	} else {
+		n.Value = uint64(binary.LittleEndian.Uint32(b[8:]))
+	}
+	return n
 }
 
 // readStringPool reads a NUL-terminated string from a string pool,

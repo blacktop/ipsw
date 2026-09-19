@@ -986,22 +986,19 @@ func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
 	if nlistCount == 0 {
 		return "", fmt.Errorf("no local symbols for image")
 	}
-	// Compute direct offset to this image's nlist entries using NlistStartIndex
+	size := nlistSize(i.cache.Is64bit())
 	nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
-		int64(i.cache.Images[i.Index].NlistStartIndex)*nlist64Size
-	// Bulk-read all nlist entries for this image
-	nlistBuf := make([]byte, nlistCount*nlist64Size)
+		int64(i.cache.Images[i.Index].NlistStartIndex)*int64(size)
+	nlistBuf := make([]byte, nlistCount*size)
 	if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
 		return "", fmt.Errorf("failed to read nlist entries: %w", err)
 	}
-	// Scan for matching address
 	strPoolBase := int64(i.cache.LocalSymInfo.StringsFileOffset)
 	strPoolSize := int64(i.cache.LocalSymInfo.StringsSize)
 	for n := range nlistCount {
-		off := n * nlist64Size
-		nameIdx, value := parseNlist64(nlistBuf[off:])
-		if value == addr {
-			s, _, err := readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nameIdx), nil)
+		nlist := parseNlist(nlistBuf[n*size:], size)
+		if nlist.Value == addr {
+			s, _, err := readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nlist.Name), nil)
 			if err != nil {
 				return "", err
 			}
@@ -1035,12 +1032,10 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			return nil
 		}
 
-		// Compute direct offset to this image's nlist entries using NlistStartIndex
+		size := nlistSize(i.cache.Is64bit())
 		nlistOffset := int64(i.cache.LocalSymInfo.NListFileOffset) +
-			int64(i.cache.Images[i.Index].NlistStartIndex)*nlist64Size
-
-		// Bulk-read all nlist entries for this image at once
-		nlistBuf := make([]byte, nlistCount*nlist64Size)
+			int64(i.cache.Images[i.Index].NlistStartIndex)*int64(size)
+		nlistBuf := make([]byte, nlistCount*size)
 		if _, err := i.cache.r[uuid].ReadAt(nlistBuf, nlistOffset); err != nil {
 			return fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
 		}
@@ -1055,23 +1050,15 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 		)
 
 		for n := range nlistCount {
-			off := n * nlist64Size
-			nameIdx, value := parseNlist64(nlistBuf[off:])
+			nlist := parseNlist(nlistBuf[n*size:], size)
 
-			s, strBuf, readErr = readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nameIdx), strBuf)
+			s, strBuf, readErr = readStringPool(i.cache.r[uuid], strPoolBase, strPoolSize, int64(nlist.Name), strBuf)
 			if readErr != nil {
 				log.Errorf("failed to read local symbol name for image %s: %v", filepath.Base(i.Name), readErr)
 				continue
 			}
 
-			nlist := types.Nlist64{}
-			nlist.Name = nameIdx
-			nlist.Type = types.NType(nlistBuf[off+4])
-			nlist.Sect = nlistBuf[off+5]
-			nlist.Desc = types.NDescType(binary.LittleEndian.Uint16(nlistBuf[off+6:]))
-			nlist.Value = value
-
-			i.cache.AddressToSymbol.Set(value, s)
+			i.cache.AddressToSymbol.Set(nlist.Value, s)
 			i.cache.Images[i.Index].LocalSymbols = append(i.cache.Images[i.Index].LocalSymbols, &CacheLocalSymbol64{
 				Name:         s,
 				Nlist64:      nlist,
