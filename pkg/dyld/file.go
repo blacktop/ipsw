@@ -417,7 +417,9 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			if m.Name == "__DATA" {
 				cm.SlideInfoOffset = f.Headers[uuid].SlideInfoOffsetUnused
 				cm.SlideInfoSize = f.Headers[uuid].SlideInfoSizeUnused
-				f.GetSlideInfo(uuid, cm)
+				if err := f.GetSlideInfo(uuid, cm); err != nil {
+					return fmt.Errorf("failed to parse slide info for %s mapping: %w", cm.Name, err)
+				}
 			}
 			f.MappingsWithSlideInfo[uuid] = append(f.MappingsWithSlideInfo[uuid], cm)
 		}
@@ -458,7 +460,9 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 
 			if cm.SlideInfoSize > 0 {
-				f.GetSlideInfo(uuid, cm)
+				if err := f.GetSlideInfo(uuid, cm); err != nil {
+					return fmt.Errorf("failed to parse slide info for %s mapping: %w", cm.Name, err)
+				}
 			}
 
 			f.MappingsWithSlideInfo[uuid] = append(f.MappingsWithSlideInfo[uuid], cm)
@@ -957,6 +961,15 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 	var symName string
 	var rebases []Rebase
 
+	setSlideInfo := func(info slideInfo) error {
+		// Validate the header before exposing its page size to range calculations
+		if info.GetPageSize() == 0 {
+			return fmt.Errorf("invalid slide info page size: 0")
+		}
+		f.SlideInfo = info
+		return nil
+	}
+
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	sr.Seek(int64(mapping.SlideInfoOffset), io.SeekStart)
@@ -981,7 +994,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 		}
 
-		f.SlideInfo = slideInfo
+		if err := setSlideInfo(slideInfo); err != nil {
+			return nil, err
+		}
 
 		if !parsePages {
 			return nil, nil
@@ -1022,7 +1037,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 		}
 
-		f.SlideInfo = slideInfo
+		if err := setSlideInfo(slideInfo); err != nil {
+			return nil, err
+		}
 
 		if !parsePages {
 			return nil, nil
@@ -1131,7 +1148,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 		}
 
-		f.SlideInfo = slideInfo
+		if err := setSlideInfo(slideInfo); err != nil {
+			return nil, err
+		}
 
 		if !parsePages {
 			return nil, nil
@@ -1230,7 +1249,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 		}
 
-		f.SlideInfo = slideInfo
+		if err := setSlideInfo(slideInfo); err != nil {
+			return nil, err
+		}
 
 		if !parsePages {
 			return nil, nil
@@ -1334,7 +1355,9 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			return nil, err
 		}
 
-		f.SlideInfo = slideInfo
+		if err := setSlideInfo(slideInfo); err != nil {
+			return nil, err
+		}
 
 		if !parsePages {
 			return nil, nil

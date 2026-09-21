@@ -373,7 +373,8 @@ func (i CacheSlideInfo) GetVersion() uint32 {
 	return i.Version
 }
 func (i CacheSlideInfo) GetPageSize() uint32 {
-	return 0
+	// v1 uses fixed 4 KiB pages; its header has no page-size field
+	return 4096
 }
 func (i CacheSlideInfo) SlidePointer(ptr uint64) uint64 {
 	return ptr // TODO: finish this
