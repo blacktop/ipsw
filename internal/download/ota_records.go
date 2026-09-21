@@ -246,15 +246,19 @@ func SortOTARecords(records []OTARecord) {
 }
 
 func compareOTARecords(a, b OTARecord) int {
-	aVersion, bVersion := OTAVersion(a.Asset), OTAVersion(b.Asset)
+	return compareOTAAssetsNewestFirst(a.Asset, b.Asset)
+}
+
+func compareOTAAssetsNewestFirst(a, b types.Asset) int {
+	aVersion, bVersion := OTAVersion(a), OTAVersion(b)
 	return cmp.Or(
-		strings.Compare(a.Asset.ProductSystemName, b.Asset.ProductSystemName),
+		strings.Compare(a.ProductSystemName, b.ProductSystemName),
 		-compareOTAVersions(aVersion, bVersion),
 		-strings.Compare(aVersion, bVersion),
-		-strings.Compare(a.Asset.Build, b.Asset.Build),
-		strings.Compare(OTADelivery(a.Asset), OTADelivery(b.Asset)),
-		strings.Compare(a.Asset.PrerequisiteBuild, b.Asset.PrerequisiteBuild),
-		strings.Compare(OTAURL(a.Asset), OTAURL(b.Asset)),
+		-strings.Compare(a.Build, b.Build),
+		strings.Compare(OTADelivery(a), OTADelivery(b)),
+		strings.Compare(a.PrerequisiteBuild, b.PrerequisiteBuild),
+		strings.Compare(OTAURL(a), OTAURL(b)),
 	)
 }
 

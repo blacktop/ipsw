@@ -328,6 +328,9 @@ var downloadOtaCmd = &cobra.Command{
 			build = "0"
 		}
 
+		// flags are valid; errors past this point are not usage errors
+		cmd.SilenceUsage = true
+
 		// Query for asset sets
 		as, err := download.GetAssetSets(proxy, insecure)
 		if err != nil {

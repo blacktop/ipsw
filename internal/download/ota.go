@@ -736,6 +736,8 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}
 
 	oassets = o.selectRequestedOTAs(oassets)
+	// Pallas responses arrive in completion order; callers read oassets[0] as the latest.
+	slices.SortStableFunc(oassets, compareOTAAssetsNewestFirst)
 
 	for _, oa := range oassets {
 		log.Debug(oa.String())
