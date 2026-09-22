@@ -19,3 +19,8 @@ func openCacheFile(name string) (io.ReaderAt, io.Closer, int64, error) {
 	}
 	return f, f, fi.Size(), nil
 }
+
+// mappedBytes always reports false: cache files are not mmap'd on this platform.
+func mappedBytes(io.ReaderAt) ([]byte, bool) {
+	return nil, false
+}

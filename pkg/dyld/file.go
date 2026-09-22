@@ -113,6 +113,11 @@ type File struct {
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
 
+	// strtabs holds, per cache file that isn't mmap'd, the one copy of the
+	// LC_SYMTAB string pool that every dylib pointing at the pool shares
+	strtabMu sync.Mutex
+	strtabs  map[mtypes.UUID]cachedStrtab
+
 	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
 	sortedImages []*CacheImage
 }
@@ -274,6 +279,9 @@ func (f *File) Close() error {
 			errs = append(errs, err)
 		}
 	}
+	f.strtabMu.Lock()
+	f.strtabs = nil
+	f.strtabMu.Unlock()
 	for uuid, closer := range f.closers {
 		delete(f.closers, uuid)
 		delete(f.r, uuid) // a lookup after Close fails as a nil reader, not a fault
@@ -2046,4 +2054,100 @@ func (f *File) HasImagePath(path string) (int, error) {
 	}
 
 	return int(imageIndex), nil
+}
+
+// cachedStrtab is a range of a cache file that isn't mmap'd, held in memory
+// because it contains the LC_SYMTAB string pool the file's dylibs share.
+type cachedStrtab struct {
+	off int64
+	buf []byte
+}
+
+// stringTableLookup implements go-macho's FileConfig.StringTableLookup for an
+// image whose __LINKEDIT lives in cache file uuid: it returns a function that
+// yields the NUL-terminated name at an offset into the shared LC_SYMTAB string
+// pool. The pool's bytes never leave this package; go-macho only ever receives
+// copied strings.
+func (f *File) stringTableLookup(uuid mtypes.UUID, off int64, size uint64) (func(uint64) string, error) {
+	tab, err := f.sharedStringTable(uuid, off, size)
+	if err != nil {
+		return nil, err
+	}
+	return func(o uint64) string {
+		// go-macho checks o < size before calling; guard anyway so a bad
+		// offset yields an empty name rather than a panic.
+		if o >= uint64(len(tab)) {
+			return ""
+		}
+		b := tab[o:]
+		if n := bytes.IndexByte(b, 0); n >= 0 {
+			b = b[:n]
+		}
+		return string(b)
+	}, nil
+}
+
+// sharedStringTable returns the bytes [off, off+size) of cache file uuid, the
+// LC_SYMTAB string table of an image whose __LINKEDIT lives there. Every dylib
+// in a cache points its symtab at the same shared pool, so rather than copying
+// it per image, the pool is sliced out of the mmap'd cache file or, where the
+// file isn't mmap'd, read from disk once per File.
+func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]byte, error) {
+	if size == 0 {
+		return []byte{}, nil
+	}
+	r, ok := f.r[uuid]
+	if !ok {
+		return nil, fmt.Errorf("no cache file with UUID %s", uuid)
+	}
+	end := off + int64(size)
+	if off < 0 {
+		return nil, fmt.Errorf("string table %#x-%#x extends past the end of the cache file", off, end)
+	}
+
+	// mmap'd cache file: hand back the mapping itself. Nothing is copied onto
+	// the heap and nothing needs releasing; the slice stays inside this package
+	// (see stringTableLookup).
+	if data, ok := mappedBytes(r); ok {
+		if end > int64(len(data)) {
+			return nil, fmt.Errorf("string table %#x-%#x extends past the end of the cache file", off, end)
+		}
+		return data[off:end:end], nil
+	}
+
+	f.strtabMu.Lock()
+	defer f.strtabMu.Unlock()
+	c, cached := f.strtabs[uuid]
+	if cached && off >= c.off && end <= c.off+int64(len(c.buf)) {
+		return c.buf[off-c.off : end-c.off : end-c.off], nil
+	}
+	// Not cached yet, or a range the cached one doesn't cover: read the union
+	// of the two, so one buffer per cache file serves every dylib's table and
+	// tables that differ slightly between dylibs don't each pin a copy.
+	readOff, readEnd := off, end
+	if cached {
+		if c.off < readOff {
+			readOff = c.off
+		}
+		if cend := c.off + int64(len(c.buf)); cend > readEnd {
+			readEnd = cend
+		}
+	}
+	// Probe the range's last byte before allocating, so a corrupt LC_SYMTAB
+	// can't make us allocate up to 4 GiB for a range the file doesn't contain.
+	// This bounds against the reader itself, so it holds for any File, not
+	// just one built by Open.
+	var last [1]byte
+	if n, _ := r.ReadAt(last[:], readEnd-1); n != 1 {
+		return nil, fmt.Errorf("string table %#x-%#x extends past the end of the cache file", off, end)
+	}
+	buf := make([]byte, readEnd-readOff)
+	if n, err := r.ReadAt(buf, readOff); err != nil && !(errors.Is(err, io.EOF) && n == len(buf)) {
+		return nil, fmt.Errorf("failed to read string table at %#x: %w", readOff, err)
+	}
+	if f.strtabs == nil {
+		f.strtabs = make(map[mtypes.UUID]cachedStrtab)
+	}
+	f.strtabs[uuid] = cachedStrtab{off: readOff, buf: buf}
+	return buf[off-readOff : end-readOff : end-readOff], nil
 }

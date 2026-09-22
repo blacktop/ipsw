@@ -45,3 +45,12 @@ func openCacheFile(name string) (io.ReaderAt, io.Closer, int64, error) {
 	mr := &mmapReaderAt{data: data}
 	return mr, mr, size, nil
 }
+
+// mappedBytes returns the mapping behind r when r is an mmap'd cache file.
+func mappedBytes(r io.ReaderAt) ([]byte, bool) {
+	mr, ok := r.(*mmapReaderAt)
+	if !ok {
+		return nil, false
+	}
+	return mr.data, true
+}
